@@ -318,6 +318,10 @@ public class InterpIOSLinker implements InterpLinker {
                 kind == K_OBJECT ? value : null);
     }
 
+    public boolean hasMethod(String owner, String name, String descriptor) {
+        return symbols.methodId(owner, name, descriptor) >= 0;
+    }
+
     public boolean isInstance(Object hostClass, Object value) {
         int id = idOf(hostClass);
         return id >= 0 && InterpIOSNative.isInstanceOfId(id, value);

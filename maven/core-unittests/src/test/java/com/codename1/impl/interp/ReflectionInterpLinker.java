@@ -294,6 +294,14 @@ public class ReflectionInterpLinker implements InterpLinker {
         }
     }
 
+    public boolean hasMethod(String owner, String name, String descriptor) {
+        try {
+            return lookupMethod(owner, name, descriptor) != null;
+        } catch (Throwable absent) {
+            return false;
+        }
+    }
+
     public Object invokeStatic(String owner, String name, String descriptor, Object[] args)
             throws Throwable {
         Method m = lookupMethod(owner, name, descriptor);

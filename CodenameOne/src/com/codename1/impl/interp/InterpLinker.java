@@ -82,6 +82,17 @@ public interface InterpLinker {
     Object invokeSpecial(Object target, String owner, String name, String descriptor,
                          Object[] args) throws Throwable;
 
+    /// Whether the host has this instance method, without calling it.
+    ///
+    /// Asked before a `super.` call: a generated shim provides `super_paint`
+    /// only for methods it could override, and a *final* host method has no
+    /// such bridge -- yet `super.play()` on a final method is ordinary Java.
+    /// Knowing beforehand is what lets the interpreter call the method itself
+    /// in that case rather than fail on a bridge that was never meant to exist.
+    /// A platform that cannot tell may answer false, which is the behaviour
+    /// before the question was asked.
+    boolean hasMethod(String owner, String name, String descriptor);
+
     /// Invokes a host static method.
     Object invokeStatic(String owner, String name, String descriptor, Object[] args)
             throws Throwable;

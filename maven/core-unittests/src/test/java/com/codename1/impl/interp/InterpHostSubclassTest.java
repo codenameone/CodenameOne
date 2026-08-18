@@ -85,6 +85,16 @@ public class InterpHostSubclassTest {
         public String describe() {
             return "[" + render() + "]";
         }
+
+        /**
+         * Final, so a generated shim can neither override it nor bridge it --
+         * the generator skips final methods, since neither is possible. A
+         * pushed subclass may still write {@code super.stamp()}, and that is
+         * ordinary Java rather than a mistake.
+         */
+        public final String stamp() {
+            return "stamp:" + tag;
+        }
     }
 
     /** Stands in for a generated shim, written exactly as the generator emits one. */
@@ -182,6 +192,37 @@ public class InterpHostSubclassTest {
         factory.attach(rt);
         rt.setEdtBudgetMs(0);
         return rt;
+    }
+
+    private static final String FINAL_SUPER_SOURCE =
+            "public class SubFinal extends com.codename1.impl.interp.InterpHostSubclassTest.HostBase {\n"
+          + "  public SubFinal() { super(\"pushed\"); }\n"
+          + "  private String superStamp() { return super.stamp(); }\n"
+          + "  public static String viaSuper() { return new SubFinal().superStamp(); }\n"
+          + "  public static String viaPlain() { return new SubFinal().stamp(); }\n"
+          + "  public static void main(String[] a) {}\n"
+          + "}\n";
+
+    /**
+     * {@code super.} on a *final* host method has no bridge to call, because
+     * the shim generator skips what it cannot override. Insisting on
+     * {@code super_stamp} anyway reported a missing method for a program that
+     * is perfectly legal Java; with nothing overriding the method, calling it
+     * directly is exactly what the super call means.
+     */
+    @Test
+    @DisplayName("super. on a final host method calls it directly")
+    void superCallOnAFinalMethodNeedsNoBridge() throws Throwable {
+        InterpRuntime rt = load("SubFinal", FINAL_SUPER_SOURCE);
+        InterpClass c = rt.getBundle().findClass("SubFinal");
+        assertEquals("stamp:pushed",
+                rt.invoke(c.declaredMethod("viaSuper", "()Ljava/lang/String;"),
+                        null, new Object[0]));
+        // The same value without `super.`, so the assertion above is about the
+        // route rather than about what stamp() returns.
+        assertEquals("stamp:pushed",
+                rt.invoke(c.declaredMethod("viaPlain", "()Ljava/lang/String;"),
+                        null, new Object[0]));
     }
 
     private static final String SUBCLASS_SOURCE =

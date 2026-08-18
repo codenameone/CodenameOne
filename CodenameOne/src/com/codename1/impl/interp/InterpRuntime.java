@@ -1827,8 +1827,19 @@ public final class InterpRuntime {
                     // to provide `super_paint` as the way out; that bridge is
                     // the only thing that can reach the framework implementation
                     // from here.
-                    pushBoxed(f, returnKind,
-                            hostCall(peerOwner, "super_" + name, desc, io.hostPeer, args, false));
+                    //
+                    // Unless there is no bridge, which is not an error: a shim
+                    // overrides only what it can, so a *final* host method has
+                    // none -- and `super.play()` on a final method is ordinary
+                    // Java. With nothing overriding it, calling the method
+                    // itself is what the super call means, and cannot recurse.
+                    if (linker.hasMethod(peerOwner, "super_" + name, desc)) {
+                        pushBoxed(f, returnKind, hostCall(peerOwner, "super_" + name, desc,
+                                io.hostPeer, args, false));
+                    } else {
+                        pushBoxed(f, returnKind,
+                                hostCall(owner, name, desc, io.hostPeer, args, true));
+                    }
                     return;
                 }
                 pushBoxed(f, returnKind,

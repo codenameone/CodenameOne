@@ -307,6 +307,18 @@ public class InterpAndroidLinker implements InterpLinker {
         }
     }
 
+    public boolean hasMethod(String owner, String name, String descriptor) {
+        try {
+            // The call is the question; lookupMethod either answers or throws.
+            lookupMethod(owner, name, descriptor);
+            return true;
+        } catch (ClassNotFoundException absent) {
+            return false;
+        } catch (NoSuchMethodException absent) {
+            return false;
+        }
+    }
+
     public Object invokeStatic(String owner, String name, String descriptor, Object[] args)
             throws Throwable {
         Method m = lookupMethod(owner, name, descriptor);

@@ -255,8 +255,14 @@ class InterpIOSSymbols {
      */
     int methodId(String owner, String name, String descriptor) {
         String currentOwner = owner;
-        int guard = 0;
-        while (currentOwner != null && guard++ < 64) {
+        // Bounded by what has been seen, not by a count: a superclass chain is
+        // finite and a table that somehow named a class as its own ancestor is
+        // the only way this could not end. A number would instead stop looking
+        // partway up a hierarchy that is merely deep, and answer "no such
+        // method" for a method the app has.
+        Hashtable seen = new Hashtable();
+        while (currentOwner != null && seen.get(currentOwner) == null) {
+            seen.put(currentOwner, Boolean.TRUE);
             Integer id = (Integer)methodIds.get(currentOwner + "." + name + descriptor);
             if (id != null) {
                 return id.intValue();
@@ -335,8 +341,10 @@ class InterpIOSSymbols {
 
     private int lookupField(Hashtable table, String owner, String name) {
         String currentOwner = owner;
-        int guard = 0;
-        while (currentOwner != null && guard++ < 64) {
+        // See methodId: the walk ends because the chain does, not at a count.
+        Hashtable seen = new Hashtable();
+        while (currentOwner != null && seen.get(currentOwner) == null) {
+            seen.put(currentOwner, Boolean.TRUE);
             Integer id = (Integer)table.get(currentOwner + "#" + name);
             if (id != null) {
                 return id.intValue();
