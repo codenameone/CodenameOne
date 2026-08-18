@@ -151,7 +151,9 @@ const setText = await page.evaluate(() => {
   const boxes = Array.from(tree.querySelectorAll('[role="textbox"],[role="searchbox"]'));
   if (boxes.length === 0) return { fields: 0 };
   const ids = boxes.map(b => b.getAttribute('id')).filter(Boolean);
-  const inputs = actions ? Array.from(actions.querySelectorAll('input')) : [];
+  // A multiline field's control is a textarea, not an input -- looking only for inputs would
+  // report a screen of TextAreas as having no way to set text.
+  const inputs = actions ? Array.from(actions.querySelectorAll('input,textarea')) : [];
   const wired = inputs.filter(i => ids.includes(i.getAttribute('aria-controls')));
   return { fields: boxes.length, inputs: inputs.length, wired: wired.length };
 });
