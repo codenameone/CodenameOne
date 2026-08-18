@@ -99,13 +99,31 @@ extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
     }
 }
 
+#if TARGET_OS_MACCATALYST
+/*
+ * The window id of a Codename One window's scene, or -1 for the application's own
+ * scene. Every scene lifecycle callback has to ask this before running the global
+ * application path: a Codename One window is one window of the application, not the
+ * application, so treating its scene as the app's suspends everything -- including
+ * the still-visible main window -- and a disconnected scene never comes back to undo
+ * it. Shared rather than repeated, because two of these callbacks were missing the
+ * check while the other two had it.
+ */
+static int cn1MacCodenameOneWindowScene(UIScene *scene) {
+    if ([scene isKindOfClass:[UIWindowScene class]]) {
+        return CN1MacWindowIdForScene((UIWindowScene *)scene);
+    }
+    return -1;
+}
+#endif
+
 - (void)sceneDidBecomeActive:(UIScene *)scene API_AVAILABLE(ios(13.0))
 {
 #if TARGET_OS_MACCATALYST
     // A Codename One window's scene: report the focus rather than treating it as the
     // application becoming active, which would run the main form's resume path.
-    if ([scene isKindOfClass:[UIWindowScene class]]) {
-        int windowId = CN1MacWindowIdForScene((UIWindowScene *)scene);
+    {
+        int windowId = cn1MacCodenameOneWindowScene(scene);
         if (windowId >= 0) {
             CN1MacWindowDeliverFocus(windowId, YES);
             return;
@@ -119,8 +137,8 @@ extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 - (void)sceneWillResignActive:(UIScene *)scene API_AVAILABLE(ios(13.0))
 {
 #if TARGET_OS_MACCATALYST
-    if ([scene isKindOfClass:[UIWindowScene class]]) {
-        int windowId = CN1MacWindowIdForScene((UIWindowScene *)scene);
+    {
+        int windowId = cn1MacCodenameOneWindowScene(scene);
         if (windowId >= 0) {
             CN1MacWindowDeliverFocus(windowId, NO);
             return;
@@ -145,12 +163,30 @@ extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 
 - (void)sceneWillEnterForeground:(UIScene *)scene API_AVAILABLE(ios(13.0))
 {
+#if TARGET_OS_MACCATALYST
+    // A Codename One window coming back from minimized is not the application
+    // returning to the foreground; running the global resume path here would
+    // resume an application that was never suspended.
+    if (cn1MacCodenameOneWindowScene(scene) >= 0) {
+        return;
+    }
+#endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationWillEnterForeground];
 }
 
 - (void)sceneDidEnterBackground:(UIScene *)scene API_AVAILABLE(ios(13.0))
 {
+#if TARGET_OS_MACCATALYST
+    // Minimizing or closing one Codename One window is not the application going to
+    // the background. The global path sets isAppSuspended, stops the garbage
+    // collector and notifies the application of suspension -- and if this scene is
+    // then disconnected it never enters the foreground again to undo any of it,
+    // leaving the still-visible main window suspended for good.
+    if (cn1MacCodenameOneWindowScene(scene) >= 0) {
+        return;
+    }
+#endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationDidEnterBackground];
 }

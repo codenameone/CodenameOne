@@ -1064,24 +1064,50 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_monitorDpi___int_R_int(
 }
 
 
+/* Recomputed on the GTK thread rather than answered from w->monitorIndex. That
+ * cached ordinal is only refreshed by configure-event, and a monitor added or
+ * removed elsewhere on the desktop renumbers GDK's list without moving this window
+ * -- so the cache kept pointing at whatever now occupies that index, and the window
+ * reported another display's bounds, scale and DPI indefinitely. */
+static void cn1MonitorForWindowOnMain(void* arg) {
+    CN1MonitorOp* op = (CN1MonitorOp*) arg;
+    CN1LinuxWindow* w = slotAt(op->monitor);
+    if (w == 0 || w->window == 0) {
+        op->result = 0;
+        return;
+    }
+    op->result = cn1DesktopMonitorIndexFor(w->window);
+    /* Kept in step so the change notification the configure path sends still
+     * compares against something current. */
+    w->monitorIndex = op->result;
+}
+
 JAVA_INT com_codename1_impl_linux_LinuxNative_monitorForWindow___int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot) {
-    CN1LinuxWindow* w = slotAt(slot);
-    if (w == 0) {
-        return 0;
-    }
-    return w->monitorIndex;
+    CN1MonitorOp op;
+    memset(&op, 0, sizeof(op));
+    op.monitor = slot;
+    cn1LinuxRunOnMainAndWait(cn1MonitorForWindowOnMain, &op);
+    return op.result;
 }
 
 /* The application's main window has no desktop-window slot, so its monitor cannot
  * be asked for through monitorForWindow. Without this, everything positioned
  * against the main form reported monitor 0 even after the application had been
  * dragged to a second display. */
+static void cn1MonitorForMainWindowOnMain(void* arg) {
+    CN1MonitorOp* op = (CN1MonitorOp*) arg;
+    GtkWidget* main = cn1LinuxWindowWidget();
+    op->result = main == 0 ? 0 : cn1DesktopMonitorIndexFor(main);
+}
+
 JAVA_INT com_codename1_impl_linux_LinuxNative_monitorForMainWindow___R_int(
         CODENAME_ONE_THREAD_STATE) {
-    GtkWidget* main = cn1LinuxWindowWidget();
-    if (main == 0) {
-        return 0;
-    }
-    return cn1DesktopMonitorIndexFor(main);
+    /* Marshalled like every other monitor native. Calling GDK straight from the
+     * event dispatch thread, which is what this did when I added it, is exactly the
+     * thread-safety violation the rest of this file goes out of its way to avoid. */
+    CN1MonitorOp op;
+    memset(&op, 0, sizeof(op));
+    cn1LinuxRunOnMainAndWait(cn1MonitorForMainWindowOnMain, &op);
+    return op.result;
 }
