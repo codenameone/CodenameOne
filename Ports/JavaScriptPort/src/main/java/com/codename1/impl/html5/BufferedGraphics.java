@@ -766,11 +766,68 @@ public class BufferedGraphics extends HTML5Graphics {
             maxX = Math.max(maxX, out[0]);
             maxY = Math.max(maxY, out[1]);
         }
-        // The outline test belongs to untransformed coordinates, so it is dropped here rather
-        // than asked the wrong question: what remains is the projected bounding box, which is
-        // what the draw is known to be inside.
+        // The outline test belongs to untransformed coordinates, so the text is brought to it
+        // rather than the test being dropped: the projected bounding box of a rotated bar is
+        // mostly empty, and reporting all of it detaches text the bar never crossed -- for good,
+        // since a detached component stays on the canvas.
+        Transform inverse = null;
+        try {
+            inverse = getInverseTransform();
+        } catch (Throwable ignored) {
+            // A transform with no inverse -- degenerate, or one the platform will not invert --
+            // leaves the projected bounding box as the whole answer.
+        }
         layer.noteCanvasCover((int) Math.floor(minX), (int) Math.floor(minY),
-                (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY), null);
+                (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY),
+                unprojected(test, inverse));
+    }
+
+    /**
+     * Reads a coverage test written in untransformed coordinates from the transformed side.
+     *
+     * <p>The rectangle the layer asks about is where the text is on screen, while the outline is
+     * where the draw was asked for, so the rectangle is carried back through the transform
+     * before the outline is asked about it. Its four corners can land as a rotated quadrilateral,
+     * and the enclosing rectangle of that is what the outline is tested against -- wider than
+     * the text, which keeps the answer on the side of saying the draw reached it.</p>
+     *
+     * @param test the test in untransformed coordinates, or null if there is none
+     * @param inverse the transform back from screen coordinates, or null if it has none
+     * @return a test in screen coordinates, or null when it cannot be built
+     */
+    private static JavaScriptTextLayer.CoverTest unprojected(
+            final JavaScriptTextLayer.CoverTest test, final Transform inverse) {
+        if (test == null || inverse == null) {
+            return null;
+        }
+        return new JavaScriptTextLayer.CoverTest() {
+            @Override
+            public boolean covers(int x, int y, int w, int h) {
+                float minX = Float.MAX_VALUE;
+                float minY = Float.MAX_VALUE;
+                float maxX = -Float.MAX_VALUE;
+                float maxY = -Float.MAX_VALUE;
+                float[] corner = new float[2];
+                float[] out = new float[2];
+                for (int i = 0; i < 4; i++) {
+                    corner[0] = (i == 0 || i == 3) ? x : x + w;
+                    corner[1] = (i < 2) ? y : y + h;
+                    try {
+                        inverse.transformPoint(corner, out);
+                    } catch (Throwable ignored) {
+                        // Nothing to go by, so the draw is treated as reaching the text: a run
+                        // left above a draw that covered it is the error that shows on screen.
+                        return true;
+                    }
+                    minX = Math.min(minX, out[0]);
+                    minY = Math.min(minY, out[1]);
+                    maxX = Math.max(maxX, out[0]);
+                    maxY = Math.max(maxY, out[1]);
+                }
+                return test.covers((int) Math.floor(minX), (int) Math.floor(minY),
+                        (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY));
+            }
+        };
     }
 
 
