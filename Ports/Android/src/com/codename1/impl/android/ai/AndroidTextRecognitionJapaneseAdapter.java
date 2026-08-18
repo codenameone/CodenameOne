@@ -20,26 +20,19 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai.vision;
+package com.codename1.impl.android.ai;
 
-/// Creates reusable on-device OCR analyzers. The default recognizes the Latin
-/// script; select {@link VisionOptions#textScript(TextScript)} to read Chinese,
-/// Devanagari, Japanese or Korean text.
-public final class TextRecognizer extends AbstractVisionAnalyzer<TextRecognitionResult> {
-    /// Creates an analyzer using the platform default backend and options,
-    /// reading the Latin script.
-    /// @see VisionOptions
-    public TextRecognizer() {
-        this(null);
-    }
+import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions;
 
-    /// Creates a reusable analyzer with explicit backend and result options.
-    /// The writing system comes from
-    /// {@link VisionOptions#textScript(TextScript)}.
-    ///
-    /// @param options configuration captured by this analyzer; {@code null}
-    ///        uses defaults
-    public TextRecognizer(VisionOptions options) {
-        super(VisionFeature.TEXT_RECOGNITION, options);
+/**
+ * ML Kit Japanese text recognition, covering kanji, hiragana and katakana.
+ * Kept in its own source file so the text-recognition-japanese ML Kit
+ * dependency is packaged only for an application that selects {@code
+ * TextScript.japanese()}.
+ */
+final class AndroidTextRecognitionJapaneseAdapter
+        extends AndroidTextRecognitionAdapter {
+    AndroidTextRecognitionJapaneseAdapter() {
+        super(new JapaneseTextRecognizerOptions.Builder().build());
     }
 }

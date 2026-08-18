@@ -30,6 +30,7 @@ import com.codename1.ai.language.LanguageBackends;
 import com.codename1.ai.language.LanguageOptions;
 import com.codename1.ai.language.Translator;
 import com.codename1.ai.vision.TextRecognizer;
+import com.codename1.ai.vision.TextScript;
 import com.codename1.ai.vision.VisionBackends;
 import com.codename1.ai.vision.VisionImage;
 import com.codename1.ai.vision.VisionOptions;
@@ -50,6 +51,17 @@ class AiAndSpeechOnDeviceSnippet {
                 .ready(result -> Log.p(result.getText()))
                 .except(error -> Log.e(error));
         // end::ai-and-speech-on-device-vision[]
+    }
+
+    void visionScript() {
+        // tag::ai-and-speech-on-device-vision-script[]
+        TextRecognizer recognizer = new TextRecognizer(new VisionOptions()
+                .textScript(TextScript.japanese()));
+
+        recognizer.process(VisionImage.encoded(jpegBytes))
+                .ready(result -> Log.p(result.getText()))
+                .except(error -> Log.e(error));
+        // end::ai-and-speech-on-device-vision-script[]
     }
 
     void inference() {

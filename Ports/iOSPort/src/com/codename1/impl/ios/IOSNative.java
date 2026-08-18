@@ -543,7 +543,7 @@ public final class IOSNative {
     native boolean cn1VisionIsSupported(int feature, boolean mlKit);
     native String cn1VisionAnalyze(byte[] imageData, int feature, boolean mlKit,
                                    int rotationDegrees, int width, int height,
-                                   int frameFormat);
+                                   int frameFormat, String textScript);
     native boolean cn1LanguageIsSupported(int feature, boolean mlKit);
     native String cn1LanguageIdentify(String text, float minimumConfidence,
                                       boolean mlKit);

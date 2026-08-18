@@ -2041,6 +2041,11 @@ public class AndroidGradleBuilder extends Executor {
                     // dependencies and plist entries for every feature,
                     // health included, and is indifferent to what follows.
                     aiAcc.consumeMethod(cls, method);
+                    String scriptAdapter =
+                            androidTextScriptAdapterSource(cls, method);
+                    if (scriptAdapter != null) {
+                        includedAiAdapterSources.add(scriptAdapter);
+                    }
                     // A store method reached through a passed-in HealthStore
                     // never names Health at all, so the facade hook below
                     // cannot see it -- and without this the build skipped the
@@ -6504,6 +6509,10 @@ public class AndroidGradleBuilder extends Executor {
                 "com/codename1/impl/android/ai");
         String[] vision = {
             "AndroidTextRecognitionAdapter.java",
+            "AndroidTextRecognitionChineseAdapter.java",
+            "AndroidTextRecognitionDevanagariAdapter.java",
+            "AndroidTextRecognitionJapaneseAdapter.java",
+            "AndroidTextRecognitionKoreanAdapter.java",
             "AndroidBarcodeScanningAdapter.java",
             "AndroidFaceDetectionAdapter.java",
             "AndroidImageLabelingAdapter.java",
@@ -6572,6 +6581,37 @@ public class AndroidGradleBuilder extends Executor {
         // DocumentScanner is Apple-only. Returning null intentionally prunes
         // the Android vision backend for an app that references only it; the
         // public API then reports UNSUPPORTED without a native dependency.
+        return null;
+    }
+
+    /**
+     * Maps a {@code TextScript} selector call to the adapter source that owns
+     * that ML Kit script model. ML Kit ships one artifact per script, so unlike
+     * the feature adapters these are keyed on the selector method rather than a
+     * class: {@code TextRecognizer} alone says nothing about which scripts the
+     * application reads. Latin is the built-in default and has no separate
+     * source.
+     *
+     * @param cls internal-form owner of the referenced method
+     * @param method referenced method name
+     * @return the adapter source file to retain, or {@code null}
+     */
+    static String androidTextScriptAdapterSource(String cls, String method) {
+        if (!"com/codename1/ai/vision/TextScript".equals(cls)) {
+            return null;
+        }
+        if ("chinese".equals(method)) {
+            return "AndroidTextRecognitionChineseAdapter.java";
+        }
+        if ("devanagari".equals(method)) {
+            return "AndroidTextRecognitionDevanagariAdapter.java";
+        }
+        if ("japanese".equals(method)) {
+            return "AndroidTextRecognitionJapaneseAdapter.java";
+        }
+        if ("korean".equals(method)) {
+            return "AndroidTextRecognitionKoreanAdapter.java";
+        }
         return null;
     }
 

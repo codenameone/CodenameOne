@@ -29,11 +29,23 @@ public final class VisionOptions {
     private VisionBackend backend = VisionBackends.auto();
     private float minimumConfidence;
     private int maximumResults;
+    private TextScript textScript;
 
     /// @param value selector, or {@code null} to restore automatic selection
     /// @return this options object
     public VisionOptions backend(VisionBackend value) {
         backend = value == null ? VisionBackends.auto() : value;
+        return this;
+    }
+
+    /// Selects the writing system {@link TextRecognizer} should read. Analyzers
+    /// other than the text recognizer ignore it.
+    ///
+    /// @param value script selector, or {@code null} for the platform default
+    ///        (Latin)
+    /// @return this options object
+    public VisionOptions textScript(TextScript value) {
+        textScript = value;
         return this;
     }
 
@@ -74,9 +86,16 @@ public final class VisionOptions {
         return maximumResults;
     }
 
+    /// @return the selected writing system, or {@code null} for the platform
+    ///         default
+    public TextScript getTextScript() {
+        return textScript;
+    }
+
     VisionOptions snapshot() {
         return new VisionOptions().backend(backend)
                 .minimumConfidence(minimumConfidence)
-                .maximumResults(maximumResults);
+                .maximumResults(maximumResults)
+                .textScript(textScript);
     }
 }
