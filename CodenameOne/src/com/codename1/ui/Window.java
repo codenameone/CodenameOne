@@ -29,6 +29,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -632,14 +633,82 @@ public class Window extends Container implements TopLevelContainer {
         if (this.focused == focused) { //NOPMD CompareObjectsWithEquals
             return;
         }
-        Component old = this.focused;
-        setFocusedInternal(focused);
-        if (old != null) {
-            old.repaint();
+        Component oldFocus = this.focused;
+        this.focused = focused;
+        boolean triggerRevalidate = false;
+        if (oldFocus != null) {
+            triggerRevalidate = changeFocusState(oldFocus, false);
+            // No repaint when a revalidate is coming: the window repaints it.
+            if (!triggerRevalidate && oldFocus.getParent() != null) {
+                oldFocus.repaint();
+            }
         }
-        if (focused != null) {
-            focused.repaint();
+        // A listener may change focus again from inside the notification, which must
+        // not be undone here.
+        if (focused != null && this.focused == focused) { //NOPMD CompareObjectsWithEquals
+            triggerRevalidate = changeFocusState(focused, true) || triggerRevalidate;
+            if (!triggerRevalidate) {
+                focused.repaint();
+            }
         }
+        if (triggerRevalidate) {
+            revalidateLater();
+        }
+    }
+
+    /// Runs the full focus lifecycle for a component, the same way `Form` does.
+    ///
+    /// Toggling the focus flag and repainting is not enough: the notifications are
+    /// what components build their behaviour on. `TextArea.focusGainedInternal()`
+    /// enables its input handling there, so without this an arrow key traversed away
+    /// from a text field in a window instead of moving the caret inside it.
+    ///
+    /// Returns true when the selected and unselected styles differ enough to change
+    /// the preferred size, so the caller revalidates instead of repainting.
+    private boolean changeFocusState(Component cmp, boolean gained) {
+        boolean trigger = false;
+        Style selected = cmp.getSelectedStyle();
+        Style unselected = cmp.getUnselectedStyle();
+        // Different selected styling is a good hint the preferred size moves with it.
+        if (!selected.getFont().equals(unselected.getFont())
+                || selected.getPaddingTop() != unselected.getPaddingTop()
+                || selected.getPaddingBottom() != unselected.getPaddingBottom()
+                || selected.getPaddingRight(isRTL()) != unselected.getPaddingRight(isRTL())
+                || selected.getPaddingLeft(isRTL()) != unselected.getPaddingLeft(isRTL())
+                || selected.getMarginTop() != unselected.getMarginTop()
+                || selected.getMarginBottom() != unselected.getMarginBottom()
+                || selected.getMarginRight(isRTL()) != unselected.getMarginRight(isRTL())
+                || selected.getMarginLeft(isRTL()) != unselected.getMarginLeft(isRTL())) {
+            trigger = true;
+        }
+        int prefW = 0;
+        int prefH = 0;
+        if (trigger) {
+            Dimension d = cmp.getPreferredSize();
+            prefW = d.getWidth();
+            prefH = d.getHeight();
+        }
+
+        if (gained) {
+            cmp.setFocus(true);
+            cmp.fireFocusGained();
+        } else {
+            cmp.setFocus(false);
+            cmp.fireFocusLost();
+        }
+
+        // The styles can differ without the preferred size actually moving, so only
+        // revalidate when it really did.
+        if (trigger) {
+            cmp.setShouldCalcPreferredSize(true);
+            Dimension d = cmp.getPreferredSize();
+            if (prefW != d.getWidth() || prefH != d.getHeight()) {
+                cmp.setShouldCalcPreferredSize(false);
+                trigger = false;
+            }
+        }
+
+        return trigger;
     }
 
     /// {@inheritDoc}
@@ -1970,6 +2039,26 @@ public class Window extends Container implements TopLevelContainer {
                 componentsAwaitingRelease = null;
                 LeadUtil.dragInitiated(pendingC);
             }
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// `Component`'s implementation only fires listeners attached to this window, so
+    /// without this a long press on a button inside a window reached nothing --
+    /// neither the component nor its context menu.
+    @Override
+    public void longPointerPress(int x, int y) {
+        // A long press is the touch equivalent of a right click, so it is a context
+        // menu request first, exactly as on a Form.
+        Component ctxCmp = resolveComponentAt(x, y);
+        if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
+            return;
+        }
+        Component target = pressedCmp != null ? pressedCmp : focused;
+        if (target != null && target.contains(x, y)
+                && target.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
+            LeadUtil.longPointerPress(target, x, y);
         }
     }
 

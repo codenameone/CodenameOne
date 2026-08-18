@@ -1071,6 +1071,83 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void focusChangesInAWindowRunTheFocusLifecycle() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("focus", new BorderLayout());
+        final FocusCountingComponent a = new FocusCountingComponent();
+        final FocusCountingComponent b = new FocusCountingComponent();
+        Container box = new Container(new BorderLayout());
+        box.add(BorderLayout.NORTH, a);
+        box.add(BorderLayout.SOUTH, b);
+        w.add(BorderLayout.CENTER, box);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Toggling the focus flag and repainting is not the same as running the
+        // lifecycle: components build real behaviour on these notifications --
+        // TextArea enables its input handling in focusGainedInternal -- so without
+        // them an arrow key traversed away from a field instead of moving its caret.
+        w.setFocused(a);
+        w.setFocused(b);
+        int aGained = a.gained;
+        int aLost = a.lost;
+        int bGained = b.gained;
+        w.dispose();
+
+        assertEquals(1, aGained, "the first component must be told it gained focus");
+        assertEquals(1, aLost, "and told when it loses it");
+        assertEquals(1, bGained, "and the second must be told it gained it");
+    }
+
+    /// Counts the focus notifications it receives.
+    private static final class FocusCountingComponent extends Component {
+        private int gained;
+        private int lost;
+
+        @Override
+        public boolean isFocusable() {
+            return true;
+        }
+
+        @Override
+        public void fireFocusGained() {
+            super.fireFocusGained();
+            gained++;
+        }
+
+        @Override
+        public void fireFocusLost() {
+            super.fireFocusLost();
+            lost++;
+        }
+    }
+
+    @FormTest
+    void aLongPressInAWindowReachesThePressedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("long press", new BorderLayout());
+        final int[] longPresses = new int[1];
+        Button b = new Button("hold me") {
+            @Override
+            public void longPointerPress(int x, int y) {
+                longPresses[0]++;
+            }
+        };
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        w.longPointerPress(150, 120);
+        int count = longPresses[0];
+        w.dispose();
+
+        assertEquals(1, count,
+                "Component's implementation only fires the window's own listeners, so "
+                        + "a long press reached nothing inside a window");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
