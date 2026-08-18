@@ -107,6 +107,11 @@ public class Window extends Container implements TopLevelContainer {
     /// hidden: it is still open, and still modal if it was.
     private boolean iconified;
 
+    /// Vibration length for a tactile touch, in milliseconds; -1 until read from the
+    /// look and feel, the same value `Form` uses so a window feels like the rest of
+    /// the application.
+    private int tactileTouchDuration = -1;
+
     private final Container contentPane;
     private final Container titleArea = new Container(new BorderLayout());
     private final Label title = new Label("", "Title");
@@ -1813,7 +1818,13 @@ public class Window extends Container implements TopLevelContainer {
             super.repaint(cmp);
             return;
         }
-        if (isVisible() && paintSurface != null) {
+        // nativeVisible as well as isVisible(): a minimized window keeps its
+        // hierarchy visible on purpose, so a model update or explicit repaint would
+        // otherwise queue paint work that can never drain -- paintOpenWindows skips
+        // a window that is not showing while hasPendingPaints() still counts its
+        // queue, which spins the event dispatch thread until the window is restored.
+        // Nothing is lost: showNotify repaints in full on restore.
+        if (isVisible() && nativeVisible && paintSurface != null) {
             Display.impl.repaintWindow(paintSurface, cmp);
         }
     }
@@ -1960,6 +1971,19 @@ public class Window extends Container implements TopLevelContainer {
                 return;
             }
         }
+        // Surfaced at the top level so addStylusListener fires regardless of which
+        // component is under the pen, exactly as Form does it.
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveComponentAt(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerPressed, x, y);
+            }
+        }
+        // A press dismisses any tooltip so it cannot linger over a drag image or be
+        // stranded when the gesture rebuilds the UI, as on a Form.
+        if (TooltipManager.getInstance() != null) {
+            TooltipManager.getInstance().clearTooltip();
+        }
         initialPressX = x;
         initialPressY = y;
         currentPointerPress = new Object();
@@ -1972,6 +1996,13 @@ public class Window extends Container implements TopLevelContainer {
         // firing its action on release. Leaving pressedCmp null for a disabled
         // component also keeps the drag and release paths off it, since both start
         // from pressedCmp.
+        if (cmp != null && isCurrentlyScrolling(cmp)) {
+            // A press landing on a container that is still gliding should stop the
+            // scroll rather than start an interaction, which is what Form does.
+            cmp.clearDrag();
+            pressedCmp = null;
+            return;
+        }
         if (cmp != null && cmp.isEnabled()) {
             pressedCmp = cmp;
             // Drag and drop has to be primed on the press, as Form does in every one
@@ -1993,6 +2024,7 @@ public class Window extends Container implements TopLevelContainer {
             if (cmp.isFocusable()) {
                 setFocused(cmp);
             }
+            tactileTouchVibe(x, y, cmp);
         } else {
             pressedCmp = null;
         }
@@ -2006,6 +2038,12 @@ public class Window extends Container implements TopLevelContainer {
             pointerDraggedListeners.fireActionEvent(e);
             if (e.isConsumed()) {
                 return;
+            }
+        }
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveComponentAt(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
             }
         }
         autoRelease(x, y);
@@ -2054,6 +2092,12 @@ public class Window extends Container implements TopLevelContainer {
                 dragged = null;
                 currentPointerPress = null;
                 return;
+            }
+        }
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveComponentAt(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
             }
         }
         Component target = dragged != null ? dragged : pressedCmp;
@@ -2151,6 +2195,32 @@ public class Window extends Container implements TopLevelContainer {
         if (target != null && target.contains(x, y)
                 && target.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
             LeadUtil.longPointerPress(target, x, y);
+        }
+    }
+
+    /// Whether any ancestor of the pressed component is still gliding from a
+    /// previous drag. Ported from `Form`, which swallows the press in that case so a
+    /// tap stops the scroll instead of starting an interaction.
+    private boolean isCurrentlyScrolling(Component cmp) {
+        Container parent = cmp.getParent();
+        while (parent != null) {
+            if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                return true;
+            }
+            parent = parent.getParent();
+        }
+        return false;
+    }
+
+    /// Haptic feedback for a press on a component that asks for it, as `Form` does.
+    private void tactileTouchVibe(int x, int y, Component cmp) {
+        if (tactileTouchDuration < 0) {
+            // Resolved on first use rather than in a constructor: the look and feel a
+            // window should follow is the one in effect when it is interacted with.
+            tactileTouchDuration = getUIManager().getLookAndFeel().getTactileTouchDuration();
+        }
+        if (tactileTouchDuration > 0 && cmp.isTactileTouch(x, y)) {
+            Display.getInstance().vibrate(tactileTouchDuration);
         }
     }
 

@@ -1424,6 +1424,29 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aMinimizedWindowStopsQueueingRepaints() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("minimized", new BorderLayout());
+        Label content = new Label("content");
+        w.add(BorderLayout.CENTER, content);
+        w.setWindowSize(300, 200);
+        w.show();
+        DisplayTest.flushEdt();
+
+        w.hideNotify();
+        // paintOpenWindows skips a window that is not showing while hasPendingPaints
+        // still counts its queue, so anything queued here can never drain and the
+        // event dispatch thread spins until the window is restored.
+        content.repaint();
+        w.repaint();
+        boolean pendingWhileMinimized = Display.impl.hasPendingPaints();
+        w.dispose();
+
+        assertFalse(pendingWhileMinimized,
+                "a minimized window must not queue paint work that cannot drain");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
