@@ -158,6 +158,14 @@ public class WindowsWindowManager extends WindowManager {
     }
 
     @Override
+    public void setMinimumSize(Object peerObj, int width, int height) {
+        int s = slot(peerObj);
+        if (s >= 0) {
+            WindowsNative.desktopWindowSetMinimumSize(s, width, height);
+        }
+    }
+
+    @Override
     public void setUtilityWindow(Object peerObj, boolean utility) {
         int s = slot(peerObj);
         if (s >= 0) {

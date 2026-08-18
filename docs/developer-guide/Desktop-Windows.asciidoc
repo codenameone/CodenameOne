@@ -120,7 +120,8 @@ the native window and releases everything behind it; calling it twice is harmles
 `setOwnerWindow()` has to be called before the window is shown. Native ownership is
 established when the window is created -- the owner window handle on Windows, the
 transient parent on GTK, the owner passed to the dialog on Java SE -- and no platform
-lets it be re-pointed afterwards, so changing it later throws rather than pretending.
+lets it be re-pointed once the window exists, so changing it later throws rather than
+pretending.
 
 `setCloseOperation()` decides what the platform's own close control does:
 

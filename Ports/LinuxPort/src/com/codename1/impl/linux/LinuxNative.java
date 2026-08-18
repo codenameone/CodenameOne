@@ -204,6 +204,9 @@ public final class LinuxNative {
     /** 0 resizable, 1 always on top, 2 modal, 3 decorated. */
     public static native void desktopWindowSetFlag(int slot, int flag, boolean value);
 
+    /** The smallest frame the user may drag the window to; 0 clears the constraint. */
+    public static native void desktopWindowSetMinimumSize(int slot, int width, int height);
+
     /** Enables or disables input for the application's main window. */
     public static native void mainWindowSetSensitive(boolean sensitive);
 

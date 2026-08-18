@@ -674,6 +674,32 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowSetFlag___int_int_bo
     cn1LinuxRunOnMainAndWait(cn1DesktopFlagOnMain, &op);
 }
 
+static void cn1DesktopMinSizeOnMain(void* arg) {
+    CN1DesktopOp* op = (CN1DesktopOp*) arg;
+    CN1LinuxWindow* w = slotAt(op->slot);
+    GdkGeometry geom;
+    if (w == 0) {
+        return;
+    }
+    memset(&geom, 0, sizeof(geom));
+    geom.min_width = op->a;
+    geom.min_height = op->b;
+    /* Applied to the whole frame, which is what a native minimum means. Zero
+     * clears the constraint. */
+    gtk_window_set_geometry_hints(GTK_WINDOW(w->window), 0, &geom,
+            (op->a > 0 && op->b > 0) ? GDK_HINT_MIN_SIZE : 0);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowSetMinimumSize___int_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+    CN1DesktopOp op;
+    memset(&op, 0, sizeof(op));
+    op.slot = slot;
+    op.a = width;
+    op.b = height;
+    cn1LinuxRunOnMainAndWait(cn1DesktopMinSizeOnMain, &op);
+}
+
 static void cn1MainWindowSensitiveOnMain(void* arg) {
     CN1DesktopOp* op = (CN1DesktopOp*) arg;
     GtkWidget* main = cn1LinuxWindowWidget();

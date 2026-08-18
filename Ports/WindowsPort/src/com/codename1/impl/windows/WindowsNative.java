@@ -188,6 +188,9 @@ public final class WindowsNative {
 
     public static native void desktopWindowSetAlwaysOnTop(int slot, boolean onTop);
 
+    /** The smallest frame the user may drag the window to; 0 clears the constraint. */
+    public static native void desktopWindowSetMinimumSize(int slot, int width, int height);
+
     /** Applies WS_EX_TOOLWINDOW, keeping a palette out of the task bar and Alt-Tab. */
     public static native void desktopWindowSetUtility(int slot, boolean utility);
 

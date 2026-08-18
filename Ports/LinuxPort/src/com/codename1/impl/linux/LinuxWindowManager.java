@@ -173,6 +173,14 @@ public class LinuxWindowManager extends WindowManager {
     }
 
     @Override
+    public void setMinimumSize(Object peer, int width, int height) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetMinimumSize(s, width, height);
+        }
+    }
+
+    @Override
     public void setUtilityWindow(Object peer, boolean utility) {
         int s = slot(peer);
         if (s >= 0) {

@@ -61,6 +61,8 @@ typedef struct {
     int windowId;      /* framework assigned; 0 marks a free slot */
     int monitorIndex;
     int minimized;
+    int minWidth;
+    int minHeight;
     int inUse;
 } CN1DesktopWindow;
 
@@ -225,6 +227,18 @@ static void cn1WinDesktopPushPointer(CN1DesktopWindow* w, CN1EventType type,
     cn1WinPushWindowEvent(w->windowId, type, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), mask);
 }
 
+/*
+ * Drops the mouse capture once no button is still held. wParam on a button-up
+ * message carries the buttons that remain down, minus the one being released, so
+ * releasing capture on the first up would strand a drag started with two buttons.
+ */
+static void cn1WinDesktopReleaseCaptureIfIdle(WPARAM wParam, WPARAM released) {
+    WPARAM stillDown = wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON) & ~released;
+    if (stillDown == 0) {
+        ReleaseCapture();
+    }
+}
+
 static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     CN1DesktopWindow* w;
     if (msg == WM_NCCREATE) {
@@ -237,24 +251,32 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
     switch (msg) {
+        /* Every button captures, and capture is released only once the last one is
+         * up. Without it a drag that leaves the window is routed to whatever is under
+         * the cursor: this window would miss the rest of the drag and the release,
+         * leaving its pressed component stuck down. */
         case WM_LBUTTONDOWN:
             SetCapture(hwnd);
             cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam, CN1_PE_MASK_PRIMARY);
             return 0;
         case WM_LBUTTONUP:
-            ReleaseCapture();
+            cn1WinDesktopReleaseCaptureIfIdle(wParam, MK_LBUTTON);
             cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam, CN1_PE_MASK_PRIMARY);
             return 0;
         case WM_RBUTTONDOWN:
+            SetCapture(hwnd);
             cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam, CN1_PE_MASK_SECONDARY);
             return 0;
         case WM_RBUTTONUP:
+            cn1WinDesktopReleaseCaptureIfIdle(wParam, MK_RBUTTON);
             cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam, CN1_PE_MASK_SECONDARY);
             return 0;
         case WM_MBUTTONDOWN:
+            SetCapture(hwnd);
             cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam, CN1_PE_MASK_MIDDLE);
             return 0;
         case WM_MBUTTONUP:
+            cn1WinDesktopReleaseCaptureIfIdle(wParam, MK_MBUTTON);
             cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam, CN1_PE_MASK_MIDDLE);
             return 0;
         case WM_MOUSEMOVE:
@@ -316,6 +338,16 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             w->pendingResize = 1;
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_SIZE_CHANGED, w->width, w->height, 0);
             return 0;
+        case WM_GETMINMAXINFO:
+            /* The minimum is native geometry, so it applies to the whole frame --
+             * which is the window this message is about. */
+            if (w->minWidth > 0 && w->minHeight > 0 && lParam != 0) {
+                MINMAXINFO* mmi = (MINMAXINFO*) lParam;
+                mmi->ptMinTrackSize.x = w->minWidth;
+                mmi->ptMinTrackSize.y = w->minHeight;
+                return 0;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_MOVE: {
             int now;
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_MOVED, 0, 0, 0);
@@ -675,6 +707,15 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetAlwaysOnTop__
     if (w != NULL) {
         SetWindowPos(w->hwnd, onTop == JAVA_TRUE ? HWND_TOPMOST : HWND_NOTOPMOST,
                 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetMinimumSize___int_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+    CN1DesktopWindow* w = slotAt(slot);
+    if (w != NULL) {
+        w->minWidth = width;
+        w->minHeight = height;
     }
 }
 

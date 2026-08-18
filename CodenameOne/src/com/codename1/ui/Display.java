@@ -328,6 +328,10 @@ public final class Display extends CN1Constants {
     private int previousKeyPressed;
     private int lastKeyPressed;
     private int lastDragOffset;
+    /// The window the coalescable drag packet at lastDragOffset belongs to. Coalescing
+    /// across windows would overwrite one window's coordinates with another's while
+    /// the packet still carries the first window's id.
+    private int lastDragWindowId;
     private boolean lockOrientation;
     private boolean disableScreenshots;
 
@@ -2395,7 +2399,7 @@ public final class Display extends CN1Constants {
                 return;
             }
             try {
-                if (lastDragOffset > -1) {
+                if (lastDragOffset > -1 && lastDragWindowId == windowId) {
                     inputEventStack[lastDragOffset] = x;
                     inputEventStack[lastDragOffset + 1] = y;
                     inputEventStack[lastDragOffset + 2] = (int) (System.currentTimeMillis() - displayInitTime);
@@ -2406,6 +2410,7 @@ public final class Display extends CN1Constants {
                     inputEventStack[inputEventStackPointer] = POINTER_DRAGGED | (windowId << 8);
                     inputEventStackPointer++;
                     lastDragOffset = inputEventStackPointer;
+                    lastDragWindowId = windowId;
                     inputEventStack[inputEventStackPointer] = x;
                     inputEventStackPointer++;
                     inputEventStack[inputEventStackPointer] = y;
@@ -2782,6 +2787,13 @@ public final class Display extends CN1Constants {
     ///
     /// - `windowId`: the id the port was given when the window was created
     public void windowCloseRequested(int windowId) {
+        // A close arrives outside the packed input queue, so it bypasses the modality
+        // filter that guards every other event. A port that cannot disable a blocked
+        // window natively -- Catalyst has no such control -- would otherwise let the
+        // user close a window an application modal is supposed to be blocking.
+        if (isBlockedByModal(windowId)) {
+            return;
+        }
         callSerially(new WindowCallback(windowId, WindowCallback.CLOSE_REQUESTED));
     }
 

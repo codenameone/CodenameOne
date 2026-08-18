@@ -1726,14 +1726,13 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     void sizeChangedInternal(int w, int h) {
-        // Clamp here as well as asking the port. Not every platform can express a
-        // minimum size, and a port that can may still deliver a smaller resize before
-        // the constraint takes effect; laying out below the minimum the application
-        // asked for is the thing this is meant to prevent.
-        if (minimumWindowSize != null) {
-            w = Math.max(w, minimumWindowSize.getWidth());
-            h = Math.max(h, minimumWindowSize.getHeight());
-        }
+        // Deliberately no clamp against the minimum size here. That minimum is native
+        // geometry, including the platform's chrome, while these are the content
+        // dimensions -- so comparing them mixes two coordinate spaces, and on a
+        // decorated window it laid the hierarchy out larger than the canvas it is
+        // drawn into, clipping controls and putting hit testing out of step with what
+        // is on screen. The constraint belongs to the platform, which applies it to
+        // the frame it owns; every desktop port implements it.
         int oldWidth = getWidth();
         int oldHeight = getHeight();
         setSize(new Dimension(w, h));
