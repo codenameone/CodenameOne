@@ -186,6 +186,9 @@ public final class WindowsNative {
 
     public static native void desktopWindowSetResizable(int slot, boolean resizable);
 
+    /// Adds or removes the window's title bar and border.
+    public static native void desktopWindowSetDecorated(int slot, boolean decorated);
+
     public static native void desktopWindowSetAlwaysOnTop(int slot, boolean onTop);
 
     /** The smallest frame the user may drag the window to; 0 clears the constraint. */

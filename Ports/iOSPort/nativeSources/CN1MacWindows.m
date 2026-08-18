@@ -321,6 +321,10 @@ typedef struct {
      * without recording it the hide is dropped and adoption shows the window
      * anyway, leaving a native window on screen the framework no longer paints. */
     int pendingVisible;
+    /* Whether the application asked for a resizable window. Recorded rather than
+     * consulted only at creation, because the scene arrives later and the size
+     * restrictions can only be applied once it exists. */
+    int resizable;
     /* The geometry asked for but not yet granted, in pixels, or 0 when nothing is
      * outstanding. A recycled scene reports the *previous* window's size the moment
      * it is adopted, before the new geometry request lands, and delivering that would
@@ -527,6 +531,7 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     g_macWindows[slot].pendingWidth = width;
     g_macWindows[slot].pendingHeight = height;
     g_macWindows[slot].pendingTitle = [title retain];
+    g_macWindows[slot].resizable = resizable ? 1 : 0;
 
     const int generation = g_macWindows[slot].generation;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -707,9 +712,18 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
         w->awaitingHeight = w->pendingHeight;
         w->staleLayoutDropped = 0;
         if (scene.sizeRestrictions != nil) {
-            scene.sizeRestrictions.minimumSize =
-                    CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
-            scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+            if (w->resizable) {
+                scene.sizeRestrictions.minimumSize =
+                        CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
+                scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+            } else {
+                /* Pinned both ways, which is how Catalyst expresses a fixed size.
+                 * The flag reached creation and was then dropped, so a window the
+                 * framework reported as non-resizable could still be dragged out of
+                 * shape by the user. */
+                scene.sizeRestrictions.minimumSize = CGSizeMake(pointWidth, pointHeight);
+                scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
+            }
         }
         CN1MacWindowRequestGeometry(scene, CGRectMake(0, 0, pointWidth, pointHeight));
     }

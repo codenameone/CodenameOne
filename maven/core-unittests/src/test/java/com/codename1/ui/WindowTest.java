@@ -1224,6 +1224,54 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aPressInOneWindowDoesNotCancelAnothersLongPress() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a", new BorderLayout());
+        a.add(BorderLayout.CENTER, new Label("a"));
+        a.setWindowSize(300, 200);
+        a.show();
+        Window b = new Window("b", new BorderLayout());
+        b.add(BorderLayout.CENTER, new Label("b"));
+        b.setWindowSize(300, 200);
+        b.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        // Press in A, then in B. The long-press timer was a single set of fields, so
+        // B's press replaced A's coordinates and clock, and releasing either one
+        // cancelled the other's pending long press.
+        Display.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Display.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        Display.getInstance().windowPointerReleased(a.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+
+        boolean bStillArmed = longPressArmedFor(b.getWindowId());
+        b.dispose();
+        a.dispose();
+
+        assertTrue(bStillArmed,
+                "releasing one window's contact must not cancel another window's "
+                        + "pending long press");
+    }
+
+    /// Reads Display's per-window long-press table, which is private state with no
+    /// public accessor.
+    private static boolean longPressArmedFor(int windowId) throws Exception {
+        java.lang.reflect.Field wf = Display.class.getDeclaredField("longPressWindows");
+        java.lang.reflect.Field af = Display.class.getDeclaredField("longPressArmed");
+        wf.setAccessible(true);
+        af.setAccessible(true);
+        int[] windows = (int[]) wf.get(Display.getInstance());
+        boolean[] armed = (boolean[]) af.get(Display.getInstance());
+        for (int iter = 0; iter < windows.length; iter++) {
+            if (windows[iter] == windowId && armed[iter]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

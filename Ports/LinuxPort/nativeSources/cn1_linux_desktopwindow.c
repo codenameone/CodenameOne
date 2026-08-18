@@ -212,6 +212,24 @@ static gboolean cn1DesktopOnConfigure(GtkWidget* widget, GdkEventConfigure* e, g
         w->pendingResize = 1;
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_SIZE_CHANGED, w->width, w->height, 0);
     }
+    /* Position and monitor are handled by cn1DesktopOnWindowConfigure, on the top
+     * level. They were handled here, on the drawing area, where e->x and e->y are
+     * the child's offset inside its parent -- which does not change when the user
+     * drags the window, so a move was never reported at all and the cached monitor
+     * never refreshed. */
+    return FALSE;
+}
+
+/* Moves and monitor changes, observed on the top level rather than on the drawing
+ * area: dragging a window changes the toplevel's position while leaving the child's
+ * allocation untouched, so the drawing area sees no configure event. */
+static gboolean cn1DesktopOnWindowConfigure(GtkWidget* widget, GdkEventConfigure* e,
+        gpointer data) {
+    CN1LinuxWindow* w = (CN1LinuxWindow*) data;
+    (void) widget;
+    if (w == 0) {
+        return FALSE;
+    }
     if (e->x != w->x || e->y != w->y) {
         w->x = e->x;
         w->y = e->y;
@@ -609,6 +627,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
      * routing free -- no lookup, no shared state. */
     g_signal_connect(w->drawingArea, "draw", G_CALLBACK(cn1DesktopOnDraw), w);
     g_signal_connect(w->drawingArea, "configure-event", G_CALLBACK(cn1DesktopOnConfigure), w);
+    g_signal_connect(w->window, "configure-event", G_CALLBACK(cn1DesktopOnWindowConfigure), w);
     g_signal_connect(w->drawingArea, "button-press-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "button-release-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "motion-notify-event", G_CALLBACK(cn1DesktopOnMotion), w);

@@ -775,6 +775,31 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetResizable___i
     }
 }
 
+/* Adds or removes the title bar and border. Without this setDecorated fell through
+ * to the SPI's empty default on this port alone, so the Java state said undecorated
+ * while the window kept its chrome. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetDecorated___int_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT slot, JAVA_BOOLEAN decorated) {
+    CN1DesktopWindow* w = slotAt(slot);
+    if (w != NULL) {
+        LONG_PTR style = GetWindowLongPtrW(w->hwnd, GWL_STYLE);
+        if (decorated == JAVA_TRUE) {
+            style |= WS_OVERLAPPEDWINDOW;
+            style &= ~WS_POPUP;
+        } else {
+            /* WS_POPUP rather than merely clearing the caption bits: a window with
+             * no caption but still WS_OVERLAPPED keeps a thin non-client frame. */
+            style &= ~WS_OVERLAPPEDWINDOW;
+            style |= WS_POPUP;
+        }
+        SetWindowLongPtrW(w->hwnd, GWL_STYLE, style);
+        /* SWP_FRAMECHANGED is what makes the non-client area recompute; without it
+         * the old chrome stays on screen until something else forces a reframe. */
+        SetWindowPos(w->hwnd, NULL, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    }
+}
+
 JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetAlwaysOnTop___int_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot, JAVA_BOOLEAN onTop) {
     CN1DesktopWindow* w = slotAt(slot);

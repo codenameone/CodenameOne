@@ -286,7 +286,6 @@ public final class Display extends CN1Constants {
     private int inputEventStackPointer;
     private int[] inputEventStackTmp = new int[1000];
     private int inputEventStackPointerTmp;
-    private boolean longPointerCharged;
     private boolean pointerPressedAndNotReleasedOrDragged;
     private boolean recursivePointerReleaseA;
     private boolean recursivePointerReleaseB;
@@ -381,7 +380,6 @@ public final class Display extends CN1Constants {
     /// Window ids remembered so a key repeat or long press started in a window is
     /// delivered back to that window rather than to the main form.
     private int keyRepeatWindowId;
-    private int longPointerWindowId;
 
     /// Private constructor to prevent instanciation
     private Display() {
@@ -1425,10 +1423,18 @@ public final class Display extends CN1Constants {
             longPressCharged = false;
             repeatTarget.longKeyPress(keyRepeatValue);
         }
-        Container pointerTarget = repeatTarget(longPointerWindowId, current);
-        if (pointerTarget != null && longPointerCharged && longPressInterval <= t - longKeyPressTime) {
-            longPointerCharged = false;
-            pointerTarget.longPointerPress(pointerX, pointerY);
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (!longPressArmed[iter] || longPressInterval > t - longPressStart[iter]) {
+                continue;
+            }
+            int pressWindow = longPressWindows[iter] == MAIN_LONG_PRESS_ID
+                    ? 0 : longPressWindows[iter];
+            Container pointerTarget = repeatTarget(pressWindow, current);
+            longPressArmed[iter] = false;
+            longPressWindows[iter] = 0;
+            if (pointerTarget != null) {
+                pointerTarget.longPointerPress(longPressPointerX[iter], longPressPointerY[iter]);
+            }
         }
         processSerialCalls();
 
@@ -1879,7 +1885,7 @@ public final class Display extends CN1Constants {
         }
         keyRepeatCharged = false;
         longPressCharged = false;
-        longPointerCharged = false;
+        cancelAllLongPresses();
         current = newForm;
         impl.setCurrentForm(current);
         current.setVisible(true);
@@ -2568,7 +2574,7 @@ public final class Display extends CN1Constants {
             // Native ports have been observed to deliver zero-length pointer arrays
             return;
         }
-        longPointerCharged = false;
+        cancelLongPress(windowId);
         if (x.length == 1) {
             addPointerDragEventWithTimestamp(windowId, x[0], y[0]);
         } else {
@@ -2751,9 +2757,9 @@ public final class Display extends CN1Constants {
 
     private void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
         lastInteractionWasKeypad = false;
-        longPointerCharged = true;
-        longPointerWindowId = windowId;
-        longKeyPressTime = System.currentTimeMillis();
+        chargeLongPress(windowId, x[0], y[0]);
+        // Still tracked globally: this is "where the pointer last was", which
+        // getCurrentPointerEvent reports and which is not per window.
         pointerX = x[0];
         pointerY = y[0];
         if (x.length == 1) {
@@ -2771,7 +2777,7 @@ public final class Display extends CN1Constants {
     ///
     /// - `y`: the y position of the pointer
     public void pointerReleased(final int[] x, final int[] y) {
-        longPointerCharged = false;
+        cancelLongPress(0);
         if (impl.getCurrentForm() == null) {
             return;
         }
@@ -2790,7 +2796,7 @@ public final class Display extends CN1Constants {
     /// - `y`: the y positions of the pointer
     public void windowPointerReleased(int windowId, int[] x, int[] y) {
         if (windowId > 0) {
-            longPointerCharged = false;
+            cancelLongPress(windowId);
             pointerReleasedImpl(windowId, x, y);
         }
     }
@@ -3033,6 +3039,81 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Ids of windows with a long press being timed, paired by index with the arrays
+    /// below. Zero means the entry is unused; window 0 uses `#MAIN_LONG_PRESS_ID`.
+    private final int[] longPressWindows = new int[TRACKED_KEY_PRESSES];
+    private final boolean[] longPressArmed = new boolean[TRACKED_KEY_PRESSES];
+    private final int[] longPressPointerX = new int[TRACKED_KEY_PRESSES];
+    private final int[] longPressPointerY = new int[TRACKED_KEY_PRESSES];
+    private final long[] longPressStart = new long[TRACKED_KEY_PRESSES];
+
+    /// Stand-in id for the main surface, so 0 can mean "unused" in
+    /// `#longPressWindows`.
+    private static final int MAIN_LONG_PRESS_ID = -1;
+
+    private static int longPressKey(int windowId) {
+        return windowId == 0 ? MAIN_LONG_PRESS_ID : windowId;
+    }
+
+    /// Starts timing a long press for one window.
+    ///
+    /// Per window rather than singleton for the same reason the press targets are:
+    /// with a contact down in two windows, pressing in the second replaced the
+    /// first's coordinates and timer, and releasing either cancelled the other's
+    /// pending long press.
+    private void chargeLongPress(int windowId, int x, int y) {
+        int key = longPressKey(windowId);
+        int free = -1;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (longPressWindows[iter] == key) {
+                free = iter;
+                break;
+            }
+            if (free < 0 && longPressWindows[iter] == 0) {
+                free = iter;
+            }
+        }
+        if (free < 0) {
+            return;
+        }
+        longPressWindows[free] = key;
+        longPressArmed[free] = true;
+        longPressPointerX[free] = x;
+        longPressPointerY[free] = y;
+        longPressStart[free] = System.currentTimeMillis();
+    }
+
+    /// Cancels the long press pending for one window, leaving other windows alone.
+    private void cancelLongPress(int windowId) {
+        int key = longPressKey(windowId);
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (longPressWindows[iter] == key) {
+                longPressArmed[iter] = false;
+                longPressWindows[iter] = 0;
+                return;
+            }
+        }
+    }
+
+    /// Whether any window is still timing a long press; the event dispatch thread
+    /// must not park while one is pending.
+    private boolean anyLongPressArmed() {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (longPressArmed[iter]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Cancels every pending long press, for the paths that reset all input state.
+    private void cancelAllLongPresses() {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            longPressArmed[iter] = false;
+            longPressWindows[iter] = 0;
+        }
+    }
+
     /// Records which top level saw a pointer press in the given window.
     private void rememberPointerPress(int windowId, Container target) {
         int free = -1;
@@ -3211,7 +3292,7 @@ public final class Display extends CN1Constants {
     public void hideNotify() {
         keyRepeatCharged = false;
         longPressCharged = false;
-        longPointerCharged = false;
+        cancelAllLongPresses();
         pointerPressedAndNotReleasedOrDragged = false;
         addNotifyEvent(HIDE_NOTIFY);
     }
@@ -3548,7 +3629,7 @@ public final class Display extends CN1Constants {
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged)
+                && !anyLongPressArmed())
                 // a minimized main window must not park the EDT while a tool window
                 // is still on screen and animating
                 || (isMinimized() && !Desktop.getInstance().hasVisibleWindows()
@@ -3826,10 +3907,7 @@ public final class Display extends CN1Constants {
             keyRepeatCharged = false;
             keyRepeatWindowId = 0;
         }
-        if (longPointerWindowId == w.getWindowId()) {
-            longPointerCharged = false;
-            longPointerWindowId = 0;
-        }
+        cancelLongPress(w.getWindowId());
     }
 
     /// Indicates whether input aimed at the given window is currently blocked by a

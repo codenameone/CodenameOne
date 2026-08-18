@@ -150,6 +150,16 @@ public class WindowsWindowManager extends WindowManager {
     }
 
     @Override
+    public void setDecorated(Object peerObj, boolean decorated) {
+        // Without this the SPI's empty default ran on this port alone, so the Java
+        // state reported the window as undecorated while it kept its chrome.
+        int s = slot(peerObj);
+        if (s >= 0) {
+            WindowsNative.desktopWindowSetDecorated(s, decorated);
+        }
+    }
+
+    @Override
     public void setAlwaysOnTop(Object peerObj, boolean alwaysOnTop) {
         int s = slot(peerObj);
         if (s >= 0) {
