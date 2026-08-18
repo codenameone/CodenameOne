@@ -2435,7 +2435,7 @@ public final class Display extends CN1Constants {
     ///
     /// - `keyCode`: keycode of the key event
     public void keyReleased(final int keyCode) {
-        cancelKeyRepeat(0);
+        cancelKeyRepeatForCode(keyCode);
         if (impl.getCurrentForm() == null) {
             return;
         }
@@ -2737,7 +2737,7 @@ public final class Display extends CN1Constants {
     /// - `keyCode`: keycode of the key event
     public void windowKeyReleased(int windowId, int keyCode) {
         if (windowId > 0) {
-            cancelKeyRepeat(windowId);
+            cancelKeyRepeatForCode(keyCode);
             addSingleArgumentEvent(KEY_RELEASED | (windowId << 8), keyCode);
         }
     }
@@ -3138,6 +3138,22 @@ public final class Display extends CN1Constants {
         keyRepeatValues[slot] = keyCode;
         keyLongPressStart[slot] = now;
         keyRepeatNext[slot] = firstRepeatAt;
+    }
+
+    /// Cancels whichever window armed a repeat for this key code.
+    ///
+    /// Keyed by the code rather than by the window the key-up packet names: the
+    /// physical key was armed by the *press*, and focus can move between the two, so
+    /// cancelling the releasing window's slot left the pressing window repeating
+    /// every 10ms with the key physically up.
+    private void cancelKeyRepeatForCode(int keyCode) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyRepeatWindows[iter] != 0 && keyRepeatValues[iter] == keyCode) {
+                keyRepeatArmed[iter] = false;
+                keyLongPressArmed[iter] = false;
+                keyRepeatWindows[iter] = 0;
+            }
+        }
     }
 
     /// Cancels key repeat for one window, leaving the others alone.
@@ -4190,17 +4206,38 @@ public final class Display extends CN1Constants {
         // blocks only its own owner, and stopping at the top of the stack would let
         // input back into the main form and every unrelated window for as long as the
         // narrower one was up.
+        Window self = windowId > 0 ? Desktop.getInstance().windowById(windowId) : null;
         int len = modalWindows.size();
         for (int iter = len - 1; iter >= 0; iter--) {
             Window modal = modalWindows.get(iter);
             if (modal.getWindowId() == windowId) {
-                // A modal window is never blocked by itself, and a modal opened from
-                // inside another is not blocked by the one it was opened from.
-                return false;
+                // Never blocked by itself -- but keep looking at the outer blockers.
+                // Returning here exempted a modal window from *every* other modal,
+                // so an unrelated modal shown while an application modal was up
+                // accepted input that application modality is meant to stop.
+                continue;
+            }
+            if (self != null && ownedBy(self, modal)) {
+                // A modal opened from inside another is not blocked by the one it was
+                // opened from. That is the exemption the self check was reaching for,
+                // and it applies to the owner chain rather than to any modal at all.
+                continue;
             }
             if (blocks(modal, windowId)) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    /// Whether `w` sits inside `candidateOwner`'s ownership chain.
+    private static boolean ownedBy(Window w, Window candidateOwner) {
+        TopLevelContainer owner = w.getOwnerWindow();
+        while (owner instanceof Window) {
+            if (owner == candidateOwner) { //NOPMD CompareObjectsWithEquals
+                return true;
+            }
+            owner = ((Window) owner).getOwnerWindow();
         }
         return false;
     }

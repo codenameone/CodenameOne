@@ -1257,6 +1257,7 @@ class WindowTest extends UITestBase {
     /// Reads Display's per-window long-press table, which is private state with no
     /// public accessor.
     private static boolean longPressArmedFor(int windowId) throws Exception {
+        // Same -1 keying for the main surface as keyRepeatArmedFor.
         java.lang.reflect.Field wf = Display.class.getDeclaredField("longPressWindows");
         java.lang.reflect.Field af = Display.class.getDeclaredField("longPressArmed");
         wf.setAccessible(true);
@@ -1579,8 +1580,12 @@ class WindowTest extends UITestBase {
         af.setAccessible(true);
         int[] windows = (int[]) wf.get(Display.getInstance());
         boolean[] armed = (boolean[]) af.get(Display.getInstance());
+        // Display keys the main surface as -1 so that 0 can mean "unused". Comparing
+        // against 0 here matched nothing, which is what made the first version of the
+        // repeat test pass with the fix removed.
+        int key = windowId == 0 ? -1 : windowId;
         for (int iter = 0; iter < windows.length; iter++) {
-            if (windows[iter] == windowId && armed[iter]) {
+            if (windows[iter] == key && armed[iter]) {
                 return true;
             }
         }
@@ -1639,6 +1644,69 @@ class WindowTest extends UITestBase {
         assertTrue(first, "an idle window must grant the lock");
         assertFalse(second, "a second caller must be refused while it is held");
         assertTrue(afterRelease, "and it must be grantable again after release");
+    }
+
+    @FormTest
+    void anUnrelatedModalIsStillBlockedByAnApplicationModal() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        // Unowned, so not nested inside the first one. Being modal itself must not
+        // exempt it from application modality -- the self check used to return for
+        // any modal, which let this one accept input.
+        Window unrelated = new Window("unrelated modal");
+        unrelated.setModalityType(Window.MODALITY_APPLICATION);
+        unrelated.show();
+        TestWindowManager.FakeWindow unrelatedPeer = wm.getLastWindow();
+        boolean blocked = !unrelatedPeer.isInputEnabled();
+
+        // Disposed before the nested case: while it is up, the nested modal is
+        // legitimately blocked *by it* -- an unrelated application modal blocks
+        // everything outside its own chain, this window included. Leaving it open
+        // made the first version of this test assert the opposite.
+        unrelated.dispose();
+
+        // A modal nested inside the first is still exempt from it.
+        Window nested = new Window("nested modal");
+        nested.setOwnerWindow(appModal);
+        nested.setModalityType(Window.MODALITY_APPLICATION);
+        nested.show();
+        boolean nestedUsable = wm.getLastWindow().isInputEnabled();
+
+        nested.dispose();
+        appModal.dispose();
+
+        assertTrue(blocked, "an unrelated modal must still be blocked by an application modal");
+        assertTrue(nestedUsable, "but a modal nested inside it must stay usable");
+    }
+
+    @FormTest
+    void aKeyReleasedAfterFocusMovedCancelsThePressingWindowsRepeat() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Pressed on the main surface, released while the other window has focus.
+        // Cancelling by the releasing window left the main surface repeating every
+        // 10ms with the key physically up.
+        Display.getInstance().keyPressed(66);
+        Display.getInstance().windowKeyReleased(w.getWindowId(), 66);
+        DisplayTest.flushEdt();
+        boolean stillArmed = keyRepeatArmedFor(0) || keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(stillArmed,
+                "releasing a key must cancel the repeat armed by its press");
     }
 
     @FormTest
