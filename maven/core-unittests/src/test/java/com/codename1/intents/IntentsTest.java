@@ -2002,6 +2002,21 @@ class IntentsTest {
         assertFalse(schemas.get("ratio_double").contains("maximum"),
                 "a double is unbounded, which is the honest description of a double: "
                         + schemas.get("ratio_double"));
+
+        // A float is not one interval: requiredFloat refuses a non-zero double that casts to
+        // zero, so the accepted set is zero plus each sign's representable range, and a
+        // magnitude bound alone let a model write 1e-100 and have it rejected before the
+        // handler ran.
+        FakeDispatcher f = new FakeDispatcher();
+        f.declarations.add(modelIntentWithNumeric("ratio_float", "ratio",
+                IntentParameterType.NUMBER, 32));
+        Intents.setDispatcher(f);
+        String floatSchema = Intents.asTools().get(0).getParametersJsonSchema();
+        assertTrue(floatSchema.contains("\"anyOf\""), floatSchema);
+        assertTrue(floatSchema.contains("\"enum\":[0.0]"),
+                "zero stays acceptable: " + floatSchema);
+        assertTrue(floatSchema.contains("1.401298464324817E-45"),
+                "and the underflow interval is excluded: " + floatSchema);
     }
 
     /// The deadline has to survive navigation. claim() runs before the route is dispatched,

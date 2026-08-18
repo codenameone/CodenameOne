@@ -761,9 +761,41 @@ public final class Intents {
             prop.put("minimum", Integer.valueOf(Integer.MIN_VALUE));
             prop.put("maximum", Integer.valueOf(Integer.MAX_VALUE));
         } else if (p.getType() == IntentParameterType.NUMBER) {
-            prop.put("minimum", Double.valueOf(-Float.MAX_VALUE));
-            prop.put("maximum", Double.valueOf(Float.MAX_VALUE));
+            // Magnitude bounds alone were not the accepted set. requiredFloat refuses a
+            // non-zero double that casts to 0.0f, so 1e-100 was schema-valid and rejected
+            // before the handler ran -- a call the model could not have got right. The three
+            // branches are the shape of what a float actually holds: zero, and each sign's
+            // representable range. Written with anyOf because that interval has a hole in it
+            // and minimum/maximum cannot describe a hole.
+            List<Object> options = new ArrayList<Object>();
+            options.add(constantZero());
+            options.add(range(Float.MIN_VALUE, Float.MAX_VALUE));
+            options.add(range(-Float.MAX_VALUE, -Float.MIN_VALUE));
+            prop.put("anyOf", options);
         }
+    }
+
+    /// A schema branch matching only zero.
+    private static Map<String, Object> constantZero() {
+        Map<String, Object> zero = new LinkedHashMap<String, Object>();
+        List<Object> only = new ArrayList<Object>();
+        only.add(Double.valueOf(0));
+        zero.put("enum", only);
+        return zero;
+    }
+
+    /// A schema branch matching one inclusive numeric range.
+    ///
+    /// The narrow end is Float.MIN_VALUE rather than half of it. A double between the two may
+    /// round up to the smallest subnormal and so be accepted at dispatch, and describing that
+    /// exactly would put a rounding rule into a schema; erring one representable step narrow
+    /// keeps the schema a subset of what runs, which is the safe direction -- a model simply
+    /// does not offer a value there.
+    private static Map<String, Object> range(double min, double max) {
+        Map<String, Object> r = new LinkedHashMap<String, Object>();
+        r.put("minimum", Double.valueOf(min));
+        r.put("maximum", Double.valueOf(max));
+        return r;
     }
 
     private static String schemaType(IntentParameterType type) {

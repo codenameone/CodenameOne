@@ -5394,6 +5394,17 @@ public class IPhoneBuilder extends Executor {
         if (!declaresAppIntents && !appIntentsSuppressed) {
             return;
         }
+        if (appIntentsSuppressed) {
+            // Before any Swift is written, not after. Donation is Objective-C and needs no
+            // Swift at all -- which is what lets it keep working below the App Intents
+            // minimum, and the whole reason this opt-out exists. Emitting the bridge, the
+            // snippet view and the surface renderer anyway put SwiftUI types into a project
+            // that had just asked to stay off them, so a target pinned below iOS 13 failed
+            // Swift availability checking for a feature it had explicitly declined.
+            log("App Intents declarations suppressed (ios.intents.appIntents=false); "
+                    + "Spotlight indexing and donation are unaffected");
+            return;
+        }
         File srcDir = new File(distDir, request.getMainClass() + "-src");
         srcDir.mkdirs();
 
@@ -5431,14 +5442,6 @@ public class IPhoneBuilder extends Executor {
             }
         }
 
-        if (appIntentsSuppressed) {
-            // Nothing more to emit. Donation is Objective-C and needs no Swift at all, which is
-            // what lets it keep working on devices below the App Intents minimum -- the reason
-            // this opt-out exists.
-            log("App Intents declarations suppressed (ios.intents.appIntents=false); "
-                    + "Spotlight indexing and donation are unaffected");
-            return;
-        }
         IOSAppIntentsBuilder gen = new IOSAppIntentsBuilder(intentsManifest, entitiesManifest);
         Map<String, String> generated = gen.buildAppTargetFileMap();
         if (!gen.getOmittedShortcutIds().isEmpty()) {

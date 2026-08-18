@@ -339,6 +339,20 @@ public class AndroidIntentBridge implements IntentBridge {
         }
     }
 
+    /// Whether a parked request's wait has run out.
+    ///
+    /// One definition, because the waiter is not the only thing that drains the queue and the
+    /// two disagreeing is how a stale request gets run. An unparseable stamp counts as expired:
+    /// this code writes it, so a value that cannot be read is a bug, and running a request that
+    /// cannot be dated is the worse of the two answers.
+    private static boolean hasExpired(String[] request, long now) {
+        try {
+            return Long.parseLong(request[2]) <= now;
+        } catch (NumberFormatException e) {
+            return true;
+        }
+    }
+
     /// Drops requests whose wait has run out. Returns true when nothing is left to wait for,
     /// having cleared `waiting` in the same critical section so a request parked in between
     /// cannot find a waiter that is about to stop existing.
@@ -347,7 +361,7 @@ public class AndroidIntentBridge implements IntentBridge {
         synchronized (FOREGROUND) {
             for (int i = FOREGROUND.size() - 1; i >= 0; i--) {
                 String[] request = FOREGROUND.get(i);
-                if (Long.parseLong(request[2]) <= now) {
+                if (hasExpired(request, now)) {
                     Log.w(TAG, "The app did not come forward; dropping \"" + request[0] + "\"");
                     FOREGROUND.remove(i);
                 }
@@ -382,13 +396,30 @@ public class AndroidIntentBridge implements IntentBridge {
             startWaiter();
             return;
         }
-        List<String[]> drained;
+        // Expiry is checked here as well as in the waiter, because the waiter is not guaranteed
+        // to have run. Android can suspend or throttle it while the app sits in the background,
+        // and this method is also called from the Activity's own startup -- so a request whose
+        // fifteen seconds ran out long ago could be delivered on an unrelated later opening of
+        // the app, which is exactly the stale invocation the expiry exists to prevent.
+        List<String[]> drained = new ArrayList<String[]>();
         synchronized (FOREGROUND) {
             if (FOREGROUND.isEmpty()) {
                 return;
             }
-            drained = new ArrayList<String[]>(FOREGROUND);
+            long now = System.currentTimeMillis();
+            for (int i = 0; i < FOREGROUND.size(); i++) {
+                String[] request = FOREGROUND.get(i);
+                if (hasExpired(request, now)) {
+                    Log.w(TAG, "Not running \"" + request[0] + "\": its wait ran out before the "
+                            + "app came forward");
+                    continue;
+                }
+                drained.add(request);
+            }
             FOREGROUND.clear();
+        }
+        if (drained.isEmpty()) {
+            return;
         }
         for (String[] request : drained) {
             try {
