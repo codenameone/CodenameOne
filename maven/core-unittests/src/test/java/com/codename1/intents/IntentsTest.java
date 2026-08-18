@@ -172,6 +172,15 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    private static IntentDeclaration declarationWithStringParam(String id, String param,
+                                                                List<String> options) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
+                "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
+                Arrays.asList(new IntentParameterInfo(param, "What?",
+                        IntentParameterType.STRING, true, null, null, options)),
+                Arrays.asList(Exposure.ASSISTANT));
+    }
+
     private static IntentDeclaration modelIntent(String id, boolean destructive) {
         return new IntentDeclaration(id, "Title of " + id, "", true, true, destructive,
                 "", 5, Collections.<String>emptyList(),
@@ -1846,6 +1855,59 @@ class IntentsTest {
         assertFalse(names.contains("wipe_all"),
                 "a model must not be able to run a destructive action on inference alone");
         assertTrue(names.contains("log_run"), "and the rest of the projection is unaffected");
+    }
+
+    /// A suggestion the system kept can outlive the policy that allowed it. Tapping one
+    /// donated before an update that marked the intent destructive would delete, send or spend
+    /// on one tap -- past the confirmation the generated App Intent performs, and past the
+    /// check donate() applies to every new donation. The declaration in front of us decides.
+    @Test
+    void aSuggestedActivityIsRefusedWhenTheDeclarationNoLongerAllowsOneTap() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("wipe_all", "Wipe", "", true, true, true,
+                "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.ASSISTANT)));
+        d.declarations.add(declaration("log_run"));
+        Intents.setDispatcher(d);
+
+        assertTrue(Intents.dispatchUserActivity("wipe_all", null),
+                "the activity type is ours, so it is claimed rather than left to the system");
+        assertTrue(d.invoked.isEmpty(), "but the handler must not run");
+
+        Intents.dispatchUserActivity("log_run", null);
+        assertEquals(Arrays.asList("log_run"), d.invoked,
+                "and an intent the declaration still allows runs as before");
+    }
+
+    /// The generated asString stringifies anything non-null and oneOf compares the result, so
+    /// refusing a non-String here declined donations that would have reached the handler.
+    @Test
+    void aStringDonationIsCheckedTheWayTheCoercionReadsIt() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithStringParam("note_it", "note", null));
+        d.declarations.add(declarationWithStringParam("pick_it", "size",
+                Arrays.asList("123", "small")));
+        Intents.setDispatcher(d);
+
+        Map<String, Object> numeric = new HashMap<String, Object>();
+        numeric.put("note", Integer.valueOf(123));
+        Intents.donate("note_it", numeric);
+        assertEquals("note_it", b.donatedId, "asString would have made this \"123\"");
+
+        b.donatedId = null;
+        Map<String, Object> inVocabulary = new HashMap<String, Object>();
+        inVocabulary.put("size", Integer.valueOf(123));
+        Intents.donate("pick_it", inVocabulary);
+        assertEquals("pick_it", b.donatedId, "oneOf compares the stringified value");
+
+        b.donatedId = null;
+        Map<String, Object> outside = new HashMap<String, Object>();
+        outside.put("size", "enormous");
+        Intents.donate("pick_it", outside);
+        assertNull(b.donatedId, "a value outside the vocabulary is still refused");
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id

@@ -898,7 +898,26 @@ public final class Intents {
         if (activityType == null) {
             return false;
         }
-        if (getDeclaration(activityType) != null) {
+        IntentDeclaration declared = getDeclaration(activityType);
+        if (declared != null) {
+            // A continued activity is a persisted suggestion: the system kept it, and a tap on
+            // it reaches the handler with the donated values and nothing in between. Which is
+            // fine for what the app donated -- and a donation made before an update that marked
+            // the intent destructive is still out there being suggested. Running it would
+            // delete, send or spend on one tap, past the confirmation the generated App Intent
+            // performs and past the check donate() applies to every new donation. The
+            // declaration in front of us is the authority, not the one that minted the
+            // suggestion.
+            if (declared.isDestructive() || !declared.isExposedTo(Exposure.ASSISTANT)) {
+                // Claimed rather than declined: the activity type is this application's, and
+                // saying otherwise would have the system look for another handler for something
+                // that is ours to refuse.
+                logDiagnostic("Not running \"" + activityType + "\" from a suggested activity: "
+                        + "the declaration no longer allows it to run without confirmation. A "
+                        + "suggestion donated by an earlier version can outlive the policy that "
+                        + "allowed it.");
+                return true;
+            }
             dispatchInvocation(activityType, params, IntentSource.SHORTCUT, false, null);
             return true;
         }
@@ -1283,10 +1302,17 @@ public final class Intents {
         }
         IntentParameterType type = p.getType();
         if (!p.getOptions().isEmpty()) {
-            return value instanceof String && p.getOptions().contains(value);
+            // Against what actually crosses, stringified, because that is what the generated
+            // oneOf compares: it reads through asString first. Requiring a String here refused
+            // a donation of 123 for a vocabulary containing "123", which would have run.
+            Object wire = IntentSerializer.toWire(value);
+            return p.getOptions().contains(String.valueOf(wire == null ? value : wire));
         }
         if (type == IntentParameterType.STRING) {
-            return value instanceof String || value instanceof Character;
+            // Anything non-null, because the generated asString stringifies anything non-null.
+            // A caller donating Integer.valueOf(123) for a String parameter was refused for a
+            // call that would have reached the handler as "123".
+            return true;
         }
         if (type == IntentParameterType.BOOLEAN) {
             if (value instanceof Boolean) {

@@ -129,6 +129,18 @@ public class CN1IntentTrampolineActivity extends Activity {
                 // intent was declared. See IntentDeclaration#runsHeadless.
                 headless = decl.runsHeadless();
             }
+            // Applied to a trusted request as well, and that is the point. A nonce says this
+            // shortcut was minted by this app; it says nothing about when. A donation made
+            // before an update that marked the intent destructive keeps working, so a shortcut
+            // the launcher has held for weeks would run a destructive action on one tap --
+            // past the confirmation that flag exists for, and past every door that refuses it
+            // today. The declaration above is already reread for exactly this class of drift,
+            // for the headless flag; this is the same reread applied to policy.
+            if (decl != null && !isStillPermittedOnOneTap(decl)) {
+                Log.w(TAG, "Refusing \"" + id + "\": the shortcut predates a declaration change "
+                        + "that no longer allows it to run on a single tap");
+                return true;
+            }
             if (!trusted) {
                 if (decl != null || !Intents.getDeclarations().isEmpty()) {
                     // The runtime is up, so the policy can be applied now: held to what the
@@ -172,6 +184,17 @@ public class CN1IntentTrampolineActivity extends Activity {
             return true;
         }
         return true;
+    }
+
+    /// Whether the *current* declaration still allows this intent to run from a single tap.
+    ///
+    /// Narrower than the unauthenticated policy on purpose: a trusted shortcut may legitimately
+    /// carry parameters and need not be discoverable, so only the rules that make one tap
+    /// unsafe apply. Destructive is one -- there is nothing between the tap and the action --
+    /// and so is an exposure that no longer includes the assistant, since the shortcut surface
+    /// is what that opts out of.
+    static boolean isStillPermittedOnOneTap(IntentDeclaration decl) {
+        return !decl.isDestructive() && decl.isExposedTo(Exposure.ASSISTANT);
     }
 
     /// True when an unauthenticated caller may run this intent: exactly the set the build
