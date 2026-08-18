@@ -328,9 +328,22 @@ public final class DeviceRuntimePairing {
     /** Records a peer id in the removable index. */
     static void remember(String peerId) {
         String index = Preferences.get(PREF_PAIRED + "index", "");
-        if (index.indexOf(peerId) < 0) {
-            Preferences.set(PREF_PAIRED + "index", index.length() == 0
-                    ? peerId : index + "\t" + peerId);
+        // Whole entries, not a substring search. Ids are variable-length hex,
+        // so a peer could choose one that is a substring of an id already in
+        // the index; it would then never be recorded, and "forget all paired
+        // computers" would leave its secret and its Always approval in place.
+        int from = 0;
+        while (from <= index.length()) {
+            int tab = index.indexOf('\t', from);
+            if (tab < 0) {
+                tab = index.length();
+            }
+            if (peerId.equals(index.substring(from, tab))) {
+                return;
+            }
+            from = tab + 1;
         }
+        Preferences.set(PREF_PAIRED + "index", index.length() == 0
+                ? peerId : index + "\t" + peerId);
     }
 }

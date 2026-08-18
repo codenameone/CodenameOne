@@ -1556,6 +1556,7 @@ public class ByteCodeClass {
           .append(", &class__").append(clsName).append(");\n");
         appendInterpStaticAccessorRegistrations(b);
         appendInterpClassInitializerRegistration(b);
+        appendInterpArrayClassRegistrations(b);
         b.append("}\n");
         b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
     }
@@ -1589,6 +1590,30 @@ public class ByteCodeClass {
             int fid = Parser.getOrAssignFieldId(clsName, bf.getFieldName());
             b.append("    cn1_debugger_register_static_accessor(").append(fid)
              .append(", &__cn1_sacc_").append(fid).append(");\n");
+        }
+    }
+
+    /**
+     * Publishes this class's array clazz objects under their class ids.
+     *
+     * <p>`String[].class` in a pushed program resolves to an array class id,
+     * and turning that id back into a class object needs the clazz registered
+     * -- the same registry that answers for ordinary classes.</p>
+     */
+    private void appendInterpArrayClassRegistrations(StringBuilder b) {
+        if (!BytecodeMethod.isInterpHost()) {
+            return;
+        }
+        // Only the ranks this build actually emitted. `class_arrayN__X` exists
+        // when something in the closed world used an array of that rank, which
+        // is the same condition the initializer above tests.
+        for (int rank = 1; rank <= 3; rank++) {
+            if (!arrayTypes.contains(rank + "_" + clsName)) {
+                continue;
+            }
+            b.append("    cn1_debugger_register_class(cn1_array_").append(rank)
+             .append("_id_").append(clsName).append(", (struct clazz*)&class_array")
+             .append(rank).append("__").append(clsName).append(");\n");
         }
     }
 

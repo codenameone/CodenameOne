@@ -59,6 +59,17 @@ void cn1_debugger_register_invoke_thunk(int methodId, cn1_invoke_thunk_t thunk) 
     (void)methodId; (void)thunk;
 }
 
+/*
+ * The device runtime's class-initializer registry. Weak like the rest: a build
+ * without the interpreter's native half registers into a sink, and the iOS
+ * port's strong definition takes over when it is present.
+ */
+__attribute__((weak))
+void cn1_register_class_initializer(int classId, cn1_class_init_t fn) {
+    (void)classId;
+    (void)fn;
+}
+
 __attribute__((weak))
 void cn1_debugger_register_static_accessor(int fieldId, cn1_static_accessor_t accessor) {
     (void)fieldId; (void)accessor;

@@ -111,6 +111,9 @@ public class InterpIOSLinker implements InterpLinker {
     }
 
     public Object findClass(String internalName) {
+        // Array descriptors resolve too: the interp-host build emits a class
+        // row per rank keyed by `[Ljava/lang/String;`, so `String[].class` is a
+        // lookup like any other rather than a NoClassDefFoundError.
         Integer cached = (Integer)classIdCache.get(internalName);
         if (cached != null) {
             return cached.intValue() < 0 ? null : cached;

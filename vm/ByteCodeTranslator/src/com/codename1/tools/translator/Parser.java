@@ -301,6 +301,35 @@ public class Parser extends ClassVisitor {
                 }
                 w.write(classSymbolRow(bc, src));
             }
+            // Array class rows, for the device runtime only. A pushed
+            // `String[].class` arrives as the descriptor `[Ljava/lang/String;`,
+            // and without a row naming it the lookup fails and the class
+            // literal raises NoClassDefFoundError for a type the app certainly
+            // has. The ids are the ones cn1_array_N_id_ defines, computed the
+            // same way: a fixed start, 100 reserved for primitive arrays, then
+            // three ranks per class in class order.
+            if (BytecodeMethod.isInterpHost()) {
+                int arrayId = classes.size() + 1 + 100;
+                for (ByteCodeClass bc : classes) {
+                    String jvmName = bc.getOriginalClassName();
+                    if (jvmName == null || jvmName.isEmpty()) {
+                        jvmName = bc.getClsName().replace('_', '/');
+                    }
+                    String element = "L" + jvmName + ";";
+                    for (int rank = 1; rank <= 3; rank++) {
+                        StringBuilder brackets = new StringBuilder();
+                        for (int i = 0; i < rank; i++) {
+                            brackets.append('[');
+                        }
+                        // A distinct mangled name, or a consumer keyed by that
+                        // column would map the class's own name to the array's
+                        // id -- the last row wins -- and lose the class.
+                        w.write("class\t" + arrayId + "\tarray" + rank + "__" + bc.getClsName()
+                                + "\t\t-1\t" + brackets + element + "\t\n");
+                        arrayId++;
+                    }
+                }
+            }
             // Emit instance-field metadata so the proxy can answer JDWP
             // ClassType.Fields / FieldsWithGeneric without a device round-trip,
             // and so ObjectReference.GetValues knows what (type, declaring class)
