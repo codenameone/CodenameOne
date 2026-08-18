@@ -55,12 +55,25 @@ import java.util.TimerTask;
 ///
 /// ```java
 /// SmartHome home = SmartHome.getInstance();
-/// if (home.getAvailability() == HomeAvailability.PERMISSION_REQUIRED) {
-///     home.requestAuthorization();
-///     return;
-/// }
+/// // refresh() connects, and connecting is what prompts. Until it has run,
+/// // getAvailability() answers NOT_STARTED on iOS -- it cannot know what the
+/// // user decided without asking the platform, and asking is the prompt.
 /// home.refresh().onResult((structures, err) -> {
 ///     if (err != null) {
+///         switch (home.getAvailability()) {
+///             case PERMISSION_REQUIRED:
+///                 home.requestAuthorization();
+///                 break;
+///             case PERMISSION_DENIED:
+///                 // Asked and refused. iOS never shows that prompt twice.
+///                 home.openHomeSettings();
+///                 break;
+///             case NOT_CONFIGURED:
+///                 home.openEcosystemApp();
+///                 break;
+///             default:
+///                 break;
+///         }
 ///         return;
 ///     }
 ///     HomeStructure h = home.getPrimaryStructure();

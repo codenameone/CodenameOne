@@ -100,7 +100,22 @@ public enum HomeAvailability {
     /// prompt shown and no way for the user to see what is being asked.
     /// Send them to [SmartHome#openHomeSettings()] instead.
     ///
-    /// Last in this enum, and new constants go after it: the ports carry
-    /// these across as ordinals.
-    PERMISSION_DENIED
+    /// New constants go after this one: the ports carry these across as
+    /// ordinals.
+    PERMISSION_DENIED,
+
+    /// Nothing has connected to the backend yet, so there is nothing to
+    /// report. Call [SmartHome#refresh()], which connects.
+    ///
+    /// Its own state rather than [#PERMISSION_REQUIRED], which iOS reported
+    /// on every cold launch: creating HomeKit's manager is what prompts, so
+    /// until something does, this process cannot tell a user who has already
+    /// authorized from one who has been asked and refused from one with no
+    /// home set up. Answering "not asked" for all three sent an app that
+    /// follows the documented branch into requestAuthorization() when the
+    /// user had already answered, and iOS asks once -- so nothing appeared on
+    /// screen and the app returned having done nothing.
+    ///
+    /// Last in this enum, and new constants go after it.
+    NOT_STARTED
 }

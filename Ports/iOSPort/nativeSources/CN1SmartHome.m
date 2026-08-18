@@ -1577,7 +1577,7 @@ static void cn1homeRebindWatches(NSString *accessoryId);
             getThreadLocalData(), pending, availability, JAVA_NULL);
         return;
     }
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil, nil);
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED, nil, nil);
 }
 
 - (void)homeManager:(HMHomeManager *)manager
@@ -1610,19 +1610,19 @@ static void cn1homeRebindWatches(NSString *accessoryId);
     // greyed its controls out on a refusal would leave them grey after the
     // user granted access, which is the state AVAILABILITY_CHANGED exists
     // to correct.
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_AVAILABILITY, nil, nil);
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_AVAILABILITY_CHANGED, nil, nil);
 }
 
 - (void)homeManager:(HMHomeManager *)manager didAddHome:(HMHome *)home {
     cn1homeRebuildSnapshot();
     cn1homeAttachDelegates();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)homeManager:(HMHomeManager *)manager didRemoveHome:(HMHome *)home {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
@@ -1661,68 +1661,68 @@ static void cn1homeRebindWatches(NSString *accessoryId);
 // graph", not "here is what changed", and the graph is a snapshot.
 - (void)homeDidUpdateName:(HMHome *)home {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didAddRoom:(HMRoom *)room {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didRemoveRoom:(HMRoom *)room {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didUpdateNameForRoom:(HMRoom *)room {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didAddZone:(HMZone *)zone {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didRemoveZone:(HMZone *)zone {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didUpdateNameForZone:(HMZone *)zone {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didAddRoom:(HMRoom *)room toZone:(HMZone *)zone {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home
         didRemoveRoom:(HMRoom *)room fromZone:(HMZone *)zone {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didAddActionSet:(HMActionSet *)actionSet {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didRemoveActionSet:(HMActionSet *)actionSet {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
@@ -1733,14 +1733,14 @@ static void cn1homeRebindWatches(NSString *accessoryId);
 - (void)home:(HMHome *)home
         didUpdateNameForActionSet:(HMActionSet *)actionSet {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home
         didUpdateActionsForActionSet:(HMActionSet *)actionSet {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES_CHANGED,
                            cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
@@ -1764,14 +1764,14 @@ static void cn1homeRebindWatches(NSString *accessoryId);
     // HMCharacteristic object under the same identifier and a notification
     // registration belongs to the object -- see cn1homeRebindWatches.
     cn1homeRebindWatches(cn1homeUuid([accessory uniqueIdentifier]));
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED, nil,
                            cn1homeUuid([accessory uniqueIdentifier]));
 }
 
 - (void)accessory:(HMAccessory *)accessory
         didUpdateNameForService:(HMService *)service {
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED, nil,
                            cn1homeUuid([accessory uniqueIdentifier]));
 }
 
@@ -1782,7 +1782,7 @@ static void cn1homeRebindWatches(NSString *accessoryId);
     // margin; if it ever shows up in a profile, the fix is a targeted patch
     // of the one record rather than dropping the notification.
     cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_REACHABILITY, nil,
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_REACHABILITY_CHANGED, nil,
                            cn1homeUuid([accessory uniqueIdentifier]));
 }
 
@@ -1864,7 +1864,7 @@ static void cn1homeInit(void) {
             // tied to a subscription -- an app with no subscriptions at all
             // still has a graph on screen.
             cn1homeRebuildSnapshot();
-            cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil, nil);
+            cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES_CHANGED, nil, nil);
             for (NSString *subscriptionId in [cn1homeWatches allKeys]) {
                 com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
                     getThreadLocalData(),
@@ -2207,10 +2207,17 @@ com_codename1_impl_ios_IOSNative_homeAvailability___R_int(
     cn1homeInit();
     JAVA_INT result;
     if (cn1homeManager == nil || !cn1homeHomesLoaded) {
-        // Nothing has connected yet. Reported as needing permission rather
-        // than as unavailable, because that is the state an app should react
-        // to by calling refresh() -- which is what connects.
-        result = CN1_HOME_AVAIL_PERMISSION_REQUIRED;
+        // Nothing has connected yet, and this process cannot find out what
+        // the user has decided without connecting: creating HMHomeManager is
+        // what prompts, and calling getAvailability() must not put a permission
+        // sheet on screen. So the honest answer is that nothing is known yet.
+        //
+        // Reported as PERMISSION_REQUIRED, this was the answer on every cold
+        // launch -- including for a user who authorized months ago, one who
+        // refused, and one with no home at all -- and an app following the
+        // documented branch called requestAuthorization(), which iOS answers
+        // once and never again: no sheet, no graph, nothing on screen.
+        result = CN1_HOME_AVAIL_NOT_STARTED;
     } else {
         HMHomeManagerAuthorizationStatus status =
                 [cn1homeManager authorizationStatus];
@@ -3928,10 +3935,10 @@ com_codename1_impl_ios_IOSNative_homeCommissioningStyle___R_int(
     if (!cn1homeSetupExtensionLoadable()) {
         // The same answer a build with no extension gives: the Apple Home app
         // can still add the accessory, and this OS cannot run our own flow.
-        return CN1_HOME_COMMISSION_APP_HANDOFF;
+        return CN1_HOME_COMMISSION_ECOSYSTEM_APP_HANDOFF;
     }
 #endif
-    return CN1_HOME_COMMISSION_OS_UI;
+    return CN1_HOME_COMMISSION_OS_OWNED_UI;
 #elif TARGET_OS_TV || TARGET_OS_WATCH || TARGET_OS_MACCATALYST || TARGET_OS_OSX
     // Not an iOS build that left the extension out -- a slice where
     // MatterSupport does not exist at all, which is why the header undefines
@@ -3942,7 +3949,7 @@ com_codename1_impl_ios_IOSNative_homeCommissioningStyle___R_int(
 #else
     // Not "none": the Apple Home app can still add the accessory, and telling
     // the app that is more useful than telling it nothing is possible.
-    return CN1_HOME_COMMISSION_APP_HANDOFF;
+    return CN1_HOME_COMMISSION_ECOSYSTEM_APP_HANDOFF;
 #endif
 }
 

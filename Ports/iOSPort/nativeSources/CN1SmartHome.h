@@ -45,8 +45,11 @@
 
 #import <Foundation/Foundation.h>
 
-// com.codename1.home.HomeAvailability ordinals. Keep in sync with the enum;
-// the order there is the contract and this is the only place it is repeated.
+// com.codename1.home.HomeAvailability ordinals. The order there is the
+// contract and this is the only place it is repeated, so every constant is
+// spelled with its Java name and NativeConstantParityTest compares the two:
+// appending to one of these enums silently repoints these defines, and the
+// failure is a device reporting the wrong state, which no build can show.
 #define CN1_HOME_AVAIL_AVAILABLE 0
 #define CN1_HOME_AVAIL_COMMISSIONING_ONLY 1
 #define CN1_HOME_AVAIL_PERMISSION_REQUIRED 2
@@ -58,6 +61,7 @@
 #define CN1_HOME_AVAIL_LOCAL_ONLY 8
 #define CN1_HOME_AVAIL_NOT_SUPPORTED 9
 #define CN1_HOME_AVAIL_PERMISSION_DENIED 10
+#define CN1_HOME_AVAIL_NOT_STARTED 11
 
 // com.codename1.home.HomeAuthorizationStatus ordinals.
 #define CN1_HOME_AUTH_NOT_DETERMINED 0
@@ -74,18 +78,18 @@
 #define CN1_HOME_KIND_ENUM 4
 
 // com.codename1.home.StructureChangeKind ordinals.
-#define CN1_HOME_CHANGE_STRUCTURES 0
+#define CN1_HOME_CHANGE_STRUCTURES_CHANGED 0
 #define CN1_HOME_CHANGE_ACCESSORY_ADDED 1
 #define CN1_HOME_CHANGE_ACCESSORY_REMOVED 2
 #define CN1_HOME_CHANGE_ACCESSORY_RENAMED 3
 #define CN1_HOME_CHANGE_ACCESSORY_MOVED 4
-#define CN1_HOME_CHANGE_REACHABILITY 5
-#define CN1_HOME_CHANGE_SCENES 6
-#define CN1_HOME_CHANGE_AVAILABILITY 7
+#define CN1_HOME_CHANGE_REACHABILITY_CHANGED 5
+#define CN1_HOME_CHANGE_SCENES_CHANGED 6
+#define CN1_HOME_CHANGE_AVAILABILITY_CHANGED 7
 
 // com.codename1.home.commissioning.CommissioningStyle ordinals.
-#define CN1_HOME_COMMISSION_OS_UI 0
-#define CN1_HOME_COMMISSION_APP_HANDOFF 1
+#define CN1_HOME_COMMISSION_OS_OWNED_UI 0
+#define CN1_HOME_COMMISSION_ECOSYSTEM_APP_HANDOFF 1
 #define CN1_HOME_COMMISSION_NONE 2
 
 #endif
