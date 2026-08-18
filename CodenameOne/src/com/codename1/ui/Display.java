@@ -3299,8 +3299,11 @@ public final class Display extends CN1Constants {
         int free = -1;
         for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
             if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
-                // Auto-repeat, or a press the matching release never arrived for.
-                keyPressTargets[iter] = target;
+                // Already held. The native ports forward every autorepeat as another
+                // press, so replacing the target here handed the key to whichever
+                // window had focus when the repeat arrived -- and the eventual key-up
+                // then went there instead of to the window that saw the original
+                // press, leaving a fire-key-activated Button stuck down.
                 return;
             }
             if (free < 0 && keyPressTargets[iter] == null) {
@@ -3578,6 +3581,15 @@ public final class Display extends CN1Constants {
             // application modal for a press the component never received.
             if (type == POINTER_PRESSED || type == POINTER_PRESSED_MULTI) {
                 cancelLongPress(windowId);
+            }
+            // The same for the keyboard. keyPressedImpl arms this window's key repeat
+            // and long-key timers before modality has had a say, and the paint loop
+            // fires keyRepeated and longKeyPress directly without consulting the
+            // filter again -- so holding a key could drive a component behind a modal
+            // that never received the press. I fixed the pointer half of this and did
+            // not check the keyboard half at the time.
+            if (type == KEY_PRESSED) {
+                cancelKeyRepeat(windowId);
             }
             // NOTE: drain the packet rather than returning offset unchanged. The
             // caller loops while (offset < end), so returning it unchanged spins the

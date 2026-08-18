@@ -1544,6 +1544,77 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aBlockedWindowsKeyPressDoesNotLeaveTimersArmed() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window blocked = new Window("blocked keys", new BorderLayout());
+        blocked.add(BorderLayout.CENTER, new Label("content"));
+        blocked.setWindowSize(300, 200);
+        blocked.show();
+
+        Window modal = new Window("modal");
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+
+        // keyPressedImpl arms the repeat and long-key timers before modality has had
+        // a say, and the paint loop fires them directly without re-checking, so
+        // holding a key could drive a component behind the modal.
+        // A positive key code, because the timers are only armed for a code that can
+        // repeat -- with a negative one the test would pass without testing anything,
+        // which is what the first version of it did.
+        Display.getInstance().windowKeyPressed(blocked.getWindowId(), 65);
+        DisplayTest.flushEdt();
+        boolean armed = keyRepeatArmedFor(blocked.getWindowId());
+
+        modal.dispose();
+        blocked.dispose();
+        assertFalse(armed,
+                "a key press rejected by modality must not leave its timers armed");
+    }
+
+    /// Reads Display's per-window key repeat table, which has no public accessor.
+    private static boolean keyRepeatArmedFor(int windowId) throws Exception {
+        java.lang.reflect.Field wf = Display.class.getDeclaredField("keyRepeatWindows");
+        java.lang.reflect.Field af = Display.class.getDeclaredField("keyRepeatArmed");
+        wf.setAccessible(true);
+        af.setAccessible(true);
+        int[] windows = (int[]) wf.get(Display.getInstance());
+        boolean[] armed = (boolean[]) af.get(Display.getInstance());
+        for (int iter = 0; iter < windows.length; iter++) {
+            if (windows[iter] == windowId && armed[iter]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @FormTest
+    void anAutorepeatInAnotherWindowKeepsTheOriginalPressTarget() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        Display.getInstance().keyPressed(-97);
+        // The native ports forward every autorepeat as another press; this one
+        // arrives while the other window has focus.
+        Display.getInstance().windowKeyPressed(w.getWindowId(), -97);
+        Display.getInstance().keyReleased(-97);
+        DisplayTest.flushEdt();
+        int released = mainKeys.released;
+        w.dispose();
+
+        assertEquals(1, released,
+                "a repeat elsewhere must not steal the original press's target");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

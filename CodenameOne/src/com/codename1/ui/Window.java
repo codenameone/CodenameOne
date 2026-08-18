@@ -26,6 +26,7 @@ import com.codename1.impl.WindowManager;
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
@@ -1953,8 +1954,7 @@ public class Window extends Container implements TopLevelContainer {
         // exactly as on a Form. Without this a right click in a window never reached
         // the component's context menu listener, and an unconsumed right press could
         // then activate the component as an ordinary click.
-        if (Display.getInstance().getPointerButton()
-                == com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY) {
+        if (Display.getInstance().getPointerButton() == PointerEvent.BUTTON_SECONDARY) {
             Component ctxCmp = resolveComponentAt(x, y);
             if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
                 return;
