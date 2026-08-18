@@ -107,6 +107,27 @@ class MultiWindowGraphicsRoutingTest {
     }
 
     @Test
+    void disposingAWindowReleasesItsGlobalGestureListener() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port);
+
+        java.awt.Toolkit toolkit = java.awt.Toolkit.getDefaultToolkit();
+        int before = toolkit.getAWTEventListeners(java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK).length;
+
+        JavaSEPort.C canvas = port.createWindowCanvas(11);
+        int during = toolkit.getAWTEventListeners(java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK).length;
+        canvas.disposeGestureListeners();
+        int after = toolkit.getAWTEventListeners(java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK).length;
+
+        // The Toolkit holds its listeners for the life of the VM, so a window that
+        // never releases one leaks the canvas and its whole hierarchy, and keeps
+        // inspecting every wheel event in the application.
+        assertTrue(during >= before, "the canvas registers a global wheel listener");
+        assertEquals(before, after, "disposing must hand that listener back");
+    }
+
+    @Test
     void layingOutASecondaryCanvasDoesNotResizeTheMainSurface() throws Exception {
         assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
         JavaSEPort port = JavaSEPort.instance;

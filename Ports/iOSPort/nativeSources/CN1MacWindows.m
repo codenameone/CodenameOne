@@ -46,6 +46,7 @@ extern void CN1MacWindowDeliverHover(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY);
 extern void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y);
 extern void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y);
+extern void cn1CapturePointerMetadata(UITouch* touch);
 
 /* The main view controller's UIKey mapping, shared so the two cannot drift. */
 extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
@@ -85,6 +86,12 @@ extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
     if (t == nil) {
         return;
     }
+    /* Capture the pointer type, pressure and tilt before the event is queued, the
+     * same way the main surface's touch handlers do. Without it the queued event
+     * carries the defaults, so a pen reads as an ordinary touch -- and the stylus
+     * listeners the framework dispatches in a Window stayed silent no matter what
+     * the Java side did. */
+    cn1CapturePointerMetadata(t);
     /* UIKit reports the location in points while the window is laid out in device
      * pixels -- the resize path multiplies by the screen scale -- so an unscaled
      * coordinate arrives at half its rendered position on a Retina display and only

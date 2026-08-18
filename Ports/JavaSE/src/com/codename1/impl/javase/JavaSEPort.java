@@ -3109,7 +3109,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
-        private void disposeGestureListeners() {
+        /// Package private so JavaSEWindowManager can release the global Toolkit
+        /// listener when the window is disposed; otherwise it outlives the canvas.
+        void disposeGestureListeners() {
             if (magnificationWheelFallbackListener != null) {
                 try {
                     Toolkit.getDefaultToolkit().removeAWTEventListener(magnificationWheelFallbackListener);

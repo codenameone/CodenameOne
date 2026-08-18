@@ -309,6 +309,15 @@ public class JavaSEWindowManager extends WindowManager {
         runOnAwt(new Runnable() {
             @Override
             public void run() {
+                // Before the frame goes: the canvas registers an AWTEventListener on
+                // the global Toolkit for the magnification wheel fallback, and the
+                // Toolkit holds it for the life of the VM. Disposing only the frame
+                // left that listener retaining the canvas and its whole hierarchy,
+                // and inspecting every wheel event in the application, once per
+                // window ever opened.
+                if (p.canvas != null) {
+                    p.canvas.disposeGestureListeners();
+                }
                 p.frame.dispose();
             }
         });
