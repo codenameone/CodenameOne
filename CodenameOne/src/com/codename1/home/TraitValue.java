@@ -422,6 +422,11 @@ public final class TraitValue {
     /// meaningful only in terms of the backend that produced it -- read
     /// [SmartHome#getBackend()] before interpreting it. Zero otherwise.
     ///
+    /// Deliberately outside [#equals(java.lang.Object)]: it is metadata about
+    /// where a value came from, not part of the value. Two readings that are
+    /// equal can carry different raw ordinals, which is exactly the lossiness
+    /// this exists to expose -- compare these explicitly when that matters.
+    ///
     /// #### Returns
     ///
     /// the platform's own ordinal, or zero
@@ -452,10 +457,13 @@ public final class TraitValue {
         if (Double.compare(numeric, other.numeric) != 0) {
             return false;
         }
-        if (hasRawPlatformValue != other.hasRawPlatformValue
-                || rawPlatformValue != other.rawPlatformValue) {
-            return false;
-        }
+        // The canonical value, and not the platform's own ordinal beside it.
+        // That ordinal is diagnostic metadata a port attaches where the
+        // mapping is lossy -- every iOS LOCK_STATE and AIR_QUALITY reading
+        // carries one and no value an app builds ever does -- so comparing it
+        // made a reading unequal to the value it plainly is. See
+        // getRawPlatformValue() for the cases where two values that are equal
+        // here still came from different platform states.
         return text == null ? other.text == null : text.equals(other.text);
     }
 
@@ -465,8 +473,8 @@ public final class TraitValue {
         result = 31 * result + unit.hashCode();
         long bits = Double.doubleToLongBits(numeric);
         result = 31 * result + (int) (bits ^ (bits >>> 32));
+        // Without the raw platform ordinal, which equals() does not compare.
         result = 31 * result + (text == null ? 0 : text.hashCode());
-        result = 31 * result + (hasRawPlatformValue ? rawPlatformValue : 0);
         return result;
     }
 

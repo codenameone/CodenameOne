@@ -162,6 +162,29 @@ class TraitValueTest {
     }
 
     /**
+     * A raw platform ordinal does not change what a value IS.
+     *
+     * <p>Every iOS LOCK_STATE and AIR_QUALITY reading carries the platform's
+     * own ordinal beside the canonical value, and no value an app builds ever
+     * does -- so comparing it made a reading unequal to the value it plainly
+     * is, and the desired-versus-actual comparison stayed false even once the
+     * enum name was there.</p>
+     */
+    @Test
+    void rawPlatformMetadataIsNotPartOfTheValue() {
+        TraitValue canonical = TraitValue.ofEnum(LockState.SECURED);
+        TraitValue fromIos = canonical.withRawPlatformValue(7);
+
+        assertEquals(canonical, fromIos,
+                "the platform's own ordinal is metadata, not the value");
+        assertEquals(canonical.hashCode(), fromIos.hashCode(),
+                "and a map keyed on values has to agree with equals");
+        assertTrue(fromIos.hasRawPlatformValue(),
+                "while the metadata itself is still there to read");
+        assertEquals(7, fromIos.getRawPlatformValue());
+    }
+
+    /**
      * The escape hatch for lossy mappings. Without it, every judgment call
      * made in the trait table would be a permanent lie to an app that needs
      * the platform's own answer.
