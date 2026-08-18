@@ -1813,6 +1813,9 @@ public final class InterpRuntime {
         if ("getComponentType".equals(name) && args.length == 0) {
             return c.arrayComponent;
         }
+        if ("getSimpleName".equals(name) && args.length == 0 && c.isArray()) {
+            return classCall(c.arrayComponent, "getSimpleName", args) + "[]";
+        }
         if ("getSimpleName".equals(name) && args.length == 0) {
             String n = c.getName();
             int slash = n.lastIndexOf('/');
@@ -1836,10 +1839,12 @@ public final class InterpRuntime {
         if ("isInstance".equals(name) && args.length == 1) {
             return isInstanceOf(args[0], c.getName()) ? Boolean.TRUE : Boolean.FALSE;
         }
-        if ("getSimpleName".equals(name) && args.length == 0 && c.isArray()) {
-            return classCall(c.arrayComponent, "getSimpleName", args) + "[]";
-        }
         if ("getSuperclass".equals(name) && args.length == 0) {
+            if (c.isArray()) {
+                // Every array class reports Object, whatever its component is.
+                Object object = linker.findClass("java/lang/Object");
+                return object == null ? null : linker.classObject(object);
+            }
             if (c.superInterp != null) {
                 return c.superInterp;
             }
@@ -1849,7 +1854,9 @@ public final class InterpRuntime {
             if (c.isInterface() || c.superExtern < 0) {
                 return null;
             }
-            return resolveExternClass(c.superExtern);
+            // classObject, because on iOS a resolved class is a numeric handle
+            // and the caller is about to treat this as a java.lang.Class.
+            return linker.classObject(resolveExternClass(c.superExtern));
         }
         return NOT_CLASS_METHOD;
     }

@@ -216,23 +216,45 @@ public final class InterpClass {
 
     /// The interfaces ordered so a supertype is copied before its subtype.
     ///
-    /// Insertion sort over "does A extend B": the arrays here have a handful of
-    /// entries at most, and the relation is a partial order, so anything
-    /// cleverer would be more machinery than the problem deserves.
+    /// A selection sort rather than an insertion sort: "extends" is a partial
+    /// order, so an unrelated interface sitting between two related ones is not
+    /// a barrier and an insertion sort that stops at the first non-swap leaves
+    /// `C implements B, X, A` (with `B extends A`) in exactly the wrong order.
+    /// This repeatedly takes an interface that nothing remaining is a supertype
+    /// of, which is well defined however the interfaces are interleaved.
     private static InterpClass[] sortBySpecificity(InterpClass[] ifaces) {
+        InterpClass[] remaining = new InterpClass[ifaces.length];
+        System.arraycopy(ifaces, 0, remaining, 0, ifaces.length);
         InterpClass[] out = new InterpClass[ifaces.length];
-        System.arraycopy(ifaces, 0, out, 0, ifaces.length);
-        for (int i = 1; i < out.length; i++) {
-            for (int j = i; j > 0; j--) {
-                if (out[j] != null && out[j - 1] != null
-                        && extendsInterface(out[j - 1], out[j])) {
-                    InterpClass tmp = out[j - 1];
-                    out[j - 1] = out[j];
-                    out[j] = tmp;
-                } else {
+        for (int written = 0; written < out.length; written++) {
+            int pick = -1;
+            for (int i = 0; i < remaining.length; i++) {
+                if (remaining[i] == null) {
+                    continue;
+                }
+                boolean anyBelow = false;
+                for (int j = 0; j < remaining.length; j++) {
+                    if (j != i && remaining[j] != null
+                            && extendsInterface(remaining[j], remaining[i])) {
+                        // remaining[i] is a supertype of something still here,
+                        // so it has to be copied first.
+                        anyBelow = true;
+                        break;
+                    }
+                }
+                if (anyBelow) {
+                    pick = i;
                     break;
                 }
+                if (pick < 0) {
+                    pick = i;
+                }
             }
+            if (pick < 0) {
+                break;
+            }
+            out[written] = remaining[pick];
+            remaining[pick] = null;
         }
         return out;
     }

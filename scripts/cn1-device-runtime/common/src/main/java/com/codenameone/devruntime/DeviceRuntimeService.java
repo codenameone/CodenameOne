@@ -697,6 +697,14 @@ public class DeviceRuntimeService {
         String main = bundle.getMainClass();
         loadedName = main == null ? "" : main.replace('/', '.');
 
+        // Detach whatever was running first. A replaced program's peers are
+        // still held by framework listeners and timers, and without this they
+        // go on dispatching into the old runtime alongside the new one -- and
+        // Stop, later, would only detach the newest.
+        InterpRuntime previous = runtime;
+        if (previous != null) {
+            previous.detach();
+        }
         ShimObjectFactory factory = new ShimObjectFactory();
         final InterpRuntime rt = new InterpRuntime(bundle, InterpPlatform.getLinker(), factory);
         factory.attach(rt);
