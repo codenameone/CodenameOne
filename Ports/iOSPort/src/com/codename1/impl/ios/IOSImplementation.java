@@ -1870,19 +1870,32 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     /// Invoked for a trackpad magnify over a secondary window.
-    public static void windowPinchCallback(int windowId, float scale, int x, int y) {
+    public static void windowPinchCallback(final int windowId, final float scale,
+            final int x, final int y) {
         if (dropEvents) {
             return;
         }
-        Display.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+        // On the event dispatch thread, not UIKit's main thread: this hit tests the
+        // window's hierarchy and runs application pinch handlers.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Display.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+            }
+        });
     }
 
     /// Invoked for a trackpad rotation over a secondary window.
-    public static void windowRotationCallback(int windowId, float radians, int x, int y) {
+    public static void windowRotationCallback(final int windowId, final float radians,
+            final int x, final int y) {
         if (dropEvents) {
             return;
         }
-        Display.getInstance().windowRotationGesture(windowId, x, y, radians);
+        // Marshalled for the same reason as windowPinchCallback.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Display.getInstance().windowRotationGesture(windowId, x, y, radians);
+            }
+        });
     }
 
     /// Invoked when a window gains or loses keyboard focus.
@@ -1978,20 +1991,33 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked from the native magnify (pinch) gesture recognizer, used by the Mac Catalyst trackpad
     /// pinch and the iOS two finger pinch. Routes to the cross-platform pinch gesture dispatch.
-    public static void pinchMagnifyCallback(float scale, int x, int y) {
+    public static void pinchMagnifyCallback(final float scale, final int x, final int y) {
         if (dropEvents || instance == null) {
             return;
         }
-        com.codename1.ui.Display.getInstance().fireMagnifyGesture(x, y, scale);
+        // Marshalled: the recognizer fires on UIKit's main thread while this hit tests
+        // the hierarchy and runs application pinch handlers, which would race the
+        // event dispatch thread's painting and layout. The pointer path is safe
+        // without this only because it enqueues rather than dispatching in place.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Display.getInstance().fireMagnifyGesture(x, y, scale);
+            }
+        });
     }
 
     /// Invoked from the native rotation gesture recognizer (Mac Catalyst trackpad rotate / iOS two
     /// finger rotate). Routes to the cross-platform rotation gesture dispatch.
-    public static void rotationGestureCallback(float radians, int x, int y) {
+    public static void rotationGestureCallback(final float radians, final int x, final int y) {
         if (dropEvents || instance == null) {
             return;
         }
-        com.codename1.ui.Display.getInstance().fireRotationGesture(x, y, radians);
+        // Marshalled for the same reason as pinchMagnifyCallback.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Display.getInstance().fireRotationGesture(x, y, radians);
+            }
+        });
     }
 
     protected void pointerPressed(final int[] x, final int[] y) {

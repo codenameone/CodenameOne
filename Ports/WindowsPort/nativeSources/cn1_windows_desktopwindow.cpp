@@ -125,26 +125,35 @@ typedef struct {
 } CN1MonitorTable;
 
 static CN1MonitorTable g_monitors;
+/* The table is refreshed from two threads: the event dispatch thread through
+ * Desktop.getMonitors(), and the window pump thread from WM_MOVE, WM_DPICHANGED and
+ * WM_DISPLAYCHANGE. Enumerating straight into the shared table let one refresh
+ * observe the other's partially built state -- duplicate or half-initialised
+ * monitors, and with enough displays a count past the array. Each refresh now builds
+ * a local table and publishes it under this lock, and every reader takes it shared.
+ * A plain SRWLOCK needs no initialisation, which matters because there is no single
+ * point where this file is set up. */
+static SRWLOCK g_monitorLock = SRWLOCK_INIT;
 
 static BOOL CALLBACK cn1WinMonitorEnum(HMONITOR mon, HDC hdc, LPRECT rect, LPARAM data) {
     MONITORINFO info;
+    CN1MonitorTable* out = (CN1MonitorTable*) data;
     (void) hdc;
     (void) rect;
-    (void) data;
-    if (g_monitors.count >= CN1_MAX_DESKTOP_WINDOWS) {
+    if (out == NULL || out->count >= CN1_MAX_DESKTOP_WINDOWS) {
         return FALSE;
     }
     ZeroMemory(&info, sizeof(info));
     info.cbSize = sizeof(info);
     if (GetMonitorInfoW(mon, &info)) {
-        int i = g_monitors.count;
-        g_monitors.handles[i] = mon;
-        g_monitors.bounds[i] = info.rcMonitor;
-        g_monitors.work[i] = info.rcWork;
+        int i = out->count;
+        out->handles[i] = mon;
+        out->bounds[i] = info.rcMonitor;
+        out->work[i] = info.rcWork;
         if (info.dwFlags & MONITORINFOF_PRIMARY) {
-            g_monitors.primary = i;
+            out->primary = i;
         }
-        g_monitors.count++;
+        out->count++;
     }
     return TRUE;
 }
@@ -153,33 +162,47 @@ static BOOL CALLBACK cn1WinMonitorEnum(HMONITOR mon, HDC hdc, LPRECT rect, LPARA
  * across time, because a display can be unplugged or reconfigured at any moment
  * and a stale table would place windows off-screen. */
 static void cn1WinRefreshMonitors(void) {
-    g_monitors.count = 0;
-    g_monitors.primary = 0;
-    EnumDisplayMonitors(NULL, NULL, cn1WinMonitorEnum, 0);
-    if (g_monitors.count == 0) {
+    CN1MonitorTable built;
+    ZeroMemory(&built, sizeof(built));
+    EnumDisplayMonitors(NULL, NULL, cn1WinMonitorEnum, (LPARAM) &built);
+    if (built.count == 0) {
         /* Degenerate but survivable: report the virtual screen as one monitor. */
         RECT r;
         r.left = 0;
         r.top = 0;
         r.right = GetSystemMetrics(SM_CXSCREEN);
         r.bottom = GetSystemMetrics(SM_CYSCREEN);
-        g_monitors.bounds[0] = r;
-        g_monitors.work[0] = r;
-        g_monitors.handles[0] = NULL;
-        g_monitors.count = 1;
+        built.bounds[0] = r;
+        built.work[0] = r;
+        built.handles[0] = NULL;
+        built.count = 1;
     }
+    /* Published in one step, so a reader never sees a half-enumerated table. */
+    AcquireSRWLockExclusive(&g_monitorLock);
+    g_monitors = built;
+    ReleaseSRWLockExclusive(&g_monitorLock);
+}
+
+/* A consistent copy of the table for readers, so a refresh mid-read cannot change
+ * the count out from under an index that was already validated against it. */
+static void cn1WinMonitorSnapshot(CN1MonitorTable* out) {
+    AcquireSRWLockShared(&g_monitorLock);
+    *out = g_monitors;
+    ReleaseSRWLockShared(&g_monitorLock);
 }
 
 static int cn1WinMonitorIndexForHwnd(HWND hwnd) {
     HMONITOR mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    CN1MonitorTable t;
     int iter;
     cn1WinRefreshMonitors();
-    for (iter = 0; iter < g_monitors.count; iter++) {
-        if (g_monitors.handles[iter] == mon) {
+    cn1WinMonitorSnapshot(&t);
+    for (iter = 0; iter < t.count; iter++) {
+        if (t.handles[iter] == mon) {
             return iter;
         }
     }
-    return g_monitors.primary;
+    return t.primary;
 }
 
 /*
@@ -192,18 +215,20 @@ typedef HRESULT (WINAPI *CN1GetDpiForMonitor)(HMONITOR, int, UINT*, UINT*);
 
 static int cn1WinMonitorDpi(int monitor) {
     HMODULE shcore;
-    if (monitor < 0 || monitor >= g_monitors.count) {
+    CN1MonitorTable t;
+    cn1WinMonitorSnapshot(&t);
+    if (monitor < 0 || monitor >= t.count) {
         return 96;
     }
     shcore = LoadLibraryW(L"shcore.dll");
     if (shcore != NULL) {
         CN1GetDpiForMonitor fn =
                 (CN1GetDpiForMonitor) GetProcAddress(shcore, "GetDpiForMonitor");
-        if (fn != NULL && g_monitors.handles[monitor] != NULL) {
+        if (fn != NULL && t.handles[monitor] != NULL) {
             UINT dpiX = 96;
             UINT dpiY = 96;
             /* 0 == MDT_EFFECTIVE_DPI */
-            if (SUCCEEDED(fn(g_monitors.handles[monitor], 0, &dpiX, &dpiY))) {
+            if (SUCCEEDED(fn(t.handles[monitor], 0, &dpiX, &dpiY))) {
                 FreeLibrary(shcore);
                 return (int) dpiX;
             }
@@ -810,28 +835,34 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetState___int_i
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_monitorCount___R_int(
         CODENAME_ONE_THREAD_STATE) {
+    CN1MonitorTable t;
     cn1WinRefreshMonitors();
-    return g_monitors.count;
+    cn1WinMonitorSnapshot(&t);
+    return t.count;
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_primaryMonitor___R_int(
         CODENAME_ONE_THREAD_STATE) {
+    CN1MonitorTable t;
     cn1WinRefreshMonitors();
-    return g_monitors.primary;
+    cn1WinMonitorSnapshot(&t);
+    return t.primary;
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_monitorBounds___int_boolean_int_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
     JAVA_ARRAY_INT* data;
     RECT r;
+    CN1MonitorTable t;
     if (out == JAVA_NULL) {
         return;
     }
     cn1WinRefreshMonitors();
-    if (monitor < 0 || monitor >= g_monitors.count) {
-        monitor = g_monitors.primary;
+    cn1WinMonitorSnapshot(&t);
+    if (monitor < 0 || monitor >= t.count) {
+        monitor = t.primary;
     }
-    r = workArea == JAVA_TRUE ? g_monitors.work[monitor] : g_monitors.bounds[monitor];
+    r = workArea == JAVA_TRUE ? t.work[monitor] : t.bounds[monitor];
     data = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) out).data;
     if ((*(JAVA_ARRAY) out).length >= 4) {
         data[0] = r.left;
@@ -851,8 +882,10 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_monitorForWindow___int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot) {
     CN1DesktopWindow* w = slotAt(slot);
     if (w == NULL) {
+        CN1MonitorTable t;
         cn1WinRefreshMonitors();
-        return g_monitors.primary;
+        cn1WinMonitorSnapshot(&t);
+        return t.primary;
     }
     return cn1WinMonitorIndexForHwnd(w->hwnd);
 }
@@ -864,8 +897,10 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_monitorForWindow___int_R_int(
 JAVA_INT com_codename1_impl_windows_WindowsNative_monitorForMainWindow___R_int(
         CODENAME_ONE_THREAD_STATE) {
     if (cn1Win.hwnd == NULL) {
+        CN1MonitorTable t;
         cn1WinRefreshMonitors();
-        return g_monitors.primary;
+        cn1WinMonitorSnapshot(&t);
+        return t.primary;
     }
     return cn1WinMonitorIndexForHwnd(cn1Win.hwnd);
 }

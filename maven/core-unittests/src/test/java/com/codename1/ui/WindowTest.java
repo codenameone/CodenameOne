@@ -1031,6 +1031,46 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aReleaseFinishingAPressSurvivesAModalOpenedByThatPress() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("presser", new BorderLayout());
+        final KeyCountingComponent keys = new KeyCountingComponent();
+        w.add(BorderLayout.CENTER, keys);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(keys);
+
+        Display.getInstance().windowKeyPressed(w.getWindowId(), -94);
+        DisplayTest.flushEdt();
+
+        // The press handler opens an application modal, so the release arrives with
+        // its own window blocked. Dropping it strands the component in its pressed
+        // state for good and never clears the recorded target, so the *next* release
+        // matches the wrong thing. Modality is there to stop new interaction, not to
+        // abandon a gesture already under way.
+        Window modal = new Window("modal");
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+
+        Display.getInstance().windowKeyReleased(w.getWindowId(), -94);
+        DisplayTest.flushEdt();
+        int released = keys.released;
+
+        // A press that never happened stays blocked: this one leaves no record.
+        Display.getInstance().windowKeyPressed(w.getWindowId(), -95);
+        DisplayTest.flushEdt();
+        int pressedWhileBlocked = keys.pressed;
+
+        modal.dispose();
+        w.dispose();
+
+        assertEquals(1, released,
+                "the release completing an accepted press must reach its target");
+        assertEquals(1, pressedWhileBlocked,
+                "but a new press on a blocked window must still be dropped");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

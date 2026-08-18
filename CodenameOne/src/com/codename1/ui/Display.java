@@ -2971,6 +2971,39 @@ public final class Display extends CN1Constants {
         callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));
     }
 
+    /// Whether this release finishes a press the framework already accepted.
+    ///
+    /// A press handler is allowed to open a modal window, and then the matching
+    /// release arrives with its own window blocked. Dropping it leaves the component
+    /// that took the press latched down for good and the recorded target never
+    /// cleared, so the next release matches the wrong thing. Modality is there to stop
+    /// *new* interaction, not to strand a gesture that was already under way.
+    ///
+    /// Only a release with a recorded press passes. A press that was itself filtered
+    /// leaves no record, so clicking a blocked window still does nothing.
+    private boolean completesAcceptedPress(int type, int offset, int[] stack) {
+        switch (type) {
+            case KEY_RELEASED:
+                // The key code is the packet's first argument.
+                return hasKeyPressTarget(stack[offset + 1]);
+            case POINTER_RELEASED:
+            case POINTER_RELEASED_MULTI:
+                return pointerEventTarget != null;
+            default:
+                return false;
+        }
+    }
+
+    /// Whether a press for this key is recorded, without consuming it.
+    private boolean hasKeyPressTarget(int keyCode) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Whether this packet is user input, and so subject to modal blocking.
     ///
     /// Modality blocks what the user does to a window, not what the platform tells the
@@ -3204,7 +3237,8 @@ public final class Display extends CN1Constants {
 
         // might happen when returning from a deinitialized version of Codename One,
         // or when a window was disposed while its events were still in flight
-        if (f == null || (isUserInputEvent(type) && isBlockedByModal(windowId))) {
+        if (f == null || (isUserInputEvent(type) && isBlockedByModal(windowId)
+                && !completesAcceptedPress(type, offset, inputEventStackTmp))) {
             // NOTE: drain the packet rather than returning offset unchanged. The
             // caller loops while (offset < end), so returning it unchanged spins the
             // EDT forever, and returning a sentinel would drop the rest of the batch
