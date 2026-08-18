@@ -10841,6 +10841,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private int historyIndex;
 
+    /**
+     * Stamps the entry the first form appears on as this session's root.
+     *
+     * <p>A reload keeps the entry it happened on, including any id this port stamped into it
+     * before the reload, while these counters start again from zero. Left alone, a Back to that
+     * entry would restore an id above anything the new session has pushed, be read as a forward
+     * traversal, and spend entries instead of returning to the first form. Overwriting it makes
+     * the entry say what it now is: the one before everything this session pushes.</p>
+     */
+    private void claimHistoryRoot() {
+        if (historyUnavailable) {
+            return;
+        }
+        try {
+            window.getHistory().replaceState(HISTORY_STATE_PREFIX + historyIndex, "");
+        } catch (Throwable ignored) {
+            // A document that refuses to rewrite its own entry will refuse to push one too, and
+            // pushHistoryState is where that is noticed and acted on. Nothing was promised here.
+        }
+    }
+
     private void pushHistoryState() {
         if (handlingPopState) {
             return;
@@ -11246,6 +11267,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // form took two presses.
             historyRootShown = true;
             historyStack.add(f);
+            claimHistoryRoot();
             return;
         }
         int depth = historyStack.size();
