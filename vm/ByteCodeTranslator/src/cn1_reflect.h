@@ -117,6 +117,18 @@ extern void cn1_debugger_register_class(int classId, struct clazz* cls);
 /** Publishes one method's invoke thunk under its methodId. */
 extern void cn1_debugger_register_invoke_thunk(int methodId, cn1_invoke_thunk_t thunk);
 
+/** A class's generated static initializer, which is idempotent. */
+typedef void (*cn1_class_init_t)(struct ThreadLocalData* threadStateData);
+
+/**
+ * Publishes a class's static initializer under its classId.
+ *
+ * The device runtime initializes a host superclass before an interpreted
+ * subclass's own initializer runs, and reading a static field -- the other way
+ * to reach an initializer -- does not exist for a class that declares none.
+ */
+extern void cn1_register_class_initializer(int classId, cn1_class_init_t fn);
+
 /**
  * Translator-emitted accessor for one static field.
  *

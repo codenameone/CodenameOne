@@ -98,6 +98,20 @@ public class InterpAndroidLinker implements InterpLinker {
         }
     }
 
+    public boolean declaresDefaultMethod(String internalName) {
+        Object c = findClass(internalName);
+        if (!(c instanceof Class) || !((Class)c).isInterface()) {
+            return false;
+        }
+        java.lang.reflect.Method[] methods = ((Class)c).getDeclaredMethods();
+        for (int i = 0; i < methods.length; i++) {
+            if (methods[i].isDefault()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Class resolve(String internalName) throws ClassNotFoundException {
         if (internalName.length() == 1) {
             switch (internalName.charAt(0)) {

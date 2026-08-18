@@ -1256,13 +1256,14 @@ public final class InterpRuntime {
                 ensureInitialized(iface);
             }
         }
-        // Host interfaces as well. Whether one declares a default method is not
-        // something the bundle records, and asking the host is not worth a
-        // round trip per interface -- initializing it is idempotent and its
-        // static state is built by the app either way, so the only thing at
-        // stake is the order, which this fixes.
+        // Host interfaces too, and under the same rule: only the ones that
+        // declare a default method. The bundle does not record that -- the
+        // interface belongs to the app -- so the platform is asked.
         for (int i = 0; i < c.hostInterfaces.length; i++) {
-            linker.initializeClass(externOwnerName(c.hostInterfaces[i]));
+            String iface = externOwnerName(c.hostInterfaces[i]);
+            if (linker.declaresDefaultMethod(iface)) {
+                linker.initializeClass(iface);
+            }
         }
     }
 

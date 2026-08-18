@@ -513,3 +513,62 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_newObjectArray___int_int_R_ja
     return allocArray(threadStateData, length, &class_array1__java_lang_Object,
                       sizeof(JAVA_OBJECT), 1);
 }
+
+/*
+ * The class-initializer registry.
+ *
+ * ParparVM initializes a class on first entry into one of its methods and from
+ * the generated static-field accessors. Neither is something the device runtime
+ * can reach for a class that declares no static field and whose methods it has
+ * no reason to call -- and it has to initialize a host superclass before an
+ * interpreted subclass's own initializer runs, or the parent's static state is
+ * built after the child's.
+ *
+ * So the interp-host build registers every class's __STATIC_INITIALIZER_ here,
+ * from the same __attribute__((constructor)) that publishes its fields, and the
+ * runtime asks for one by class id. The generated function is idempotent, so a
+ * request for a class that is already initialized costs a comparison.
+ */
+static cn1_class_init_t* g_classInits = NULL;
+static int g_classInitCap = 0;
+static pthread_mutex_t g_classInitMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void cn1_register_class_initializer(int classId, cn1_class_init_t fn) {
+    if (classId < 0 || fn == NULL) {
+        return;
+    }
+    pthread_mutex_lock(&g_classInitMutex);
+    if (classId >= g_classInitCap) {
+        int newCap = g_classInitCap == 0 ? 1024 : g_classInitCap * 2;
+        while (classId >= newCap) {
+            newCap *= 2;
+        }
+        cn1_class_init_t* n = (cn1_class_init_t*)realloc(
+                g_classInits, newCap * sizeof(cn1_class_init_t));
+        if (!n) {
+            pthread_mutex_unlock(&g_classInitMutex);
+            return;
+        }
+        memset(n + g_classInitCap, 0,
+               (newCap - g_classInitCap) * sizeof(cn1_class_init_t));
+        g_classInits = n;
+        g_classInitCap = newCap;
+    }
+    g_classInits[classId] = fn;
+    pthread_mutex_unlock(&g_classInitMutex);
+}
+
+JAVA_VOID com_codename1_impl_ios_InterpIOSNative_initializeClassById___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT classId) {
+    cn1_class_init_t fn = NULL;
+    pthread_mutex_lock(&g_classInitMutex);
+    if (classId >= 0 && classId < g_classInitCap) {
+        fn = g_classInits[classId];
+    }
+    pthread_mutex_unlock(&g_classInitMutex);
+    if (fn != NULL) {
+        /* Outside the lock: the initializer runs arbitrary Java, which may
+           initialize another class and re-enter this. */
+        fn(threadStateData);
+    }
+}

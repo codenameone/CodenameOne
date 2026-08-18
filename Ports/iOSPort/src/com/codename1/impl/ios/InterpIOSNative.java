@@ -92,6 +92,15 @@ class InterpIOSNative {
     /** The {@code java.lang.Class} for a class id, or null. */
     static native Object classObjectById(int classId);
 
+    /**
+     * Runs a class's static initializer, if it has not run already.
+     *
+     * <p>The generated initializer is idempotent, so this is safe to call on a
+     * class that is already initialized -- and necessary for one that declares
+     * no static field, which has no accessor to reach it through.</p>
+     */
+    static native void initializeClassById(int classId);
+
     /// The class id of an object's actual class, or -1 for null.
     ///
     /// Needed for virtual dispatch: the call site names the type the code was

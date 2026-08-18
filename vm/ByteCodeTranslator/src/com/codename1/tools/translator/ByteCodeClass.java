@@ -1555,6 +1555,7 @@ public class ByteCodeClass {
         b.append("    cn1_debugger_register_class(cn1_class_id_").append(clsName)
           .append(", &class__").append(clsName).append(");\n");
         appendInterpStaticAccessorRegistrations(b);
+        appendInterpClassInitializerRegistration(b);
         b.append("}\n");
         b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
     }
@@ -1589,6 +1590,27 @@ public class ByteCodeClass {
             b.append("    cn1_debugger_register_static_accessor(").append(fid)
              .append(", &__cn1_sacc_").append(fid).append(");\n");
         }
+    }
+
+    /**
+     * Publishes this class's static initializer under its class id.
+     *
+     * <p>Reading a static field runs it, which covers most classes -- but a
+     * class can have an observable static block and declare no static field at
+     * all, and then there is nothing to read. The device runtime has to
+     * initialize a host superclass before an interpreted subclass's own
+     * initializer runs, so it needs to name one directly.</p>
+     *
+     * <p>{@code __STATIC_INITIALIZER_} is idempotent (it returns immediately
+     * once the class is loaded), so calling it when the class is already
+     * initialized costs a comparison.</p>
+     */
+    private void appendInterpClassInitializerRegistration(StringBuilder b) {
+        if (!BytecodeMethod.isInterpHost() || isInterface) {
+            return;
+        }
+        b.append("    cn1_register_class_initializer(cn1_class_id_").append(clsName)
+         .append(", &__STATIC_INITIALIZER_").append(clsName).append(");\n");
     }
 
     /**

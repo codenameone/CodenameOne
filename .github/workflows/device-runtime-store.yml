@@ -123,12 +123,15 @@ jobs:
           # A store rejects an upload that reuses a version code, and the app's
           # version is a fixed 1.0 -- so every scheduled run after the first
           # would be refused. The run number is monotonic and unique per repo,
-          # which is exactly what a build number has to be.
+          # which is exactly what a build number has to be. It has to travel as
+          # codename1.arg.*: that is the prefix CN1BuildMojo copies into the
+          # BuildRequest, and android.versionCode is what the Gradle builder
+          # reads from it.
           cd scripts/cn1-device-runtime
           mvn -B -q package -DskipTests \
             -Dcodename1.platform=android \
             -Dcodename1.buildTarget=android-source \
-            -Dcodename1.android.versionCode=${{ github.run_number }} \
+            -Dcodename1.arg.android.versionCode=${{ github.run_number }} \
             -Dopen=false
 
       - name: Sign and assemble
@@ -196,12 +199,14 @@ jobs:
         run: |
           cd scripts/cn1-device-runtime
           # As on Android: TestFlight refuses a build number it has seen, and
-          # the app's version stays 1.0 between releases.
+          # the app's version stays 1.0 between releases. ios.bundleVersion is
+          # the argument IPhoneBuilder reads for CFBundleVersion, and it has to
+          # be dotted numerics, so the run number becomes the third component.
           mvn -B -q package -DskipTests \
             -Dcodename1.platform=ios \
             -Dcodename1.buildTarget=ios-source \
             -Dcodename1.arg.ios.interpHost=true \
-            -Dcodename1.arg.ios.buildVersion=${{ github.run_number }} \
+            -Dcodename1.arg.ios.bundleVersion=1.0.${{ github.run_number }} \
             -Dopen=false
 
       - name: Import signing material

@@ -71,34 +71,29 @@ public class InterpIOSLinker implements InterpLinker {
     }
 
     public void initializeClass(String internalName) {
-        // ParparVM has no "initialize this class" entry point of its own: a
-        // generated body runs its class's initializer on first entry, and every
-        // route into a host class goes through one. Reading a static field is
-        // the cheapest such route and the only one with no side effect of its
-        // own -- the generated accessor calls __STATIC_INITIALIZER_ first, and
-        // that function is idempotent.
+        // A real entry point rather than a side effect: the interp-host build
+        // registers every class's __STATIC_INITIALIZER_ under its class id, and
+        // that function is idempotent. Reading a static field would also run it
+        // -- the generated accessor calls it first -- but a class can have an
+        // observable static block and declare no static field at all, and then
+        // there is nothing to read.
         //
-        // A class declaring no static field has nothing to read; its
-        // initializer then runs when something first enters it, which is what
-        // happened before this method existed.
-        String field = symbols.anyStaticField(internalName);
-        if (field == null) {
-            return;
+        // A failure propagates. Java requires that a superclass initializer
+        // throwing aborts the subclass's initialization, and swallowing it here
+        // would let the subclass complete on top of a parent that never ran.
+        int id = symbols.classId(internalName);
+        if (id >= 0) {
+            InterpIOSNative.initializeClassById(id);
         }
-        int bar = field.indexOf('|');
-        if (bar <= 0) {
-            return;
-        }
-        try {
-            int fieldId = Integer.parseInt(field.substring(0, bar));
-            int kind = kindOf(field.substring(bar + 1));
-            InterpIOSNative.getStaticById(fieldId, kind, new long[1]);
-        } catch (Throwable initializerFailed) {
-            // The class initializer threw. Its own caller will see that when it
-            // touches the class; there is nothing useful to do from here, and
-            // failing the subclass's initialization for it would report the
-            // wrong class.
-        }
+    }
+
+    public boolean declaresDefaultMethod(String internalName) {
+        // The symbol table records a method's name, descriptor and staticness,
+        // not its access flags, so "is this a default method" cannot be
+        // answered here. False leaves an interface to initialize on its own
+        // first use, which is what happens on this platform anyway -- entering
+        // any of its methods runs its initializer.
+        return false;
     }
 
     public Object findClass(String internalName) {

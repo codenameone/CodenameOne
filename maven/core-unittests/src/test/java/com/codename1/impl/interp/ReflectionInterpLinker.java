@@ -73,6 +73,19 @@ public class ReflectionInterpLinker implements InterpLinker {
         this.loader = loader;
     }
 
+    public boolean declaresDefaultMethod(String internalName) {
+        Object c = findClass(internalName);
+        if (!(c instanceof Class) || !((Class<?>) c).isInterface()) {
+            return false;
+        }
+        for (java.lang.reflect.Method m : ((Class<?>) c).getDeclaredMethods()) {
+            if (m.isDefault()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void initializeClass(String internalName) throws Throwable {
         Object c = findClass(internalName);
         if (c instanceof Class) {
