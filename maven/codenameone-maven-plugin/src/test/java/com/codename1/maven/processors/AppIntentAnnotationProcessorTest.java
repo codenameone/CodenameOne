@@ -1311,6 +1311,21 @@ public class AppIntentAnnotationProcessorTest {
         assertError(classes, "not a valid double");
     }
 
+    /// An unmatched brace makes the rest of the template a literal, and a wildcard route like
+    /// /orders/:id matches "{id" as an ordinary segment -- so validation passed, expandRoute
+    /// left the text alone, and the handler navigated with a parameter never substituted.
+    @Test
+    public void anUnclosedRoutePlaceholderIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"open_order\", title = \"Open\",\n"
+                        + "        opensRoute = \"/orders/{id\")\n"
+                        + "public static IntentResult open(@IntentParam(\"id\") String id) {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        assertError(classes, "opening brace with no closing one");
+    }
+
     /// A parameter name may hold anything, and the placeholder pattern only matched
     /// [A-Za-z0-9_] -- so a phrase naming two such parameters passed a check that exists
     /// because Apple rejects exactly that, as a halting error producing no metadata at all.

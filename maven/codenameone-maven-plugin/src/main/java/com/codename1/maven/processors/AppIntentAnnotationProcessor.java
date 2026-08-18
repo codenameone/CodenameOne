@@ -857,6 +857,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             }
             int close = template.indexOf('}', open);
             if (close < 0) {
+                // Not "nothing more to check". An unmatched brace makes the rest of the
+                // template a literal, and a wildcard route like /orders/:id happily matches
+                // "{id" as an ordinary segment -- so routeDeclared passed, expandRoute left the
+                // brace text alone, and the handler ran and navigated somewhere with a
+                // parameter that was never substituted.
+                ctx.error(cls, "@AppIntent " + where + " opensRoute \"" + template
+                        + "\" has an opening brace with no closing one. A placeholder that is "
+                        + "not closed is left in the URL as written, so the route opens with "
+                        + "the literal text instead of the value.");
                 return;
             }
             String name = template.substring(open + 1, close);

@@ -1534,7 +1534,12 @@ public final class Intents {
                 logDiagnostic(suggestionRefusedMessage(a.activityType));
                 continue;
             }
-            dispatchInvocation(a.activityType, a.params, IntentSource.SHORTCUT, false, null);
+            // Run rather than dispatch, and marked drained: whoever delivered this activity had
+            // control returned to it when it was queued, so nothing is waiting on the stack and
+            // these keep the order they arrived in. Going back through dispatchInvocation would
+            // have called them direct, which is what decides whether a worker thread is used.
+            run(new PendingInvocation(a.activityType, a.params, IntentSource.SHORTCUT,
+                    false, null), false);
         }
     }
 
@@ -2062,7 +2067,7 @@ public final class Intents {
             // returns, so the longest it can hold a process open is that budget -- and it
             // usually returns the moment the handler completes.
             new Thread(watchdog, "CN1 Intent timeout").start();
-            if (direct && inv.completion != null) {
+            if (direct) {
                 // The caller is still on the stack and is holding a token for this: on iOS a
                 // withCheckedContinuation inside perform(), which cannot proceed until the
                 // native call returns. Running the handler inline kept that call there, so

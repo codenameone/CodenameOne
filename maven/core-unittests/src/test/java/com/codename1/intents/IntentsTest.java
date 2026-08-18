@@ -232,6 +232,24 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    /// Waits for a platform dispatch to land, because one no longer runs on the caller's
+    /// thread: a direct invocation is handed to a worker so the native call that delivered it
+    /// can return. Bounded so a regression fails the test rather than hanging the suite.
+    private static void awaitCondition(java.util.concurrent.Callable<Boolean> c, String what) {
+        long giveUpAt = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < giveUpAt) {
+            try {
+                if (Boolean.TRUE.equals(c.call())) {
+                    return;
+                }
+                Thread.sleep(5);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        fail("timed out waiting for " + what);
+    }
+
     @AfterEach
     void tearDown() {
         Intents.reset();
@@ -376,6 +394,11 @@ class IntentsTest {
 
         Intents.dispatchInvocation("known", null, IntentSource.VOICE, true, null);
 
+        awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+            public Boolean call() {
+                return Boolean.valueOf(seen[0] != null);
+            }
+        }, "the context to reach the handler");
         assertNotNull(seen[0]);
         assertEquals(IntentSource.VOICE, seen[0].getSource());
         assertTrue(seen[0].isHeadless());
@@ -1902,6 +1925,12 @@ class IntentsTest {
         assertTrue(d.invoked.isEmpty(), "but the handler must not run");
 
         Intents.dispatchUserActivity("log_run", null);
+        final FakeDispatcher watched = d;
+        awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+            public Boolean call() {
+                return Boolean.valueOf(!watched.invoked.isEmpty());
+            }
+        }, "the allowed activity to run");
         assertEquals(Arrays.asList("log_run"), d.invoked,
                 "and an intent the declaration still allows runs as before");
     }
@@ -2258,6 +2287,49 @@ class IntentsTest {
                 "the handler has to actually run");
         assertTrue(elapsed < 3000,
                 "the call returned while the handler was still running, rather than after it: "
+                        + elapsed + "ms");
+        release.countDown();
+    }
+
+    /// A donated activity cold-launching the app arrives on the app delegate's stack with no
+    /// completion to answer, so the earlier rule -- offload only when something holds a token --
+    /// still ran it inline and kept that native call from returning. What decides is whether a
+    /// caller is waiting on the stack, not whether it wants a result.
+    @Test
+    void aDirectDispatchWithNoCompletionStillDoesNotBlockItsCaller() throws Exception {
+        final java.util.concurrent.CountDownLatch running =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+        Intents.setDispatcher(new IntentDispatcher() {
+            public List<IntentDeclaration> describe() {
+                return Arrays.asList(declaration("known"));
+            }
+
+            public IntentResult invoke(String id, Map<String, Object> params, IntentContext c) {
+                running.countDown();
+                try {
+                    release.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return IntentResult.ok();
+            }
+
+            public List<AppEntity> queryEntities(String t, String k, String a) {
+                return Collections.emptyList();
+            }
+        });
+
+        long before = System.currentTimeMillis();
+        // No completion: this is the shape a donated NSUserActivity arrives in.
+        Intents.dispatchInvocation("known", null, IntentSource.SHORTCUT, true, null);
+        long elapsed = System.currentTimeMillis() - before;
+
+        assertTrue(running.await(5, java.util.concurrent.TimeUnit.SECONDS),
+                "the handler has to actually run");
+        assertTrue(elapsed < 3000,
+                "the delegate's call has to return while the handler is still working: "
                         + elapsed + "ms");
         release.countDown();
     }
