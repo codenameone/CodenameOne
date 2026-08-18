@@ -368,7 +368,7 @@ public final class Intents {
                 return;
             }
         }
-        run(inv);
+        run(inv, true);
     }
 
     /// Overrides how long a handler may run before the framework gives up, for
@@ -845,12 +845,36 @@ public final class Intents {
                 // rounded into a different, still-plausible number.
                 args = IntentSerializer.parsePayload(argumentsJson);
             }
-            ToolCompletion done = new ToolCompletion();
+            final ToolCompletion done = new ToolCompletion();
             dispatchInvocation(declaration.getId(), args, IntentSource.MODEL, false, done);
-            IntentResult r = done.awaitResult(budgetFor(declaration));
+            IntentResult r = awaitToolResult(done, budgetFor(declaration));
             Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
             return IntentSerializer.serializeResult(r, images);
         }
+    }
+
+    /// Waits for a tool's outcome without taking the event thread down with it.
+    ///
+    /// The tool contract is synchronous, so an application is free to call it from an event
+    /// callback -- and a plain wait there is a deadlock in slow motion: the handler's route
+    /// navigation asks for the same event thread this wait is holding, so nothing moves until
+    /// the deadline fires and the model is told the action failed, having done nothing wrong.
+    ///
+    /// invokeAndBlock is the framework's answer to exactly this. It keeps the event loop
+    /// running while the caller waits, so the navigation gets its turn and the tool returns
+    /// what actually happened.
+    private static IntentResult awaitToolResult(final ToolCompletion done, final int budget) {
+        if (!Display.isInitialized() || !Display.getInstance().isEdt()) {
+            return done.awaitResult(budget);
+        }
+        final IntentResult[] holder = new IntentResult[1];
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                holder[0] = done.awaitResult(budget);
+            }
+        });
+        return holder[0] == null ? IntentResult.ok() : holder[0];
     }
 
     /// Blocks a model's synchronous tool call until the framework reports an outcome.
@@ -1081,7 +1105,10 @@ public final class Intents {
         }
         if (queued != null) {
             for (PendingInvocation q : queued) {
-                run(q);
+                // Drained rather than direct: whoever queued these already had control
+                // returned to it, so nothing is blocked on them and they run in the order they
+                // arrived, which is the guarantee this queue exists to make.
+                run(q, false);
             }
         }
     }
@@ -1966,7 +1993,14 @@ public final class Intents {
     /// app -- and a handler that blocks the EDT for even a second there is a
     /// visible freeze. Handlers are forbidden from touching UI precisely so they
     /// do not need it.
-    private static void run(final PendingInvocation inv) {
+    /// Runs one invocation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inv`: what to run
+    /// - `direct`: true when the caller is still on the stack waiting for this call to return,
+    ///   false when it was queued and its caller already has control back
+    private static void run(final PendingInvocation inv, boolean direct) {
         final IntentDeclaration decl = getDeclaration(inv.intentId);
         final int timeout = budgetFor(decl);
         final IntentContext ctx = new IntentContext(inv.source, inv.headless,
@@ -2028,6 +2062,21 @@ public final class Intents {
             // returns, so the longest it can hold a process open is that budget -- and it
             // usually returns the moment the handler completes.
             new Thread(watchdog, "CN1 Intent timeout").start();
+            if (direct && inv.completion != null) {
+                // The caller is still on the stack and is holding a token for this: on iOS a
+                // withCheckedContinuation inside perform(), which cannot proceed until the
+                // native call returns. Running the handler inline kept that call there, so
+                // answering the continuation from the watchdog was not enough -- Swift still
+                // had nowhere to go, and the assistant waited on a call that had already been
+                // decided.
+                new Thread(body, "CN1 Intent " + inv.intentId).start();
+                return;
+            }
+            // Either nothing is waiting on an answer, or this was queued and its caller has
+            // long since been given control back. Inline keeps the drain ordered, which is what
+            // the queue promises, and on a device it runs from the stub's main before UIKit has
+            // started -- so there is no event loop to block, only the application's own
+            // startup, which is already waiting for this.
             body.run();
             return;
         }

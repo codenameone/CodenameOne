@@ -2216,6 +2216,52 @@ class IntentsTest {
                 "a suggestion cannot outlive the policy that allowed it, cold start included");
     }
 
+    /// The native caller is on the stack while this runs. On iOS that stack frame is a
+    /// withCheckedContinuation inside perform(), which cannot proceed until the call returns --
+    /// so running the handler inline meant answering the continuation from the watchdog was not
+    /// enough, and the assistant waited on a call that had already been decided.
+    @Test
+    void aPlatformInvocationDoesNotBlockTheCallerThatIsHoldingAToken() throws Exception {
+        final java.util.concurrent.CountDownLatch running =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+        Intents.setDispatcher(new IntentDispatcher() {
+            public List<IntentDeclaration> describe() {
+                return Arrays.asList(declaration("known"));
+            }
+
+            public IntentResult invoke(String id, Map<String, Object> params, IntentContext c) {
+                running.countDown();
+                try {
+                    release.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return IntentResult.ok();
+            }
+
+            public List<AppEntity> queryEntities(String type, String kind, String arg) {
+                return Collections.emptyList();
+            }
+        });
+
+        long before = System.currentTimeMillis();
+        Intents.dispatchInvocation("known", null, IntentSource.SHORTCUT, true,
+                new IntentCompletion() {
+                    public void onIntentResult(IntentResult r) {
+                    }
+                });
+        long elapsed = System.currentTimeMillis() - before;
+
+        assertTrue(running.await(5, java.util.concurrent.TimeUnit.SECONDS),
+                "the handler has to actually run");
+        assertTrue(elapsed < 3000,
+                "the call returned while the handler was still running, rather than after it: "
+                        + elapsed + "ms");
+        release.countDown();
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail
