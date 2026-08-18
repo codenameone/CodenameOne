@@ -302,11 +302,23 @@ public final class Display extends CN1Constants {
     private boolean dragOccured;
     private boolean processingSerialCalls;
     private int PATHLENGTH;
-    private float[] dragPathX;
-    private float[] dragPathY;
-    private long[] dragPathTime;
-    private int dragPathOffset = 0;
-    private int dragPathLength = 0;
+    /// Drag sample history, one ring per window.
+    ///
+    /// Singleton before: two touchscreen contacts dragging in two windows appended
+    /// to the same ring, so releasing either scrolling component computed its
+    /// inertia from the other window's samples -- wrong or wildly extreme fling.
+    /// Index 0 is the main surface; `#dragHistoryWindows` maps the rest.
+    private float[][] dragPathX;
+    private float[][] dragPathY;
+    private long[][] dragPathTime;
+    private int[] dragPathOffset;
+    private int[] dragPathLength;
+    private int[] dragHistoryWindows;
+
+    /// The window whose drag samples `#getDragSpeed(boolean)` should report. Set
+    /// while that window's pointer events are dispatched, since the public accessor
+    /// takes no window and is called by components during their own release.
+    private int dragHistoryCurrent;
     private Boolean darkMode;
     private PluginSupport pluginSupport;
     /// Internally track display initialization time as a fixed point to allow tagging of pointer
@@ -451,9 +463,18 @@ public final class Display extends CN1Constants {
             MenuBar.clearSK = impl.getClearKeyCode();
 
             INSTANCE.PATHLENGTH = impl.getDragPathLength();
-            INSTANCE.dragPathX = new float[INSTANCE.PATHLENGTH];
-            INSTANCE.dragPathY = new float[INSTANCE.PATHLENGTH];
-            INSTANCE.dragPathTime = new long[INSTANCE.PATHLENGTH];
+            INSTANCE.dragPathX = new float[TRACKED_KEY_PRESSES][];
+            INSTANCE.dragPathY = new float[TRACKED_KEY_PRESSES][];
+            INSTANCE.dragPathTime = new long[TRACKED_KEY_PRESSES][];
+            INSTANCE.dragPathOffset = new int[TRACKED_KEY_PRESSES];
+            INSTANCE.dragPathLength = new int[TRACKED_KEY_PRESSES];
+            INSTANCE.dragHistoryWindows = new int[TRACKED_KEY_PRESSES];
+            // Slot 0 is the main surface and is always present; the rings for the
+            // other slots are allocated the first time a window drags.
+            INSTANCE.dragHistoryWindows[0] = MAIN_LONG_PRESS_ID;
+            INSTANCE.dragPathX[0] = new float[INSTANCE.PATHLENGTH];
+            INSTANCE.dragPathY[0] = new float[INSTANCE.PATHLENGTH];
+            INSTANCE.dragPathTime[0] = new long[INSTANCE.PATHLENGTH];
             com.codename1.util.StringUtil.setImplementation(impl);
             Util.setImplementation(impl);
 
@@ -3315,17 +3336,74 @@ public final class Display extends CN1Constants {
         return b;
     }
 
-    private void updateDragSpeedStatus(int x, int y, int timestamp) {
+    private void updateDragSpeedStatus(int windowId, int x, int y, int timestamp) {
         //save dragging input to calculate the dragging speed later
-        dragPathX[dragPathOffset] = x;
-        dragPathY[dragPathOffset] = y;
-        dragPathTime[dragPathOffset] = displayInitTime + (long) timestamp;
-        if (dragPathLength < PATHLENGTH) {
-            dragPathLength++;
+        int slot = dragHistorySlot(windowId);
+        if (slot < 0) {
+            return;
         }
-        dragPathOffset++;
-        if (dragPathOffset >= PATHLENGTH) {
-            dragPathOffset = 0;
+        dragPathX[slot][dragPathOffset[slot]] = x;
+        dragPathY[slot][dragPathOffset[slot]] = y;
+        dragPathTime[slot][dragPathOffset[slot]] = displayInitTime + (long) timestamp;
+        if (dragPathLength[slot] < PATHLENGTH) {
+            dragPathLength[slot]++;
+        }
+        dragPathOffset[slot]++;
+        if (dragPathOffset[slot] >= PATHLENGTH) {
+            dragPathOffset[slot] = 0;
+        }
+    }
+
+    /// The drag ring for a window, allocating it on first use. Returns -1 only when
+    /// every slot is taken, in which case the samples are dropped rather than
+    /// corrupting another window's history.
+    private int dragHistorySlot(int windowId) {
+        int key = longPressKey(windowId);
+        int free = -1;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (dragHistoryWindows[iter] == key) {
+                return iter;
+            }
+            if (free < 0 && dragHistoryWindows[iter] == 0) {
+                free = iter;
+            }
+        }
+        if (free < 0) {
+            return -1;
+        }
+        dragHistoryWindows[free] = key;
+        if (dragPathX[free] == null) {
+            dragPathX[free] = new float[PATHLENGTH];
+            dragPathY[free] = new float[PATHLENGTH];
+            dragPathTime[free] = new long[PATHLENGTH];
+        }
+        dragPathOffset[free] = 0;
+        dragPathLength[free] = 0;
+        return free;
+    }
+
+    /// Frees a disposed window's drag ring so the slot can be reused.
+    private void releaseDragHistory(int windowId) {
+        int key = longPressKey(windowId);
+        for (int iter = 1; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (dragHistoryWindows[iter] == key) {
+                dragHistoryWindows[iter] = 0;
+                dragPathLength[iter] = 0;
+                dragPathOffset[iter] = 0;
+                return;
+            }
+        }
+    }
+
+    /// Clears one window's drag history, on press and on disposal.
+    private void resetDragHistory(int windowId) {
+        int key = longPressKey(windowId);
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (dragHistoryWindows[iter] == key) {
+                dragPathLength[iter] = 0;
+                dragPathOffset[iter] = 0;
+                return;
+            }
         }
     }
 
@@ -3362,12 +3440,25 @@ public final class Display extends CN1Constants {
         // or when a window was disposed while its events were still in flight
         if (f == null || (isUserInputEvent(type) && isBlockedByModal(windowId)
                 && !completesAcceptedPress(type, windowId, offset, inputEventStackTmp))) {
+            // A press that is being filtered must not leave its long-press timer
+            // armed. The timer is charged off the event dispatch thread when the
+            // press is queued, before modality has had a say, and the event
+            // dispatch thread later fires longPointerPress directly without
+            // consulting the filter again -- so a context menu could open behind an
+            // application modal for a press the component never received.
+            if (type == POINTER_PRESSED || type == POINTER_PRESSED_MULTI) {
+                cancelLongPress(windowId);
+            }
             // NOTE: drain the packet rather than returning offset unchanged. The
             // caller loops while (offset < end), so returning it unchanged spins the
             // EDT forever, and returning a sentinel would drop the rest of the batch
             // -- which may contain main form events.
             return skipEvent(type, offset + 1, inputEventStackTmp);
         }
+
+        // Which window's samples getDragSpeed should report while this packet's
+        // handlers run.
+        dragHistoryCurrent = windowId;
 
         // no need to synchronize since we are reading only and modifying the stack frame offset
         offset++;
@@ -3408,7 +3499,7 @@ public final class Display extends CN1Constants {
                     recursivePointerReleaseB = true;
                 }
                 dragOccured = false;
-                dragPathLength = 0;
+                resetDragHistory(windowId);
                 pointerPressedAndNotReleasedOrDragged = true;
                 xArray1[0] = inputEventStackTmp[offset];
                 offset++;
@@ -3423,7 +3514,7 @@ public final class Display extends CN1Constants {
                     recursivePointerReleaseB = true;
                 }
                 dragOccured = false;
-                dragPathLength = 0;
+                resetDragHistory(windowId);
                 pointerPressedAndNotReleasedOrDragged = true;
                 int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array1.length + 1;
@@ -3488,7 +3579,7 @@ public final class Display extends CN1Constants {
                 offset++;
                 int timestamp = inputEventStackTmp[offset];
                 offset++;
-                updateDragSpeedStatus(arg1, arg2, timestamp);
+                updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
                 pointerPressedAndNotReleasedOrDragged = false;
                 xArray1[0] = arg1;
                 yArray1[0] = arg2;
@@ -3514,7 +3605,7 @@ public final class Display extends CN1Constants {
                 offset++;
                 int timestamp = inputEventStackTmp[offset];
                 offset++;
-                updateDragSpeedStatus(arg1, arg2, timestamp);
+                updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
                 xArray1[0] = arg1;
                 yArray1[0] = arg2;
                 currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
@@ -3908,6 +3999,7 @@ public final class Display extends CN1Constants {
             keyRepeatWindowId = 0;
         }
         cancelLongPress(w.getWindowId());
+        releaseDragHistory(w.getWindowId());
     }
 
     /// Indicates whether input aimed at the given window is currently blocked by a
@@ -4408,10 +4500,19 @@ public final class Display extends CN1Constants {
     /// the dragging speed
     public float getDragSpeed(boolean yAxis) {
         float speed;
+        // The window whose events are being dispatched. Components call this from
+        // their own pointerReleased, so "the window currently being serviced" is the
+        // one that owns the samples they mean.
+        int readSlot = dragHistorySlot(dragHistoryCurrent);
+        if (readSlot < 0) {
+            return 0;
+        }
         if (yAxis) {
-            speed = impl.getDragSpeed(dragPathY, dragPathTime, dragPathOffset, dragPathLength);
+            speed = impl.getDragSpeed(dragPathY[readSlot], dragPathTime[readSlot],
+                    dragPathOffset[readSlot], dragPathLength[readSlot]);
         } else {
-            speed = impl.getDragSpeed(dragPathX, dragPathTime, dragPathOffset, dragPathLength);
+            speed = impl.getDragSpeed(dragPathX[readSlot], dragPathTime[readSlot],
+                    dragPathOffset[readSlot], dragPathLength[readSlot]);
         }
         return speed;
     }

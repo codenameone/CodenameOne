@@ -1272,6 +1272,34 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aBlockedWindowsPressDoesNotLeaveALongPressArmed() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window blocked = new Window("blocked", new BorderLayout());
+        blocked.add(BorderLayout.CENTER, new Label("content"));
+        blocked.setWindowSize(300, 200);
+        blocked.show();
+
+        Window modal = new Window("modal");
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        // The timer is charged when the press is queued, before modality has had a
+        // say, and the event dispatch thread fires longPointerPress directly without
+        // re-checking -- so a context menu could open behind the modal for a press
+        // the component never received.
+        Display.getInstance().windowPointerPressed(blocked.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        boolean armed = longPressArmedFor(blocked.getWindowId());
+
+        modal.dispose();
+        blocked.dispose();
+        assertFalse(armed,
+                "a press rejected by modality must not leave its long press armed");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

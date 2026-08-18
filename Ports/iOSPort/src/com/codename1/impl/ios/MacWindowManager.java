@@ -317,6 +317,16 @@ public class MacWindowManager extends WindowManager {
     }
 
     @Override
+    public void setResizable(Object p, boolean resizable) {
+        // Without this the SPI's no-op ran, so a window shown and then made
+        // non-resizable stayed draggable while the framework reported it fixed.
+        int s = slot(p);
+        if (s >= 0) {
+            IOSImplementation.nativeInstance.macWindowSetResizable(s, resizable);
+        }
+    }
+
+    @Override
     public int getMonitorForMainWindow() {
         // The default answers the primary monitor, which is wrong here: the
         // application's own scene moves between displays like any other window, so a

@@ -63,6 +63,11 @@ typedef struct {
     int minimized;
     int minWidth;
     int minHeight;
+    /* The resizable state the application asked for. Remembered because restoring
+     * decorations re-adds WS_OVERLAPPEDWINDOW, which carries WS_THICKFRAME and
+     * WS_MAXIMIZEBOX with it -- silently undoing an earlier setResizable(false)
+     * while the framework still reported the window as fixed. */
+    int resizable;
     int inUse;
 } CN1DesktopWindow;
 
@@ -496,6 +501,8 @@ static void cn1WinDesktopCreateOnPump(CN1DesktopWindowOp* op) {
     ZeroMemory(w, sizeof(*w));
     w->windowId = op->windowId;
     w->inUse = 1;
+    /* Seeded here so a later decoration change knows what to restore. */
+    w->resizable = op->resizable ? 1 : 0;
 
     style = op->decorated ? WS_OVERLAPPEDWINDOW : WS_POPUP;
     if (op->decorated && !op->resizable) {
@@ -763,7 +770,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetResizable___i
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot, JAVA_BOOLEAN resizable) {
     CN1DesktopWindow* w = slotAt(slot);
     if (w != NULL) {
-        LONG_PTR style = GetWindowLongPtrW(w->hwnd, GWL_STYLE);
+        LONG_PTR style;
+        w->resizable = resizable == JAVA_TRUE ? 1 : 0;
+        style = GetWindowLongPtrW(w->hwnd, GWL_STYLE);
         if (resizable == JAVA_TRUE) {
             style |= (WS_THICKFRAME | WS_MAXIMIZEBOX);
         } else {
@@ -786,6 +795,11 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetDecorated___i
         if (decorated == JAVA_TRUE) {
             style |= WS_OVERLAPPEDWINDOW;
             style &= ~WS_POPUP;
+            if (!w->resizable) {
+                /* WS_OVERLAPPEDWINDOW bundles the resize affordances, so restoring
+                 * the chrome would quietly make a fixed window resizable again. */
+                style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+            }
         } else {
             /* WS_POPUP rather than merely clearing the caption bits: a window with
              * no caption but still WS_OVERLAPPED keeps a thin non-client frame. */

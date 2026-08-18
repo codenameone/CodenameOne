@@ -237,6 +237,9 @@ public final class IOSNative {
     native void macWindowSetState(int slot, int state);
 
     /** Requests a scene again after one was destroyed without the app getting a say. */
+    /// Applies a resizability change to a window that may already have a scene.
+    native void macWindowSetResizable(int slot, boolean resizable);
+
     native boolean macWindowReopen(int slot);
 
     /** Enables or disables touch input, used while a modal window blocks this one. */

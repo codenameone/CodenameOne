@@ -2390,6 +2390,12 @@ void com_codename1_impl_ios_IOSNative_macWindowShow___int_boolean(CN1_THREAD_STA
 #endif
 }
 
+void com_codename1_impl_ios_IOSNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetResizable(slot, resizable == JAVA_TRUE ? YES : NO);
+#endif
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;

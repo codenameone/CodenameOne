@@ -1164,6 +1164,42 @@ int CN1MacMonitorForWindow(int slot) {
  * CN1MacMonitorForWindow cannot answer for it, and without this everything
  * positioned against the main form reported the primary screen even after the user
  * had dragged the application to an external display. */
+/* Applies a resizability change to a window that already has a scene. The flag is
+ * also recorded so a scene adopted later (a reopen, or a request still in flight)
+ * picks up the current value rather than the one from creation. */
+void CN1MacWindowSetResizable(int slot, BOOL resizable) {
+    CN1MacWindow* w = slotAt(slot);
+    if (w == NULL) {
+        return;
+    }
+    pthread_mutex_lock(&g_slotLock);
+    w->resizable = resizable ? 1 : 0;
+    UIWindowScene* scene = w->scene;
+    int pixelWidth = w->pendingWidth;
+    int pixelHeight = w->pendingHeight;
+    pthread_mutex_unlock(&g_slotLock);
+    if (scene == nil) {
+        /* No scene yet: adoption reads the flag. */
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (scene.sizeRestrictions == nil) {
+            return;
+        }
+        CGFloat scale = scene.screen != nil ? scene.screen.scale : 1.0;
+        CGFloat pointWidth = pixelWidth / scale;
+        CGFloat pointHeight = pixelHeight / scale;
+        if (resizable) {
+            scene.sizeRestrictions.minimumSize =
+                    CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
+            scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+        } else {
+            scene.sizeRestrictions.minimumSize = CGSizeMake(pointWidth, pointHeight);
+            scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
+        }
+    });
+}
+
 int CN1MacMonitorForMainWindow(void) {
     NSArray<UIScreen*>* screens = [UIScreen screens];
     UIScreen* main = nil;
