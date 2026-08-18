@@ -127,7 +127,49 @@ public class MediaQueryData {
         } catch (Throwable ignore) {
             // ports without dark-mode detection
         }
-        return compute(d.getDisplayWidth(), d.getDisplayHeight(), Dp.scale(), dark);
+        return compute(d.getDisplayWidth(), d.getDisplayHeight(), Dp.scale(), dark,
+                safeAreaInsets(d));
+    }
+
+    /**
+     * The device's safe-area insets, in LOGICAL pixels — what {@code MediaQuery.padding}
+     * means in Flutter.
+     *
+     * <p>This used to be left at zero, and that is not a cosmetic omission: content ran
+     * under the notch, the status bar and the home indicator, and controls near the bottom
+     * edge could not be reached. Anything reading {@code MediaQuery.of(context).padding} got
+     * nothing to work with — the gallery sizes its settings button as
+     * {@code height + padding.top}, so that button came out short by the notch.</p>
+     *
+     * <p>Codename One already knows the answer ({@code Form.getSafeArea()}, backed by the
+     * port's {@code getDisplaySafeArea}); the runtime simply never asked.</p>
+     */
+    private static EdgeInsets safeAreaInsets(Display d) {
+        try {
+            com.codename1.ui.Form f = d.getCurrent();
+            if (f == null) {
+                return EdgeInsets.all(0);
+            }
+            com.codename1.ui.geom.Rectangle safe = f.getSafeArea();
+            if (safe == null || safe.getWidth() <= 0 || safe.getHeight() <= 0) {
+                return EdgeInsets.all(0);
+            }
+            double scale = Dp.scale();
+            if (scale <= 0) {
+                scale = 1;
+            }
+            int w = d.getDisplayWidth();
+            int h = d.getDisplayHeight();
+            // The safe rectangle is in pixels; the insets are the margins around it.
+            double left = Math.max(0, safe.getX());
+            double top = Math.max(0, safe.getY());
+            double right = Math.max(0, w - (safe.getX() + safe.getWidth()));
+            double bottom = Math.max(0, h - (safe.getY() + safe.getHeight()));
+            return EdgeInsets.fromLTRB(left / scale, top / scale, right / scale, bottom / scale);
+        } catch (Throwable t) {
+            // a port without safe-area support behaves as it did before
+            return EdgeInsets.all(0);
+        }
     }
 
     /**
@@ -136,12 +178,20 @@ public class MediaQueryData {
      * or FALSE dark flag maps to light.
      */
     public static MediaQueryData compute(int widthPx, int heightPx, double scale, Boolean darkMode) {
+        return compute(widthPx, heightPx, scale, darkMode, EdgeInsets.all(0));
+    }
+
+    /** As above, with the device's safe-area insets (already in logical pixels). */
+    public static MediaQueryData compute(int widthPx, int heightPx, double scale,
+            Boolean darkMode, EdgeInsets padding) {
         if (scale <= 0) {
             scale = 1;
         }
         return new MediaQueryData(
                 new Size(widthPx / scale, heightPx / scale),
                 scale,
-                Boolean.TRUE.equals(darkMode) ? Brightness.dark : Brightness.light);
+                Boolean.TRUE.equals(darkMode) ? Brightness.dark : Brightness.light,
+                1.0,
+                padding);
     }
 }

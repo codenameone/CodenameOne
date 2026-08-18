@@ -1,15 +1,20 @@
 package com.codename1.flutter;
 
 /**
- * Display-metric lookup, mirroring Flutter's {@code MediaQuery.of(context)}.
- * There is no inherited-widget scoping in this runtime — the metrics are
- * computed on demand from the CN1 Display, so every context sees the same
- * (current) values.
+ * Display-metric scope, mirroring Flutter's {@code MediaQuery.of(context)}.
+ *
+ * <p>An in-tree MediaQuery now actually SCOPES its subtree. It used to be decorative:
+ * {@code of(context)} ignored the context and always recomputed from the CN1 Display, so a
+ * widget that wrapped part of the app to override the metrics — a smaller size, a different
+ * text scale, the safe-area padding it wants its children to see — was silently overruled.
+ * Flutter's own {@code removePadding}/{@code copyWith} idiom depends on this working.</p>
+ *
+ * <p>Without an ancestor the metrics still come from the Display, which is the right default
+ * for the root of the app.</p>
  */
-public class MediaQuery extends StatelessWidget {
+public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
 
     private MediaQueryData data;
-    private Widget child;
 
     public MediaQuery() {
     }
@@ -19,27 +24,38 @@ public class MediaQuery extends StatelessWidget {
         this.data = v;
     }
 
-    public void child(Widget v) {
-        this.child = v;
+    public MediaQueryData getData() {
+        return data;
     }
 
     @Override
-    public Widget build(BuildContext context) {
-        return child;
+    public boolean updateShouldNotify(com.codename1.flutter.widgets.InheritedWidget oldWidget) {
+        return !(oldWidget instanceof MediaQuery) || ((MediaQuery) oldWidget).data != data;
     }
 
+    /** The nearest enclosing scope's metrics, else the Display's. */
     public static MediaQueryData of(BuildContext context) {
+        if (context != null) {
+            try {
+                MediaQuery q = context.dependOnInheritedWidgetOfExactType(MediaQuery.class);
+                if (q != null && q.data != null) {
+                    return q.data;
+                }
+            } catch (Throwable t) {
+                // fall back to the Display below
+            }
+        }
         return MediaQueryData.fromDisplay();
     }
 
     /** {@code MediaQuery.sizeOf}: the ambient display size. */
     public static com.codename1.flutter.rendering.Size sizeOf(BuildContext context) {
-        return MediaQueryData.fromDisplay().size();
+        return of(context).size();
     }
 
     /** {@code MediaQuery.paddingOf}: the ambient safe-area padding. */
     public static EdgeInsets paddingOf(BuildContext context) {
-        return MediaQueryData.fromDisplay().padding();
+        return of(context).padding();
     }
 
     /**
