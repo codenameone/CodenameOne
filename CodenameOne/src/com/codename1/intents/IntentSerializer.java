@@ -340,7 +340,10 @@ public final class IntentSerializer {
         return parser.parseJSON(new StringReader(json));
     }
 
-    private static Object toWire(Object value) {
+    /// Reduces a value to what the wire format carries. Package-visible because in-process
+    /// dispatch has to apply the same reduction: a handler must not be able to tell whether its
+    /// arguments crossed a platform boundary.
+    static Object toWire(Object value) {
         if (value == null) {
             return null;
         }

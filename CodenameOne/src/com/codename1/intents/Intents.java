@@ -1347,10 +1347,10 @@ public final class Intents {
             // A parameterization runs its base intent. Bound values go in first so anything
             // supplied at invocation time overrides them -- a binding is a default, not a lock.
             targetId = dyn.getBaseIntentId();
-            safe.putAll(dyn.getBoundParameters());
+            reduceInto(safe, dyn.getBoundParameters());
         }
         if (params != null) {
-            safe.putAll(params);
+            reduceInto(safe, params);
         }
         IntentDeclaration decl = getDeclaration(targetId);
         try {
@@ -1364,6 +1364,23 @@ public final class Intents {
             logError(t);
             return new Outcome(IntentResult.failed(
                     "The action could not be completed"), decl, safe);
+        }
+    }
+
+    /// Copies values in, reduced exactly as they would be if they had crossed a platform
+    /// boundary.
+    ///
+    /// Without this the two routes disagreed about the same object: donation reduces an
+    /// AppEntity to its id, while in-process dispatch handed the entity itself to the generated
+    /// reader, which stringified it as "type:id" and asked BY_ID to resolve that. So a dynamic
+    /// intent could fail through Intents.invoke and the simulator, and work once donated --
+    /// the least debuggable shape a difference can take.
+    private static void reduceInto(Map<String, Object> target, Map<String, Object> source) {
+        for (Map.Entry<String, Object> e : source.entrySet()) {
+            Object wire = IntentSerializer.toWire(e.getValue());
+            if (wire != null) {
+                target.put(e.getKey(), wire);
+            }
         }
     }
 

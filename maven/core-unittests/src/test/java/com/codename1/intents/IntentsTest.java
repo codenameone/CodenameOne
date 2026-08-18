@@ -1335,6 +1335,40 @@ class IntentsTest {
         assertEquals("/orders/42", doc.get("openUrl"));
     }
 
+    /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
+    /// while in-process dispatch handed the entity itself to the generated reader, which
+    /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail
+    /// through invoke() and the simulator, and work once donated.
+    @Test
+    void anEntityArgumentReachesTheHandlerAsItsIdEitherWay() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        d.next = IntentResult.ok();
+        Intents.setDispatcher(d);
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("shop", new AppEntity("coffee_shop", "shop-7"));
+        Intents.invoke("known", params);
+
+        assertEquals("shop-7", d.lastParams.get("shop"),
+                "the handler sees what it would have seen from the platform");
+    }
+
+    /// And through a parameterization's bound values, which took the other path entirely.
+    @Test
+    void aBoundEntityIsReducedTheSameWay() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        d.next = IntentResult.ok();
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("usual", "known", "The usual")
+                .bind("shop", new AppEntity("coffee_shop", "shop-7")));
+
+        Intents.invoke("usual", null);
+
+        assertEquals("shop-7", d.lastParams.get("shop"));
+    }
+
     @Test
     void parametersReduceToWireTypesWithoutCasting() {
         Map<String, Object> params = new HashMap<String, Object>();
