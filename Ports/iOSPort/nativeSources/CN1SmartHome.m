@@ -3776,10 +3776,35 @@ void com_codename1_impl_ios_IOSNative_homeIdentify___int_java_lang_String(
 @end
 #endif
 
+#if defined(CN1_INCLUDE_MATTER_SETUP) && defined(CN1_MATTER_OWN_FABRIC)
+/// Whether this OS can load the generated setup extension.
+///
+/// An own-fabric build's extension is compiled for iOS 16.4: the Matter
+/// framework's controller factory does not exist before it. The APP still
+/// runs from 16.1, because raising its floor would cost every user on 16.1
+/// through 16.3 the whole application over a commissioning feature -- but
+/// those three releases cannot load the extension, so the sheet would open on
+/// nothing. Reported as unavailable instead, which is what an app checks
+/// before offering the button.
+static BOOL cn1homeSetupExtensionLoadable(void) {
+    if (@available(iOS 16.4, *)) {
+        return YES;
+    }
+    return NO;
+}
+#endif
+
 JAVA_INT
 com_codename1_impl_ios_IOSNative_homeCommissioningStyle___R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #ifdef CN1_INCLUDE_MATTER_SETUP
+#ifdef CN1_MATTER_OWN_FABRIC
+    if (!cn1homeSetupExtensionLoadable()) {
+        // The same answer a build with no extension gives: the Apple Home app
+        // can still add the accessory, and this OS cannot run our own flow.
+        return CN1_HOME_COMMISSION_APP_HANDOFF;
+    }
+#endif
     return CN1_HOME_COMMISSION_OS_UI;
 #else
     // Not "none": the Apple Home app can still add the accessory, and telling
@@ -3795,6 +3820,22 @@ com_codename1_impl_ios_IOSNative_homeCommission___int_java_lang_String_java_lang
         JAVA_OBJECT suggestedName, JAVA_INT timeoutMillis) {
 #ifdef CN1_INCLUDE_MATTER_SETUP
     POOL_BEGIN();
+#ifdef CN1_MATTER_OWN_FABRIC
+    if (!cn1homeSetupExtensionLoadable()) {
+        // Refused here as well as reported by homeCommissioningStyle: an app
+        // that asks anyway gets a failure it can show, rather than a sheet
+        // that opens and dies on an extension this OS cannot load.
+        com_codename1_impl_ios_IOSHomeCallbacks_commissioningResult___int_java_lang_String_java_lang_String_java_lang_String_int_java_lang_String(
+            CN1_THREAD_STATE_PASS_ARG requestId, JAVA_NULL, JAVA_NULL,
+            JAVA_NULL, 0,
+            fromNSString(CN1_THREAD_STATE_PASS_ARG
+                         @"COMMISSIONING_UNAVAILABLE\tthis build commissions "
+                         "onto its own fabric, which needs iOS 16.4; add the "
+                         "accessory in the Home app instead"));
+        POOL_END();
+        return;
+    }
+#endif
     NSString *payload = toNSString(CN1_THREAD_STATE_PASS_ARG setupPayload);
     NSString *home = toNSString(CN1_THREAD_STATE_PASS_ARG structureId);
     NSString *room = toNSString(CN1_THREAD_STATE_PASS_ARG roomId);

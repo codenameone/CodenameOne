@@ -3511,6 +3511,17 @@ public class IPhoneBuilder extends Executor {
                             "Failed to enable CN1_INCLUDE_MATTER_SETUP", ex);
                 }
                 if (matterOwnFabric(request)) {
+                    // A fabric of this app's own needs Apple's Matter
+                    // framework, which starts at iOS 16.4 -- so the extension
+                    // is built for 16.4 while the app keeps the 16.1 floor
+                    // above. What 16.1 through 16.3 must not get is a
+                    // commissioning button that opens a sheet backed by an
+                    // extension they cannot load: CN1SmartHome.m answers
+                    // APP_HANDOFF rather than OS_UI there in an own-fabric
+                    // build, and refuses the call itself, so those releases
+                    // hand off to the Home app exactly as a build with no
+                    // extension does.
+                    //
                     // Same flip, for the half that decides what a successful
                     // flow means: with a fabric of this app's, the extension
                     // commissioned the accessory onto it or threw, and a

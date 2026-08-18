@@ -148,6 +148,20 @@ class TraitValueTest {
     }
 
     /**
+     * NaN compares false against every operator, so a {@code <= 0} guard
+     * lets it straight through -- and the reciprocal of NaN is NaN, so a bad
+     * reading became a colour temperature that spread through every
+     * calculation it touched rather than failing at the conversion.
+     */
+    @Test
+    void miredAndKelvinConversionsRefuseNotANumber() {
+        assertThrows(IllegalArgumentException.class,
+                () -> TraitUnit.miredToKelvin(Double.NaN));
+        assertThrows(IllegalArgumentException.class,
+                () -> TraitUnit.kelvinToMired(Double.NaN));
+    }
+
+    /**
      * The escape hatch for lossy mappings. Without it, every judgment call
      * made in the trait table would be a permanent lie to an app that needs
      * the platform's own answer.

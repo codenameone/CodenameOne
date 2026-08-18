@@ -42,6 +42,11 @@ public enum CommissioningStyle {
     /// that can.
     ///
     /// [Commissioner#openEcosystemApp()] is the whole capability here.
+    ///
+    /// An iOS build that commissions onto a fabric of its own answers this on
+    /// iOS 16.1 through 16.3: Apple's Matter framework starts at 16.4, so the
+    /// generated extension is built for 16.4 and those releases cannot load
+    /// it. The app itself still runs, and hands off.
     ECOSYSTEM_APP_HANDOFF,
 
     /// Not possible from this platform at all -- watchOS, tvOS, macOS, or an

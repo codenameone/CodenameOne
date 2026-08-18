@@ -230,9 +230,15 @@ public enum TraitUnit {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: when `mireds` is zero or negative
+    /// - `IllegalArgumentException`: when `mireds` is zero, negative or
+///   not a number
     public static double miredToKelvin(double mireds) {
-        if (mireds <= 0) {
+        // NaN named on its own, because it compares false against every
+        // operator: `mireds <= 0` lets it straight through, and a reciprocal of
+        // NaN is NaN, so a bad reading became a colour temperature that
+        // spread through every calculation it touched instead of failing
+        // here.
+        if (Double.isNaN(mireds) || mireds <= 0) {
             throw new IllegalArgumentException(
                     "mireds must be positive, got " + mireds);
         }
@@ -252,9 +258,15 @@ public enum TraitUnit {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: when `kelvin` is zero or negative
+    /// - `IllegalArgumentException`: when `kelvin` is zero, negative or
+///   not a number
     public static double kelvinToMired(double kelvin) {
-        if (kelvin <= 0) {
+        // NaN named on its own, because it compares false against every
+        // operator: `kelvin <= 0` lets it straight through, and a reciprocal of
+        // NaN is NaN, so a bad reading became a colour temperature that
+        // spread through every calculation it touched instead of failing
+        // here.
+        if (Double.isNaN(kelvin) || kelvin <= 0) {
             throw new IllegalArgumentException(
                     "kelvin must be positive, got " + kelvin);
         }
