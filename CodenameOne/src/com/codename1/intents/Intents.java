@@ -1145,7 +1145,7 @@ public final class Intents {
         // A declared opensRoute has already brought the app forward -- that is what the flag is
         // for. A route the handler decided on at runtime has not, and if it ran headless the
         // destination would otherwise be built somewhere nobody can see.
-        if (fromResult && decl != null && decl.isHeadless()) {
+        if (fromResult && decl != null && decl.runsHeadless()) {
             requestForeground(decl);
         }
         try {

@@ -102,6 +102,20 @@ public final class IntentDeclaration {
         return headless;
     }
 
+    /// True when an invocation of this intent actually runs with no window.
+    ///
+    /// Not the same question as [#isHeadless()], which reports what the declaration *said*. An
+    /// intent that names a route is foregrounded however it was declared, because the route has
+    /// to open somewhere a person can see -- iOS decides that statically through
+    /// `openAppWhenRun`, and every Java caller has to reach the same answer.
+    ///
+    /// It exists because that combination was resolved separately in four places -- the Android
+    /// trampoline, the service's post-bootstrap recheck, the parked-request path and the
+    /// shortcut generator -- and each was fixed as its own bug. One definition, one answer.
+    public boolean runsHeadless() {
+        return headless && opensRoute.length() == 0;
+    }
+
     /// True when the platform may offer this intent before the user has ever run
     /// it. A false value means the intent only appears after a donation.
     public boolean isDiscoverable() {

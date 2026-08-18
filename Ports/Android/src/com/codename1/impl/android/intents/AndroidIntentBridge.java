@@ -131,9 +131,7 @@ public class AndroidIntentBridge implements IntentBridge {
         // first tap after process death visibly open the app for an intent that declared
         // headless=true, and the trampoline had already foregrounded by then.
         com.codename1.intents.IntentDeclaration decl = Intents.getDeclaration(parked);
-        // A route needs somewhere visible to land, exactly as the trampoline decides it.
-        boolean headless = decl != null && decl.isHeadless()
-                && decl.getOpensRoute().length() == 0;
+        boolean headless = decl != null && decl.runsHeadless();
         if (!headless) {
             // This runs from registerIntents, which the stub calls while the app instance is
             // still being built -- before init()/start() have produced a Form. Dispatching a
@@ -772,7 +770,10 @@ public class AndroidIntentBridge implements IntentBridge {
         }
         com.codename1.intents.IntentDeclaration decl =
                 com.codename1.intents.Intents.getDeclaration(intentId);
-        if (decl != null && decl.isHeadless()) {
+        // runsHeadless: this URI outlives the process, so a routed intent claiming headless
+        // here is what a cold tap later believes before any declaration is loaded. The static
+        // shortcut generator writes the flag by the same rule.
+        if (decl != null && decl.runsHeadless()) {
             uri += "&h=1";
         }
         // Marks the URI as one this application published, which is what lets the trampoline

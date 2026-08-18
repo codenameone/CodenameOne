@@ -125,11 +125,9 @@ public class CN1IntentTrampolineActivity extends Activity {
             boolean headless = "1".equals(data.getQueryParameter("h"));
             IntentDeclaration decl = Intents.getDeclaration(id);
             if (decl != null) {
-                // A declared route needs a window to land in. iOS reaches the same conclusion
-                // statically -- openAppWhenRun is (route || !headless) -- and without it here a
-                // headless intent that names a route builds its Form inside the service
-                // runtime, where nobody sees it and which then stops.
-                headless = decl.isHeadless() && decl.getOpensRoute().length() == 0;
+                // runsHeadless, not isHeadless: a declared route is foregrounded however the
+                // intent was declared. See IntentDeclaration#runsHeadless.
+                headless = decl.runsHeadless();
             }
             if (!trusted) {
                 if (decl != null || !Intents.getDeclarations().isEmpty()) {

@@ -1089,6 +1089,24 @@ class IntentsTest {
         assertEquals("shop:42", ok.getId());
     }
 
+    /// Whether an invocation actually runs headless is one question with one answer. It was
+    /// being recomputed in four places -- the trampoline, the service's recheck, the parked
+    /// path and the donation URI -- and each was fixed as a separate bug when it disagreed.
+    @Test
+    void aRoutedIntentNeverRunsHeadlessHoweverItWasDeclared() {
+        IntentDeclaration routed = new IntentDeclaration("show_order", "Show", "", true, true,
+                false, "/orders/{id}", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(), Arrays.asList(Exposure.ASSISTANT));
+        IntentDeclaration plain = new IntentDeclaration("log_workout", "Log", "", true, true,
+                false, "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(), Arrays.asList(Exposure.ASSISTANT));
+
+        assertTrue(routed.isHeadless(), "the declaration still says what it said");
+        assertFalse(routed.runsHeadless(), "but a route has to open somewhere visible");
+        assertTrue(plain.isHeadless());
+        assertTrue(plain.runsHeadless());
+    }
+
     /// The convenience parser materialises every number as a Double, which rounds anything past
     /// 2^53 into a different, still-integral number -- so every downstream check accepts it and
     /// the handler acts on an id the caller never sent. Snowflake ids and database keys are

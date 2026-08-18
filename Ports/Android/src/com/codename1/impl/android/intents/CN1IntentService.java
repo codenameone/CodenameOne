@@ -129,7 +129,7 @@ public class CN1IntentService extends IntentService {
         // and running that handler here gives it no Activity and no visible Form. Hand it to
         // the foreground path instead of honouring a flag the app no longer agrees with.
         IntentDeclaration decl = Intents.getDeclaration(id);
-        if (decl != null && !decl.isHeadless()) {
+        if (decl != null && !decl.runsHeadless()) {
             Log.w(TAG, "Shortcut for \"" + id + "\" asked for headless, but the declaration is "
                     + "not; running it in the foreground instead");
             AndroidIntentBridge.parkForegroundRequest(id, data.getQueryParameter("p"));
