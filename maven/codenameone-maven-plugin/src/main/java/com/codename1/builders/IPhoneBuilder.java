@@ -313,6 +313,12 @@ public class IPhoneBuilder extends Executor {
     private boolean usesSmartHome;
     private boolean usesHomeAccessoryData;
     private boolean usesHomeCommissioning;
+    // Whether the app asked for the accessory to join a fabric of its own.
+    // Set by CommissioningRequest.setCommissionToThisApp(true) -- a call the
+    // scanner can see, which is why the API takes a boolean rather than being
+    // a mode the developer configures somewhere the build cannot read -- or
+    // by ios.home.commissioning.fabric for a call behind reflection.
+    private boolean usesHomeOwnFabric;
 
     /// Whether the generated Xcode project gets the MatterAddDeviceExtension
     /// target. True only when the app referenced
@@ -1474,6 +1480,21 @@ public class IPhoneBuilder extends Executor {
                     // reading it as store use linked that app against
                     // HealthKit and demanded purpose strings for data it
                     // had just declined to touch.
+                    // Asking for a fabric of this app's is what turns the
+                    // generated extension's commissioning implementation from
+                    // commented-out scaffolding into live code, and it ships
+                    // an operating-system Matter controller with it. The
+                    // argument decides it for the same reason it does above:
+                    // an explicit setCommissionToThisApp(false) is an app
+                    // saying it does NOT want that, and reading it as a
+                    // request would ship the controller to a build that had
+                    // just declined it.
+                    if ("com/codename1/home/commissioning/CommissioningRequest"
+                            .equals(cls)
+                            && "setCommissionToThisApp".equals(method)
+                            && Boolean.TRUE.equals(value)) {
+                        usesHomeOwnFabric = true;
+                    }
                     if (HealthManifestFragments.enablesSensorWriteThrough(
                             cls, method, value)) {
                         usesHealth = true;
@@ -5634,9 +5655,21 @@ public class IPhoneBuilder extends Executor {
         String extBundle = injectedBundle != null ? injectedBundle
                 : request.getArg("ios.bundleVersion",
                         WatchNativeBuilder.shortVersion(request));
+        // The hint is an override, not the only way in: an app whose
+        // setCommissionToThisApp(true) the scanner saw needs no hint, and one
+        // that reaches the API through reflection has no other way to say so.
+        boolean ownFabric = usesHomeOwnFabric
+                || "true".equalsIgnoreCase(request.getArg(
+                        "ios.home.commissioning.fabric", "false"));
+        if (ownFabric) {
+            log("Smart home: commissioning onto this app's own Matter fabric"
+                    + " -- the extension ships a Matter controller");
+        }
         IOSWalletExtensionBuilder.writeFileMap(
                 MatterExtensionBuilder.buildFileMap(request.getPackageName(),
-                        matterAppGroup, displayName, extShort, extBundle),
+                        matterAppGroup, displayName, extShort, extBundle,
+                        ownFabric, request.getArg(
+                                "ios.home.commissioning.vendorId", "0xFFF1")),
                 new File(distDir, name));
         // The app-side Swift shim, into <MainClass>-src, exactly where the
         // surfaces glue goes and for the same reason: this method runs while
@@ -5681,6 +5714,15 @@ public class IPhoneBuilder extends Executor {
                 + "service_target = xcproj.new_target(:app_extension, '" + name + "', :ios, '"
                 + MatterExtensionBuilder.DEPLOYMENT_TARGET + "')\n"
                 + "service_target.add_system_framework('MatterSupport')\n"
+                // Matter is Apple's own CHIP stack, and it is what the
+                // generated commissioning implementation drives. Linked
+                // whether or not that implementation is live: the file
+                // imports it either way so that uncommenting the
+                // implementation is the only step, and an unused system
+                // framework in an extension costs the app nothing at
+                // runtime -- the extension only runs while the setup sheet
+                // is on screen.
+                + "service_target.add_system_framework('Matter')\n"
                 + "service_group = xcproj.new_group('" + name + "')\n");
         appendFilesToXcodeProjGroup(sb, new File(distDir, name), "service_group", "service_target",
                 distDir);

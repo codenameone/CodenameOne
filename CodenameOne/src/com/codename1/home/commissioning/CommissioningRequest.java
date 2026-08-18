@@ -52,6 +52,7 @@ public final class CommissioningRequest {
     private String roomId;
     private String suggestedName;
     private int timeoutMillis;
+    private boolean commissionToThisApp;
 
     /// The accessory's onboarding payload, from a scanned QR code or a typed
     /// manual code.
@@ -251,6 +252,58 @@ public final class CommissioningRequest {
     /// #### Returns
     ///
     /// the limit, or zero for the platform default
+    /// Ask that the accessory also join a Matter fabric this app owns, so it
+    /// can be reached directly rather than only through the user's home.
+    ///
+    /// #### What this costs, and what it does not do
+    ///
+    /// Commissioning to the user's ecosystem -- their HomeKit or Google home
+    /// -- is what the flow does by default, and it is what makes the
+    /// accessory usable at all. This asks for a *second* administrator: the
+    /// accessory is additionally commissioned onto a fabric belonging to this
+    /// app, which is the only way an app can talk to a Matter accessory
+    /// without going through the ecosystem.
+    ///
+    /// It is not free. On iOS the build ships an operating-system Matter
+    /// controller inside the generated commissioning extension, and the app
+    /// carries the key material for its fabric. So it is opt-in, and the
+    /// builder switches that machinery on because it saw this call --
+    /// `ios.home.commissioning.fabric=true` says the same thing for a build
+    /// whose call the scanner cannot see, such as one behind reflection.
+    ///
+    /// **Codename One does not yet expose an API for talking to an accessory
+    /// over that fabric.** What asking for it buys today is that the
+    /// accessory is already commissioned when such an API arrives, and that
+    /// [CommissioningResult#wasCommissionedToThisApp()] can be true. Reading
+    /// and writing traits still goes through the ecosystem.
+    ///
+    /// Where the platform cannot do it -- Android's Play Services
+    /// commissioning, every desktop -- this is ignored and
+    /// [CommissioningResult#wasCommissionedToThisApp()] stays `false`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commissionToThisApp`: `true` to ask for the second fabric
+    ///
+    /// #### Returns
+    ///
+    /// this request, for chaining
+    public CommissioningRequest setCommissionToThisApp(
+            boolean commissionToThisApp) {
+        this.commissionToThisApp = commissionToThisApp;
+        return this;
+    }
+
+    /// Whether this request asks for the accessory to join a fabric of this
+    /// app's.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when [#setCommissionToThisApp(boolean)] asked for it
+    public boolean isCommissionToThisApp() {
+        return commissionToThisApp;
+    }
+
     public int getTimeoutMillis() {
         return timeoutMillis;
     }

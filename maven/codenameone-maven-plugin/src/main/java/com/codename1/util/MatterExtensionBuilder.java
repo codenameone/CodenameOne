@@ -90,13 +90,20 @@ public final class MatterExtensionBuilder {
      * @param displayName    the name shown in the setup sheet
      * @param shortVersion   the containing app's CFBundleShortVersionString
      * @param bundleVersion  the containing app's CFBundleVersion
+     * @param ownFabric      whether the app asked for the accessory to join a
+     *                       fabric of its own, which is what turns the
+     *                       commissioning implementation from commented-out
+     *                       scaffolding into live code
+     * @param vendorId       the Matter vendor id the fabric commissions under
      * @return path to content, in a stable order
      */
     public static Map<String, byte[]> buildFileMap(String packageName,
             String appGroup, String displayName, String shortVersion,
-            String bundleVersion) {
+            String bundleVersion, boolean ownFabric, String vendorId) {
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
-        files.put("RequestHandler.swift", utf8(requestHandlerSwift()));
+        files.put("RequestHandler.swift",
+                utf8(requestHandlerSwift(packageName, appGroup, ownFabric,
+                        vendorId)));
         files.put("Info.plist",
                 utf8(infoPlist(displayName, shortVersion, bundleVersion)));
         files.put(EXTENSION_NAME + ".entitlements",
@@ -114,7 +121,214 @@ public final class MatterExtensionBuilder {
      *
      * @return the Swift source
      */
-    static String requestHandlerSwift() {
+    /// The Matter-controller half, as Swift source lines.
+    ///
+    /// One implementation, emitted either live or commented out, so the code
+    /// a build ships is the code a reader of a default build sees. The
+    /// accessory reaching the user's ecosystem is the sheet's own doing; this
+    /// is the second administrator an app asks for with
+    /// CommissioningRequest.setCommissionToThisApp(true), and it is where the
+    /// operating system's Matter stack -- Apple's, not one of ours -- joins
+    /// the accessory to a fabric this app owns.
+    ///
+    /// @param packageName the app's bundle identifier, for the keychain tag
+    /// @param appGroup    the group whose UserDefaults holds the fabric state
+    /// @return the lines, without the comment prefix
+    private static String[] fabricSwift(String packageName, String appGroup,
+            String vendorId) {
+        return new String[] {
+            "@available(iOS 16.4, *)",
+            "enum CN1MatterFabric {",
+            "",
+            "    // The app group, because the controller's storage and the",
+            "    // fabric's keys have to survive the extension being torn",
+            "    // down between sheets and have to be the same ones the app",
+            "    // itself would see.",
+            "    static let group = \"" + escape(appGroup) + "\"",
+            "    static let keyTag = \"" + escape(packageName)
+                    + ".cn1matter.signer\"",
+            "    // 0xFFF1 is the Matter test vendor. A shipping product",
+            "    // replaces it with its own through",
+            "    // ios.home.commissioning.vendorId -- accessories are free to",
+            "    // refuse a test vendor, and some do.",
+            "    static let vendorID: UInt16 = " + vendorId,
+            "",
+            "    static func defaults() -> UserDefaults {",
+            "        return UserDefaults(suiteName: group)"
+                    + " ?? UserDefaults.standard",
+            "    }",
+            "",
+            "    // The fabric's signing key, generated once and kept in the",
+            "    // keychain. Losing it means every accessory commissioned on",
+            "    // this fabric has to be commissioned again.",
+            "    static func signingKey() throws -> SecKey {",
+            "        let tag = keyTag.data(using: .utf8)!",
+            "        let query: [String: Any] = [",
+            "            kSecClass as String: kSecClassKey,",
+            "            kSecAttrApplicationTag as String: tag,",
+            "            kSecAttrKeyType as String:"
+                    + " kSecAttrKeyTypeECSECPrimeRandom,",
+            "            kSecReturnRef as String: true]",
+            "        var item: CFTypeRef?",
+            "        if SecItemCopyMatching(query as CFDictionary, &item)"
+                    + " == errSecSuccess,",
+            "           let existing = item {",
+            "            return (existing as! SecKey)",
+            "        }",
+            "        let attributes: [String: Any] = [",
+            "            kSecAttrKeyType as String:"
+                    + " kSecAttrKeyTypeECSECPrimeRandom,",
+            "            kSecAttrKeySizeInBits as String: 256,",
+            "            kSecPrivateKeyAttrs as String: [",
+            "                kSecAttrIsPermanent as String: true,",
+            "                kSecAttrApplicationTag as String: tag]]",
+            "        var error: Unmanaged<CFError>?",
+            "        guard let key = SecKeyCreateRandomKey("
+                    + "attributes as CFDictionary, &error) else {",
+            "            throw error!.takeRetainedValue() as Error",
+            "        }",
+            "        return key",
+            "    }",
+            "",
+            "    static func identityProtectionKey() -> Data {",
+            "        if let stored = defaults().data(forKey: \"cn1.matter.ipk\"),",
+            "           stored.count == 16 {",
+            "            return stored",
+            "        }",
+            "        var bytes = [UInt8](repeating: 0, count: 16)",
+            "        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count,"
+                    + " &bytes)",
+            "        let fresh = Data(bytes)",
+            "        defaults().set(fresh, forKey: \"cn1.matter.ipk\")",
+            "        return fresh",
+            "    }",
+            "",
+            "    static func controller() throws -> MTRDeviceController {",
+            "        let factory = MTRDeviceControllerFactory.sharedInstance()",
+            "        try factory.start("
+                    + "MTRDeviceControllerFactoryParams(storage:"
+                    + " CN1MatterStorage()))",
+            "        let params = MTRDeviceControllerStartupParams(",
+            "            ipk: identityProtectionKey(),"
+                    + " fabricID: NSNumber(value: 1),",
+            "            nocSigner: CN1MatterKeypair(key: try signingKey()))",
+            "        params.vendorID = NSNumber(value: vendorID)",
+            "        // The fabric outlives the first accessory, so the second",
+            "        // commissioning joins the one already there rather than",
+            "        // starting another the accessory would not recognise.",
+            "        if let existing = try? factory.createController("
+                    + "onExistingFabric: params) {",
+            "            return existing",
+            "        }",
+            "        return try factory.createController(onNewFabric: params)",
+            "    }",
+            "",
+            "    static func nextNodeID() -> NSNumber {",
+            "        let next = defaults().integer(forKey: \"cn1.matter.node\")"
+                    + " + 1",
+            "        defaults().set(next, forKey: \"cn1.matter.node\")",
+            "        return NSNumber(value: UInt64(next + 1))",
+            "    }",
+            "}",
+            "",
+            "@available(iOS 16.4, *)",
+            "final class CN1MatterStorage: NSObject, MTRStorage {",
+            "    func storageData(forKey key: String) -> Data? {",
+            "        return CN1MatterFabric.defaults().data(forKey: key)",
+            "    }",
+            "    func setStorageData(_ value: Data, forKey key: String)"
+                    + " -> Bool {",
+            "        CN1MatterFabric.defaults().set(value, forKey: key)",
+            "        return true",
+            "    }",
+            "    func removeStorageData(forKey key: String) -> Bool {",
+            "        CN1MatterFabric.defaults().removeObject(forKey: key)",
+            "        return true",
+            "    }",
+            "}",
+            "",
+            "@available(iOS 16.4, *)",
+            "final class CN1MatterKeypair: NSObject, MTRKeypair {",
+            "    private let key: SecKey",
+            "    init(key: SecKey) { self.key = key }",
+            "    func publicKey() -> Unmanaged<SecKey> {",
+            "        return Unmanaged.passUnretained(SecKeyCopyPublicKey(key)!)",
+            "    }",
+            "    func signMessageECDSA_DER(_ message: Data) -> Data {",
+            "        var error: Unmanaged<CFError>?",
+            "        let signature = SecKeyCreateSignature(",
+            "            key, .ecdsaSignatureMessageX962SHA256,"
+                    + " message as CFData, &error)",
+            "        return (signature as Data?) ?? Data()",
+            "    }",
+            "}",
+            "",
+            "// Commissioning is two steps with a delegate callback between",
+            "// them -- establish the session, then commission the node -- and",
+            "// commissionDevice is an async throws the OS waits on, so the",
+            "// two are stitched back together with a continuation.",
+            "@available(iOS 16.4, *)",
+            "final class CN1MatterSession: NSObject,"
+                    + " MTRDeviceControllerDelegate {",
+            "    private var continuation: CheckedContinuation<Void, Error>?",
+            "    private let nodeID: NSNumber",
+            "    init(nodeID: NSNumber) { self.nodeID = nodeID }",
+            "",
+            "    func commission(payload: MTRSetupPayload) async throws {",
+            "        let controller = try CN1MatterFabric.controller()",
+            "        try await withCheckedThrowingContinuation {",
+            "                (c: CheckedContinuation<Void, Error>) in",
+            "            continuation = c",
+            "            controller.setDeviceControllerDelegate(self,"
+                    + " queue: DispatchQueue.main)",
+            "            do {",
+            "                try controller.setupCommissioningSession("
+                    + "with: payload,",
+            "                                                         "
+                    + "newNodeID: nodeID)",
+            "            } catch {",
+            "                finish(error)",
+            "            }",
+            "        }",
+            "    }",
+            "",
+            "    private func finish(_ error: Error?) {",
+            "        guard let waiting = continuation else { return }",
+            "        continuation = nil",
+            "        if let error = error {",
+            "            waiting.resume(throwing: error)",
+            "        } else {",
+            "            waiting.resume()",
+            "        }",
+            "    }",
+            "",
+            "    func controller(_ controller: MTRDeviceController,",
+            "                    commissioningSessionEstablishmentDone"
+                    + " error: Error?) {",
+            "        if let error = error {",
+            "            finish(error)",
+            "            return",
+            "        }",
+            "        do {",
+            "            try controller.commissionNode(",
+            "                withID: nodeID,"
+                    + " commissioningParams: MTRCommissioningParameters())",
+            "        } catch {",
+            "            finish(error)",
+            "        }",
+            "    }",
+            "",
+            "    func controller(_ controller: MTRDeviceController,",
+            "                    commissioningComplete error: Error?,",
+            "                    nodeID: NSNumber?) {",
+            "        finish(error)",
+            "    }",
+            "}",
+        };
+    }
+
+    static String requestHandlerSwift(String packageName, String appGroup,
+            boolean ownFabric, String vendorId) {
         StringBuilder sb = new StringBuilder();
         sb.append("//\n");
         sb.append("//  Generated by Codename One. Do not edit: this file is\n");
@@ -125,16 +339,21 @@ public final class MatterExtensionBuilder {
         sb.append("//  outside the app and talks to this handler.\n");
         sb.append("//\n\n");
         sb.append("import Foundation\n");
-        sb.append("import MatterSupport\n\n");
+        sb.append("import MatterSupport\n");
+        // Imported either way. A commented-out implementation that needs two
+        // more imports to work is a trap: the developer who uncomments it
+        // gets errors about MTRSetupPayload rather than about what is
+        // missing, and the imports cost a build nothing.
+        sb.append("import Matter\n");
+        sb.append("import Security\n\n");
         sb.append("@available(iOS 16.1, *)\n");
         sb.append("final class RequestHandler: "
                 + "MatterAddDeviceExtensionRequestHandler {\n\n");
-        sb.append("    // Codename One is not a Matter controller: the\n");
-        sb.append("    // accessory joins the user's own HomeKit home, not a\n");
-        sb.append("    // fabric of this app's. So every step below is the\n");
-        sb.append("    // default, and the app learns about the new accessory\n");
-        sb.append("    // the same way it learns about any other -- by\n");
-        sb.append("    // refreshing the graph.\n\n");
+        sb.append("    // The accessory joins the user's own home, and the\n");
+        sb.append("    // app learns about it the way it learns about any\n");
+        sb.append("    // other accessory -- by refreshing the graph. The\n");
+        sb.append("    // steps below are the defaults for everything the\n");
+        sb.append("    // sheet does not need this app's answer to.\n\n");
         sb.append("    override func validateDeviceCredential(\n");
         sb.append("            _ deviceCredential: "
                 + "MatterAddDeviceExtensionRequestHandler.DeviceCredential)\n");
@@ -168,7 +387,59 @@ public final class MatterExtensionBuilder {
                 + ".ThreadNetworkAssociation {\n");
         sb.append("        return .defaultSystemNetwork\n");
         sb.append("    }\n");
-        sb.append("}\n");
+        if (ownFabric) {
+            sb.append("\n");
+            sb.append("    // This app asked for the accessory to join a\n");
+            sb.append("    // fabric of its own -- see\n");
+            sb.append("    // CommissioningRequest.setCommissionToThisApp.\n");
+            sb.append("    override func commissionDevice(\n");
+            sb.append("            in home: MatterAddDeviceRequest.Home?,\n");
+            sb.append("            onboardingPayload: String,\n");
+            sb.append("            commissioningID: UUID) async throws {\n");
+            sb.append("        guard #available(iOS 16.4, *) else { return }\n");
+            sb.append("        let payload = try MTRSetupPayload(\n");
+            sb.append("            onboardingPayload: onboardingPayload)\n");
+            sb.append("        try await CN1MatterSession(\n");
+            sb.append("            nodeID: CN1MatterFabric.nextNodeID())\n");
+            sb.append("            .commission(payload: payload)\n");
+            sb.append("    }\n");
+        } else {
+            sb.append("\n");
+            sb.append("    // commissionDevice is where an app that runs its\n");
+            sb.append("    // OWN Matter fabric joins the accessory to it, as\n");
+            sb.append("    // a second administrator alongside the user's\n");
+            sb.append("    // ecosystem. This app does not ask for that, so\n");
+            sb.append("    // the override below is inert -- and it is here,\n");
+            sb.append("    // rather than absent, because the machinery it\n");
+            sb.append("    // needs is generated with it and a reader should\n");
+            sb.append("    // see exactly what enabling it would ship.\n");
+            sb.append("    //\n");
+            sb.append("    // To switch it on, call\n");
+            sb.append("    // CommissioningRequest.setCommissionToThisApp(true)\n");
+            sb.append("    // -- the builder sees that call and generates this\n");
+            sb.append("    // file live -- or set\n");
+            sb.append("    // ios.home.commissioning.fabric=true when the call\n");
+            sb.append("    // is somewhere the scanner cannot see it.\n");
+            sb.append("//    override func commissionDevice(\n");
+            sb.append("//            in home: MatterAddDeviceRequest.Home?,\n");
+            sb.append("//            onboardingPayload: String,\n");
+            sb.append("//            commissioningID: UUID) async throws {\n");
+            sb.append("//        guard #available(iOS 16.4, *) else { return }\n");
+            sb.append("//        let payload = try MTRSetupPayload(\n");
+            sb.append("//            onboardingPayload: onboardingPayload)\n");
+            sb.append("//        try await CN1MatterSession(\n");
+            sb.append("//            nodeID: CN1MatterFabric.nextNodeID())\n");
+            sb.append("//            .commission(payload: payload)\n");
+            sb.append("//    }\n");
+        }
+        sb.append("}\n\n");
+        for (String line : fabricSwift(packageName, appGroup, vendorId)) {
+            if (line.length() == 0) {
+                sb.append(ownFabric ? "\n" : "//\n");
+                continue;
+            }
+            sb.append(ownFabric ? "" : "//").append(line).append("\n");
+        }
         return sb.toString();
     }
 

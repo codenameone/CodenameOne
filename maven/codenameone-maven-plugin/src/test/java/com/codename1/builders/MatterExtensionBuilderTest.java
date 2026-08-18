@@ -58,11 +58,79 @@ public class MatterExtensionBuilderTest {
         return new String(raw, "UTF-8");
     }
 
+    /**
+     * The commissioning callback is generated either way, and inert by
+     * default.
+     *
+     * <p>commissionDevice is where an app that runs its own Matter fabric
+     * joins the accessory to it. Codename One asks for nothing of the sort by
+     * default -- the accessory joins the user's ecosystem, which is what the
+     * sheet itself does -- so the implementation ships commented out, with
+     * the controller it would need beside it. A developer who turns it on
+     * gets exactly the code they read.</p>
+     */
+    @Test
+    public void theCommissioningCallbackIsCommentedOutByDefault()
+            throws Exception {
+        String swift = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR),
+                "RequestHandler.swift");
+        assertTrue(swift.contains("//    override func commissionDevice("),
+                "the override must be present and commented out");
+        assertFalse(swift.contains("\n    override func commissionDevice("),
+                "and must not be live: " + swift);
+        assertTrue(swift.contains("//final class CN1MatterSession"),
+                "the controller it needs travels with it, commented out too");
+        // The imports stay live: uncommenting the implementation must be the
+        // only step, and an import of a framework nothing calls costs the
+        // extension nothing.
+        assertTrue(swift.contains("\nimport Matter\n"), swift);
+    }
+
+    /**
+     * Asking for a fabric of the app's own emits the same code, live.
+     *
+     * <p>Same text, so what a default build shows a reader is what an
+     * enabled build compiles -- and the enabled one carries Apple's Matter
+     * stack, the storage the fabric persists through, and the keypair that
+     * signs for it.</p>
+     */
+    @Test
+    public void askingForItsOwnFabricEmitsTheImplementationLive()
+            throws Exception {
+        String swift = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, true, VENDOR),
+                "RequestHandler.swift");
+        assertTrue(swift.contains("    override func commissionDevice("),
+                "the override must be live: " + swift);
+        assertFalse(swift.contains("//    override func commissionDevice("),
+                "and not also commented out");
+        for (String needed : new String[] {"MTRDeviceControllerFactory",
+                "MTRSetupPayload", "MTRKeypair", "MTRStorage",
+                "commissionNode(", "setupCommissioningSession("}) {
+            assertTrue(swift.contains(needed),
+                    "expected " + needed + " in the live implementation");
+        }
+        // Its own explanatory comments are still comments; what must not
+        // survive is a commented-out declaration.
+        for (String dead : new String[] {"//enum CN1MatterFabric",
+                "//final class CN1MatterSession", "//final class CN1MatterKeypair",
+                "//    override func commissionDevice("}) {
+            assertFalse(swift.contains(dead),
+                    dead + " must be live in an enabled build");
+        }
+        assertTrue(swift.contains("static let vendorID: UInt16 = " + VENDOR),
+                "the vendor id is the build's, not a constant");
+    }
+
+    /** The Matter test vendor, which is what a build defaults to. */
+    private static final String VENDOR = "0xFFF1";
+
     @Test
     public void theExtensionCarriesItsHandlerPlistAndEntitlements()
             throws Exception {
         Map<String, byte[]> files =
-                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION);
+                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR);
         assertEquals(3, files.size(), files.keySet().toString());
         assertNotNull(files.get("RequestHandler.swift"));
         assertNotNull(files.get("Info.plist"));
@@ -78,7 +146,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void thePlistNamesApplesAddDeviceExtensionPoint() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         assertTrue(plist.contains(
                 "com.apple.matter.support.extension.device-setup"), plist);
         assertTrue(plist.contains("NSExtensionPointIdentifier"), plist);
@@ -92,7 +160,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void theExtensionEchoesTheHostVersions() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         assertTrue(plist.contains("<string>" + SHORT_VERSION + "</string>"),
                 plist);
         assertTrue(plist.contains("<string>" + BUNDLE_VERSION + "</string>"),
@@ -111,7 +179,7 @@ public class MatterExtensionBuilderTest {
     public void theHandlerUsesMatterSupportsAssociationTypes()
             throws Exception {
         String swift = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION),
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR),
                 "RequestHandler.swift");
         assertTrue(swift.contains("WiFiNetworkAssociation"), swift);
         assertTrue(swift.contains("ThreadNetworkAssociation"), swift);
@@ -133,7 +201,7 @@ public class MatterExtensionBuilderTest {
     public void thePlistCarriesTheBundleKeysXcodeDoesNotMergeIn()
             throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         assertTrue(plist.contains("<key>CFBundleExecutable</key>"), plist);
         assertTrue(plist.contains("$(EXECUTABLE_NAME)"), plist);
         assertTrue(plist.contains("<key>CFBundleIdentifier</key>"), plist);
@@ -152,7 +220,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void thePrincipalClassIsModuleQualified() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         assertTrue(plist.contains(
                 "$(PRODUCT_MODULE_NAME).RequestHandler"), plist);
     }
@@ -160,7 +228,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void thePlistIsAnExtensionBundle() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         assertTrue(plist.contains("<string>XPC!</string>"), plist);
     }
 
@@ -171,7 +239,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void theEntitlementsCarryTheSharedAppGroup() throws Exception {
         String entitlements = text(
-                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION),
+                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR),
                 MatterExtensionBuilder.EXTENSION_NAME + ".entitlements");
         assertTrue(entitlements.contains(
                 "com.apple.security.application-groups"), entitlements);
@@ -202,7 +270,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void theHandlerImplementsApplesProtocol() throws Exception {
         String swift = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION), "RequestHandler.swift");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "RequestHandler.swift");
         assertTrue(swift.contains("import MatterSupport"), swift);
         assertTrue(swift.contains(
                 "MatterAddDeviceExtensionRequestHandler"), swift);
@@ -220,7 +288,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void aDisplayNameWithMarkupInItIsEscaped() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Tom & Jerry <Home>", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                "Tom & Jerry <Home>", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         assertTrue(plist.contains("Tom &amp; Jerry &lt;Home&gt;"), plist);
     }
 
@@ -232,9 +300,9 @@ public class MatterExtensionBuilderTest {
     @Test
     public void generationIsDeterministic() throws Exception {
         String first = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         String second = text(MatterExtensionBuilder.buildFileMap(PACKAGE,
-                GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+                GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION, false, VENDOR), "Info.plist");
         assertEquals(first, second);
     }
 }

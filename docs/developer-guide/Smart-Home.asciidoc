@@ -159,4 +159,12 @@ Stated plainly, because each of these has a query that answers rather than a sil
 * *Energy, appliance and diagnostic clusters.*
 * *The Google Home APIs accessory graph on Android.* See above.
 
-And one structural point: Codename One isn't a Matter controller. There's no CHIP stack in your app, no fabric of its own, no direct on-network commissioning and no Thread border-router interaction. Everything Matter goes through the operating system's ecosystem, so the Apple Home or Google Home app has to be installed and set up.
+And one structural point: by default Codename One isn't a Matter controller. There's no fabric of its own, no direct on-network commissioning and no Thread border-router interaction. Everything Matter goes through the operating system's ecosystem, so the Apple Home or Google Home app has to be installed and set up.
+
+=== Commissioning onto your own fabric
+
+`CommissioningRequest.setCommissionToThisApp(true)` asks for one thing more: that the accessory also join a Matter fabric your app owns, as a second administrator beside the user's home. On iOS the generated commissioning extension then carries Apple's own Matter stack, a fabric key it keeps in the keychain and the controller storage that fabric persists through -- so the build sees the call and switches that machinery on. Set `codename1.arg.ios.home.commissioning.fabric=true` if your call is somewhere the class scanner can't see, such as behind reflection, and `codename1.arg.ios.home.commissioning.vendorId` to your own Matter vendor id -- the default is the test vendor `0xFFF1`, which some accessories refuse.
+
+Read the generated `CN1MatterSetup/RequestHandler.swift` before you turn it on. The implementation ships in every commissioning build, commented out, precisely so that what you enable is code you have read.
+
+What it does *not* buy you is a way to talk to the accessory over that fabric: Codename One has no API for that yet, and reads and writes still go through the ecosystem. What it buys is that the accessory is already commissioned when such an API arrives, and that `CommissioningResult.wasCommissionedToThisApp()` can be true. Android's Play Services commissioning can't do it at all, and ignores the request.
