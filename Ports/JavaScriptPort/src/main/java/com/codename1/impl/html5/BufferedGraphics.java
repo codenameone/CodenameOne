@@ -621,11 +621,13 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     /**
-     * Reports a region the canvas is having pixels taken out of, which counts however transparent
-     * the graphics happens to be.
+     * Reports a region a draw rewrites without consulting the graphics alpha -- an erase, which
+     * takes pixels away, or a backdrop effect, which samples what is there and paints the result.
+     * Those count however transparent the graphics happens to be.
      */
-    private void noteErasedRegion(int x, int y, int w, int h) {
-        noteCanvasCover(x, y, w, h, null, true);
+    private void noteAlphaIndependentRegion(int x, int y, int w, int h,
+            JavaScriptTextLayer.CoverTest test) {
+        noteCanvasCover(x, y, w, h, test, true);
     }
 
     private void noteCanvasCover(int x, int y, int w, int h, JavaScriptTextLayer.CoverTest test) {
@@ -633,7 +635,7 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     private void noteCanvasCover(int x, int y, int w, int h, JavaScriptTextLayer.CoverTest test,
-            boolean erasing) {
+            boolean alphaIndependent) {
         JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
         if (layer == null || w <= 0 || h <= 0) {
             return;
@@ -643,9 +645,9 @@ public class BufferedGraphics extends HTML5Graphics {
             return;
         }
         // A fully transparent draw leaves what is underneath exactly as it was, which is no
-        // reason to take text off the layer. An erase is different: it takes pixels away
-        // whatever the alpha says, so it counts either way.
-        if (!erasing && getAlpha() <= 0) {
+        // reason to take text off the layer. An erase and a backdrop effect are different: they
+        // rewrite pixels without consulting the alpha, so they count either way.
+        if (!alphaIndependent && getAlpha() <= 0) {
             return;
         }
         // Clipped first, in the coordinates the clip is kept in, and only then projected: the
@@ -741,7 +743,7 @@ public class BufferedGraphics extends HTML5Graphics {
         // A blur rewrites what is under it. Promoted text is not under it -- it is above the
         // canvas entirely -- so it would come out unblurred beside everything else. Back to the
         // canvas it goes.
-        noteCanvasCover(x, y, width, height, cornerRadius > 0
+        noteAlphaIndependentRegion(x, y, width, height, cornerRadius > 0
                 ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
                 : null);
         // Route through addOp (this class's chokepoint) so the empty-clip cull
@@ -755,7 +757,7 @@ public class BufferedGraphics extends HTML5Graphics {
         // Glass samples what is behind it and draws the result. Promoted text is not behind it,
         // so the material would be made from a backdrop the text is missing from, while the text
         // itself floated over the finished glass.
-        noteCanvasCover(x, y, width, height, cornerRadius > 0
+        noteAlphaIndependentRegion(x, y, width, height, cornerRadius > 0
                 ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
                 : null);
         addOp(new com.codename1.impl.html5.graphics.GlassRegion(x, y, width, height,
@@ -768,7 +770,7 @@ public class BufferedGraphics extends HTML5Graphics {
         // A lens magnifies, tints and aberrates what is under it. Promoted text is not under it,
         // so the selected tab's label would float over the effect untouched instead of being
         // drawn through it. Back to the canvas, where the lens can reach it.
-        noteCanvasCover(x, y, width, height, cornerRadius > 0
+        noteAlphaIndependentRegion(x, y, width, height, cornerRadius > 0
                 ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
                 : null);
         addOp(new com.codename1.impl.html5.graphics.LensRegion(x, y, width, height, cornerRadius,
@@ -780,7 +782,7 @@ public class BufferedGraphics extends HTML5Graphics {
         // Erasing the canvas erases nothing in the layer above it, so text promoted out of this
         // region would go on showing over pixels that were wiped. Reported whatever the alpha
         // is: a clear takes pixels away rather than painting over them.
-        noteErasedRegion(x, y, width, height);
+        noteAlphaIndependentRegion(x, y, width, height, null);
         primitiveRenderAdapter.clearRect(x, y, width, height);
     }
     
