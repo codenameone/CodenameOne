@@ -5245,6 +5245,33 @@ public class IPhoneBuilder extends Executor {
     /// through `ios.intents.minDeploymentTarget`.
     static final String APP_INTENTS_MIN_IOS = "16.0";
 
+    /// Adds this app's intent ids to an NSUserActivityTypes array the project already declared.
+    ///
+    /// Returns the injection unchanged when the key's array cannot be located, because writing
+    /// a second NSUserActivityTypes key would produce a plist iOS reads unpredictably -- worse
+    /// than the ids being absent, which at least fails in one direction.
+    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
+        int key = inject.indexOf("NSUserActivityTypes");
+        int open = key < 0 ? -1 : inject.indexOf("<array>", key);
+        int close = open < 0 ? -1 : inject.indexOf("</array>", open);
+        if (close < 0) {
+            return inject;
+        }
+        String existing = inject.substring(open, close);
+        StringBuilder add = new StringBuilder();
+        for (Map<String, Object> intent : intents) {
+            Object id = intent.get("id");
+            if (id instanceof String
+                    && !existing.contains("<string>" + (String) id + "</string>")) {
+                add.append("<string>").append((String) id).append("</string>");
+            }
+        }
+        if (add.length() == 0) {
+            return inject;
+        }
+        return inject.substring(0, close) + add + inject.substring(close);
+    }
+
     /// Reads the `intents.json` the annotation processor emitted into the project jar and
     /// decides what this app has to pay for it.
     ///
@@ -6116,18 +6143,31 @@ public class IPhoneBuilder extends Executor {
         // Emitted whenever the app declares intents, including the appIntents=false opt-out:
         // donation still runs there, and iOS only offers an activity whose type is declared
         // here, so omitting it would make the opt-out donate into a void.
-        if ((declaresAppIntents || appIntentsSuppressed)
-                && !inject.contains("NSUserActivityTypes")) {
-            StringBuilder types = new StringBuilder("\n<key>NSUserActivityTypes</key><array>");
-            for (Map<String, Object> intent : intentsManifest) {
-                Object id = intent.get("id");
-                if (id instanceof String) {
-                    types.append("<string>").append((String) id).append("</string>");
+        if (declaresAppIntents || appIntentsSuppressed) {
+            // Each key is decided on its own. Treating any existing NSUserActivityTypes as
+            // complete configuration meant an app that already declared one Handoff activity
+            // through ios.plistInject silently lost every intent id -- and lost
+            // CoreSpotlightContinuation too, which is a different key entirely, so a Spotlight
+            // result could not continue into the app either.
+            if (!inject.contains("NSUserActivityTypes")) {
+                StringBuilder types = new StringBuilder("\n<key>NSUserActivityTypes</key><array>");
+                for (Map<String, Object> intent : intentsManifest) {
+                    Object id = intent.get("id");
+                    if (id instanceof String) {
+                        types.append("<string>").append((String) id).append("</string>");
+                    }
                 }
+                types.append("</array>");
+                inject += types.toString();
+            } else {
+                // Merge into the array the application supplied rather than replacing it: its
+                // own activity types have to keep working. Appended just before the closing
+                // </array> of that key, and only ids it does not already list.
+                inject = mergeUserActivityTypes(inject, intentsManifest);
             }
-            types.append("</array>");
-            inject += types.toString();
-            inject += "\n<key>CoreSpotlightContinuation</key><true/>";
+            if (!inject.contains("CoreSpotlightContinuation")) {
+                inject += "\n<key>CoreSpotlightContinuation</key><true/>";
+            }
         }
 
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the

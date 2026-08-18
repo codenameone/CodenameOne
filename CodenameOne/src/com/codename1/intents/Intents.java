@@ -476,8 +476,30 @@ public final class Intents {
         if (b == null || !b.isIndexingSupported()) {
             return;
         }
+        // A title is what a search result shows, and the platforms disagree about a missing one
+        // rather than degrading alike: Android hands an empty long label to ShortcutInfo.Builder
+        // and can reject the shortcut outright, while iOS publishes a searchable item with
+        // nothing written on it. The build enforces this for a declared @IntentEntity through
+        // @EntityTitle; direct construction is the path that skips the build, so it is checked
+        // here instead of failing differently on each device.
+        List<AppEntity> publishable = new ArrayList<AppEntity>();
+        for (AppEntity e : entities) {
+            if (e == null) {
+                continue;
+            }
+            if (e.getTitle() == null || e.getTitle().length() == 0) {
+                logDiagnostic("Not indexing " + e.getType() + ":" + e.getId()
+                        + " because it has no title. A search result with nothing written on it "
+                        + "is not something a user can act on; call setTitle before indexing.");
+                continue;
+            }
+            publishable.add(e);
+        }
+        if (publishable.isEmpty()) {
+            return;
+        }
         Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
-        String json = IntentSerializer.serializeEntities(entities, images);
+        String json = IntentSerializer.serializeEntities(publishable, images);
         try {
             b.index(json, images);
         } catch (Throwable t) {

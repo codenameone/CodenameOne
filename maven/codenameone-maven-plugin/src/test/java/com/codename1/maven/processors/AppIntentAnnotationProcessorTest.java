@@ -738,6 +738,41 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// A boxed primitive looks nullable and is not: the wire format cannot say "absent" for a
+    /// number, so an omitted value becomes the type's zero, which the handler cannot tell from
+    /// a supplied one.
+    @Test
+    public void anOptionalBoxedPrimitiveWithoutADefaultIsRejected() throws Exception {
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"count\",\n"
+                        + "        required = false) Integer count) { }\n")),
+                "cannot arrive as null");
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"hard\",\n"
+                        + "        required = false) Boolean hard) { }\n")),
+                "cannot arrive as null");
+    }
+
+    /// Both ways out have to work: a declared default makes the substitution explicit, and a
+    /// required boxed parameter is unambiguous because absence is rejected outright.
+    @Test
+    public void aBoxedPrimitiveIsFineWithADefaultOrWhenRequired() throws Exception {
+        File withDefault = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"count\",\n"
+                        + "        required = false, defaultValue = \"3\") Integer count) { }\n"));
+        run(withDefault, true);
+        assertTrue(new File(withDefault, REGISTRY_PATH).exists());
+
+        File required = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(\"count\") Integer count) { }\n"));
+        run(required, true);
+        assertTrue(new File(required, REGISTRY_PATH).exists());
+    }
+
     /// Both arguments would read the same map key, so the handler runs with the same value
     /// twice and the tool schema keeps one property -- leaving a model no way to supply them
     /// independently even though the signature says it can.

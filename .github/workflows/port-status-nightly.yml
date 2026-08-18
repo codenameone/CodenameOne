@@ -50,7 +50,7 @@ jobs:
           java-version: '17'
           cache: maven
       - name: Install Xvfb
-        run: bash scripts/ci/apt-get-update.sh && sudo apt-get install -y --no-install-recommends xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb
       - name: Set up workspace
         run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build compliance application for JavaScript

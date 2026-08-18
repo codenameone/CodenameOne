@@ -117,7 +117,22 @@ final class IOSIntentCallbacks {
                     @Override
                     public void onIntentResult(IntentResult result) {
                         Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
-                        String json = IntentSerializer.serializeResult(result, images);
+                        String json;
+                        try {
+                            json = IntentSerializer.serializeResult(result, images);
+                        } catch (Throwable t) {
+                            // The token has to be answered whatever happens here. The guard has
+                            // already recorded this invocation as complete, so the timeout
+                            // thread will never fire for it -- if this throws and nothing
+                            // reaches the native side, the Swift continuation is never resumed
+                            // and the assistant waits forever. A result too deep to serialize,
+                            // for instance, would do that.
+                            Log.e(t);
+                            images.clear();
+                            json = IntentSerializer.serializeResult(
+                                    IntentResult.failed("The result could not be delivered"),
+                                    images);
+                        }
                         IOSIntentBridge b = resolveBridge();
                         if (b != null) {
                             b.completeInvocation(token, json, images);

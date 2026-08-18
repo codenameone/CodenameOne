@@ -474,6 +474,19 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                 pd.kind = "entity";
                 pd.entityBinary = args[i].getClassName();
             }
+            if (!pd.required && pd.defaultValue.length() == 0 && isBoxed(desc)) {
+                // The wire format has no way to say "absent" for a number or a boolean, so the
+                // generated coercion substitutes the declared default -- and with no default
+                // that is 0 or false, autoboxed. A developer writing Integer reasonably expects
+                // null there, and would have no way to tell an omitted value from a supplied
+                // zero. Both ways out are real, so the message names them rather than picking.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where + " is an "
+                        + "optional " + desc.substring(desc.lastIndexOf('/') + 1, desc.length() - 1)
+                        + " with no default. An omitted value cannot arrive as null -- it becomes "
+                        + "the type's zero, which you could not tell from a supplied one. Declare "
+                        + "a defaultValue, or use the primitive so the substitution is explicit.");
+                continue;
+            }
             if (pd.required && pd.defaultValue.length() > 0) {
                 // The two halves contradict each other and the platforms resolve the
                 // contradiction differently: the generated coercion treats a defaulted
@@ -1576,6 +1589,14 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         if ("Z".equals(descriptor) || "Ljava/lang/Boolean;".equals(descriptor)) return "boolean";
         if (DATE_DESC.equals(descriptor)) return "date";
         return null;
+    }
+
+    /// True for the boxed primitives, which look nullable and are not.
+    private static boolean isBoxed(String descriptor) {
+        return "Ljava/lang/Integer;".equals(descriptor) || "Ljava/lang/Long;".equals(descriptor)
+                || "Ljava/lang/Float;".equals(descriptor)
+                || "Ljava/lang/Double;".equals(descriptor)
+                || "Ljava/lang/Boolean;".equals(descriptor);
     }
 
     private static String parameterTypeConstant(ParamDef p) {

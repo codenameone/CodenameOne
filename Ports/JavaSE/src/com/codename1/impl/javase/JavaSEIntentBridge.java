@@ -134,6 +134,7 @@ public class JavaSEIntentBridge implements IntentBridge {
             for (String uid : uidsIn(idsJson)) {
                 index.remove(uid);
             }
+            pruneImages();
         }
     }
 
@@ -153,6 +154,36 @@ public class JavaSEIntentBridge implements IntentBridge {
             for (int i = 0; i < drop.size(); i++) {
                 index.remove(drop.get(i));
             }
+            pruneImages();
+        }
+    }
+
+    /// Drops thumbnails no surviving entry references.
+    ///
+    /// Removing a document left its blob behind, so a desktop session that repeatedly replaces
+    /// indexed content grew forever and getIndexedImages() reported thumbnails belonging to
+    /// entries that no longer exist -- a preview disagreeing with the device about what is
+    /// published. Always called while holding the lock.
+    private void pruneImages() {
+        if (indexImages.isEmpty()) {
+            return;
+        }
+        List<String> orphans = new ArrayList<String>();
+        for (String name : indexImages.keySet()) {
+            boolean referenced = false;
+            for (Map<String, String> entry : index.values()) {
+                String json = entry.get("json");
+                if (json != null && json.contains("\"" + name + "\"")) {
+                    referenced = true;
+                    break;
+                }
+            }
+            if (!referenced) {
+                orphans.add(name);
+            }
+        }
+        for (int i = 0; i < orphans.size(); i++) {
+            indexImages.remove(orphans.get(i));
         }
     }
 

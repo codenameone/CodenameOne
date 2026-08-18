@@ -1106,6 +1106,35 @@ class IntentsTest {
                 "a removal names one entity, and the type is half of what names it");
     }
 
+    /// The platforms disagree about a missing title rather than degrading alike: Android hands
+    /// an empty long label to ShortcutInfo.Builder and can reject the shortcut, while iOS
+    /// publishes a searchable item with nothing written on it. The build enforces this for a
+    /// declared @IntentEntity through @EntityTitle; direct construction skips the build.
+    @Test
+    void anEntityWithoutATitleIsNotIndexed() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+
+        Intents.index(new AppEntity("order", "42"));
+
+        assertNull(b.indexedJson, "a search result with nothing written on it cannot be acted on");
+    }
+
+    /// And one bad entity must not take the rest of the batch with it.
+    @Test
+    void anUntitledEntityIsSkippedWithoutLosingItsSiblings() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+
+        Intents.index(Arrays.asList(
+                new AppEntity("order", "42"),
+                new AppEntity("order", "43").setTitle("Two coffees")));
+
+        assertNotNull(b.indexedJson);
+        assertTrue(b.indexedJson.contains("order:43"));
+        assertFalse(b.indexedJson.contains("order:42"));
+    }
+
     @Test
     void indexingAnEmptyListDoesNotCallThePlatform() {
         FakeBridge b = new FakeBridge();

@@ -203,6 +203,50 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
         assertEquals("17.2", floor);
     }
 
+    /// An app that already declares a Handoff activity through ios.plistInject used to lose
+    /// every intent id, because any occurrence of the key was treated as complete
+    /// configuration -- and it lost CoreSpotlightContinuation too, which is a different key.
+    @Test
+    void intentActivityTypesMergeIntoAnExistingArray() throws Exception {
+        java.util.List<java.util.Map<String, Object>> intents =
+                new java.util.ArrayList<java.util.Map<String, Object>>();
+        java.util.Map<String, Object> one = new java.util.LinkedHashMap<String, Object>();
+        one.put("id", "log_workout");
+        intents.add(one);
+        java.util.Map<String, Object> two = new java.util.LinkedHashMap<String, Object>();
+        two.put("id", "play_list");
+        intents.add(two);
+
+        String existing = "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.handoff</string></array>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(existing, intents);
+
+        assertTrue(merged.contains("com.example.handoff"), "the app's own activity has to stay");
+        assertTrue(merged.contains("<string>log_workout</string>"), merged);
+        assertTrue(merged.contains("<string>play_list</string>"), merged);
+        assertEquals(1, merged.split("NSUserActivityTypes", -1).length - 1,
+                "a second key would make the plist ambiguous: " + merged);
+    }
+
+    @Test
+    void mergingIsIdempotentAndLeavesAnUnknownShapeAlone() throws Exception {
+        java.util.List<java.util.Map<String, Object>> intents =
+                new java.util.ArrayList<java.util.Map<String, Object>>();
+        java.util.Map<String, Object> one = new java.util.LinkedHashMap<String, Object>();
+        one.put("id", "log_workout");
+        intents.add(one);
+
+        String already = "<key>NSUserActivityTypes</key><array>"
+                + "<string>log_workout</string></array>";
+        assertEquals(already, IPhoneBuilder.mergeUserActivityTypes(already, intents));
+
+        // No array to merge into: returning it untouched is better than emitting a second key,
+        // which iOS reads unpredictably.
+        String odd = "<key>NSUserActivityTypes</key><string>weird</string>";
+        assertEquals(odd, IPhoneBuilder.mergeUserActivityTypes(odd, intents));
+    }
+
     @Test
     void aMissingManifestIsNotAnError(@TempDir Path dir) throws Exception {
         // An app may reference com.codename1.intents purely to index content, in which case
