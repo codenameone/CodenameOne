@@ -65,9 +65,11 @@ Text that stays on the canvas, by design:
   own background, or a container painting behind children it is about to paint,
   covers text it draws again a moment later and hides nothing. What the draw
   reaches decides too: an empty clip or a fully transparent one reaches nothing,
-  the report is clipped to the graphics clip, and a shape, polygon, arc, radial
-  gradient or rounded rectangle is asked whether its outline meets the glyphs
-  rather than whether its bounding rectangle does.
+  the report is clipped to the graphics clip -- to the clip's own outline when it
+  is a shape, since text the clip protects is not covered by a draw it culls --
+  and a shape, polygon, arc, radial gradient or rounded rectangle is asked
+  whether its outline meets the glyphs rather than whether its bounding rectangle
+  does. Curves are walked rather than replaced by their control points.
 
 Bitmap fonts need no exclusion: `Graphics.drawString` renders a `CustomFont`
 itself and never reaches the implementation.
