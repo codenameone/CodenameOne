@@ -2568,9 +2568,10 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             // "heat, to 21", and HomeKit applies the writes as a batch --
             // refusing on the mode the thermostat is about to leave would
             // make that impossible to express.
+            HMCharacteristic *prerequisite = nil;
+            id prerequisiteValue = nil;
             if ([traitId isEqualToString:@"target_temperature"]
                     && cn1homeHasNoValueNow(service, traitId)) {
-                BOOL leavingAuto = NO;
                 for (NSUInteger j = 0; j < count; j++) {
                     if (j == i
                             || ![[traits objectAtIndex:j]
@@ -2581,14 +2582,33 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                                  isEqualToString:serviceId]) {
                         continue;
                     }
-                    if (j < [numbers count]
-                            && (int) [[numbers objectAtIndex:j] doubleValue]
-                                != CN1_HOME_MODE_AUTO) {
-                        leavingAuto = YES;
-                        break;
+                    if (j >= [numbers count]
+                            || (int) [[numbers objectAtIndex:j] doubleValue]
+                                == CN1_HOME_MODE_AUTO) {
+                        continue;
                     }
+                    // The mode change becomes this write's prerequisite
+                    // rather than a promise. Launched independently, a mode
+                    // write that the accessory refuses -- unreachable,
+                    // read-only, out of range -- left the thermostat in AUTO
+                    // while the setpoint landed and was reported as applied,
+                    // which is precisely the "applied a target nothing can
+                    // read back" this refusal exists to prevent.
+                    HMCharacteristic *modeChar = cn1homeFindCharacteristic(
+                        service, @"target_heating_cooling");
+                    NSArray *modeEntry =
+                            cn1homeEntryFor(@"target_heating_cooling");
+                    id modeValue = modeChar == nil || modeEntry == nil ? nil
+                            : cn1homeToHomeKit(
+                                [[modeEntry objectAtIndex:3] intValue],
+                                [[numbers objectAtIndex:j] doubleValue]);
+                    if (modeValue != nil) {
+                        prerequisite = modeChar;
+                        prerequisiteValue = modeValue;
+                    }
+                    break;
                 }
-                if (!leavingAuto) {
+                if (prerequisite == nil) {
                     [records replaceObjectAtIndex:i
                                        withObject:cn1homeJoinFields(
                         [base arrayByAddingObjectsFromArray:
@@ -2677,40 +2697,68 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                 }
             }
             NSUInteger index = i;
-            __block NSUInteger partsLeft = [chars count];
-            __block BOOL reported = NO;
-            for (NSUInteger part = 0; part < [chars count]; part++) {
-                [[chars objectAtIndex:part]
-                        writeValue:[values objectAtIndex:part]
-                 completionHandler:^(NSError *error) {
-                    if (error != nil && !reported) {
-                        // The first failure is the one reported. A second
-                        // would only describe the same broken accessory.
-                        reported = YES;
-                        [records replaceObjectAtIndex:index
-                                           withObject:cn1homeJoinFields(
-                            [base arrayByAddingObjectsFromArray:
-                             [NSArray arrayWithObjects:@"0",
-                              cn1homeErrorName(error),
-                              cn1homeSanitize([error localizedDescription]),
-                              nil]])];
-                    }
-                    partsLeft--;
-                    if (partsLeft > 0) {
-                        return;
-                    }
-                    if (!reported) {
-                        [records replaceObjectAtIndex:index
-                                           withObject:cn1homeJoinFields(
-                            [base arrayByAddingObjectsFromArray:
-                             [NSArray arrayWithObjects:@"1", @"", @"", nil]])];
-                    }
-                    finished++;
-                    if (finished == outstanding) {
-                        answer();
-                    }
-                }];
+            void (^writeParts)(void) = ^{
+                __block NSUInteger partsLeft = [chars count];
+                __block BOOL reported = NO;
+                for (NSUInteger part = 0; part < [chars count]; part++) {
+                    [[chars objectAtIndex:part]
+                            writeValue:[values objectAtIndex:part]
+                     completionHandler:^(NSError *error) {
+                        if (error != nil && !reported) {
+                            // The first failure is the one reported. A second
+                            // would only describe the same broken accessory.
+                            reported = YES;
+                            [records replaceObjectAtIndex:index
+                                               withObject:cn1homeJoinFields(
+                                [base arrayByAddingObjectsFromArray:
+                                 [NSArray arrayWithObjects:@"0",
+                                  cn1homeErrorName(error),
+                                  cn1homeSanitize([error localizedDescription]),
+                                  nil]])];
+                        }
+                        partsLeft--;
+                        if (partsLeft > 0) {
+                            return;
+                        }
+                        if (!reported) {
+                            [records replaceObjectAtIndex:index
+                                               withObject:cn1homeJoinFields(
+                                [base arrayByAddingObjectsFromArray:
+                                 [NSArray arrayWithObjects:@"1", @"", @"",
+                                  nil]])];
+                        }
+                        finished++;
+                        if (finished == outstanding) {
+                            answer();
+                        }
+                    }];
+                }
+            };
+            if (prerequisite == nil) {
+                writeParts();
+                continue;
             }
+            [prerequisite writeValue:prerequisiteValue
+                   completionHandler:^(NSError *error) {
+                if (error == nil) {
+                    writeParts();
+                    return;
+                }
+                // The thermostat is still in AUTO, so the setpoint means
+                // nothing and saying it was applied would be the lie this
+                // whole branch exists to avoid. The mode's own record
+                // reports the same failure on its own account.
+                [records replaceObjectAtIndex:index
+                                   withObject:cn1homeJoinFields(
+                    [base arrayByAddingObjectsFromArray:
+                     [NSArray arrayWithObjects:@"0", cn1homeErrorName(error),
+                      @"the thermostat is in AUTO and the mode change that"
+                      " would have left it there failed", nil]])];
+                finished++;
+                if (finished == outstanding) {
+                    answer();
+                }
+            }];
         }
         if (outstanding == 0) {
             answer();
