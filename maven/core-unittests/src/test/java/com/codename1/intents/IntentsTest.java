@@ -1490,6 +1490,33 @@ class IntentsTest {
                 "and must not mistake the build-time intent for one");
     }
 
+    /// A declaration records INTEGER for both int and long and NUMBER for both float and
+    /// double, so a binding cannot be checked against the width the handler declared -- while
+    /// the coercion checks the real one. Hiding a binding that can never run is unrecoverable;
+    /// surfacing one that was already satisfied is harmless, since dispatch merges it anyway.
+    /// So an out-of-range binding must leave its parameter visible.
+    @Test
+    void anOutOfRangeBindingLeavesTheParameterVisible() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithIntParam("count_it", "count"));
+        Intents.setDispatcher(d);
+
+        Intents.registerDynamicIntent(new DynamicIntent("count_huge", "count_it", "Huge")
+                .bind("count", Double.valueOf(1e20)));
+        assertNotNull(Intents.getDeclaration("count_huge").getParameter("count"),
+                "past the long range the coercion rejects it, so it must stay correctable");
+
+        Intents.registerDynamicIntent(new DynamicIntent("count_wide", "count_it", "Wide")
+                .bind("count", Long.valueOf(5000000000L)));
+        assertNotNull(Intents.getDeclaration("count_wide").getParameter("count"),
+                "and the declaration cannot tell an int parameter from a long one");
+
+        Intents.registerDynamicIntent(new DynamicIntent("count_frac", "count_it", "Fraction")
+                .bind("count", Double.valueOf(1.5)));
+        assertNotNull(Intents.getDeclaration("count_frac").getParameter("count"),
+                "the coercion rejects a fraction rather than rounding it");
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail
