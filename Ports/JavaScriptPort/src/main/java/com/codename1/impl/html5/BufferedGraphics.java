@@ -388,10 +388,13 @@ public class BufferedGraphics extends HTML5Graphics {
      * Flattens a shape's outline into one array of x coordinates and one of y coordinates per
      * subpath, so it can be asked whether it meets a rectangle.
      *
-     * <p>Curves are taken through their control points. That traces slightly wide of the curve
-     * itself, which errs towards saying the shape meets the text -- the same side the canvas errs
-     * on, since text it may have painted over must not stay above it.</p>
+     * <p>Curves are walked rather than replaced by their control points. A control polygon runs
+     * wide of the curve it describes -- a quadratic through (0,0), (50,100), (100,0) passes
+     * through (50,50), which neither of its control segments goes near -- so a stroke following
+     * the curve would have been judged to miss text it runs straight through.</p>
      */
+    private static final int CURVE_STEPS = 8;
+
     private static float[][] outlineOf(Shape shape) {
         java.util.List<float[]> xs = new java.util.ArrayList<float[]>();
         java.util.List<float[]> ys = new java.util.ArrayList<float[]>();
@@ -413,15 +416,31 @@ public class BufferedGraphics extends HTML5Graphics {
             } else if (type == com.codename1.ui.geom.PathIterator.SEG_LINETO) {
                 curX.add(Float.valueOf(coords[0]));
                 curY.add(Float.valueOf(coords[1]));
-            } else if (type == com.codename1.ui.geom.PathIterator.SEG_QUADTO) {
-                curX.add(Float.valueOf(coords[0]));
-                curY.add(Float.valueOf(coords[1]));
-                curX.add(Float.valueOf(coords[2]));
-                curY.add(Float.valueOf(coords[3]));
-            } else if (type == com.codename1.ui.geom.PathIterator.SEG_CUBICTO) {
-                for (int i = 0; i < 6; i += 2) {
-                    curX.add(Float.valueOf(coords[i]));
-                    curY.add(Float.valueOf(coords[i + 1]));
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_QUADTO
+                    && !curX.isEmpty()) {
+                float fromX = curX.get(curX.size() - 1).floatValue();
+                float fromY = curY.get(curY.size() - 1).floatValue();
+                for (int i = 1; i <= CURVE_STEPS; i++) {
+                    double t = (double) i / CURVE_STEPS;
+                    double u = 1 - t;
+                    curX.add(Float.valueOf((float) (u * u * fromX
+                            + 2 * u * t * coords[0] + t * t * coords[2])));
+                    curY.add(Float.valueOf((float) (u * u * fromY
+                            + 2 * u * t * coords[1] + t * t * coords[3])));
+                }
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_CUBICTO
+                    && !curX.isEmpty()) {
+                float fromX = curX.get(curX.size() - 1).floatValue();
+                float fromY = curY.get(curY.size() - 1).floatValue();
+                for (int i = 1; i <= CURVE_STEPS; i++) {
+                    double t = (double) i / CURVE_STEPS;
+                    double u = 1 - t;
+                    curX.add(Float.valueOf((float) (u * u * u * fromX
+                            + 3 * u * u * t * coords[0] + 3 * u * t * t * coords[2]
+                            + t * t * t * coords[4])));
+                    curY.add(Float.valueOf((float) (u * u * u * fromY
+                            + 3 * u * u * t * coords[1] + 3 * u * t * t * coords[3]
+                            + t * t * t * coords[5])));
                 }
             }
             it.next();
