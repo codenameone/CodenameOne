@@ -967,7 +967,7 @@ public final class SmartHome {
         for (int i = 0; i < traits.size(); i++) {
             traitIds[i] = traits.get(i).getId();
         }
-        afterStart(new IssueSubscribe(b, nextRequestId(), subscriptionId,
+        afterStart(new IssueSubscribe(this, b, nextRequestId(), subscriptionId,
                 toArray(accessoryIds), toArray(serviceIds), traitIds));
         if (request.isDeliverInitialValues()) {
             deliverInitialValues(state, request);
@@ -1092,6 +1092,7 @@ public final class SmartHome {
     /// A subscription waiting for the backend.
     private static final class IssueSubscribe implements Runnable {
 
+        private final SmartHome home;
         private final HomeBridge bridge;
         private final int requestId;
         private final String subscriptionId;
@@ -1099,9 +1100,10 @@ public final class SmartHome {
         private final String[] serviceIds;
         private final String[] traitIds;
 
-        IssueSubscribe(HomeBridge bridge, int requestId, String subscriptionId,
-                String[] accessoryIds, String[] serviceIds,
-                String[] traitIds) {
+        IssueSubscribe(SmartHome home, HomeBridge bridge, int requestId,
+                String subscriptionId, String[] accessoryIds,
+                String[] serviceIds, String[] traitIds) {
+            this.home = home;
             this.bridge = bridge;
             this.requestId = requestId;
             this.subscriptionId = subscriptionId;
@@ -1112,6 +1114,17 @@ public final class SmartHome {
 
         @Override
         public void run() {
+            if (!home.isSubscriptionLive(subscriptionId)) {
+                // Stopped while the backend was still starting. Registering
+                // it now would leave a native watch and a HomeKit
+                // notification alive with no Java state behind them: the
+                // deliveries go nowhere, unsubscribe has already run, and
+                // nothing will ever turn them off -- so a screen opened and
+                // closed during startup leaks a registration each time and
+                // can hold a characteristic's notification on for a later
+                // subscription that wanted it off.
+                return;
+            }
             bridge.subscribe(requestId, subscriptionId, accessoryIds,
                     serviceIds, traitIds);
         }
@@ -1173,6 +1186,20 @@ public final class SmartHome {
             read.add(accessoryIds.get(i), serviceIds.get(i), traits.get(i));
         }
         read(read).onResult(new InitialDelivery(state));
+    }
+
+    /// Whether a subscription is still registered, for a deferred
+    /// registration that has to decide whether it is still wanted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `subscriptionId`: the subscription to check
+    ///
+    /// #### Returns
+    ///
+    /// `true` when it has not been stopped
+    private synchronized boolean isSubscriptionLive(String subscriptionId) {
+        return subscriptions.containsKey(subscriptionId);
     }
 
     /// Called by [TraitSubscription#stop()].
