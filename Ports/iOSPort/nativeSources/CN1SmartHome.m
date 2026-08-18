@@ -2569,6 +2569,16 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             [records addObject:@""];
         }
         __block NSUInteger outstanding = 0;
+        // Setpoints waiting on the caller's own mode write, keyed
+        // "accessoryId \t serviceId". A setpoint that only makes sense once
+        // the thermostat leaves AUTO used to write the mode itself before
+        // writing the setpoint -- which sent the accessory the same command
+        // twice, and let the two answers disagree: the copy could succeed
+        // and apply the mode while the caller's own write failed, so the
+        // batch reported a mode change that had in fact happened as a
+        // failure. The caller's write is the prerequisite now, and this is
+        // what it releases.
+        NSMutableDictionary *afterMode = [NSMutableDictionary dictionary];
         __block NSUInteger finished = 0;
         NSMutableArray *pending = [NSMutableArray array];
         for (NSUInteger i = 0; i < count; i++) {
@@ -2632,8 +2642,7 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             // "heat, to 21", and HomeKit applies the writes as a batch --
             // refusing on the mode the thermostat is about to leave would
             // make that impossible to express.
-            HMCharacteristic *prerequisite = nil;
-            id prerequisiteValue = nil;
+            BOOL waitsForMode = NO;
             if ([traitId isEqualToString:@"target_temperature"]
                     && cn1homeHasNoValueNow(service, traitId)) {
                 for (NSUInteger j = 0; j < count; j++) {
@@ -2651,28 +2660,18 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                                 == CN1_HOME_MODE_AUTO) {
                         continue;
                     }
-                    // The mode change becomes this write's prerequisite
-                    // rather than a promise. Launched independently, a mode
-                    // write that the accessory refuses -- unreachable,
-                    // read-only, out of range -- left the thermostat in AUTO
-                    // while the setpoint landed and was reported as applied,
-                    // which is precisely the "applied a target nothing can
-                    // read back" this refusal exists to prevent.
-                    HMCharacteristic *modeChar = cn1homeFindCharacteristic(
-                        service, @"target_heating_cooling");
-                    NSArray *modeEntry =
-                            cn1homeEntryFor(@"target_heating_cooling");
-                    id modeValue = modeChar == nil || modeEntry == nil ? nil
-                            : cn1homeToHomeKit(
-                                [[modeEntry objectAtIndex:3] intValue],
-                                [[numbers objectAtIndex:j] doubleValue]);
-                    if (modeValue != nil) {
-                        prerequisite = modeChar;
-                        prerequisiteValue = modeValue;
-                    }
+                    // The caller's own mode write becomes this write's
+                    // prerequisite. Launched independently, a mode write the
+                    // accessory refuses -- unreachable, read-only, out of
+                    // range -- left the thermostat in AUTO while the setpoint
+                    // landed and was reported as applied, which is precisely
+                    // the "applied a target nothing can read back" this
+                    // refusal exists to prevent.
+                    waitsForMode = cn1homeFindCharacteristic(
+                        service, @"target_heating_cooling") != nil;
                     break;
                 }
-                if (prerequisite == nil) {
+                if (!waitsForMode) {
                     [records replaceObjectAtIndex:i
                                        withObject:cn1homeJoinFields(
                         [base arrayByAddingObjectsFromArray:
@@ -2761,6 +2760,10 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                 }
             }
             NSUInteger index = i;
+            // Set for a mode write other entries are waiting on, and read in
+            // this entry's completion: the setpoints queued against it go out
+            // once it has actually landed.
+            __block NSString *releaseAfterMode = nil;
             void (^writeParts)(void) = ^{
                 __block NSUInteger partsLeft = [chars count];
                 __block BOOL reported = NO;
@@ -2791,6 +2794,14 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                                  [NSArray arrayWithObjects:@"1", @"", @"",
                                   nil]])];
                         }
+                        if (releaseAfterMode != nil) {
+                            NSArray *queued = [afterMode
+                                               objectForKey:releaseAfterMode];
+                            [afterMode removeObjectForKey:releaseAfterMode];
+                            for (void (^waiting)(BOOL) in queued) {
+                                waiting(!reported);
+                            }
+                        }
                         finished++;
                         if (finished == outstanding) {
                             answer();
@@ -2798,31 +2809,44 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                     }];
                 }
             };
-            if (prerequisite == nil) {
-                writeParts();
+            NSString *serviceKey = [NSString stringWithFormat:@"%@\t%@",
+                                    accessoryId, serviceId];
+            if (waitsForMode) {
+                void (^waiting)(BOOL) = ^(BOOL modeApplied) {
+                    if (modeApplied) {
+                        writeParts();
+                        return;
+                    }
+                    // Still in AUTO, so the setpoint means nothing and
+                    // saying it was applied would be the lie this whole
+                    // branch exists to avoid. The mode's own record reports
+                    // its failure on its own account.
+                    [records replaceObjectAtIndex:index
+                                       withObject:cn1homeJoinFields(
+                        [base arrayByAddingObjectsFromArray:
+                         [NSArray arrayWithObjects:@"0", @"INVALID_ARGUMENT",
+                          @"the thermostat is in AUTO and the mode change"
+                          " that would have left it there failed", nil]])];
+                    finished++;
+                    if (finished == outstanding) {
+                        answer();
+                    }
+                };
+                NSMutableArray *queued = [afterMode objectForKey:serviceKey];
+                if (queued == nil) {
+                    queued = [NSMutableArray array];
+                    [afterMode setObject:queued forKey:serviceKey];
+                }
+                [queued addObject:[[waiting copy] autorelease]];
                 continue;
             }
-            [prerequisite writeValue:prerequisiteValue
-                   completionHandler:^(NSError *error) {
-                if (error == nil) {
-                    writeParts();
-                    return;
-                }
-                // The thermostat is still in AUTO, so the setpoint means
-                // nothing and saying it was applied would be the lie this
-                // whole branch exists to avoid. The mode's own record
-                // reports the same failure on its own account.
-                [records replaceObjectAtIndex:index
-                                   withObject:cn1homeJoinFields(
-                    [base arrayByAddingObjectsFromArray:
-                     [NSArray arrayWithObjects:@"0", cn1homeErrorName(error),
-                      @"the thermostat is in AUTO and the mode change that"
-                      " would have left it there failed", nil]])];
-                finished++;
-                if (finished == outstanding) {
-                    answer();
-                }
-            }];
+            if ([traitId isEqualToString:@"target_heating_cooling"]) {
+                // This write is somebody's prerequisite. Its own answer is
+                // reported by writeParts as usual; releasing the setpoints
+                // that waited on it is the extra step.
+                releaseAfterMode = serviceKey;
+            }
+            writeParts();
         }
         if (outstanding == 0) {
             answer();
@@ -3316,6 +3340,12 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
             // already created is removed rather than left in their home.
             __block NSUInteger failedActions = 0;
             __block NSString *firstFailure = nil;
+            // Actions that actually made it into the set. A scene whose only
+            // action was a setpoint the thermostat's mode makes meaningless
+            // is left with none at all, and HomeKit is perfectly happy to
+            // keep an empty action set -- so the caller would be told their
+            // scene exists and it would do nothing, for ever.
+            __block NSUInteger addedActions = 0;
             void (^answer)(NSString *) = ^(NSString *encodedError) {
                 cn1homeRebuildSnapshot();
                 NSString *line = encodedError != nil ? nil
@@ -3336,11 +3366,18 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                 releaseArgs();
             };
             void (^done)(void) = ^{
-                if (failedActions == 0) {
+                if (failedActions == 0 && addedActions > 0) {
                     answer(nil);
                     return;
                 }
-                NSString *encoded = [[firstFailure retain] autorelease];
+                NSString *encoded = failedActions == 0
+                        ? cn1homeJoinFields([NSArray arrayWithObjects:
+                            @"INVALID_ARGUMENT",
+                            @"every action in this scene sets a thermostat's"
+                             " single target while that thermostat is in"
+                             " AUTO, where it has none -- so the scene would"
+                             " have done nothing at all", nil])
+                        : [[firstFailure retain] autorelease];
                 [home removeActionSet:actionSet
                     completionHandler:^(NSError *removeError) {
                     if (removeError == nil) {
@@ -3367,6 +3404,11 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                 done();
                 return;
             }
+            // Counted before the loop rather than inside it: the filter below
+            // and the failures above both reduce what lands, and the answer
+            // has to distinguish "nothing was asked for" from "everything
+            // asked for was dropped".
+
             for (NSUInteger i = 0; i < [traits count]; i++) {
                 HMService *service = cn1homeFindService(
                     [accessories objectAtIndex:i], [services objectAtIndex:i]);
@@ -3492,6 +3534,8 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                                 cn1homeErrorName(actionError),
                                 actionError) retain];
                         }
+                    } else {
+                        addedActions++;
                     }
                     remaining--;
                     if (remaining == 0) {
