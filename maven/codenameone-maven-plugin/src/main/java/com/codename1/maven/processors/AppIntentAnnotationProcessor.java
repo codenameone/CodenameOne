@@ -1164,7 +1164,8 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         }
         if ("entity".equals(p.kind)) {
             return "entity_" + p.entityType + "(params, " + key + ", "
-                    + (p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue)) + ")";
+                    + (p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue))
+                    + ", false)";
         }
         String def = p.defaultValue.length() == 0 ? null : p.defaultValue;
         if ("string".equals(p.kind)) {
@@ -1203,7 +1204,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     private String requiredReader(ParamDef p) {
         String key = quote(p.name);
         if ("entity".equals(p.kind)) {
-            return "entity_" + p.entityType + "(params, " + key + ", null)";
+            return "entity_" + p.entityType + "(params, " + key + ", null, true)";
         }
         if ("date".equals(p.kind)) {
             return "requiredDate(params, " + key + ")";
@@ -1301,16 +1302,37 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
             sb.append("    private static ").append(sourceName(e.binaryName)).append(" entity_")
                     .append(e.type)
-                    .append("(Map<String, Object> params, String key, String def) {\n");
+                    .append("(Map<String, Object> params, String key, String def,\n");
+            sb.append("            boolean required) {\n");
             // The declared default is an id like any other, so it resolves through the same
             // query. Ignoring it left an optional entity parameter null for a caller that
             // simply omitted it, which is the case the default exists for.
             sb.append("        String id = asString(params, key, def);\n");
-            sb.append("        if (id == null) { return null; }\n");
+            sb.append("        if (id == null) {\n");
+            // Absent is the only thing that may become null, and only for an optional
+            // parameter. A required entity used to arrive null too -- the one reader that did
+            // not hold the line every other required reader holds.
+            sb.append("            if (required) {\n");
+            sb.append("                throw new IllegalArgumentException(\n");
+            sb.append("                        \"Missing required value for \" + key);\n");
+            sb.append("            }\n");
+            sb.append("            return null;\n");
+            sb.append("        }\n");
             // Entities are never cast out of the payload: they arrive as an id
             // and become objects only through the declared BY_ID query.
-            sb.append("        return ").append(sourceName(e.binaryName)).append(".")
+            sb.append("        ").append(sourceName(e.binaryName)).append(" resolved = ")
+                    .append(sourceName(e.binaryName)).append(".")
                     .append(e.queries.get("BY_ID")).append("(id);\n");
+            // A supplied id that resolves to nothing is not an omitted parameter, and returning
+            // null made the handler unable to tell the two apart -- so a donated shortcut
+            // replayed after its entity was deleted ran the no-selection path instead of
+            // failing. The caller named something; if it is gone, the invocation is what fails.
+            sb.append("        if (resolved == null) {\n");
+            sb.append("            throw new IllegalArgumentException(\"\\\"\" + id\n");
+            sb.append("                    + \"\\\" is not a known ").append(e.type)
+                    .append(" for \" + key);\n");
+            sb.append("        }\n");
+            sb.append("        return resolved;\n");
             sb.append("    }\n\n");
         }
     }

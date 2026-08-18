@@ -606,12 +606,15 @@ public final class IOSAppIntentsBuilder {
     public static boolean isExposedToAssistant(Map<String, Object> intent) {
         Object exposure = intent.get("exposure");
         if (!(exposure instanceof List)) {
+            // No exposure key at all: an older manifest, or a declaration that never said. The
+            // default is what an omitted element means.
             return true;
         }
+        // An empty list is not the same as no list. A declaration that wrote exposure = {} chose
+        // no platform consumer, and the processor preserves that -- so treating it as the
+        // default here generated an executable App Intent for a capability that had asked for
+        // none of this.
         List<Object> list = (List<Object>) exposure;
-        if (list.isEmpty()) {
-            return true;
-        }
         for (Object o : list) {
             if ("ASSISTANT".equals(o)) {
                 return true;

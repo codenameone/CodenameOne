@@ -7445,7 +7445,7 @@ public class AndroidGradleBuilder extends Executor {
         StringBuilder strings = new StringBuilder();
         strings.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<resources>\n");
         int count = 0;
-        for (Object o : declared) {
+        for (Object o : stableOrder(declared)) {
             if (!(o instanceof Map)) {
                 continue;
             }
@@ -7569,15 +7569,47 @@ public class AndroidGradleBuilder extends Executor {
     /// True when the intent offered itself to the platform. An absent list means the default,
     /// which is platform exposure.
     @SuppressWarnings("unchecked")
+    /// The declarations in an order that does not depend on the machine that built them.
+    ///
+    /// The quota below keeps the first few and drops the rest, and the order it was keeping them
+    /// in came from ClassScanner walking File.listFiles(), which the filesystem orders however
+    /// it likes. Two clean builds of unchanged source on different runners could therefore
+    /// publish different launcher shortcuts -- an action a user had could vanish on a rebuild
+    /// that changed nothing, and nothing in the build would say why. Sorted by intent id, which
+    /// the build already requires to be unique and well formed.
+    private static java.util.List<Object> stableOrder(java.util.List<Object> declared) {
+        java.util.List<Object> sorted = new java.util.ArrayList<Object>(declared);
+        java.util.Collections.sort(sorted, new java.util.Comparator<Object>() {
+            @Override
+            public int compare(Object a, Object b) {
+                return idOf(a).compareTo(idOf(b));
+            }
+        });
+        return sorted;
+    }
+
+    /// An entry's id, or the empty string when it has none -- those are skipped by the caller,
+    /// and sorting must not throw on one.
+    private static String idOf(Object entry) {
+        if (!(entry instanceof Map)) {
+            return "";
+        }
+        Object id = ((Map<String, Object>) entry).get("id");
+        return id instanceof String ? (String) id : "";
+    }
+
     private static boolean isExposedToAssistant(Map<String, Object> intent) {
         Object exposure = intent.get("exposure");
         if (!(exposure instanceof java.util.List)) {
+            // No exposure key at all: an older manifest, or a declaration that never said. The
+            // default is what an omitted element means.
             return true;
         }
+        // An empty list is not the same as no list. A declaration that wrote exposure = {} chose
+        // no platform consumer, and the processor preserves that -- so treating it as the
+        // default here published a launcher shortcut that this app's own trampoline then
+        // refuses, which reads to the user as the action being broken.
         java.util.List<Object> list = (java.util.List<Object>) exposure;
-        if (list.isEmpty()) {
-            return true;
-        }
         for (Object o : list) {
             if ("ASSISTANT".equals(o)) {
                 return true;

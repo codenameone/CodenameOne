@@ -1514,6 +1514,74 @@ public class AppIntentAnnotationProcessorTest {
         }
     }
 
+    /// A supplied id that resolves to nothing is not an omitted parameter. Returning null made
+    /// the handler unable to tell them apart, so a donated shortcut replayed after its entity
+    /// was deleted ran the no-selection path instead of failing. And a *required* entity that
+    /// was absent arrived null too -- the one reader that did not hold the line every other
+    /// required reader holds.
+    @Test
+    public void aSuppliedEntityIdThatResolvesToNothingIsRejected() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.App",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.intents.IntentResult;\n"
+                                + "public class App {\n"
+                                + "  public static String seen = \"untouched\";\n"
+                                + "  @IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "  public static class Playlist {\n"
+                                + "    @EntityId public String getId() { return \"only\"; }\n"
+                                + "    @EntityTitle public String getName() { return \"F\"; }\n"
+                                + "    @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "    public static Playlist byId(String id) {\n"
+                                + "      return \"only\".equals(id) ? new Playlist() : null; }\n"
+                                + "  }\n"
+                                + "  @AppIntent(value = \"play_opt\", title = \"Play\")\n"
+                                + "  public static IntentResult playOpt(\n"
+                                + "      @IntentParam(value = \"p\", required = false) Playlist p) {\n"
+                                + "    seen = p == null ? \"null\" : p.getId();\n"
+                                + "    return IntentResult.ok(); }\n"
+                                + "  @AppIntent(value = \"play_req\", title = \"Play\")\n"
+                                + "  public static IntentResult playReq(\n"
+                                + "      @IntentParam(\"p\") Playlist p) {\n"
+                                + "    seen = p == null ? \"null\" : p.getId();\n"
+                                + "    return IntentResult.ok(); }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+
+            assertRejected(invoke, registry, "play_opt", "p", "deleted", "is not a known playlist");
+            assertEquals("the handler must not have run", "untouched",
+                    loader.loadClass("com.example.App").getField("seen").get(null));
+
+            // Absent is still absent: an optional entity nobody named is null, as declared.
+            invoke.invoke(registry, "play_opt", new LinkedHashMap<String, Object>(), null);
+            assertEquals("null", loader.loadClass("com.example.App").getField("seen").get(null));
+
+            // A required one that is absent is a rejection, like every other required reader.
+            try {
+                invoke.invoke(registry, "play_req", new LinkedHashMap<String, Object>(), null);
+                fail("a required entity that was never supplied must not arrive as null");
+            } catch (java.lang.reflect.InvocationTargetException expected) {
+                assertTrue(String.valueOf(expected.getCause()),
+                        String.valueOf(expected.getCause()).contains("Missing required value"));
+            }
+        } finally {
+            loader.close();
+        }
+    }
+
     @Test
     public void anUnknownReturnTypeIsRejected() throws Exception {
         File classes = compile(source(

@@ -109,6 +109,54 @@ class AndroidIntentShortcutsTest {
 
     /// res/xml is not processed for manifest placeholders, so ${applicationId} written there
     /// reaches the launcher literally and the explicit component cannot resolve -- every
+    /// An explicitly written exposure = {} chose no platform consumer. The processor preserves
+    /// it; treating it as the default here published a launcher shortcut that this app's own
+    /// trampoline then refuses, which reads to the user as the action being broken.
+    @Test
+    void anEmptyExposureIsNotALauncherShortcut(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\": 1, \"intents\": ["
+                + "{\"id\": \"internal_only\", \"title\": \"Internal\","
+                + " \"headless\": true, \"discoverable\": true, \"destructive\": false,"
+                + " \"opensRoute\": \"\", \"params\": [], \"exposure\": []},"
+                + "{\"id\": \"log_workout\", \"title\": \"Log a workout\","
+                + " \"headless\": true, \"discoverable\": true, \"destructive\": false,"
+                + " \"opensRoute\": \"\", \"params\": [],"
+                + " \"exposure\": [\"ASSISTANT\"]}]}");
+
+        String xml = shortcutsXml(dir);
+
+        assertFalse(xml.contains("internal_only"),
+                "an empty exposure selected no consumer: " + xml);
+        assertTrue(xml.contains("log_workout"));
+    }
+
+    /// The quota keeps the first few and drops the rest, and the order it kept them in came
+    /// from ClassScanner walking File.listFiles(), which the filesystem orders however it
+    /// likes. Two clean builds of unchanged source on different runners could publish
+    /// different shortcuts, so an action a user had could vanish on a rebuild that changed
+    /// nothing.
+    @Test
+    void theShortcutSubsetDoesNotDependOnTraversalOrder(@TempDir Path dir) throws Exception {
+        StringBuilder json = new StringBuilder("{\"schema\":1,\"intents\":[");
+        String[] declaredInThisOrder = {"zulu", "mike", "alpha", "delta", "bravo"};
+        for (int i = 0; i < declaredInThisOrder.length; i++) {
+            json.append(i == 0 ? "" : ",");
+            json.append("{\"id\":\"").append(declaredInThisOrder[i])
+                    .append("\",\"title\":\"T\",\"discoverable\":true}");
+        }
+        json.append("]}");
+
+        entriesFor(dir, json.toString());
+
+        String xml = shortcutsXml(dir);
+        assertTrue(xml.contains("alpha"), xml);
+        assertTrue(xml.contains("bravo"), xml);
+        assertTrue(xml.contains("delta"), xml);
+        assertFalse(xml.contains("mike"),
+                "the subset is chosen by id, not by whatever order the disk gave: " + xml);
+        assertFalse(xml.contains("zulu"));
+    }
+
     /// A static shortcut is minted at build time, so it carries no runtime nonce and the
     /// trampoline treats a tap on it as unauthenticated -- and that policy refuses anything
     /// destructive. Emitting one anyway would put an entry on the launcher that opens the app

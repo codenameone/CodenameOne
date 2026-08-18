@@ -117,6 +117,23 @@ class IOSAppIntentsBuilderTest {
         assertEquals(3, cases.size());
     }
 
+    /// An explicitly written exposure = {} chose no platform consumer, and the processor
+    /// preserves it. Treating it as the default here emitted an executable App Intent for a
+    /// capability that had asked for none of this.
+    @Test
+    void anEmptyExposureProducesNoAppIntent() {
+        Map<String, Object> internal = intent("internal_only", "Internal");
+        internal.put("exposure", new ArrayList<Object>());
+
+        String swift = intentsSwift(
+                Arrays.asList(internal, intent("log_workout", "Log a workout")),
+                new ArrayList<Map<String, Object>>());
+
+        assertFalse(swift.contains("internal_only"),
+                "an empty exposure selected no consumer:\n" + swift);
+        assertTrue(swift.contains("log_workout"));
+    }
+
     @Test
     void everythingIsAvailabilityFencedSoALowerTargetStillBuilds() {
         String swift = intentsSwift(
