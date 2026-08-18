@@ -94,8 +94,13 @@ class LinuxBrowserComponent extends PeerComponent {
         super.initComponent();
         LinuxNative.browserSetBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
         LinuxNative.browserSetVisible(peer, true);
-        if (poller == null && getComponentForm() != null) {
-            poller = UITimer.timer(60, true, getComponentForm(), new Runnable() {
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so the poller never started there and poll() never drained
+        // the native LOAD, NAV and MSG events -- onLoad, navigation callbacks and
+        // JavaScript return callbacks simply never fired in a window.
+        com.codename1.ui.TopLevelContainer browserTop = getTopLevelContainer();
+        if (poller == null && browserTop != null) {
+            poller = UITimer.timer(60, true, browserTop, new Runnable() {
                 public void run() {
                     poll();
                 }

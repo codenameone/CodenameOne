@@ -193,9 +193,14 @@ public class EditorView extends Component implements TextInputClient {
 
     /// Relinquishes focus and stops the active platform text-input session.
     public void blur() {
-        com.codename1.ui.Form form = getComponentForm();
-        if (form != null && equals(form.getFocused())) {
-            form.setFocused(null);
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so blurring there took the else branch and merely stopped
+        // the input session. focusLost() then never ran, leaving the caret animation
+        // registered and the global multi-key mode switched on while the editor still
+        // reported itself focused.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null && equals(top.getFocused())) {
+            top.setFocused(null);
         } else {
             stopInput();
         }

@@ -876,48 +876,35 @@ public class ImageDownloadService extends ConnectionRequest {
         final Image i = image;
         if (parentLabel != null) {
             final Dimension pref = parentLabel.getPreferredSize();
-            if (parentLabel.getComponentForm() != null) {
-                Display.getInstance().callSerially(new Runnable() {
+            // One branch rather than two. These used to differ only in whether the
+            // revalidate ran, chosen by whether the label was on a form -- so a label
+            // in a Window took the branch that applies the icon and never reflows, and
+            // the window stayed laid out for the placeholder's size. Resolving the top
+            // level covers both, and does nothing when the label is detached.
+            Display.getInstance().callSerially(new Runnable() {
 
-                    @Override
-                    public void run() {
-                        if (isDownloadToStyles()) {
-                            parentLabel.getUnselectedStyle().setBgImage(i);
-                            parentLabel.getSelectedStyle().setBgImage(i);
-                            parentLabel.getPressedStyle().setBgImage(i);
-                        } else {
-                            parentLabel.setIcon(i);
-                        }
-                        Dimension newPref = parentLabel.getPreferredSize();
-                        // if the preferred size changed we need to reflow the UI
-                        // this might not be necessary if the label already had an identically
-                        // sized image in place or has a hardcoded preferred size.
-                        if (pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {
-                            com.codename1.ui.TopLevelContainer top =
-                                    parentLabel.getTopLevelContainer();
-                            if (top != null) {
-                                top.asContainer().revalidate();
-                            }
+                @Override
+                public void run() {
+                    if (isDownloadToStyles()) {
+                        parentLabel.getUnselectedStyle().setBgImage(i);
+                        parentLabel.getSelectedStyle().setBgImage(i);
+                        parentLabel.getPressedStyle().setBgImage(i);
+                    } else {
+                        parentLabel.setIcon(i);
+                    }
+                    Dimension newPref = parentLabel.getPreferredSize();
+                    // if the preferred size changed we need to reflow the UI
+                    // this might not be necessary if the label already had an identically
+                    // sized image in place or has a hardcoded preferred size.
+                    if (pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {
+                        com.codename1.ui.TopLevelContainer top =
+                                parentLabel.getTopLevelContainer();
+                        if (top != null) {
+                            top.asContainer().revalidate();
                         }
                     }
-                });
-
-            } else {
-                Display.getInstance().callSerially(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        if (isDownloadToStyles()) {
-                            parentLabel.getUnselectedStyle().setBgImage(i);
-                            parentLabel.getSelectedStyle().setBgImage(i);
-                            parentLabel.getPressedStyle().setBgImage(i);
-                        } else {
-                            parentLabel.setIcon(i);
-                        }
-
-                    }
-                });
-            }
+                }
+            });
             parentLabel.repaint();
             return;
         } else {

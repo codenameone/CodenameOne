@@ -2302,6 +2302,33 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void editingATextFieldInsideAWindowReachesThePort() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("editor", new BorderLayout());
+        w.setWindowSize(400, 300);
+        TextField field = new TextField("hello");
+        w.add(BorderLayout.CENTER, field);
+        w.show();
+        w.revalidate();
+
+        // Display.editString() resolved getComponentForm() and returned outright when
+        // it was null -- which it always is inside a Window. That guard rejected every
+        // editor in a window before impl.editStringImpl() was reached, so none of the
+        // port level editor routing could run however correct the ports were. The
+        // windowed screenshot goldens could not see it either: a field that never
+        // enters editing still renders.
+        Display.getInstance().editString(field, 20, TextArea.ANY, "hello", 0);
+
+        java.lang.reflect.Field active = com.codename1.testing.TestCodenameOneImplementation
+                .class.getDeclaredField("activeTextEditor");
+        active.setAccessible(true);
+        assertSame(field, active.get(implementation),
+                "editing a text field in a window must reach the port");
+
+        w.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

@@ -2021,7 +2021,11 @@ public final class Display extends CN1Constants {
         if (cmp instanceof TextArea) {
             ((TextArea) cmp).setSuppressActionEvent(false);
         }
-        Form f = cmp.getComponentForm();
+        // The top level rather than the form. getComponentForm() is null by design
+        // inside a Window, so this guard rejected every editor in a window before any
+        // of the port level editor routing could run -- native text editing in a window
+        // was unreachable from here however correct the ports were.
+        TopLevelContainer f = cmp.getTopLevelContainer();
 
         // this can happen in the spinner in the simulator where the key press should in theory start native
         // edit
