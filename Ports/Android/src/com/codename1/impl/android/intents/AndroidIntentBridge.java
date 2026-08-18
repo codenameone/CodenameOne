@@ -762,22 +762,46 @@ public class AndroidIntentBridge implements IntentBridge {
         if (manager == null) {
             return MAX_SHORTCUTS;
         }
+        int quota;
+        List<ShortcutInfo> manifest;
+        List<ShortcutInfo> dynamic;
         try {
-            int quota = manager.getMaxShortcutCountPerActivity();
-            int manifest = manager.getManifestShortcuts() == null
-                    ? 0 : manager.getManifestShortcuts().size();
-            int left = quota - manifest;
-            if (left < 1) {
-                // Nothing to publish into. One is better than none: pushDynamicShortcut evicts
-                // a dynamic shortcut to make room, so the most recently indexed content still
-                // reaches the launcher rather than the whole call going quiet.
-                left = 1;
-            }
-            return left < MAX_SHORTCUTS ? left : MAX_SHORTCUTS;
+            quota = manager.getMaxShortcutCountPerActivity();
+            manifest = manager.getManifestShortcuts();
+            dynamic = manager.getDynamicShortcuts();
         } catch (Throwable t) {
             Log.w(TAG, "Could not read the shortcut quota", t);
             return MAX_SHORTCUTS;
         }
+        // Dynamic slots the application is using for its own shortcuts count against the quota
+        // just as manifest ones do, and they are not ours to take: pushDynamicShortcut evicts
+        // the least recently used dynamic shortcut when the cap is reached, so indexing enough
+        // entities would have quietly removed a launcher action published by native code or
+        // another library. Only the slots this framework already owns are reusable, because
+        // replacing one of those is what indexing is supposed to do.
+        int taken = manifest == null ? 0 : manifest.size();
+        if (dynamic != null) {
+            for (ShortcutInfo info : dynamic) {
+                if (!isOurShortcut(info.getId())) {
+                    taken++;
+                }
+            }
+        }
+        int left = quota - taken;
+        if (left < 1) {
+            // Nothing free. One is better than none: the eviction that follows can only take a
+            // shortcut this framework published, so the most recently indexed content still
+            // reaches the launcher rather than the whole call going quiet.
+            left = 1;
+        }
+        return left < MAX_SHORTCUTS ? left : MAX_SHORTCUTS;
+    }
+
+    /// Whether this shortcut id is one this framework published.
+    ///
+    /// Both stamps, because both spend the same quota: an indexed entity and a donation.
+    private static boolean isOurShortcut(String id) {
+        return id != null && (id.startsWith(INDEXED_PREFIX) || id.startsWith(DONATED_PREFIX));
     }
 
     /// Whether a donation payload names any value at all.
