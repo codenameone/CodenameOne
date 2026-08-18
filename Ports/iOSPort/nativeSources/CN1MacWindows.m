@@ -1049,10 +1049,16 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height) {
     }
     {
         size_t bytes = (size_t) width * (size_t) height * 4;
-        /* Copy before wrapping. The caller hands us a Java int[]'s data pointer, and
-         * that array is garbage the moment this returns -- the collector is free to
-         * reclaim or move it while the image below is still referencing the memory on
-         * a later main-queue turn. */
+        /* Copy before wrapping, and do not be tempted to wrap the caller's memory to
+         * save the copy. The caller hands us a Java int[]'s data pointer, and that
+         * array is garbage the moment this returns -- the collector is free to reclaim
+         * or move it while the image below is still referencing the memory on a later
+         * main-queue turn. MacWindowManager now reuses one frame buffer per window
+         * rather than allocating per frame, which makes wrapping strictly worse: the
+         * next frame overwrites the very array a still-live CGImage would point at.
+         * This is C heap with a deterministic lifetime (cn1MacReleasePixels below),
+         * not garbage-collected memory, so it is not the per-frame GC pressure the
+         * Java-side reuse was there to remove. */
         void* pixels = malloc(bytes);
         if (pixels == NULL) {
             return;
