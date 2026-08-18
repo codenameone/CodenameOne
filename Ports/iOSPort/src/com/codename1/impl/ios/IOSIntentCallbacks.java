@@ -32,6 +32,7 @@ import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,8 +93,67 @@ final class IOSIntentCallbacks {
     static synchronized IOSIntentBridge getBridge(IOSNative nativeInstance) {
         if (bridge == null) {
             bridge = new IOSIntentBridge(nativeInstance);
+            // Anything that finished before there was a bridge is waiting on this moment.
+            deliverQueuedCompletions(bridge);
         }
         return bridge;
+    }
+
+    /// Results that finished before a bridge existed to carry them.
+    private static final List<Object[]> QUEUED = new ArrayList<Object[]>();
+
+    /// Answers the native token, or holds the answer until something can.
+    ///
+    /// The bridge needs the implementation's IOSNative instance, so in the earliest cold-start
+    /// window -- before Display.init, which is a window this feature deliberately supports --
+    /// there is none, and this used to drop the result. The Swift side is a withCheckedContinuation
+    /// inside perform() with no other resume path, so dropping it left Siri or Shortcuts waiting
+    /// on an intent that had already finished, with no timeout and nothing in the log.
+    private static void completeOrQueue(String token, String json, Map<String, byte[]> images) {
+        IOSIntentBridge b = resolveBridge();
+        if (b != null) {
+            b.completeInvocation(token, json, images);
+            return;
+        }
+        synchronized (QUEUED) {
+            QUEUED.add(new Object[]{token, json, images});
+        }
+        // Racing getBridge: one may have appeared between the check above and the queueing.
+        // Draining here as well is idempotent -- the queue is emptied under its own lock -- and
+        // it is what closes that window.
+        IOSIntentBridge appeared = resolveBridge();
+        if (appeared != null) {
+            deliverQueuedCompletions(appeared);
+        }
+    }
+
+    /// Hands every held result to the bridge, in the order they finished.
+    @SuppressWarnings("unchecked")
+    private static void deliverQueuedCompletions(IOSIntentBridge b) {
+        List<Object[]> drained;
+        synchronized (QUEUED) {
+            if (QUEUED.isEmpty()) {
+                return;
+            }
+            drained = new ArrayList<Object[]>(QUEUED);
+            QUEUED.clear();
+        }
+        // The loop is outside any handler on purpose: iterating List<Object[]> compiles to a
+        // CHECKCAST, and ParparVM does not throw for a failed cast, so a catch around one reads
+        // as relying on an exception that never arrives.
+        for (int i = 0; i < drained.size(); i++) {
+            Object[] held = drained.get(i);
+            String token = (String) held[0];
+            String json = (String) held[1];
+            Map<String, byte[]> images = (Map<String, byte[]>) held[2];
+            try {
+                b.completeInvocation(token, json, images);
+            } catch (Throwable t) {
+                // One token failing must not strand the rest: every one of them is a Swift
+                // continuation that nothing else will ever resume.
+                Log.e(t);
+            }
+        }
     }
 
     // ---- Callbacks invoked from native code (do not rename) ----------------
@@ -112,7 +172,13 @@ final class IOSIntentCallbacks {
             return;
         }
         Map<String, Object> params = parse(paramsJson);
-        Intents.dispatchInvocation(intentId, params, IntentSource.VOICE, headless,
+        // Not VOICE. Everything the system runs through an App Intent arrives here -- Siri, the
+        // Shortcuts app, an App Shortcut on the home screen -- and perform() is not told which.
+        // Claiming Siri for all of them was a statement the platform never made, and an
+        // application reading getSource() for analytics or for how much detail to speak was
+        // reading a guess. UNKNOWN is the case for "the platform did not say", which is exactly
+        // what happened.
+        Intents.dispatchInvocation(intentId, params, IntentSource.UNKNOWN, headless,
                 new IntentCompletion() {
                     @Override
                     public void onIntentResult(IntentResult result) {
@@ -133,10 +199,7 @@ final class IOSIntentCallbacks {
                                     IntentResult.failed("The result could not be delivered"),
                                     images);
                         }
-                        IOSIntentBridge b = resolveBridge();
-                        if (b != null) {
-                            b.completeInvocation(token, json, images);
-                        }
+                        completeOrQueue(token, json, images);
                     }
                 });
     }

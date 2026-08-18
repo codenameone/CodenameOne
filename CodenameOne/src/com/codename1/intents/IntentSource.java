@@ -29,8 +29,12 @@ package com.codename1.intents;
 /// analytics, for tailoring the spoken line, and for deciding how much detail a
 /// snippet should carry.
 public enum IntentSource {
-    /// A voice assistant (Siri on iOS). Only ever seen where
-    /// [Intents#isVoiceInvocationSupported()] is true.
+    /// A voice assistant, where the platform says so.
+    ///
+    /// iOS does not: an App Intent's `perform()` is not told whether Siri, the Shortcuts app or
+    /// a home-screen App Shortcut ran it, so all three arrive as [#UNKNOWN] rather than one of
+    /// them claiming to be Siri. Do not write a branch that expects this on a device; the
+    /// simulator can still produce it, which is how the path is exercised.
     VOICE,
 
     /// The user tapped an item this app published through [Intents#index].
@@ -51,7 +55,11 @@ public enum IntentSource {
     /// [Intents#asTools()] exposes.
     MODEL,
 
-    /// The platform did not say, or the source is one this version does not
-    /// model. Treat exactly as [#IN_APP].
+    /// The platform did not say, or the source is one this version does not model.
+    ///
+    /// This is the ordinary case for an iOS App Intent, which is invoked by Siri, the Shortcuts
+    /// app or an App Shortcut without disclosing which -- so it is not a rare fallback and
+    /// carries no implication that the app is on screen. Take it as exactly what it says: the
+    /// source is unknown. Anything that needs to be certain should be true for every source.
     UNKNOWN
 }
