@@ -346,11 +346,16 @@ public class SmartHomeScannerParityTest {
                 "the builder must raise the floor from the shared constant");
         assertEquals(21, SmartHomeManifestFragments.MINIMUM_SDK,
                 "the floor is what play-services-home needs");
-        assertGatedBy(android, "smartHomeGradleDependency = \"    implementation \"",
+        assertGatedBy(android, "\"com.google.android.gms:play-services-home:\"",
                 "if (usesSmartHome)");
+        // The keyword itself is chosen where `compile` is known, further
+        // down: a legacy project without AndroidX cannot evaluate a
+        // build.gradle that says implementation.
+        assertTrue(android.contains("\"    \" + compile + \" '\""),
+                "the dependency line must use the selected configuration");
         int gate = android.indexOf("if (usesSmartHome) {");
         int dependency = android.indexOf(
-                "smartHomeGradleDependency = \"    implementation \"");
+                "\"com.google.android.gms:play-services-home:\"");
         int floor = android.indexOf(
                 "SmartHomeManifestFragments.MINIMUM_SDK)", gate);
         assertTrue(gate > 0 && dependency > gate && floor > dependency,

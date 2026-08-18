@@ -626,7 +626,11 @@ public class AndroidGradleBuilder extends Executor {
     private String healthQueriesFragment = "";
     private String healthApplicationFragment = "";
     private String healthGradleDependency = "";
-    private String smartHomeGradleDependency = "";
+    // The artifact only. The configuration keyword -- implementation or the
+    // legacy compile -- is decided further down, after useAndroidX is known,
+    // and a generated project that predates implementation fails evaluating a
+    // build.gradle that uses it.
+    private String smartHomeGradleArtifact = "";
 
     // Smart home (com.codename1.home.*). usesSmartHome gates the whole
     // feature; usesHomeCommissioning is tracked separately because on iOS it
@@ -2495,10 +2499,10 @@ public class AndroidGradleBuilder extends Executor {
             // Services AAR it never calls. This gate is the one that knows
             // the difference, and it keeps the dependency and the delegate
             // that imports it inseparable.
-            smartHomeGradleDependency = "    implementation "
-                    + "'com.google.android.gms:play-services-home:"
+            smartHomeGradleArtifact =
+                    "com.google.android.gms:play-services-home:"
                     + request.getArg("android.home.playServicesVersion",
-                            "16.0.0-beta1") + "'\n";
+                            "16.0.0-beta1");
             smartHomeSupport = SmartHomeInjector.injectAndroid(this, srcDir);
             if (targetSDKVersionInt >= 30) {
                 // Package visibility. Without this
@@ -6004,7 +6008,14 @@ public class AndroidGradleBuilder extends Executor {
         request.putArgument("var.android.playServicesVersion", playServicesVersion);
         String additionalDependencies = request.getArg("gradleDependencies", "");
         additionalDependencies += healthGradleDependency;
-        additionalDependencies += smartHomeGradleDependency;
+        if (smartHomeGradleArtifact.length() > 0) {
+            // Built here rather than where the artifact is chosen: `compile`
+            // is decided a few hundred lines below that, and a legacy project
+            // -- android.useGradle8=false without AndroidX -- fails
+            // evaluating a build.gradle that says implementation.
+            additionalDependencies += "    " + compile + " '"
+                    + smartHomeGradleArtifact + "'\n";
+        }
         if (facebookSupported) {
             minSDK = maxInt("15", minSDK);
 

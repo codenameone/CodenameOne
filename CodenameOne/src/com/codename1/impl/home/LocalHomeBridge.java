@@ -917,6 +917,7 @@ public class LocalHomeBridge implements HomeBridge {
             // listener the number rather than the absence.
             Map<String, TraitValue> finalModes =
                     new HashMap<String, TraitValue>();
+            int applied = 0;
             for (int i = 0; i < scene.actions.size(); i++) {
                 ActionRecord a = scene.actions.get(i);
                 if (Trait.TARGET_HEATING_COOLING.getId()
@@ -939,7 +940,9 @@ public class LocalHomeBridge implements HomeBridge {
                         // Dropped rather than refused: a scene is a whole
                         // thing, and failing it because one action means
                         // nothing in the mode the same scene selects would
-                        // leave the lights it also sets unswitched.
+                        // leave the lights it also sets unswitched. A scene
+                        // left with NOTHING is a different matter -- see
+                        // below.
                         changed.add(TraitReading.absent(a.accessoryId,
                                 a.serviceId, a.trait));
                         continue;
@@ -947,10 +950,25 @@ public class LocalHomeBridge implements HomeBridge {
                 }
                 values.put(key(a.accessoryId, a.serviceId, a.trait.getId()),
                         a.value);
+                applied++;
                 changed.add(TraitReading.of(a.accessoryId, a.serviceId,
                         a.trait, a.value, System.currentTimeMillis()));
                 appendDerivedTargetChange(changed, a.accessoryId, a.serviceId,
                         a.trait);
+            }
+            if (applied == 0 && !scene.actions.isEmpty()) {
+                // Every action was a setpoint the thermostat's mode makes
+                // meaningless, so running this scene changed nothing. Saying
+                // it ran is the lie: the caller shows "Good night is on" and
+                // the house is exactly as it was. The device path refuses the
+                // same scene.
+                answer(new SceneResult(requestId, null, structureId,
+                        HomeError.INVALID_ARGUMENT.name()
+                        + "\tevery action in this scene sets a thermostat's"
+                        + " single target while that thermostat is in AUTO,"
+                        + " where it has none -- so running it changed"
+                        + " nothing"));
+                return;
             }
             line = HomeWire.join(new String[] {scene.id, scene.name,
                 Integer.toString(scene.typeOrdinal), HomeWire.flag(true)});
