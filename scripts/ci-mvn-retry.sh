@@ -34,8 +34,23 @@ fi
 
 MVN_BIN="${MAVEN_HOME:+$MAVEN_HOME/bin/}mvn"
 
-# Markers that mean "the network or the repository misbehaved", never "your code is wrong".
-TRANSIENT='Could not transfer artifact|Unresolveable build extension|Failed to read artifact descriptor|Non-resolvable import POM|Could not resolve dependencies|Connection reset|Premature EOF|Connection timed out|status: 4[0-9][0-9]|status code: 5[0-9][0-9]|Bad Gateway|Service Unavailable|Too Many Requests'
+# Markers that mean "the transport misbehaved", never "your build is wrong".
+#
+# Deliberately narrow, and narrower than it used to be. It matched any 4xx and the generic
+# resolution phrases, so a POM naming an artifact or version that does not exist -- a 404, and
+# "Could not resolve dependencies" -- was read as transient and reran three times. That is 7.5
+# minutes added to a deterministic configuration error before anyone sees it, from a script
+# whose whole promise is that it does not retry real failures.
+#
+# The resolution phrases are gone entirely, because they are symptoms rather than causes: Maven
+# prints them for a missing artifact and for a throttled one alike, and when the cause really is
+# the transport it says so on the same line ("Non-resolvable import POM: ... Could not transfer
+# artifact ...: status code: 429"). So the cause is what gets matched.
+#
+# 403 stays, against the general rule that 4xx is permanent, because this repository has
+# watched Central answer 403 to a whole CI matrix under load -- it is in the header above, from
+# the day this script was written. 404 does not stay: nothing makes a missing artifact appear.
+TRANSIENT='Connection reset|Premature EOF|Connection timed out|Read timed out|Too Many Requests|Bad Gateway|Service Unavailable|Gateway Time-?out|status: 429|status code: 429|status: 403|status code: 403|status: 5[0-9][0-9]|status code: 5[0-9][0-9]'
 
 # Markers that mean the build itself failed. Any of these vetoes a retry outright, however the
 # log started: Maven retries some transfers internally, so an early warning that it recovered
