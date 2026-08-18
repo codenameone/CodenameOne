@@ -322,6 +322,13 @@ public class ThreadSafeDatabase extends Database {
         });
     }
 
+    /// Closes the database on the worker, and shuts the worker down.
+    ///
+    /// Idempotent, and synchronous: it returns with the database closed, so a `delete()` on the
+    /// next line does not race it. If the worker was stopped from outside -- `getThread()` is
+    /// public, and both `kill()` and `killWhenIdle()` on it are calls anybody can make -- this
+    /// waits for the work that worker had already accepted before closing the database itself,
+    /// rather than closing it underneath an operation that is still running.
     @Override
     public void close() throws IOException {
         if (et.isThisIt()) {
