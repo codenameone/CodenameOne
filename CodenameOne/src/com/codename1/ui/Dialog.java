@@ -1000,6 +1000,13 @@ public class Dialog extends Form implements AbstractDialog {
             revalidate();
             return;
         }
+        if (titleCentered && centeredTitleArea != null) {
+            // The area's UIID comes from a theme constant, and a refresh is exactly when that
+            // constant can have changed. Restoring the label without it would leave a centered
+            // dialog wearing the previous theme's title styling.
+            centeredTitleArea.setUIID(getUIManager().getThemeConstant(
+                    "dlgCenteredTitleUIID", "Container"));
+        }
         if (dialogTitle.getParent() == target) { //NOPMD CompareObjectsWithEquals
             return;
         }

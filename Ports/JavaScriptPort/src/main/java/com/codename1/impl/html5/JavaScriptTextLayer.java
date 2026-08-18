@@ -333,6 +333,12 @@ public final class JavaScriptTextLayer {
         if (suspended || depth == 0 || font == null || str == null || str.length() == 0) {
             return false;
         }
+        if (alpha <= 0) {
+            // Drawn with nothing to show. On the canvas that leaves no mark; in the document it
+            // would leave a span that find-in-page, selection and the inspector can all reach,
+            // which is text the application never put on screen.
+            return false;
+        }
         // A cell renderer is one component instance stamped at many positions, so runs cannot be
         // keyed by it: every row would overwrite the previous row's element and only the last
         // would survive. Renderer subtrees keep their text on the canvas.
