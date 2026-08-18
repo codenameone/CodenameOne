@@ -7511,6 +7511,16 @@ public class AndroidGradleBuilder extends Executor {
             }
             String label = intent.get("title") instanceof String
                     ? (String) intent.get("title") : (String) id;
+            // The raw id is a legal Android resource-name suffix already, so it is not
+            // sanitized here: @AppIntent ids are validated against [a-z][a-z0-9_]{2,63} by
+            // AppIntentAnnotationProcessor before intents.json is written, which is exactly
+            // the character set AAPT accepts. Lower-casing or rewriting it here would be
+            // worse than a no-op -- the id is also the dispatch key in the cn1intent:// URI
+            // and in the declaration table, so a rewritten resource key that no longer
+            // matched would have to be carried as a second name for the life of the build.
+            // A hand-edited intents.json can still carry an out-of-grammar id; that fails
+            // loudly at AAPT rather than silently, which is the right outcome for a manifest
+            // nothing generated.
             String labelRes = "cn1_shortcut_" + ((String) id);
             strings.append("    <string name=\"").append(labelRes).append("\">")
                     .append(androidStringValue(label)).append("</string>\n");
