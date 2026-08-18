@@ -720,6 +720,49 @@ public class JavaSEWindowManager extends WindowManager {
         return p.canvas.captureBuffer();
     }
 
+    /**
+     * Installs the window's commands as a native menu bar on its own frame.
+     *
+     * The main window builds its menu the same way through
+     * {@code JavaSEPort.setNativeCommands}; this is the per-window counterpart, so a
+     * command added to a Window is displayed and activated rather than only recorded.
+     * Gated on desktop native chrome mode for the same reason the main window is: in
+     * skin mode there is no native frame to hang a menu on.
+     */
+    @Override
+    public void setCommands(Object peerObj, final com.codename1.ui.Command[] commands) {
+        final Peer p = peer(peerObj);
+        if (p == null || !port.isDesktopNativeChromeMode()) {
+            return;
+        }
+        final java.util.ArrayList<com.codename1.ui.Command> named =
+                new java.util.ArrayList<com.codename1.ui.Command>();
+        if (commands != null) {
+            for (com.codename1.ui.Command c : commands) {
+                String name = c == null ? null : c.getCommandName();
+                if (name != null && name.length() > 0) {
+                    // Icon-only commands have nothing to label a menu item with.
+                    named.add(c);
+                }
+            }
+        }
+        runOnAwt(new Runnable() {
+            @Override
+            public void run() {
+                javax.swing.JMenuBar bar = named.isEmpty()
+                        ? null : port.buildWindowMenuBar(named);
+                if (p.frame instanceof javax.swing.JFrame) {
+                    ((javax.swing.JFrame) p.frame).setJMenuBar(bar);
+                } else if (p.frame instanceof javax.swing.JDialog) {
+                    ((javax.swing.JDialog) p.frame).setJMenuBar(bar);
+                } else {
+                    return;
+                }
+                p.frame.revalidate();
+            }
+        });
+    }
+
     // ---- monitors ---------------------------------------------------------------------
 
     private static GraphicsDevice[] devices() {

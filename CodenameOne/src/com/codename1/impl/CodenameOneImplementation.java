@@ -3132,10 +3132,16 @@ public abstract class CodenameOneImplementation {
     /// which is enough to lose a context menu or a stylus callback.
     ///
     /// A snapshot is taken when the packet is queued and restored when it is
-    /// dispatched, so each event keeps the metadata that arrived with it. Sized well
-    /// past the number of pointer packets the input stack can hold, so a slot cannot be
-    /// recycled while its packet is still queued.
-    private static final int POINTER_METADATA_SLOTS = 512;
+    /// dispatched, so each event keeps the metadata that arrived with it.
+    ///
+    /// Sized for **two** live buffers, not one. `Display` double buffers the input event
+    /// stack: the event dispatch thread swaps a full batch out and dispatches it while
+    /// the native input thread fills the other, so both are live at once. Each is 1000
+    /// ints and the smallest pointer packet is three (type, x, y), which puts a ceiling
+    /// of about 666 queued snapshots -- past a 512 slot ring, which would then wrap onto
+    /// packets that had not been dispatched yet and hand them the wrong button or device
+    /// type under a sustained burst. 2048 leaves headroom over that ceiling.
+    private static final int POINTER_METADATA_SLOTS = 2048;
     private final int[] pointerMetadataInts =
             new int[POINTER_METADATA_SLOTS * 4];
     private final float[] pointerMetadataFloats =

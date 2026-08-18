@@ -2329,6 +2329,43 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void commandsAddedToAWindowReachThePort() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("commands", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        // Added before show(): the peer does not exist yet, so these have to be
+        // published when it does rather than silently lost.
+        Command before = new Command("Before");
+        w.addCommand(before);
+        w.show();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        // The command list used to be private bookkeeping that nothing consumed, so a
+        // command added to a window was never displayed and never activated -- unlike
+        // the identical call on a Form.
+        assertEquals(1, wm.getPublishedCommands(peer).size(),
+                "commands added before show() must reach the port once it exists");
+        assertSame(before, wm.getPublishedCommands(peer).get(0));
+
+        Command after = new Command("After");
+        w.addCommand(after);
+        assertEquals(2, wm.getPublishedCommands(peer).size(),
+                "and a command added afterwards must be published too");
+
+        w.removeCommand(before);
+        assertEquals(1, wm.getPublishedCommands(peer).size());
+        assertSame(after, wm.getPublishedCommands(peer).get(0));
+
+        w.removeAllCommands();
+        assertEquals(0, wm.getPublishedCommands(peer).size());
+
+        w.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

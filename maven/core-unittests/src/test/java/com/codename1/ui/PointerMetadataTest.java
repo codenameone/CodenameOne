@@ -199,4 +199,32 @@ class PointerMetadataTest extends UITestBase {
 
         implementation.resetPointerEventMetadata();
     }
+
+    @Test
+    void theSnapshotRingCoversBothLiveEventStacks() throws Exception {
+        // Display double buffers the input event stack: the event dispatch thread swaps
+        // a full batch out and dispatches it while the native input thread fills the
+        // other, so both are live at once. The ring has to cover both, or it wraps onto
+        // packets that have not been dispatched yet.
+        //
+        // Asserted against the arithmetic rather than against the number, so that
+        // growing the event stack without growing the ring fails here instead of
+        // producing a rare wrong-button dispatch under load.
+        java.lang.reflect.Field stack =
+                Display.class.getDeclaredField("inputEventStack");
+        stack.setAccessible(true);
+        int stackInts = ((int[]) stack.get(display)).length;
+
+        java.lang.reflect.Field slots = com.codename1.impl.CodenameOneImplementation.class
+                .getDeclaredField("POINTER_METADATA_SLOTS");
+        slots.setAccessible(true);
+        int ring = slots.getInt(null);
+
+        // Smallest pointer packet is three ints: the type word, x and y.
+        int maxLivePackets = (stackInts / 3) * 2;
+        assertTrue(ring >= maxLivePackets,
+                "the metadata ring (" + ring + " slots) must cover both live event "
+                        + "stacks (" + maxLivePackets + " packets); a smaller ring wraps "
+                        + "onto packets that are still queued");
+    }
 }

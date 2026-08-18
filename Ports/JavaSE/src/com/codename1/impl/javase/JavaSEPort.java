@@ -2288,6 +2288,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
     /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
     /// Codename One EDT before invoking the command's action.
+    /// Builds a menu bar for a secondary desktop window's commands. Same builder as the
+    /// main window's, with no owning frame: the MCP menu and the frame-scoped items only
+    /// belong on the application's main frame.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the window's named commands
+    ///
+    /// #### Returns
+    ///
+    /// the menu bar to install on the window
+    JMenuBar buildWindowMenuBar(java.util.List<com.codename1.ui.Command> commands) {
+        return buildNativeMenuBar(commands, null);
+    }
+
     private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame) {
         JMenuBar bar = new JMenuBar();
         // preserve first-seen order of the menu groups
@@ -2473,7 +2488,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// @return true when running on the desktop with a title-bar mode that hides the CN1
     /// Toolbar in favor of native chrome (native or custom).
-    private boolean isDesktopNativeChromeMode() {
+    boolean isDesktopNativeChromeMode() {
         if (!isDesktop()) {
             return false;
         }

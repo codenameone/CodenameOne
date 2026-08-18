@@ -425,18 +425,37 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     public void addCommand(Command cmd) {
         commands.add(cmd);
+        publishCommands();
     }
 
     /// {@inheritDoc}
     @Override
     public void removeCommand(Command cmd) {
         commands.remove(cmd);
+        publishCommands();
     }
 
     /// {@inheritDoc}
     @Override
     public void removeAllCommands() {
         commands.clear();
+        publishCommands();
+    }
+
+    /// Hands the current command list to the port so it can put them wherever this
+    /// platform shows a window's commands -- a native menu bar on the window's own
+    /// frame, where one exists.
+    ///
+    /// Without this the list was private bookkeeping: nothing consumed it, so a command
+    /// added to a window was never displayed and never activated, while the same call
+    /// on a `Form` works. A port with no command surface leaves them undisplayed, and
+    /// `#dispatchCommand(Command, ActionEvent)` remains the programmatic path.
+    private void publishCommands() {
+        if (nativePeer == null) {
+            return;
+        }
+        manager().setCommands(nativePeer,
+                commands.toArray(new Command[commands.size()]));
     }
 
     /// {@inheritDoc}
@@ -1375,6 +1394,8 @@ public class Window extends Container implements TopLevelContainer {
             }
         }
         Desktop.getInstance().registerWindow(this);
+        // Commands added before the peer existed have not reached the port yet.
+        publishCommands();
         setVisible(true);
         // A port that creates its native window asynchronously reports zero until it
         // exists. Keep the requested size until a real one is delivered, rather than

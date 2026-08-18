@@ -22,6 +22,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.ui.Command;
 import com.codename1.ui.Image;
 
 /// The whole native windowing contract for a port, kept out of
@@ -418,6 +419,22 @@ public abstract class WindowManager {
     /// a native image of the window, or null when the port cannot capture one
     public Object capture(Object peer) {
         return null;
+    }
+
+    /// Installs this window's commands into whatever command surface the platform
+    /// offers for a secondary window, typically a native menu bar on its own frame.
+    ///
+    /// A no-op by default. `com.codename1.ui.TopLevelContainer#addCommand` is shared
+    /// with `Form`, so a `Window` accepts commands everywhere; a port with nowhere to
+    /// put them simply does not show them, and an application can still activate them
+    /// through `com.codename1.ui.Window#dispatchCommand`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window's native peer
+    ///
+    /// - `commands`: the window's commands in the order they were added, never null
+    public void setCommands(Object peer, Command[] commands) {
     }
 
     // ---- monitors --------------------------------------------------------------------

@@ -299,6 +299,32 @@ public class TestWindowManager extends WindowManager {
         return captureCalls;
     }
 
+    /// The commands last published for each window, so a test can tell "the port was
+    /// told about this command" from "it was only added to a private list".
+    private final java.util.Map<Object, java.util.List<com.codename1.ui.Command>>
+            publishedCommands =
+                    new java.util.HashMap<Object, java.util.List<com.codename1.ui.Command>>();
+
+    @Override
+    public void setCommands(Object peer, com.codename1.ui.Command[] commands) {
+        java.util.List<com.codename1.ui.Command> copy =
+                new java.util.ArrayList<com.codename1.ui.Command>();
+        if (commands != null) {
+            for (com.codename1.ui.Command c : commands) {
+                copy.add(c);
+            }
+        }
+        publishedCommands.put(peer, copy);
+    }
+
+    /// The commands last published for the given window peer, never null.
+    public java.util.List<com.codename1.ui.Command> getPublishedCommands(Object peer) {
+        java.util.List<com.codename1.ui.Command> c = publishedCommands.get(peer);
+        return c == null
+                ? new java.util.ArrayList<com.codename1.ui.Command>()
+                : new java.util.ArrayList<com.codename1.ui.Command>(c);
+    }
+
     @Override
     public Object capture(Object peer) {
         captureCalls++;
@@ -306,6 +332,7 @@ public class TestWindowManager extends WindowManager {
     }
 
     public void reset() {
+        publishedCommands.clear();
         captureResult = null;
         captureCalls = 0;
         createFails = false;
