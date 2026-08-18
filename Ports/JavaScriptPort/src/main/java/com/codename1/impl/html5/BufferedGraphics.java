@@ -272,8 +272,12 @@ public class BufferedGraphics extends HTML5Graphics {
      */
     private static float[][] roundRectOutline(int x, int y, int width, int height,
             int arcWidth, int arcHeight) {
-        int rx = Math.min(Math.max(0, arcWidth) / 2, width / 2);
-        int ry = Math.min(Math.max(0, arcHeight) / 2, height / 2);
+        // The renderer rounds both axes by max(arcWidth, arcHeight) -- DrawRoundRect and
+        // FillRoundRect both do -- so the outline has to be built from the same radius, or it
+        // would describe a corner the draw does not have and miss text the draw reaches.
+        int radius = Math.max(0, Math.max(arcWidth, arcHeight)) / 2;
+        int rx = Math.min(radius, width / 2);
+        int ry = Math.min(radius, height / 2);
         if (rx <= 0 || ry <= 0) {
             return null;
         }
