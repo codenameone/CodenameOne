@@ -427,11 +427,16 @@ static int cn1WinTouchFlag(void) {
 /* macOS-style trackpad / touchscreen pinch and rotate via the Win32 gesture API.
  * GID_ZOOM reports the absolute distance between the fingers and GID_ROTATE the
  * absolute angle (radians); we forward the incremental scale / radians since the
- * cross-platform pinch() / rotation() callbacks expect deltas like the Mac. */
+ * cross-platform pinch() / rotation() callbacks expect deltas like the Mac.
+ * The baselines are process wide rather than per window, which is correct because
+ * there is one touchpad: a gesture that starts over another window sends GF_BEGIN
+ * first, which is what resets them. Shared by the main window proc and the desktop
+ * window proc, so a pinch over a secondary window produces a gesture too -- the
+ * windowId is what decides whose component tree it reaches. */
 static double cn1WinZoomLast = 0.0;
 static double cn1WinRotateLast = 0.0;
 
-static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
+int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam) {
     GESTUREINFO gi;
     ZeroMemory(&gi, sizeof(gi));
     gi.cbSize = sizeof(gi);
@@ -450,7 +455,8 @@ static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
         } else if (cn1WinZoomLast > 0.0 && dist > 0.0) {
             double scale = dist / cn1WinZoomLast;
             cn1WinZoomLast = dist;
-            cn1WinPushEvent(CN1_EVENT_PINCH, pt.x, pt.y, (int) (scale * CN1_GESTURE_FIXED + 0.5));
+            cn1WinPushWindowEvent(windowId, CN1_EVENT_PINCH, pt.x, pt.y,
+                    (int) (scale * CN1_GESTURE_FIXED + 0.5));
         }
         handled = 1;
     } else if (gi.dwID == GID_ROTATE) {
@@ -460,7 +466,7 @@ static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
             double angle = GID_ROTATE_ANGLE_FROM_ARGUMENT(gi.ullArguments);
             double delta = angle - cn1WinRotateLast;
             cn1WinRotateLast = angle;
-            cn1WinPushEvent(CN1_EVENT_ROTATE, pt.x, pt.y,
+            cn1WinPushWindowEvent(windowId, CN1_EVENT_ROTATE, pt.x, pt.y,
                     (int) (delta * CN1_GESTURE_FIXED + (delta >= 0 ? 0.5 : -0.5)));
         }
         handled = 1;
@@ -532,7 +538,7 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         }
 #ifdef WM_GESTURE
         case WM_GESTURE:
-            if (cn1WinHandleGesture(hwnd, lParam)) {
+            if (cn1WinHandleGesture(hwnd, 0, lParam)) {
                 return 0;
             }
             return DefWindowProcW(hwnd, msg, wParam, lParam);

@@ -1248,6 +1248,14 @@ public class Window extends Container implements TopLevelContainer {
         initFocused();
         nativeVisible = true;
         acquireModal();
+        // Only meaningful when this window is *not* modal, which is why acquireModal()
+        // above cannot cover it: a window shown while someone else's application modal
+        // is up registers no blocker of its own, so no port ever hears about the new
+        // peer. Ports enable a native window by default, leaving its title bar live --
+        // focusable, movable, closable -- underneath a modal that is supposed to be
+        // blocking it. Recomputed here, before the peer is mapped, so the window is
+        // never briefly interactive.
+        Display.getInstance().syncNativeModalBlocking();
         wm.show(nativePeer);
         showListeners.fireActionEvent(new ActionEvent(this));
         fireWindowEvent(WindowEvent.Type.Shown);
@@ -1627,6 +1635,19 @@ public class Window extends Container implements TopLevelContainer {
             // that is the window the port was told to disable.
             throw new IllegalStateException(
                     "the owner has to be set before the window is shown");
+        }
+        // A cycle here is not caught anywhere downstream: show() creates an unshown
+        // owner's native window first, so a window that owns itself -- directly or
+        // round a longer chain -- recurses through show() until the stack runs out,
+        // before either peer exists. A StackOverflowError names none of the windows
+        // involved, so reject the relation at the point it is described.
+        TopLevelContainer probe = owner;
+        while (probe instanceof Window) {
+            if (probe == this) { //NOPMD CompareObjectsWithEquals
+                throw new IllegalArgumentException(
+                        "a window cannot own itself, directly or through its owner chain");
+            }
+            probe = ((Window) probe).ownerWindow;
         }
         this.ownerWindow = owner;
     }

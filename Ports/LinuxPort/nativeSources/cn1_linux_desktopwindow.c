@@ -57,6 +57,10 @@ typedef struct {
     int windowId;
     int monitorIndex;
     int inUse;
+    /* Pinch baseline, per window rather than per process: GDK reports scale
+     * cumulatively from the gesture's BEGIN, so the previous value is what turns
+     * it into the incremental multiplier Codename One dispatches. */
+    double pinchLastScale;
 } CN1LinuxWindow;
 
 static CN1LinuxWindow cn1DesktopWindows[CN1_MAX_DESKTOP_WINDOWS];
@@ -376,6 +380,41 @@ static gboolean cn1DesktopOnFocus(GtkWidget* widget, GdkEventFocus* e, gpointer 
     return FALSE;
 }
 
+/* Touchpad pinch / rotate, the same GDK_TOUCHPAD_PINCH handling the main window
+ * does, routed to this window instead. Without it a trackpad pinch over a
+ * secondary window produced no Codename One gesture at all, so a component that
+ * zooms on the main form did nothing once it was hosted in a window. */
+static gboolean cn1DesktopOnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointer data) {
+    CN1LinuxWindow* w = (CN1LinuxWindow*) data;
+    (void) widget;
+    if (w == 0 || e->type != GDK_TOUCHPAD_PINCH) {
+        /* FALSE for everything else, so the handlers connected to the specific
+         * signals above still see their events. */
+        return FALSE;
+    }
+    GdkEventTouchpadPinch* pe = (GdkEventTouchpadPinch*) e;
+    if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_BEGIN) {
+        w->pinchLastScale = pe->scale > 0 ? pe->scale : 1.0;
+    } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_UPDATE) {
+        int x = (int) pe->x;
+        int y = (int) pe->y;
+        if (pe->scale > 0 && w->pinchLastScale > 0) {
+            double inc = pe->scale / w->pinchLastScale;
+            w->pinchLastScale = pe->scale;
+            if (inc != 1.0) {
+                cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_PINCH, x, y,
+                        (int) (inc * CN1_GESTURE_FIXED + 0.5));
+            }
+        }
+        if (pe->angle_delta != 0.0) {
+            double rad = pe->angle_delta * G_PI / 180.0;
+            cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_ROTATE, x, y,
+                    (int) (rad * CN1_GESTURE_FIXED + (rad >= 0 ? 0.5 : -0.5)));
+        }
+    }
+    return TRUE;
+}
+
 /* ------------------------------------------------------- create / destroy */
 
 typedef struct {
@@ -399,6 +438,9 @@ static void cn1DesktopCreateOnMain(void* arg) {
 
     memset(w, 0, sizeof(*w));
     w->windowId = op->windowId;
+    /* memset above zeroed it, and a zero baseline would divide the first pinch
+     * update by nothing. */
+    w->pinchLastScale = 1.0;
     w->width = op->width > 0 ? op->width : 1;
     w->height = op->height > 0 ? op->height : 1;
     w->inUse = 1;
@@ -444,7 +486,8 @@ static void cn1DesktopCreateOnMain(void* arg) {
 
     gtk_widget_add_events(w->drawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
-            | GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK);
+            | GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK
+            | GDK_TOUCHPAD_GESTURE_MASK);
 
     /* Every handler takes the window as its closure data, which is what makes
      * routing free -- no lookup, no shared state. */
@@ -454,6 +497,9 @@ static void cn1DesktopCreateOnMain(void* arg) {
     g_signal_connect(w->drawingArea, "button-release-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "motion-notify-event", G_CALLBACK(cn1DesktopOnMotion), w);
     g_signal_connect(w->drawingArea, "scroll-event", G_CALLBACK(cn1DesktopOnScroll), w);
+    /* Touchpad gestures arrive through the generic "event" signal rather than one
+     * of their own, which is why this is connected separately. */
+    g_signal_connect(w->drawingArea, "event", G_CALLBACK(cn1DesktopOnGenericEvent), w);
     g_signal_connect(w->window, "key-press-event", G_CALLBACK(cn1DesktopOnKey), w);
     g_signal_connect(w->window, "key-release-event", G_CALLBACK(cn1DesktopOnKey), w);
     cn1LinuxWatchMonitors();

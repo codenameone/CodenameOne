@@ -3108,7 +3108,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void fireMagnify(final int x, final int y, final float scale) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    Display.getInstance().fireMagnifyGesture(x, y, scale);
+                    // Routed by window id like every other input this canvas
+                    // produces: the canvas a trackpad magnify arrived on is the
+                    // window whose component tree has to see it.
+                    Display.getInstance().windowMagnifyGesture(windowId, x, y, scale);
                 }
             });
         }

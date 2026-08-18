@@ -332,11 +332,17 @@ class WindowTest extends UITestBase {
                 "the constraint has to reach the port, which is where it can be enforced");
         assertEquals(240, wm.getLastWindow().getMinimumHeight());
 
-        // A port that cannot express a minimum, or that delivers a smaller resize
-        // before the constraint takes effect, must not lay the window out below it.
+        // The framework deliberately does not re-clamp what the port reports. The
+        // minimum is native geometry and includes the platform's chrome, while a
+        // resize reports content dimensions, so clamping one against the other mixes
+        // two coordinate spaces -- on a decorated window it laid the hierarchy out
+        // larger than the canvas it is drawn into, clipping controls and putting hit
+        // testing out of step with what is on screen. The window lays out to what it
+        // was actually given; enforcing the minimum belongs to the platform that owns
+        // the frame, which is why the assertions above matter.
         w.sizeChangedInternal(100, 80);
-        assertEquals(320, w.getWidth());
-        assertEquals(240, w.getHeight());
+        assertEquals(100, w.getWidth());
+        assertEquals(80, w.getHeight());
         w.dispose();
     }
 
@@ -666,6 +672,135 @@ class WindowTest extends UITestBase {
         assertTrue(wm.isMainWindowInputEnabled(), "nothing blocks any more");
         assertTrue(plainPeer.isInputEnabled());
         plain.dispose();
+    }
+
+    @FormTest
+    void aWindowShownUnderAnApplicationModalIsBlockedNatively() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        // Shown *after* the modal, so it registers no blocker of its own and
+        // acquireModal() does nothing for it. Ports enable a native window by
+        // default, so without a resync at registration its title bar stayed live
+        // -- focusable, movable, closable -- under a modal meant to block it.
+        Window later = new Window("opened while blocked");
+        later.show();
+        TestWindowManager.FakeWindow laterPeer = wm.getLastWindow();
+        assertFalse(laterPeer.isInputEnabled(),
+                "a window opened under an application modal must start blocked");
+
+        appModal.dispose();
+        assertTrue(laterPeer.isInputEnabled(), "the modal is gone");
+        later.dispose();
+    }
+
+    @FormTest
+    void aWindowCannotOwnItself() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("self owned");
+        // show() creates an unshown owner's native window first, so a cycle here
+        // recurses until the stack runs out before either peer exists -- and a
+        // StackOverflowError names none of the windows involved.
+        assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                w.setOwnerWindow(w);
+            }
+        });
+        w.dispose();
+    }
+
+    @FormTest
+    void aCycleThroughTheOwnerChainIsRejected() {
+        implementation.setMultiWindowSupported(true);
+        final Window a = new Window("a");
+        final Window b = new Window("b");
+        final Window c = new Window("c");
+        b.setOwnerWindow(a);
+        c.setOwnerWindow(b);
+        // a -> c would close the loop a -> c -> b -> a. Only a walk of the whole
+        // chain sees it; comparing against the immediate owner does not.
+        assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                a.setOwnerWindow(c);
+            }
+        });
+        c.dispose();
+        b.dispose();
+        a.dispose();
+    }
+
+    @FormTest
+    void aGestureIsDispatchedToItsOwnWindow() {
+        implementation.setMultiWindowSupported(true);
+        final int[] mainPinches = new int[1];
+        final int[] windowPinches = new int[1];
+
+        Form main = new Form("main", new BorderLayout());
+        main.add(BorderLayout.CENTER, new PinchCountingComponent(mainPinches));
+        main.show();
+
+        Window w = new Window("windowed", new BorderLayout());
+        w.add(BorderLayout.CENTER, new PinchCountingComponent(windowPinches));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Aimed at the middle of the content, not the corner: the window's title
+        // area covers the top rows and would answer the hit test instead.
+        Display.getInstance().windowMagnifyGesture(w.getWindowId(), 150, 120, 1.5f);
+        Display.getInstance().windowMagnifyGesture(0, 150, 120, 1.5f);
+        // Disposed before asserting: a window left open by a failing assertion is
+        // painted for the rest of the class and times out every later test.
+        w.dispose();
+
+        assertEquals(1, windowPinches[0], "the gesture belongs to the window it arrived on");
+        assertEquals(1, mainPinches[0], "window 0 is still the main surface");
+    }
+
+    @FormTest
+    void aGestureOverABlockedWindowIsDropped() {
+        implementation.setMultiWindowSupported(true);
+        final int[] pinches = new int[1];
+        Window blocked = new Window("blocked", new BorderLayout());
+        blocked.add(BorderLayout.CENTER, new PinchCountingComponent(pinches));
+        blocked.setWindowSize(300, 200);
+        blocked.show();
+
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        // Gestures are filtered like every other input event: pinching a window a
+        // modal is blocking has to do nothing, the same way clicking it does.
+        Display.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
+        int whileBlocked = pinches[0];
+
+        appModal.dispose();
+        Display.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
+        int afterRelease = pinches[0];
+        blocked.dispose();
+
+        assertEquals(0, whileBlocked, "a blocked window must not see the gesture");
+        assertEquals(1, afterRelease, "and resume once nothing blocks it");
+    }
+
+    /// Counts the pinches it is handed, so a test can tell which tree a gesture
+    /// reached.
+    private static final class PinchCountingComponent extends Component {
+        private final int[] counter;
+
+        PinchCountingComponent(int[] counter) {
+            this.counter = counter;
+        }
+
+        @Override
+        public boolean pinch(float scale) {
+            counter[0]++;
+            return true;
+        }
     }
 
     @FormTest

@@ -271,6 +271,15 @@ int  cn1WinCreateWindow(const char* utf8Title, int width, int height);
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
 /* Same, but tagged with the desktop window the event came from. */
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode);
+
+#ifdef WM_GESTURE
+/* Handles a WM_GESTURE for the given window, pushing pinch / rotate events tagged
+ * with windowId (0 is the main window). Returns non-zero when the gesture was
+ * consumed, in which case the handle has already been closed. Shared so a
+ * secondary desktop window reports trackpad gestures the same way the main one
+ * does. */
+int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam);
+#endif
 int  cn1WinPollEvent(CN1Event* out);
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);

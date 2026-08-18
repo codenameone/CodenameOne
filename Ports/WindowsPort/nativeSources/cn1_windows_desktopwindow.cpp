@@ -304,6 +304,16 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                     pt.x, pt.y, GET_WHEEL_DELTA_WPARAM(wParam));
             return 0;
         }
+#ifdef WM_GESTURE
+        case WM_GESTURE:
+            /* Trackpad / touchscreen pinch and rotate, handled by the same routine
+             * the main window proc uses so the two cannot drift; without this case a
+             * gesture over a secondary window produced nothing at all. */
+            if (cn1WinHandleGesture(hwnd, w->windowId, lParam)) {
+                return 0;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
+#endif
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);

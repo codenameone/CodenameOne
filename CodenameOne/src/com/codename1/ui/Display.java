@@ -2219,16 +2219,29 @@ public final class Display extends CN1Constants {
     ///
     /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
     public void fireMagnifyGesture(int x, int y, float scale) {
-        Form f = getCurrent();
+        windowMagnifyGesture(0, x, y, scale);
+    }
+
+    /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the
+    /// implementation for a gesture that arrived over a secondary window; window 0 is
+    /// the application's main surface, which is what `#fireMagnifyGesture(int, int, float)`
+    /// reports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
+    public void windowMagnifyGesture(int windowId, int x, int y, float scale) {
+        Container f = gestureRoot(windowId);
         if (f == null) {
             return;
         }
-        Component cmp;
-        try {
-            cmp = f.getComponentAt(x, y);
-        } catch (Throwable t) {
-            cmp = null;
-        }
+        Component cmp = gestureComponentAt(f, x, y);
         if (cmp == null) {
             cmp = f;
         }
@@ -2252,21 +2265,56 @@ public final class Display extends CN1Constants {
     ///
     /// - `radians`: the incremental rotation in radians, positive is clockwise
     public void fireRotationGesture(int x, int y, float radians) {
-        Form f = getCurrent();
+        windowRotationGesture(0, x, y, radians);
+    }
+
+    /// Dispatches a rotation (twist) gesture aimed at one native window. Invoked by the
+    /// implementation for a gesture that arrived over a secondary window; window 0 is
+    /// the application's main surface, which is what `#fireRotationGesture(int, int, float)`
+    /// reports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `radians`: the incremental rotation in radians, positive is clockwise
+    public void windowRotationGesture(int windowId, int x, int y, float radians) {
+        Container f = gestureRoot(windowId);
         if (f == null) {
             return;
         }
-        Component cmp;
-        try {
-            cmp = f.getComponentAt(x, y);
-        } catch (Throwable t) {
-            cmp = null;
-        }
+        Component cmp = gestureComponentAt(f, x, y);
         while (cmp != null) {
             if (cmp.rotation(radians)) {
                 return;
             }
             cmp = cmp.getParent();
+        }
+    }
+
+    /// The top level a gesture was aimed at, or null when it is gone or currently
+    /// blocked by a modal window. Gestures are filtered like every other input event:
+    /// pinching a window a modal is blocking has to do nothing, the same way clicking
+    /// it does.
+    private Container gestureRoot(int windowId) {
+        if (isBlockedByModal(windowId)) {
+            return null;
+        }
+        if (windowId > 0) {
+            return Desktop.getInstance().windowById(windowId);
+        }
+        return getCurrent();
+    }
+
+    private static Component gestureComponentAt(Container root, int x, int y) {
+        try {
+            return root.getComponentAt(x, y);
+        } catch (Throwable t) {
+            return null;
         }
     }
 
