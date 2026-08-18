@@ -2406,9 +2406,32 @@ public abstract class Database {
     ///
     /// #### Parameters
     ///
-    /// - `key`: identifies the file, canonically enough that two spellings of one path agree
+    /// - `key`: identifies the file, canonically enough that two spellings of one path agree, or
+    ///   null for a connection that cannot say which file it holds
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the file is being deleted or re-keyed, or -- for a null key -- if any
+    ///   database is, since such a connection cannot be ruled out as that one
     protected static synchronized void registerOpenDatabase(String key) throws IOException {
         if (key == null) {
+            // A connection that cannot say which file it holds could be holding any of them,
+            // including one being unlinked or rewritten at this moment. The guards on those two
+            // operations read this counter once, before they begin -- claimForDelete and
+            // requireSoleConnectionForKeyChange both refuse outright when it is above zero -- and
+            // they have no way to look again. So a registration arriving after their check is a
+            // connection they have already concluded does not exist: the delete unlinks the file
+            // underneath it, or the key change rewrites the file it is reading.
+            //
+            // Every claim counts, not only the one for a particular file, because "which file"
+            // is exactly what this connection could not answer.
+            if (!DELETING_DATABASES.isEmpty() || !REKEYING_DATABASES.isEmpty()
+                    || !CONVERTING_DATABASES.isEmpty()) {
+                throw new IOException("A database is being deleted or having its key changed, and"
+                        + " this connection cannot say which file it holds -- so it cannot be ruled"
+                        + " out as that one. Open it once that operation returns, or open by name"
+                        + " so the file is known.");
+            }
             unidentifiedOpenDatabases++;
             return;
         }

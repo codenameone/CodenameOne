@@ -218,6 +218,35 @@ class DatabaseCoverageTest extends UITestBase {
                 "a database that exists but cannot be read is not called plaintext");
     }
 
+    @FormTest
+    void anUnidentifiedConnectionIsRefusedWhileAKeyChangeHoldsAFile() throws IOException {
+        // The guards that protect a delete and a key change read the unidentified-connection
+        // count once, before they start, and refuse outright when it is above zero. They cannot
+        // look again -- so a connection that registers as unidentified after that check is one
+        // they have already concluded does not exist, and the file gets unlinked or rewritten
+        // underneath it. The simulator's connection-taking constructor is how such a connection
+        // arises, when the driver reports no file for the URL.
+        Database.requireSoleConnectionForKeyChange("test_registry_rekey_target.db");
+        try {
+            IOException refused = assertThrows(IOException.class,
+                    () -> Database.registerOpenDatabase(null),
+                    "an unidentified connection cannot be admitted while a file is being rewritten");
+            assertTrue(refused.getMessage().indexOf("cannot say which file") > 0,
+                    "and the message says why: " + refused.getMessage());
+
+            // An identified connection to some other file is unaffected: it can say it is not the
+            // one being rewritten, which is the whole difference.
+            Database.registerOpenDatabase("test_registry_other.db");
+            Database.releaseOpenDatabase("test_registry_other.db");
+        } finally {
+            Database.releaseKeyChangeClaim("test_registry_rekey_target.db");
+        }
+
+        // And once the claim is gone the same registration is accepted again.
+        Database.registerOpenDatabase(null);
+        Database.releaseOpenDatabase(null);
+    }
+
     /// Puts bytes where the implementation says this database lives.
     private void writeDatabaseFile(String databaseName, byte[] content) throws IOException {
         String path = Database.getDatabasePath(databaseName);
