@@ -600,10 +600,13 @@ public class AndroidIntentBridge implements IntentBridge {
             // common case and keeps working when the launcher is full.
             String donatedId = DONATED_PREFIX + intentId;
             synchronized (PUBLISH) {
-                if (!capacity(ctx).admits(donatedId, 0)) {
-                    Log.i(TAG, "Not donating \"" + intentId + "\": the launcher's shortcut quota "
-                            + "is full, and recording this one would evict something already "
-                            + "there");
+                ShortcutCapacity room = capacity(ctx);
+                if (!room.admits(donatedId, 0)) {
+                    Log.i(TAG, "Not donating \"" + intentId + "\": " + (room.isKnown()
+                            ? "the launcher's shortcut quota is full, and recording this one "
+                                    + "would evict something already there"
+                            : "the launcher would not say what it already holds, and "
+                                    + "publishing without knowing that could evict it"));
                     return;
                 }
                 pushShortcut(ctx, donatedId, label, label,
@@ -652,7 +655,10 @@ public class AndroidIntentBridge implements IntentBridge {
                     // The launcher caps how many it will show. Truncating silently would look like
                     // indexing randomly failing, so it is reported once -- and the two reasons read
                     // differently to whoever has to act on them.
-                    if (capacity.getFree() == 0) {
+                    if (!capacity.isKnown()) {
+                        Log.i(TAG, "Not indexing: the launcher would not say what it already "
+                                + "holds, and publishing without knowing that could evict it");
+                    } else if (capacity.getFree() == 0) {
                         Log.i(TAG, "Not indexing: the launcher's shortcut quota is already "
                                 + "full, and publishing content here would evict something "
                                 + "already there");
@@ -845,7 +851,8 @@ public class AndroidIntentBridge implements IntentBridge {
         // not throw -- and the repo's gate rejects the shape wherever it appears.
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
-            return new ShortcutCapacity(MAX_SHORTCUTS, new ArrayList<String>());
+            // Unknown, not empty. See ShortcutCapacity.unknown().
+            return ShortcutCapacity.unknown();
         }
         int quota;
         List<ShortcutInfo> manifest;
@@ -856,7 +863,7 @@ public class AndroidIntentBridge implements IntentBridge {
             dynamic = manager.getDynamicShortcuts();
         } catch (Throwable t) {
             Log.w(TAG, "Could not read the shortcut quota", t);
-            return new ShortcutCapacity(MAX_SHORTCUTS, new ArrayList<String>());
+            return ShortcutCapacity.unknown();
         }
         List<String> existing = new ArrayList<String>();
         int taken = manifest == null ? 0 : manifest.size();
@@ -883,10 +890,40 @@ public class AndroidIntentBridge implements IntentBridge {
     private static final class ShortcutCapacity {
         private final int free;
         private final List<String> existing;
+        private final boolean known;
 
         ShortcutCapacity(int free, List<String> existing) {
             this.free = free;
             this.existing = existing;
+            this.known = true;
+        }
+
+        private ShortcutCapacity() {
+            this.free = 0;
+            this.existing = new ArrayList<String>();
+            this.known = false;
+        }
+
+        /// What the launcher has room for when the launcher would not say.
+        ///
+        /// No slots, rather than the maximum. This path used to report ten empty ones, which
+        /// is the most dangerous answer available: the whole point of the accounting is that
+        /// nothing this framework publishes evicts anything, and that guarantee rests on
+        /// knowing what is already there. A failed read knows nothing -- an OEM
+        /// ShortcutManager that throws, or a getSystemService that returns null -- so
+        /// assuming the launcher was empty authorized exactly the pushes the check exists to
+        /// refuse, and pushDynamicShortcut would then have made room by evicting whatever the
+        /// user had touched least recently.
+        ///
+        /// Publishing nothing costs content that is findable through the app itself. Guessing
+        /// wrong costs a launcher action the user put there.
+        static ShortcutCapacity unknown() {
+            return new ShortcutCapacity();
+        }
+
+        /// Whether the launcher answered at all.
+        boolean isKnown() {
+            return known;
         }
 
         /// Whether this id can be published: either it is already there and is being updated
