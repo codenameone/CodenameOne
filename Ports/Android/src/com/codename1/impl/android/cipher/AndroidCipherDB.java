@@ -431,6 +431,29 @@ class AndroidCipherDB extends Database {
         return settings;
     }
 
+    /**
+     * Runs a PRAGMA on a connection, through a cursor.
+     *
+     * <p>Some pragma assignments answer with a row and some do not -- {@code journal_mode} and
+     * {@code busy_timeout} report the value they settled on, while {@code auto_vacuum},
+     * {@code user_version} and the two boolean ones say nothing -- and the Android API refuses
+     * the first kind through execSQL with "Queries can be performed using SQLiteDatabase query
+     * or rawQuery methods only". Which pragma falls on which side is not something a reader
+     * should have to remember, so they all go through here. rawQuery is lazy, so the statement
+     * runs when the cursor is stepped; that step is the point of moveToFirst, not the row.
+     *
+     * @param target the connection to run it on
+     * @param pragma the complete PRAGMA statement
+     */
+    private void runPragma(SQLiteDatabase target, String pragma) {
+        android.database.Cursor c = target.rawQuery(pragma, null);
+        try {
+            c.moveToFirst();
+        } finally {
+            c.close();
+        }
+    }
+
     /** Puts the captured settings back on a connection that has just replaced the old one. */
     private void applyConnectionSettings(SQLiteDatabase opened) {
         if (connectionSettings == null) {
@@ -438,7 +461,7 @@ class AndroidCipherDB extends Database {
         }
         for (String pragma : connectionSettings) {
             try {
-                opened.execSQL(pragma);
+                runPragma(opened, pragma);
             } catch (RuntimeException rejected) {
                 // One setting that will not go back is not a reason to abandon a conversion that
                 // has already succeeded, and it is not silent either: the value is readable by
@@ -588,7 +611,7 @@ class AndroidCipherDB extends Database {
             // stopped, or -- worse for a FULL database -- holding on to every page it deletes
             // from then on. A conversion is not supposed to change how the database behaves.
             if (autoVacuum != 0) {
-                db.execSQL("PRAGMA cn1migrate.auto_vacuum = " + autoVacuum);
+                runPragma(db, "PRAGMA cn1migrate.auto_vacuum = " + autoVacuum);
             }
             android.database.Cursor exported = db.rawQuery("SELECT sqlcipher_export('cn1migrate')",
                     null);
@@ -597,8 +620,8 @@ class AndroidCipherDB extends Database {
             } finally {
                 exported.close();
             }
-            db.execSQL("PRAGMA cn1migrate.user_version = " + userVersion);
-            db.execSQL("PRAGMA cn1migrate.application_id = " + applicationId);
+            runPragma(db, "PRAGMA cn1migrate.user_version = " + userVersion);
+            runPragma(db, "PRAGMA cn1migrate.application_id = " + applicationId);
             if (journalMode != null) {
                 // After the export, unlike auto_vacuum: the journal mode is settable at any point
                 // in a database's life, and WAL in particular cannot be entered from inside a
@@ -606,7 +629,7 @@ class AndroidCipherDB extends Database {
                 // others, and not carried by sqlcipher_export -- so a database an application put
                 // into WAL once came back in DELETE mode after a key change, losing the reader
                 // and writer concurrency it was relying on and taking new lock failures with it.
-                db.execSQL("PRAGMA cn1migrate.journal_mode = " + journalMode);
+                runPragma(db, "PRAGMA cn1migrate.journal_mode = " + journalMode);
             }
             db.execSQL("DETACH DATABASE cn1migrate");
         } catch (RuntimeException err) {

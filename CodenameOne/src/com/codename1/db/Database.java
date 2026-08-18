@@ -1610,8 +1610,12 @@ public abstract class Database {
             // and either way it is a parameter rather than a name this could have resolved.
             return true;
         }
-        // :name, @name and $name, the named forms.
-        return (first == ':' || first == '@' || first == '$') && token.length() > 1;
+        // :name, @name, $name and #name -- all four spellings SQLite binds by name, and the same
+        // set SQLStatementSplitter.countParameters recognizes. Leaving one out here made a
+        // statement the splitter counts as parameterized read as an expression instead, so
+        // "ATTACH #file AS aux" was refused before the engine ever saw it.
+        return (first == ':' || first == '@' || first == '$' || first == '#')
+                && token.length() > 1;
     }
 
     /// The form of a file name a port resolves, for a name an ATTACH names either way.

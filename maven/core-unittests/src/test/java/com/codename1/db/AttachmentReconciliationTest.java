@@ -354,6 +354,10 @@ class AttachmentReconciliationTest extends UITestBase {
             "ATTACH '/data/plain.db' AS aux",
             "ATTACH DATABASE ? AS aux",
             "ATTACH :name AS aux",
+            // All four spellings SQLite binds by name, and the four SQLStatementSplitter counts.
+            "ATTACH @name AS aux",
+            "ATTACH $name AS aux",
+            "ATTACH #name AS aux",
             "ATTACH '/data/it''s.db' AS aux",
             "ATTACH ':memory:' AS aux",
         };
