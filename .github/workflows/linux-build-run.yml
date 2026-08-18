@@ -192,6 +192,14 @@ jobs:
         # resolution failure, so the job dies at plugin download with nothing built. See
         # scripts/ci/retry.sh; this step only builds, so a blanket retry cannot turn a flaky test
         # into a pass.
+        #
+        # Five attempts a minute apart rather than the default three at thirty seconds: this failed
+        # with "authorization failed for https://repo.maven.apache.org" on all three, one of
+        # several jobs Central refused on this branch in a day, and a window of about a minute is
+        # shorter than those refusals have lasted.
+        env:
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
         run: |
           cd maven
           JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
