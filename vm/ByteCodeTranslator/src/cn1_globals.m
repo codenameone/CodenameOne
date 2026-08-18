@@ -3434,6 +3434,22 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
           spins++ < 200000) {
         usleep(50);
     }
+    // RE-CHARGE the block we are about to dirty. cn1BibopBeginGcCycle resets the volume
+    // counter to zero and releases every waiter at once, but our calloc'd block is still
+    // clean -- we were parked precisely so we could dirty it afterwards. Without this the
+    // reset erases it from the only figure other waiters compare against, so sixteen
+    // threads holding individually-fitting 1MB blocks all see an empty counter, all
+    // resume together and dirty 16MB into whatever headroom is left.
+    //
+    // Adding it back charges the block once (the original add was erased by the reset)
+    // and, because the counter is what every waiter tests, it serializes them: the next
+    // thread released by the same reset sees our bytes and keeps waiting until a later
+    // cycle. No new counter and no new reset path -- this reuses one whose lifecycle is
+    // already correct. Only under a budget, so nothing off iOS changes.
+    if(bounded && pendingBytes > 0) {
+        atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc, pendingBytes,
+                                  memory_order_relaxed);
+    }
     // The spin can exit via the safety cap while a mark is STILL RUNNING and the
     // collector believes this thread is paused (it already scanned our roots).
     // Waking mid-drain violates snapshot-at-the-beginning: we could load a grey
