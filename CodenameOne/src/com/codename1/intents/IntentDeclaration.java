@@ -62,7 +62,7 @@ public final class IntentDeclaration {
             throw new IllegalArgumentException("id is required");
         }
         this.id = id;
-        this.title = title == null ? id : title;
+        this.title = IntentText.orFallback(title, id);
         this.description = description == null ? "" : description;
         this.headless = headless;
         this.discoverable = discoverable;

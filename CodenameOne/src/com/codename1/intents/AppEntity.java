@@ -124,7 +124,11 @@ public final class AppEntity {
     ///
     /// this entity, for chaining
     public AppEntity setTitle(String title) {
-        this.title = title;
+        // Normalized here rather than at each reader: an entity's title reaches the Spotlight
+        // entry, the donation and a result's embedded entity, and spaces would show as a blank
+        // row in all three. Null is the honest record of "no title", and it is what the index
+        // check already refuses to publish.
+        this.title = IntentText.orFallback(title, null);
         return this;
     }
 

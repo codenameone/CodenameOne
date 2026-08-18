@@ -1440,6 +1440,32 @@ class IntentsTest {
         assertNull(Intents.getDeclaration("count_5").getParameter("count"));
     }
 
+    /// One rule, every door. A title of spaces is present, so each door's empty-only fallback
+    /// declined to fire and the spaces travelled out as an Android shortcut label, an iOS
+    /// NSUserActivity.title, a Spotlight row, or a parameter prompt -- an entry the user can
+    /// see and cannot read. Four review findings were four instances of this.
+    @Test
+    void aBlankNameIsNotANameAtAnyDoor() {
+        assertEquals("ride_home",
+                new DynamicIntent("ride_home", "log_workout", "   ").getTitle(),
+                "a parameterization falls back to its id");
+
+        assertEquals("log_workout", declaration("log_workout").getId());
+        assertEquals("log_workout",
+                new IntentDeclaration("log_workout", "  ", "", true, true, false, "", 5,
+                        Collections.<String>emptyList(),
+                        Collections.<IntentParameterInfo>emptyList(),
+                        Arrays.asList(Exposure.ASSISTANT)).getTitle(),
+                "a declaration falls back to its id");
+
+        assertEquals("count", new IntentParameterInfo("count", "\t", 
+                IntentParameterType.INTEGER, true, null, null, null).getTitle(),
+                "a parameter falls back to its name");
+
+        assertNull(new AppEntity("order", "42").setTitle("   ").getTitle(),
+                "an entity has no title rather than a blank one");
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

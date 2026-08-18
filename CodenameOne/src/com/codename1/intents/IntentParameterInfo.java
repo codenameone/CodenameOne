@@ -55,11 +55,9 @@ public final class IntentParameterInfo {
                                boolean required, String entityType, String defaultValue,
                                List<String> options) {
         this.name = name;
-        // Trimmed, not merely checked for empty: a title of spaces is present, so the
-        // fallback never fired and the platform showed a prompt with nothing in it. The build
-        // normalizes the same way, so a declaration reads identically in the simulator and on
-        // a device.
-        this.title = title == null || title.trim().length() == 0 ? name : title;
+        // The build normalizes a blank prompt the same way, so a declaration reads identically
+        // in the simulator and on a device.
+        this.title = IntentText.orFallback(title, name);
         this.type = type;
         this.required = required;
         this.entityType = entityType;

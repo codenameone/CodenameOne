@@ -75,7 +75,9 @@ public final class DynamicIntent {
         }
         this.id = id;
         this.baseIntentId = baseIntentId;
-        this.title = title == null ? id : title;
+        // Blank, not merely null: spaces would become the Android shortcut label and the iOS
+        // NSUserActivity.title, publishing a launcher entry with no visible name.
+        this.title = IntentText.orFallback(title, id);
     }
 
     /// Binds values for the base intent's parameters. Anything supplied at
