@@ -3159,6 +3159,18 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_PACING_MIN_CAP
 #define CN1_PACING_MIN_CAP (4*1024*1024)
 #endif
+// How much legacy allocation one thread may do between two pacing evaluations. This
+// bounds the overshoot past the cap, so it has to stay well under the smallest cap the
+// clamp can produce; it is deliberately independent of CN1_LEGACY_GC_TRIGGER_BYTES,
+// which sizes when to SCHEDULE a cycle rather than when to stop running ahead of one.
+#ifndef CN1_PACING_CHECK_INTERVAL_BYTES
+#define CN1_PACING_CHECK_INTERVAL_BYTES (1024*1024)
+#endif
+
+// This thread's legacy allocation since its last pacing evaluation. __thread rather
+// than a ThreadLocalData field, matching cn1LowMemoryParkStampMs: zero-initialized per
+// thread with no malloc'd-not-zeroed trap to remember.
+static __thread long long cn1LegacyBytesSinceCheck = 0;
 
 // Cached free-memory reading, refreshed once per GC cycle (cn1RefreshFreeMemCache, called from
 // codenameOneGCMark) so the dynamic pacing cap costs no per-page-acquire syscall.
@@ -3204,7 +3216,7 @@ static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
-static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
+static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOut) {
     long trigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
     long base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER;
     // PROCESS BUDGET FIRST (issue #5537). Where the platform caps what this process
@@ -3213,6 +3225,9 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     // once-per-cycle reading is used exactly as before, so nothing off iOS changes.
     long procHeadroom = cn1ProcessHeadroom();
     JAVA_BOOLEAN bounded = procHeadroom >= 0;
+    if(boundedOut != 0) {
+        *boundedOut = bounded;
+    }
     long fm = bounded ? procHeadroom
                       : atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
     long cap = fm / 8;                                       // baseline: 1/8 of available RAM of slack
@@ -3244,7 +3259,12 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
         // ...but never pace so tightly that a genuinely-live heap makes no progress.
         // A heap with nothing left to reclaim would otherwise spend the full 10s spin
         // budget at every page acquire, turning a memory problem into an apparent hang.
-        if(cap < CN1_PACING_MIN_CAP) cap = CN1_PACING_MIN_CAP;
+        // The floor is itself capped by what remains: authorizing 4MB of fresh garbage
+        // with 2MB left to live is just a slower way to be killed, and a thread that
+        // parks instead still has the spin's own safety cap as its escape hatch.
+        long floor = CN1_PACING_MIN_CAP;
+        if(floor > fm) floor = fm;
+        if(cap < floor) cap = floor;
     }
     return cap;
 }
@@ -3278,7 +3298,19 @@ static long long cn1PacingVolume(int which) {
 }
 
 static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which) {
-    long cap = cn1BibopPacingCap(threadStateData);
+    JAVA_BOOLEAN bounded = JAVA_FALSE;
+    long cap = cn1BibopPacingCap(threadStateData, &bounded);
+    // The legacy path's backpressure is NEW, and it exists to keep a process inside a
+    // hard ceiling. Applying it where there is no ceiling would change behaviour on
+    // every other target for no benefit -- and it would engage readily, because
+    // cn1_available_memory is a flat 100MB placeholder off Apple, so the cap there is
+    // the 72MB static floor: measured, a 768MB churn parked 10 times on a Linux runner
+    // that was never in any danger. Off a budgeted platform the legacy path therefore
+    // keeps exactly the behaviour it had. The BiBOP path is unaffected either way --
+    // it was already paced against this same cap before this change.
+    if(which == CN1_PACE_LEGACY && !bounded) {
+        return;
+    }
     if(cn1PacingVolume(which) <= (long long)cap ||
        get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
         return;
@@ -5922,10 +5954,18 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // churning board arrays could take the process past the iOS ceiling with a live
     // set of almost nothing.
     //
-    // Gated on the crossing already computed above, so the common case costs one
-    // comparison on an integer we are holding anyway, and the cap is only consulted
-    // once legacy volume since the last cycle has passed the 24MB trigger.
-    if(prevLegacyBytes + (long long)size > CN1_LEGACY_GC_TRIGGER_BYTES
+    // Evaluated on a fixed BYTE INTERVAL of this thread's own legacy allocation, not
+    // on the 24MB scheduling trigger above. Reusing that trigger looks free -- the
+    // crossing is already computed -- but it is the wrong threshold and fails exactly
+    // where this matters most: near the ceiling the cap can be a few MB, and a
+    // workload that dirties each block before requesting the next could spend the
+    // whole remaining budget and be killed while legacy volume was still climbing
+    // toward 24MB. The interval is unconditional, so the cap is consulted long before
+    // any scheduling threshold, and it bounds the overshoot between two evaluations to
+    // CN1_PACING_CHECK_INTERVAL_BYTES whatever the cap turns out to be. Cost is one
+    // thread-local add and one compare per legacy allocation.
+    cn1LegacyBytesSinceCheck += (long long)size;
+    if(cn1LegacyBytesSinceCheck >= CN1_PACING_CHECK_INTERVAL_BYTES
        && constantPoolObjects != 0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
        // Same bracket gate as the trigger: without conservative roots a thread inside
@@ -5934,6 +5974,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
        && !threadStateData->nativeAllocationMode
 #endif
        ) {
+        cn1LegacyBytesSinceCheck = 0;
         cn1PacingPark(threadStateData, CN1_PACE_LEGACY);
     }
 #endif

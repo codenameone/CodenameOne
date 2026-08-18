@@ -83,24 +83,29 @@ import static org.junit.jupiter.api.Assertions.fail;
  *
  * <p>The control's PEAK is reported but deliberately not asserted on. Whether an
  * unpaced mutator actually outruns the collector is up to the scheduler: the identical
- * binary was measured peaking at 98MB, 553MB and 626MB on three consecutive runs of an
- * idle laptop. The bounded run's park COUNT is not asserted either, for the same reason
- * (0, 1, 2 and 8 across repetitions). What does not vary is the bound itself -- across
- * every run measured, the bounded peak stayed between 111MB and 176MB against a 256MB
- * budget -- and that the control paces nothing at all.</p>
+ * binary was measured peaking anywhere from 98MB to 815MB across runs on an idle
+ * laptop. The bounded run's park COUNT is not asserted either, for the same reason
+ * (0, 1, 2, 6 and 8 across repetitions). What does not vary is that the bound holds --
+ * across every run measured the bounded peak stayed between 95MB and 216MB against a
+ * 256MB budget -- and that the control paces nothing at all.</p>
  *
  * <p>Teeth were confirmed by ablation rather than assumed. With the legacy-path
  * backpressure removed and everything else in place, the bounded run peaks at 472MB
  * against the 256MB budget and this guard fails; with the fix whole it peaks at
  * 131MB.</p>
  *
- * <p>The bound asserted is not a tuned threshold, it is the invariant the clamp
- * provides: at any pacing point with footprint F under budget L the thread may grow to
- * F + (L-F)/2 = (L+F)/2, which is strictly less than L for every F. The footprint
- * therefore approaches the ceiling geometrically and never reaches it, however fast the
- * mutator allocates and however far behind the collector falls. A regression that
- * restores host-wide sizing, or drops the legacy path's backpressure, blows straight
- * through it.</p>
+ * <p>The bound asserted is not a tuned threshold, it is the property the clamp
+ * provides: every pacing evaluation re-reads the LIVE remaining budget, so at footprint
+ * F under budget L the thread is authorized to grow to F + (L-F)/2 = (L+F)/2, which is
+ * below L for every F. Note what this does and does not say. The footprint RATCHETS --
+ * successive pace points measured at 176MB, 216MB, 236MB under a 256MB budget --
+ * because the cap bounds uncollected allocation volume while the footprint also carries
+ * memory the collector has freed but not yet handed back. So the peak converges on the
+ * ceiling rather than sitting at a fixed fraction of it, and a longer workload gets
+ * closer to it. What holds regardless is that it converges from BELOW: each step is
+ * half of what is left, so no amount of churn crosses the line. A regression that
+ * restores host-wide sizing, or drops the legacy path's backpressure, does not converge
+ * at all and blows straight through.</p>
  *
  * <p>Tagged {@code benchmark}: it needs a translate-and-build and churns
  * ~768MB through a live set of one block.</p>
@@ -225,13 +230,14 @@ class ProcessBudgetPacingIntegrationTest {
                 + " boundedPeakKb=" + boundedPeakKb + " limitKb=" + SIMULATED_LIMIT_KB
                 + " control " + pacing(controlOutput) + " bounded " + pacing(boundedOutput));
 
-        // THE INVARIANT. Under a declared budget the peak must stay inside it. This is
-        // not a tuned threshold: at any pacing point with footprint F under budget L the
-        // thread may grow to F + (L-F)/2 = (L+F)/2 < L, for every F, so the footprint
-        // approaches the ceiling geometrically and never reaches it however far behind
-        // the collector falls. Measured with the legacy-path backpressure ablated out
-        // and everything else in place, the same run peaked at 472MB against this 256MB
-        // budget -- i.e. dead on device.
+        // THE PROPERTY UNDER TEST. Under a declared budget the peak must stay inside
+        // it. Not a tuned threshold: every pacing evaluation re-reads the live remaining
+        // budget, so at footprint F under budget L the thread is authorized to reach
+        // F + (L-F)/2 = (L+F)/2 < L, for every F. The peak converges on the ceiling
+        // rather than settling at a fraction of it -- it also carries memory freed but
+        // not yet returned -- but it converges from below and cannot cross. Measured
+        // with the legacy-path backpressure ablated out and everything else in place,
+        // the same run peaked at 472MB against this 256MB budget: dead on device.
         assertTrue(boundedPeakKb < SIMULATED_LIMIT_KB,
                 "Under a declared " + SIMULATED_LIMIT_KB + "KB process budget the allocating"
                         + " thread peaked at " + boundedPeakKb + "KB, so the process would have"
@@ -242,6 +248,11 @@ class ProcessBudgetPacingIntegrationTest {
 
         // AND THE OTHER DIRECTION, which is what keeps this fix from costing throughput
         // everywhere else: with no budget declared, no allocation may be paced at all.
+        // Load-bearing rather than decorative. cn1_available_memory is a flat 100MB
+        // placeholder off Apple, so an unbudgeted legacy path paced against it would sit
+        // at the 72MB static floor and engage constantly -- measured, before the legacy
+        // park was scoped to budgeted platforms, this control run parked 10 times on a
+        // Linux CI runner that was never in any danger.
         // Unlike a peak, this is deterministic -- it is a property of the code rather
         // than of how loaded the machine is -- so it is the half of the guard that
         // cannot go quiet. (The bounded run's park count is NOT asserted for exactly
