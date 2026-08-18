@@ -696,6 +696,7 @@ public final class Intents {
             Map<String, Object> prop = new LinkedHashMap<String, Object>();
             prop.put("type", schemaType(p.getType()));
             prop.put("description", p.getTitle());
+            addNumericBounds(prop, p);
             if (!p.getOptions().isEmpty()) {
                 prop.put("enum", new ArrayList<Object>(p.getOptions()));
             }
@@ -722,6 +723,33 @@ public final class Intents {
             schema.put("required", required);
         }
         return JSONWriter.toJson(schema);
+    }
+
+    /// Bounds a numeric property to what the handler declared, so a schema-valid call is also
+    /// a runnable one.
+    ///
+    /// Without them a model reading the schema sees "integer" and may produce 5000000000 for a
+    /// handler that declared an int -- valid against the schema and rejected by the coercion
+    /// before it reaches the handler, which is a failure the model had no way to avoid. The
+    /// width is recorded on the declaration, so the schema can say it.
+    ///
+    /// A double is unbounded and says nothing, which is the honest description of a double.
+    private static void addNumericBounds(Map<String, Object> prop, IntentParameterInfo p) {
+        if (p.getNumericWidthBits() != 32) {
+            if (p.getType() == IntentParameterType.INTEGER
+                    && p.getNumericWidthBits() == 64) {
+                prop.put("minimum", Long.valueOf(Long.MIN_VALUE));
+                prop.put("maximum", Long.valueOf(Long.MAX_VALUE));
+            }
+            return;
+        }
+        if (p.getType() == IntentParameterType.INTEGER) {
+            prop.put("minimum", Integer.valueOf(Integer.MIN_VALUE));
+            prop.put("maximum", Integer.valueOf(Integer.MAX_VALUE));
+        } else if (p.getType() == IntentParameterType.NUMBER) {
+            prop.put("minimum", Double.valueOf(-Float.MAX_VALUE));
+            prop.put("maximum", Double.valueOf(Float.MAX_VALUE));
+        }
     }
 
     private static String schemaType(IntentParameterType type) {
@@ -1509,6 +1537,45 @@ public final class Intents {
                 + "app for it.");
     }
 
+    /// Percent-encodes a route value, one UTF-8 byte at a time.
+    ///
+    /// Util.encodeUrl walks UTF-16 code units and encodes each as up to three bytes, which is
+    /// correct for everything in the basic plane and wrong above it: a supplementary character
+    /// -- an emoji in an entity id, say -- is a surrogate pair, and encoding each half
+    /// separately emits two three-byte sequences that are not valid UTF-8 at all. The router
+    /// decodes them as UTF-8 and gets replacement characters, so the handler ran on the right
+    /// id and the screen it opened was built from a corrupted one.
+    ///
+    /// Encoding the UTF-8 bytes of the whole string cannot make that mistake, because the
+    /// pairing is resolved before any byte is written. Only the unreserved set is left as-is;
+    /// over-encoding is harmless to a decoder and safe in every part of a URL.
+    private static String percentEncode(String value) {
+        byte[] utf8;
+        try {
+            utf8 = value.getBytes("UTF-8");
+        } catch (Throwable t) {
+            // No UTF-8 is not a situation this can improve on; the old behaviour is still
+            // right for everything in the basic plane.
+            return com.codename1.io.Util.encodeUrl(value);
+        }
+        StringBuilder out = new StringBuilder(utf8.length * 3);
+        for (byte raw : utf8) {
+            int b = raw & 0xff;
+            if ((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')
+                    || b == '-' || b == '.' || b == '_' || b == '~') {
+                out.append((char) b);
+            } else {
+                out.append('%');
+                String hex = Integer.toHexString(b).toUpperCase();
+                if (hex.length() == 1) {
+                    out.append('0');
+                }
+                out.append(hex);
+            }
+        }
+        return out.toString();
+    }
+
     /// What the generated coercion substitutes for an omitted value of this type, or null when
     /// absence really does mean null.
     ///
@@ -1577,7 +1644,7 @@ public final class Intents {
             // Encoded, because a value is data and the template is structure. An id
             // containing "/" would otherwise add a path segment and stop matching the route it
             // was built for, and "?" or "#" would invent a query or a fragment.
-            out.append(com.codename1.io.Util.encodeUrl(String.valueOf(value)));
+            out.append(percentEncode(String.valueOf(value)));
             i = close + 1;
         }
         return out.toString();

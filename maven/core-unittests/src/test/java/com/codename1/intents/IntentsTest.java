@@ -181,6 +181,15 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    private static IntentDeclaration modelIntentWithNumeric(String id, String param,
+                                                            IntentParameterType type, int bits) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
+                "", 5, Collections.<String>emptyList(),
+                Arrays.asList(new IntentParameterInfo(param, "How many?", type, true,
+                        null, null, null, bits)),
+                Arrays.asList(Exposure.MODEL));
+    }
+
     private static IntentDeclaration modelIntent(String id, boolean destructive) {
         return new IntentDeclaration(id, "Title of " + id, "", true, true, destructive,
                 "", 5, Collections.<String>emptyList(),
@@ -1908,6 +1917,74 @@ class IntentsTest {
         outside.put("size", "enormous");
         Intents.donate("pick_it", outside);
         assertNull(b.donatedId, "a value outside the vocabulary is still refused");
+    }
+
+    /// Util.encodeUrl walks UTF-16 code units, so a supplementary character -- an emoji in an
+    /// entity id -- is encoded as two three-byte sequences that are not valid UTF-8 at all.
+    /// The router decodes them as UTF-8 and gets replacement characters, so the handler ran on
+    /// the right id and the screen it opened was built from a corrupted one.
+    @Test
+    void aRouteValueOutsideTheBasicPlaneSurvivesEncoding() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Open", "", false, true, false,
+                    "/notes/{id}", 5, Collections.<String>emptyList(),
+                    Arrays.asList(new IntentParameterInfo("id", "Which?",
+                            IntentParameterType.STRING, true, null, null, null)),
+                    Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.ok();
+            Intents.setDispatcher(d);
+
+            Map<String, Object> params = new HashMap<String, Object>();
+            params.put("id", "note-\uD83D\uDE00");
+            Intents.invoke("known", params);
+
+            assertEquals(1, navigated.size(), "the declared route has to be navigated");
+            String url = navigated.get(0);
+            // U+1F600 is F0 9F 98 80 in UTF-8. The broken form emits ED A0 BD ED B8 80.
+            assertTrue(url.contains("%F0%9F%98%80"),
+                    "the surrogate pair has to become one four-byte sequence: " + url);
+            assertFalse(url.contains("%ED"),
+                    "a lone surrogate encoded on its own is not UTF-8: " + url);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
+    /// A model reading "integer" may produce 5000000000 for a handler that declared an int --
+    /// valid against the schema and rejected by the coercion before it reaches the handler,
+    /// which is a failure the model had no way to avoid. The width is on the declaration, so
+    /// the schema can say it.
+    @Test
+    void aToolSchemaBoundsANumberToTheDeclaredWidth() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(modelIntentWithNumeric("count_int", "count",
+                IntentParameterType.INTEGER, 32));
+        d.declarations.add(modelIntentWithNumeric("count_long", "count",
+                IntentParameterType.INTEGER, 64));
+        d.declarations.add(modelIntentWithNumeric("ratio_double", "ratio",
+                IntentParameterType.NUMBER, 64));
+        Intents.setDispatcher(d);
+
+        Map<String, String> schemas = new HashMap<String, String>();
+        for (com.codename1.ai.Tool t : Intents.asTools()) {
+            schemas.put(t.getName(), t.getParametersJsonSchema());
+        }
+
+        assertTrue(schemas.get("count_int").contains("2147483647"),
+                "an int says so: " + schemas.get("count_int"));
+        assertTrue(schemas.get("count_long").contains("9223372036854775807"),
+                "and a long says so too: " + schemas.get("count_long"));
+        assertFalse(schemas.get("ratio_double").contains("maximum"),
+                "a double is unbounded, which is the honest description of a double: "
+                        + schemas.get("ratio_double"));
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
