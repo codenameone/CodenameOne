@@ -2536,9 +2536,17 @@ public final class Display extends CN1Constants {
             try {
                 if (lastDragOffset > -1 && lastDragWindowId == windowId) {
                     // A coalesced drag replaces the queued one, so it must also carry
-                    // the newest metadata rather than the metadata of the drag it
-                    // just overwrote. The type word sits one slot before the payload.
-                    pointerMetaStack[lastDragOffset - 1] = impl.capturePointerEventMetadata();
+                    // the newest metadata rather than the metadata of the drag it just
+                    // overwrote. The type word sits one slot before the payload.
+                    //
+                    // The existing slot is overwritten rather than a new one taken:
+                    // coalescing keeps one packet however many updates arrive, so
+                    // taking a slot per update would run the ring forward without
+                    // bound -- with the event dispatch thread blocked it would wrap
+                    // and clobber slots belonging to presses and releases that are
+                    // still queued, which is exactly the mix-up this prevents.
+                    pointerMetaStack[lastDragOffset - 1] =
+                            impl.recapturePointerEventMetadata(pointerMetaStack[lastDragOffset - 1]);
                     inputEventStack[lastDragOffset] = x;
                     inputEventStack[lastDragOffset + 1] = y;
                     inputEventStack[lastDragOffset + 2] = (int) (System.currentTimeMillis() - displayInitTime);

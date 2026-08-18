@@ -2114,4 +2114,30 @@ class WindowTest extends UITestBase {
 
         w.dispose();
     }
+
+    @FormTest
+    void anInfiniteProgressAnimatesAndTearsDownInsideAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("busy", new BorderLayout());
+        w.setWindowSize(300, 200);
+        com.codename1.components.InfiniteProgress progress =
+                new com.codename1.components.InfiniteProgress();
+        w.add(BorderLayout.CENTER, progress);
+        w.show();
+        w.revalidate();
+
+        // The spinner decided whether to animate by comparing Display.getCurrent() --
+        // which only ever names a Form -- with its own getComponentForm(), null inside
+        // a Window. That is false for every spinner in a window, so it registered
+        // nothing and sat completely static.
+        assertTrue(progress.animate(false),
+                "an infinite progress in a shown window must animate");
+
+        // And teardown resolved the form with a fallback to the current form, which
+        // threw in a window-only application -- during Window.dispose(), before the
+        // native peer and paint surface were released.
+        w.dispose();
+        assertTrue(w.isWindowDisposed(),
+                "dispose must complete rather than throw on the way through teardown");
+    }
 }

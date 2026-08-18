@@ -3153,6 +3153,28 @@ public abstract class CodenameOneImplementation {
             slot = pointerMetadataNext;
             pointerMetadataNext = (pointerMetadataNext + 1) % POINTER_METADATA_SLOTS;
         }
+        return recapturePointerEventMetadata(slot);
+    }
+
+    /// Overwrites an existing snapshot slot rather than taking a new one.
+    ///
+    /// Coalescing is why this exists. A drag that replaces the queued drag packet keeps
+    /// one packet however many updates arrive, so advancing the ring on each of them
+    /// would run it forward without bound while the number of live packets stays small
+    /// -- and the ring would then wrap onto slots belonging to presses and releases
+    /// that are still queued, which is the very mix-up the snapshot prevents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: the slot to overwrite; out of range values are ignored
+    ///
+    /// #### Returns
+    ///
+    /// the slot that now holds the current metadata
+    public int recapturePointerEventMetadata(int slot) {
+        if (slot < 0 || slot >= POINTER_METADATA_SLOTS) {
+            return capturePointerEventMetadata();
+        }
         int i = slot * 4;
         pointerMetadataInts[i] = currentPointerButton;
         pointerMetadataInts[i + 1] = currentPointerButtonMask;

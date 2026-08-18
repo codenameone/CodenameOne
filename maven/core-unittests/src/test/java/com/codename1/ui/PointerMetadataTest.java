@@ -148,4 +148,55 @@ class PointerMetadataTest extends UITestBase {
 
         implementation.resetPointerEventMetadata();
     }
+
+    @Test
+    void coalescedDragsDoNotConsumeSnapshotSlotsFromOtherQueuedEvents() {
+        // Coalescing keeps ONE queued drag packet however many updates arrive. Taking a
+        // fresh snapshot slot per update therefore runs the ring forward without bound
+        // while the number of live packets stays tiny -- and with the event dispatch
+        // thread blocked the ring wraps onto slots belonging to packets that are still
+        // queued. The press below is the victim: it dispatches with the drag's button.
+        Form f = new Form("coalesce");
+        final java.util.List<Integer> pressButtons = new java.util.ArrayList<Integer>();
+        f.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                pressButtons.add(Integer.valueOf(display.getPointerButton()));
+            }
+        });
+        f.show();
+        flushSerialCalls();
+
+        // Queued from the event dispatch thread itself, so nothing can be dispatched
+        // part way through. Queueing from the test thread let the event dispatch
+        // thread drain the press before the drags arrived, and the test then passed
+        // against the un-fixed code because the ring never had a chance to wrap onto a
+        // slot that was still live.
+        display.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                implementation.setPointerEventMetadata(PointerEvent.BUTTON_SECONDARY,
+                        PointerEvent.MASK_SECONDARY, PointerEvent.TYPE_STYLUS,
+                        0.5f, 0, 0, 0, 0, false);
+                display.pointerPressed(new int[]{10}, new int[]{10});
+
+                // More updates than the ring has slots, all collapsing into one packet.
+                implementation.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY,
+                        PointerEvent.MASK_PRIMARY, PointerEvent.TYPE_MOUSE,
+                        1f, 0, 0, 0, 0, false);
+                for (int iter = 0; iter < 600; iter++) {
+                    display.pointerDragged(new int[]{11 + iter}, new int[]{11});
+                }
+            }
+        });
+
+        flushSerialCalls();
+
+        assertEquals(1, pressButtons.size(), "the press should have dispatched once");
+        assertEquals(PointerEvent.BUTTON_SECONDARY, pressButtons.get(0).intValue(),
+                "a coalesced drag must reuse its own snapshot slot; taking a new one "
+                        + "per update wraps the ring onto the still-queued press");
+
+        implementation.resetPointerEventMetadata();
+    }
 }
