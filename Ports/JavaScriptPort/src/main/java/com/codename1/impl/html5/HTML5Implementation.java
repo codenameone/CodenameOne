@@ -6768,9 +6768,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // The repaint is requested and the read deferred instead, which this API can do because
         // it answers through a callback. Two hops: the event thread runs queued work before it
         // paints, so the first lands before the repaint and the second after it.
+        if (readbackRepaintPending) {
+            // A capture is already waiting for the frame that puts the text back on the canvas.
+            // Reading now would hand this caller the canvas as it stands, which is the one
+            // missing every promoted glyph, so this capture waits for the same frame.
+            pendingReadbacks.add(callback);
+            return;
+        }
         if (textLayer != null && !textLayer.isSuspended()) {
             textLayer.setSuspended(true);
             textLayerDisabledByReadback = true;
+            readbackRepaintPending = true;
             // The semantic overlay stops mirroring labels while the text layer renders them and
             // starts again once it does not. Nothing else would notice the switch, so ask for a
             // semantic refresh here -- otherwise find-in-page would keep finding nothing until
@@ -6786,7 +6794,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
+                            readbackRepaintPending = false;
                             readDisplaySurface(callback);
+                            // Whatever else asked for a capture while this one was waiting reads
+                            // the same frame, rather than the one before the text came back.
+                            while (!pendingReadbacks.isEmpty()) {
+                                readDisplaySurface(pendingReadbacks.remove(0));
+                            }
                         }
                     });
                 }
@@ -6795,6 +6809,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         readDisplaySurface(callback);
     }
+
+    /**
+     * True while a capture is waiting for the frame that rasterizes the text the layer had
+     * promoted. Any capture asked for in the meantime waits for that frame too.
+     */
+    private boolean readbackRepaintPending;
+
+    /**
+     * Captures asked for while that frame is on its way.
+     */
+    private final List<SuccessCallback<Image>> pendingReadbacks = new ArrayList<SuccessCallback<Image>>();
 
     /**
      * Reads the display surface back and hands the pixels to the caller.
@@ -10802,12 +10827,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (handlingPopState) {
             return;
         }
+        if (historyUnavailable) {
+            return;
+        }
         try {
             historyIndex++;
             window.getHistory().pushState(HISTORY_STATE_PREFIX + historyIndex, "");
             historyEntriesPushed++;
         } catch (Throwable ignored) {
-            // A sandboxed or file:// document can refuse pushState. Back simply stays inert.
+            // A sandboxed or file:// document can refuse pushState. Back stays inert from here
+            // on: the entry was never created, and going on as though it had been would have a
+            // later in-app back traverse history that does not belong to this application --
+            // out of the document, rather than back a form.
+            historyIndex--;
+            historyUnavailable = true;
         }
     }
 
@@ -10839,7 +10872,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @param delta entries to move, negative for backwards
      */
     private void requestSuppressedTraversal(int delta) {
-        if (delta == 0) {
+        if (delta == 0 || historyUnavailable) {
             return;
         }
         suppressedTraversals.add(Long.valueOf(System.currentTimeMillis() + SUPPRESSION_TIMEOUT_MILLIS));
@@ -10964,6 +10997,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * bounces the browser straight back out again without ever running the form's back command.
      */
     private static final String HISTORY_STATE_PREFIX = "cn1-history:";
+
+    /**
+     * True once the document has refused to take an entry. Nothing this port pushed is there to
+     * traverse, so it stops asking.
+     */
+    private boolean historyUnavailable;
 
     /**
      * Reads the id stamped into a history entry. Entries this port did not push -- the document
@@ -11119,6 +11158,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * nothing and the user would have to press again.</p>
      */
     private void leaveDocument() {
+        if (historyUnavailable) {
+            return;
+        }
         // Every entry this port pushed has to go, not just one: a form reached through several
         // others still has theirs above the document, and stepping over a single one would
         // leave the browser inside a history the application has no forms for.
