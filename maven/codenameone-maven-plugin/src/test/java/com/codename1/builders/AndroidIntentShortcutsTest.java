@@ -109,6 +109,31 @@ class AndroidIntentShortcutsTest {
 
     /// res/xml is not processed for manifest placeholders, so ${applicationId} written there
     /// reaches the launcher literally and the explicit component cannot resolve -- every
+    /// A static shortcut is minted at build time, so it carries no runtime nonce and the
+    /// trampoline treats a tap on it as unauthenticated -- and that policy refuses anything
+    /// destructive. Emitting one anyway would put an entry on the launcher that opens the app
+    /// and logs a refusal on every tap, which reads as the action being broken rather than
+    /// protected. It is not donatable either, which is what the build message now says.
+    @Test
+    void aDestructiveIntentIsNeverAStaticShortcut(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\": 1, \"intents\": ["
+                + "{\"id\": \"delete_all\", \"title\": \"Delete everything\","
+                + " \"headless\": false, \"discoverable\": true, \"destructive\": true,"
+                + " \"opensRoute\": \"\", \"params\": [],"
+                + " \"exposure\": [\"ASSISTANT\"]},"
+                + "{\"id\": \"log_workout\", \"title\": \"Log a workout\","
+                + " \"headless\": true, \"discoverable\": true, \"destructive\": false,"
+                + " \"opensRoute\": \"\", \"params\": [],"
+                + " \"exposure\": [\"ASSISTANT\"]}]}");
+
+        String xml = shortcutsXml(dir);
+
+        assertFalse(xml.contains("delete_all"),
+                "a destructive intent must not reach the launcher: " + xml);
+        assertTrue(xml.contains("log_workout"),
+                "and the rest of the catalogue is unaffected: " + xml);
+    }
+
     /// generated static shortcut would open nothing at all.
     @Test
     void aShortcutNamesTheRealPackage(@TempDir Path dir) throws Exception {

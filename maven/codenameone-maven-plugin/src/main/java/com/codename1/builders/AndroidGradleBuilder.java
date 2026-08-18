@@ -7476,6 +7476,29 @@ public class AndroidGradleBuilder extends Executor {
                         + "publish at all on a device whose shortcut quota is 5.");
                 break;
             }
+            // Destructive is judged first, because it is the stronger restriction and the one
+            // whose message has to be the one the developer reads. An intent that is both
+            // destructive and parameterized would otherwise be told to donate it below.
+            //
+            // A static shortcut is minted at build time, so it carries no runtime nonce and the
+            // trampoline treats it as unauthenticated -- and that policy refuses anything
+            // destructive, deliberately. Emitting one anyway produces a launcher entry that on
+            // every tap opens the app and logs a refusal, which reads to the user as the action
+            // being broken rather than protected.
+            Object destructive = intent.get("destructive");
+            if (Boolean.TRUE.equals(destructive) || "true".equals(destructive)) {
+                // And it is not donatable either: Intents.donate refuses a destructive
+                // declaration for the same reason this does, since a donated shortcut also runs
+                // on one tap with nothing between the tap and the action. Telling the developer
+                // to donate it described a path that ends in a runtime diagnostic and no
+                // shortcut. The guide already says this; the build now says the same thing.
+                log("Not offering \"" + id + "\" as a launcher shortcut: it is destructive, and "
+                        + "a static shortcut cannot be confirmed the way the platform confirms "
+                        + "a Shortcuts or assistant invocation. It is not donatable either, for "
+                        + "the same reason. It stays available through the assistant and the "
+                        + "Shortcuts app, which confirm first.");
+                continue;
+            }
             // A static shortcut carries no parameters and Android has no picker on this path,
             // so an intent with a required parameter would be invoked with a null or zero and
             // quietly do the wrong thing. Only intents that can run as declared are offered;
@@ -7484,19 +7507,6 @@ public class AndroidGradleBuilder extends Executor {
                 log("Not offering \"" + id + "\" as a launcher shortcut: it has a required "
                         + "parameter and a static shortcut cannot supply one. It remains "
                         + "invocable and can be donated with its values bound.");
-                continue;
-            }
-            // A static shortcut is minted at build time, so it carries no runtime nonce and the
-            // trampoline treats it as unauthenticated -- and that policy refuses anything
-            // destructive, deliberately. Emitting one anyway produces a launcher entry that on
-            // every tap opens the app and logs a refusal, which reads to the user as the action
-            // being broken rather than protected.
-            Object destructive = intent.get("destructive");
-            if (Boolean.TRUE.equals(destructive) || "true".equals(destructive)) {
-                log("Not offering \"" + id + "\" as a launcher shortcut: it is destructive, and "
-                        + "a static shortcut cannot be confirmed the way the platform confirms "
-                        + "a Shortcuts or assistant invocation. It remains invocable and can be "
-                        + "donated, which mints a shortcut this app has authenticated.");
                 continue;
             }
             String label = intent.get("title") instanceof String
