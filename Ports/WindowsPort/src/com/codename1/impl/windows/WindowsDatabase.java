@@ -90,7 +90,10 @@ class WindowsDatabase extends Database {
     /// are the same file but cannot name a database that is not open -- which is what delete and
     /// the persistent managed key alias need. Null when there is no file to ask about, and then
     /// only the path key is in play, exactly as before.
-    private final String identityKey;
+    /// Not final: a database being created has no file to identify until sqlDbOpen has made
+    /// one, so this is filled in a second time after the open when the first attempt found
+    /// nothing. Written on the constructing thread before this object is handed to anyone.
+    private String identityKey;
 
     WindowsDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
@@ -142,6 +145,16 @@ class WindowsDatabase extends Database {
                             + "SQLite result " + status);
                 }
             }
+            // Again, now that there is a file. A database being created had none to identify a
+            // moment ago, and leaving it at null meant this connection never registered an
+            // identity at all -- so a second handle opened through an 8.3 alias or a hard link
+            // registered one nobody else shared, each looked like the only connection, and
+            // either could re-key the file under the other. Only when the first attempt came
+            // back empty: an identity that was already found is the same file and is already
+            // registered.
+            if (identityKey == null) {
+                adoptIdentityAfterOpen(path);
+            }
             opened = true;
         } finally {
             if (!opened) {
@@ -163,6 +176,37 @@ class WindowsDatabase extends Database {
                 releaseOpenDatabase(identityKey);
             }
         }
+    }
+
+    /// Registers the identity of a file that did not exist until this connection created it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the file this connection just opened
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if something else has claimed the file this turned out to be
+    private void adoptIdentityAfterOpen(String path) throws IOException {
+        String identity;
+        try {
+            identity = WindowsNative.fileIdentity(path);
+        } catch (RuntimeException cannotAsk) {
+            return;
+        }
+        if (identity == null || identity.length() == 0) {
+            return;
+        }
+        String candidate = "winfile:" + identity;
+        if (candidate.equals(openKey)) {
+            return;
+        }
+        // Registered before it is recorded. A refusal here means a delete or a key change owns
+        // this file already, and the caller has to hear that rather than carry on holding a
+        // handle to it; the constructor's failure path closes the handle and gives the path key
+        // back, exactly as it does when the open itself fails.
+        registerOpenDatabase(candidate);
+        identityKey = candidate;
     }
 
     /// The registry key for a Windows path.

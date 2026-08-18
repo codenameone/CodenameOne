@@ -299,11 +299,14 @@ class AndroidCipherDB extends Database {
      * them decide whether statements are refused, whether triggers recurse, and whether a
      * contended write waits or fails.
      *
-     * <p>A pragma SQLite offers no way to read back cannot be carried, because there is nothing
-     * to read: {@code case_sensitive_like} and {@code ignore_check_constraints} are the two worth
-     * naming. An application that sets either has to set it again after this returns. Every other
-     * port re-keys in place and keeps the whole connection, so this is the one platform where
-     * that applies.
+     * <p>The list is derived from the engine -- every pragma SQLite reports, set and read back
+     * from a fresh connection to see which ones a reopen loses -- rather than written from
+     * memory, so it covers the whole class rather than the names somebody happened to think of.
+     *
+     * <p>One setting still cannot be carried: {@code case_sensitive_like}, which SQLite offers
+     * no way to read. An application that sets it has to set it again after this returns. Every
+     * other port re-keys in place and keeps the whole connection, so this is the one platform
+     * where any of this applies.
      */
     @Override
     public void changeKey(DatabaseConfig config) throws IOException {
@@ -412,38 +415,54 @@ class AndroidCipherDB extends Database {
     /**
      * Every connection-scoped pragma this can read back and put on the replacement connection.
      *
-     * <p>Checked one at a time against the engine rather than guessed: each of these reports a
-     * value, keeps it for the connection that set it, and is back at its default in the next
-     * connection -- so each is lost when a conversion swaps the file and reopens. They were
-     * being restored one at a time as somebody noticed another one missing, which is the wrong
-     * shape for a list where the whole class has the same failure.
+     * <p>Derived from the engine rather than written from memory. Each name in PRAGMA
+     * pragma_list was read, set to a different value, read back, and then read again from a
+     * fresh connection; the ones here are those that reported a value, kept it, and were back
+     * at their default in the next connection -- which is precisely what a conversion does to
+     * them when it swaps the file and reopens. An earlier version of this list was hand
+     * written, and hand written is how it came to be missing query_only and locking_mode.
      *
-     * <p>What is deliberately absent: {@code defer_foreign_keys}, which SQLite clears at every
-     * commit and rollback, so restoring it after a conversion would set something that is about
-     * to clear itself; and {@code journal_mode}, which is persistent in the file and carried by
-     * the migration itself rather than by the connection.
+     * <p>Deliberately absent: the pragmas that are questions rather than settings
+     * (integrity_check, table_info and the rest); the ones that live in the file and are carried
+     * by the migration itself (journal_mode, auto_vacuum, user_version, application_id);
+     * defer_foreign_keys, which SQLite clears at every commit and rollback; and the key pragmas,
+     * which the conversion is the one deciding.
+     *
+     * <p>case_sensitive_like is the one setting that genuinely cannot be carried: SQLite offers
+     * no way to read it. ignore_check_constraints was in that category in an earlier note here
+     * and should not have been -- it reports a value, so it is in the list.
      */
     private static final String[] CONNECTION_PRAGMAS = {
-        // Semantics: these decide whether a statement is refused or a row is written.
-        "foreign_keys",
-        "recursive_triggers",
-        "query_only",
-        "read_uncommitted",
-        "trusted_schema",
-        "legacy_alter_table",
-        "reverse_unordered_selects",
-        "cell_size_check",
-        // Durability, which is a promise to whoever set it rather than a preference.
-        "synchronous",
-        "fullfsync",
-        "checkpoint_fullfsync",
-        "secure_delete",
-        // Behaviour under contention and load.
+        "analysis_limit",
+        "automatic_index",
         "busy_timeout",
         "cache_size",
+        "cache_spill",
+        "cell_size_check",
+        "checkpoint_fullfsync",
+        "count_changes",
+        "empty_result_callbacks",
+        "foreign_keys",
+        "full_column_names",
+        "fullfsync",
+        "ignore_check_constraints",
+        "journal_size_limit",
+        "legacy_alter_table",
+        "locking_mode",
+        "max_page_count",
+        "mmap_size",
+        "query_only",
+        "read_uncommitted",
+        "recursive_triggers",
+        "reverse_unordered_selects",
+        "secure_delete",
+        "short_column_names",
+        "soft_heap_limit",
+        "synchronous",
         "temp_store",
         "threads",
-        "automatic_index",
+        "trusted_schema",
+        "wal_autocheckpoint",
     };
 
     /**
@@ -455,9 +474,9 @@ class AndroidCipherDB extends Database {
      * {@code checkpoint_fullfsync}, off as a side effect of a key change. So a value that is not
      * there is left alone.
      *
-     * <p>A pragma with no getter -- {@code case_sensitive_like} and
-     * {@code ignore_check_constraints} among them -- cannot be captured by anything short of the
-     * caller telling us, and that is documented on changeKey rather than pretended about here.
+     * <p>A pragma with no getter cannot be captured by anything short of the caller telling us.
+     * {@code case_sensitive_like} is the only one of those left, and it is named on changeKey
+     * rather than pretended about here.
      */
     private java.util.List<String> captureConnectionSettings() {
         java.util.List<String> settings = new java.util.ArrayList<String>();
