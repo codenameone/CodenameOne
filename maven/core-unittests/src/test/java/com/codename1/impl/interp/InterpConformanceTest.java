@@ -391,6 +391,22 @@ class InterpConformanceTest {
                 + " System.out.println(Object[].class.isAssignableFrom(Base[].class));"
                 + " System.out.println(Runnable.class.isAssignableFrom(Base[].class));"
                 + "}}"));
+        // getSimpleName over the shapes javac actually produces: a member
+        // class, a local one, an anonymous one, and an array of each.
+        out.add(c("SimpleNames",
+                "public class SimpleNames {"
+                + " static class Member {}"
+                + " public static void main(String[] a) {"
+                + " class Local {}"
+                + " Runnable anon = new Runnable() { public void run() {} };"
+                + " System.out.println(SimpleNames.class.getSimpleName());"
+                + " System.out.println(Member.class.getSimpleName());"
+                + " System.out.println(\"[\" + Local.class.getSimpleName() + \"]\");"
+                + " System.out.println(\"[\" + anon.getClass().getSimpleName() + \"]\");"
+                + " System.out.println(Member[].class.getSimpleName());"
+                + " System.out.println(SimpleNames.class.getName());"
+                + " System.out.println(Member.class.getName());"
+                + "}}"));
         // A private method is not virtual, and from JDK 11 javac emits
         // invokevirtual for one anyway -- so resolving from the receiver runs
         // the subclass's same-named method instead of the one written.

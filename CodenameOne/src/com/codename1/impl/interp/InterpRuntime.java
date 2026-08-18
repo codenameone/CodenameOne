@@ -1803,9 +1803,7 @@ public final class InterpRuntime {
                 // from the receiver would make `Base.value()` calling its own
                 // private `label()` land on a `label()` that Child happens to
                 // declare -- a different answer, silently.
-                InterpClass named = bundle.findClass(owner);
-                InterpMethod direct = named == null ? null : named.declaredMethod(name, desc);
-                m = direct != null && direct.isPrivate() ? direct : io.type.resolve(name, desc);
+                m = resolveVirtual(io.type, owner, name, desc);
             }
             if (m != null && !m.isAbstract()) {
                 pushBoxed(f, returnKind, invokeInterpreted(m, io, args));
@@ -2048,6 +2046,87 @@ public final class InterpRuntime {
         }
     }
 
+    /// The simple name of a class, as `Class.getSimpleName` reports it.
+    ///
+    /// Splitting on the last `$` is not enough. javac names a local class
+    /// `Outer$1Local` and an anonymous one `Outer$1`, whose simple names are
+    /// `Local` and the empty string -- and a top-level class is allowed a `$`
+    /// in its own name, where nothing should be stripped at all. The
+    /// InnerClasses attribute that would say which is which is not in the
+    /// bundle, so the enclosing name is looked up instead: a prefix that is
+    /// itself a class here means this one is nested in it.
+    private String simpleNameOf(String internalName) {
+        int slash = internalName.lastIndexOf('/');
+        String simple = slash < 0 ? internalName : internalName.substring(slash + 1);
+        int dollar = internalName.lastIndexOf('$');
+        if (dollar < 0 || dollar < slash) {
+            return simple;
+        }
+        if (bundle.findClass(internalName.substring(0, dollar)) == null) {
+            // Not a nested class of anything the bundle has: the `$` belongs to
+            // the class's own name.
+            return simple;
+        }
+        String suffix = internalName.substring(dollar + 1);
+        int digits = 0;
+        while (digits < suffix.length() && suffix.charAt(digits) >= '0'
+                && suffix.charAt(digits) <= '9') {
+            digits++;
+        }
+        // All digits is an anonymous class, whose simple name is empty; leading
+        // digits mark a local class, and the name is what follows them.
+        return suffix.substring(digits);
+    }
+
+    /// Selects the method an `invokevirtual` actually runs.
+    ///
+    /// Not simply the receiver's, for two reasons the opcode does not express.
+    /// A *private* method is not virtual at all, and from JDK 11 javac emits
+    /// invokevirtual for one (nestmates replaced the synthetic bridges). A
+    /// *package-private* method is overridden only from within its own package
+    /// -- JVMS 5.4.5 -- so a public method of the same signature in another
+    /// package does not replace it, and the call still runs the one that was
+    /// written.
+    private InterpMethod resolveVirtual(InterpClass receiver, String owner,
+                                        String name, String desc) {
+        InterpClass named = bundle.findClass(owner);
+        InterpMethod declared = named == null ? null : named.declaredMethod(name, desc);
+        if (declared == null) {
+            return receiver.resolve(name, desc);
+        }
+        if (declared.isPrivate()) {
+            return declared;
+        }
+        if (!isPackagePrivate(declared)) {
+            return receiver.resolve(name, desc);
+        }
+        // The most derived class that may override it: one in the same package
+        // as the declaring class. Anything nearer the receiver but outside that
+        // package declares a different method that happens to share a name.
+        for (InterpClass k = receiver; k != null && k != named; k = k.superInterp) {  //NOPMD CompareObjectsWithEquals - one class object, not an equal one
+            InterpMethod m = k.declaredMethod(name, desc);
+            if (m != null && !m.isPrivate() && samePackage(k.getName(), named.getName())) {
+                return m;
+            }
+        }
+        return declared;
+    }
+
+    /// Whether a method is package-private: none of public, protected, private.
+    private static boolean isPackagePrivate(InterpMethod m) {
+        return !m.isPrivate() && !m.isPublic() && !m.isProtected();
+    }
+
+    /// Whether two JVM internal names sit in the same package.
+    private static boolean samePackage(String a, String b) {
+        int i = a.lastIndexOf('/');
+        int j = b.lastIndexOf('/');
+        if (i != j) {
+            return false;
+        }
+        return i < 0 || a.regionMatches(0, b, 0, i);
+    }
+
     /// Whether a host class is a supertype of an interpreted one.
     ///
     /// The interpreted class itself is nothing to the host, but its supertypes
@@ -2253,11 +2332,7 @@ public final class InterpRuntime {
             return classCall(c.arrayComponent, "getSimpleName", args) + "[]";
         }
         if ("getSimpleName".equals(name) && args.length == 0) {
-            String n = c.getName();
-            int slash = n.lastIndexOf('/');
-            String simple = slash < 0 ? n : n.substring(slash + 1);
-            int dollar = simple.lastIndexOf('$');
-            return dollar < 0 ? simple : simple.substring(dollar + 1);
+            return simpleNameOf(c.getName());
         }
         if ("toString".equals(name) && args.length == 0) {
             return (c.isInterface() ? "interface " : "class ")

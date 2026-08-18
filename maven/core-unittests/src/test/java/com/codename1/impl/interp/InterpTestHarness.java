@@ -176,6 +176,37 @@ final class InterpTestHarness {
     }
 
     /** Builds a bundle from every class file under {@code dir}. */
+    /**
+     * A bundle from a tree with more than one source file.
+     *
+     * <p>The reader refuses a bundle whose classes have no source, so a fixture
+     * spanning two packages has to carry both -- keyed by package-qualified
+     * path, which is how the runtime looks one up.</p>
+     */
+    static byte[] buildBundle(Path dir, String mainClass, String[] sourceNames,
+                              String[] sources) throws Exception {
+        Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
+        Object writer = writerClass.getDeclaredConstructor().newInstance();
+        Method addClassFile = writerClass.getMethod("addClassFile", File.class);
+        Method addSource = writerClass.getMethod("addSource", String.class, String.class);
+        Method setMain = writerClass.getMethod("setMainClass", String.class);
+        Method write = writerClass.getMethod("write", java.io.OutputStream.class);
+
+        List<File> classFiles = new ArrayList<File>();
+        collectClassFiles(dir.toFile(), classFiles);
+        for (File f : classFiles) {
+            addClassFile.invoke(writer, f);
+        }
+        for (int i = 0; i < sourceNames.length; i++) {
+            addSource.invoke(writer, sourceNames[i], sources[i]);
+        }
+        setMain.invoke(writer, mainClass);
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        write.invoke(writer, bos);
+        return bos.toByteArray();
+    }
+
     static byte[] buildBundle(Path dir, String mainClass, String source) throws Exception {
         // Loaded reflectively so core-unittests does not need a compile-time
         // dependency on the translator module.

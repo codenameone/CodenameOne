@@ -77,7 +77,6 @@ public final class InterpMethod {
         return (accessFlags & 0x0008) != 0;
     }
 
-    /// True for an abstract method -- one with no code.
     /// A synchronized method holds its receiver's monitor -- or its class's,
     /// when static -- for the whole call. There is no `monitorenter` in the
     /// body; the flag is the only record of it.
@@ -94,6 +93,17 @@ public final class InterpMethod {
         return (accessFlags & 0x0002) != 0;
     }
 
+    /// Whether this method is public.
+    public boolean isPublic() {
+        return (accessFlags & 0x0001) != 0;
+    }
+
+    /// Whether this method is protected.
+    public boolean isProtected() {
+        return (accessFlags & 0x0004) != 0;
+    }
+
+    /// True for an abstract method -- one with no code.
     public boolean isAbstract() {
         return (accessFlags & 0x0400) != 0;
     }

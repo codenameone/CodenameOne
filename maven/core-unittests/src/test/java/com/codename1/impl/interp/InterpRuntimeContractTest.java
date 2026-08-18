@@ -71,6 +71,57 @@ class InterpRuntimeContractTest {
     }
 
     /**
+     * A package-private method is overridden only from inside its own package
+     * (JVMS 5.4.5). A public method of the same signature in another package is
+     * a different method that happens to share a name, and dispatch that
+     * followed the receiver ran it instead -- silently changing what a library
+     * class does when a program subclasses it from its own package.
+     */
+    @Test
+    @DisplayName("a package-private method is not overridden from another package")
+    void packagePrivateMethodsAreNotOverriddenAcrossPackages() throws Throwable {
+        Path dir = Files.createTempDirectory("interp-packages");
+        String aSource = "package a;\n"
+                + "public class A {\n"
+                + "  String label() { return \"a\"; }\n"
+                + "  public String value() { return \"v:\" + label(); }\n"
+                + "}\n";
+        String bSource = "package b;\n"
+                + "public class B extends a.A {\n"
+                + "  public String label() { return \"b\"; }\n"
+                + "  public static String call() { return new B().value(); }\n"
+                + "  public static String own() { return new B().label(); }\n"
+                + "  public static void main(String[] args) { }\n"
+                + "}\n";
+        Files.createDirectories(dir.resolve("a"));
+        Files.createDirectories(dir.resolve("b"));
+        Path aFile = dir.resolve("a/A.java");
+        Path bFile = dir.resolve("b/B.java");
+        Files.write(aFile, aSource.getBytes(StandardCharsets.UTF_8));
+        Files.write(bFile, bSource.getBytes(StandardCharsets.UTF_8));
+        javax.tools.JavaCompiler javac = javax.tools.ToolProvider.getSystemJavaCompiler();
+        int rc = javac.run(null, null, null, "-g", "-nowarn", "-XDstringConcat=inline",
+                "-d", dir.toString(), aFile.toString(), bFile.toString());
+        assertEquals(0, rc, "the two-package fixture should compile");
+
+        byte[] bundleBytes = InterpTestHarness.buildBundle(dir, "b/B",
+                new String[]{"a/A.java", "b/B.java"}, new String[]{aSource, bSource});
+        InterpBundle bundle = InterpBundleReader.read(new ByteArrayInputStream(bundleBytes));
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        ProxyInterpObjectFactory factory = new ProxyInterpObjectFactory(linker);
+        InterpRuntime rt = new InterpRuntime(bundle, linker, factory);
+        factory.attach(rt);
+
+        InterpClass b = bundle.findClass("b/B");
+        // The JVM answers "v:a" here -- B.label() does not override a's -- and
+        // "b" for the call B makes on itself.
+        assertEquals("v:a", rt.invoke(b.declaredMethod("call", "()Ljava/lang/String;"),
+                null, new Object[0]));
+        assertEquals("b", rt.invoke(b.declaredMethod("own", "()Ljava/lang/String;"),
+                null, new Object[0]));
+    }
+
+    /**
      * A pushed program that never returns has to be stoppable, or the Stop
      * button is decoration and the only recovery is killing the app. The
      * existing BeanShell playground has no such check.
