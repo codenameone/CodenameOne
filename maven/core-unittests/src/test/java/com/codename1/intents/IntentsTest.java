@@ -172,6 +172,14 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    private static IntentDeclaration declarationWithBooleanParam(String id, String param) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
+                "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
+                Arrays.asList(new IntentParameterInfo(param, "On?",
+                        IntentParameterType.BOOLEAN, true, null, null, null)),
+                Arrays.asList(Exposure.ASSISTANT));
+    }
+
     private static IntentDeclaration declarationWithDateParam(String id, String param) {
         return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
                 "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
@@ -1648,6 +1656,27 @@ class IntentsTest {
         Intents.registerDynamicIntent(new DynamicIntent("open_right", "open_order", "Right")
                 .bind("order", new AppEntity("order", "42")));
         assertNull(Intents.getDeclaration("open_right").getParameter("order"));
+    }
+
+    /// The coercion reads a string boolean with equalsIgnoreCase, so refusing "TRUE" here
+    /// declined to donate a shortcut that would have dispatched perfectly well.
+    @Test
+    void aBooleanBindingIsReadTheWayTheCoercionReadsIt() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithBooleanParam("set_flag", "on"));
+        Intents.setDispatcher(d);
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("on", "TRUE");
+        Intents.donate("set_flag", params);
+        assertEquals("set_flag", b.donatedId);
+
+        Intents.registerDynamicIntent(new DynamicIntent("flag_off", "set_flag", "Off")
+                .bind("on", "False"));
+        assertNull(Intents.getDeclaration("flag_off").getParameter("on"),
+                "a value the coercion accepts satisfies the parameter");
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id

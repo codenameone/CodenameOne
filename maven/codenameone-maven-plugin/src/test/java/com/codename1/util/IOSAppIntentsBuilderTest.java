@@ -550,6 +550,24 @@ class IOSAppIntentsBuilderTest {
         assertTrue(swift.contains("var `repeat`: Int"));
     }
 
+    /// Swift ends a single-line literal at a carriage return exactly as it does at a newline,
+    /// so one written through unterminates the string and the iOS target fails to compile.
+    /// A description typed on Windows carries them in pairs.
+    @Test
+    void controlCharactersCannotBreakOutOfTheStringLiteral() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log",
+                        "description", "First\r\nSecond\tthird\u0001")),
+                new ArrayList<Map<String, Object>>());
+
+        assertFalse(swift.contains("\r"), "a raw carriage return ends the literal:\n" + swift);
+        assertFalse(swift.contains("\t"), "a raw tab is not spelled in a literal:\n" + swift);
+        assertFalse(swift.contains(String.valueOf((char) 1)),
+                "no control character may be written raw");
+        assertTrue(swift.contains("First\\r\\nSecond\\tthird\\" + "u{1}"),
+                "each one keeps its meaning as an escape:\n" + swift);
+    }
+
     @Test
     void quotesInATitleCannotBreakOutOfTheStringLiteral() {
         String swift = intentsSwift(

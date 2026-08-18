@@ -1246,8 +1246,13 @@ public final class Intents {
                 double d = ((Number) value).doubleValue();
                 return d == 0 || d == 1;
             }
+            // equalsIgnoreCase, because that is what the coercion uses. Being stricter here is
+            // not the safe direction for every caller: hiding a parameter that would have run
+            // is recoverable, but refusing to donate a shortcut that would have dispatched
+            // just loses it.
             String t = value.toString().trim();
-            return "true".equals(t) || "false".equals(t) || "1".equals(t) || "0".equals(t);
+            return "true".equalsIgnoreCase(t) || "false".equalsIgnoreCase(t)
+                    || "1".equals(t) || "0".equals(t);
         }
         if (type == IntentParameterType.INTEGER) {
             if (value instanceof Number) {

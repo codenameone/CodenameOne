@@ -22,9 +22,7 @@
  */
 package com.codename1.intents;
 
-import java.util.Calendar;
 import java.util.Date;
-import java.util.TimeZone;
 
 /// The one definition of what counts as a moment in time.
 ///
@@ -80,19 +78,33 @@ public final class IntentDates {
         return null;
     }
 
+    /// Parses ISO-8601, strictly, using arithmetic rather than Calendar.
+    ///
+    /// #### Why not Calendar
+    ///
+    /// Codename One's `java.util.Calendar` is far smaller than the JDK's: it has `set(int,int)`
+    /// and no `clear()`, no `setLenient()` and no multi-argument `set`. The version of this
+    /// parser that lived in generated code used all three, so an application declaring a date
+    /// parameter could not have compiled for a device at all -- and nothing caught it, because
+    /// the processor's tests compile their fixtures against the full JDK. Moving the grammar
+    /// here is what surfaced it, since core is built against the reduced runtime.
+    ///
+    /// Civil-date arithmetic is the better answer anyway. It is exact for the proleptic
+    /// Gregorian calendar, which is the calendar ISO-8601 defines, and it is strict by
+    /// construction: there is no leniency to switch off, so 2026-13-40 is rejected because 13
+    /// is not a month rather than because a flag was set.
     private static Date parseIso8601(String s) {
         if (s.length() < 10 || s.charAt(4) != '-' || s.charAt(7) != '-') {
             return null;
         }
-        Calendar c = Calendar.getInstance(
-                TimeZone.getTimeZone("GMT"));
-        c.clear();
-        c.setLenient(false);
         int offsetMinutes = 0;
         try {
             int year = Integer.parseInt(s.substring(0, 4));
             int month = Integer.parseInt(s.substring(5, 7));
             int day = Integer.parseInt(s.substring(8, 10));
+            if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
+                return null;
+            }
             int hour = 0;
             int minute = 0;
             int second = 0;
@@ -100,56 +112,113 @@ public final class IntentDates {
             String rest = s.substring(10);
             if (rest.length() > 0) {
                 char sep = rest.charAt(0);
-                if (sep != 'T' && sep != 't' && sep != ' ') { return null; }
+                if (sep != 'T' && sep != 't' && sep != ' ') {
+                    return null;
+                }
                 rest = rest.substring(1);
                 int zone = -1;
                 for (int i = 0; i < rest.length(); i++) {
                     char ch = rest.charAt(i);
-                    if (ch == 'Z' || ch == 'z' || ch == '+'
-                            || (ch == '-' && i > 0)) { zone = i; break; }
-                }
-                String time = zone < 0 ? rest : rest.substring(0, zone);
-                if (zone >= 0) {
-                    String z = rest.substring(zone);
-                    if (!"Z".equals(z) && !"z".equals(z)) {
-                        String digits = z.substring(1).replace(":", "");
-                        if (digits.length() != 4) { return null; }
-                        int oh = Integer.parseInt(digits.substring(0, 2));
-                        int om = Integer.parseInt(digits.substring(2));
-                        if (oh > 18 || om > 59 || oh * 60 + om > 18 * 60) {
-                            return null;
-                        }
-                        offsetMinutes = oh * 60 + om;
-                        if (z.charAt(0) == '-') { offsetMinutes = -offsetMinutes; }
+                    if (ch == 'Z' || ch == 'z' || ch == '+' || (ch == '-' && i > 0)) {
+                        zone = i;
+                        break;
                     }
                 }
-                if (time.length() < 5 || time.charAt(2) != ':') { return null; }
+                String time = zone < 0 ? rest : rest.substring(0, zone);
+                String tz = zone < 0 ? "" : rest.substring(zone);
+                if (time.length() < 5 || time.charAt(2) != ':') {
+                    return null;
+                }
                 hour = Integer.parseInt(time.substring(0, 2));
                 minute = Integer.parseInt(time.substring(3, 5));
-                if (time.length() != 5) {
-                    if (time.length() < 8 || time.charAt(5) != ':') { return null; }
+                if (time.length() >= 8) {
+                    if (time.charAt(5) != ':') {
+                        return null;
+                    }
                     second = Integer.parseInt(time.substring(6, 8));
-                    if (time.length() != 8) {
-                        if (time.length() < 10 || time.charAt(8) != '.') { return null; }
-                        String digits = time.substring(9);
-                        for (int f = 0; f < digits.length(); f++) {
-                            char fc = digits.charAt(f);
-                            if (fc < '0' || fc > '9') { return null; }
+                    if (time.length() > 8) {
+                        if (time.charAt(8) != '.') {
+                            return null;
                         }
-                        millis = Integer.parseInt((digits + "000").substring(0, 3));
+                        // Only the leading three digits are milliseconds; ISO allows more
+                        // precision than a Date can hold, and truncating is the honest answer.
+                        String frac = time.substring(9);
+                        for (int i = 0; i < frac.length(); i++) {
+                            if (frac.charAt(i) < '0' || frac.charAt(i) > '9') {
+                                return null;
+                            }
+                        }
+                        if (frac.length() == 0) {
+                            return null;
+                        }
+                        String three = (frac + "000").substring(0, 3);
+                        millis = Integer.parseInt(three);
+                    }
+                } else if (time.length() != 5) {
+                    return null;
+                }
+                if (hour > 23 || minute > 59 || second > 59) {
+                    return null;
+                }
+                if (tz.length() > 0 && tz.charAt(0) != 'Z' && tz.charAt(0) != 'z') {
+                    // Built by hand: this runtime's String has replace(char,char) and not the
+                    // CharSequence overload, and an offset may be written +0200 or +02:00.
+                    StringBuilder buf = new StringBuilder();
+                    String off = tz.substring(1);
+                    for (int i = 0; i < off.length(); i++) {
+                        if (off.charAt(i) != ':') {
+                            buf.append(off.charAt(i));
+                        }
+                    }
+                    String digits = buf.toString();
+                    if (digits.length() != 4) {
+                        return null;
+                    }
+                    int oh = Integer.parseInt(digits.substring(0, 2));
+                    int om = Integer.parseInt(digits.substring(2, 4));
+                    // No real zone is further from UTC than 18 hours, and a number past that is
+                    // a typo rather than a place; accepting it would silently move the moment.
+                    if (oh > 18 || om > 59 || oh * 60 + om > 18 * 60) {
+                        return null;
+                    }
+                    offsetMinutes = oh * 60 + om;
+                    if (tz.charAt(0) == '-') {
+                        offsetMinutes = -offsetMinutes;
                     }
                 }
             }
-            c.set(year, month - 1, day, hour, minute, second);
-            c.set(Calendar.MILLISECOND, millis);
-            return new Date(
-                    c.getTime().getTime() - offsetMinutes * 60000L);
+            long epochDay = daysFromCivil(year, month, day);
+            long millisOfDay = hour * 3600000L + minute * 60000L + second * 1000L + millis;
+            return new Date(epochDay * 86400000L + millisOfDay - offsetMinutes * 60000L);
         } catch (NumberFormatException e) {
             return null;
         } catch (IndexOutOfBoundsException e) {
             return null;
-        } catch (IllegalArgumentException e) {
-            return null;
         }
+    }
+
+    /// Days from 1970-01-01 to this civil date, proleptic Gregorian.
+    ///
+    /// Shifting the year to start in March puts the leap day at the end of the cycle, which is
+    /// what removes every special case from the arithmetic below.
+    private static long daysFromCivil(int year, int month, int day) {
+        long y = year;
+        y -= month <= 2 ? 1 : 0;
+        long era = (y >= 0 ? y : y - 399) / 400;
+        long yoe = y - era * 400;
+        long doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return era * 146097 + doe - 719468;
+    }
+
+    private static int daysInMonth(int year, int month) {
+        if (month == 2) {
+            boolean leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+            return leap ? 29 : 28;
+        }
+        if (month == 4 || month == 6 || month == 9 || month == 11) {
+            return 30;
+        }
+        return 31;
     }
 }

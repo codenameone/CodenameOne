@@ -572,6 +572,21 @@ public final class IOSAppIntentsBuilder {
                 sb.append('\\').append(c);
             } else if (c == '\n') {
                 sb.append("\\n");
+            } else if (c == '\r') {
+                // Swift ends a single-line literal at a carriage return exactly as it does at a
+                // newline, so letting one through unterminates the string and the iOS target
+                // fails to compile. A description written on Windows carries them in pairs.
+                sb.append("\\r");
+            } else if (c == '\t') {
+                sb.append("\\t");
+            } else if (c == '\0') {
+                sb.append("\\0");
+            } else if (c < 0x20 || c == 0x7f) {
+                // Every other control character has no literal spelling. Swift's numeric
+                // escape covers them all, and is what it documents for exactly this. Spelled
+                // in two pieces because Java expands a backslash-u sequence during lexing --
+                // in comments as well as in code, which is why this note avoids writing one.
+                sb.append("\\").append("u{").append(Integer.toHexString(c)).append("}");
             } else {
                 sb.append(c);
             }
