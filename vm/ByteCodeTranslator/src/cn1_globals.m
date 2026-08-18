@@ -3249,7 +3249,8 @@ static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
-static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOut) {
+static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOut,
+                              long long pendingBytes) {
     long trigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
     long base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER;
     // PROCESS BUDGET FIRST (issue #5537). Where the platform caps what this process
@@ -3289,13 +3290,24 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
         // allocate-and-drop workload in issue #5537 is essentially all of it.
         long ceiling = fm / 2;
         // The cap is the volume allowed BEFORE parking -- the park predicate is strictly
-        // greater -- and up to one check interval can be allocated unobserved on top of
-        // it, so BOTH have to fit in what is left. Reserving the interval only ever binds
-        // below 2 * CN1_PACING_CHECK_INTERVAL_BYTES, since half the headroom is already
-        // the tighter of the two above that; but in that last couple of MB it is the
-        // difference between pacing and dying with pacing enabled.
-        long absolute = fm - CN1_PACING_CHECK_INTERVAL_BYTES;
-        if(absolute < 0) absolute = 0;
+        // greater -- and more can be dirtied unobserved on top of it, so BOTH have to fit
+        // in what is left.
+        //
+        // How much more is NOT simply the check interval. The pacing check runs after the
+        // allocation is registered but before its caller writes to it, and calloc'd pages
+        // cost nothing until written, so the thread is about to dirty the whole block it
+        // just took -- pendingBytes -- however small the interval is. An 8MB array against
+        // 6MB of headroom would otherwise sail through a check that reserved 1MB and then
+        // dirty all 8MB with no further check. Reserve the larger of the two.
+        //
+        // When the pending block alone exceeds the headroom this drives the cap to zero,
+        // so the thread waits out a full cycle before dirtying anything. That cannot
+        // conjure memory the process does not have, but it is the most that can be done:
+        // it gives reclamation its best chance of making the block fit.
+        long long reserve = CN1_PACING_CHECK_INTERVAL_BYTES;
+        if(pendingBytes > reserve) reserve = pendingBytes;
+        long long absoluteLL = (long long)fm - reserve;
+        long absolute = absoluteLL > 0 ? (long)absoluteLL : 0;
         if(ceiling > absolute) ceiling = absolute;
         if(cap > ceiling) cap = ceiling;
         // ...but never pace so tightly that a genuinely-live heap makes no progress.
@@ -3334,9 +3346,10 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
 // never a permanent hang.
 //
 // Shared by both allocation paths, which is the point: they hold separate counters and
-// only the BiBOP one was ever paced (issue #5537). Each paces its own volume rather
-// than the sum, so no path gets a tighter bound than it had -- the legacy path simply
-// gains one it never had.
+// only the BiBOP one was ever paced (issue #5537). Under a budget they are paced against
+// the SUM of the two, since that is what spends the budget; without one they keep their
+// own separate bounds, so no path off iOS gets a tighter bound than it had -- the legacy
+// path simply gains one it never had. See cn1PacingVolume.
 // Which uncollected-volume counter a park is waiting on. The two are separate types
 // (the legacy one is long long: on the Windows LLP64 target long is 32-bit and it
 // accumulates raw allocation bytes), so the caller names the counter rather than
@@ -3344,16 +3357,31 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
 #define CN1_PACE_BIBOP  0
 #define CN1_PACE_LEGACY 1
 
-static long long cn1PacingVolume(int which) {
-    if(which == CN1_PACE_LEGACY) {
-        return atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
+static long long cn1PacingVolume(int which, JAVA_BOOLEAN bounded) {
+    long long bibop = (long long)atomic_load_explicit(&bibopBytesSinceGc,
+                                                      memory_order_relaxed);
+    long long legacy = atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
+    if(bounded) {
+        // Under a hard ceiling the two counters must be paced against their SUM, because
+        // the budget is a constraint on total footprint and both halves spend it. Pacing
+        // them separately against the same cap lets each path run a full cap ahead, so
+        // the process can hold 2 * cap of fresh dirty memory -- and since the clamp sets
+        // cap near fm/2, that is the entire remaining budget, which is exactly what the
+        // clamp exists to prevent.
+        return bibop + legacy;
     }
-    return (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed);
+    // With no ceiling there is nothing to divide up, and summing here would tighten the
+    // BiBOP path everywhere off iOS -- a behaviour change this fix has no business
+    // making. Each path keeps the bound it had.
+    if(which == CN1_PACE_LEGACY) {
+        return legacy;
+    }
+    return bibop;
 }
 
-static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which) {
+static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendingBytes) {
     JAVA_BOOLEAN bounded = JAVA_FALSE;
-    long cap = cn1BibopPacingCap(threadStateData, &bounded);
+    long cap = cn1BibopPacingCap(threadStateData, &bounded, pendingBytes);
     // The legacy path's backpressure is NEW, and it exists to keep a process inside a
     // hard ceiling. Applying it where there is no ceiling would change behaviour on
     // every other target for no benefit -- and it would engage readily, because
@@ -3365,7 +3393,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which) {
     if(which == CN1_PACE_LEGACY && !bounded) {
         return;
     }
-    if(cn1PacingVolume(which) <= (long long)cap ||
+    if(cn1PacingVolume(which, bounded) <= (long long)cap ||
        get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
         return;
     }
@@ -3401,7 +3429,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which) {
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     threadStateData->threadActive = JAVA_FALSE;
     int spins = 0;
-    while(cn1PacingVolume(which) > (long long)cap &&
+    while(cn1PacingVolume(which, bounded) > (long long)cap &&
           get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
           spins++ < 200000) {
         usleep(50);
@@ -3463,7 +3491,9 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
         threadStateData->nativeAllocationMode = wasNam;
     }
 #ifndef CN1_BIBOP_NO_PACING
-    cn1PacingPark(threadStateData, CN1_PACE_BIBOP);
+    // 0 pending: a BiBOP thread dirties at most one CN1_BIBOP_PAGE_SIZE page before its
+    // next page-acquire check, which the interval reservation already covers.
+    cn1PacingPark(threadStateData, CN1_PACE_BIBOP, 0);
 #endif
 }
 
@@ -6055,7 +6085,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
        && !threadStateData->nativeAllocationMode
 #endif
        ) {
-        cn1PacingPark(threadStateData, CN1_PACE_LEGACY);
+        cn1PacingPark(threadStateData, CN1_PACE_LEGACY, (long long)size);
     }
 #endif
 #endif
