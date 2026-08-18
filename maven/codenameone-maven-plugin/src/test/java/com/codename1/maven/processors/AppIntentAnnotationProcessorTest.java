@@ -1101,6 +1101,56 @@ public class AppIntentAnnotationProcessorTest {
         return classes;
     }
 
+    /// Only the method name is recorded, so the generated call resolves by overload rules
+    /// rather than by which method carried the annotation: annotating byId(int) beside an
+    /// unannotated byId(String) built a call that compiled, ran, and invoked the method the
+    /// developer did not mark.
+    @Test
+    public void anEntityQueryWithTheWrongSignatureIsRejected() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Playlist",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "@IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "public class Playlist {\n"
+                                + "  @EntityId public String getId() { return \"1\"; }\n"
+                                + "  @EntityTitle public String getName() { return \"Focus\"; }\n"
+                                + "  public static Playlist byId(String id) { return null; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "  public static Playlist byId(int id) { return null; }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        assertError(classes, "wrong signature");
+    }
+
+    @Test
+    public void correctlyShapedEntityQueriesAreAccepted() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Playlist",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "import java.util.List;\n"
+                                + "@IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "public class Playlist {\n"
+                                + "  @EntityId public String getId() { return \"1\"; }\n"
+                                + "  @EntityTitle public String getName() { return \"Focus\"; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "  public static Playlist byId(String id) { return null; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.SUGGESTED)\n"
+                                + "  public static List<Playlist> recent() { return null; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.SEARCH)\n"
+                                + "  public static List<Playlist> matching(String q) { return null; }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        run(classes, true);
+
+        assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
     /// Keeping the later of two same-kind queries picks a resolver by declaration order, which
     /// nobody chose -- and for BY_ID it decides what every entity id in the app resolves to.
     @Test

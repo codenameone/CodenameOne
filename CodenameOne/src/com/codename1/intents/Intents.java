@@ -1380,8 +1380,17 @@ public final class Intents {
                 // had the platform told it failed, and moving the user's screen afterwards
                 // contradicts that -- the app foregrounding itself onto a new form for an
                 // action the assistant just said did not happen.
-                if (guard.complete(o.result)) {
-                    navigateIfRequested(o.result, o.declaration, o.params);
+                //
+                // Claimed, then navigated, then reported: the report releases the Android
+                // service's latch and that service tears down the runtime this navigation is
+                // using. try/finally because a failure to navigate must not leave the platform
+                // waiting forever for an answer that is already decided.
+                if (guard.claim()) {
+                    try {
+                        navigateIfRequested(o.result, o.declaration, o.params);
+                    } finally {
+                        guard.deliver(o.result);
+                    }
                 }
             }
         };
@@ -1444,16 +1453,26 @@ public final class Intents {
             }
         }
 
-        /// Reports the outcome exactly once. Returns true when this caller is the one that
-        /// did, which is also what decides whether it may act on the result.
-        boolean complete(IntentResult result) {
+        /// Claims the right to report this invocation, without reporting it yet.
+        ///
+        /// Split from the delivery because the completion is what releases the Android
+        /// service's latch, and that service then tears down the only runtime in the process.
+        /// Firing it before navigation meant stopContext could run concurrently with
+        /// foregrounding and route dispatch, so the destination sometimes never appeared.
+        /// Claiming first still stops the timeout thread from reporting a failure underneath us.
+        boolean claim() {
             synchronized (this) {
                 if (done) {
                     return false;
                 }
                 done = true;
                 notifyAll();
+                return true;
             }
+        }
+
+        /// Reports an outcome this caller has already claimed.
+        void deliver(IntentResult result) {
             if (completion != null) {
                 try {
                     completion.onIntentResult(result == null ? IntentResult.ok() : result);
@@ -1461,6 +1480,15 @@ public final class Intents {
                     logError(t);
                 }
             }
+        }
+
+        /// Reports the outcome exactly once. Returns true when this caller is the one that
+        /// did, which is also what decides whether it may act on the result.
+        boolean complete(IntentResult result) {
+            if (!claim()) {
+                return false;
+            }
+            deliver(result);
             return true;
         }
     }

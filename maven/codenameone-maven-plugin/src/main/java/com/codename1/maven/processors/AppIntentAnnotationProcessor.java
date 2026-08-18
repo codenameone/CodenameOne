@@ -258,6 +258,19 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                         + " instance of your class in existence");
                 continue;
             }
+            String expected = expectedQueryDescriptor(kind, cls.getBinaryName());
+            if (expected != null && !expected.equals(m.getDescriptor())) {
+                // Only the method *name* is recorded, so the generated call resolves by
+                // overload rules rather than by which method carried the annotation. Annotating
+                // byId(int) beside an unannotated byId(String) therefore built a call that
+                // compiled, ran, and invoked the method the developer did not mark.
+                ctx.error(cls, "@EntityQuery(" + kind + ") on " + cls.getBinaryName() + "."
+                        + m.getName() + " has the wrong signature. Expected "
+                        + describeQuery(kind, cls.getBinaryName()) + ", found " + m.getDescriptor()
+                        + ". The generated code calls this by name, so an overload with the "
+                        + "right shape would be invoked instead of the one you annotated.");
+                continue;
+            }
             String existing = def.queries.get(kind);
             if (existing != null) {
                 // Silently keeping the later one picks a resolver by declaration order, which
@@ -279,6 +292,38 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                     + " framework cannot do without");
         }
         entities.put(type, def);
+    }
+
+    /// The descriptor an `@EntityQuery` method of this kind must have, or null when the kind
+    /// is not one this framework generates a call for.
+    ///
+    /// BY_ID takes the id and returns the entity; SUGGESTED takes nothing and SEARCH takes the
+    /// query string, both returning a List. Checked because only the name is recorded, so a
+    /// mismatch does not fail to compile -- it silently calls a different overload.
+    private static String expectedQueryDescriptor(String kind, String binaryName) {
+        String entity = "L" + binaryName.replace('.', '/') + ";";
+        if ("BY_ID".equals(kind)) {
+            return "(Ljava/lang/String;)" + entity;
+        }
+        if ("SUGGESTED".equals(kind)) {
+            return "()Ljava/util/List;";
+        }
+        if ("SEARCH".equals(kind)) {
+            return "(Ljava/lang/String;)Ljava/util/List;";
+        }
+        return null;
+    }
+
+    /// The same shape, written the way a developer wrote it.
+    private static String describeQuery(String kind, String binaryName) {
+        String simple = binaryName.substring(binaryName.lastIndexOf('.') + 1).replace('$', '.');
+        if ("BY_ID".equals(kind)) {
+            return "public static " + simple + " <name>(String id)";
+        }
+        if ("SUGGESTED".equals(kind)) {
+            return "public static List<" + simple + "> <name>()";
+        }
+        return "public static List<" + simple + "> <name>(String query)";
     }
 
     /// Finds the single member carrying `descriptor`, reporting a clear error

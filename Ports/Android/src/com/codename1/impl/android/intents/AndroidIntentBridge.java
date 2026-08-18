@@ -447,8 +447,9 @@ public class AndroidIntentBridge implements IntentBridge {
                         com.codename1.intents.Intents.getDeclaration(targetId);
                 label = decl == null ? intentId : decl.getTitle();
             }
+            // A donation is the app saying the user just did this, so it reports usage.
             pushShortcut(ctx, intentId, label, label,
-                    uriFor(targetId, effectiveParams, ctx), null);
+                    uriFor(targetId, effectiveParams, ctx), null, true);
         } catch (Throwable t) {
             Log.w(TAG, "Could not donate " + intentId, t);
         }
@@ -491,8 +492,9 @@ public class AndroidIntentBridge implements IntentBridge {
                 if (nonce != null) {
                     openUri += "&n=" + Uri.encode(nonce);
                 }
+                // Indexing publishes content the user has not necessarily touched.
                 pushShortcut(ctx, uid, title, subtitle, Uri.parse(openUri),
-                        imageFor(images, imageName));
+                        imageFor(images, imageName), false);
                 synchronized (indexed) {
                     if (!indexed.contains(uid)) {
                         indexed.add(uid);
@@ -632,8 +634,15 @@ public class AndroidIntentBridge implements IntentBridge {
     // ------------------------------------------------------------------
 
     @TargetApi(Build.VERSION_CODES.N_MR1)
+    /// Publishes a shortcut, and reports usage only when the app is telling the system the
+    /// user just did this.
+    ///
+    /// `reportShortcutUsed` is a ranking signal meaning "invoked": calling it while indexing
+    /// content told the launcher that every published entity had been used, which competes with
+    /// genuinely used shortcuts for placement and can evict them. Indexing publishes content;
+    /// donation reports an action.
     private void pushShortcut(Context ctx, String id, String shortLabel, String longLabel,
-                               Uri data, byte[] png) {
+                               Uri data, byte[] png, boolean report) {
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
             return;
@@ -696,10 +705,12 @@ public class AndroidIntentBridge implements IntentBridge {
                 Log.i(TAG, "At the shortcut limit; not publishing " + id);
             }
         }
-        try {
-            manager.reportShortcutUsed(id);
-        } catch (Throwable ignored) {
-            // Usage reporting is a hint to the launcher, never load bearing.
+        if (report) {
+            try {
+                manager.reportShortcutUsed(id);
+            } catch (Throwable ignored) {
+                // Usage reporting is a hint to the launcher, never load bearing.
+            }
         }
     }
 
