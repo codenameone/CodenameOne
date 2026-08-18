@@ -721,12 +721,21 @@ public class BufferedGraphics extends HTML5Graphics {
     @Override
     public void lensRegion(int x, int y, int width, int height, float cornerRadius, float magnify,
             float aberration, int tintColor, float tintStrength) {
+        // A lens magnifies, tints and aberrates what is under it. Promoted text is not under it,
+        // so the selected tab's label would float over the effect untouched instead of being
+        // drawn through it. Back to the canvas, where the lens can reach it.
+        noteCanvasCover(x, y, width, height, cornerRadius > 0
+                ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
+                : null);
         addOp(new com.codename1.impl.html5.graphics.LensRegion(x, y, width, height, cornerRadius,
                 magnify, aberration, tintColor, tintStrength));
     }
 
     @Override
     public void clearRect(int x, int y, int width, int height) {
+        // Erasing the canvas erases nothing in the layer above it, so text promoted out of this
+        // region would go on showing over pixels that were wiped.
+        noteCanvasCover(x, y, width, height);
         primitiveRenderAdapter.clearRect(x, y, width, height);
     }
     
