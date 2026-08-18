@@ -3349,10 +3349,19 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which) {
     // cap drops well below those -- which is precisely the near-ceiling case this exists
     // for. Without this, a thread with a 4MB cap and 3MB of uncollected volume would
     // find nothing scheduled, spin out its whole 10s safety budget, and resume with no
-    // reclamation even begun, once per check. Requesting a cycle here is cheap (a lock
-    // and a notify, guarded so it happens only when we are actually about to wait) and
-    // is what makes the backpressure produce reclamation rather than just delay.
-    if(!gcCurrentlyRunning) {
+    // reclamation even begun, once per check.
+    //
+    // UNCONDITIONAL, deliberately: a running cycle is not a cycle that will help us. The
+    // counter is reset by cn1BibopBeginGcCycle at the START of a cycle, so the bytes that
+    // brought us here were charged AFTER the running cycle's reset and only the NEXT
+    // cycle can clear them. Skipping the request while one is in flight is therefore the
+    // same stall in a different disguise, and it is the case a paced thread hits most --
+    // it parks precisely when the collector is busy. Requesting during a cycle is also
+    // exactly how a follow-up is booked: System.gc() sets forceGc, and the collector
+    // loop tests it after gcMarkSweep() returns, taking LOCK.wait(200) instead of
+    // LOCK.wait(30000). The cost is a lock and a notify on a path that is about to sleep
+    // anyway.
+    {
         JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
         threadStateData->nativeAllocationMode = JAVA_TRUE;
         java_lang_System_gc__(threadStateData);
