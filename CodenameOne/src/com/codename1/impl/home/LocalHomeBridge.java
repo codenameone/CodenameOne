@@ -1231,8 +1231,20 @@ public class LocalHomeBridge implements HomeBridge {
                         trait));
             } else {
                 values.put(k, value);
-                changed.add(TraitReading.of(accessoryId, serviceId, trait,
-                        value, System.currentTimeMillis()));
+                // Stored, and reported as absent while the thermostat is in
+                // AUTO. The single setpoint means nothing there -- readOne()
+                // says so, and so does the device -- so a scripted setpoint
+                // announced as a value put a number in front of a user that
+                // an immediate read denied the existence of. The value is
+                // kept because leaving AUTO brings it back.
+                if (Trait.TARGET_TEMPERATURE.getId().equals(trait.getId())
+                        && inAutoMode(accessoryId, serviceId)) {
+                    changed.add(TraitReading.absent(accessoryId, serviceId,
+                            trait));
+                } else {
+                    changed.add(TraitReading.of(accessoryId, serviceId, trait,
+                            value, System.currentTimeMillis()));
+                }
             }
             appendDerivedTargetChange(changed, accessoryId, serviceId, trait);
         }

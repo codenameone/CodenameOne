@@ -311,6 +311,42 @@ class LocalHomeTest {
     }
 
     /**
+     * A scripted setpoint on a thermostat in AUTO is announced as absent.
+     *
+     * <p>A read of the single setpoint answers absent in AUTO -- there are
+     * two thresholds there and no single target -- and the device says the
+     * same. Announced as a value, the simulator put a number in front of a
+     * UI that the very next read denied the existence of, which is the one
+     * disagreement between simulator and device that a test written against
+     * the simulator cannot see.</p>
+     */
+    @Test
+    void aScriptedSetpointIsAbsentWhileTheThermostatIsInAuto() {
+        Accessory thermostat = home.findAccessory("thermostat");
+        AccessoryService svc = thermostat.getPrimaryService();
+        AtomicReference<TraitChangeBatch> seen =
+                new AtomicReference<TraitChangeBatch>();
+        TraitSubscription sub = home.subscribe(
+                new SubscriptionRequest()
+                        .add(thermostat, svc, Trait.TARGET_TEMPERATURE)
+                        .setMinIntervalMillis(0),
+                seen::set);
+
+        bridge.setValue("thermostat", svc.getId(), Trait.TARGET_TEMPERATURE,
+                TraitValue.of(21, TraitUnit.CELSIUS));
+        settled(home.drainChanges());
+
+        assertNotNull(seen.get());
+        assertFalse(seen.get().getReadings().get(0).hasValue(),
+                "a thermostat in AUTO has no single target, and the read"
+                        + " agrees -- so neither may the change");
+        assertFalse(settled(home.read(thermostat, svc,
+                        Trait.TARGET_TEMPERATURE)).get().hasValue(),
+                "and the read has to keep saying so");
+        sub.stop();
+    }
+
+    /**
      * A batch is a state update, not an event log: within the window the
      * newest value per trait is what survives.
      */
