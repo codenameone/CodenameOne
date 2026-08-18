@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -165,6 +166,14 @@ class ProcessBudgetPacingIntegrationTest {
      * iOS host-wide headroom yields a gigabyte-scale cap.</p>
      */
     private static final long STATIC_CAP_FLOOR_KB = 3 * 24 * 1024;
+
+    /**
+     * Bound on a single translated-binary run. The workload takes a few seconds; this is
+     * two orders of magnitude above that, so it can only be reached by a run that is not
+     * progressing. Generous on purpose -- it exists to turn a stall into a failure, not
+     * to police performance.
+     */
+    private static final long VM_RUN_TIMEOUT_SECONDS = 300;
 
     @Test
     void anAllocatingThreadStaysInsideTheProcessMemoryBudget() throws Exception {
@@ -437,18 +446,66 @@ class ProcessBudgetPacingIntegrationTest {
         return output;
     }
 
+    /**
+     * Runs the translated binary under a bounded wait, draining its output on a separate
+     * thread.
+     *
+     * <p>Both halves matter here and neither is boilerplate. The behaviour under test is
+     * a thread PARKING, and the failure mode of a broken park is a stall -- a run that
+     * exhausts its 10s pacing spin on every check, or deadlocks outright. Collecting the
+     * stream on this thread would block until the child closed stdout, so that stall
+     * would hang the surefire fork until the CI job's global timeout instead of failing:
+     * the guard would stop reporting a regression and start eating the build. The wait is
+     * therefore bounded and the child is killed on expiry.</p>
+     *
+     * <p>And the drain has to be concurrent rather than after the wait, or a child that
+     * fills the pipe buffer blocks in write() while we block in waitFor(). Draining as we
+     * go also means a killed run still yields whatever it printed, which is the only
+     * diagnostic a stalled run leaves behind.</p>
+     */
     private String runVm(Path executable, Path workingDir, Map<String, String> env) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(executable.toString());
         builder.directory(workingDir.toFile());
         builder.environment().putAll(env);
         builder.redirectErrorStream(true);
-        Process process = builder.start();
-        String output;
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            output = reader.lines().collect(Collectors.joining("\n"));
+        final Process process = builder.start();
+
+        final StringBuilder captured = new StringBuilder();
+        Thread drain = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    synchronized (captured) {
+                        captured.append(line).append('\n');
+                    }
+                }
+            } catch (Exception e) {
+                // The stream ends abruptly when we destroy a timed-out child. Whatever was
+                // captured before that is exactly what we want to report.
+            }
+        });
+        drain.setDaemon(true);
+        drain.start();
+
+        boolean exited = process.waitFor(VM_RUN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        if (!exited) {
+            process.destroyForcibly();
+            process.waitFor(10, TimeUnit.SECONDS);
         }
-        assertEquals(0, process.waitFor(),
+        drain.join(10_000);
+        String output;
+        synchronized (captured) {
+            output = captured.toString();
+        }
+
+        assertTrue(exited,
+                "ParparVM run did not finish within " + VM_RUN_TIMEOUT_SECONDS + "s (env "
+                        + env + "). For this guard that is a result, not an infrastructure"
+                        + " problem: the behaviour under test is a thread parking, and a"
+                        + " park that waits on a collection nobody scheduled stalls exactly"
+                        + " like this. Output so far: " + output);
+        assertEquals(0, process.exitValue(),
                 "ParparVM run should exit cleanly (env " + env + "). Output: " + output);
         return output;
     }

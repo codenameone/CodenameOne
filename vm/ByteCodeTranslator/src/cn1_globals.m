@@ -3288,15 +3288,26 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
         // It reopens on its own as the collector hands memory back, which for the
         // allocate-and-drop workload in issue #5537 is essentially all of it.
         long ceiling = fm / 2;
+        // The cap is the volume allowed BEFORE parking -- the park predicate is strictly
+        // greater -- and up to one check interval can be allocated unobserved on top of
+        // it, so BOTH have to fit in what is left. Reserving the interval only ever binds
+        // below 2 * CN1_PACING_CHECK_INTERVAL_BYTES, since half the headroom is already
+        // the tighter of the two above that; but in that last couple of MB it is the
+        // difference between pacing and dying with pacing enabled.
+        long absolute = fm - CN1_PACING_CHECK_INTERVAL_BYTES;
+        if(absolute < 0) absolute = 0;
+        if(ceiling > absolute) ceiling = absolute;
         if(cap > ceiling) cap = ceiling;
         // ...but never pace so tightly that a genuinely-live heap makes no progress.
         // A heap with nothing left to reclaim would otherwise spend the full 10s spin
         // budget at every page acquire, turning a memory problem into an apparent hang.
-        // The floor is itself capped by what remains: authorizing 4MB of fresh garbage
-        // with 2MB left to live is just a slower way to be killed, and a thread that
-        // parks instead still has the spin's own safety cap as its escape hatch.
+        // The floor is bounded by the ceiling just computed and never by fm itself: a
+        // floor of fm authorizes the entire remaining budget as fresh garbage, which is
+        // pacing that guarantees the death it exists to prevent. Where there is no room
+        // for the floor the cap goes to zero and the thread parks on every check, which
+        // is correct -- and the spin's own safety cap remains its escape hatch.
         long floor = CN1_PACING_MIN_CAP;
-        if(floor > fm) floor = fm;
+        if(floor > ceiling) floor = ceiling;
         if(cap < floor) cap = floor;
     }
     if(cn1PacingTraceOn()) {
