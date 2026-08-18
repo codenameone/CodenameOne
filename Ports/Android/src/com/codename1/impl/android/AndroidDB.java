@@ -292,6 +292,14 @@ public class AndroidDB extends Database {
      */
     @Override
     public void changeKey(DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            // Asked to make a plaintext database plaintext. There is nothing for an engine to do,
+            // and every port that re-keys in place accepts it as the no-op it is -- so refusing it
+            // here would make Android the one platform where removing a key from a database that
+            // has none is an error.
+            checkOpen();
+            return;
+        }
         throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
                 "This connection was opened through the platform SQLite engine, which has no "
                 + "cipher, so it cannot re-key itself. Close it and call Database.encrypt(name, "
