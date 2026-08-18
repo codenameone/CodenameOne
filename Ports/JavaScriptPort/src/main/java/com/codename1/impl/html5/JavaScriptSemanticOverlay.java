@@ -28,6 +28,7 @@ import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.html5.js.dom.HTMLInputElement;
+import com.codename1.html5.js.dom.HTMLTextAreaElement;
 import com.codename1.ui.Component;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.accessibility.AccessibilityAction;
@@ -102,6 +103,12 @@ public final class JavaScriptSemanticOverlay {
      * changes between masked and revealed is noticed on the next snapshot.
      */
     private static final String ATTRIBUTE_OBSCURED = "data-cn1-obscured";
+
+    /**
+     * Marks a SET_TEXT control built as a textarea, since an element cannot change tag: a field
+     * that becomes multiline needs its control built again rather than reconfigured.
+     */
+    private static final String ATTRIBUTE_MULTILINE = "data-cn1-multiline";
 
     /**
      * Retained state for a single semantic node. Everything the diff needs to decide whether a
@@ -604,13 +611,26 @@ public final class JavaScriptSemanticOverlay {
             }
             String label = controlLabel(action, node);
             HTMLElement existing = entry.customActions.get(action.getId());
+            if (existing != null && staleControlShape(existing, action.getId(), node)) {
+                // An input cannot become a textarea, so a field that turned multiline is given a
+                // control that can hold the line breaks its value now has.
+                actionsContainer().removeChild(existing);
+                entry.customActions.remove(action.getId());
+                if (entry.customActionLabels != null) {
+                    entry.customActionLabels.remove(action.getId());
+                }
+                existing = null;
+            }
             if (existing != null) {
                 // An application can replace an action with the same id and a new label -- an
                 // Expand that becomes a Collapse. Without this the retained button keeps
                 // announcing the old wording until the action is removed entirely.
                 if (!label.equals(entry.customActionLabels.get(action.getId()))) {
                     existing.setAttribute("aria-label", label);
-                    if (!(existing instanceof HTMLInputElement)) {
+                    if (!AccessibilityAction.SET_TEXT.equals(action.getId())) {
+                        // A control that carries a value is named by aria-label alone: its text
+                        // content IS its value for a textarea, and writing the label there would
+                        // replace what the field holds with the name of the control.
                         existing.setTextContent(label);
                     }
                     entry.customActionLabels.put(action.getId(), label);
@@ -720,23 +740,29 @@ public final class JavaScriptSemanticOverlay {
     private HTMLElement createSetTextControl(Entry entry, AccessibilityNodeSnapshot node,
             final AccessibilityAction action, String label) {
         final long nodeId = entry.id;
-        final HTMLInputElement input = (HTMLInputElement) document.createElement("input");
-        // An obscured field's contents must never be written into the document, so its control
-        // is a password input that starts empty: it can set a new value without ever carrying
-        // the old one.
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
-        input.setAttribute("type", obscured ? "password" : "text");
-        if (obscured) {
-            input.setAttribute(ATTRIBUTE_OBSCURED, "1");
+        // A multiline field's value has line breaks in it, and an input cannot hold one: what a
+        // screen-reader user typed would arrive with its lines run together. An obscured field
+        // is single-line by nature and keeps the masking input.
+        boolean multiline = !obscured && node.getMultiline() != null
+                && node.getMultiline().booleanValue();
+        final HTMLElement control = document.createElement(multiline ? "textarea" : "input");
+        if (multiline) {
+            control.setAttribute(ATTRIBUTE_MULTILINE, "1");
+        } else {
+            control.setAttribute("type", obscured ? "password" : "text");
+            if (obscured) {
+                control.setAttribute(ATTRIBUTE_OBSCURED, "1");
+            }
         }
-        input.setAttribute("aria-label", label);
+        control.setAttribute("aria-label", label);
         String owner = ownerId(entry);
-        input.setAttribute("aria-controls", owner);
-        input.setAttribute("aria-describedby", owner);
+        control.setAttribute("aria-controls", owner);
+        control.setAttribute("aria-describedby", owner);
         if (!obscured) {
-            input.setValue(textEntryValue(node));
+            setControlValue(control, textEntryValue(node));
         }
-        input.getStyle().setCssText(
+        control.getStyle().setCssText(
                 "position:absolute;opacity:0.001;pointer-events:none;width:1px;height:1px;");
         EventListener commit = new EventListener() {
             @Override
@@ -744,30 +770,82 @@ public final class JavaScriptSemanticOverlay {
                 // The overlay root carries handlers of its own, and this is not one of the
                 // node's own actions -- it must not read as input on anything above it.
                 event.stopPropagation();
-                dispatcher.performAction(nodeId, action.getId(), input.getValue());
+                dispatcher.performAction(nodeId, action.getId(), controlValue(control));
             }
         };
         // change fires when the user leaves the field, which is when a screen reader in forms
         // mode has finished; input covers assistive technology that sets the value outright and
         // never sends a change.
-        input.addEventListener("change", commit);
-        input.addEventListener("input", commit);
+        control.addEventListener("change", commit);
+        control.addEventListener("input", commit);
         // Marked on the element rather than compared against document.activeElement, which this
         // port's document binding does not expose.
-        input.addEventListener("focus", new EventListener() {
+        control.addEventListener("focus", new EventListener() {
             @Override
             public void handleEvent(Event event) {
-                input.setAttribute(ATTRIBUTE_EDITING, "1");
+                control.setAttribute(ATTRIBUTE_EDITING, "1");
             }
         });
-        input.addEventListener("blur", new EventListener() {
+        control.addEventListener("blur", new EventListener() {
             @Override
             public void handleEvent(Event event) {
-                input.removeAttribute(ATTRIBUTE_EDITING);
+                control.removeAttribute(ATTRIBUTE_EDITING);
             }
         });
-        actionsContainer().appendChild(input);
-        return input;
+        actionsContainer().appendChild(control);
+        return control;
+    }
+
+    /**
+     * True when a retained SET_TEXT control no longer has the shape its field needs.
+     *
+     * <p>Only the tag matters here: masking is an attribute an input can be given, but an input
+     * cannot become a textarea, so that change means building the control again.</p>
+     *
+     * @param element the retained control
+     * @param actionId the action it performs
+     * @param node the field's current snapshot
+     * @return true when the control has to be replaced
+     */
+    private boolean staleControlShape(HTMLElement element, String actionId,
+            AccessibilityNodeSnapshot node) {
+        if (!AccessibilityAction.SET_TEXT.equals(actionId)) {
+            return false;
+        }
+        boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
+        boolean multiline = !obscured && node.getMultiline() != null
+                && node.getMultiline().booleanValue();
+        return multiline != (element.getAttribute(ATTRIBUTE_MULTILINE) != null);
+    }
+
+    /**
+     * Reads a SET_TEXT control's value, whichever element it was built as.
+     *
+     * @param element the control
+     * @return what it holds, never null
+     */
+    private static String controlValue(HTMLElement element) {
+        // Which element this is was recorded when it was built, rather than asked of the object:
+        // the interop types are interfaces over the same host object, so a type test says
+        // nothing about which tag was created.
+        String value = element.getAttribute(ATTRIBUTE_MULTILINE) != null
+                ? ((HTMLTextAreaElement) element).getValue()
+                : ((HTMLInputElement) element).getValue();
+        return value == null ? "" : value;
+    }
+
+    /**
+     * Writes a SET_TEXT control's value, whichever element it was built as.
+     *
+     * @param element the control
+     * @param value the value to show
+     */
+    private static void setControlValue(HTMLElement element, String value) {
+        if (element.getAttribute(ATTRIBUTE_MULTILINE) != null) {
+            ((HTMLTextAreaElement) element).setValue(value);
+        } else {
+            ((HTMLInputElement) element).setValue(value);
+        }
     }
 
     /**
@@ -782,22 +860,21 @@ public final class JavaScriptSemanticOverlay {
      */
     private void syncSetTextControl(HTMLElement element, String actionId,
             AccessibilityNodeSnapshot node) {
-        if (!AccessibilityAction.SET_TEXT.equals(actionId)
-                || !(element instanceof HTMLInputElement)) {
+        if (!AccessibilityAction.SET_TEXT.equals(actionId)) {
             return;
         }
-        HTMLInputElement input = (HTMLInputElement) element;
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
-        if (obscured != (element.getAttribute(ATTRIBUTE_OBSCURED) != null)) {
+        if (obscured != (element.getAttribute(ATTRIBUTE_OBSCURED) != null)
+                && element.getAttribute(ATTRIBUTE_MULTILINE) == null) {
             // A field can be masked and revealed while it stays in the tree -- the eye button on
             // a password field. A control left as it was would either keep typing in the clear
             // into a field that is now a secret, or go on masking one that no longer is.
-            input.setAttribute("type", obscured ? "password" : "text");
+            element.setAttribute("type", obscured ? "password" : "text");
             if (obscured) {
                 element.setAttribute(ATTRIBUTE_OBSCURED, "1");
                 // Cleared even mid-edit: what it holds became a secret, and a secret does not
                 // stay in the document waiting for focus to leave.
-                input.setValue("");
+                setControlValue(element, "");
             } else {
                 element.removeAttribute(ATTRIBUTE_OBSCURED);
             }
@@ -811,8 +888,8 @@ public final class JavaScriptSemanticOverlay {
             return;
         }
         String value = textEntryValue(node);
-        if (!value.equals(input.getValue())) {
-            input.setValue(value);
+        if (!value.equals(controlValue(element))) {
+            setControlValue(element, value);
         }
     }
 
