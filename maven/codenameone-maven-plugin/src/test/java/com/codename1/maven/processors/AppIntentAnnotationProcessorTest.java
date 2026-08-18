@@ -738,6 +738,18 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// Both arguments would read the same map key, so the handler runs with the same value
+    /// twice and the tool schema keeps one property -- leaving a model no way to supply them
+    /// independently even though the signature says it can.
+    @Test
+    public void twoParametersCannotShareAName() throws Exception {
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(\"kind\") String a,\n"
+                        + "        @IntentParam(\"kind\") String b) { }\n")),
+                "declares two parameters named");
+    }
+
     /// The string form accepts only true/false/1/0 and a declared default only 0 or 1, so a
     /// number was the one place a value nobody defined became a confident yes.
     @Test

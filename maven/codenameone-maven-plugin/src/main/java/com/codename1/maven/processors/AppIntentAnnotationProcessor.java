@@ -519,6 +519,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                         + "rejected by the vocabulary the same declaration defines.");
                 continue;
             }
+            if (def.param(pd.name) != null) {
+                // Both arguments would read the same map key, so the handler runs with the same
+                // value twice, and the tool schema keeps one property -- leaving a model no way
+                // to supply them independently even though the signature says it can.
+                ctx.error(cls, "@AppIntent " + def.where + " declares two parameters named \""
+                        + pd.name + "\". Parameter names are the keys a caller supplies, so they "
+                        + "have to be distinct.");
+                continue;
+            }
             def.params.add(pd);
         }
     }

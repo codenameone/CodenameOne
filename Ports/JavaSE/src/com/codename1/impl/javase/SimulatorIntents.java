@@ -307,7 +307,21 @@ class SimulatorIntents {
             }
             choices.addAll(p.getOptions());
             String[] opts = choices.toArray(new String[choices.size()]);
-            return new ChoiceEditor(new JComboBox(new DefaultComboBoxModel(opts)), opts);
+            JComboBox box = new JComboBox(new DefaultComboBoxModel(opts));
+            // A declared default is what the runtime substitutes for an omitted value, so it is
+            // where the form starts -- otherwise Run submits the first option and quietly
+            // exercises a different request. The blank entry above covers the no-default case;
+            // this covers the rest.
+            String declared = p.getDefaultValue() == null ? "" : p.getDefaultValue();
+            if (declared.length() > 0) {
+                for (int i = 0; i < opts.length; i++) {
+                    if (declared.equals(opts[i])) {
+                        box.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+            return new ChoiceEditor(box, opts);
         }
         if (p.getType() == IntentParameterType.BOOLEAN) {
             // Seeded from the declaration. An unchecked box always submits false, and because
