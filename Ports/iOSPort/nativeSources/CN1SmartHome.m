@@ -1816,13 +1816,44 @@ static void cn1homeRebindWatches(NSString *accessoryId) {
     }
 }
 
+/// Whether anything still needs this characteristic's notifications.
+///
+/// #### Parameters
+///
+/// - `subscriptionId`: the subscription the state key belongs to
+///
+/// - `key`: "accessoryId \t serviceId \t traitId"
+///
+/// #### Returns
+///
+/// `true` while that subscription still watches it, or depends on it
+static BOOL cn1homeStillNeeded(NSString *subscriptionId, NSString *key) {
+    return [[cn1homeWatches objectForKey:subscriptionId] containsObject:key]
+            || [[cn1homeDependencies objectForKey:subscriptionId]
+                containsObject:key];
+}
+
 /// Tries the notification registration again, and forgets the polling state
 /// once it takes.
 ///
 /// Separated out so the caller can order it after a live read: the two
 /// completions ran concurrently once, and clearing the baseline out from
 /// under an in-flight read is how a change went missing.
-static void cn1homeRetryNotification(HMCharacteristic *c, NSString *stateKey) {
+///
+/// The liveness check is not the caller's: a read can be in flight when the
+/// screen closes, and unsubscribe turns the notification off on its way out.
+/// Retrying afterwards would turn it back on for a characteristic nobody
+/// watches, and nothing would ever turn it off again -- so an open-and-close
+/// during a recovery pass leaves HomeKit traffic running for the life of the
+/// process.
+static void cn1homeRetryNotification(HMCharacteristic *c,
+                                     NSString *subscriptionId, NSString *key,
+                                     NSString *stateKey) {
+    if (!cn1homeStillNeeded(subscriptionId, key)) {
+        [cn1homeNotifyFailed removeObject:stateKey];
+        [cn1homeLastPolled removeObjectForKey:stateKey];
+        return;
+    }
     [c enableNotification:YES completionHandler:^(NSError *error) {
         if (error != nil) {
             return;
@@ -1870,8 +1901,7 @@ static void cn1homeRunRecovery(void) {
         // the setpoint's update, so that is what gets delivered below.
         BOOL isDependency = ![watched containsObject:key]
                 && [depends containsObject:key];
-        if (!isDependency && (watched == nil
-                              || ![watched containsObject:key])) {
+        if (!cn1homeStillNeeded(subscriptionId, key)) {
             // The subscription went away. Nothing to recover, and leaving it
             // here would keep the timer alive for the life of the process.
             [cn1homeNotifyFailed removeObject:stateKey];
@@ -1887,7 +1917,7 @@ static void cn1homeRunRecovery(void) {
             continue;
         }
         if (![[c properties] containsObject:HMCharacteristicPropertyReadable]) {
-            cn1homeRetryNotification(c, stateKey);
+            cn1homeRetryNotification(c, subscriptionId, key, stateKey);
             continue;
         }
         // The read first, and the retry only once it has answered. Issued
@@ -1935,7 +1965,7 @@ static void cn1homeRunRecovery(void) {
                     }
                 }
             }
-            cn1homeRetryNotification(c, stateKey);
+            cn1homeRetryNotification(c, subscriptionId, key, stateKey);
         }];
     }
     cn1homeArmRecovery();

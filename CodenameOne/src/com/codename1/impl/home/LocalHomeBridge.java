@@ -888,8 +888,42 @@ public class LocalHomeBridge implements HomeBridge {
                     return;
                 }
             }
+            // The mode a scene leaves each thermostat in, decided before
+            // anything is applied. A scene is one instant, not a sequence:
+            // applying its actions in list order let "AUTO, and 21 degrees"
+            // store a setpoint that an immediate read then reports absent,
+            // and the coalescing a subscription does by default handed the
+            // listener the number rather than the absence.
+            Map<String, TraitValue> finalModes =
+                    new HashMap<String, TraitValue>();
             for (int i = 0; i < scene.actions.size(); i++) {
                 ActionRecord a = scene.actions.get(i);
+                if (Trait.TARGET_HEATING_COOLING.getId()
+                        .equals(a.trait.getId())) {
+                    finalModes.put(key(a.accessoryId, a.serviceId, ""),
+                            a.value);
+                }
+            }
+            for (int i = 0; i < scene.actions.size(); i++) {
+                ActionRecord a = scene.actions.get(i);
+                if (Trait.TARGET_TEMPERATURE.getId().equals(a.trait.getId())) {
+                    TraitValue mode = finalModes.get(
+                            key(a.accessoryId, a.serviceId, ""));
+                    boolean auto = mode == null
+                            ? inAutoMode(a.accessoryId, a.serviceId)
+                            : mode.getKind() == TraitValueKind.ENUM
+                                    && mode.getEnumOrdinal()
+                                        == HeatingCoolingMode.AUTO.ordinal();
+                    if (auto) {
+                        // Dropped rather than refused: a scene is a whole
+                        // thing, and failing it because one action means
+                        // nothing in the mode the same scene selects would
+                        // leave the lights it also sets unswitched.
+                        changed.add(TraitReading.absent(a.accessoryId,
+                                a.serviceId, a.trait));
+                        continue;
+                    }
+                }
                 values.put(key(a.accessoryId, a.serviceId, a.trait.getId()),
                         a.value);
                 changed.add(TraitReading.of(a.accessoryId, a.serviceId,
