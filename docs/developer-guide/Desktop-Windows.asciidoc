@@ -310,6 +310,22 @@ above, until those components gain a top-level-aware attachment path.
 `Display.getDisplayWidth()` and `getDisplayHeight()` continue to report the *main*
 window. Components inside a window should size against their own top level.
 
+[[window-capture]]
+=== Capturing a window
+
+`Display.screenshot()` can only see the application's main surface, so a second
+operating-system window is simply not in it. `Window.capture()` exists for that and
+returns an image of the window itself.
+
+Where the platform can read a window's own pixels back, that's what you get: the
+JavaSE simulator, Mac Catalyst and native Linux all return the window's real raster.
+On native Windows a desktop window renders into a Direct2D `HWND` target, which has no
+readable bitmap behind it, so `capture()` re-renders the component tree at the window's
+current size instead. The image is the content the window is showing, which is what
+almost every caller wants -- but it's a re-render rather than a readback, so it can't
+reveal a disagreement between the window's raster and its component hierarchy. The main
+window's own capture has the same limitation on that platform for the same reason.
+
 [[mac-catalyst-windows]]
 === Mac Catalyst
 
