@@ -1484,6 +1484,34 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aNestedPressSurvivesTheOuterReleaseTeardown() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("nested", new BorderLayout());
+        final Window[] self = new Window[]{w};
+        Component target = new Component() {
+            @Override
+            public void pointerReleased(int x, int y) {
+                // Stands in for a handler that enters invokeAndBlock and has a fresh
+                // press dispatched to the same window before it returns.
+                self[0].pointerPressed(150, 120);
+            }
+        };
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        w.pointerReleased(150, 120);
+        // The replacement press must still be installed: tearing down by window
+        // rather than by gesture erased it.
+        boolean replacementHeld = w.getCurrentPointerPress() != null;
+        w.dispose();
+
+        assertTrue(replacementHeld,
+                "a press installed during the outer release must survive its teardown");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

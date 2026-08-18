@@ -1960,9 +1960,18 @@ public class Window extends Container implements TopLevelContainer {
                 return;
             }
         }
+        // Surfaced at the top level so addStylusListener fires regardless of which
+        // component is under the pen, exactly as Form does it.
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveComponentAt(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerPressed, x, y);
+            }
+        }
         // Listeners registered on the window itself can consume the event. They run
-        // *after* the context menu check above, which is Form's order: a consuming
-        // pressed listener must not be able to suppress a right click's context menu.
+        // *after* the context menu and stylus dispatches above, which is Form's
+        // order: a consuming pressed listener must not be able to suppress a right
+        // click's context menu or a pen's stylus event.
         // Without this block at all, addPointerPressedListener on a Window never
         // fired -- and material pull to refresh broke with it, since Component
         // installs its refresh listeners on the top level.
@@ -1971,14 +1980,6 @@ public class Window extends Container implements TopLevelContainer {
             pointerPressedListeners.fireActionEvent(e);
             if (e.isConsumed()) {
                 return;
-            }
-        }
-        // Surfaced at the top level so addStylusListener fires regardless of which
-        // component is under the pen, exactly as Form does it.
-        if (Display.getInstance().isStylusPointer()) {
-            Component stylusCmp = resolveComponentAt(x, y);
-            if (stylusCmp != null) {
-                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerPressed, x, y);
             }
         }
         // A press dismisses any tooltip so it cannot linger over a drag image or be
@@ -2035,17 +2036,17 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
+        if (Display.getInstance().isStylusPointer()) {
+            Component stylusCmp = resolveComponentAt(x, y);
+            if (stylusCmp != null) {
+                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
+            }
+        }
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
             pointerDraggedListeners.fireActionEvent(e);
             if (e.isConsumed()) {
                 return;
-            }
-        }
-        if (Display.getInstance().isStylusPointer()) {
-            Component stylusCmp = resolveComponentAt(x, y);
-            if (stylusCmp != null) {
-                stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
             }
         }
         autoRelease(x, y);
@@ -2084,27 +2085,40 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
-        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
-            pointerReleasedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                // Still cleared: the gesture is over regardless of who handled it,
-                // and leaving these set would strand the next press.
-                pressedCmp = null;
-                dragged = null;
-                currentPointerPress = null;
-                return;
-            }
-        }
         if (Display.getInstance().isStylusPointer()) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
             }
         }
+        // The token identifying *this* gesture. A release handler may enter
+        // invokeAndBlock, whose nested event loop can dispatch a fresh press in this
+        // same window before the handler returns; tearing down unconditionally then
+        // erases the replacement gesture's target rather than this one's.
+        final Object releasing = currentPointerPress;
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
+            pointerReleasedListeners.fireActionEvent(e);
+            if (e.isConsumed()) {
+                // Still cleared: the gesture is over regardless of who handled it,
+                // and leaving these set would strand the next press.
+                endGesture(releasing);
+                return;
+            }
+        }
         Component target = dragged != null ? dragged : pressedCmp;
         if (target != null) {
             LeadUtil.pointerReleased(target, x, y);
+        }
+        endGesture(releasing);
+    }
+
+    /// Clears the pressed state for the gesture identified by `token`, and only that
+    /// gesture. A newer press installed during nested dispatch carries a different
+    /// token and is left alone.
+    private void endGesture(Object token) {
+        if (currentPointerPress != token) { //NOPMD CompareObjectsWithEquals
+            return;
         }
         pressedCmp = null;
         dragged = null;

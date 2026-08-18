@@ -369,12 +369,16 @@ public final class Display extends CN1Constants {
 
     /// How many entries the per-key and per-window input tables hold.
     ///
-    /// Matches CN1_MAX_DESKTOP_WINDOWS in the native ports, which is what bounds the
-    /// number of windows that can be open at once. It was 8, chosen for simultaneous
-    /// keys, which silently starved the window-keyed tables: with the table full an
-    /// extra window could record neither drag state nor velocity, so a completed drag
-    /// there read as a click. Well past what a keyboard reports at once either way.
-    private static final int TRACKED_KEY_PRESSES = 32;
+    /// CN1_MAX_DESKTOP_WINDOWS in the native ports, *plus one* for the application's
+    /// main surface, which holds a permanent entry of its own. Sizing this to 32
+    /// alone left only 31 usable secondary slots, so the last window the ports allow
+    /// still lost its drag state.
+    ///
+    /// It was originally 8, a size chosen for simultaneous key presses that I reused
+    /// for the window-keyed tables without asking what bounds those. Exhaustion is
+    /// silent -- the lookup returns -1 and the setter no-ops -- so the window simply
+    /// behaves as though the drag never happened.
+    private static final int TRACKED_KEY_PRESSES = 33;
 
     /// Key codes currently held, paired with `#keyPressTargets` by index.
     private final int[] keyPressCodes = new int[TRACKED_KEY_PRESSES];
@@ -3684,7 +3688,14 @@ public final class Display extends CN1Constants {
                 // window, so a handful of long-lived windows could exhaust the table
                 // and leave a later window unable to record drag state at all.
                 // After the dispatch, since the release handlers read it.
-                releaseDragHistory(windowId);
+                //
+                // Unless a newer gesture has already started in this window: a
+                // release handler can enter invokeAndBlock, whose nested loop
+                // dispatches a fresh press, and that press records a target. Freeing
+                // the ring then would strip the replacement gesture of its velocity.
+                if (!hasPointerPressTarget(windowId)) {
+                    releaseDragHistory(windowId);
+                }
                 break;
             case POINTER_RELEASED_MULTI:
                 recursivePointerReleaseA = true;
@@ -3712,7 +3723,14 @@ public final class Display extends CN1Constants {
                 // window, so a handful of long-lived windows could exhaust the table
                 // and leave a later window unable to record drag state at all.
                 // After the dispatch, since the release handlers read it.
-                releaseDragHistory(windowId);
+                //
+                // Unless a newer gesture has already started in this window: a
+                // release handler can enter invokeAndBlock, whose nested loop
+                // dispatches a fresh press, and that press records a target. Freeing
+                // the ring then would strip the replacement gesture of its velocity.
+                if (!hasPointerPressTarget(windowId)) {
+                    releaseDragHistory(windowId);
+                }
                 break;
             case POINTER_DRAGGED: {
                 setDragOccured(windowId, true);
