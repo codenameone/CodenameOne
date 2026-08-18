@@ -1982,13 +1982,26 @@ static void cn1homeRebindWatches(NSString *accessoryId) {
                 // belongs to the object that is gone, so it is taken again
                 // here -- keeping the old one would report the swap itself
                 // as a change on the next drain.
-                [cn1homeNotifyFailed removeObject:stateKey];
+                //
+                // And onto the recovery path, not off it. This subscription
+                // was handed to the caller as push, because the
+                // characteristic that has just been replaced said it
+                // notified; isPushDelivery() is a property of that handle and
+                // cannot be taken back, so nobody is ever going to call
+                // drainChanges() for it. Dropped here, the watch had no
+                // pusher and no poller: one resyncRequired went out and then
+                // the listener sat on that value for as long as the screen
+                // stayed open. The recovery pass polls it and keeps retrying
+                // the registration, so it also heals itself if the accessory
+                // comes back advertising notifications again.
+                [cn1homeNotifyFailed addObject:stateKey];
                 [cn1homeLastPolled setObject:cn1homeReadingWithoutTimestamp(
                      cn1homeEncodeReading(accessoryId, serviceId, traitId,
                                           cn1homeValueForReading(service,
                                                                  traitId, c),
                                           nil, nil))
                                       forKey:stateKey];
+                cn1homeArmRecovery();
                 continue;
             }
             [c enableNotification:YES completionHandler:^(NSError *error) {
@@ -2051,6 +2064,16 @@ static void cn1homeRetryNotification(HMCharacteristic *c,
     if (!cn1homeStillNeeded(subscriptionId, key)) {
         [cn1homeNotifyFailed removeObject:stateKey];
         [cn1homeLastPolled removeObjectForKey:stateKey];
+        return;
+    }
+    if (![[c properties] containsObject:
+          HMCharacteristicPropertySupportsEventNotification]) {
+        // Nothing to retry: this characteristic says it does not notify, so
+        // the polling entry IS the delivery path and has to stay. Asked
+        // anyway, a HomeKit that answered without an error would end the
+        // polling and leave the watch with nothing at all -- and the
+        // subscription was handed to the caller as push, so nobody is going
+        // to drain it.
         return;
     }
     [c enableNotification:YES completionHandler:^(NSError *error) {
@@ -2116,6 +2139,16 @@ static void cn1homeRunRecovery(void) {
             continue;
         }
         if (![[c properties] containsObject:HMCharacteristicPropertyReadable]) {
+            if (![[c properties] containsObject:
+                  HMCharacteristicPropertySupportsEventNotification]) {
+                // Neither pushed nor polled: nothing can deliver this one,
+                // and keeping it here would keep the recovery timer running
+                // for the life of the process for a characteristic that will
+                // never answer.
+                [cn1homeNotifyFailed removeObject:stateKey];
+                [cn1homeLastPolled removeObjectForKey:stateKey];
+                continue;
+            }
             cn1homeRetryNotification(c, subscriptionId, key, stateKey);
             continue;
         }
