@@ -2228,6 +2228,46 @@ class IntentsTest {
         }
     }
 
+    /// A schema is the only thing a model has to go on, so anything it calls valid should be
+    /// something the dispatcher can parse. The string branch of a date parameter said nothing
+    /// at all, which made "not-a-date" a schema-valid call that IntentDates refuses before the
+    /// handler runs -- a failure the model had no way to avoid.
+    ///
+    /// What is pinned here is the agreement between the two: every form the pattern accepts is
+    /// one the parser accepts. The pattern describes shape and not meaning, so "2026-13-40"
+    /// matches and is still refused; that is the part a regex cannot carry.
+    @Test
+    void theDateSchemaAcceptsOnlyFormsTheParserCanRead() {
+        IntentParameterInfo when = new IntentParameterInfo("when", "When?",
+                IntentParameterType.DATE, true, null, null, null);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("log_workout", "Log", "", true, true, false,
+                "", 5, Collections.<String>emptyList(), Arrays.asList(when),
+                Arrays.asList(Exposure.MODEL)));
+        Intents.setDispatcher(d);
+
+        String schema = Intents.asTools().get(0).getParametersJsonSchema();
+        int at = schema.indexOf("\"pattern\"");
+        assertTrue(at > 0, "the string branch must be constrained:\n" + schema);
+        String pattern = schema.substring(schema.indexOf('"', at + 10) + 1);
+        pattern = pattern.substring(0, pattern.indexOf('"')).replace("\\\\", "\\");
+
+        assertFalse("not-a-date".matches(pattern),
+                "text that was never a date must not be schema-valid");
+        assertFalse("".matches(pattern), "an empty string names no moment");
+
+        // Everything the pattern admits, the parser reads.
+        String[] accepted = {"1770000000000", "-1", "2026-03-14", "2026-03-14T12:30",
+            "2026-03-14 12:30:15", "2026-03-14T12:30:15.250Z", "2026-03-14T12:30:15+02:00",
+            "2026-03-14T12:30:15-0200"};
+        for (String form : accepted) {
+            assertTrue(form.matches(pattern),
+                    "the schema rejects \"" + form + "\", which the dispatcher parses");
+            assertNotNull(IntentDates.parse(form),
+                    "the parser rejects \"" + form + "\", which the schema advertises");
+        }
+    }
+
     /// Bringing the app forward cannot be undone, so it has to be decided before it happens.
     ///
     /// requestForeground posts the launch and only then waits for the Activity to arrive. If

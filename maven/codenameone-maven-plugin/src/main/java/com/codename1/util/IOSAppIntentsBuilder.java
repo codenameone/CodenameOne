@@ -79,6 +79,9 @@ public final class IOSAppIntentsBuilder {
     /// Intents whose phrases did not fit that limit, for the build to report.
     private final List<String> omittedShortcuts = new ArrayList<String>();
 
+    /// Choice enum names, allocated across the whole manifest on first use. Null until then.
+    private Map<String, String> choiceEnumNames;
+
     private final List<Map<String, Object>> intents;
     private final List<Map<String, Object>> entities;
 
@@ -144,8 +147,54 @@ public final class IOSAppIntentsBuilder {
     }
 
     /// The Swift enum name backing one parameter's declared `options`.
-    static String choiceEnumName(String intentId, String paramName) {
+    ///
+    /// Allocated once across the whole manifest rather than derived from the pair on each call,
+    /// because joining the two with an underscore cannot express where one ends: intent
+    /// `foo_bar` with parameter `baz` and intent `foo` with parameter `bar_baz` produce the same
+    /// text, and both spellings are legal. The generated file then declared one enum twice and
+    /// the iOS target failed to compile. There is no separator that would fix it either --
+    /// sanitize() maps everything outside [A-Za-z0-9_] to an underscore, so any character used
+    /// as a boundary can also occur inside a component.
+    ///
+    /// Collisions take a numeric suffix, as parameter identifiers and enum cases do, so the
+    /// ordinary name stays readable and only a genuine clash is decorated.
+    String choiceEnumName(String intentId, String paramName) {
+        if (choiceEnumNames == null) {
+            Map<String, String> allocated = new LinkedHashMap<String, String>();
+            List<String> taken = new ArrayList<String>();
+            for (Map<String, Object> intent : intents) {
+                String id = str(intent, "id");
+                for (Map<String, Object> p : params(intent)) {
+                    if (!hasChoices(p)) {
+                        continue;
+                    }
+                    String key = key(id, paramIdentifier(intent, str(p, "name")));
+                    if (allocated.containsKey(key)) {
+                        continue;
+                    }
+                    String base = rawChoiceEnumName(id, paramIdentifier(intent, str(p, "name")));
+                    String candidate = base;
+                    for (int n = 2; taken.contains(candidate); n++) {
+                        candidate = base + "_" + n;
+                    }
+                    taken.add(candidate);
+                    allocated.put(key, candidate);
+                }
+            }
+            choiceEnumNames = allocated;
+        }
+        String name = choiceEnumNames.get(key(intentId, paramName));
+        return name == null ? rawChoiceEnumName(intentId, paramName) : name;
+    }
+
+    /// The undecorated spelling, which is what collides.
+    private static String rawChoiceEnumName(String intentId, String paramName) {
         return "CN1Choice_" + sanitize(intentId) + "_" + sanitize(paramName);
+    }
+
+    /// A key that cannot be produced by any other pair: NUL never occurs in either component.
+    private static String key(String intentId, String paramName) {
+        return intentId + '\u0000' + paramName;
     }
 
     /// Emits an `AppEnum` per closed-vocabulary parameter.

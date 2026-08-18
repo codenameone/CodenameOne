@@ -89,6 +89,38 @@ class IOSAppIntentsBuilderTest {
     /// Options are application strings, so two legal and quite different ones reduce to the
     /// same Swift identifier -- and a duplicated `case` does not degrade at runtime, it fails
     /// to compile the iOS target, in a file the developer never wrote.
+    /// Two legal declarations whose intent id and parameter name join to the same text.
+    /// "CN1Choice_" + id + "_" + param cannot say where the id ended, so both produced
+    /// CN1Choice_foo_bar_baz and the generated file declared one enum twice -- an iOS build
+    /// failing on two declarations that are each perfectly ordinary.
+    @Test
+    void choiceEnumsFromDifferentIntentsDoNotShareAName() {
+        Map<String, Object> a = intent("foo_bar", "A");
+        a.put("params", Arrays.asList(param("baz", "string",
+                "options", Arrays.asList("x", "y"))));
+        Map<String, Object> b = intent("foo", "B");
+        b.put("params", Arrays.asList(param("bar_baz", "string",
+                "options", Arrays.asList("p", "q"))));
+
+        String swift = intentsSwift(Arrays.asList(a, b), new ArrayList<Map<String, Object>>());
+
+        List<String> declared = new ArrayList<String>();
+        for (String line : swift.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("enum CN1Choice_")) {
+                String name = t.substring(5, t.indexOf(":")).trim();
+                assertFalse(declared.contains(name),
+                        "enum " + name + " is declared twice and will not compile:\n" + swift);
+                declared.add(name);
+            }
+        }
+        assertEquals(2, declared.size(),
+                "both parameters still need their own vocabulary:\n" + swift);
+
+        // Each intent must reference the enum that carries its own options.
+        assertTrue(swift.contains("= \"x\"") && swift.contains("= \"p\""), swift);
+    }
+
     /// `perform` is the one method every generated AppIntent struct declares, and Swift does
     /// not let a property and a method of the same type share a name -- so a parameter a
     /// developer was entitled to call "perform" made the whole iOS target fail to compile with

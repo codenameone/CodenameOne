@@ -41,6 +41,25 @@ public final class IntentDates {
     private IntentDates() {
     }
 
+    /// The string forms [#parse] accepts, written as a JSON-Schema pattern.
+    ///
+    /// It lives here rather than in the schema builder because this class owns the grammar --
+    /// a pattern kept next to the consumer would drift from the parser the first time either
+    /// changed, which is the whole reason the parsing was consolidated in the first place.
+    ///
+    /// It describes the *shape* and cannot describe the meaning: "2026-13-40" matches and is
+    /// still refused, because no regex says a year has twelve months. That is the right split.
+    /// The value of the pattern is that it rules out text which was never a date at all --
+    /// "not-a-date" was schema-valid before, so a model obeying the schema could make a call
+    /// that was certain to fail. Narrowing it to a grammar the parser recognizes removes the
+    /// entire class of well-formed-but-unparseable calls; the remaining rejections are values
+    /// that look like dates and are not.
+    static final String SCHEMA_PATTERN =
+            "^(-?[0-9]+"
+            + "|[0-9]{4}-[0-9]{2}-[0-9]{2}"
+            + "([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]+)?)?"
+            + "([Zz]|[+-][0-9]{2}:?[0-9]{2})?)?)$";
+
     /// The moment this value names, or null when it names none.
     ///
     /// Null rather than an exception because both callers want to decide for themselves what an

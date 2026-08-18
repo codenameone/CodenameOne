@@ -724,6 +724,13 @@ public final class Intents {
                 // could write a schema-valid epoch that is rejected before the handler runs.
                 prop.put("minimum", Long.valueOf(Long.MIN_VALUE));
                 prop.put("maximum", Long.valueOf(Long.MAX_VALUE));
+                // The same argument applied to the other branch, which said nothing at all: an
+                // unconstrained string accepted "not-a-date", so a model obeying the schema
+                // could make a request certain to fail, and the schema is the only thing it has
+                // to go on. The pattern is the parser's own, kept beside the grammar it
+                // describes. In a union type a pattern constrains the string branch only, just
+                // as minimum and maximum constrain the numeric one.
+                prop.put("pattern", IntentDates.SCHEMA_PATTERN);
             }
             properties.put(p.getName(), prop);
             if (p.isRequired()) {
