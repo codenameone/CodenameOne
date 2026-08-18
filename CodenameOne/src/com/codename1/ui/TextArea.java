@@ -208,9 +208,14 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private final ActionListener formPressListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
-            if (f != null) {
-                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this) { //NOPMD CompareObjectsWithEquals
+            // The top level, not the form: this listener is registered on the window
+            // a text area lives in, and resolving the form here is null there -- so the
+            // documented pre-click action event never fired and the other component's
+            // handler could observe an uncommitted value.
+            TopLevelContainer top = getTopLevelContainer();
+            if (top != null) {
+                Component hit = top.asContainer().getComponentAt(evt.getX(), evt.getY());
+                if (isEditing() && hit != TextArea.this) { //NOPMD CompareObjectsWithEquals
                     fireActionEvent();
                     setSuppressActionEvent(true);
                 }
@@ -2046,7 +2051,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// @deprecated Don't call this method directly, unless you really know what you're doing.  It is used
     /// primarily by implementation APIs.
     public void registerAsInputDevice() {
-        Form f = this.getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
 
         if (f != null && Display.impl.getEditingText() != this) { //NOPMD CompareObjectsWithEquals
             try {

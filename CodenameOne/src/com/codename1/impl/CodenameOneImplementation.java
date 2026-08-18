@@ -575,9 +575,12 @@ public abstract class CodenameOneImplementation {
     public void setFocusedEditingText(Component cmp) {
         editingText = cmp;
         if (cmp != null) {
-            Form form = cmp.getComponentForm();
-            if (form != null) {
-                form.setFocused(cmp);
+            // The top level rather than the form: getComponentForm() is null by design
+            // inside a Window, so focus was silently never moved to the component being
+            // edited there.
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top != null) {
+                top.setFocused(cmp);
             }
         }
     }

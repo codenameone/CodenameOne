@@ -2222,6 +2222,86 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void groupedRadioButtonsAndTextAreasWorkInsideAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("radios", new BorderLayout());
+        w.setWindowSize(400, 300);
+
+        // initNamedGroup() stored the ButtonGroup as a client property on the form and
+        // dereferenced it without a guard, so showing a window containing a grouped
+        // radio button threw before the native window was even mapped.
+        Container box = new Container(new com.codename1.ui.layouts.BoxLayout(
+                com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+        RadioButton first = new RadioButton("first");
+        RadioButton second = new RadioButton("second");
+        first.setGroup("choice");
+        second.setGroup("choice");
+        box.add(first);
+        box.add(second);
+        w.add(BorderLayout.CENTER, box);
+        w.show();
+        w.revalidate();
+
+        assertTrue(w.isWindowShowing(),
+                "a window with a grouped radio button must show");
+
+        // The group has to actually work, not merely not throw: selecting the second
+        // must clear the first, which only happens if both joined the same group.
+        first.setSelected(true);
+        second.setSelected(true);
+        assertTrue(second.isSelected());
+        assertFalse(first.isSelected(),
+                "both radio buttons must have joined the same named group");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void aWindowTaggedPressReachesAnEditingTextAreaWithoutThrowing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("editing", new BorderLayout());
+        w.setWindowSize(400, 300);
+        TextArea area = new TextArea("text");
+        Button other = new Button("elsewhere");
+        w.add(BorderLayout.NORTH, area);
+        w.add(BorderLayout.SOUTH, other);
+        w.show();
+        w.revalidate();
+
+        final boolean[] fired = new boolean[1];
+        area.addActionListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                fired[0] = true;
+            }
+        });
+
+        // The press listener is registered on the window, but its body resolved
+        // getComponentForm() -- null there -- and did nothing. So the documented
+        // pre-click action event never fired and the other component's handler could
+        // observe an uncommitted value.
+        implementation.setFocusedEditingText(area);
+        assertTrue(area.isEditing(), "the area should be in editing state");
+
+        // Tagged with the window's id: the untagged entry point is window 0, the main
+        // surface, and the press would never reach this window at all.
+        Display.getInstance().windowPointerPressed(w.getWindowId(),
+                new int[]{other.getAbsoluteX() + 2},
+                new int[]{other.getAbsoluteY() + 2});
+        flushSerialCalls();
+
+        // Deliberately not asserting that *this* listener fired the early event. The
+        // press path fires an action event and sets suppressActionEvent by another
+        // route as well, so both assertions pass against the un-fixed listener and
+        // would prove nothing. What this does pin down is that a window-tagged press
+        // reaches an editing text area in a window and is handled without throwing;
+        // the listener body's own fix is covered by reading, and stated as such.
+        assertTrue(fired[0], "the press must be handled and its action event delivered");
+        assertTrue(w.isWindowShowing(), "and must not throw on the way");
+        w.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

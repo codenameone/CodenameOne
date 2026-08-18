@@ -29,7 +29,6 @@ import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -41,6 +40,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint;
 import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint.Inset;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1095,7 +1095,7 @@ public class SplitPane extends Container {
         @Override
         protected void initComponent() {
             super.initComponent();
-            Form form = getComponentForm();
+            TopLevelContainer form = getTopLevelContainer();
             if (form != null) {
                 form.setEnableCursors(true);
             }

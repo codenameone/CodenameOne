@@ -25,7 +25,6 @@ package com.codename1.gaming;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
-import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
@@ -339,7 +338,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         int sy = 0;
         int sw = getWidth();
         int sh = getHeight();
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             Rectangle safe = f.getSafeArea();
             if (safe != null && safe.getWidth() > 0 && safe.getHeight() > 0) {

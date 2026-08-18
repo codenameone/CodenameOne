@@ -618,11 +618,11 @@ public class List<T> extends Component implements ActionSource {
             accessibilityChanged(AccessibilityManager.CHANGE_STATE | AccessibilityManager.CHANGE_VALUE);
         }
         if (!isInitialized()) {
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
             if (f == null) {
                 return;
             }
-            f.revalidate();
+            f.asContainer().revalidate();
         }
         if (scrollToSelection/* && isInitialized() */) {
             selectElement(index);
@@ -966,7 +966,7 @@ public class List<T> extends Component implements ActionSource {
     /// {@inheritDoc}
     @Override
     public void setHandlesInput(boolean b) {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             // prevent the list from losing focus if its the only element
             // or when the user presses fire and there is no other component
