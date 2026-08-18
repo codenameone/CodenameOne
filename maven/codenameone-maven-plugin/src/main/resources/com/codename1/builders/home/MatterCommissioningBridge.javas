@@ -139,6 +139,16 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
     }
 
     @Override
+    public String backendId() {
+        // What this delegate IS, whatever Play services is doing right now.
+        // It commissions and nothing else: there is no Google Home graph
+        // behind it, so calling it "google_home" whenever the provider is
+        // missing or out of date named the one backend it is not, in exactly
+        // the situation an app is trying to explain to its user.
+        return "matter_only";
+    }
+
+    @Override
     public int availability() {
         int status = GoogleApiAvailability.getInstance()
                 .isGooglePlayServicesAvailable(AndroidNativeUtil.getContext());

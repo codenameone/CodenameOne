@@ -93,12 +93,13 @@ final class AndroidHomeBridge implements HomeBridge {
         if (d == null) {
             return "none";
         }
-        // Which backend this is follows from what it can actually do, not
-        // from a flag the bridge sets separately -- the two could disagree,
-        // and the availability is the one an app already branches on.
-        return d.availability()
-                == HomeAvailability.COMMISSIONING_ONLY.ordinal()
-                ? "matter_only" : "google_home";
+        // The delegate says which backend it is. Read off its availability
+        // instead, a Play services install that is missing or out of date
+        // made a commission-only delegate answer "google_home" -- the one
+        // backend it is not -- precisely when an app is trying to tell its
+        // user what is wrong.
+        String id = d.backendId();
+        return id == null || id.length() == 0 ? "none" : id;
     }
 
     @Override

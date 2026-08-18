@@ -137,6 +137,20 @@ public interface SmartHomeDelegate {
     /// the availability ordinal
     int availability();
 
+    /// Which backend this delegate IS, for
+    /// `com.codename1.home.SmartHome#getBackend()`.
+    ///
+    /// A fact about the delegate, not about its current state. Derived from
+    /// availability instead, a Play services install that is missing or out
+    /// of date -- the moments an app most wants to explain -- turned a
+    /// commission-only delegate into "Google Home", which is the one backend
+    /// it is not.
+    ///
+    /// #### Returns
+    ///
+    /// `matter_only`, `google_home`, or `none`
+    String backendId();
+
     /// The `com.codename1.home.HomeAuthorizationStatus` ordinal.
     ///
     /// #### Returns

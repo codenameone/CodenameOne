@@ -157,6 +157,45 @@ public final class MatterExtensionBuilder {
     /// @param packageName the app's bundle identifier, for the keychain tag
     /// @param appGroup    the group whose UserDefaults holds the fabric state
     /// @return the lines, without the comment prefix
+    /**
+     * The vendor id, checked to be a UInt16 literal and nothing else.
+     *
+     * <p>It is interpolated into Swift that the build compiles, so anything
+     * this does not constrain is code. A value of "1, x: run()" or one
+     * carrying a newline would be compiled into the extension -- and in a
+     * build that never asked for a fabric it would also walk straight out of
+     * the {@code //} that comments the implementation out, since a comment
+     * ends at the end of its line.</p>
+     *
+     * @param vendorId the hint's value
+     * @return the same text, once it is known to be a number
+     * @throws IllegalArgumentException when it is anything else
+     */
+    public static String vendorLiteral(String vendorId) {
+        String value = vendorId == null ? "" : vendorId.trim();
+        long parsed = -1;
+        try {
+            if (value.length() > 2 && (value.startsWith("0x")
+                    || value.startsWith("0X"))) {
+                parsed = Long.parseLong(value.substring(2), 16);
+            } else if (value.length() > 0) {
+                parsed = Long.parseLong(value, 10);
+            }
+        } catch (NumberFormatException ex) {
+            parsed = -1;
+        }
+        if (parsed < 0 || parsed > 0xFFFF) {
+            throw new IllegalArgumentException(
+                    "ios.home.commissioning.vendorId must be a Matter vendor"
+                    + " id -- a number from 0 to 65535, decimal or 0x hex --"
+                    + " got '" + vendorId + "'. Its value is compiled into"
+                    + " the generated commissioning extension, so it is"
+                    + " accepted only in a shape that cannot carry anything"
+                    + " else.");
+        }
+        return value;
+    }
+
     private static String[] fabricSwift(String packageName, String appGroup,
             String vendorId) {
         return new String[] {
@@ -174,7 +213,7 @@ public final class MatterExtensionBuilder {
             "    // replaces it with its own through",
             "    // ios.home.commissioning.vendorId -- accessories are free to",
             "    // refuse a test vendor, and some do.",
-            "    static let vendorID: UInt16 = " + vendorId,
+            "    static let vendorID: UInt16 = " + vendorLiteral(vendorId),
             "",
             "    static func defaults() -> UserDefaults {",
             "        return UserDefaults(suiteName: group)"

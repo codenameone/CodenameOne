@@ -31,6 +31,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -150,6 +151,32 @@ public class MatterExtensionBuilderTest {
                 "returning from the guard reports success for a fabric that"
                         + " never gained the accessory");
         assertTrue(swift.contains("throw NSError("), swift);
+    }
+
+    /**
+     * The vendor id is a number or the build stops.
+     *
+     * <p>It is compiled into the generated extension, so anything the check
+     * does not constrain is Swift -- and in a build that never asked for a
+     * fabric, a newline in it walks straight out of the {@code //} that
+     * comments the implementation out, because a comment ends at its
+     * line.</p>
+     */
+    @Test
+    public void theVendorIdIsAcceptedOnlyAsANumber() {
+        assertEquals("0xFFF1", MatterExtensionBuilder.vendorLiteral("0xFFF1"));
+        assertEquals("4660", MatterExtensionBuilder.vendorLiteral(" 4660 "));
+        assertEquals("0", MatterExtensionBuilder.vendorLiteral("0"));
+        for (String bad : new String[] {"1, x: run()", "0xFFF1\n    exit(0)",
+                "", null, "65536", "-1", "0x10000", "FFF1"}) {
+            try {
+                MatterExtensionBuilder.vendorLiteral(bad);
+                fail("expected a refusal for '" + bad + "'");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("vendorId"),
+                        expected.getMessage());
+            }
+        }
     }
 
     /** The Matter test vendor, which is what a build defaults to. */
