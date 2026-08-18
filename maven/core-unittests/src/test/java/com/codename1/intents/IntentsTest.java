@@ -368,6 +368,14 @@ class IntentsTest {
 
         Intents.setDispatcher(d);
 
+        // Each queued invocation is started on its own thread, in arrival order: one that
+        // blocks must not stop the next from starting, or from arming its own deadline. So
+        // what is asserted is that both ran and both answered, not the order they finished in.
+        awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+            public Boolean call() {
+                return Boolean.valueOf(results.size() == 2);
+            }
+        }, "both queued invocations to answer");
         assertEquals(Arrays.asList("known", "known"), d.invoked);
         assertEquals(Arrays.asList("ok", "ok"), results);
     }
@@ -684,10 +692,15 @@ class IntentsTest {
         assertTrue(Intents.dispatchUserActivity("known", null),
                 "an id this application recorded is claimed while the table is empty");
 
-        FakeDispatcher d = new FakeDispatcher();
+        final FakeDispatcher d = new FakeDispatcher();
         d.declarations.add(declaration("known"));
         Intents.setDispatcher(d);
 
+        awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+            public Boolean call() {
+                return Boolean.valueOf(!d.invoked.isEmpty());
+            }
+        }, "the queued activity to run");
         assertEquals(Arrays.asList("known"), d.invoked);
     }
 
@@ -2241,6 +2254,12 @@ class IntentsTest {
         updated.declarations.add(declaration("known"));
         Intents.setDispatcher(updated);
 
+        final FakeDispatcher watched = updated;
+        awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+            public Boolean call() {
+                return Boolean.valueOf(!watched.invoked.isEmpty());
+            }
+        }, "the allowed activity to run");
         assertEquals(Arrays.asList("known"), updated.invoked,
                 "a suggestion cannot outlive the policy that allowed it, cold start included");
     }
@@ -2430,6 +2449,100 @@ class IntentsTest {
         assertFalse(reported.get(0).isFailed(),
                 "a budget of weeks must not expire before a handler that took 200ms");
         assertEquals("done", reported.get(0).getDialog());
+    }
+
+    /// The drain is a loop, so a first handler that blocks used to stop the second from ever
+    /// starting -- and with it the second's watchdog, leaving that invocation's platform token
+    /// unanswered for as long as the first ran.
+    @Test
+    void aBlockedQueuedHandlerDoesNotStopTheNextOne() throws Exception {
+        final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+        final List<String> started = Collections.synchronizedList(new ArrayList<String>());
+
+        IntentCompletion ignore = new IntentCompletion() {
+            public void onIntentResult(IntentResult r) {
+            }
+        };
+        Intents.dispatchInvocation("blocks", null, IntentSource.SHORTCUT, true, ignore);
+        Intents.dispatchInvocation("quick", null, IntentSource.SHORTCUT, true, ignore);
+
+        final IntentDispatcher installing = new IntentDispatcher() {
+            public List<IntentDeclaration> describe() {
+                return Arrays.asList(declaration("blocks"), declaration("quick"));
+            }
+
+            public IntentResult invoke(String id, Map<String, Object> params, IntentContext c) {
+                started.add(id);
+                if ("blocks".equals(id)) {
+                    try {
+                        release.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                return IntentResult.ok();
+            }
+
+            public List<AppEntity> queryEntities(String t, String k, String a) {
+                return Collections.emptyList();
+            }
+        };
+
+        // On another thread, because the drain used to happen inside this call: watching from
+        // the caller could only ever look after it had finished, which is precisely the moment
+        // the defect is invisible.
+        Thread installer = new Thread(new Runnable() {
+            public void run() {
+                Intents.setDispatcher(installing);
+            }
+        }, "installer");
+        installer.start();
+
+        try {
+            awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+                public Boolean call() {
+                    return Boolean.valueOf(started.contains("quick"));
+                }
+            }, "the second queued invocation to start while the first is blocked");
+        } finally {
+            release.countDown();
+            installer.join(10000);
+        }
+    }
+
+    /// The tool's own deadline adds a backstop to the declared budget, and that addition was
+    /// two ints: within five seconds of Integer.MAX_VALUE it overflowed before the widening
+    /// multiplication, so a model's synchronous call returned a timeout while its handler
+    /// carried on.
+    @Test
+    void aToolWithAVeryLongBudgetDoesNotTimeOutImmediately() throws Exception {
+        Intents.setDispatcher(new IntentDispatcher() {
+            public List<IntentDeclaration> describe() {
+                return Arrays.asList(new IntentDeclaration("slow_tool", "Slow", "", true, true,
+                        false, "", Integer.MAX_VALUE - 1, Collections.<String>emptyList(),
+                        Collections.<IntentParameterInfo>emptyList(),
+                        Arrays.asList(Exposure.MODEL)));
+            }
+
+            public IntentResult invoke(String id, Map<String, Object> params, IntentContext c) {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return IntentResult.spoken("done");
+            }
+
+            public List<AppEntity> queryEntities(String t, String k, String a) {
+                return Collections.emptyList();
+            }
+        });
+
+        String json = Intents.asTools().get(0).invoke("{}");
+
+        assertTrue(json.contains("done"),
+                "a budget of years must not expire before a handler that took 200ms: " + json);
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id

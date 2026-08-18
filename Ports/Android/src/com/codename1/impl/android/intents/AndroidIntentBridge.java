@@ -603,9 +603,16 @@ public class AndroidIntentBridge implements IntentBridge {
         for (String[] entry : entries) {
             if (published >= budget) {
                 // The launcher caps how many it will show. Truncating silently would look like
-                // indexing randomly failing, so it is reported once.
-                Log.i(TAG, "Indexed the first " + budget
-                        + " items; Android limits how many shortcuts an app may publish");
+                // indexing randomly failing, so it is reported once -- and the two reasons read
+                // differently to whoever has to act on them.
+                if (budget == 0) {
+                    Log.i(TAG, "Not indexing: this app's own shortcuts already fill the "
+                            + "launcher's quota, and publishing content here would evict one "
+                            + "of them");
+                } else {
+                    Log.i(TAG, "Indexed the first " + budget
+                            + " items; Android limits how many shortcuts an app may publish");
+                }
                 break;
             }
             String uid = entry[0];
@@ -787,12 +794,15 @@ public class AndroidIntentBridge implements IntentBridge {
                 }
             }
         }
+        // Slots this framework already holds are not in `taken`, so they are counted as
+        // available here -- publishing over one of those is what indexing does. What is left
+        // after that is genuinely nothing, and forcing a budget of one anyway would have
+        // pushShortcut evict the least recently used dynamic shortcut, which at that point can
+        // only be one belonging to the application. Publishing nothing is the correct answer:
+        // indexing content must not cost a launcher action this framework never published.
         int left = quota - taken;
-        if (left < 1) {
-            // Nothing free. One is better than none: the eviction that follows can only take a
-            // shortcut this framework published, so the most recently indexed content still
-            // reaches the launcher rather than the whole call going quiet.
-            left = 1;
+        if (left < 0) {
+            left = 0;
         }
         return left < MAX_SHORTCUTS ? left : MAX_SHORTCUTS;
     }

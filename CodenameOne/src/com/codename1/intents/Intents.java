@@ -368,7 +368,7 @@ public final class Intents {
                 return;
             }
         }
-        run(inv, true);
+        run(inv);
     }
 
     /// Overrides how long a handler may run before the framework gives up, for
@@ -897,8 +897,12 @@ public final class Intents {
         /// normal case; the margin here exists only so a completion lost to a bug cannot block
         /// the caller forever.
         IntentResult awaitResult(int timeoutSeconds) {
+            // Widened before the addition, not after. The multiplication was already a long,
+            // which is not enough: a budget within five seconds of Integer.MAX_VALUE overflowed
+            // while the two ints were still being added, so a model's synchronous call returned
+            // a timeout at once while its handler carried on.
             long giveUpAt = System.currentTimeMillis()
-                    + (timeoutSeconds + COMPLETION_BACKSTOP_SECONDS) * 1000L;
+                    + ((long) timeoutSeconds + COMPLETION_BACKSTOP_SECONDS) * 1000L;
             synchronized (this) {
                 while (!done) {
                     long left = giveUpAt - System.currentTimeMillis();
@@ -1174,10 +1178,9 @@ public final class Intents {
         }
         if (queued != null) {
             for (PendingInvocation q : queued) {
-                // Drained rather than direct: whoever queued these already had control
-                // returned to it, so nothing is blocked on them and they run in the order they
-                // arrived, which is the guarantee this queue exists to make.
-                run(q, false);
+                // Started in the order they arrived, each on its own thread: one that blocks
+                // must not hold up the next, whose platform token is waiting on nothing else.
+                run(q);
             }
         }
     }
@@ -1604,12 +1607,11 @@ public final class Intents {
                 logDiagnostic(suggestionRefusedMessage(a.activityType));
                 continue;
             }
-            // Run rather than dispatch, and marked drained: whoever delivered this activity had
-            // control returned to it when it was queued, so nothing is waiting on the stack and
-            // these keep the order they arrived in. Going back through dispatchInvocation would
-            // have called them direct, which is what decides whether a worker thread is used.
+            // Run rather than dispatch: this is the drain, so the dispatcher is installed and
+            // the queue check would only be repeated. Started in arrival order, each on its own
+            // thread.
             run(new PendingInvocation(a.activityType, a.params, IntentSource.SHORTCUT,
-                    false, null), false);
+                    false, null));
         }
     }
 
@@ -2069,13 +2071,7 @@ public final class Intents {
     /// visible freeze. Handlers are forbidden from touching UI precisely so they
     /// do not need it.
     /// Runs one invocation.
-    ///
-    /// #### Parameters
-    ///
-    /// - `inv`: what to run
-    /// - `direct`: true when the caller is still on the stack waiting for this call to return,
-    ///   false when it was queued and its caller already has control back
-    private static void run(final PendingInvocation inv, boolean direct) {
+    private static void run(final PendingInvocation inv) {
         final IntentDeclaration decl = getDeclaration(inv.intentId);
         final int timeout = budgetFor(decl);
         final IntentContext ctx = new IntentContext(inv.source, inv.headless,
@@ -2142,22 +2138,23 @@ public final class Intents {
             // returns, so the longest it can hold a process open is that budget -- and it
             // usually returns the moment the handler completes.
             new Thread(watchdog, "CN1 Intent timeout").start();
-            if (direct) {
-                // The caller is still on the stack and is holding a token for this: on iOS a
-                // withCheckedContinuation inside perform(), which cannot proceed until the
-                // native call returns. Running the handler inline kept that call there, so
-                // answering the continuation from the watchdog was not enough -- Swift still
-                // had nowhere to go, and the assistant waited on a call that had already been
-                // decided.
-                new Thread(body, "CN1 Intent " + inv.intentId).start();
-                return;
-            }
-            // Either nothing is waiting on an answer, or this was queued and its caller has
-            // long since been given control back. Inline keeps the drain ordered, which is what
-            // the queue promises, and on a device it runs from the stub's main before UIKit has
-            // started -- so there is no event loop to block, only the application's own
-            // startup, which is already waiting for this.
-            body.run();
+            // Always a worker, never inline. Two callers depend on that and for different
+            // reasons. A direct invocation is delivered on a native stack -- on iOS a
+            // withCheckedContinuation inside perform(), which cannot proceed until the call
+            // returns -- so running the handler there left the assistant waiting on a call that
+            // had already been decided.
+            //
+            // A drained one has no caller waiting, and running it inline was worse rather than
+            // safer: the drain is a loop, so a first handler that blocks stops the second from
+            // ever starting, and with it the second's watchdog -- leaving *its* platform token
+            // unanswered for as long as the first runs. On iOS the same loop runs from the
+            // stub's main before Display.init, so a blocking handler there holds up the
+            // application's own startup.
+            //
+            // What the queue promises is the order they are started in, which is preserved:
+            // once Display exists these have always gone to separate threads, so completion
+            // order was never the guarantee.
+            new Thread(body, "CN1 Intent " + inv.intentId).start();
             return;
         }
 
