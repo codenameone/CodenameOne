@@ -502,11 +502,17 @@ public class AndroidIntentBridge implements IntentBridge {
                 label = decl == null ? intentId : decl.getTitle();
             }
             // A donation carrying no values of its own has nothing to publish that is not
-            // already on the launcher: the build's static shortcut for this intent runs exactly
-            // the same thing. Publishing a second entry under another id would put one label
-            // there twice. What the donation is actually saying -- the user just did this --
-            // is the usage report, and that works on a manifest shortcut.
-            if (dyn == null && !carriesValues(effectiveParams)) {
+            // already on the launcher -- *if* the launcher has it. The build's static shortcut
+            // runs exactly the same thing, so a second entry under another id would put one
+            // label there twice, and what the donation is actually saying (the user just did
+            // this) is the usage report.
+            //
+            // Only when that shortcut exists, which is why this asks. The build omits one for
+            // an intent declared discoverable=false -- whose documented meaning is precisely
+            // that it appears *after* a donation -- and for anything past the static quota,
+            // which the build's own log says remains donatable. Reporting usage for an id the
+            // launcher does not have is a no-op, so those donations did nothing at all.
+            if (dyn == null && !carriesValues(effectiveParams) && hasManifestShortcut(ctx, intentId)) {
                 reportUsage(ctx, intentId);
                 return;
             }
@@ -730,6 +736,40 @@ public class AndroidIntentBridge implements IntentBridge {
         }
         String trimmed = paramsJson.trim();
         return trimmed.length() > 0 && !"{}".equals(trimmed);
+    }
+
+    /// Whether the build published a manifest shortcut for this intent.
+    ///
+    /// Asked of the platform rather than inferred from the declaration: the build drops a
+    /// shortcut for more reasons than the declaration shows -- not discoverable, past the
+    /// static quota, destructive -- and this only needs to know whether the launcher has one.
+    @TargetApi(Build.VERSION_CODES.N_MR1)
+    private static boolean hasManifestShortcut(Context ctx, String intentId) {
+        // Cast outside the guard: inside a catch(Throwable) it reads as relying on
+        // ClassCastException, which ParparVM does not throw.
+        ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
+        if (manager == null) {
+            return false;
+        }
+        // Only the platform call is guarded, and the iteration stays outside it: a for-each
+        // over List<ShortcutInfo> compiles to a CHECKCAST, and a handler around one reads as
+        // relying on ClassCastException. allPublished is written this way for the same reason.
+        List<ShortcutInfo> manifest;
+        try {
+            manifest = manager.getManifestShortcuts();
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not read the manifest shortcuts", t);
+            return false;
+        }
+        if (manifest == null) {
+            return false;
+        }
+        for (ShortcutInfo info : manifest) {
+            if (intentId.equals(info.getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Reports that a shortcut was used, without publishing anything.
