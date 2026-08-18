@@ -265,13 +265,35 @@ public class BufferedGraphics extends HTML5Graphics {
 
     /**
      * A draw covers text only where both the draw's own outline and the clip reach it.
+     *
+     * <p>Each is asked about the part of the text the clip's bounds can reach rather than about
+     * the whole run, so a clip whose bounds fall short of the glyphs answers no on its own and
+     * neither outline is consulted about text neither could touch.</p>
+     *
+     * <p>What is left is that both can answer yes about the same rectangle while touching
+     * different parts of it -- two wedges crossing one line of text without meeting over it.
+     * The exact answer is the intersection of the two regions, which means a polygon
+     * intersection, and getting one wrong in the other direction is the expensive mistake:
+     * reporting less than was painted leaves glyphs above a draw that covered them, which is
+     * wrong on screen, while reporting more only sends a component's text back to the canvas --
+     * where every case this layer does not handle already lives, and where it still renders. So
+     * the conjunction stays, deliberately, on the side that cannot draw the wrong picture.</p>
      */
     private static JavaScriptTextLayer.CoverTest bothCover(final JavaScriptTextLayer.CoverTest a,
-            final JavaScriptTextLayer.CoverTest b) {
+            final JavaScriptTextLayer.CoverTest b, final int clipX, final int clipY,
+            final int clipW, final int clipH) {
         return new JavaScriptTextLayer.CoverTest() {
             @Override
             public boolean covers(int x, int y, int w, int h) {
-                return a.covers(x, y, w, h) && b.covers(x, y, w, h);
+                int left = Math.max(x, clipX);
+                int top = Math.max(y, clipY);
+                int right = Math.min(x + w, clipX + clipW);
+                int bottom = Math.min(y + h, clipY + clipH);
+                if (right <= left || bottom <= top) {
+                    return false;
+                }
+                return a.covers(left, top, right - left, bottom - top)
+                        && b.covers(left, top, right - left, bottom - top);
             }
         };
     }
@@ -734,7 +756,9 @@ public class BufferedGraphics extends HTML5Graphics {
         // the DOM for the rest of the form's life, so the clip's own outline gets a say.
         JavaScriptTextLayer.CoverTest clipTest = clipShapeCoverTest();
         if (clipTest != null) {
-            test = test == null ? clipTest : bothCover(test, clipTest);
+            test = test == null ? clipTest
+                    : bothCover(test, clipTest, clipBoundsTracker.getX(), clipBoundsTracker.getY(),
+                            clipBoundsTracker.getWidth(), clipBoundsTracker.getHeight());
         }
         if (transform == null || transform.isIdentity()) {
             layer.noteCanvasCover(x, y, w, h, test);
