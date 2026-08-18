@@ -255,6 +255,37 @@ public class InterpHostSubclassTest {
                 "and must not be mistaken for a missing implementation");
     }
 
+    /**
+     * A peerless interpreted object outlives its program the same way a peer
+     * does -- as a key in a host collection, or something waiting to be logged
+     * -- and its own toString/equals/hashCode ask the interpreter too. Casting
+     * the detached sentinel to the return type turned printing such an object
+     * into a ClassCastException.
+     */
+    @Test
+    @DisplayName("a peerless object stays usable after its program is detached")
+    void peerlessObjectMethodsSurviveDetach() throws Throwable {
+        InterpRuntime rt = load("Bare",
+                "public class Bare {\n"
+              + "  public String toString() { return \"bare!\"; }\n"
+              + "  public boolean equals(Object o) { return o == this; }\n"
+              + "  public int hashCode() { return 42; }\n"
+              + "  public static Object make() { return new Bare(); }\n"
+              + "  public static void main(String[] a) {}\n"
+              + "}\n");
+        Object o = rt.invoke(rt.getBundle().findClass("Bare")
+                .declaredMethod("make", "()Ljava/lang/Object;"), null, new Object[0]);
+        assertEquals("bare!", o.toString());
+        assertEquals(42, o.hashCode());
+
+        rt.detach();
+        // Whatever these answer, they must answer: the object is still reachable
+        // from host code that has no idea the program was stopped.
+        assertNotNull(o.toString());
+        o.hashCode();
+        assertTrue(o.equals(o), "identity survives detaching");
+    }
+
     private static final String SUBCLASS_SOURCE =
             "public class Sub extends com.codename1.impl.interp.InterpHostSubclassTest.HostBase {\n"
           + "  public Sub() { super(\"pushed\"); }\n"

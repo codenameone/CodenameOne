@@ -134,7 +134,7 @@ public final class InterpObject {
         if (runtime != null) {
             Object r = runtime.dispatch(this, "toString", "()Ljava/lang/String;",
                     new Object[0]);
-            if (r != InterpRuntime.NOT_OVERRIDDEN) {  //NOPMD CompareObjectsWithEquals - a sentinel
+            if (!isMiss(r)) {
                 return (String) r;
             }
         }
@@ -158,7 +158,7 @@ public final class InterpObject {
         if (runtime != null) {
             Object r = runtime.dispatch(this, "equals", "(Ljava/lang/Object;)Z",
                     new Object[] {other});
-            if (r != InterpRuntime.NOT_OVERRIDDEN) {  //NOPMD CompareObjectsWithEquals - a sentinel
+            if (!isMiss(r)) {
                 return ((Boolean) r).booleanValue();
             }
         }
@@ -172,10 +172,23 @@ public final class InterpObject {
     public int hashCode() {
         if (runtime != null) {
             Object r = runtime.dispatch(this, "hashCode", "()I", new Object[0]);
-            if (r != InterpRuntime.NOT_OVERRIDDEN) {  //NOPMD CompareObjectsWithEquals - a sentinel
+            if (!isMiss(r)) {
                 return ((Integer) r).intValue();
             }
         }
         return System.identityHashCode(this);
+    }
+
+    /// Whether the interpreter answered with a sentinel rather than a value.
+    ///
+    /// Two of them, and both mean "use the default behaviour here":
+    /// NOT_OVERRIDDEN because the pushed class does not declare the method,
+    /// DETACHED because the program that did has been stopped. Host code can
+    /// still hold a peerless object -- a key in a collection, something waiting
+    /// to be logged -- and casting the sentinel would turn printing it into a
+    /// ClassCastException.
+    private static boolean isMiss(Object answer) {
+        //NOPMD CompareObjectsWithEquals - sentinels, not equal objects
+        return answer == InterpRuntime.NOT_OVERRIDDEN || answer == InterpRuntime.DETACHED;
     }
 }

@@ -875,7 +875,31 @@ public class DeviceRuntimeService {
 
     private Resources hostTheme;
 
+    /**
+     * Serializes installing a bundle.
+     *
+     * <p>Two pushes can arrive at once -- every accepted connection is served on
+     * a thread of its own, and the outbound dialer is a third -- and installing
+     * is not one step but several: clearing and republishing global resources,
+     * applying a theme, detaching the previous runtime and publishing the new
+     * one. Interleaved, one program starts with the other's resources, or is
+     * detached the moment it starts while its push reports success.</p>
+     *
+     * <p>Held only by the threads that serve a push. The event thread must
+     * never take it: installing calls {@code callSeriallyAndWait}, so an event
+     * thread blocking here while the installer waits for the event thread is a
+     * deadlock. That is why stopping a program -- which runs from the UI --
+     * does not.</p>
+     */
+    private final Object installLock = new Object();
+
     private String loadAndRun(byte[] payload) throws Throwable {
+        synchronized (installLock) {
+            return install(payload);
+        }
+    }
+
+    private String install(byte[] payload) throws Throwable {
 
         InterpBundle bundle = InterpBundleReader.read(new ByteArrayInputStream(payload));
 
