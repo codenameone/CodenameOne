@@ -466,6 +466,14 @@ static void cn1StartSimulatedMemoryWarnings(void) {
 // property of the code under test rather than of the runner.
 static _Atomic long cn1PacingParksBibop = 0;
 static _Atomic long cn1PacingParksLegacy = 0;
+// Smallest cap any thread computed this run. Park COUNTS alone cannot tell budget-derived
+// sizing from the old host-wide sizing -- a 768MB churn parks against the 72MB static cap
+// too -- but the cap VALUE can, because that 72MB is a hard floor off the budget path:
+// bibopGcTriggerBytes is clamped to never fall below CN1_BIBOP_GC_TRIGGER_BYTES in either
+// direction, so base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER is always at least 72MB
+// and every unbounded branch takes the larger of that and a fraction of host RAM. Only the
+// process-budget clamp can produce less. LONG_MAX until something computes a cap.
+static _Atomic long cn1PacingMinCap = 0x7fffffffffffffffLL;
 static _Atomic int cn1PacingTrace = -1;
 static int cn1PacingTraceOn(void) {
     int on = atomic_load_explicit(&cn1PacingTrace, memory_order_relaxed);
@@ -480,9 +488,11 @@ static void cn1ReportPacingParks(void) {
     if(!cn1PacingTraceOn()) {
         return;
     }
-    fprintf(stderr, "[PACING] bibopParks=%ld legacyParks=%ld\n",
+    long minCap = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
+    fprintf(stderr, "[PACING] bibopParks=%ld legacyParks=%ld minCapKb=%ld\n",
             atomic_load_explicit(&cn1PacingParksBibop, memory_order_relaxed),
-            atomic_load_explicit(&cn1PacingParksLegacy, memory_order_relaxed));
+            atomic_load_explicit(&cn1PacingParksLegacy, memory_order_relaxed),
+            minCap == 0x7fffffffffffffffLL ? -1L : minCap / 1024);
 }
 
 static void cn1ReportLowMemoryParks(void) {
@@ -3288,6 +3298,16 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
         long floor = CN1_PACING_MIN_CAP;
         if(floor > fm) floor = fm;
         if(cap < floor) cap = floor;
+    }
+    if(cn1PacingTraceOn()) {
+        long seen = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
+        while(cap < seen &&
+              !atomic_compare_exchange_weak_explicit(&cn1PacingMinCap, &seen, cap,
+                                                     memory_order_relaxed,
+                                                     memory_order_relaxed)) {
+            // seen was reloaded by the failed exchange; retry only while we are still
+            // the smaller value.
+        }
     }
     return cap;
 }

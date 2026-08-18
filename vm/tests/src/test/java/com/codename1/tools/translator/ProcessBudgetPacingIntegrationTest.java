@@ -147,6 +147,25 @@ class ProcessBudgetPacingIntegrationTest {
 
     private static final long TIGHT_LIMIT_BYTES = TIGHT_LIMIT_MB * 1024 * 1024;
 
+    /**
+     * The smallest pacing cap reachable WITHOUT a process budget, and therefore the
+     * dividing line between the two sizings.
+     *
+     * <p>Off the budget path every branch of {@code cn1BibopPacingCap} takes the larger
+     * of a fraction of host RAM and {@code base}, where {@code base} is
+     * {@code bibopGcTriggerBytes * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER}. The trigger is
+     * adaptive but clamped to never fall below {@code CN1_BIBOP_GC_TRIGGER_BYTES} (24MB)
+     * in either direction, so {@code base} is at least 3 x 24MB and the unbounded cap can
+     * never be less. Only the process-budget clamp can produce a smaller one.</p>
+     *
+     * <p>That is what makes a cap value, unlike a park count, able to tell the two apart.
+     * A park count cannot: this workload churns 768MB, which parks against a 72MB static
+     * cap just as readily as against a budget-derived one, so a regression to host-wide
+     * sizing would keep {@code legacyParks > 0} green while restoring the device bug --
+     * iOS host-wide headroom yields a gigabyte-scale cap.</p>
+     */
+    private static final long STATIC_CAP_FLOOR_KB = 3 * 24 * 1024;
+
     @Test
     void anAllocatingThreadStaysInsideTheProcessMemoryBudget() throws Exception {
         Parser.cleanup();
@@ -320,6 +339,30 @@ class ProcessBudgetPacingIntegrationTest {
                         + " nearly every check. Not finishing is the signature of a park"
                         + " that waits on a collection nobody scheduled.\n--- tight ---\n"
                         + tightOutput);
+
+        // AND THAT THE BUDGET IS WHAT SIZED THE CAP. Everything above is still consistent
+        // with a cap that ignored the budget: 768MB of churn parks against the 72MB static
+        // cap too, and that same static cap could hold the 256MB run under its limit. The
+        // cap VALUE separates them, because 72MB is a hard floor everywhere except the
+        // budget clamp -- see STATIC_CAP_FLOOR_KB.
+        long tightMinCapKb = parsePacing(tightOutput, "minCapKb=");
+        assertTrue(tightMinCapKb >= 0 && tightMinCapKb < STATIC_CAP_FLOOR_KB,
+                "Under a " + TIGHT_LIMIT_MB + "MB budget the smallest pacing cap computed"
+                        + " was " + tightMinCapKb + "KB, which is not below the "
+                        + STATIC_CAP_FLOOR_KB + "KB floor that sizing WITHOUT a budget can"
+                        + " never go under. So the cap was not derived from the budget, and"
+                        + " the parks above prove nothing: on device that is the original"
+                        + " bug, where host-wide headroom yields a gigabyte-scale cap."
+                        + "\n--- tight ---\n" + tightOutput);
+
+        long controlMinCapKb = parsePacing(controlOutput, "minCapKb=");
+        assertTrue(controlMinCapKb >= STATIC_CAP_FLOOR_KB,
+                "With no budget declared the cap must come from the host-wide reading and"
+                        + " its static floor, but the smallest computed was "
+                        + controlMinCapKb + "KB, under " + STATIC_CAP_FLOOR_KB + "KB. Some"
+                        + " budget clamp is being applied where no ceiling exists, which is"
+                        + " throttling every non-iOS target.\n--- control ---\n"
+                        + controlOutput);
     }
 
     private long parsePacing(String output, String key) {
