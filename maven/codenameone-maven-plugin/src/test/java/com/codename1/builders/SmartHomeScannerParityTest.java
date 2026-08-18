@@ -172,6 +172,11 @@ public class SmartHomeScannerParityTest {
         assertFalse(SmartHomeManifestFragments
                 .isCommissioningCall("isSupported"));
         assertFalse(SmartHomeManifestFragments.isCommissioningCall("getStyle"));
+        // The documented fallback for a platform with no commissioning of its
+        // own: it opens the ecosystem's app and nothing else, which is why
+        // the same call on SmartHome is availability-only.
+        assertFalse(SmartHomeManifestFragments
+                .isCommissioningCall("openEcosystemApp"));
         assertTrue(SmartHomeManifestFragments.isCommissioningCall("commission"),
                 "and everything else counts, including a method added later");
 

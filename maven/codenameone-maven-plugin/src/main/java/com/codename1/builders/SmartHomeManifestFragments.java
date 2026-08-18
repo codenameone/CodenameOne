@@ -190,11 +190,14 @@ final class SmartHomeManifestFragments {
     /**
      * Whether a Commissioner method actually commissions.
      *
-     * <p>Only two of them do not, and they are the pair a capability probe
-     * calls. Anything else -- now or later -- counts as commissioning, for
-     * the same reason the accessory-data classifier works that way: a method
-     * nobody listed is far more likely to be a new way to add an accessory
-     * than a new way to ask about one.</p>
+     * <p>Three of them do not. Two are what a capability probe calls, and
+     * the third is openEcosystemApp(), the documented fallback for a platform
+     * that has no commissioning of its own: it opens the Apple Home or Google
+     * Home app and nothing else, which is why the same call on SmartHome is
+     * on the availability-only list. Anything else -- now or later -- counts
+     * as commissioning, for the same reason the accessory-data classifier
+     * works that way: a method nobody listed is far more likely to be a new
+     * way to add an accessory than a new way to ask about one.</p>
      *
      * @param method the method name
      * @return true when the call means the app commissions accessories
@@ -203,7 +206,8 @@ final class SmartHomeManifestFragments {
         if (method == null || method.length() == 0) {
             return false;
         }
-        return !"isSupported".equals(method) && !"getStyle".equals(method);
+        return !"isSupported".equals(method) && !"getStyle".equals(method)
+                && !"openEcosystemApp".equals(method);
     }
 
     static String[] availabilityOnlyCalls() {
