@@ -733,6 +733,15 @@ static int cn1homeCategoryOrdinal(HMAccessoryCategory *category) {
     if ([t isEqualToString:HMAccessoryCategoryTypeVideoDoorbell]) return 13;
     if ([t isEqualToString:HMAccessoryCategoryTypeBridge]) return 14;
     if ([t isEqualToString:HMAccessoryCategoryTypeSecuritySystem]) return 15;
+    // Guarded: the constant arrived in iOS 18, and this port deploys lower.
+    // It is weak-imported, so on an older system it is simply null and the
+    // comparison would answer NO -- the guard says that on purpose rather
+    // than relying on it.
+    if (@available(iOS 18.0, watchOS 11.0, tvOS 18.0, *)) {
+        if ([t isEqualToString:HMAccessoryCategoryTypeTelevision]) {
+            return 11;
+        }
+    }
     return 16; // OTHER
 }
 
@@ -2165,6 +2174,19 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             NSString *traitId = [traits objectAtIndex:i];
             NSArray *base = [NSArray arrayWithObjects:accessoryId, serviceId,
                              traitId, nil];
+            // The accessory first, so a stale id is reported as one. Rolled
+            // into the trait answer it said "this accessory does not have
+            // that capability" about an accessory that is not there at all,
+            // and ACCESSORY_NOT_FOUND is the one that tells the caller their
+            // snapshot is old and a refresh will fix it. The read path
+            // already draws this distinction.
+            if (cn1homeFindAccessory(accessoryId) == nil) {
+                [records replaceObjectAtIndex:i withObject:cn1homeJoinFields(
+                    [base arrayByAddingObjectsFromArray:
+                     [NSArray arrayWithObjects:@"0", @"ACCESSORY_NOT_FOUND",
+                      @"no such accessory in this home", nil]])];
+                continue;
+            }
             HMService *service = cn1homeFindService(accessoryId, serviceId);
             HMCharacteristic *c = cn1homeFindCharacteristic(service, traitId);
             if (c == nil) {
@@ -2324,6 +2346,24 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
                 // The accessory will not report this one. The key stays in
                 // the watch set anyway so a later read still routes here, and
                 // TraitConstraint.notifiesOnChange already told the caller.
+                //
+                // Its polling baseline is taken HERE, at registration, not on
+                // the first drain. Established on the first poll instead, a
+                // change between subscribing and that poll became the
+                // baseline and was never delivered -- and unless the value
+                // moved a second time the listener sat on the old one for
+                // good. Recorded even when the characteristic has no cached
+                // value yet, so the baseline exists either way and the first
+                // real change is a change.
+                NSString *baselineKey = [NSString stringWithFormat:@"%@\t%@",
+                                         subId,
+                                         cn1homeReadingKey(accessoryId,
+                                                           serviceId,
+                                                           traitId)];
+                NSString *baseline = cn1homeReadingWithoutTimestamp(
+                    cn1homeEncodeReading(accessoryId, serviceId, traitId,
+                                         [c value], nil, nil));
+                [cn1homeLastPolled setObject:baseline forKey:baselineKey];
                 continue;
             }
             [c enableNotification:YES completionHandler:^(NSError *error) {
@@ -2494,14 +2534,14 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                                           objectForKey:stateKey];
                     NSString *current = cn1homeReadingWithoutTimestamp(record);
                     if (previous == nil) {
-                        // The first poll of this characteristic establishes
-                        // the baseline and reports nothing. A subscription
-                        // asks to hear about CHANGES, and
-                        // setDeliverInitialValues(false) -- the default --
-                        // says the caller does not want the current value; a
-                        // first poll that announced it would deliver exactly
-                        // what they declined, or a second copy of what the
-                        // initial delivery just gave them.
+                        // No baseline, which normally cannot happen: it is
+                        // taken when the subscription registers, precisely so
+                        // a change between then and now is a change and not a
+                        // baseline. This is the leftover case -- a
+                        // characteristic that appeared after registration --
+                        // where there is nothing to compare against and
+                        // announcing the current value would be delivering
+                        // the initial value the caller did not ask for.
                         [cn1homeLastPolled setObject:current forKey:stateKey];
                     } else if (![previous isEqualToString:current]) {
                         [cn1homeLastPolled setObject:current forKey:stateKey];

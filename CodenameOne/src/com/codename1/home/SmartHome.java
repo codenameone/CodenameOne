@@ -1126,9 +1126,13 @@ public final class SmartHome {
     /// holds one tells the caller it need not drain, which is precisely how
     /// that trait then never updates.
     ///
-    /// Unknown answers count as notifying: the graph may not be loaded yet,
-    /// and claiming a trait needs polling when it does not costs a drain the
-    /// caller did not need, whereas the reverse costs them the value.
+    /// Anything this cannot look up counts as needing a poll. That is the
+    /// cheap direction, and the earlier reading of it was backwards: an app
+    /// subscribing with persisted ids before its first refresh has an empty
+    /// graph, so EVERY lookup is unknown -- and calling that push told the
+    /// caller not to drain, which is the one thing that stops those traits
+    /// ever updating. A needless drain costs a round trip; a missed one
+    /// costs the value.
     ///
     /// #### Parameters
     ///
@@ -1144,15 +1148,15 @@ public final class SmartHome {
         for (int i = 0; i < traits.size(); i++) {
             Accessory accessory = findAccessory(accessoryIds.get(i));
             if (accessory == null) {
-                continue;
+                return false;
             }
             AccessoryService service =
                     accessory.getService(serviceIds.get(i));
             if (service == null) {
-                continue;
+                return false;
             }
             TraitConstraint c = service.getConstraint(traits.get(i));
-            if (c != null && !c.notifiesOnChange()) {
+            if (c == null || !c.notifiesOnChange()) {
                 return false;
             }
         }
