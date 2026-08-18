@@ -2684,9 +2684,23 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             // released the setpoint anyway -- and which of them finished
             // first was down to the accessory, so the same batch behaved
             // differently from run to run.
+            //
+            // What the batch asks for is every mode write in it, not the
+            // first one that happens not to be AUTO. Taking the first,
+            // "HEAT, then AUTO, and a target" bound the setpoint to HEAT
+            // and applied it, while the AUTO write left the thermostat in
+            // AUTO holding a target nothing can read back -- exactly the
+            // outcome this refusal exists to prevent. And a batch that
+            // names two different modes for one thermostat has no answer
+            // at all: HomeKit runs the writes independently, so which mode
+            // the accessory ends in is whichever landed last. Nothing here
+            // can honestly say the setpoint applied, so it is refused.
             NSUInteger waitsForEntry = NSNotFound;
             if ([traitId isEqualToString:@"target_temperature"]
                     && cn1homeHasNoValueNow(service, traitId)) {
+                NSUInteger lastMode = NSNotFound;
+                BOOL modesDisagree = NO;
+                int requestedMode = 0;
                 for (NSUInteger j = 0; j < count; j++) {
                     if (j == i
                             || ![[traits objectAtIndex:j]
@@ -2694,35 +2708,41 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                             || ![[accessories objectAtIndex:j]
                                  isEqualToString:accessoryId]
                             || ![[services objectAtIndex:j]
-                                 isEqualToString:serviceId]) {
+                                 isEqualToString:serviceId]
+                            || j >= [numbers count]) {
                         continue;
                     }
-                    if (j >= [numbers count]
-                            || (int) [[numbers objectAtIndex:j] doubleValue]
-                                == CN1_HOME_MODE_AUTO) {
-                        continue;
+                    int mode = (int) [[numbers objectAtIndex:j] doubleValue];
+                    if (lastMode != NSNotFound && mode != requestedMode) {
+                        modesDisagree = YES;
                     }
-                    // The caller's own mode write becomes this write's
-                    // prerequisite. Launched independently, a mode write the
-                    // accessory refuses -- unreachable, read-only, out of
-                    // range -- left the thermostat in AUTO while the setpoint
-                    // landed and was reported as applied, which is precisely
-                    // the "applied a target nothing can read back" this
-                    // refusal exists to prevent.
-                    if (cn1homeFindCharacteristic(
+                    requestedMode = mode;
+                    lastMode = j;
+                }
+                // The caller's own mode write becomes this write's
+                // prerequisite. Launched independently, a mode write the
+                // accessory refuses -- unreachable, read-only, out of
+                // range -- left the thermostat in AUTO while the setpoint
+                // landed and was reported as applied.
+                if (lastMode != NSNotFound && !modesDisagree
+                        && requestedMode != CN1_HOME_MODE_AUTO
+                        && cn1homeFindCharacteristic(
                             service, @"target_heating_cooling") != nil) {
-                        waitsForEntry = j;
-                    }
-                    break;
+                    waitsForEntry = lastMode;
                 }
                 if (waitsForEntry == NSNotFound) {
+                    NSString *why = modesDisagree
+                            ? @"this batch asks this thermostat for more than"
+                              " one mode, so which one it ends in is undefined"
+                              " and a single target cannot be applied with it"
+                            : @"this thermostat is in AUTO, where there is no"
+                              " single target; set the heating and cooling"
+                              " thresholds instead";
                     [records replaceObjectAtIndex:i
                                        withObject:cn1homeJoinFields(
                         [base arrayByAddingObjectsFromArray:
                          [NSArray arrayWithObjects:@"0", @"INVALID_ARGUMENT",
-                          @"this thermostat is in AUTO, where there is no"
-                          " single target; set the heating and cooling"
-                          " thresholds instead", nil]])];
+                          why, nil]])];
                     outstanding--;
                     continue;
                 }

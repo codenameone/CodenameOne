@@ -866,6 +866,70 @@ class WatchNativeBuilder {
         }
     }
 
+    /// The tag name of the value a {@code ios.plistInject} fragment gives {@code key} --
+    /// {@code "string"}, {@code "false"}, {@code "array"} -- or null when the fragment does not
+    /// carry the key at all.
+    ///
+    /// {@link #injectedPlistString} answers only for {@code <string>} values and answers null for
+    /// every other kind, which reads to a caller as "not supplied". A validator that then fills in
+    /// a default gets neither: the renderer suppresses the generated value because the key IS
+    /// there, and the injected non-string stays. Telling absent from present-and-not-a-string
+    /// needs the tag itself.
+    static String injectedPlistValueTag(BuildRequest request, String key) {
+        String inject = request.getArg("ios.plistInject", null);
+        if (inject == null) {
+            return null;
+        }
+        int at = 0;
+        while (true) {
+            int content = contentAfterOpenTag(inject, "key", at);
+            if (content < 0) {
+                return null;
+            }
+            int close = closeOfElement(inject, content, "</key>");
+            if (close < 0) {
+                return null;
+            }
+            at = close + 1;
+            if (!key.equals(plistStringContent(inject.substring(content, close)).trim())) {
+                continue;
+            }
+            int after = inject.indexOf('>', close);
+            if (after < 0) {
+                return "";
+            }
+            // The element that FOLLOWS the key, not the next one of a given kind anywhere after
+            // it. Whitespace, comments and CDATA sit between them in real fragments and none of
+            // them is the value.
+            int i = after + 1;
+            while (i < inject.length()) {
+                if (Character.isWhitespace(inject.charAt(i))) {
+                    i++;
+                    continue;
+                }
+                int skipped = skipMarkupBefore(inject, i, i);
+                if (skipped < 0) {
+                    return "";
+                }
+                if (skipped != i) {
+                    i = skipped;
+                    continue;
+                }
+                if (inject.charAt(i) != '<') {
+                    return "";
+                }
+                StringBuilder tag = new StringBuilder();
+                for (int j = i + 1; j < inject.length()
+                        && Character.isLetterOrDigit(inject.charAt(j)); j++) {
+                    tag.append(inject.charAt(j));
+                }
+                return tag.toString().toLowerCase();
+            }
+            // The key is the last thing in the fragment: present, and with no value at all.
+            return "";
+        }
+    }
+
     static String injectedPlistString(BuildRequest request, String key) {
         String inject = request.getArg("ios.plistInject", null);
         if (inject == null) {

@@ -3611,19 +3611,38 @@ public class IPhoneBuilder extends Executor {
                     // iOS treats exactly as it treats none.
                     String supplied = request.getArg(matterPrivacyKey, null);
                     if (supplied == null) {
-                        supplied = WatchNativeBuilder.injectedPlistString(
-                                request,
-                                matterPrivacyKey.substring("ios.".length()));
-                    } else if (supplied.trim().length() == 0) {
-                        supplied = "false";
+                        // What KIND of value the fragment gives the key, before its text.
+                        // injectedPlistString answers null both for a key that is not there and
+                        // for one given <false/>, and the two need opposite handling: the first
+                        // takes the generated default, the second cannot, because the renderer
+                        // drops the default for a key the fragment already carries. Read as
+                        // "absent", <false/> shipped a commissioning app whose purpose string was
+                        // the boolean false.
+                        String bare = matterPrivacyKey.substring("ios.".length());
+                        String tag = WatchNativeBuilder.injectedPlistValueTag(
+                                request, bare);
+                        if (tag == null) {
+                            supplied = null;
+                        } else if (!"string".equals(tag)) {
+                            supplied = "false";
+                        } else {
+                            supplied = WatchNativeBuilder.injectedPlistString(
+                                    request, bare);
+                            if (supplied == null) {
+                                supplied = "false";
+                            }
+                        }
                     }
                     if (supplied != null && supplied.trim().length() == 0) {
                         supplied = "false";
                     }
                     if ("false".equalsIgnoreCase(supplied)) {
                         throw new BuildException(
-                                "This app adds Matter accessories but sets "
-                                + matterPrivacyKey + "=false. Commissioning "
+                                "This app adds Matter accessories but has "
+                                + "no usable " + matterPrivacyKey + ": it is "
+                                + "false, empty, or -- through "
+                                + "ios.plistInject -- not a string at all. "
+                                + "Commissioning "
                                 + "uses Bluetooth to reach a new accessory "
                                 + "and the local network to find it "
                                 + "afterwards, and iOS terminates an app that "

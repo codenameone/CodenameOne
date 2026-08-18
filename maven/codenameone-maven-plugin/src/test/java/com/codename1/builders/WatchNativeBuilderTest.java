@@ -937,6 +937,36 @@ class WatchNativeBuilderTest {
     }
 
     /**
+     * A key present with a non-string value is not an absent key.
+     *
+     * <p>{@code injectedPlistString} answers null for both, and the two need opposite handling:
+     * an absent key takes the generated default, while a key the fragment already carries
+     * suppresses that default in the renderer -- so treating {@code <false/>} as absent shipped a
+     * plist whose purpose string was the boolean false. The Matter privacy validation refuses on
+     * this tag.</p>
+     */
+    @Test
+    void injectedValueTagTellsAbsentFromNonString() {
+        BuildRequest req = request();
+        req.putArgument("ios.plistInject",
+                "<key>NSBluetoothAlwaysUsageDescription</key><false/>"
+                + "<key>NSLocalNetworkUsageDescription</key> <!-- why --> <string>find</string>"
+                + "<key>NSBonjourServices</key><array><string>_matter._tcp</string></array>");
+
+        assertEquals("false",
+                WatchNativeBuilder.injectedPlistValueTag(req, "NSBluetoothAlwaysUsageDescription"),
+                "<false/> is a value the fragment carries, not a missing key");
+        assertEquals("string",
+                WatchNativeBuilder.injectedPlistValueTag(req, "NSLocalNetworkUsageDescription"),
+                "a comment between the key and its value is not the value");
+        assertEquals("array",
+                WatchNativeBuilder.injectedPlistValueTag(req, "NSBonjourServices"),
+                "the element that follows the key, not the next string anywhere after it");
+        assertNull(WatchNativeBuilder.injectedPlistValueTag(req, "CFBundleVersion"),
+                "a key the fragment does not carry is absent, and takes the default");
+    }
+
+    /**
      * A key inside an XML comment is not a key.
      *
      * <p>A plist fragment routinely carries an example in a comment, and the phone's parser ignores
