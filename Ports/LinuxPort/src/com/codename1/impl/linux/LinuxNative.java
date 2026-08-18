@@ -311,6 +311,14 @@ public final class LinuxNative {
      */
     public static native byte[] captureWindowToPngBytes();
 
+    /**
+     * Reads a desktop window's own back buffer back as PNG bytes, or null when the
+     * slot has no surface. This is a genuine readback rather than a re-render, which
+     * is what lets the windowed screenshot goldens catch a window whose raster and
+     * component hierarchy disagree.
+     */
+    public static native byte[] captureDesktopWindowToPngBytes(int slot);
+
     /* ----------------------------------------------------- graphics state */
 
     public static native int getColor(long graphics);

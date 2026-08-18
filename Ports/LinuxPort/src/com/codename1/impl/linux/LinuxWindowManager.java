@@ -283,6 +283,36 @@ public class LinuxWindowManager extends WindowManager {
         }
     }
 
+    /// Reads this window's own back buffer back, rather than letting
+    /// `com.codename1.ui.Window#capture()` fall back to re-rendering the component
+    /// tree. The fallback produces the content the window *should* be showing, so it
+    /// cannot tell a correct window from one whose raster and hierarchy disagree --
+    /// which is exactly what the windowed screenshot goldens are here to catch.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window's native peer
+    ///
+    /// #### Returns
+    ///
+    /// the native image, or null when the window has no surface to read
+    @Override
+    public Object capture(Object peer) {
+        int s = slot(peer);
+        if (s < 0) {
+            return null;
+        }
+        byte[] png = LinuxNative.captureDesktopWindowToPngBytes(s);
+        if (png == null || png.length == 0) {
+            return null;
+        }
+        long img = LinuxNative.createImageFromBytes(png, 0, png.length);
+        if (img == 0) {
+            return null;
+        }
+        return Long.valueOf(img);
+    }
+
     @Override
     public void setPaintDirtyRegionClip(Object peer, int x, int y, int width, int height) {
         int s = slot(peer);

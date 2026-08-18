@@ -2022,4 +2022,36 @@ class WindowTest extends UITestBase {
                 "a hidden window must not leave paint work that nothing will ever drain");
         w.dispose();
     }
+
+    @FormTest
+    void captureUsesThePortsReadbackWhenItHasOneAndRendersWhenItDoesNot() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("shot", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // A port that can read its own window back must be used: re-rendering the
+        // hierarchy produces the content the window *should* be showing, so it cannot
+        // tell a correct window from one whose raster and hierarchy disagree -- which
+        // is the whole thing the windowed screenshot goldens exist to catch.
+        Object readback = implementation.createImage(new int[64 * 32], 64, 32);
+        wm.setCaptureResult(readback);
+        Image shot = w.capture();
+        assertNotNull(shot);
+        assertEquals(1, wm.getCaptureCalls(), "the port must be asked first");
+        assertEquals(64, shot.getWidth(),
+                "capture() must hand back the port's readback, not a re-render at the "
+                        + "window's size");
+        assertEquals(32, shot.getHeight());
+
+        // A port with no readback still owes a capture, so the re-render remains --
+        // at the window's own size rather than the main display's.
+        wm.setCaptureResult(null);
+        Image rendered = w.capture();
+        assertNotNull(rendered, "a port that cannot read back still owes a capture");
+        assertEquals(w.getWidth(), rendered.getWidth());
+        assertEquals(w.getHeight(), rendered.getHeight());
+
+        w.dispose();
+    }
 }

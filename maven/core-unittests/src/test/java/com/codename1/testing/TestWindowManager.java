@@ -281,7 +281,33 @@ public class TestWindowManager extends WindowManager {
 
     private boolean createFails;
 
+    /// The native image the next capture() should hand back, or null to model a port
+    /// that cannot read its own window back. Ports differ here -- JavaSE, Catalyst and
+    /// Linux read the window's real raster, while a port with no readback leaves
+    /// Window.capture() to re-render -- and both paths need covering.
+    private Object captureResult;
+
+    /// Counts capture() calls, so a test can tell "the port was asked and declined"
+    /// from "the port was never asked at all".
+    private int captureCalls;
+
+    public void setCaptureResult(Object nativeImage) {
+        captureResult = nativeImage;
+    }
+
+    public int getCaptureCalls() {
+        return captureCalls;
+    }
+
+    @Override
+    public Object capture(Object peer) {
+        captureCalls++;
+        return win(peer) == null ? null : captureResult;
+    }
+
     public void reset() {
+        captureResult = null;
+        captureCalls = 0;
         createFails = false;
         mainWindowInputEnabled = true;
         windows.clear();
