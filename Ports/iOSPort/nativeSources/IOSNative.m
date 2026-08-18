@@ -15190,15 +15190,35 @@ static void cn1IntentsEnsureStaging() {
 /// Everything indexed through Intents lives under it, so clearing "everything this framework
 /// indexed" is a domain delete rather than deleting the application's entire Spotlight index --
 /// which is what it used to be, and which took content the app indexed itself along with it.
+///
+/// **The recursive delete is documented Core Spotlight behaviour, not an assumption.** Review
+/// twice read this as an exact-match API that would leave every typed item behind. It is not;
+/// CSSearchableIndex.h says so directly, above deleteSearchableItemsWithDomainIdentifiers:
+///
+///   "The delete is recursive so if domain identifiers are of the form
+///    <account-id>.<mailbox-id>, for example, calling delete with <account-id> will delete all
+///    the searchable items with that account and any mailbox."
+///
+/// (Quoted from the iPhoneOS SDK header.) That is precisely this scheme: the root is the
+/// account, an entity type is the mailbox. Deleting the root therefore clears every type.
 #define CN1_INTENT_DOMAIN_ROOT @"com.codename1.intents"
 
-/// The subdomain an entity type is indexed under. Core Spotlight deletes a domain's subdomains
-/// with it, so this nests rather than being a separate namespace.
+/// The subdomain an entity type is indexed under.
+///
+/// The dot is what makes the hierarchy, so a dot *inside* an entity type would make one nobody
+/// asked for: with types "order" and "order.line" -- ordinary enough for a reverse-DNS naming
+/// scheme -- clearIndex("order") would take "order.line" with it, two unrelated types clearing
+/// as one. Percent-escaping the separator keeps every type exactly one level below the root, so
+/// the hierarchy means only what this file intends it to mean. The escape is applied on both
+/// paths because index and clear share this function.
 static NSString *cn1IntentDomain(NSString *entityType) {
     if (entityType == nil || [entityType length] == 0) {
         return CN1_INTENT_DOMAIN_ROOT;
     }
-    return [NSString stringWithFormat:@"%@.%@", CN1_INTENT_DOMAIN_ROOT, entityType];
+    NSString *escaped = [entityType stringByReplacingOccurrencesOfString:@"%"
+                                                             withString:@"%25"];
+    escaped = [escaped stringByReplacingOccurrencesOfString:@"." withString:@"%2E"];
+    return [NSString stringWithFormat:@"%@.%@", CN1_INTENT_DOMAIN_ROOT, escaped];
 }
 
 /// The generated Swift bridge, present only when the app declares an @AppIntent. Absent is a
