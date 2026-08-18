@@ -321,7 +321,45 @@ class InterpIOSSymbols {
             if (id != null) {
                 return id.intValue();
             }
+            // Interfaces as well as superclasses: a constant declared on an
+            // interface is read through whatever implements it, and an
+            // interface reached through another interface is ordinary Java.
+            // A superclass-only walk answers -1 for a field the app has.
+            int fromInterface = interfaceFieldId(table, currentOwner, name, 0);
+            if (fromInterface >= 0) {
+                return fromInterface;
+            }
             currentOwner = superName(currentOwner);
+        }
+        return -1;
+    }
+
+    /** Searches a class's interfaces, and theirs, for a field. */
+    private int interfaceFieldId(Hashtable table, String owner, String name, int depth) {
+        if (depth > 16) {
+            return -1;
+        }
+        Integer ownerId = (Integer)classIds.get(owner);
+        if (ownerId == null) {
+            return -1;
+        }
+        int[] ifaces = (int[])interfaceIds.get(ownerId);
+        if (ifaces == null) {
+            return -1;
+        }
+        for (int i = 0; i < ifaces.length; i++) {
+            String ifaceName = (String)classNames.get(Integer.valueOf(ifaces[i]));
+            if (ifaceName == null) {
+                continue;
+            }
+            Integer id = (Integer)table.get(ifaceName + "#" + name);
+            if (id != null) {
+                return id.intValue();
+            }
+            int deeper = interfaceFieldId(table, ifaceName, name, depth + 1);
+            if (deeper >= 0) {
+                return deeper;
+            }
         }
         return -1;
     }

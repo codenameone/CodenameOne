@@ -1309,10 +1309,13 @@ public final class InterpRuntime {
         String desc = bundle.string(bundle.externDesc[ext]);
         InterpClass ic = bundle.findClass(owner);
         if (ic != null) {
-            ensureInitialized(ic);
             if (declaredByInterpreted(ic, name)) {
-                pushBoxed(f, InterpValues.kindOf(desc),
-                        findStaticHolder(ic, name).staticValue(name));
+                // The class that declares it, not the one the call site named.
+                // `Child.x` where Parent declares x initializes Parent and
+                // leaves Child alone.
+                InterpClass holder = findStaticHolder(ic, name);
+                ensureInitialized(holder);
+                pushBoxed(f, InterpValues.kindOf(desc), holder.staticValue(name));
                 return;
             }
             // Inherited from a host supertype -- a superclass, or an
@@ -1326,7 +1329,11 @@ public final class InterpRuntime {
                             linker.getStatic(hostOwners[i], name, desc));
                     return;
                 } catch (Throwable notThere) {
-                    if (i == hostOwners.length - 1) {
+                    // Only "this candidate does not have it" moves on. A field
+                    // that exists and whose class initializer threw must be
+                    // reported as itself, not masked by the next candidate's
+                    // NoSuchFieldError.
+                    if (!isAbsent(notThere) || i == hostOwners.length - 1) {
                         throw notThere;
                     }
                 }
@@ -1345,9 +1352,10 @@ public final class InterpRuntime {
         Object value = popBoxed(f, kind);
         InterpClass ic = bundle.findClass(owner);
         if (ic != null) {
-            ensureInitialized(ic);
             if (declaredByInterpreted(ic, name)) {
-                findStaticHolder(ic, name).setStaticValue(name, value);
+                InterpClass holder = findStaticHolder(ic, name);
+                ensureInitialized(holder);
+                holder.setStaticValue(name, value);
                 return;
             }
             // As above: writing it here would create a private copy the host
@@ -1361,7 +1369,7 @@ public final class InterpRuntime {
                     linker.setStatic(hostOwners[i], name, desc, value);
                     return;
                 } catch (Throwable notThere) {
-                    if (i == hostOwners.length - 1) {
+                    if (!isAbsent(notThere) || i == hostOwners.length - 1) {
                         throw notThere;
                     }
                 }
@@ -1404,6 +1412,19 @@ public final class InterpRuntime {
             k = k.superInterp;
         }
         return null;
+    }
+
+    /// Whether a failure means "this class does not have that member" rather
+    /// than "reading it went wrong".
+    ///
+    /// The difference decides whether another candidate owner may be tried. A
+    /// class initializer that threw is a real failure and belongs to the
+    /// caller; only absence is a reason to keep looking.
+    private static boolean isAbsent(Throwable t) {
+        return t instanceof NoSuchFieldException
+                || t instanceof NoSuchFieldError
+                || t instanceof ClassNotFoundException
+                || t instanceof NoClassDefFoundError;
     }
 
     /// Where a static the interpreted hierarchy does not declare might live.
