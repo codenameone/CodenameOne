@@ -1909,17 +1909,33 @@ public final class InterpRuntime {
         // block for a long time (invokeAndBlock waiting on the network) and
         // that must not read as a runaway loop.
         ThreadState st = state();
-        // A class token for a bundle-only type is an InterpClass, and the host
-        // method wants a java.lang.Class. The documented resource idiom --
-        // `getResourceAsStream(getClass(), "/theme.res")` -- hits this on every
-        // pushed program, so the token is exchanged for the class of its
-        // nearest host ancestor: the same class loader, and a real Class.
-        for (int i = 0; i < args.length; i++) {
-            if (args[i] instanceof InterpClass) {
+        // A class token for a bundle-only type is an InterpClass, and a host
+        // method declaring java.lang.Class cannot be handed one. The documented
+        // resource idiom -- `getResourceAsStream(getClass(), "/theme.res")` --
+        // hits this on every pushed program, so the token is exchanged for the
+        // class of its nearest host ancestor: the same class loader, and a real
+        // Class.
+        //
+        // Only where the parameter actually says Class. Substituting into an
+        // Object parameter loses the token itself: `list.add(Pushed.class)`
+        // would store Object.class, and reading it back would not equal the
+        // literal the program still holds. A host that took it as Object never
+        // needed a Class in the first place -- it is storing a reference.
+        String[] params = paramDescriptors(desc);
+        for (int i = 0; i < args.length && i < params.length; i++) {
+            if (args[i] instanceof InterpClass && "Ljava/lang/Class;".equals(params[i])) {
                 args[i] = hostClassFor((InterpClass) args[i]);
             }
         }
         st.hostCallDepth++;
+        // When this is the outermost host call, the wall clock it spends is not
+        // the program's to answer for: invokeAndBlock, a network read or a
+        // dialog can sit for seconds, and the budget is about interpreted code
+        // that never yields. Suppressing the check for the duration is not
+        // enough -- the entry clock keeps running, so the first checkpoint
+        // after a long call trips on time the host spent. The clock is moved
+        // forward by that interval instead.
+        long hostCallStart = st.hostCallDepth == 1 ? System.currentTimeMillis() : 0;
         try {
             if (target == null) {
                 if (hostInterceptor != null) {
@@ -1948,7 +1964,44 @@ public final class InterpRuntime {
             throw t;
         } finally {
             st.hostCallDepth--;
+            if (st.hostCallDepth == 0 && st.runStartMs > 0) {
+                st.runStartMs += System.currentTimeMillis() - hostCallStart;
+            }
         }
+    }
+
+    /// The parameter descriptors of a method descriptor, in order.
+    ///
+    /// `(ILjava/lang/String;[J)V` is `I`, `Ljava/lang/String;`, `[J` -- one
+    /// entry per argument, so the result lines up with the argument array.
+    private static String[] paramDescriptors(String desc) {
+        Vector out = new Vector();
+        int i = desc.indexOf('(') + 1;
+        int end = desc.indexOf(')');
+        if (i <= 0 || end < i) {
+            return new String[0];
+        }
+        while (i < end) {
+            int start = i;
+            while (i < end && desc.charAt(i) == '[') {
+                i++;
+            }
+            if (i < end && desc.charAt(i) == 'L') {
+                int semi = desc.indexOf(';', i);
+                if (semi < 0 || semi > end) {
+                    // A descriptor this malformed cannot be walked; the caller
+                    // simply does not substitute, which is the safe direction.
+                    return new String[0];
+                }
+                i = semi + 1;
+            } else {
+                i++;
+            }
+            out.addElement(desc.substring(start, i));
+        }
+        String[] answer = new String[out.size()];
+        out.copyInto(answer);
+        return answer;
     }
 
     /// The host class standing in for an interpreted one: the nearest ancestor
@@ -2058,6 +2111,16 @@ public final class InterpRuntime {
         }
         if ("isInterface".equals(name) && args.length == 0) {
             return c.isInterface() ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("desiredAssertionStatus".equals(name) && args.length == 0) {
+            // Not a curiosity: javac compiles an `assert` into a <clinit> that
+            // reads ThisClass.class.desiredAssertionStatus() into a synthetic
+            // $assertionsDisabled field, so without an answer here a class
+            // containing one assert fails to initialize and the push dies
+            // before the program runs. False is also what the device says --
+            // java.lang.Class on ParparVM returns false unconditionally -- so
+            // an assert is inert here exactly as it is in a built app.
+            return Boolean.FALSE;
         }
         if ("isInstance".equals(name) && args.length == 1) {
             return isInstanceOf(args[0], c.getName()) ? Boolean.TRUE : Boolean.FALSE;

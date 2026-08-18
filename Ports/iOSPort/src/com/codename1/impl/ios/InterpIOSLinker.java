@@ -294,11 +294,17 @@ public class InterpIOSLinker implements InterpLinker {
     }
 
     public Object cloneArray(Object source) {
-        // ParparVM arrays carry their element type in the object itself, and
-        // there is no reflective way to ask for it from Java. Returning null
-        // leaves the caller with an Object[] of the right length, which is what
-        // the interpreter's own arrays are anyway.
-        return null;
+        // ParparVM arrays carry their element type in the object itself, which
+        // Java cannot read but a native can. Allocating from the source's own
+        // clazz is what keeps `String[] copy = original.clone()` a String[]:
+        // an Object[] of the right length passes nothing that checks the type,
+        // so the copy failed the first cast or host call it reached.
+        if (!(source instanceof Object[])) {
+            // Primitive arrays are copied by the caller, which knows their type
+            // from Java.
+            return null;
+        }
+        return InterpIOSNative.newArrayLike(source, ((Object[]) source).length);
     }
 
     public Object newArray(String componentDescriptor, int length) throws Throwable {

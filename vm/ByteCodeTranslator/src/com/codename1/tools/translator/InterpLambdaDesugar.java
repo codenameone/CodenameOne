@@ -104,12 +104,13 @@ final class InterpLambdaDesugar {
     /**
      * Builds the class the metafactory would have spun.
      *
-     * <p>{@code altMetafactory} carries extra marker interfaces and bridge
-     * signatures after the first three arguments. The three that matter are in
-     * the same positions for both, and a marker interface is by definition
-     * empty, so the extras are ignored deliberately rather than by oversight --
-     * a serializable lambda runs, it simply is not serializable, and nothing on
-     * the device could serialize it anyway.</p>
+     * <p>The first three bootstrap arguments mean the same thing for
+     * {@code metafactory} and {@code altMetafactory}. The latter then carries a
+     * flags word, marker interfaces and bridge signatures, and those are read
+     * rather than dropped: an intersection cast such as {@code (A & B) () ->
+     * "x"} names A as a marker and A's erased {@code ()Object} as a bridge, so
+     * a class carrying only B and only B's method fails the call site's own
+     * cast and cannot answer a call through A.</p>
      */
     private static ClassNode synthesize(ClassNode owner, InvokeDynamicInsnNode indy, int index) {
         Type[] captured = Type.getArgumentTypes(indy.desc);
@@ -137,7 +138,105 @@ final class InterpLambdaDesugar {
         cn.methods.add(constructor(cn, captured));
         cn.methods.add(factory(cn, captured, indy.desc));
         cn.methods.add(samMethod(cn, indy.name, sam, instantiated, impl, captured));
+        addAltExtras(cn, indy, sam);
         return cn;
+    }
+
+    /// Set in altMetafactory's flags word when marker interfaces follow.
+    private static final int FLAG_MARKERS = 2;
+
+    /// Set in altMetafactory's flags word when bridge signatures follow.
+    private static final int FLAG_BRIDGES = 4;
+
+    /**
+     * Adds altMetafactory's marker interfaces and bridge methods.
+     *
+     * <p>The extras are positional: a flags word, then -- each only when its
+     * flag is set, and in this order -- a count of marker interfaces followed
+     * by that many types, then a count of bridge signatures followed by that
+     * many method types. A shape that does not parse is left alone rather than
+     * guessed at, which is the same outcome as before this was read at all.</p>
+     */
+    private static void addAltExtras(ClassNode cn, InvokeDynamicInsnNode indy, Type sam) {
+        if (!"altMetafactory".equals(indy.bsm.getName()) || indy.bsmArgs.length < 4
+                || !(indy.bsmArgs[3] instanceof Integer)) {
+            return;
+        }
+        int flags = ((Integer) indy.bsmArgs[3]).intValue();
+        int at = 4;
+        if ((flags & FLAG_MARKERS) != 0) {
+            if (at >= indy.bsmArgs.length || !(indy.bsmArgs[at] instanceof Integer)) {
+                return;
+            }
+            int count = ((Integer) indy.bsmArgs[at++]).intValue();
+            for (int i = 0; i < count && at < indy.bsmArgs.length; i++) {
+                Object marker = indy.bsmArgs[at++];
+                if (marker instanceof Type) {
+                    String name = ((Type) marker).getInternalName();
+                    if (!cn.interfaces.contains(name)) {
+                        cn.interfaces.add(name);
+                    }
+                }
+            }
+        }
+        if ((flags & FLAG_BRIDGES) == 0) {
+            return;
+        }
+        if (at >= indy.bsmArgs.length || !(indy.bsmArgs[at] instanceof Integer)) {
+            return;
+        }
+        int count = ((Integer) indy.bsmArgs[at++]).intValue();
+        for (int i = 0; i < count && at < indy.bsmArgs.length; i++) {
+            Object bridge = indy.bsmArgs[at++];
+            if (bridge instanceof Type
+                    && !sam.getDescriptor().equals(((Type) bridge).getDescriptor())) {
+                cn.methods.add(bridgeMethod(cn, indy.name, sam, (Type) bridge));
+            }
+        }
+    }
+
+    /**
+     * One bridge: another erasure of the same method, forwarding to the SAM.
+     *
+     * <p>Two interfaces can declare the same method with different erased
+     * signatures -- {@code Object m()} and {@code String m()} -- and a class
+     * implementing both needs a body for each. This one adapts its arguments,
+     * calls the real implementation and adapts the result back.</p>
+     */
+    private static MethodNode bridgeMethod(ClassNode cn, String name, Type sam, Type bridge) {
+        Type[] bridgeArgs = bridge.getArgumentTypes();
+        Type[] samArgs = sam.getArgumentTypes();
+        MethodNode mn = new MethodNode(
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC,
+                name, bridge.getDescriptor(), null, null);
+        InsnList il = mn.instructions;
+        il.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        int local = 1;
+        int stack = 1;
+        for (int i = 0; i < bridgeArgs.length; i++) {
+            il.add(new VarInsnNode(bridgeArgs[i].getOpcode(Opcodes.ILOAD), local));
+            local += bridgeArgs[i].getSize();
+            if (i < samArgs.length) {
+                adapt(il, bridgeArgs[i], samArgs[i]);
+            }
+            stack += 2;
+        }
+        il.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, cn.name, name,
+                sam.getDescriptor(), false));
+        Type samReturn = sam.getReturnType();
+        Type bridgeReturn = bridge.getReturnType();
+        if (bridgeReturn.getSort() == Type.VOID) {
+            if (samReturn.getSort() != Type.VOID) {
+                il.add(new InsnNode(samReturn.getSize() == 2 ? Opcodes.POP2 : Opcodes.POP));
+            }
+            il.add(new InsnNode(Opcodes.RETURN));
+        } else {
+            adapt(il, samReturn, bridgeReturn);
+            il.add(new InsnNode(bridgeReturn.getOpcode(Opcodes.IRETURN)));
+        }
+        mn.maxStack = Math.max(stack + 2, 4);
+        mn.maxLocals = local;
+        return mn;
     }
 
     private static MethodNode constructor(ClassNode cn, Type[] captured) {

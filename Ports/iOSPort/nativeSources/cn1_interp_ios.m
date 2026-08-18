@@ -519,6 +519,27 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_newObjectArray___int_int_R_ja
     return allocArray(threadStateData, length, arrayClass, sizeof(JAVA_OBJECT), 1);
 }
 
+JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_newArrayLike___java_lang_Object_int_R_java_lang_Object(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT source, JAVA_INT length) {
+    if (source == JAVA_NULL || length < 0) {
+        return JAVA_NULL;
+    }
+    /* An empty array shaped exactly like the source: its own clazz, its own
+       dimension count and its own element size. Cloning a host reference array
+       through the generic path produced a plain Object[], and a String[] that
+       has become an Object[] fails the next checkcast and cannot be handed to
+       a method declaring String[] -- so a clone silently broke the value it
+       was copying. Taking the clazz from the object needs no registry lookup
+       and is right for ranks and component types no table anticipated. */
+    struct clazz* arrayClass = source->__codenameOneParentClsReference;
+    if (arrayClass == NULL) {
+        return JAVA_NULL;
+    }
+    JAVA_ARRAY src = (JAVA_ARRAY)source;
+    return allocArray(threadStateData, length, arrayClass, src->primitiveSize,
+                      src->dimensions);
+}
+
 /*
  * The class-initializer registry.
  *

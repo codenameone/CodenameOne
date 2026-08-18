@@ -126,15 +126,22 @@ public final class InterpObject {
     /// the peer, whose generated override routes to the interpreter already.
     @Override
     public String toString() {
-        if (enumName != null) {
-            return enumName;
-        }
+        // The override first, the constant name second. An enum is allowed to
+        // define toString -- `RED` printing as `red` is the ordinary reason to
+        // write one -- and answering the name here made the override apply to
+        // interpreted callers and not to host ones, so the same constant
+        // printed two different ways depending on who asked.
         if (runtime != null) {
             Object r = runtime.dispatch(this, "toString", "()Ljava/lang/String;",
                     new Object[0]);
             if (r != InterpRuntime.NOT_OVERRIDDEN) {  //NOPMD CompareObjectsWithEquals - a sentinel
                 return (String) r;
             }
+        }
+        if (enumName != null) {
+            // What java.lang.Enum.toString does, for a constant that did not
+            // override it.
+            return enumName;
         }
         return type.name.replace('/', '.') + "@interp";
     }

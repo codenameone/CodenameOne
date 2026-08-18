@@ -107,7 +107,6 @@ class InterpIOSNative {
     /// compiled against, and only the receiver knows which override to run.
     static native int classIdOf(Object value);
 
-    /** Allocates an object array whose component type is the given class id. */
     /**
      * Allocates a reference array of the class named by {@code arrayClassId}.
      *
@@ -116,6 +115,17 @@ class InterpIOSNative {
      * against `String[]` compares.</p>
      */
     static native Object newObjectArray(int arrayClassId, int length);
+
+    /**
+     * Allocates an empty array shaped exactly like {@code source} -- the same
+     * class, rank and element size -- or null when it cannot be read.
+     *
+     * <p>This is what makes {@code clone()} keep a host array's type. The
+     * component of an existing array is written into the object itself, so
+     * copying it needs no registry entry and works for ranks and component
+     * types no table anticipated.</p>
+     */
+    static native Object newArrayLike(Object source, int length);
 
     /** True when the running binary carries invoke thunks. */
     static native boolean isInterpHostBuild();

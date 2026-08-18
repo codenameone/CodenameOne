@@ -364,6 +364,68 @@ class InterpConformanceTest {
                 + " try { Color.valueOf(\"PINK\"); } catch (IllegalArgumentException e) {"
                 + "   System.out.println(\"no PINK\"); }"
                 + "}}"));
+        // An enum constant that overrides toString. The interpreter answers
+        // name() itself, and answering it for toString as well made the
+        // override apply to interpreted callers and not to host ones -- so the
+        // same constant printed two ways depending on who asked.
+        out.add(c("EnumToStringOverride",
+                "public class EnumToStringOverride {"
+                + " enum Color { RED, GREEN;"
+                + "   public String toString() { return name().toLowerCase(); } }"
+                + " public static void main(String[] a) {"
+                + " System.out.println(Color.RED);"
+                + " System.out.println(\"v=\" + Color.GREEN);"
+                + " System.out.println(String.valueOf(Color.RED));"
+                + " StringBuilder sb = new StringBuilder(); sb.append(Color.GREEN);"
+                + " System.out.println(sb.toString());"
+                + " System.out.println(Color.RED.name() + \" \" + Color.valueOf(\"GREEN\"));"
+                + "}}"));
+        // An `assert` compiles to a <clinit> that reads
+        // ThisClass.class.desiredAssertionStatus(), so a class containing one
+        // failed to initialize before that question had an answer -- the push
+        // died before the program ran.
+        out.add(c("Assertions",
+                "public class Assertions {"
+                + " static int sum(int a, int b) { assert a >= 0; return a + b; }"
+                + " public static void main(String[] a) {"
+                + " int n = 1;"
+                + " assert n == 1 : \"never\";"
+                + " System.out.println(\"ran \" + sum(n, 2));"
+                + "}}"));
+        // A class token passed where the host declares Object is stored, not
+        // converted: substituting the nearest host ancestor's Class there put
+        // Object.class in the collection, and reading it back no longer equalled
+        // the literal the program still held.
+        out.add(c("ClassTokenIdentity",
+                "import java.util.*;"
+                + "public class ClassTokenIdentity {"
+                + " static class Thing {}"
+                + " public static void main(String[] a) {"
+                + " List list = new ArrayList();"
+                + " list.add(Thing.class);"
+                + " list.add(String.class);"
+                + " System.out.println(list.get(0) == Thing.class);"
+                + " System.out.println(list.get(1) == String.class);"
+                + " Map m = new HashMap(); m.put(Thing.class, \"t\");"
+                + " System.out.println(m.get(Thing.class));"
+                + "}}"));
+        // An intersection cast names extra interfaces and extra erasures of the
+        // same method through altMetafactory. A synthesized class carrying only
+        // the first interface fails the call site's own cast, and a call through
+        // the other interface's erased signature resolves to nothing.
+        out.add(c("IntersectionLambda",
+                "import java.io.Serializable;"
+                + "public class IntersectionLambda {"
+                + " interface StringSupplier { String get(); }"
+                + " interface ObjectSupplier { Object get(); }"
+                + " public static void main(String[] a) {"
+                + " StringSupplier s = (StringSupplier & ObjectSupplier) () -> \"x\";"
+                + " System.out.println(s.get());"
+                + " System.out.println(((ObjectSupplier) s).get());"
+                + " System.out.println(s instanceof ObjectSupplier);"
+                + " Runnable r = (Runnable & Serializable) () -> System.out.println(\"ran\");"
+                + " r.run();"
+                + "}}"));
         // An interpreted class whose toString the host has to reach when it
         // converts the object to a string.
         out.add(c("ToStringOverride",

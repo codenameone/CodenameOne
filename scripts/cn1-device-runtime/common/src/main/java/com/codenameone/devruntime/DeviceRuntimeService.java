@@ -344,13 +344,42 @@ public class DeviceRuntimeService {
         return spoke[0];
     }
 
-    /// Closes everything a sweep batch left open, unblocking the readers.
-    private static void closeAll(Vector streams) {
-        synchronized (streams) {
-            for (int i = 0; i < streams.size(); i++) {
-                closeQuietly((InputStream) streams.elementAt(i));
+    /// One sweep connection, and whether the peer behind it has answered.
+    private static final class SweepConnection {
+        private final InputStream is;
+
+        /// True once the exchange read the protocol magic; shared with handle.
+        private final boolean[] started = new boolean[1];
+
+        SweepConnection(InputStream is) {
+            this.is = is;
+        }
+    }
+
+    /// Whether any connection in this batch is in the middle of an exchange.
+    private static boolean anyStarted(Vector connections) {
+        synchronized (connections) {
+            for (int i = 0; i < connections.size(); i++) {
+                if (((SweepConnection) connections.elementAt(i)).started[0]) {
+                    return true;
+                }
             }
-            streams.removeAllElements();
+        }
+        return false;
+    }
+
+    /// Closes the connections a sweep batch left parked on a silent address,
+    /// unblocking their readers, and leaves an exchange in progress alone.
+    private static void closeSilent(Vector connections) {
+        synchronized (connections) {
+            for (int i = connections.size() - 1; i >= 0; i--) {
+                SweepConnection conn = (SweepConnection) connections.elementAt(i);
+                if (conn.started[0]) {
+                    continue;
+                }
+                closeQuietly(conn.is);
+                connections.removeElementAt(i);
+            }
         }
     }
 
@@ -398,10 +427,13 @@ public class DeviceRuntimeService {
         String selfSuffix = self.substring(self.lastIndexOf('.') + 1);
         status = "looking for a computer on " + prefix + "*";
 
-        // Streams the sweep has open, so an address that accepts and then says
-        // nothing can be closed rather than left with a thread parked in
+        // Connections the sweep has open, so an address that accepts and then
+        // says nothing can be closed rather than left with a thread parked in
         // readInt. A sweep is 254 addresses; leaking one thread each would end
-        // the app.
+        // the app. Each carries whether it has spoken the magic, because only
+        // the silent ones may be closed: a peer that answered is pairing (a
+        // human is typing a code) or transferring a bundle, and neither
+        // finishes inside a batch deadline.
         final Vector openStreams = new Vector();
         for (int base = 1; base <= 254; base += SWEEP_BATCH) {
             final boolean[] found = new boolean[1];
@@ -423,13 +455,20 @@ public class DeviceRuntimeService {
                         //
                         // Held so the sweep can close it: an address that
                         // accepts and then says nothing parks this thread in
-                        // readInt forever, and a sweep is 254 of them.
+                        // readInt forever, and a sweep is 254 of them. The
+                        // holder's flag goes true the moment this one answers,
+                        // which is what takes it out of the batch's reach.
+                        SweepConnection conn = new SweepConnection(is);
                         synchronized (openStreams) {
-                            openStreams.addElement(is);
+                            openStreams.addElement(conn);
                         }
-                        boolean spoke = handle(is, os, false);
-                        synchronized (openStreams) {
-                            openStreams.removeElement(is);
+                        boolean spoke;
+                        try {
+                            spoke = handle(is, os, false, conn.started);
+                        } finally {
+                            synchronized (openStreams) {
+                                openStreams.removeElement(conn);
+                            }
                         }
                         if (spoke) {
                             synchronized (found) {
@@ -448,17 +487,24 @@ public class DeviceRuntimeService {
                 sc.setConnectTimeout(CONNECT_TIMEOUT_MS);
                 Socket.connect(candidate, port, sc);
             }
+            // Same rule as the dial: wait out the connect attempts, but once an
+            // address has spoken the magic wait for that exchange however long
+            // it takes. Ending the batch on the clock closed the one connection
+            // that was working -- pairing waits on a human, and a bundle takes
+            // as long as it takes -- so discovery could never complete on iOS,
+            // where the sweep is the only way in.
             long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS + 800;
-            while (!found[0] && System.currentTimeMillis() < deadline) {
+            while (!found[0]
+                    && (anyStarted(openStreams) || System.currentTimeMillis() < deadline)) {
                 try {
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
-                    closeAll(openStreams);
+                    closeSilent(openStreams);
                     return false;
                 }
             }
             // Whatever this batch left parked on a silent address.
-            closeAll(openStreams);
+            closeSilent(openStreams);
             if (found[0]) {
                 setHost(foundAt[0]);
                 status = "found " + foundAt[0] + ":" + port;

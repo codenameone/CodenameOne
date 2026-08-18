@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -137,6 +138,41 @@ class InterpRuntimeContractTest {
                 "the budget should fire promptly, took " + elapsed + "ms");
         assertTrue(e.getMessage().indexOf("without yielding") > 0,
                 "the message should explain why, was: " + e.getMessage());
+    }
+
+    /// Time the host spent is not the program's to answer for.
+    ///
+    /// `invokeAndBlock`, a network read or a dialog can sit for seconds, and
+    /// the budget is about interpreted code that never yields. Suppressing the
+    /// check for the duration of a host call is not enough: the entry clock
+    /// kept running, so the first checkpoint after a long call tripped on time
+    /// the host had spent and every program that waited for anything died on
+    /// its next loop.
+    @Test
+    @DisplayName("time inside a host call is not charged to the EDT budget")
+    void aLongHostCallDoesNotSpendTheBudget() throws Throwable {
+        InterpRuntime rt = load("Waiter",
+                "public class Waiter {"
+                + " public static void main(String[] a) {"
+                + "   try { Thread.sleep(1500); } catch (InterruptedException e) { }"
+                + "   int n = 0; for (int i = 0; i < 20000; i++) { n += i; }"
+                + "   System.out.println(n); } }");
+        rt.setEdtBudgetMs(800);
+
+        final InterpRuntime runtime = rt;
+        Throwable e = runWhereTheBudgetApplies(new Runnable() {
+            public void run() {
+                try {
+                    runtime.runMain(new String[0]);
+                } catch (RuntimeException re) {
+                    throw re;
+                } catch (Throwable t) {
+                    throw new IllegalStateException(t);
+                }
+            }
+        });
+        assertNull(e, "waiting on the host should not spend the budget, got "
+                + (e == null ? "" : String.valueOf(unwrap(e))));
     }
 
     /// The budget covers one entry into the interpreter, not the session.
