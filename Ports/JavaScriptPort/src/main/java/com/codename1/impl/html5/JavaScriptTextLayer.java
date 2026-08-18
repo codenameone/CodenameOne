@@ -134,6 +134,10 @@ public final class JavaScriptTextLayer {
         private boolean promotable;
         private boolean covering;
         private boolean clipEmpty;
+        private int clipX;
+        private int clipY;
+        private int clipW;
+        private int clipH;
     }
 
     private final HTMLDocument document;
@@ -268,6 +272,10 @@ public final class JavaScriptTextLayer {
                 && component.getComponentForm() == Display.getInstance().getCurrent();
         frame.covering = covering;
         frame.clipEmpty = clipEmpty;
+        frame.clipX = clipX;
+        frame.clipY = clipY;
+        frame.clipW = clipW;
+        frame.clipH = clipH;
         if (frame.cellRenderer) {
             cellRendererDepth++;
         }
@@ -303,6 +311,9 @@ public final class JavaScriptTextLayer {
                 releaseFrom(frame.runs, 0);
             } else if (frame.covering) {
                 releaseFrom(frame.runs, frame.sequence);
+            } else {
+                releaseStaleWithin(frame.runs, frame.paintPass,
+                        frame.clipX, frame.clipY, frame.clipW, frame.clipH);
             }
         }
         frame.covering = false;
@@ -754,6 +765,50 @@ public final class JavaScriptTextLayer {
             runs.runs.add(new Run(clip, text));
         }
         return runs.runs.get(index);
+    }
+
+    /**
+     * Releases the runs a partial repaint stopped drawing.
+     *
+     * <p>A repaint of part of a component redraws whatever its clip reaches, so a run inside
+     * that clip which this paint did not draw again is text the component no longer shows --
+     * the canvas lost those glyphs when the region was repainted, and the layer has to lose
+     * them too. Its own background paint will not do it: coverage deliberately ignores runs
+     * belonging to the component that is painting, since a component covers its own text on
+     * every ordinary repaint and draws it again a moment later.</p>
+     *
+     * <p>Runs outside the clip are left alone. Nothing repainted there, so their glyphs are
+     * still what the screen shows -- releasing them is what would make the other lines of a
+     * multiline component disappear.</p>
+     *
+     * @param runs the component's runs
+     * @param paintPass the pass this paint claimed its runs with
+     * @param x the repainted region's x, in Codename One pixels
+     * @param y the repainted region's y
+     * @param w the repainted region's width
+     * @param h the repainted region's height
+     */
+    private void releaseStaleWithin(ComponentRuns runs, int paintPass, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        for (int i = 0; i < runs.runs.size(); i++) {
+            Run run = runs.runs.get(i);
+            if (!run.attached || run.claimedPass >= paintPass) {
+                continue;
+            }
+            // A run with nothing recorded cannot be placed against the region, and guessing
+            // would take text off the screen that may be nowhere near it.
+            if (run.coverW <= 0 || run.coverH <= 0) {
+                continue;
+            }
+            if (run.coverX + run.coverW <= x || x + w <= run.coverX
+                    || run.coverY + run.coverH <= y || y + h <= run.coverY) {
+                continue;
+            }
+            container.removeChild(run.clip);
+            run.attached = false;
+        }
     }
 
     private void releaseFrom(ComponentRuns runs, int from) {
