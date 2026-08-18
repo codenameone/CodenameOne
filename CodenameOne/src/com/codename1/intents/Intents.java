@@ -27,6 +27,8 @@ import com.codename1.ai.ToolHandler;
 import com.codename1.intents.spi.IntentBridge;
 import com.codename1.io.JSONWriter;
 import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import com.codename1.util.StringUtil;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
@@ -898,7 +900,21 @@ public final class Intents {
                 // else.
                 return false;
             }
-            if (!looksLikeIntentId(activityType)) {
+            // Shape is not ownership. An application may declare its own activity type that
+            // happens to look like an intent id -- "continue_reading" is entirely ordinary --
+            // and claiming it here tells iOS the activity was handled, so the app's own
+            // continuation never runs and drainPendingActivities quietly drops it. The warm
+            // path already answers correctly, because by then the real list exists.
+            //
+            // So the real list is what decides, remembered by the previous launch. Only when
+            // there has never been one -- a first launch, where an App Shortcut can still be
+            // invoked against an app that has not run -- does the shape heuristic stand in,
+            // and that window closes as soon as the app publishes its declarations once.
+            String recorded = recordedDeclarationIds();
+            boolean ours = recorded == null
+                    ? looksLikeIntentId(activityType)
+                    : recordNames(recorded, activityType);
+            if (!ours) {
                 return false;
             }
             pendingActivities.add(new PendingActivity(activityType, params));
@@ -1080,6 +1096,13 @@ public final class Intents {
             selectionHandler = null;
             pendingSelections.clear();
         }
+        try {
+            // Remembered across launches on a device, so a reset that left it behind would let
+            // one test's declaration list decide what the next one claims.
+            Preferences.delete(DECLARED_IDS_KEY);
+        } catch (Throwable ignored) {
+            // A reset must not fail because storage is unavailable.
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1093,6 +1116,12 @@ public final class Intents {
     /// each reading it their own way is how the same handler ended up with contradictory
     /// deadlines: platform dispatch substituting the default, Intents.invoke building an
     /// already-expired context, and a model waiting on the raw number.
+    /// Where the declared intent ids are remembered between launches.
+    ///
+    /// Prefixed like every other framework preference so an application's own key cannot
+    /// collide with it.
+    private static final String DECLARED_IDS_KEY = "cn1$intents$declared";
+
     private static int budgetFor(IntentDeclaration decl) {
         int declared = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
         return declared < 1 ? defaultTimeoutSeconds : declared;
@@ -1544,6 +1573,69 @@ public final class Intents {
         } catch (Throwable t) {
             logError(t);
         }
+        rememberDeclaredIds(d);
+    }
+
+    /// Records which activity types belong to this application's intents, for the next cold
+    /// start to consult before its dispatcher exists.
+    ///
+    /// Written every publication rather than once: the set changes when the app is updated, and
+    /// a stale entry would have the framework claim an activity type the app has since given
+    /// back to its own continuation handling.
+    private static void rememberDeclaredIds(IntentDispatcher d) {
+        try {
+            Preferences.set(DECLARED_IDS_KEY, joinDeclaredIds(d));
+        } catch (Throwable t) {
+            // Persisting is an optimisation for one launch, never a requirement.
+            logError(t);
+        }
+    }
+
+    /// The declared ids as one comma-separated string.
+    ///
+    /// Separate from the method above so the loop is not inside a catch(Throwable). Iterating a
+    /// List<IntentDeclaration> compiles to a CHECKCAST, and ParparVM does not throw for a
+    /// failed cast -- so a handler wrapped around one reads as relying on an exception that
+    /// never arrives, and the repo's gate rejects the shape wherever it appears. The caller
+    /// still catches, so behaviour is unchanged.
+    private static String joinDeclaredIds(IntentDispatcher d) {
+        List<IntentDeclaration> all = d.describe();
+        if (all == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (IntentDeclaration decl : all) {
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(decl.getId());
+        }
+        return sb.toString();
+    }
+
+    /// The declaration ids a previous launch recorded, or null when there has never been one.
+    ///
+    /// Null and empty are different answers and the caller depends on the difference: an empty
+    /// record means the app published a list and it was empty, so nothing is ours; no record at
+    /// all means a genuinely first launch, which is the only case left to guess about. Returned
+    /// as the raw text rather than a tri-state Boolean, because a Boolean that can be null is
+    /// one auto-unboxing away from a NullPointerException.
+    private static String recordedDeclarationIds() {
+        try {
+            return Preferences.get(DECLARED_IDS_KEY, null);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /// Whether a recorded declaration list names this activity type.
+    private static boolean recordNames(String recorded, String activityType) {
+        for (String id : StringUtil.tokenize(recorded, ",")) {
+            if (activityType.equals(id)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static IntentResult invokeInternal(String intentId, Map<String, Object> params,

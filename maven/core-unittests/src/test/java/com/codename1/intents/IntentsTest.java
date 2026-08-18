@@ -648,6 +648,29 @@ class IntentsTest {
         assertTrue(second.invoked.isEmpty(), "a refused activity must not be queued at all");
     }
 
+    /// Shape is not ownership. An application may declare its own activity type that happens
+    /// to look like an intent id, and claiming it on a cold start tells iOS the activity was
+    /// handled -- so the app's own continuation never runs, and the queued activity is dropped
+    /// later with nothing said. The warm path already answers correctly; the cold one now
+    /// consults the list a previous launch recorded.
+    @Test
+    void anApplicationsOwnActivityTypeIsNotClaimedOnAColdStart() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        // A later cold start: the process is new, so there is no dispatcher yet, but what this
+        // app declares was recorded by the launch above.
+        Intents.setDispatcher(null);
+
+        assertFalse(Intents.dispatchUserActivity("continue_reading", null),
+                "an activity type this app never declared belongs to the app, not to intents");
+        assertTrue(Intents.dispatchUserActivity("known", null),
+                "and one it did declare is still claimed before the dispatcher exists");
+    }
+
     @Test
     void aThirdPartyActivityIsNeverClaimed() {
         // Handoff and third-party types are reverse-DNS, so claiming everything while the table
