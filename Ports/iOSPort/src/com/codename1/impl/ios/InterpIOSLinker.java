@@ -86,15 +86,17 @@ public class InterpIOSLinker implements InterpLinker {
         // never needs it to, because entering the parent's constructor or
         // reading its statics does that -- so initializing one class here would
         // leave a grandparent's static block unrun.
-        String[] chain = new String[32];
-        int depth = 0;
+        // The whole chain, however long it is. A fixed array truncated it, and
+        // the classes it dropped were the ones nearest java/lang/Object -- the
+        // ones most likely to carry a static block something else depends on.
+        java.util.Vector chain = new java.util.Vector();
         String at = internalName;
-        while (at != null && depth < chain.length) {
-            chain[depth++] = at;
+        while (at != null && !chain.contains(at)) {
+            chain.addElement(at);
             at = symbols.superName(at);
         }
-        for (int i = depth - 1; i >= 0; i--) {
-            int id = symbols.classId(chain[i]);
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            int id = symbols.classId((String)chain.elementAt(i));
             if (id >= 0) {
                 InterpIOSNative.initializeClassById(id);
             }
@@ -102,12 +104,40 @@ public class InterpIOSLinker implements InterpLinker {
     }
 
     public void initializeDefaultBearingInterfaces(String internalName) {
-        // The symbol table records a method's name, descriptor and staticness,
-        // not its access flags, so "does this interface declare a default
-        // method" cannot be answered here -- and initializing every interface
-        // instead would run initializers Java does not. Each one initializes on
-        // its own first use, which on this platform is entry into any of its
-        // methods; only the ordering is lost.
+        // JLS 12.4.1: initializing a class initializes the superinterfaces that
+        // declare a default method, and only those. The class row's eighth
+        // column says which ones do, so this can honour the rule instead of
+        // leaving each interface to initialize on its own first use -- which is
+        // entry into one of its methods, and may never happen at all.
+        int id = symbols.classId(internalName);
+        if (id < 0) {
+            return;
+        }
+        initializeDefaultBearing(id, new java.util.Hashtable(), true);
+    }
+
+    /// Superinterfaces first, then the interface itself when it declares a
+    /// default method. Bounded by what has been seen: an interface hierarchy is
+    /// a DAG whose diamonds would otherwise be walked twice, and a depth cap
+    /// would answer wrongly on a hierarchy that is merely deep.
+    private void initializeDefaultBearing(int classId, java.util.Hashtable visited,
+                                          boolean root) {
+        Integer key = Integer.valueOf(classId);
+        if (visited.get(key) != null) {
+            return;
+        }
+        visited.put(key, Boolean.TRUE);
+        int[] ifaces = symbols.interfacesOf(classId);
+        if (ifaces != null) {
+            for (int i = 0; i < ifaces.length; i++) {
+                initializeDefaultBearing(ifaces[i], visited, false);
+            }
+        }
+        // The class this walk started from is initialized by initializeClass;
+        // only the interfaces above it are this method's business.
+        if (!root && symbols.declaresDefaultMethod(classId)) {
+            InterpIOSNative.initializeClassById(classId);
+        }
     }
 
     public Object findClass(String internalName) {

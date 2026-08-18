@@ -425,6 +425,7 @@ class InterpConformanceTest {
                 + " System.out.println(s instanceof ObjectSupplier);"
                 + " Runnable r = (Runnable & Serializable) () -> System.out.println(\"ran\");"
                 + " r.run();"
+                + " System.out.println(r instanceof Serializable);"
                 + "}}"));
         // An interpreted class whose toString the host has to reach when it
         // converts the object to a string.

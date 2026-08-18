@@ -89,6 +89,18 @@ class InterpIOSSymbols {
      */
     private final Hashtable interfaceIds = new Hashtable();
 
+    /**
+     * The ids of interfaces that declare a default method.
+     *
+     * <p>JLS 12.4.1 initializes an interface when a class implementing it is
+     * initialized only when it declares one, so this is what separates the
+     * interfaces that have to be initialized with an implementing class from
+     * the ones that must not be. The interp-host build writes it as the class
+     * row's eighth column, because nothing else in the table records access
+     * flags.</p>
+     */
+    private final Hashtable defaultBearing = new Hashtable();
+
     private static InterpIOSSymbols instance;
 
     /** Loads the table on first use; it is immutable afterwards. */
@@ -142,6 +154,9 @@ class InterpIOSSymbols {
                 }
                 if (p.length >= 7 && p[6].length() > 0) {
                     interfaceIds.put(id, parseIds(p[6]));
+                }
+                if (p.length >= 8 && "1".equals(p[7])) {
+                    defaultBearing.put(id, Boolean.TRUE);
                 }
             }
         } else if (table.charAt(start) == 'm' && table.startsWith("method\t", start)) {
@@ -371,6 +386,16 @@ class InterpIOSSymbols {
             }
         }
         return -1;
+    }
+
+    /** Whether this interface declares a default method. */
+    boolean declaresDefaultMethod(int classId) {
+        return defaultBearing.get(Integer.valueOf(classId)) != null;
+    }
+
+    /** The ids of the interfaces this class implements directly, or null. */
+    int[] interfacesOf(int classId) {
+        return (int[])interfaceIds.get(Integer.valueOf(classId));
     }
 
     String superName(String internalName) {

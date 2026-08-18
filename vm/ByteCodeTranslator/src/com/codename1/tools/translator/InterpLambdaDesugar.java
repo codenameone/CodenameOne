@@ -142,6 +142,9 @@ final class InterpLambdaDesugar {
         return cn;
     }
 
+    /// Set in altMetafactory's flags word when the lambda is serializable.
+    private static final int FLAG_SERIALIZABLE = 1;
+
     /// Set in altMetafactory's flags word when marker interfaces follow.
     private static final int FLAG_MARKERS = 2;
 
@@ -164,6 +167,16 @@ final class InterpLambdaDesugar {
         }
         int flags = ((Integer) indy.bsmArgs[3]).intValue();
         int at = 4;
+        if ((flags & FLAG_SERIALIZABLE) != 0
+                && !cn.interfaces.contains("java/io/Serializable")) {
+            // `(Runnable & Serializable) () -> {}` sets this flag and names no
+            // marker at all, and javac still emits the cast to Serializable --
+            // so a class carrying only Runnable fails an intersection cast that
+            // is otherwise ordinary. The interface is added; writeReplace is
+            // not, so such a lambda is Serializable and would fail to serialize,
+            // which is what it does on the device anyway.
+            cn.interfaces.add("java/io/Serializable");
+        }
         if ((flags & FLAG_MARKERS) != 0) {
             if (at >= indy.bsmArgs.length || !(indy.bsmArgs[at] instanceof Integer)) {
                 return;

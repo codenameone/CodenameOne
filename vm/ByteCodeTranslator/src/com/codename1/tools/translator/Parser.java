@@ -530,9 +530,26 @@ public class Parser extends ClassVisitor {
                 ifaces.append(iface.getClassOffset());
             }
         }
+        // An eighth column: whether this interface declares a default method.
+        // JLS 12.4.1 initializes an interface when a class implementing it is
+        // initialized only if it declares one, and the device runtime cannot
+        // tell from anything else in this table -- a method row carries name,
+        // descriptor and staticness, not access flags. Without it the iOS
+        // linker had nothing to act on and left the ordering to first use.
+        boolean declaresDefault = false;
+        if (bc.isIsInterface()) {
+            for (BytecodeMethod m : bc.getMethods()) {
+                if (!m.isStatic() && !m.isAbstract() && !m.isEliminated()
+                        && !"__CLINIT__".equals(m.getMethodName())
+                        && !"<clinit>".equals(m.getMethodName())) {
+                    declaresDefault = true;
+                    break;
+                }
+            }
+        }
         return "class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
                 + "\t" + sourceFile + "\t" + superId + "\t" + jvmName
-                + "\t" + ifaces + "\n";
+                + "\t" + ifaces + "\t" + (declaresDefault ? "1" : "0") + "\n";
     }
     
     private static void appendClassOffset(ByteCodeClass bc, List<Integer> clsIds) {

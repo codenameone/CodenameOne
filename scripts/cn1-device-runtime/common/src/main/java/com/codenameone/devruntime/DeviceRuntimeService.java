@@ -287,29 +287,38 @@ public class DeviceRuntimeService {
         // our protocol" is the answer -- something else listening on 18234
         // would otherwise hold the dial loop and stop the sweep from ever
         // looking for the real desktop.
-        final boolean[] started = new boolean[1];
-        final boolean[] finished = new boolean[1];
-        final boolean[] spoke = new boolean[1];
-        // The streams, so a connection that accepts and then says nothing can
+        //
+        // Volatile holders rather than one-element arrays: the socket callback
+        // runs on a thread of its own and this one only polls, and an array
+        // element carries no visibility guarantee at all -- the poll is
+        // entitled to never see the write, time out and close an exchange that
+        // was working.
+        final Flag started = new Flag();
+        final Flag finished = new Flag();
+        final Flag spoke = new Flag();
+        // The stream, so a connection that accepts and then says nothing can
         // be closed rather than left behind. Socket.connect gives the callback
         // its own thread and closes nothing when the caller gives up, so
         // without this every dial past a silent listener leaks a thread parked
         // in readInt and the socket under it, for the life of the app.
-        final InputStream[] open = new InputStream[1];
+        final StreamHolder open = new StreamHolder();
         SocketConnection sc = new SocketConnection() {
             public void connectionEstablished(InputStream is, OutputStream os) {
-                open[0] = is;
+                open.set(is);
                 try {
-                    spoke[0] = handle(is, os, isLoopback(host), started);
+                    if (handle(is, os, isLoopback(host), started)) {
+                        spoke.set();
+                    }
                 } finally {
-                    finished[0] = true;
-                    open[0] = null;
+                    open.set(null);
+                    // Last, so a poll that sees "finished" also sees the rest.
+                    finished.set();
                 }
             }
 
             public void connectionError(int errorCode, String message) {
                 // Nobody listening: the ordinary case between pushes.
-                finished[0] = true;
+                finished.set();
             }
         };
         sc.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -328,28 +337,73 @@ public class DeviceRuntimeService {
         // then says nothing. Waiting on *that* forever wedges the dial loop and
         // the device never calls again.
         long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS + 500;
-        while (!finished[0] && (started[0] || System.currentTimeMillis() < deadline)) {
+        while (!finished.isSet() && (started.isSet() || System.currentTimeMillis() < deadline)) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
-                return spoke[0];
+                return spoke.isSet();
             }
         }
-        if (!finished[0]) {
+        if (!finished.isSet()) {
             // Gave up on a peer that never said anything. Closing the stream is
             // what unblocks the read the handler is parked in, so its thread
             // ends rather than accumulating one per dial.
-            closeQuietly(open[0]);
+            closeQuietly(open.get());
         }
-        return spoke[0];
+        return spoke.isSet();
+    }
+
+    /// A flag two threads share: set on the socket callback's thread, polled on
+    /// the dial or sweep thread.
+    ///
+    /// Volatile because that is the whole point -- an ordinary field (or an
+    /// array element, which is what this replaced) gives the polling thread no
+    /// guarantee it will ever observe the write.
+    private static final class Flag {
+        private volatile boolean value;
+
+        boolean isSet() {
+            return value;
+        }
+
+        void set() {
+            value = true;
+        }
+    }
+
+    /// The stream a connection callback published, for the thread that may have
+    /// to close it. Volatile for the same reason [Flag] is.
+    private static final class StreamHolder {
+        private volatile InputStream stream;
+
+        InputStream get() {
+            return stream;
+        }
+
+        void set(InputStream stream) {
+            this.stream = stream;
+        }
+    }
+
+    /// The address a sweep batch found, published across threads.
+    private static final class AddressHolder {
+        private volatile String address;
+
+        String get() {
+            return address;
+        }
+
+        void set(String address) {
+            this.address = address;
+        }
     }
 
     /// One sweep connection, and whether the peer behind it has answered.
     private static final class SweepConnection {
         private final InputStream is;
 
-        /// True once the exchange read the protocol magic; shared with handle.
-        private final boolean[] started = new boolean[1];
+        /// Set once the exchange is identifiably ours; shared with handle.
+        private final Flag started = new Flag();
 
         SweepConnection(InputStream is) {
             this.is = is;
@@ -360,7 +414,7 @@ public class DeviceRuntimeService {
     private static boolean anyStarted(Vector connections) {
         synchronized (connections) {
             for (int i = 0; i < connections.size(); i++) {
-                if (((SweepConnection) connections.elementAt(i)).started[0]) {
+                if (((SweepConnection) connections.elementAt(i)).started.isSet()) {
                     return true;
                 }
             }
@@ -374,7 +428,7 @@ public class DeviceRuntimeService {
         synchronized (connections) {
             for (int i = connections.size() - 1; i >= 0; i--) {
                 SweepConnection conn = (SweepConnection) connections.elementAt(i);
-                if (conn.started[0]) {
+                if (conn.started.isSet()) {
                     continue;
                 }
                 closeQuietly(conn.is);
@@ -436,8 +490,8 @@ public class DeviceRuntimeService {
         // finishes inside a batch deadline.
         final Vector openStreams = new Vector();
         for (int base = 1; base <= 254; base += SWEEP_BATCH) {
-            final boolean[] found = new boolean[1];
-            final String[] foundAt = new String[1];
+            final Flag found = new Flag();
+            final AddressHolder foundAt = new AddressHolder();
             int last = Math.min(base + SWEEP_BATCH - 1, 254);
             for (int i = base; i <= last; i++) {
                 final String candidate = prefix + i;
@@ -471,10 +525,14 @@ public class DeviceRuntimeService {
                             }
                         }
                         if (spoke) {
-                            synchronized (found) {
-                                if (!found[0]) {
-                                    found[0] = true;
-                                    foundAt[0] = candidate;
+                            synchronized (openStreams) {
+                                // The address before the flag, so the sweeping
+                                // thread that sees "found" also sees which
+                                // address it was. Two candidates can answer at
+                                // once; the first one to arrive is kept.
+                                if (!found.isSet()) {
+                                    foundAt.set(candidate);
+                                    found.set();
                                 }
                             }
                         }
@@ -494,7 +552,7 @@ public class DeviceRuntimeService {
             // as long as it takes -- so discovery could never complete on iOS,
             // where the sweep is the only way in.
             long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS + 800;
-            while (!found[0]
+            while (!found.isSet()
                     && (anyStarted(openStreams) || System.currentTimeMillis() < deadline)) {
                 try {
                     Thread.sleep(50);
@@ -505,9 +563,9 @@ public class DeviceRuntimeService {
             }
             // Whatever this batch left parked on a silent address.
             closeSilent(openStreams);
-            if (found[0]) {
-                setHost(foundAt[0]);
-                status = "found " + foundAt[0] + ":" + port;
+            if (found.isSet()) {
+                setHost(foundAt.get());
+                status = "found " + foundAt.get() + ":" + port;
                 return true;
             }
         }
@@ -607,20 +665,24 @@ public class DeviceRuntimeService {
      * its life.</p>
      */
     boolean handle(InputStream is, OutputStream os, boolean loopback) {
-        return handle(is, os, loopback, new boolean[1]);
+        return handle(is, os, loopback, new Flag());
     }
 
     /**
      * Serves one connection, reporting when the exchange actually began.
      *
-     * <p>{@code started[0]} goes true once the magic has been read, which is
-     * the moment a caller can stop applying a connect timeout: everything after
-     * it -- a human typing a pairing code, a bundle crossing, an entry point
-     * running -- takes as long as it takes. Before it, a connection that
-     * accepts and then says nothing (an `adb reverse` with no listener behind
-     * it does exactly that) must not be waited on forever.</p>
+     * <p>{@code started} is set once the frame is identified -- the magic, the
+     * protocol version and, on v3, the frame type -- which is the moment a
+     * caller can stop applying a connect timeout: everything after it, a human
+     * typing a pairing code, a bundle crossing, an entry point running, takes
+     * as long as it takes. Not at the magic: four bytes are cheap to send, and
+     * a peer that sent them and then stalled would otherwise be waited on
+     * forever and exempted from the cleanup, which is all it takes to stop
+     * discovery for good. Before it, a connection that accepts and says nothing
+     * (an `adb reverse` with no listener behind it does exactly that) is closed
+     * when the batch deadline passes.</p>
      */
-    boolean handle(InputStream is, OutputStream os, boolean loopback, boolean[] started) {
+    boolean handle(InputStream is, OutputStream os, boolean loopback, Flag started) {
         firstContact();
         DataInputStream in = new DataInputStream(is);
         DataOutputStream out = new DataOutputStream(os);
@@ -630,9 +692,9 @@ public class DeviceRuntimeService {
             if (in.readInt() != MAGIC) {
                 reject = "bad magic";
             } else {
-                started[0] = true;
                 int version = in.readInt();
                 if (version == PROTOCOL_V1) {
+                    started.set();
                     if (!loopback) {
                         reject = "this app requires a paired computer; upgrade the push tool";
                     } else {
@@ -646,6 +708,7 @@ public class DeviceRuntimeService {
                     }
                 } else if (version == PROTOCOL_V3) {
                     int frame = in.readInt();
+                    started.set();
                     if (frame == FRAME_PING) {
                         out.writeByte(1);
                         out.writeUTF(DeviceRuntimePairing.deviceId());
