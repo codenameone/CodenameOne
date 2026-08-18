@@ -35,6 +35,7 @@
  * handling stays in one place.
  */
 extern void CN1MacWindowDeliverClose(int windowId);
+extern void CN1MacWindowDeliverClosed(int windowId);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
@@ -434,9 +435,14 @@ int CN1MacWindowIdForScene(UIWindowScene* scene) {
 }
 
 /*
- * The user closed the window with the native close control, so the scene is going
- * away. Reported as a close request rather than acted on: the application may veto
- * it from a close listener, and setCloseOperation decides what happens otherwise.
+ * The user closed the window with the native close control.
+ *
+ * Reported as a close that has already happened, not as a request. UIKit hands the
+ * disconnect over after the scene is gone, so there is nothing left to veto: asking
+ * would let DO_NOTHING_ON_CLOSE leave a registered window painting into a surface
+ * that no longer exists, and HIDE_ON_CLOSE keep a window with no scene to show
+ * again. An application that needs to intervene closes the window itself, which is
+ * a request and is vetoable.
  */
 void CN1MacWindowSceneDisconnected(UIWindowScene* scene) {
     int slot = slotForScene(scene);
@@ -448,7 +454,7 @@ void CN1MacWindowSceneDisconnected(UIWindowScene* scene) {
         /* The scene is gone, so it must not be recycled or presented into. */
         [w->scene release];
         w->scene = nil;
-        CN1MacWindowDeliverClose(w->windowId);
+        CN1MacWindowDeliverClosed(w->windowId);
     }
 }
 

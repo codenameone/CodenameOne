@@ -39,6 +39,9 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* Starts reporting display attach/remove; idempotent. */
+void cn1LinuxWatchMonitors(void);
+
 #endif
 
 /* ------------------------------------------------------------------ events */

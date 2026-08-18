@@ -1828,6 +1828,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().windowCloseRequested(windowId);
     }
 
+    /// Invoked once the platform has destroyed a window's scene. Catalyst hands the
+    /// disconnect over after the fact, so there is nothing left to veto.
+    public static void windowClosedNativelyCallback(int windowId) {
+        Display.getInstance().windowClosedNatively(windowId);
+    }
+
     /// Invoked when a window gains or loses keyboard focus.
     public static void windowFocusCallback(int windowId, boolean gained) {
         Display.getInstance().windowFocusChanged(windowId, gained);

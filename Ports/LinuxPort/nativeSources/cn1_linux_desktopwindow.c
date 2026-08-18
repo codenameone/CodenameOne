@@ -280,7 +280,7 @@ static void cn1DesktopMonitorsChanged(GdkDisplay* display, GdkMonitor* monitor, 
 
 static int cn1DesktopMonitorWatchInstalled;
 
-static void cn1DesktopWatchMonitors(void) {
+void cn1LinuxWatchMonitors(void) {
     GdkDisplay* display;
     if (cn1DesktopMonitorWatchInstalled) {
         return;
@@ -410,7 +410,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     g_signal_connect(w->drawingArea, "scroll-event", G_CALLBACK(cn1DesktopOnScroll), w);
     g_signal_connect(w->window, "key-press-event", G_CALLBACK(cn1DesktopOnKey), w);
     g_signal_connect(w->window, "key-release-event", G_CALLBACK(cn1DesktopOnKey), w);
-    cn1DesktopWatchMonitors();
+    cn1LinuxWatchMonitors();
     g_signal_connect(w->window, "window-state-event", G_CALLBACK(cn1DesktopOnWindowState), w);
     g_signal_connect(w->window, "delete-event", G_CALLBACK(cn1DesktopOnDelete), w);
     g_signal_connect(w->window, "focus-in-event", G_CALLBACK(cn1DesktopOnFocus), w);
@@ -773,6 +773,8 @@ static void cn1MonitorCountOnMain(void* arg) {
     CN1MonitorOp* op = (CN1MonitorOp*) arg;
     GdkDisplay* display = gdk_display_get_default();
     int n;
+    /* Idempotent, and this is the first monitor call any application makes. */
+    cn1LinuxWatchMonitors();
     op->result = 1;
     if (display == 0) {
         return;

@@ -558,6 +558,12 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         case WM_KEYUP:
             cn1WinPushEvent(CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
             return 0;
+        case WM_DISPLAYCHANGE:
+            /* Handled on the main window too, not only on the desktop windows: an
+             * application can attach a monitor listener before it has opened any
+             * secondary window, and a display change has to reach it either way. */
+            cn1WinPushEvent(CN1_EVENT_MONITORS_CHANGED, 0, 0, 0);
+            return 0;
         case WM_SIZE:
             cn1Win.width = LOWORD(lParam);
             cn1Win.height = HIWORD(lParam);

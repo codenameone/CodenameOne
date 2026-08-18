@@ -247,6 +247,10 @@ public final class Desktop {
     /// - `l`: the listener to add
     public void addMonitorListener(ActionListener l) {
         monitorListeners.addListener(l);
+        // Touching the manager is what makes a port start watching for display
+        // changes; without it a listener registered before anything else looked at
+        // the windowing system would never hear about one.
+        Display.impl.getWindowManager();
     }
 
     /// Removes a previously added monitor listener.

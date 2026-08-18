@@ -2797,6 +2797,23 @@ public final class Display extends CN1Constants {
         callSerially(new WindowCallback(windowId, WindowCallback.CLOSE_REQUESTED));
     }
 
+    /// Notifies Codename One that the platform has already destroyed a window's
+    /// native surface, so the window is gone whatever the application would prefer.
+    ///
+    /// Distinct from `#windowCloseRequested(int)`, which asks. Some platforms do not
+    /// offer the close control as a question: a Mac Catalyst scene is disconnected
+    /// after the fact, with nothing left to veto. Reporting that as a request would
+    /// let `DO_NOTHING_ON_CLOSE` leave a registered window painting into a surface
+    /// that no longer exists, so it is reported as what it is and the window is
+    /// disposed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowClosedNatively(int windowId) {
+        callSerially(new WindowCallback(windowId, WindowCallback.CLOSED_NATIVELY));
+    }
+
     /// Notifies Codename One that a native window moved to a monitor with different
     /// characteristics, so that its scale and layout are recomputed.
     ///
@@ -2838,6 +2855,7 @@ public final class Display extends CN1Constants {
         private static final int MONITOR_CHANGED = 3;
         private static final int MONITORS_CHANGED = 4;
         private static final int MOVED = 5;
+        private static final int CLOSED_NATIVELY = 6;
 
         private final int windowId;
         private final int kind;
@@ -2880,6 +2898,11 @@ public final class Display extends CN1Constants {
                 case MOVED:
                     if (w != null) {
                         w.moved();
+                    }
+                    break;
+                case CLOSED_NATIVELY:
+                    if (w != null) {
+                        w.dispose();
                     }
                     break;
                 default:
