@@ -268,13 +268,17 @@ public class CN1IntentService extends IntentService {
     /// Derived from what the intent declared rather than fixed: an intent allowed more than the
     /// default would otherwise have its runtime torn down while its handler was still running,
     /// and the caller told nothing.
-    private static int backstopSeconds(String intentId) {
+    private static long backstopSeconds(String intentId) {
         com.codename1.intents.IntentDeclaration decl = Intents.getDeclaration(intentId);
         int declared = decl == null ? Intents.getDefaultTimeout() : decl.getTimeoutSeconds();
         if (declared < 1) {
             declared = DEFAULT_BUDGET_SECONDS;
         }
-        return declared + BACKSTOP_MARGIN_SECONDS;
+        // Widened before the addition. Both operands are ints and the declared budget can be
+        // anything the build accepts, so within five seconds of Integer.MAX_VALUE this went
+        // negative -- await returned at once and the service tore down the runtime with the
+        // handler still in it.
+        return (long) declared + BACKSTOP_MARGIN_SECONDS;
     }
 
     /// Shows what the handler wanted said.
@@ -306,7 +310,7 @@ public class CN1IntentService extends IntentService {
             done.countDown();
         }
 
-        boolean await(int seconds, TimeUnit unit) throws InterruptedException {
+        boolean await(long seconds, TimeUnit unit) throws InterruptedException {
             return done.await(seconds, unit);
         }
 

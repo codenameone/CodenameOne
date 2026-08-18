@@ -215,7 +215,9 @@ public class AndroidIntentBridge implements IntentBridge {
                 return;
             }
             deadline = System.currentTimeMillis()
-                    + (parkedBudgetSeconds + marginSeconds) * 1000L;
+                    // Widened before the addition: two ints whose sum can exceed what an int
+                    // holds, and a negative deadline makes this return immediately.
+                    + ((long) parkedBudgetSeconds + marginSeconds) * 1000L;
             while (!parkedFinished) {
                 long remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
