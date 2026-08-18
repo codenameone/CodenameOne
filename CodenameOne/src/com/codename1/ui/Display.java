@@ -292,14 +292,8 @@ public final class Display extends CN1Constants {
     private int pointerX;
     private int pointerY;
     private PointerEvent currentPointerEvent;
-    private boolean keyRepeatCharged;
-    private boolean longPressCharged;
-    private long longKeyPressTime;
     private int longPressInterval = 500;
-    private long nextKeyRepeatEvent;
-    private int keyRepeatValue;
     private boolean lastInteractionWasKeypad;
-    private boolean dragOccured;
     private boolean processingSerialCalls;
     private int PATHLENGTH;
     /// Drag sample history, one ring per window.
@@ -391,7 +385,6 @@ public final class Display extends CN1Constants {
 
     /// Window ids remembered so a key repeat or long press started in a window is
     /// delivered back to that window rather than to the main form.
-    private int keyRepeatWindowId;
 
     /// Private constructor to prevent instanciation
     private Display() {
@@ -1434,15 +1427,25 @@ public final class Display extends CN1Constants {
         // Key repeat and long press are routed back to whichever top level the
         // originating press came from, not blindly to the current form.
         long t = System.currentTimeMillis();
-        Container repeatTarget = repeatTarget(keyRepeatWindowId, current);
-        if (repeatTarget != null && keyRepeatCharged && nextKeyRepeatEvent <= t) {
-            repeatTarget.keyRepeated(keyRepeatValue);
-            int keyRepeatNextIntervalTime = 10;
-            nextKeyRepeatEvent = t + keyRepeatNextIntervalTime;
-        }
-        if (repeatTarget != null && longPressCharged && longPressInterval <= t - longKeyPressTime) {
-            longPressCharged = false;
-            repeatTarget.longKeyPress(keyRepeatValue);
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyRepeatWindows[iter] == 0) {
+                continue;
+            }
+            int repeatWindow = keyRepeatWindows[iter] == MAIN_LONG_PRESS_ID
+                    ? 0 : keyRepeatWindows[iter];
+            Container repeatTarget = repeatTarget(repeatWindow, current);
+            if (repeatTarget == null) {
+                continue;
+            }
+            if (keyRepeatArmed[iter] && keyRepeatNext[iter] <= t) {
+                repeatTarget.keyRepeated(keyRepeatValues[iter]);
+                int keyRepeatNextIntervalTime = 10;
+                keyRepeatNext[iter] = t + keyRepeatNextIntervalTime;
+            }
+            if (keyLongPressArmed[iter] && longPressInterval <= t - keyLongPressStart[iter]) {
+                keyLongPressArmed[iter] = false;
+                repeatTarget.longKeyPress(keyRepeatValues[iter]);
+            }
         }
         for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
             if (!longPressArmed[iter] || longPressInterval > t - longPressStart[iter]) {
@@ -1904,8 +1907,7 @@ public final class Display extends CN1Constants {
         if (!initialWindowSizeApplied) {
             initialWindowSizeApplied = applyInitialWindowSize(newForm);
         }
-        keyRepeatCharged = false;
-        longPressCharged = false;
+        cancelAllKeyRepeats();
         cancelAllLongPresses();
         current = newForm;
         impl.setCurrentForm(current);
@@ -2002,8 +2004,7 @@ public final class Display extends CN1Constants {
         Component.setDisableSmoothScrolling(true);
         f.scrollComponentToVisible(cmp);
         Component.setDisableSmoothScrolling(false);
-        keyRepeatCharged = false;
-        longPressCharged = false;
+        cancelAllKeyRepeats();
         lastKeyPressed = 0;
         previousKeyPressed = 0;
         impl.editStringImpl(cmp, maxSize, constraint, text, initiatingKeycode);
@@ -2406,19 +2407,16 @@ public final class Display extends CN1Constants {
     }
 
     private void keyPressedImpl(int windowId, final int keyCode) {
-        keyRepeatWindowId = windowId;
         addSingleArgumentEvent(KEY_PRESSED | (windowId << 8), keyCode);
 
         lastInteractionWasKeypad = lastInteractionWasKeypad || (keyCode != MenuBar.leftSK && keyCode != MenuBar.clearSK && keyCode != MenuBar.backSK);
 
         // this solves a Sony Ericsson bug where on slider open/close someone "brilliant" chose
         // to send a keyPress with a -43/-44 keycode... Without ever sending a key release!
-        keyRepeatCharged = (keyCode >= 0 || getGameAction(keyCode) > 0) || keyCode == impl.getClearKeyCode();
-        longPressCharged = keyRepeatCharged;
-        longKeyPressTime = System.currentTimeMillis();
-        keyRepeatValue = keyCode;
+        boolean armed = (keyCode >= 0 || getGameAction(keyCode) > 0) || keyCode == impl.getClearKeyCode();
+        long now = System.currentTimeMillis();
         int keyRepeatInitialIntervalTime = 800;
-        nextKeyRepeatEvent = System.currentTimeMillis() + keyRepeatInitialIntervalTime;
+        chargeKeyRepeat(windowId, keyCode, armed, now, now + keyRepeatInitialIntervalTime);
         previousKeyPressed = lastKeyPressed;
         lastKeyPressed = keyCode;
     }
@@ -2429,8 +2427,7 @@ public final class Display extends CN1Constants {
     ///
     /// - `keyCode`: keycode of the key event
     public void keyReleased(final int keyCode) {
-        keyRepeatCharged = false;
-        longPressCharged = false;
+        cancelKeyRepeat(0);
         if (impl.getCurrentForm() == null) {
             return;
         }
@@ -2732,8 +2729,7 @@ public final class Display extends CN1Constants {
     /// - `keyCode`: keycode of the key event
     public void windowKeyReleased(int windowId, int keyCode) {
         if (windowId > 0) {
-            keyRepeatCharged = false;
-            longPressCharged = false;
+            cancelKeyRepeat(windowId);
             addSingleArgumentEvent(KEY_RELEASED | (windowId << 8), keyCode);
         }
     }
@@ -3060,6 +3056,33 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Whether a drag has happened on the *main* surface since its press.
+    ///
+    /// The main surface keeps the original single flag deliberately. Routing window 0
+    /// through the per-window table changed behaviour for ordinary single-window
+    /// applications -- it regressed an unrelated component test -- and the defect
+    /// being fixed here is specifically that a *secondary* window's press clobbered
+    /// another window's state. Windows above 0 get their own entry.
+    private boolean dragOccured;
+
+    /// Whether a drag has happened in each secondary window since its press, paired
+    /// by index with `#longPressWindows`.
+    ///
+    /// Global before: pressing in one window cleared the flag after another had
+    /// already dragged, so releasing the first made `List` and friends read
+    /// `hasDragOccured()` as false and treat a completed drag as a click.
+    private final boolean[] dragOccuredPerWindow = new boolean[TRACKED_KEY_PRESSES];
+
+    /// Key repeat and long-key-press state, per window for the same reason the
+    /// pointer equivalents are: a key held in one window and another pressed in a
+    /// second window shared one id, value and clock, so each cancelled the other.
+    private final int[] keyRepeatWindows = new int[TRACKED_KEY_PRESSES];
+    private final boolean[] keyRepeatArmed = new boolean[TRACKED_KEY_PRESSES];
+    private final boolean[] keyLongPressArmed = new boolean[TRACKED_KEY_PRESSES];
+    private final int[] keyRepeatValues = new int[TRACKED_KEY_PRESSES];
+    private final long[] keyRepeatNext = new long[TRACKED_KEY_PRESSES];
+    private final long[] keyLongPressStart = new long[TRACKED_KEY_PRESSES];
+
     /// Ids of windows with a long press being timed, paired by index with the arrays
     /// below. Zero means the entry is unused; window 0 uses `#MAIN_LONG_PRESS_ID`.
     private final int[] longPressWindows = new int[TRACKED_KEY_PRESSES];
@@ -3074,6 +3097,92 @@ public final class Display extends CN1Constants {
 
     private static int longPressKey(int windowId) {
         return windowId == 0 ? MAIN_LONG_PRESS_ID : windowId;
+    }
+
+    /// The key-repeat slot for a window, allocating one if needed.
+    private int keyRepeatSlot(int windowId, boolean create) {
+        int key = longPressKey(windowId);
+        int free = -1;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyRepeatWindows[iter] == key) {
+                return iter;
+            }
+            if (free < 0 && keyRepeatWindows[iter] == 0) {
+                free = iter;
+            }
+        }
+        if (!create || free < 0) {
+            return -1;
+        }
+        keyRepeatWindows[free] = key;
+        return free;
+    }
+
+    /// Arms key repeat and the long-key-press timer for one window.
+    private void chargeKeyRepeat(int windowId, int keyCode, boolean armed, long now,
+            long firstRepeatAt) {
+        int slot = keyRepeatSlot(windowId, true);
+        if (slot < 0) {
+            return;
+        }
+        keyRepeatArmed[slot] = armed;
+        keyLongPressArmed[slot] = armed;
+        keyRepeatValues[slot] = keyCode;
+        keyLongPressStart[slot] = now;
+        keyRepeatNext[slot] = firstRepeatAt;
+    }
+
+    /// Cancels key repeat for one window, leaving the others alone.
+    private void cancelKeyRepeat(int windowId) {
+        int slot = keyRepeatSlot(windowId, false);
+        if (slot >= 0) {
+            keyRepeatArmed[slot] = false;
+            keyLongPressArmed[slot] = false;
+            keyRepeatWindows[slot] = 0;
+        }
+    }
+
+    /// Cancels key repeat everywhere, for the paths that reset all input state.
+    private void cancelAllKeyRepeats() {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            keyRepeatArmed[iter] = false;
+            keyLongPressArmed[iter] = false;
+            keyRepeatWindows[iter] = 0;
+        }
+    }
+
+    /// Whether any window has *both* key repeat and a long key press armed. The
+    /// single-flag predicate this replaces was `!keyRepeatCharged ||
+    /// !longPressCharged`, i.e. false only when both were set.
+    private boolean anyKeyRepeatAndLongPressArmed() {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyRepeatArmed[iter] && keyLongPressArmed[iter]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether any window still has key repeat or a long key press pending.
+    private boolean anyKeyRepeatArmed() {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyRepeatArmed[iter] || keyLongPressArmed[iter]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Records that a drag happened in one window.
+    private void setDragOccured(int windowId, boolean value) {
+        if (windowId == 0) {
+            dragOccured = value;
+            return;
+        }
+        int slot = dragHistorySlot(windowId);
+        if (slot >= 0) {
+            dragOccuredPerWindow[slot] = value;
+        }
     }
 
     /// Starts timing a long press for one window.
@@ -3311,8 +3420,7 @@ public final class Display extends CN1Constants {
     /// Broadcasts hide notify into Codename One, this method is invoked by the Codename One implementation
     /// to notify Codename One of hideNotify events
     public void hideNotify() {
-        keyRepeatCharged = false;
-        longPressCharged = false;
+        cancelAllKeyRepeats();
         cancelAllLongPresses();
         pointerPressedAndNotReleasedOrDragged = false;
         addNotifyEvent(HIDE_NOTIFY);
@@ -3331,7 +3439,11 @@ public final class Display extends CN1Constants {
         synchronized (lock) {
             b = inputEventStackPointer == 0 &&
                     hasNoSerialCallsPending() &&
-                    (!keyRepeatCharged || !longPressCharged);
+                    // Deliberately "not both", which is what the single-flag version
+                    // meant: (!keyRepeatCharged || !longPressCharged). Collapsing it
+                    // to "neither armed" is a different predicate and made this
+                    // report not-idle far more often, which stalled the flush.
+                    !anyKeyRepeatAndLongPressArmed();
         }
         return b;
     }
@@ -3358,6 +3470,16 @@ public final class Display extends CN1Constants {
     /// every slot is taken, in which case the samples are dropped rather than
     /// corrupting another window's history.
     private int dragHistorySlot(int windowId) {
+        return dragHistorySlot(windowId, true);
+    }
+
+    /// Looks a window's drag ring up, optionally allocating one.
+    ///
+    /// `create` is false for readers. Allocating from `hasDragOccured()` or
+    /// `getDragSpeed()` -- which is what the first version of this did -- makes a
+    /// query mutate state: it claimed a slot and zeroed the ring, so simply asking
+    /// about a window could wipe another's history once the table filled.
+    private int dragHistorySlot(int windowId, boolean create) {
         int key = longPressKey(windowId);
         int free = -1;
         for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
@@ -3368,7 +3490,7 @@ public final class Display extends CN1Constants {
                 free = iter;
             }
         }
-        if (free < 0) {
+        if (!create || free < 0) {
             return -1;
         }
         dragHistoryWindows[free] = key;
@@ -3498,7 +3620,7 @@ public final class Display extends CN1Constants {
                 if (recursivePointerReleaseA) {
                     recursivePointerReleaseB = true;
                 }
-                dragOccured = false;
+                setDragOccured(windowId, false);
                 resetDragHistory(windowId);
                 pointerPressedAndNotReleasedOrDragged = true;
                 xArray1[0] = inputEventStackTmp[offset];
@@ -3513,7 +3635,7 @@ public final class Display extends CN1Constants {
                 if (recursivePointerReleaseA) {
                     recursivePointerReleaseB = true;
                 }
-                dragOccured = false;
+                setDragOccured(windowId, false);
                 resetDragHistory(windowId);
                 pointerPressedAndNotReleasedOrDragged = true;
                 int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
@@ -3572,7 +3694,7 @@ public final class Display extends CN1Constants {
                 recursivePointerReleaseB = false;
                 break;
             case POINTER_DRAGGED: {
-                dragOccured = true;
+                setDragOccured(windowId, true);
                 int arg1 = inputEventStackTmp[offset];
                 offset++;
                 int arg2 = inputEventStackTmp[offset];
@@ -3588,7 +3710,7 @@ public final class Display extends CN1Constants {
                 break;
             }
             case POINTER_DRAGGED_MULTI: {
-                dragOccured = true;
+                setDragOccured(windowId, true);
                 pointerPressedAndNotReleasedOrDragged = false;
                 int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array1.length + 1;
@@ -3708,7 +3830,13 @@ public final class Display extends CN1Constants {
     ///
     /// true if a drag has occured since the last pointer pressed
     public boolean hasDragOccured() {
-        return dragOccured;
+        // The window whose events are being dispatched, for the same reason
+        // getDragSpeed uses it: components ask during their own release handling.
+        if (dragHistoryCurrent == 0) {
+            return dragOccured;
+        }
+        int slot = dragHistorySlot(dragHistoryCurrent, false);
+        return slot >= 0 && dragOccuredPerWindow[slot];
     }
 
     /// Returns true for a case where the EDT has nothing at all to do
@@ -3719,7 +3847,7 @@ public final class Display extends CN1Constants {
                 (animationQueue == null || animationQueue.isEmpty()) &&
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
-                hasNoSerialCallsPending() && !keyRepeatCharged
+                hasNoSerialCallsPending() && !anyKeyRepeatArmed()
                 && !anyLongPressArmed())
                 // a minimized main window must not park the EDT while a tool window
                 // is still on screen and animating
@@ -3994,10 +4122,7 @@ public final class Display extends CN1Constants {
                 keyPressCodes[iter] = 0;
             }
         }
-        if (keyRepeatWindowId == w.getWindowId()) {
-            keyRepeatCharged = false;
-            keyRepeatWindowId = 0;
-        }
+        cancelKeyRepeat(w.getWindowId());
         cancelLongPress(w.getWindowId());
         releaseDragHistory(w.getWindowId());
     }
@@ -4503,7 +4628,7 @@ public final class Display extends CN1Constants {
         // The window whose events are being dispatched. Components call this from
         // their own pointerReleased, so "the window currently being serviced" is the
         // one that owns the samples they mean.
-        int readSlot = dragHistorySlot(dragHistoryCurrent);
+        int readSlot = dragHistorySlot(dragHistoryCurrent, false);
         if (readSlot < 0) {
             return 0;
         }

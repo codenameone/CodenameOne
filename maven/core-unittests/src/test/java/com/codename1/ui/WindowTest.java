@@ -1300,6 +1300,79 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void windowLevelPointerListenersFire() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("listeners", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+        final int[] counts = new int[3];
+        w.addPointerPressedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                counts[0]++;
+            }
+        });
+        w.addPointerDraggedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                counts[1]++;
+            }
+        });
+        w.addPointerReleasedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                counts[2]++;
+            }
+        });
+
+        // These dispatchers were never fired, so listeners attached to a Window did
+        // nothing -- and material pull to refresh went with them, since Component
+        // installs its refresh listeners on the top level.
+        w.pointerPressed(150, 120);
+        w.pointerDragged(150, 130);
+        w.pointerReleased(150, 130);
+        w.dispose();
+
+        assertEquals(1, counts[0], "the window's pointer pressed listener must fire");
+        assertEquals(1, counts[1], "and its dragged listener");
+        assertEquals(1, counts[2], "and its released listener");
+    }
+
+    @FormTest
+    void aPressInOneWindowDoesNotClearAnothersDragOccurred() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a", new BorderLayout());
+        a.add(BorderLayout.CENTER, new Label("a"));
+        a.setWindowSize(300, 200);
+        a.show();
+        Window b = new Window("b", new BorderLayout());
+        b.add(BorderLayout.CENTER, new Label("b"));
+        b.setWindowSize(300, 200);
+        b.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        int[] py2 = new int[]{160};
+        Display.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Display.getInstance().windowPointerDragged(a.getWindowId(), px, py2);
+        DisplayTest.flushEdt();
+        // B's press cleared the global flag after A had already dragged, so releasing
+        // A made List and friends read hasDragOccured() as false and treat a
+        // completed drag as a click.
+        Display.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        Display.getInstance().windowPointerReleased(a.getWindowId(), px, py2);
+        DisplayTest.flushEdt();
+        boolean aDragSeen = Display.getInstance().hasDragOccured();
+        b.dispose();
+        a.dispose();
+
+        assertTrue(aDragSeen,
+                "a press in another window must not erase this window's drag state");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

@@ -1938,6 +1938,17 @@ public class Window extends Container implements TopLevelContainer {
     /// window has no equivalent of.
     @Override
     public void pointerPressed(int x, int y) {
+        // Listeners registered on the window itself run first and can consume the
+        // event, the same order Form uses. Without this, addPointerPressedListener on
+        // a Window never fired -- and material pull to refresh broke with it, since
+        // Component installs its refresh listeners on the top level.
+        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
+            pointerPressedListeners.fireActionEvent(e);
+            if (e.isConsumed()) {
+                return;
+            }
+        }
         initialPressX = x;
         initialPressY = y;
         currentPointerPress = new Object();
@@ -1964,6 +1975,13 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
+        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+            pointerDraggedListeners.fireActionEvent(e);
+            if (e.isConsumed()) {
+                return;
+            }
+        }
         autoRelease(x, y);
         Component target = dragged != null ? dragged : pressedCmp;
         if (target != null) {
@@ -1990,6 +2008,18 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
+            pointerReleasedListeners.fireActionEvent(e);
+            if (e.isConsumed()) {
+                // Still cleared: the gesture is over regardless of who handled it,
+                // and leaving these set would strand the next press.
+                pressedCmp = null;
+                dragged = null;
+                currentPointerPress = null;
+                return;
+            }
+        }
         Component target = dragged != null ? dragged : pressedCmp;
         if (target != null) {
             LeadUtil.pointerReleased(target, x, y);
