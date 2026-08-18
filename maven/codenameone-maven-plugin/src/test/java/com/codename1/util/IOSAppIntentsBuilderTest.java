@@ -134,6 +134,29 @@ class IOSAppIntentsBuilderTest {
         assertTrue(swift.contains("log_workout"));
     }
 
+    /// Apple allows a provider ten app shortcuts. Emitting more does not get more -- the
+    /// excess is rejected -- and which ten survived was decided by whatever order the scanner
+    /// walked the disk in, so a rebuild that changed nothing could change which phrases work.
+    @Test
+    void appShortcutsAreCappedAtApplesLimitAndTheRestAreNamed() {
+        List<Map<String, Object>> declared = new ArrayList<Map<String, Object>>();
+        String[] ids = {"m1", "m2", "m3", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "z1"};
+        for (String id : ids) {
+            Map<String, Object> i = intent(id, "Title " + id);
+            i.put("phrases", Arrays.asList("Do " + id + " in ${applicationName}"));
+            declared.add(i);
+        }
+
+        IOSAppIntentsBuilder gen =
+                new IOSAppIntentsBuilder(declared, new ArrayList<Map<String, Object>>());
+        String swift = gen.buildAppTargetFileMap().get("CN1AppIntents.swift");
+
+        int shortcuts = swift.split("AppShortcut\\(").length - 1;
+        assertEquals(10, shortcuts, "Apple allows ten:\n" + swift);
+        assertEquals(Arrays.asList("z1", "m3"), gen.getOmittedShortcutIds(),
+                "chosen by id, and the omitted ones are named rather than dropped quietly");
+    }
+
     @Test
     void everythingIsAvailabilityFencedSoALowerTargetStillBuilds() {
         String swift = intentsSwift(

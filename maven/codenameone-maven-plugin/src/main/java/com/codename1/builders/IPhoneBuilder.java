@@ -5440,7 +5440,16 @@ public class IPhoneBuilder extends Executor {
             return;
         }
         IOSAppIntentsBuilder gen = new IOSAppIntentsBuilder(intentsManifest, entitiesManifest);
-        for (Map.Entry<String, String> e : gen.buildAppTargetFileMap().entrySet()) {
+        Map<String, String> generated = gen.buildAppTargetFileMap();
+        if (!gen.getOmittedShortcutIds().isEmpty()) {
+            // Named rather than dropped quietly: the intents still work, they simply have no
+            // spoken phrase, and a developer who wrote one has to be able to find out why it
+            // never worked.
+            log("Apple allows ten App Shortcut phrases per app. These intents keep working and "
+                    + "are still offered in the Shortcuts app, but their phrases were left out: "
+                    + gen.getOmittedShortcutIds());
+        }
+        for (Map.Entry<String, String> e : generated.entrySet()) {
             try (FileOutputStream out = new FileOutputStream(new File(srcDir, e.getKey()))) {
                 out.write(e.getValue().getBytes(StandardCharsets.UTF_8));
             }

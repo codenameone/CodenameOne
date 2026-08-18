@@ -645,11 +645,21 @@ class IntentsTest {
 
     @Test
     void anActivityArrivingBeforeTheDeclarationsIsRunOnceTheyExist() {
-        // A donated shortcut tapped on a dead process delivers the activity before the
+        // A donated shortcut tapped on a dead process can deliver the activity before the
         // generated dispatcher installs itself. Rejecting it there made the app launch and do
         // nothing.
+        //
+        // What makes it ours is the list a previous launch recorded, never the shape of the
+        // id: an application's own activity type may look exactly like one of these.
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher first = new FakeDispatcher();
+        first.declarations.add(declaration("known"));
+        Intents.setDispatcher(first);
+        Intents.setDispatcher(null);
+
         assertTrue(Intents.dispatchUserActivity("known", null),
-                "an id shaped like ours is claimed while the table is still empty");
+                "an id this application recorded is claimed while the table is empty");
 
         FakeDispatcher d = new FakeDispatcher();
         d.declarations.add(declaration("known"));
@@ -712,6 +722,13 @@ class IntentsTest {
         // is empty would swallow activities belonging to somebody else.
         assertFalse(Intents.dispatchUserActivity("com.example.SomeOtherActivity", null));
         assertFalse(Intents.dispatchUserActivity("NSUserActivityTypeBrowsingWeb", null));
+
+        // And neither is one that merely looks like an intent id. Nothing has been recorded
+        // here, and reaching this point at all means no dispatcher was installed -- which on a
+        // real device means the application declared no intents, since the generated bootstrap
+        // runs before UIKit can deliver anything. There is nothing here to own.
+        assertFalse(Intents.dispatchUserActivity("continue_reading", null),
+                "shape is not ownership, and there is no first-launch exception to that");
     }
 
     @Test

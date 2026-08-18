@@ -965,21 +965,20 @@ public final class Intents {
                 // else.
                 return false;
             }
-            // Shape is not ownership. An application may declare its own activity type that
-            // happens to look like an intent id -- "continue_reading" is entirely ordinary --
-            // and claiming it here tells iOS the activity was handled, so the app's own
-            // continuation never runs and drainPendingActivities quietly drops it. The warm
-            // path already answers correctly, because by then the real list exists.
+            // Shape is not ownership, and there is no first-launch exception to that. An
+            // application may declare its own activity type that happens to look like an intent
+            // id -- "continue_reading" is entirely ordinary -- and claiming it tells iOS the
+            // activity was handled, so the app's own continuation never runs and
+            // drainPendingActivities drops it later without a word.
             //
-            // So the real list is what decides, remembered by the previous launch. Only when
-            // there has never been one -- a first launch, where an App Shortcut can still be
-            // invoked against an app that has not run -- does the shape heuristic stand in,
-            // and that window closes as soon as the app publishes its declarations once.
+            // Nothing is lost by refusing when there is no record, because reaching here at all
+            // already means this application declared no intents. The generated bootstrap is
+            // spliced into the stub's main *before* Display.init, and UIKit only starts
+            // delivering activities after that -- so an app with any @AppIntent has its real
+            // table installed before the first one can arrive, and takes the branch above. An
+            // app without one has no bootstrap, no dispatcher, and nothing here to own.
             String recorded = recordedDeclarationIds();
-            boolean ours = recorded == null
-                    ? looksLikeIntentId(activityType)
-                    : recordNames(recorded, activityType);
-            if (!ours) {
+            if (recorded == null || !recordNames(recorded, activityType)) {
                 return false;
             }
             pendingActivities.add(new PendingActivity(activityType, params));
@@ -987,25 +986,6 @@ public final class Intents {
         return true;
     }
 
-    /// True when a string has the shape the build enforces for an intent id: lower case, digits
-    /// and underscores only, so it can never be confused with a platform activity type.
-    private static boolean looksLikeIntentId(String s) {
-        if (s.length() < 3 || s.length() > 64) {
-            return false;
-        }
-        char first = s.charAt(0);
-        if (first < 'a' || first > 'z') {
-            return false;
-        }
-        for (int i = 1; i < s.length(); i++) {
-            char c = s.charAt(i);
-            boolean ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
-            if (!ok) {
-                return false;
-            }
-        }
-        return true;
-    }
 
     private static void deliverSelection(final EntitySelectionHandler h, final AppEntity e) {
         if (h == null) {

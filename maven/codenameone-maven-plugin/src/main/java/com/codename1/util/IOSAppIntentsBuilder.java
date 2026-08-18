@@ -23,6 +23,8 @@
 package com.codename1.util;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +54,31 @@ import java.util.Map;
 /// forcing every app that declares one to abandon them.
 public final class IOSAppIntentsBuilder {
 
+    /// Orders declarations by intent id.
+    ///
+    /// Named and static rather than anonymous: an anonymous class declared inside an instance
+    /// method holds a reference to the enclosing builder, which it has no use for and which
+    /// SpotBugs reports.
+    private static final class ById
+            implements Comparator<Map<String, Object>>, java.io.Serializable {
+        /// Serializable because SpotBugs asks every Comparator to be: one can end up inside a
+        /// TreeMap that someone serializes. Nothing here does, and nothing here has state.
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public int compare(Map<String, Object> a, Map<String, Object> b) {
+            return str(a, "id").compareTo(str(b, "id"));
+        }
+    }
+
+    private static final Comparator<Map<String, Object>> BY_ID = new ById();
+
+    /// Apple's limit on one AppShortcutsProvider.
+    private static final int MAX_APP_SHORTCUTS = 10;
+
+    /// Intents whose phrases did not fit that limit, for the build to report.
+    private final List<String> omittedShortcuts = new ArrayList<String>();
+
     private final List<Map<String, Object>> intents;
     private final List<Map<String, Object>> entities;
 
@@ -71,6 +98,12 @@ public final class IOSAppIntentsBuilder {
             out.put("CN1AppEntities.swift", buildEntities());
         }
         return out;
+    }
+
+    /// The ids whose phrases were left out because the provider was full, in the order they
+    /// were dropped. Empty until buildAppTargetFileMap has run.
+    public List<String> getOmittedShortcutIds() {
+        return omittedShortcuts;
     }
 
     /// True when there is anything worth generating. An app that only indexes content declares
@@ -304,6 +337,15 @@ public final class IOSAppIntentsBuilder {
         }
         if (withPhrases.isEmpty()) {
             return;
+        }
+        // Apple allows a provider ten app shortcuts. Emitting more does not get more: the
+        // excess is rejected, and which ten survived was decided by whatever order the
+        // annotation scanner walked the disk in -- so a rebuild that changed nothing could
+        // change which phrases work. Sorted by intent id and cut at ten, with the rest named
+        // rather than dropped quietly.
+        Collections.sort(withPhrases, BY_ID);
+        while (withPhrases.size() > MAX_APP_SHORTCUTS) {
+            omittedShortcuts.add(str(withPhrases.remove(withPhrases.size() - 1), "id"));
         }
         sb.append("@available(iOS 16.0, *)\n");
         sb.append("struct CN1AppShortcuts: AppShortcutsProvider {\n");
