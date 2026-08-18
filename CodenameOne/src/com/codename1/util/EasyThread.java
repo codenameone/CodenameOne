@@ -271,6 +271,34 @@ public final class EasyThread {
         }
     }
 
+    /// Blocks until the thread has left its loop.
+    ///
+    /// `#isFinished()` answers whether that has happened; this waits for it. The two are not the
+    /// same question as "has a stop been asked for": `#kill()` and `#killWhenIdle()` make this
+    /// thread refuse new work immediately, while whatever it had already accepted keeps running.
+    /// A caller that reads the refusal as "the thread is gone" and then touches what the thread
+    /// was working on is racing the tasks still in flight.
+    ///
+    /// Returns immediately when called from the thread itself, which cannot wait for its own exit.
+    public void awaitFinished() {
+        if (isThisIt()) {
+            return;
+        }
+        Display.getInstance().invokeAndBlock(new AwaitFinishedRunnable());
+    }
+
+    /// Waits off the EDT, in the style of the other blocking calls here.
+    private class AwaitFinishedRunnable implements Runnable {
+        @Override
+        public void run() {
+            synchronized (LOCK) {
+                while (!finished) {
+                    Util.wait(LOCK);
+                }
+            }
+        }
+    }
+
     /// Stops the thread once the current task completes
     public void kill() {
         synchronized (LOCK) {

@@ -379,11 +379,18 @@ public class ThreadSafeDatabase extends Database {
                 // refusal into "this database has been closed", but close() is idempotent by
                 // contract, so here it is not an error to report.
                 //
-                // Closed directly rather than assumed closed, because a stopped worker is all
-                // this can observe and a worker can also stop without having closed anything --
+                // Closed directly rather than assumed closed, because a refusal is all this can
+                // observe and a worker can also stop without having closed anything --
                 // getThread() is public, and killWhenIdle() on it is a call anybody can make.
-                // There is no thread left to race with once it has stopped, so the call is safe
-                // from here, and closing an already closed database does nothing.
+                //
+                // Waited for first, because a refusal does not mean the worker has gone.
+                // EasyThread stops accepting the moment a stop is asked for, while the tasks it
+                // already took keep running -- against this database. Closing here and then is
+                // the concurrent use this wrapper exists to prevent, and it can leave an
+                // operation that was already under way failing or half done. Once the worker has
+                // left its loop there is nothing to race with, and closing an already closed
+                // database does nothing.
+                et.awaitFinished();
                 underlying.close();
                 return;
             }

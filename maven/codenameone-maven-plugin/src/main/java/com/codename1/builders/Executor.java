@@ -1015,6 +1015,36 @@ public abstract class Executor {
             }
         }
 
+        /// A constant that can name a type or a method: a class literal, a method handle, or --
+        /// on a class file new enough to have them -- a dynamic constant whose own bootstrap
+        /// arguments carry more of the same.
+        private void noteConstant(Object value) {
+            if (value instanceof Type) {
+                // The descriptor rather than the internal name, because a Type here can describe a
+                // method, and an internal name is not a question that can be asked of one.
+                note(((Type) value).getDescriptor());
+                return;
+            }
+            if (value instanceof Handle) {
+                Handle handle = (Handle) value;
+                note(handle.getOwner());
+                note(handle.getDesc());
+                if (DATABASE_CONFIG_CLASS.equals(handle.getOwner())
+                        && isEncryptingFactory(handle.getName())) {
+                    hit[1] = true;
+                }
+                return;
+            }
+            if (value instanceof ConstantDynamic) {
+                ConstantDynamic constant = (ConstantDynamic) value;
+                note(constant.getDescriptor());
+                noteConstant(constant.getBootstrapMethod());
+                for (int iter = 0; iter < constant.getBootstrapMethodArgumentCount(); iter++) {
+                    noteConstant(constant.getBootstrapMethodArgument(iter));
+                }
+            }
+        }
+
         private void noteAll(String[] names) {
             if (names != null) {
                 for (int iter = 0; iter < names.length; iter++) {
@@ -1073,8 +1103,24 @@ public abstract class Executor {
 
                 @Override
                 public void visitLdcInsn(Object value) {
-                    if (value instanceof Type) {
-                        note(((Type) value).getInternalName());
+                    noteConstant(value);
+                }
+
+                /// A lambda or a method reference, which is not a call instruction.
+                ///
+                /// `DatabaseConfig::passphrase` compiles to an invokedynamic whose bootstrap
+                /// arguments carry the factory as a method handle, so nothing reaches
+                /// visitMethodInsn above. Missing it left an application that encrypts being
+                /// built without a cipher -- the one direction this scan must never get wrong.
+                @Override
+                public void visitInvokeDynamicInsn(String name, String descriptor,
+                        Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+                    note(descriptor);
+                    noteConstant(bootstrapMethodHandle);
+                    if (bootstrapMethodArguments != null) {
+                        for (int iter = 0; iter < bootstrapMethodArguments.length; iter++) {
+                            noteConstant(bootstrapMethodArguments[iter]);
+                        }
                     }
                 }
             };

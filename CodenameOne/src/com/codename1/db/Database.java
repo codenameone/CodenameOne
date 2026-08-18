@@ -530,7 +530,9 @@ public abstract class Database {
     /// This inspects the file header: an unencrypted SQLite database begins with the ASCII bytes
     /// `SQLite format 3` followed by a zero byte, and an encrypted one does not. It is therefore a
     /// **header sniff, not a cryptographic assertion** -- a truncated or corrupt file also reports
-    /// true, and a false result only means the file is a readable plaintext SQLite database.
+    /// true, and a false result only means the file is a readable plaintext SQLite database. An
+    /// empty file reports false: SQLite writes no header until the first change, so that is what a
+    /// database that has been created and not yet written to looks like.
     ///
     /// #### Parameters
     ///
@@ -562,7 +564,12 @@ public abstract class Database {
                 while (offset < header.length) {
                     int read = in.read(header, offset, header.length - offset);
                     if (read < 0) {
-                        return true;
+                        // An empty file is a valid empty plaintext database, not a short one:
+                        // SQLite writes nothing until the first change, so openOrCreate() followed
+                        // by close() leaves exactly this. Reporting it as encrypted said an
+                        // untouched plaintext database needed a key. A file with some bytes but
+                        // not enough of them is a different case and stays conservative.
+                        return offset != 0;
                     }
                     offset += read;
                 }

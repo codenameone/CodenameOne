@@ -169,4 +169,55 @@ public class ThreadSafeDatabaseTest extends UITestBase {
         // Still idempotent afterwards.
         tsDb.close();
     }
+    @FormTest
+    public void closingWhileTheWorkerIsStillDrainingWaitsForIt() throws Exception {
+        // A stop that has been asked for is not a worker that has gone. EasyThread refuses new
+        // work the moment killWhenIdle() is called, while whatever it already accepted keeps
+        // running -- against this database. Reading that refusal as "there is nothing left to race
+        // with" closed the database on the caller thread underneath a live operation, which is the
+        // one thing this wrapper exists to prevent.
+        Database db = TestCodenameOneImplementation.getInstance()
+                .openOrCreateDB("test_threadsafe_close_while_draining.db");
+        final TestCodenameOneImplementation.TestDatabase underlying =
+                (TestCodenameOneImplementation.TestDatabase) db;
+        ThreadSafeDatabase tsDb = new ThreadSafeDatabase(db);
+
+        final boolean[] started = new boolean[1];
+        final boolean[] finished = new boolean[1];
+        final boolean[] closedMidTask = new boolean[1];
+        tsDb.getThread().run(new Runnable() {
+            public void run() {
+                synchronized (started) {
+                    started[0] = true;
+                    started.notifyAll();
+                }
+                try {
+                    // Long enough that a close which does not wait returns while this is running.
+                    Thread.sleep(500);
+                } catch (InterruptedException ignored) {
+                }
+                closedMidTask[0] = underlying.isClosed();
+                finished[0] = true;
+            }
+        });
+        synchronized (started) {
+            while (!started[0]) {
+                started.wait(5000);
+            }
+        }
+
+        // The state any caller can produce, since getThread() is public: still busy, no longer
+        // accepting. close() below is refused rather than handed over.
+        tsDb.getThread().killWhenIdle();
+
+        tsDb.close();
+
+        Assertions.assertTrue(finished[0],
+                "close() returned while the worker was still running a task");
+        Assertions.assertFalse(closedMidTask[0],
+                "the database was closed underneath an operation that was still running");
+        Assertions.assertTrue(underlying.isClosed(),
+                "and the database still has to end up closed");
+    }
+
 }

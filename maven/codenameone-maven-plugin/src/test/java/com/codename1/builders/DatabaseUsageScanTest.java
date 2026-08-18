@@ -572,4 +572,67 @@ class DatabaseUsageScanTest {
         assertFalse(usage.usesDatabaseCipher(), "and certainly not encryption");
     }
 
+    @Test
+    void aMethodReferenceToAFactoryIsEncryption() throws IOException {
+        // Supplier<DatabaseConfig> keys = DatabaseConfig::managed. There is no call instruction:
+        // the factory travels as a method handle in an invokedynamic's bootstrap arguments, so a
+        // scan that only reads call sites reports no encryption and the build drops the cipher --
+        // on Android by deleting the package outright. The application then fails to open its own
+        // database on the device.
+        writeClassReferencing("com/example/App.class", "managed");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "it names the config type");
+        assertTrue(usage.usesDatabaseCipher(), "and a method reference configures a key");
+    }
+
+    @Test
+    void aMethodReferenceToPlainIsStillNotEncryption() throws IOException {
+        // The same shape, and the same distinction the call site path draws.
+        writeClassReferencing("com/example/App.class", "plain");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "it names the config type");
+        assertFalse(usage.usesDatabaseCipher(), "plain() configures no key");
+    }
+
+    /** A class that captures DatabaseConfig::factory as a lambda, rather than calling it. */
+    private void writeClassReferencing(String path, String factory) throws IOException {
+        File f = new File(root, path.replace('/', File.separatorChar));
+        assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        String internalName = path.substring(0, path.length() - ".class".length());
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internalName, null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "keys", "()Ljava/util/concurrent/Callable;", null, null);
+        m.visitCode();
+        org.objectweb.asm.Handle metafactory = new org.objectweb.asm.Handle(
+                org.objectweb.asm.Opcodes.H_INVOKESTATIC,
+                "java/lang/invoke/LambdaMetafactory", "metafactory",
+                "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;"
+                        + "Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;"
+                        + "Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)"
+                        + "Ljava/lang/invoke/CallSite;",
+                false);
+        org.objectweb.asm.Handle target = new org.objectweb.asm.Handle(
+                org.objectweb.asm.Opcodes.H_INVOKESTATIC,
+                "com/codename1/db/DatabaseConfig", factory,
+                "()Lcom/codename1/db/DatabaseConfig;", false);
+        m.visitInvokeDynamicInsn("call", "()Ljava/util/concurrent/Callable;", metafactory,
+                org.objectweb.asm.Type.getType("()Ljava/lang/Object;"),
+                target,
+                org.objectweb.asm.Type.getType("()Lcom/codename1/db/DatabaseConfig;"));
+        m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        m.visitMaxs(1, 1);
+        m.visitEnd();
+        w.visitEnd();
+        OutputStream out = new FileOutputStream(f);
+        try {
+            out.write(w.toByteArray());
+        } finally {
+            out.close();
+        }
+    }
+
 }

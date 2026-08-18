@@ -25,11 +25,13 @@ package com.codename1.db;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.CN;
 
 import java.util.List;
 
 import java.io.IOException;
+import java.io.OutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -158,4 +160,59 @@ class DatabaseCoverageTest extends UITestBase {
             }
         });
     }
+    @FormTest
+    void anEmptyFileIsAPlaintextDatabaseRatherThanAnEncryptedOne() throws IOException {
+        // SQLite writes nothing until the first change, so a database that has been created and
+        // not yet written to is a zero byte file -- a valid empty plaintext database. Reading the
+        // end of the file as a failed header read reported it as encrypted, which is the state
+        // openOrCreate() followed by close() leaves behind.
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        Database db = impl.openOrCreateDB("test_is_encrypted_empty.db");
+        db.close();
+        writeDatabaseFile("test_is_encrypted_empty.db", new byte[0]);
+
+        assertFalse(Database.isEncrypted("test_is_encrypted_empty.db"),
+                "an empty database file is plaintext");
+    }
+
+    @FormTest
+    void aPlaintextHeaderReadsAsPlaintextAndAnythingElseDoesNot() throws IOException {
+        // The two ends of the same sniff, so the empty case above is not the only thing holding
+        // this method's contract in place.
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.openOrCreateDB("test_is_encrypted_plain.db").close();
+        impl.openOrCreateDB("test_is_encrypted_short.db").close();
+        impl.openOrCreateDB("test_is_encrypted_cipher.db").close();
+
+        byte[] header = "SQLite format 3".getBytes("UTF-8");
+        byte[] plaintext = new byte[header.length + 1];
+        System.arraycopy(header, 0, plaintext, 0, header.length);
+        writeDatabaseFile("test_is_encrypted_plain.db", plaintext);
+        // Some bytes, but not a header. Unlike the empty file this really could be a short read of
+        // something encrypted or corrupt, and the conservative answer stands.
+        writeDatabaseFile("test_is_encrypted_short.db", new byte[] {'S', 'Q', 'L'});
+        writeDatabaseFile("test_is_encrypted_cipher.db",
+                new byte[] {(byte) 0xD9, 0x4F, (byte) 0xA3, 0x11, 0x22, 0x33, 0x44, 0x55,
+                    0x66, 0x77, (byte) 0x88, (byte) 0x99, 0x01, 0x02, 0x03, 0x04});
+
+        assertFalse(Database.isEncrypted("test_is_encrypted_plain.db"),
+                "the plaintext SQLite header is plaintext");
+        assertTrue(Database.isEncrypted("test_is_encrypted_short.db"),
+                "a short file that is not a header stays conservative");
+        assertTrue(Database.isEncrypted("test_is_encrypted_cipher.db"),
+                "and ciphertext has no header at all");
+    }
+
+    /// Puts bytes where the implementation says this database lives.
+    private void writeDatabaseFile(String databaseName, byte[] content) throws IOException {
+        String path = Database.getDatabasePath(databaseName);
+        assertNotNull(path, "the test implementation has to report a path for " + databaseName);
+        OutputStream out = FileSystemStorage.getInstance().openOutputStream(path);
+        try {
+            out.write(content);
+        } finally {
+            out.close();
+        }
+    }
+
 }
