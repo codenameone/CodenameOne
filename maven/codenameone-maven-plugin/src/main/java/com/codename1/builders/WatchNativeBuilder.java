@@ -841,8 +841,16 @@ class WatchNativeBuilder {
     /// Deliberately literal, like {@link #injectedPlistString}: the hint is a fragment, not a
     /// document, so this scans for the tags rather than pretending to parse XML.
     static java.util.List<String> injectedPlistKeys(BuildRequest request) {
+        return injectedPlistKeys(request.getArg("ios.plistInject", null));
+    }
+
+    /// The keys a plist FRAGMENT declares, for a caller holding the text rather than the request.
+    ///
+    /// The Info.plist renderer is that caller: it appends its own fragments to the injected one as
+    /// it goes, so what it must not declare twice is decided by the string it has built, not by
+    /// the build hint it started from.
+    static java.util.List<String> injectedPlistKeys(String inject) {
         java.util.List<String> out = new java.util.ArrayList<String>();
-        String inject = request.getArg("ios.plistInject", null);
         if (inject == null) {
             return out;
         }

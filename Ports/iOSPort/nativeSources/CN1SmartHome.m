@@ -2713,8 +2713,15 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             // the accessory ends in is whichever landed last. Nothing here
             // can honestly say the setpoint applied, so it is refused.
             NSUInteger waitsForEntry = NSNotFound;
-            if ([traitId isEqualToString:@"target_temperature"]
-                    && cn1homeHasNoValueNow(service, traitId)) {
+            if ([traitId isEqualToString:@"target_temperature"]) {
+                // Whether it is in AUTO NOW is only half of it. Judged on
+                // that alone, a thermostat in HEAT given "AUTO, and 21"
+                // passed both writes: the mode landed, and the target was
+                // reported as applied to a thermostat that no longer has
+                // one -- an immediate read answers absent. What the batch
+                // LEAVES it in is the question, so the scan runs whatever
+                // state it starts from.
+                BOOL inAutoNow = cn1homeHasNoValueNow(service, traitId);
                 NSUInteger lastMode = NSNotFound;
                 BOOL modesDisagree = NO;
                 int requestedMode = 0;
@@ -2736,22 +2743,33 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                     requestedMode = mode;
                     lastMode = j;
                 }
+                // A mode write to a service with no mode characteristic
+                // cannot land -- its own record says TRAIT_NOT_SUPPORTED --
+                // so it changes nothing and this setpoint is judged as if
+                // the batch had not asked.
+                if (cn1homeFindCharacteristic(
+                        service, @"target_heating_cooling") == nil) {
+                    lastMode = NSNotFound;
+                }
                 // The caller's own mode write becomes this write's
                 // prerequisite. Launched independently, a mode write the
                 // accessory refuses -- unreachable, read-only, out of
                 // range -- left the thermostat in AUTO while the setpoint
                 // landed and was reported as applied.
                 if (lastMode != NSNotFound && !modesDisagree
-                        && requestedMode != CN1_HOME_MODE_AUTO
-                        && cn1homeFindCharacteristic(
-                            service, @"target_heating_cooling") != nil) {
+                        && requestedMode != CN1_HOME_MODE_AUTO) {
                     waitsForEntry = lastMode;
                 }
-                if (waitsForEntry == NSNotFound) {
+                if (waitsForEntry == NSNotFound
+                        && (inAutoNow || lastMode != NSNotFound)) {
                     NSString *why = modesDisagree
                             ? @"this batch asks this thermostat for more than"
                               " one mode, so which one it ends in is undefined"
                               " and a single target cannot be applied with it"
+                            : lastMode != NSNotFound
+                            ? @"this batch puts this thermostat in AUTO, where"
+                              " there is no single target; set the heating and"
+                              " cooling thresholds instead"
                             : @"this thermostat is in AUTO, where there is no"
                               " single target; set the heating and cooling"
                               " thresholds instead";
@@ -2898,16 +2916,17 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                         writeParts();
                         return;
                     }
-                    // Still in AUTO, so the setpoint means nothing and
-                    // saying it was applied would be the lie this whole
-                    // branch exists to avoid. The mode's own record reports
-                    // its failure on its own account.
+                    // The mode this target depends on did not land, so the
+                    // thermostat is in whatever mode it was already in --
+                    // reporting the target as applied would be the lie this
+                    // whole branch exists to avoid. The mode's own record
+                    // reports its failure on its own account.
                     [records replaceObjectAtIndex:index
                                        withObject:cn1homeJoinFields(
                         [base arrayByAddingObjectsFromArray:
                          [NSArray arrayWithObjects:@"0", @"INVALID_ARGUMENT",
-                          @"the thermostat is in AUTO and the mode change"
-                          " that would have left it there failed", nil]])];
+                          @"the mode change this target depends on failed, so"
+                          " the target was not applied", nil]])];
                     finished++;
                     if (finished == outstanding) {
                         answer();

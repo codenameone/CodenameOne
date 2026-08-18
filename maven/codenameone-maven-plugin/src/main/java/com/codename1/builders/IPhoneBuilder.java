@@ -6435,8 +6435,14 @@ public class IPhoneBuilder extends Executor {
         
         
         // Some stuff for the switch to Xcode 8, but we don't need it yet
+        // The keys the fragment DECLARES, not the text it happens to contain. A comment
+        // mentioning NSBluetoothAlwaysUsageDescription -- or a purpose string of another key
+        // that names it -- suppressed the generated value, and the app was terminated on the
+        // device for a disclosure the build had approved. Recomputed here because everything
+        // above appends to inject as it goes.
+        java.util.List<String> declaredKeys = WatchNativeBuilder.injectedPlistKeys(inject);
         for (String privacyKey : privacyUsageDescriptions.keySet()) {
-            if (!inject.contains(privacyKey)) {
+            if (!declaredKeys.contains(privacyKey)) {
                 if (privacyKey.toLowerCase().contains("location")) {
                     // We add location usage descriptions after when we deal with the ios.locationUsageDescription
                     // build hint.
@@ -6612,7 +6618,8 @@ public class IPhoneBuilder extends Executor {
         // into the required <array><string>...</string></array> fragment.
         String bonjourServices = request.getArg("ios.NSBonjourServices", null);
         if (bonjourServices != null && bonjourServices.length() > 0
-                && !inject.contains("NSBonjourServices")) {
+                && !WatchNativeBuilder.injectedPlistKeys(inject)
+                        .contains("NSBonjourServices")) {
             StringBuilder arr = new StringBuilder();
             arr.append("\n<key>NSBonjourServices</key><array>");
             for (String s : bonjourServices.split("[,;]")) {
