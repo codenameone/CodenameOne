@@ -40,6 +40,12 @@ import SwiftUI
 import UIKit
 
 /// Everything a render pass needs besides the node itself.
+///
+/// Fenced because it stores a SwiftUI Axis, which is iOS 13 and up. The type declaration
+/// itself is what fails availability checking on a lower target -- an app that keeps one and
+/// declares an intent still gets this file, since the intent declarations are fenced at 16 and
+/// this was not fenced at all.
+@available(iOS 14.0, *)
 struct CN1RenderContext {
     /// Flat state map of the active timeline entry / live activity update; resolves ${key}.
     var state: [String: Any]

@@ -24,6 +24,7 @@ package com.codename1.impl.ios;
 
 import com.codename1.intents.AppEntity;
 import com.codename1.intents.IntentCompletion;
+import com.codename1.intents.IntentDeclaration;
 import com.codename1.intents.IntentResult;
 import com.codename1.intents.IntentSerializer;
 import com.codename1.intents.IntentSource;
@@ -220,7 +221,114 @@ final class IOSIntentCallbacks {
         if (dceGuard) {
             return false;
         }
-        return Intents.dispatchUserActivity(activityType, parse(userInfoJson));
+        Map<String, Object> params = parse(userInfoJson);
+        if (needsAWindowFirst(activityType)) {
+            // A donated activity can cold-launch the app, and both delegates deliver it before
+            // the application has finished starting: the legacy one calls through right after
+            // IOSImplementation.callback, which only *enqueues* init/start, and the scene
+            // delegate calls through from willConnectToSession. The generated bootstrap
+            // installed the dispatcher from main, so the framework would happily run the
+            // handler -- against no Form at all, for an intent whose whole contract is that it
+            // has one. Held until there is a window, which is what Android's foreground queue
+            // does for the same reason.
+            synchronized (PARKED) {
+                PARKED.add(new String[]{activityType, userInfoJson});
+                if (!waiting) {
+                    waiting = true;
+                    startWindowWaiter();
+                }
+            }
+            // Claimed: it is ours, and the policy that decides whether it may actually run is
+            // applied on delivery, exactly as it would have been now.
+            return true;
+        }
+        return Intents.dispatchUserActivity(activityType, params);
+    }
+
+    /// Activities waiting for the application to finish starting.
+    private static final List<String[]> PARKED = new ArrayList<String[]>();
+
+    /// True while a waiter thread is alive. Guarded by PARKED.
+    private static boolean waiting;
+
+    /// How long to wait for the first window before giving up on a parked activity.
+    ///
+    /// A launch that never produces one is a broken application, not something to keep a
+    /// thread alive for; and running the handler minutes later, into whatever the user is
+    /// doing by then, is worse than not running it.
+    private static final long WINDOW_WAIT_MILLIS = 15000L;
+
+    /// Whether this activity has to wait for the application to have a window.
+    ///
+    /// Only a declared, non-headless intent does. A headless one is expressly allowed to run
+    /// with nothing on screen -- that is what the flag buys -- and an activity type this
+    /// application does not declare is not ours to hold.
+    private static boolean needsAWindowFirst(String activityType) {
+        if (hasWindow()) {
+            return false;
+        }
+        IntentDeclaration decl = Intents.getDeclaration(activityType);
+        return decl != null && !decl.runsHeadless();
+    }
+
+    /// True when the application has started far enough to have something on screen.
+    private static boolean hasWindow() {
+        return Display.isInitialized() && Display.getInstance().getCurrent() != null;
+    }
+
+    /// Polls for the first window and then delivers everything held.
+    private static void startWindowWaiter() {
+        Thread t = new Thread(new WindowWaiter(), "CN1 Intent window");
+        t.start();
+    }
+
+    /// Named and static rather than anonymous: it outlives the call that started it, and an
+    /// anonymous class here would hold whatever created it.
+    private static final class WindowWaiter implements Runnable {
+        @Override
+        public void run() {
+            long giveUpAt = System.currentTimeMillis() + WINDOW_WAIT_MILLIS;
+            while (System.currentTimeMillis() < giveUpAt) {
+                if (hasWindow()) {
+                    deliverParked();
+                    return;
+                }
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            synchronized (PARKED) {
+                if (!PARKED.isEmpty()) {
+                    Log.p("[intents] the application never produced a window; dropping "
+                            + PARKED.size() + " continued activity(ies)", Log.WARNING);
+                    PARKED.clear();
+                }
+                waiting = false;
+            }
+        }
+    }
+
+    /// Hands every held activity to the framework, in the order they arrived.
+    private static void deliverParked() {
+        List<String[]> drained;
+        synchronized (PARKED) {
+            drained = new ArrayList<String[]>(PARKED);
+            PARKED.clear();
+            waiting = false;
+        }
+        // The loop is outside any handler: iterating List<String[]> compiles to a CHECKCAST,
+        // and ParparVM does not throw for a failed cast.
+        for (int i = 0; i < drained.size(); i++) {
+            String[] held = drained.get(i);
+            try {
+                Intents.dispatchUserActivity(held[0], parse(held[1]));
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
     }
 
     /// Answers an entity query the platform runs while building its own picker.

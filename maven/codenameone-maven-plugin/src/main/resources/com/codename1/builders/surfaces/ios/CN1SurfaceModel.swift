@@ -135,6 +135,7 @@ func cn1UIColor(argb: Int) -> UIColor {
 
 /// Color spec: {"l": argb, "d": argb} (light/dark pair, resolved via trait collection)
 /// or {"role": "label|secondaryLabel|background|accent"} (semantic role).
+@available(iOS 14.0, *)
 func cn1Color(_ spec: Any?) -> Color? {
     guard let dict = spec as? [String: Any] else {
         return nil
@@ -183,12 +184,14 @@ func cn1PointList(_ value: Any?) -> [CGPoint] {
 /// Converts a clock-convention angle (the surfaces wire convention: degrees, 0 = 12 o'clock,
 /// clockwise positive) to a SwiftUI Angle. Path angles measure from 3 o'clock advancing
 /// clockwise in SwiftUI's y-down coordinate space, so the conversion subtracts 90 degrees.
+@available(iOS 14.0, *)
 func cn1ClockAngle(_ clockDegrees: CGFloat) -> Angle {
     return .degrees(Double(clockDegrees) - 90)
 }
 
 // MARK: - Fonts and alignment
 
+@available(iOS 14.0, *)
 func cn1FontWeight(_ value: Any?) -> Font.Weight {
     switch value as? String {
     case "light":
@@ -204,6 +207,7 @@ func cn1FontWeight(_ value: Any?) -> Font.Weight {
     }
 }
 
+@available(iOS 14.0, *)
 func cn1Alignment(_ value: Any?) -> Alignment? {
     switch value as? String {
     case "topLeading":
