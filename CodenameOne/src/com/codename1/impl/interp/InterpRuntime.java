@@ -1421,10 +1421,17 @@ public final class InterpRuntime {
     /// class initializer that threw is a real failure and belongs to the
     /// caller; only absence is a reason to keep looking.
     private static boolean isAbsent(Throwable t) {
-        return t instanceof NoSuchFieldException
-                || t instanceof NoSuchFieldError
-                || t instanceof ClassNotFoundException
-                || t instanceof NoClassDefFoundError;
+        if (t instanceof NoSuchFieldError || t instanceof NoClassDefFoundError
+                || t instanceof ClassNotFoundException) {
+            return true;
+        }
+        // NoSuchFieldException is a reflection type, and the device's java.lang
+        // does not have one -- naming it here would not compile for the device
+        // at all. The reflection-backed linker still throws it, so it is
+        // recognised by name.
+        String thrown = t.getClass().getName();
+        return "java.lang.NoSuchFieldException".equals(thrown)
+                || "java.lang.NoSuchMethodException".equals(thrown);
     }
 
     /// Where a static the interpreted hierarchy does not declare might live.
