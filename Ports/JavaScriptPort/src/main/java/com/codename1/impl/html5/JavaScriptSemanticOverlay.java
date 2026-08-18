@@ -454,12 +454,17 @@ public final class JavaScriptSemanticOverlay {
     }
 
     private void applyListeners(Entry entry, AccessibilityNodeSnapshot node) {
+        // A node reported as disabled takes no action from here, whatever its actions say about
+        // themselves: a slider builds its increment and decrement without asking the component
+        // whether it is enabled, and an arrow key would otherwise move something the application
+        // has switched off -- and which is announced as switched off.
+        boolean usable = node.getEnabled() == null || node.getEnabled().booleanValue();
         AccessibilityAction activate = node.getAction(AccessibilityAction.ACTIVATE);
-        entry.activateEnabled = activate != null && activate.isEnabled();
+        entry.activateEnabled = usable && activate != null && activate.isEnabled();
         AccessibilityAction increment = node.getAction(AccessibilityAction.INCREMENT);
-        entry.incrementEnabled = increment != null && increment.isEnabled();
+        entry.incrementEnabled = usable && increment != null && increment.isEnabled();
         AccessibilityAction decrement = node.getAction(AccessibilityAction.DECREMENT);
-        entry.decrementEnabled = decrement != null && decrement.isEnabled();
+        entry.decrementEnabled = usable && decrement != null && decrement.isEnabled();
         if (entry.listenersBound) {
             return;
         }
