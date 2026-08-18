@@ -339,6 +339,14 @@ class AttachmentReconciliationTest extends UITestBase {
             "ATTACH 'file:///data/b.db#frag' AS aux",
             // One slash, which is a URI spelling this does not resolve.
             "ATTACH 'file:/data/b.db' AS aux",
+            // A URI authority, which SQLite reads and this does not. Checked against the engine:
+            // file://localhost/x opens /x, so keying on "localhost/x" would reserve a file that
+            // is not the one attached, and every other authority -- "file://C:/x", the shape a
+            // Windows path takes if it is pasted after the prefix -- is an error there anyway.
+            "ATTACH 'file://localhost/data/b.db' AS aux",
+            "ATTACH 'file://C:/data/b.db' AS aux",
+            // A prefix and nothing else is not a name in either reading.
+            "ATTACH 'file://' AS aux",
             // A double quoted name is an identifier to SQLite, read as a filename only when no
             // column answers to it -- which cannot be known from here either.
             "ATTACH \"/data/b.db\" AS aux",

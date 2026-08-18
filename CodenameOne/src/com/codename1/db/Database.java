@@ -1641,7 +1641,9 @@ public abstract class Database {
     /// one that refuses, so those are refused.
     ///
     /// A `file:` with anything other than two slashes after it -- `file:/data/x.db`, which SQLite
-    /// also accepts -- is refused for the same reason: it is not the form this resolves.
+    /// also accepts -- is refused for the same reason: it is not the form this resolves. So is one
+    /// that carries a URI authority: `file://localhost/data/x.db` opens `/data/x.db` in SQLite,
+    /// verified against the engine, while stripping the prefix here leaves `localhost/data/x.db`.
     ///
     /// #### Parameters
     ///
@@ -1656,6 +1658,16 @@ public abstract class Database {
         }
         if (!file.startsWith("file://")) {
             // Any other number of slashes is a URI spelling this does not resolve.
+            return true;
+        }
+        int pathStart = "file://".length();
+        if (file.indexOf('/', pathStart) != pathStart) {
+            // What sits between those two slashes and the next one is the URI authority, and
+            // SQLite reads it: it opens the path after "file://localhost" and rejects any other
+            // authority outright. Resolving the same string here is a prefix strip, so
+            // "file://localhost/data/x.db" would be keyed on "localhost/data/x.db" while the
+            // engine attaches "/data/x.db" -- a reservation on a file that is not the one open.
+            // A URI with no path at all lands here too, which is not a name either.
             return true;
         }
         return file.indexOf('?') >= 0 || file.indexOf('#') >= 0 || file.indexOf('%') >= 0;
