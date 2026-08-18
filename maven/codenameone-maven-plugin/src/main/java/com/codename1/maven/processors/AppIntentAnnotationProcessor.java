@@ -849,32 +849,48 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     private void checkRoutePlaceholders(AnnotatedClass cls, ProcessorContext ctx, String where,
                                          IntentDef def) {
         String template = def.opensRoute;
-        int i = 0;
-        while (true) {
-            int open = template.indexOf('{', i);
-            if (open < 0) {
-                return;
-            }
-            int close = template.indexOf('}', open);
-            if (close < 0) {
-                // Not "nothing more to check". An unmatched brace makes the rest of the
-                // template a literal, and a wildcard route like /orders/:id happily matches
-                // "{id" as an ordinary segment -- so routeDeclared passed, expandRoute left the
-                // brace text alone, and the handler ran and navigated somewhere with a
-                // parameter that was never substituted.
-                ctx.error(cls, "@AppIntent " + where + " opensRoute \"" + template
-                        + "\" has an opening brace with no closing one. A placeholder that is "
-                        + "not closed is left in the URL as written, so the route opens with "
-                        + "the literal text instead of the value.");
-                return;
-            }
-            String name = template.substring(open + 1, close);
-            i = close + 1;
-            if (def.param(name) == null) {
-                ctx.error(cls, "@AppIntent " + where + " opensRoute references {" + name
-                        + "} but declares no parameter with that name");
+        int open = -1;
+        for (int i = 0; i < template.length(); i++) {
+            char c = template.charAt(i);
+            if (c == '{') {
+                if (open >= 0) {
+                    ctx.error(cls, malformedRoute(where, template,
+                            "a second opening brace inside a placeholder"));
+                    return;
+                }
+                open = i;
+            } else if (c == '}') {
+                if (open < 0) {
+                    // Validating only the well-formed placeholders left this one in the
+                    // literal text: "/orders/{id}}" expands to "/orders/42}", which a wildcard
+                    // route matches happily, so a valid invocation navigated with a corrupted
+                    // parameter.
+                    ctx.error(cls, malformedRoute(where, template,
+                            "a closing brace with no opening one"));
+                    return;
+                }
+                String name = template.substring(open + 1, i);
+                if (def.param(name) == null) {
+                    ctx.error(cls, "@AppIntent " + where + " opensRoute references {" + name
+                            + "} but declares no parameter with that name");
+                }
+                open = -1;
             }
         }
+        if (open >= 0) {
+            // An unclosed placeholder is left in the URL as written, so the route opens with
+            // the literal text instead of the value.
+            ctx.error(cls, malformedRoute(where, template,
+                    "an opening brace with no closing one"));
+        }
+    }
+
+    /// One message for every shape of unbalanced braces, which all fail the same way: the
+    /// template stops being a template and the route opens with the text as written.
+    private static String malformedRoute(String where, String template, String what) {
+        return "@AppIntent " + where + " opensRoute \"" + template + "\" has " + what
+                + ". A placeholder that is not exactly {name} is left in the URL as written, so "
+                + "the route opens with the literal text instead of the value.";
     }
 
     private void checkPlaceholders(AnnotatedClass cls, ProcessorContext ctx, String where,

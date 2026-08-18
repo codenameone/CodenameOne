@@ -1323,7 +1323,21 @@ public class AppIntentAnnotationProcessorTest {
                         + "    return IntentResult.ok();\n"
                         + "}\n"));
 
-        assertError(classes, "opening brace with no closing one");
+        assertError(classes, "an opening brace with no closing one");
+    }
+
+    /// "/orders/{id}}" expands to "/orders/42}", which a wildcard route matches happily -- so
+    /// a valid invocation navigated with a corrupted parameter.
+    @Test
+    public void anUnmatchedClosingRouteBraceIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"open_order\", title = \"Open\",\n"
+                        + "        opensRoute = \"/orders/{id}}\")\n"
+                        + "public static IntentResult open(@IntentParam(\"id\") String id) {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        assertError(classes, "a closing brace with no opening one");
     }
 
     /// A parameter name may hold anything, and the placeholder pattern only matched

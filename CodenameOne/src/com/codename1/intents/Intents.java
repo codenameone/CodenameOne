@@ -1058,15 +1058,84 @@ public final class Intents {
         if (h == null) {
             return;
         }
-        if (Display.isInitialized()) {
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    h.onEntitySelected(e);
+        if (!Display.isInitialized()) {
+            // EntitySelectionHandler says it is invoked on the event dispatch thread, and a
+            // handler written to that promise opens or updates a screen. Calling it inline here
+            // -- on whoever registered the handler, or on the native callback that delivered
+            // the tap -- gave it that thread's stack instead, before the application had even
+            // started. Held until there is an event thread to keep the promise on.
+            synchronized (pendingSelections) {
+                pendingSelections.add(e);
+                if (!awaitingDisplay) {
+                    awaitingDisplay = true;
+                    new Thread(new SelectionWaiter(), "CN1 Intent selection").start();
                 }
-            });
-        } else {
-            h.onEntitySelected(e);
+            }
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                h.onEntitySelected(e);
+            }
+        });
+    }
+
+    /// True while a thread is waiting for Display so held selections can be delivered on the
+    /// event thread. Guarded by pendingSelections.
+    private static boolean awaitingDisplay;
+
+    /// Waits for an event dispatch thread to exist, then releases what was held for it.
+    ///
+    /// Named and static rather than anonymous: it outlives the call that started it.
+    private static final class SelectionWaiter implements Runnable {
+        @Override
+        public void run() {
+            long giveUpAt = System.currentTimeMillis() + SELECTION_WAIT_MILLIS;
+            while (System.currentTimeMillis() < giveUpAt) {
+                if (Display.isInitialized()) {
+                    releaseHeldSelections();
+                    return;
+                }
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            synchronized (pendingSelections) {
+                // An application that never starts is not one to deliver a tap into minutes
+                // later, into whatever it is showing by then.
+                if (!pendingSelections.isEmpty()) {
+                    logDiagnostic("No event dispatch thread appeared; dropping "
+                            + pendingSelections.size() + " Spotlight selection(s)");
+                    pendingSelections.clear();
+                }
+                awaitingDisplay = false;
+            }
+        }
+    }
+
+    /// How long a held selection waits for an event thread before it is dropped.
+    private static final long SELECTION_WAIT_MILLIS = 15000L;
+
+    /// Hands everything held to the handler registered now, on the event thread.
+    private static void releaseHeldSelections() {
+        List<AppEntity> held;
+        EntitySelectionHandler h;
+        synchronized (pendingSelections) {
+            awaitingDisplay = false;
+            h = selectionHandler;
+            if (h == null || pendingSelections.isEmpty()) {
+                // Still nobody to hand them to; setSelectionHandler drains when one arrives.
+                return;
+            }
+            held = new ArrayList<AppEntity>(pendingSelections);
+            pendingSelections.clear();
+        }
+        for (AppEntity e : held) {
+            deliverSelection(h, e);
         }
     }
 
@@ -1210,6 +1279,7 @@ public final class Intents {
         synchronized (pendingSelections) {
             selectionHandler = null;
             pendingSelections.clear();
+            awaitingDisplay = false;
         }
         try {
             // Remembered across launches on a device, so a reset that left it behind would let

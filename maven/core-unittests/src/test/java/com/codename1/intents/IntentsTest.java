@@ -2334,6 +2334,59 @@ class IntentsTest {
         release.countDown();
     }
 
+    /// EntitySelectionHandler says it is invoked on the event dispatch thread, and a handler
+    /// written to that promise opens or updates a screen. Calling it inline gave it the
+    /// registering or native-callback thread instead, before the application had started.
+    @Test
+    void aSpotlightSelectionIsNotDeliveredOffTheEventThread() {
+        final List<AppEntity> seen = new ArrayList<AppEntity>();
+        Intents.setSelectionHandler(new EntitySelectionHandler() {
+            public void onEntitySelected(AppEntity e) {
+                seen.add(e);
+            }
+        });
+
+        // No Display in this harness, so there is no event thread to keep the promise on.
+        Intents.dispatchSpotlightSelection("order:42");
+
+        assertTrue(seen.isEmpty(),
+                "a handler promised the event thread must not be called on this one");
+    }
+
+    /// A selection arriving before anyone registers is held for whoever does.
+    @Test
+    void aSpotlightSelectionArrivingBeforeAHandlerIsNotLost() {
+        Intents.dispatchSpotlightSelection("order:42");
+
+        final List<AppEntity> seen = new ArrayList<AppEntity>();
+        Intents.setSelectionHandler(new EntitySelectionHandler() {
+            public void onEntitySelected(AppEntity e) {
+                seen.add(e);
+            }
+        });
+
+        // Still not delivered -- there is no event thread -- but held rather than dropped,
+        // which is what the queue is for.
+        assertTrue(seen.isEmpty());
+    }
+
+    /// A malformed uid is not a selection: nothing is queued and nothing is delivered.
+    @Test
+    void aSpotlightSelectionWithNoSeparatorIsIgnored() {
+        final List<AppEntity> seen = new ArrayList<AppEntity>();
+        Intents.setSelectionHandler(new EntitySelectionHandler() {
+            public void onEntitySelected(AppEntity e) {
+                seen.add(e);
+            }
+        });
+
+        Intents.dispatchSpotlightSelection("noseparator");
+        Intents.dispatchSpotlightSelection("trailing:");
+        Intents.dispatchSpotlightSelection(null);
+
+        assertTrue(seen.isEmpty());
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail
