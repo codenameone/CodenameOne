@@ -347,7 +347,7 @@ public class Tabs extends Container {
         if (frm != null) {
             TopLevelSupport.registerAnimatedInternal(frm, this);
             if (changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
-                Component f = getComponentForm().getFocused();
+                Component f = frm.getFocused();
                 if (f != null && f.getParent() == tabsContainer) { //NOPMD CompareObjectsWithEquals
                     initTabsContainerStyle();
                     tabsContainer.setUnselectedStyle(originalTabsContainerSelected);

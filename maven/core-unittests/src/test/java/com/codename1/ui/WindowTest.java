@@ -2192,6 +2192,54 @@ class WindowTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void selectingACalendarDayInsideAWindowDoesNotThrow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("calendar", new BorderLayout());
+        w.setWindowSize(400, 400);
+        Calendar cal = new Calendar();
+        w.add(BorderLayout.CENTER, cal);
+        w.show();
+        w.revalidate();
+
+        // MonthView.actionPerformed() asked getComponentForm().isSingleFocusMode()
+        // unconditionally, so every ordinary day selection updated the date, fired its
+        // listeners, and then threw on the way out.
+        final boolean[] fired = new boolean[1];
+        cal.addActionListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                fired[0] = true;
+            }
+        });
+        Button day = findFirstDayButton(cal);
+        assertNotNull(day, "the month view should contain day buttons");
+        day.pressed();
+        day.released();
+
+        assertTrue(fired[0], "selecting a day must fire its listeners");
+        assertTrue(w.isWindowShowing(), "and must not throw on the way out");
+        w.dispose();
+    }
+
+    /// The first day cell in a calendar's month view.
+    private static Button findFirstDayButton(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Button && ((Button) cmp).getText().length() > 0
+                    && Character.isDigit(((Button) cmp).getText().charAt(0))) {
+                return (Button) cmp;
+            }
+            if (cmp instanceof Container) {
+                Button b = findFirstDayButton((Container) cmp);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
+    }
+
     /// An image that reports itself as an animation, which is what drives the
     /// registration path under test.
     private static Image makeAnimatedImage() {

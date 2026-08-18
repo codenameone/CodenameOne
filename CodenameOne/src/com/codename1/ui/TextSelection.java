@@ -60,6 +60,25 @@ import static com.codename1.ui.ComponentSelector.$;
 public class TextSelection {
 
     /// Comparator used for ordering components in left-to-right mode.
+
+    /// Revalidates the surface a component lives in, whether that is a form or a
+    /// window. Resolving the form directly is null inside a Window, and text selection
+    /// is supported there.
+    private static void revalidateTopLevel(Component c) {
+        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().revalidate();
+        }
+    }
+
+    /// The deferred counterpart to `#revalidateTopLevel(Component)`.
+    private static void revalidateLaterTopLevel(Component c) {
+        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().revalidateLater();
+        }
+    }
+
     private static final Comparator<Component> LTRComparator = new Comparator<Component>() {
 
         /// We can't just use component's AbsoluteY coordinates for ordering because of scrolling,
@@ -200,7 +219,7 @@ public class TextSelection {
                         selectionMask.remove();
                         getLayeredPane().remove();
                         selectionMask = null;
-                        root.getComponentForm().revalidate();
+                        revalidateTopLevel(root);
                     }
                     startX = evt.getX();
                     startY = evt.getY();
@@ -242,7 +261,7 @@ public class TextSelection {
                         getLayeredPane().add(selectionMask);
 
                     }
-                    root.getComponentForm().revalidate();
+                    revalidateTopLevel(root);
                     if (selectionRoot.isScrollableX() && evt.getX() > selectionRoot.getAbsoluteX() + selectionRoot.getScrollX() + selectionRoot.getWidth() - ONE_MM * 5) {
                         Component.setDisableSmoothScrolling(true);
                         int scrollX = selectionRoot.getScrollX();
@@ -345,12 +364,12 @@ public class TextSelection {
                             selectedBounds.setHeight(startSelectedBounds.getHeight() + offY);
                         }
                         update();
-                        root.getComponentForm().revalidate();
+                        revalidateTopLevel(root);
                     } else if (inSelectionDrag && evt.getEventType() == ActionEvent.Type.PointerReleased || evt.getEventType() == ActionEvent.Type.DragFinished) {
                         evt.consume();
                         inSelectionDrag = false;
                         update();
-                        root.getComponentForm().revalidate();
+                        revalidateTopLevel(root);
                         textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
                     }
                 } else {
@@ -386,7 +405,7 @@ public class TextSelection {
                                 layeredPane.add(selectionMask);
 
                             }
-                            root.getComponentForm().revalidate();
+                            revalidateTopLevel(root);
 
 
                         }
@@ -413,7 +432,7 @@ public class TextSelection {
                             selectionMask.remove();
                             getLayeredPane().remove();
                             selectionMask = null;
-                            root.getComponentForm().revalidate();
+                            revalidateTopLevel(root);
                         }
                     }
                 }
@@ -677,7 +696,8 @@ public class TextSelection {
 
     private Container getLayeredPane() {
         //return root.getComponentForm().getLayeredPane(TextSelection.class, true);
-        return root.getComponentForm().getFormLayeredPane(TextSelection.class, true);
+        TopLevelContainer top = root.getTopLevelContainer();
+        return top == null ? null : top.getFormLayeredPane(TextSelection.class, true);
     }
 
     /// Copies the current selection to the system clipboard.
@@ -697,7 +717,7 @@ public class TextSelection {
         selectionRoot = root;
         selectedBounds.setBounds(0, 0, selectionRoot.getWidth(), selectionRoot.getHeight());
         update();
-        selectionRoot.getComponentForm().revalidateLater();
+        revalidateLaterTopLevel(selectionRoot);
         textSelectionListeners.fireActionEvent(new ActionEvent(this, Type.Change));
     }
 

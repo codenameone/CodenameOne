@@ -53,6 +53,7 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.Calendar;
 import java.util.Date;
@@ -725,7 +726,12 @@ public class Picker extends Button {
 
                             };
                         }
-                        getComponentForm().addKeyListener(9, keyListener);
+                        {
+                            TopLevelContainer keyTop = getTopLevelContainer();
+                            if (keyTop != null) {
+                                keyTop.addKeyListener(9, keyListener);
+                            }
+                        }
                     }
 
                     @Override
@@ -825,7 +831,9 @@ public class Picker extends Button {
                 //final Component nextComponent = getNextFocusRight() != null ? getNextFocusRight() :
                 //        getNextFocusDown() != null ? getNextFocusDown() :
                 //        null;
-                ListIterator<Component> traversalIt = getComponentForm().getTabIterator(Picker.this);
+                TopLevelContainer tabTop = getTopLevelContainer();
+                ListIterator<Component> traversalIt = tabTop == null
+                        ? null : tabTop.getTabIterator(Picker.this);
                 if (Picker.this.isTraversable() && traversalIt.hasNext()) {
                     nextButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
                     // Javascript port needs to know that this button is going to try to

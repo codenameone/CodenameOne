@@ -268,7 +268,11 @@ public class MediaPlayer extends Container {
 
     private void checkProgressSlider() {
         if (progressUpdater == null) {
-            progressUpdater = UITimer.timer(50, true, getComponentForm(),
+            // The top level rather than the form: getComponentForm() is null by design
+            // inside a Window, and UITimer dereferences what it is bound to -- so
+            // starting playback threw on the event dispatch thread after the media had
+            // already begun.
+            progressUpdater = UITimer.timer(50, true, getTopLevelContainer(),
                     new Runnable() {
                         @Override
                         public void run() {

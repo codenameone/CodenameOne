@@ -726,8 +726,9 @@ public class Validator {
 
         if (cmp.getComponentForm() != null) {
             if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
-                if (!(cmp.getComponentForm().getGlassPane() instanceof ComponentListener)) {
-                    cmp.getComponentForm().setGlassPane(new ComponentListener(null));
+                com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+                if (top != null && !(top.getGlassPane() instanceof ComponentListener)) {
+                    top.setGlassPane(new ComponentListener(null));
                 }
             }
         }

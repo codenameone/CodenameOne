@@ -893,7 +893,11 @@ public class ImageDownloadService extends ConnectionRequest {
                         // this might not be necessary if the label already had an identically
                         // sized image in place or has a hardcoded preferred size.
                         if (pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {
-                            parentLabel.getComponentForm().revalidate();
+                            com.codename1.ui.TopLevelContainer top =
+                                    parentLabel.getTopLevelContainer();
+                            if (top != null) {
+                                top.asContainer().revalidate();
+                            }
                         }
                     }
                 });

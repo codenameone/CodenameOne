@@ -1666,7 +1666,13 @@ public class List<T> extends Component implements ActionSource {
     protected void fireActionEvent(ActionEvent a) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             if (disposeDialogOnSelection) {
-                getComponentForm().dispose();
+                // Form only on purpose: this disposes the enclosing Dialog, and Dialog
+                // is documented as unsupported inside a Window. Form.dispose() means
+                // "pop back to the previous form", which a Window has no notion of.
+                Form disposing = getComponentForm();
+                if (disposing != null) {
+                    disposing.dispose();
+                }
             }
             super.fireActionEvent();
             dispatcher.fireActionEvent(a);

@@ -526,7 +526,7 @@ public class Toolbar extends Container {
     public void closeLeftSideMenu(final Runnable onFinish) {
         if (onTopSideMenu) {
             if (sidemenuDialog != null && sidemenuDialog.isShowing()) {
-                final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+                final Container cnt = toolbarLayeredPane();
                 Runnable onDisposed = new Runnable() {
                     @Override
                     public void run() {
@@ -570,7 +570,7 @@ public class Toolbar extends Container {
     public void closeRightSideMenu(final Runnable onFinish) {
         if (onTopSideMenu) {
             if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
-                final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+                final Container cnt = toolbarLayeredPane();
                 Runnable onDisposed = new Runnable() {
                     @Override
                     public void run() {
@@ -2038,7 +2038,7 @@ public class Toolbar extends Container {
         }
 
         float f = ((float) v) / ((float) dw) * 80.0f;
-        Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+        Container cnt = toolbarLayeredPane();
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency((int) f);
         s.setBgColor(0);
@@ -2173,7 +2173,7 @@ public class Toolbar extends Container {
         }
 
         float f = ((float) v) / ((float) dw) * 80.0f;
-        Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+        Container cnt = toolbarLayeredPane();
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency((int) f);
         s.setBgColor(0);
@@ -2821,6 +2821,18 @@ public class Toolbar extends Container {
             bindScrollListener(true);
         }
         this.scrollOff = scrollOff;
+    }
+
+    /// The layered pane this toolbar's overlays live in, resolved from its own top
+    /// level. `getFormLayeredPane` is on `TopLevelContainer`, so this works in a
+    /// `Window` -- where `getComponentForm()` is null and these overlays threw.
+    ///
+    /// #### Returns
+    ///
+    /// the layered pane, or null when this toolbar is not in a hierarchy
+    private Container toolbarLayeredPane() {
+        TopLevelContainer top = getTopLevelContainer();
+        return top == null ? null : top.getFormLayeredPane(Toolbar.class, false);
     }
 
     /// Hide the Toolbar if it is currently showing
