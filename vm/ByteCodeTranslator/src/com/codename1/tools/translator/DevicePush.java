@@ -220,6 +220,7 @@ public final class DevicePush {
     static String findEntryPoint(List<File> classes) throws IOException {
         java.util.Map<String, String> supers = new java.util.HashMap<String, String>();
         java.util.Set<String> abstractClasses = new java.util.HashSet<String>();
+        java.util.List<String> mains = new java.util.ArrayList<String>();
         for (File f : classes) {
             ClassNode cn = new ClassNode();
             new ClassReader(Files.readAllBytes(f.toPath())).accept(cn, ClassReader.SKIP_CODE);
@@ -227,13 +228,26 @@ public final class DevicePush {
                 MethodNode m = (MethodNode) mo;
                 if ("main".equals(m.name) && "([Ljava/lang/String;)V".equals(m.desc)
                         && (m.access & Opcodes.ACC_STATIC) != 0) {
-                    return cn.name;
+                    mains.add(cn.name);
                 }
             }
             supers.put(cn.name, cn.superName);
             if ((cn.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_INTERFACE)) != 0) {
                 abstractClasses.add(cn.name);
             }
+        }
+        if (!mains.isEmpty()) {
+            // Sorted, because listFiles() has no defined order: a tree with a
+            // second main -- a diagnostic launcher, a utility -- would
+            // otherwise push one program today and the other tomorrow from the
+            // same sources. Naming them says which was chosen and that there
+            // was a choice.
+            java.util.Collections.sort(mains);
+            if (mains.size() > 1) {
+                System.out.println("more than one main(String[]): " + mains
+                        + " -- entering " + mains.get(0));
+            }
+            return mains.get(0);
         }
         // Transitively, and skipping the abstract ones. A project whose app
         // extends its own BaseApp extends Lifecycle has two Lifecycle

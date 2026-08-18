@@ -372,6 +372,7 @@ class InterpConformanceTest {
                 + " static class Base implements Marker {}"
                 + " static class Child extends Base {}"
                 + " static class Other {}"
+                + " static class Task implements Runnable { public void run() {} }"
                 + " public static void main(String[] a) {"
                 + " System.out.println(Base.class.isAssignableFrom(Child.class));"
                 + " System.out.println(Child.class.isAssignableFrom(Base.class));"
@@ -381,6 +382,9 @@ class InterpConformanceTest {
                 + " System.out.println(Base.class.isAssignableFrom(String.class));"
                 + " System.out.println(Base[].class.isAssignableFrom(Base[].class));"
                 + " System.out.println(Base[].class.isAssignableFrom(Child[].class));"
+                + " System.out.println(Runnable.class.isAssignableFrom(Task.class));"
+                + " System.out.println(Object.class.isAssignableFrom(Base.class));"
+                + " System.out.println(Runnable.class.isAssignableFrom(Base.class));"
                 + "}}"));
         // An enum constant that overrides toString. The interpreter answers
         // name() itself, and answering it for toString as well made the

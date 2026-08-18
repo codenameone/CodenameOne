@@ -1980,6 +1980,17 @@ public final class InterpRuntime {
         // would store Object.class, and reading it back would not equal the
         // literal the program still holds. A host that took it as Object never
         // needed a Class in the first place -- it is storing a reference.
+        if (target != null && "java/lang/Class".equals(owner)
+                && "isAssignableFrom".equals(name) && args.length == 1
+                && args[0] instanceof InterpClass) {
+            // `Runnable.class.isAssignableFrom(Task.class)` where Task is a
+            // pushed class implementing Runnable. Substituting the token below
+            // would hand the host Object.class and get false for a relationship
+            // the bundle records; the answer is whether any host supertype the
+            // pushed class actually has is assignable to the receiver.
+            return assignableFromInterp(target, (InterpClass) args[0])
+                    ? Boolean.TRUE : Boolean.FALSE;
+        }
         String[] params = paramDescriptors(desc);
         for (int i = 0; i < args.length && i < params.length; i++) {
             if (args[i] instanceof InterpClass && "Ljava/lang/Class;".equals(params[i])) {
@@ -2027,6 +2038,38 @@ public final class InterpRuntime {
                 st.runStartMs += System.currentTimeMillis() - hostCallStart;
             }
         }
+    }
+
+    /**
+     * Whether a host class is a supertype of an interpreted one.
+     *
+     * <p>The interpreted class itself is nothing to the host, but its
+     * supertypes are: the host class it extends and every host interface it
+     * declares, transitively. If the receiver is assignable from any of them it
+     * is assignable from the pushed class, which is exactly what a program
+     * asking `Runnable.class.isAssignableFrom(Task.class)` wants to know.</p>
+     */
+    private boolean assignableFromInterp(Object hostClass, InterpClass c) throws Throwable {
+        Vector externs = new Vector();
+        c.collectHostSupertypes(externs);
+        for (int i = 0; i < externs.size(); i++) {
+            Object supertype;
+            try {
+                supertype = resolveExternClass(((Integer) externs.elementAt(i)).intValue());
+            } catch (Throwable absent) {
+                // A supertype the installed app does not have cannot make
+                // anything assignable to the receiver, and asking a type
+                // question is not a reason to raise NoClassDefFoundError.
+                continue;
+            }
+            Object answer = linker.invokeVirtual(hostClass, "java/lang/Class",
+                    "isAssignableFrom", "(Ljava/lang/Class;)Z",
+                    new Object[] {linker.classObject(supertype)});
+            if (answer instanceof Boolean && ((Boolean) answer).booleanValue()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The parameter descriptors of a method descriptor, in order.

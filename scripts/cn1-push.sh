@@ -141,6 +141,7 @@ public final class Pack {
     private static String findEntryPoint(File root, List<File> classes) throws Exception {
         Map<String,String> supers = new HashMap<String,String>();
         Set<String> abstracts = new HashSet<String>();
+        List<String> mains = new ArrayList<String>();
         for (File f : classes) {
             org.objectweb.asm.tree.ClassNode cn = new org.objectweb.asm.tree.ClassNode();
             new org.objectweb.asm.ClassReader(Files.readAllBytes(f.toPath()))
@@ -149,7 +150,7 @@ public final class Pack {
                 org.objectweb.asm.tree.MethodNode m = (org.objectweb.asm.tree.MethodNode) mo;
                 if ("main".equals(m.name) && "([Ljava/lang/String;)V".equals(m.desc)
                         && (m.access & org.objectweb.asm.Opcodes.ACC_STATIC) != 0) {
-                    return cn.name;
+                    mains.add(cn.name);
                 }
             }
             supers.put(cn.name, cn.superName);
@@ -157,6 +158,17 @@ public final class Pack {
                     | org.objectweb.asm.Opcodes.ACC_INTERFACE)) != 0) {
                 abstracts.add(cn.name);
             }
+        }
+        if (!mains.isEmpty()) {
+            // Sorted: listFiles() has no defined order, so a tree with a second
+            // main would otherwise push one program today and the other
+            // tomorrow from the same sources. As DevicePush does.
+            Collections.sort(mains);
+            if (mains.size() > 1) {
+                System.out.println("more than one main(String[]): " + mains
+                        + " -- entering " + mains.get(0));
+            }
+            return mains.get(0);
         }
         // Transitively, skipping the abstract ones and taking the deepest, as
         // DevicePush does: a project whose app extends its own BaseApp extends

@@ -97,6 +97,37 @@ class DevicePushEntryPointTest {
                 "the order the files were read in must not decide");
     }
 
+    /**
+     * Two mains is a real shape -- an application plus a diagnostic launcher --
+     * and {@code listFiles()} has no defined order, so returning the first one
+     * seen made identical sources push different programs on different
+     * machines, or after a rebuild.
+     */
+    @Test
+    void severalMainsAreChosenBetweenDeterministically() throws Exception {
+        Path dir = Files.createTempDirectory("entry-point-mains");
+        List<File> classes = new ArrayList<File>();
+        classes.add(writeWithMain(dir, "com/example/Tool"));
+        classes.add(writeWithMain(dir, "com/example/App"));
+        List<File> reversed = new ArrayList<File>(classes);
+        Collections.reverse(reversed);
+
+        assertEquals("com/example/App", DevicePush.findEntryPoint(classes));
+        assertEquals(DevicePush.findEntryPoint(classes), DevicePush.findEntryPoint(reversed),
+                "the order the files were read in must not decide");
+    }
+
+    private static File writeWithMain(Path dir, String internalName) throws Exception {
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, internalName, null, "java/lang/Object", null);
+        cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "main",
+                "([Ljava/lang/String;)V", null, null).visitEnd();
+        cw.visitEnd();
+        Path out = dir.resolve(internalName.replace('/', '_') + ".class");
+        Files.write(out, cw.toByteArray());
+        return out.toFile();
+    }
+
     private static File write(Path dir, String internalName, String superName, boolean isAbstract)
             throws Exception {
         ClassWriter cw = new ClassWriter(0);

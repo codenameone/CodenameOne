@@ -573,6 +573,44 @@ public class DeviceRuntimeService {
         return false;
     }
 
+    /// Whether a pairing prompt is on screen right now.
+    private final boolean[] pairingPromptOpen = new boolean[1];
+
+    /// When the next pairing prompt may be raised, as a wall clock.
+    private long pairingPromptNotBefore;
+
+    /// How long the device ignores pairing frames after one has been answered.
+    ///
+    /// Long enough that repeating the frame cannot fill the screen with
+    /// dialogs, short enough that a person retyping a code they mistyped is not
+    /// kept waiting: pairing is a deliberate act taking several seconds anyway.
+    private static final long PAIRING_PROMPT_COOLDOWN_MS = 3000;
+
+    /**
+     * Takes the right to raise a pairing prompt, or refuses.
+     *
+     * <p>Unauthenticated by definition -- pairing is what establishes the
+     * secret -- so this frame is the one thing anything on the network can make
+     * the device do. Serializing it and pausing between prompts is what keeps
+     * that from becoming a way to make the app unusable.</p>
+     */
+    private boolean claimPairingPrompt() {
+        synchronized (pairingPromptOpen) {
+            if (pairingPromptOpen[0] || System.currentTimeMillis() < pairingPromptNotBefore) {
+                return false;
+            }
+            pairingPromptOpen[0] = true;
+            return true;
+        }
+    }
+
+    private void releasePairingPrompt() {
+        synchronized (pairingPromptOpen) {
+            pairingPromptOpen[0] = false;
+            pairingPromptNotBefore = System.currentTimeMillis() + PAIRING_PROMPT_COOLDOWN_MS;
+        }
+    }
+
     /**
      * Runs the pairing handshake on an open connection.
      *
@@ -715,7 +753,22 @@ public class DeviceRuntimeService {
                         out.flush();
                         return true;
                     } else if (frame == FRAME_PAIR) {
-                        handlePairing(in, out);
+                        // One prompt at a time, and a pause after a refusal.
+                        // Nothing has authenticated yet at this point -- that is
+                        // what pairing is for -- so anything on the network can
+                        // reach here, and without this it could stack modal
+                        // dialogs until the runtime's own UI was unusable.
+                        if (!claimPairingPrompt()) {
+                            out.writeByte(0);
+                            out.writeUTF("a pairing prompt is already open on the device");
+                            out.flush();
+                            return true;
+                        }
+                        try {
+                            handlePairing(in, out);
+                        } finally {
+                            releasePairingPrompt();
+                        }
                         return true;
                     } else if (frame == FRAME_PUSH) {
                         String peerId = in.readUTF();
