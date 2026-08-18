@@ -385,6 +385,11 @@ class InterpConformanceTest {
                 + " System.out.println(Runnable.class.isAssignableFrom(Task.class));"
                 + " System.out.println(Object.class.isAssignableFrom(Base.class));"
                 + " System.out.println(Runnable.class.isAssignableFrom(Base.class));"
+                + " System.out.println(Object.class.isAssignableFrom(Base[].class));"
+                + " System.out.println(Cloneable.class.isAssignableFrom(Base[].class));"
+                + " System.out.println(java.io.Serializable.class.isAssignableFrom(Base[].class));"
+                + " System.out.println(Object[].class.isAssignableFrom(Base[].class));"
+                + " System.out.println(Runnable.class.isAssignableFrom(Base[].class));"
                 + "}}"));
         // An enum constant that overrides toString. The interpreter answers
         // name() itself, and answering it for toString as well made the

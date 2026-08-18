@@ -2050,6 +2050,9 @@ public final class InterpRuntime {
      * asking `Runnable.class.isAssignableFrom(Task.class)` wants to know.</p>
      */
     private boolean assignableFromInterp(Object hostClass, InterpClass c) throws Throwable {
+        if (c.isArray()) {
+            return assignableFromInterpArray(hostClass, c);
+        }
         Vector externs = new Vector();
         c.collectHostSupertypes(externs);
         for (int i = 0; i < externs.size(); i++) {
@@ -2070,6 +2073,57 @@ public final class InterpRuntime {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a host class is a supertype of an interpreted array type.
+     *
+     * <p>An array token records only its component, so the walk above finds no
+     * supertypes at all for one -- and yet every array in Java is an Object, a
+     * Cloneable and a Serializable, and {@code Base[]} is an {@code S[]} for
+     * every host supertype S of Base. Both are ordinary things to ask.</p>
+     */
+    private boolean assignableFromInterpArray(Object hostClass, InterpClass c) throws Throwable {
+        if (assignableToHostNamed(hostClass, "java/lang/Object")
+                || assignableToHostNamed(hostClass, "java/lang/Cloneable")
+                || assignableToHostNamed(hostClass, "java/io/Serializable")) {
+            return true;
+        }
+        String name = c.getName();
+        int rank = 0;
+        while (rank < name.length() && name.charAt(rank) == '[') {
+            rank++;
+        }
+        InterpClass leaf = c;
+        while (leaf.isArray()) {
+            leaf = leaf.arrayComponent;
+        }
+        StringBuilder brackets = new StringBuilder();
+        for (int i = 0; i < rank; i++) {
+            brackets.append('[');
+        }
+        Vector externs = new Vector();
+        leaf.collectHostSupertypes(externs);
+        for (int i = 0; i < externs.size(); i++) {
+            String supertype = externOwnerName(((Integer) externs.elementAt(i)).intValue());
+            if (assignableToHostNamed(hostClass, brackets + "L" + supertype + ";")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether the host class is assignable from the host type of this name,
+    /// answering false when the installed app does not have that type.
+    private boolean assignableToHostNamed(Object hostClass, String internalName)
+            throws Throwable {
+        Object other = linker.findClass(internalName);
+        if (other == null) {
+            return false;
+        }
+        Object answer = linker.invokeVirtual(hostClass, "java/lang/Class", "isAssignableFrom",
+                "(Ljava/lang/Class;)Z", new Object[] {linker.classObject(other)});
+        return answer instanceof Boolean && ((Boolean) answer).booleanValue();
     }
 
     /// The parameter descriptors of a method descriptor, in order.
