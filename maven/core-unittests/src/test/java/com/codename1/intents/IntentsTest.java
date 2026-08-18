@@ -1466,6 +1466,30 @@ class IntentsTest {
                 "an entity has no title rather than a blank one");
     }
 
+    /// The Android trampoline's unauthenticated policy keys on exactly this pair, and the port
+    /// has no unit harness of its own, so the contract it depends on is pinned here.
+    ///
+    /// getDeclaration resolving a parameterization is what made the hole: a fabricated
+    /// nonce-free URI naming a guessable dynamic id passed the discoverable/non-destructive
+    /// checks and ran the base handler with the user's own bound values. getDynamicIntent
+    /// answering for the same id is what lets the trampoline tell the two apart. If either
+    /// half ever stopped being true the guard would silently disarm.
+    @Test
+    void aParameterizationIsResolvableAsBothDeclarationAndDynamicIntent() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("order_coffee"));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(
+                new DynamicIntent("usual_coffee", "order_coffee", "My usual"));
+
+        assertNotNull(Intents.getDeclaration("usual_coffee"),
+                "the policy's own lookup still sees a parameterization as a declaration");
+        assertNotNull(Intents.getDynamicIntent("usual_coffee"),
+                "so the guard has to be able to recognise one");
+        assertNull(Intents.getDynamicIntent("order_coffee"),
+                "and must not mistake the build-time intent for one");
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

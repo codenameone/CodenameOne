@@ -181,6 +181,21 @@ public class CN1IntentTrampolineActivity extends Activity {
     /// a value nobody supplied, is never in that set -- so an arbitrary app cannot reach the
     /// capabilities most worth protecting.
     static boolean isSafeForUntrustedCallers(String id) {
+        // A parameterization is a runtime publication, not one of the launcher actions this
+        // policy exists to expose -- and it is the more dangerous of the two, because its whole
+        // point is that it carries values the user already chose. Stripping params off an
+        // untrusted request does nothing about those: dispatch merges the bound values in
+        // afterwards, so a fabricated URI naming a guessable dynamic id would run the base
+        // handler with the user's own saved arguments and no nonce anywhere.
+        //
+        // Nothing legitimate is lost. A donated parameterization does not travel under its
+        // runtime id at all: AndroidIntentBridge.donate mints the shortcut against the *base*
+        // intent with the bound values merged into the URI, precisely so the shortcut outlives
+        // the process that registered it. So an untrusted request naming a dynamic id is
+        // already something no shortcut this app published could have produced.
+        if (Intents.getDynamicIntent(id) != null) {
+            return false;
+        }
         IntentDeclaration decl = Intents.getDeclaration(id);
         if (decl == null) {
             return false;
