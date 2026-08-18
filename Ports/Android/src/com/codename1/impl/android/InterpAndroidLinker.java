@@ -101,20 +101,26 @@ public class InterpAndroidLinker implements InterpLinker {
     public void initializeDefaultBearingInterfaces(String internalName) throws Throwable {
         Object c = findClass(internalName);
         if (c instanceof Class) {
-            initializeDefaultBearing((Class)c, 0);
+            initializeDefaultBearing((Class)c, new java.util.HashSet());
         }
     }
 
     /// Superinterfaces first, then the interface itself if it declares a
     /// default method -- the order JLS 12.4.1 gives, applied to whatever depth
     /// the app's own hierarchy has.
-    private void initializeDefaultBearing(Class iface, int depth) throws Throwable {
-        if (!iface.isInterface() || depth > 16) {
+    ///
+    /// Bounded by what has already been seen rather than by a depth number.
+    /// The walk has to terminate because a diamond visits the same interface
+    /// twice, not because a hierarchy is too deep -- and a cap of sixteen
+    /// edges silently skipped a legal ancestor, leaving the default methods it
+    /// declares uninitialized when a pushed class implemented it.
+    private void initializeDefaultBearing(Class iface, java.util.Set visited) throws Throwable {
+        if (!iface.isInterface() || !visited.add(iface)) {
             return;
         }
         Class[] parents = iface.getInterfaces();
         for (int i = 0; i < parents.length; i++) {
-            initializeDefaultBearing(parents[i], depth + 1);
+            initializeDefaultBearing(parents[i], visited);
         }
         java.lang.reflect.Method[] methods = iface.getDeclaredMethods();
         for (int i = 0; i < methods.length; i++) {

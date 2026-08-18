@@ -365,6 +365,7 @@ public final class InterpRuntime {
         // with "ran without yielding", having done nothing.
         boolean freshEntry = st.depth == 0 || st.hostCallDepth > 0;
         int enclosingHostCalls = 0;
+        long enclosingRunStart = st.runStartMs;
         if (freshEntry) {
             st.runStartMs = System.currentTimeMillis();
             st.fuel = fuelPerCheck;
@@ -388,6 +389,13 @@ public final class InterpRuntime {
             st.depth--;
             if (freshEntry) {
                 st.hostCallDepth = enclosingHostCalls;
+                // And the clock it was measured against. The outer entry is
+                // still running -- its host call has not returned yet -- so
+                // leaving the callback's clock in place would hand the outer
+                // one a fresh budget every time a dialog dispatched an event,
+                // and the host-call exclusion would then be added to a
+                // timestamp that no longer belongs to anybody.
+                st.runStartMs = enclosingRunStart;
             }
         }
     }
@@ -1453,19 +1461,39 @@ public final class InterpRuntime {
         if (superOwner != null) {
             out.addElement(superOwner);
         }
+        collectHostInterfaceOwners(c, out, new Vector());
+        String[] owners = new String[out.size()];
+        out.copyInto(owners);
+        return owners;
+    }
+
+    /// Every host interface reachable from this class, however it is reached.
+    ///
+    /// Through the interpreted superclass chain and through interpreted
+    /// interfaces alike: `class C implements I` where `interface I extends
+    /// HostIface` reads `HostIface.VALUE` as `C.VALUE`, and a walk that only
+    /// followed superclasses never saw HostIface -- so a constant that plainly
+    /// exists was reported as NoSuchFieldError. The visited set is what makes
+    /// the diamond an interface hierarchy is allowed to be terminate; a depth
+    /// cap would answer wrongly on a legal hierarchy instead.
+    private void collectHostInterfaceOwners(InterpClass c, Vector out, Vector visited) {
         InterpClass k = c;
         while (k != null) {
+            if (visited.contains(k)) {
+                return;
+            }
+            visited.addElement(k);
             for (int i = 0; i < k.hostInterfaces.length; i++) {
                 String iface = externOwnerName(k.hostInterfaces[i]);
                 if (!out.contains(iface)) {
                     out.addElement(iface);
                 }
             }
+            for (int i = 0; i < k.interpInterfaces.length; i++) {
+                collectHostInterfaceOwners(k.interpInterfaces[i], out, visited);
+            }
             k = k.superInterp;
         }
-        String[] owners = new String[out.size()];
-        out.copyInto(owners);
-        return owners;
     }
 
     /// Whether any interpreted class in the chain declares this static.

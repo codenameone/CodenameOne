@@ -20,7 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import com.codename1.ai.ChatMessage;
+import com.codename1.ai.SafetyFilter;
 import com.codename1.ui.*;
+
+import java.util.List;
 
 /**
  * A field a pushed class inherits from its host superclass.
@@ -37,6 +41,27 @@ public class HostFieldProbe extends Form {
         return "read=" + before + " wrote=" + after;
     }
 
+    /** A pushed interface over a host one, so the host static is two hops away. */
+    interface Guarded extends SafetyFilter {
+    }
+
+    /**
+     * The owner javac records for `ALLOW_ALL` here is `Allowing` -- a class the
+     * app does not have -- and the host interface that declares it is reached
+     * only through `Guarded`, which the app does not have either. Following
+     * just the superclass chain answered java/lang/Object and reported a
+     * NoSuchFieldError for a constant that plainly exists.
+     */
+    static final class Allowing implements Guarded {
+        public String check(List<ChatMessage> messages) {
+            return null;
+        }
+
+        String inherited() {
+            return ALLOW_ALL == null ? "null" : "found " + (ALLOW_ALL.check(null) == null);
+        }
+    }
+
     public static void main(String[] a) {
         String result;
         try {
@@ -45,6 +70,14 @@ public class HostFieldProbe extends Form {
             result = "threw " + t.getClass().getName() + ": " + t.getMessage();
         }
         System.out.println("PROBE HostFieldProbe: " + result);
+
+        String throughInterface;
+        try {
+            throughInterface = new Allowing().inherited();
+        } catch (Throwable t) {
+            throughInterface = "threw " + t.getClass().getName() + ": " + t.getMessage();
+        }
+        System.out.println("PROBE HostFieldProbe iface: " + throughInterface);
         new Form("HostFields").show();
     }
 }
