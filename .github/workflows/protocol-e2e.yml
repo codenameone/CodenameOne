@@ -41,6 +41,12 @@ jobs:
         # before anything was compiled, which is Maven Central rather than this repository.
         env:
           RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+          # Five attempts a minute apart rather than three at thirty seconds: Central
+          # refused two different jobs on this branch today, and a window of about a
+          # minute is shorter than the incidents have been. It costs nothing on a real
+          # failure, which RETRY_ONLY_MATCHING returns on the first attempt.
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
         run: |
           export JAVA_HOME="${JAVA_HOME_8}"
           export PATH="${JAVA_HOME_8}/bin:$PATH"
