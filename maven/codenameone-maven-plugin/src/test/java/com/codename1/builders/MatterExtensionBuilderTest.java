@@ -120,8 +120,8 @@ public class MatterExtensionBuilderTest {
             assertFalse(swift.contains(dead),
                     dead + " must be live in an enabled build");
         }
-        assertTrue(swift.contains("static let vendorID: UInt16 = " + VENDOR),
-                "the vendor id is the build's, not a constant");
+        assertTrue(swift.contains("static let vendorID: UInt16 = 65521"),
+                "the vendor id is the build's, as a Swift literal: " + swift);
     }
 
     /**
@@ -164,7 +164,11 @@ public class MatterExtensionBuilderTest {
      */
     @Test
     public void theVendorIdIsAcceptedOnlyAsANumber() {
-        assertEquals("0xFFF1", MatterExtensionBuilder.vendorLiteral("0xFFF1"));
+        // The number, not the spelling: 0XFFF1 parses here and is not a
+        // Swift integer literal, so echoing it back produced an extension
+        // that did not compile.
+        assertEquals("65521", MatterExtensionBuilder.vendorLiteral("0xFFF1"));
+        assertEquals("65521", MatterExtensionBuilder.vendorLiteral("0XFFF1"));
         assertEquals("4660", MatterExtensionBuilder.vendorLiteral(" 4660 "));
         assertEquals("0", MatterExtensionBuilder.vendorLiteral("0"));
         for (String bad : new String[] {"1, x: run()", "0xFFF1\n    exit(0)",

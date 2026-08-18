@@ -167,8 +167,13 @@ public final class MatterExtensionBuilder {
      * the {@code //} that comments the implementation out, since a comment
      * ends at the end of its line.</p>
      *
+     * <p>The NUMBER comes back, not the spelling: "0XFFF1" parses happily
+     * here and is not a Swift integer literal at all -- Swift wants a
+     * lowercase x -- so echoing what was written produced an extension that
+     * did not compile.</p>
+     *
      * @param vendorId the hint's value
-     * @return the same text, once it is known to be a number
+     * @return the value as a decimal literal
      * @throws IllegalArgumentException when it is anything else
      */
     /**
@@ -230,7 +235,7 @@ public final class MatterExtensionBuilder {
                     + " accepted only in a shape that cannot carry anything"
                     + " else.");
         }
-        return value;
+        return Long.toString(parsed);
     }
 
     private static String[] fabricSwift(String packageName, String appGroup,

@@ -1032,6 +1032,74 @@ public final class SmartHome {
     /// A read waiting for the backend. Named rather than anonymous so it
     /// carries no synthetic reference to the enclosing instance (SpotBugs
     /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    /// Runs or deletes a scene, once the backend is connected.
+    private static final class IssueScene implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String structureId;
+        private final String sceneId;
+        private final boolean delete;
+
+        IssueScene(HomeBridge bridge, int id, String structureId,
+                String sceneId, boolean delete) {
+            this.bridge = bridge;
+            this.id = id;
+            this.structureId = structureId;
+            this.sceneId = sceneId;
+            this.delete = delete;
+        }
+
+        @Override
+        public void run() {
+            if (delete) {
+                bridge.deleteScene(id, structureId, sceneId);
+            } else {
+                bridge.executeScene(id, structureId, sceneId);
+            }
+        }
+    }
+
+    /// Creates a scene, once the backend is connected.
+    private static final class IssueCreateScene implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String structureId;
+        private final String name;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+        private final int[] kinds;
+        private final double[] numericValues;
+        private final String[] stringValues;
+        private final int[] unitWireIds;
+
+        IssueCreateScene(HomeBridge bridge, int id, String structureId,
+                String name, String[] accessoryIds, String[] serviceIds,
+                String[] traitIds, int[] kinds, double[] numericValues,
+                String[] stringValues, int[] unitWireIds) {
+            this.bridge = bridge;
+            this.id = id;
+            this.structureId = structureId;
+            this.name = name;
+            this.accessoryIds = accessoryIds;
+            this.serviceIds = serviceIds;
+            this.traitIds = traitIds;
+            this.kinds = kinds;
+            this.numericValues = numericValues;
+            this.stringValues = stringValues;
+            this.unitWireIds = unitWireIds;
+        }
+
+        @Override
+        public void run() {
+            bridge.createScene(id, structureId, name, accessoryIds,
+                    serviceIds, traitIds, kinds, numericValues, stringValues,
+                    unitWireIds);
+        }
+    }
+
     /// Asks an accessory to identify itself, once the backend is connected.
     private static final class IssueIdentify implements Runnable {
 
@@ -1338,7 +1406,13 @@ public final class SmartHome {
         }
         int id = nextRequestId();
         EdtResult<Scene> result = pendingScenes.open(id);
-        b.executeScene(id, scene.getStructureId(), scene.getId());
+        // Through the start path, like every other operation that takes
+        // identifiers: a scene an app kept -- in its own storage, or across a
+        // stop() -- names a home the native cannot resolve until the HomeKit
+        // database has loaded, and running it on a cold launch answered
+        // INVALID_ARGUMENT for a scene that was there.
+        afterStart(new IssueScene(b, id, scene.getStructureId(),
+                scene.getId(), false));
         return result;
     }
 
@@ -1415,8 +1489,9 @@ public final class SmartHome {
         }
         int id = nextRequestId();
         EdtResult<Scene> result = pendingScenes.open(id);
-        b.createScene(id, structure.getId(), name.trim(), accessoryIds,
-                serviceIds, traitIds, kinds, numeric, text, units);
+        afterStart(new IssueCreateScene(b, id, structure.getId(),
+                name.trim(), accessoryIds, serviceIds, traitIds, kinds,
+                numeric, text, units));
         return result;
     }
 
@@ -1444,7 +1519,8 @@ public final class SmartHome {
         }
         int id = nextRequestId();
         EdtResult<Scene> result = pendingScenes.open(id);
-        b.deleteScene(id, scene.getStructureId(), scene.getId());
+        afterStart(new IssueScene(b, id, scene.getStructureId(),
+                scene.getId(), true));
         return result;
     }
 
