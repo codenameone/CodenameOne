@@ -427,7 +427,15 @@ jobs:
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm
-        run: mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
+        # Narrowed to resolution failures, because this step RUNS A TEST: retrying every nonzero
+        # exit would let an intermittent product failure pass on a later attempt and take the gate
+        # green with it. What this does cover is the run that died here with
+        # "Plugin org.apache.maven.plugins:maven-dependency-plugin:3.6.1 or one of its dependencies
+        # could not be resolved" before a single test had run -- a Maven Central failure, which a
+        # missing plugin version fails identically on every attempt anyway.
+        env:
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|Connection reset|Premature end of Content-Length'
+        run: bash ../scripts/ci/retry.sh mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
