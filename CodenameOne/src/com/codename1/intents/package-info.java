@@ -132,14 +132,36 @@
 /// | System disambiguation | yes | **no** -- the app foregrounds its own picker | in-app picker | in-app picker |
 /// | Content indexing | device search | launcher shortcuts | searchable list | no-op |
 /// | Donation | learned suggestions | dynamic shortcuts | logged | no-op |
-/// | Spoken result | spoken aloud | **dropped** | shown as text | n/a |
-/// | Snippet | rendered natively | notification, opt-in | rasterized preview | n/a |
-/// | Returned value | piped to the next action | result extras | shown | returned |
+/// | Spoken result | spoken aloud | toast, headless runs only | shown as text | n/a |
+/// | Snippet | rendered natively | **not shown** | rasterized preview | n/a |
+/// | Returned value | piped to the next action | **caller only, not the launcher** | shown | returned |
 ///
 /// **Android is not Siri parity and this framework does not pretend otherwise.**
 /// Android has no assistant contract that hands a typed result back to an app,
-/// so phrases, system disambiguation and spoken results are iOS-only.
+/// so phrases and system disambiguation are iOS-only.
 /// [Intents#isVoiceInvocationSupported()] is the honest thing to branch on.
+///
+/// The last three rows are where that bites, so they are worth stating plainly
+/// rather than leaving to the table. A launcher shortcut is a *launch*: it starts
+/// something and nothing waits for an answer, so there is no channel to hand a
+/// result back through. What that means for each kind of output:
+///
+/// - A **spoken line** is shown as a toast, and only when the run was headless --
+///   that is the one case with no UI of its own to say it in. An intent that
+///   opened the app is expected to show its own outcome, in the form the user is
+///   already looking at.
+/// - A **snippet** is not rendered. There is no Android surface that displays one
+///   for a shortcut, so a handler that returns one is not failing; the snippet
+///   simply has no consumer on this platform and is ignored.
+/// - A **returned value** goes to whoever called [Intents#invoke], which is how an
+///   app uses its own intents as a command layer, and that works on every port.
+///   What it does *not* do is travel back to the launcher, because nothing there
+///   asked a question.
+///
+/// So a handler whose entire result is a snippet does nothing observable when it
+/// is started from an Android launcher shortcut. Write handlers that also change
+/// state, or that name a route with `opensRoute`, and the outcome is visible on
+/// every platform.
 ///
 /// #### The floor everything else sits on
 ///

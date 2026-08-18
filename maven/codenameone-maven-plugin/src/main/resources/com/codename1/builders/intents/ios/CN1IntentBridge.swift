@@ -77,6 +77,13 @@ public class CN1IntentBridge: NSObject {
     /// The continuation is resumed from `CN1IntentHost`, which removes the token before firing,
     /// so the deadline racing a slow handler cannot resume it twice -- that would be a hard
     /// crash rather than a recoverable error.
+    /// Fenced at 16 because this is the only async member of the bridge and its only caller is
+    /// a generated AppIntent, which carries the same annotation. Swift concurrency back-deploys
+    /// no further than iOS 13, and declaring an App Intent deliberately contributes no
+    /// deployment floor -- indexing and donation are Objective-C and must keep working on a
+    /// target pinned below it. Unfenced, this one `async` would have failed the compile of any
+    /// such build, taking down the very configuration the missing floor exists to support.
+    @available(iOS 16.0, *)
     static func run(id: String, params: [String: Any], headless: Bool) async -> CN1IntentOutcome {
         let json = encode(params)
         let answer: (String, String?) = await withCheckedContinuation { continuation in

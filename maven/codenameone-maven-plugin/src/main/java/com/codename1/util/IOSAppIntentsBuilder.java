@@ -250,6 +250,19 @@ public final class IOSAppIntentsBuilder {
             String declaredType = hasChoices(p)
                     ? choiceEnumName(str(intent, "id"), paramIdentifier(intent, str(p, "name")))
                     : swiftType(type, str(p, "entityType"));
+            // No `default:` is projected here, and a required parameter never needs one:
+            // AppIntentAnnotationProcessor rejects required + defaultValue outright, naming
+            // this very divergence as the reason -- the generated coercion treats a defaulted
+            // parameter as optional, so Android would publish a parameterless shortcut and run
+            // the default while this Swift kept the parameter non-optional and prompted for it.
+            // The developer is told to set required = false or drop the default, so the
+            // combination cannot reach a generated manifest.
+            //
+            // An optional parameter's default is deliberately not projected either: it is
+            // emitted as an Optional and simply left out of the payload when nil, so the one
+            // authority on what an omitted value becomes is the declaration the Java side
+            // reads. Restating it in Swift would put the same constant in two places, and the
+            // two would disagree the first time a default changed.
             sb.append("    @Parameter(title: \"").append(swift(str(p, "title")))
                     .append("\"").append(inclusiveRange(type, hasChoices(p))).append(")\n");
             sb.append("    var ").append(varName(paramIdentifier(intent, str(p, "name"))))

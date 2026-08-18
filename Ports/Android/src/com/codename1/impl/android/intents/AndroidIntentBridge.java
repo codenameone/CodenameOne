@@ -91,6 +91,22 @@ public class AndroidIntentBridge implements IntentBridge {
     /// the build published for the same intent.
     private static final String DONATED_PREFIX = "cn1donated:";
 
+    /// Serializes every capacity check with the publication it authorizes.
+    ///
+    /// The check and the push are one decision: capacity() asks the launcher what room is left
+    /// and pushShortcut() spends it. Between those two calls the answer can go stale, and it is
+    /// two background threads that make it do so -- index() and donate() are both called off
+    /// the EDT, so with a single slot free each could read "one available" and then publish,
+    /// putting two shortcuts into one slot. The platform resolves that by evicting the least
+    /// recently used dynamic shortcut, which is exactly the outcome the capacity accounting
+    /// exists to prevent, and the eviction lands on whatever the user touched longest ago
+    /// rather than on either caller.
+    ///
+    /// One lock rather than one per path, because the two paths spend the same quota: two
+    /// locks would serialize index against index and donate against donate while leaving the
+    /// interesting race, an index and a donation, running concurrently.
+    private static final Object PUBLISH = new Object();
+
     private static final long FOREGROUND_POLL_MILLIS = 50L;
 
     /// How long requestForeground waits for the Activity it launched. Deliberately shorter than
@@ -583,13 +599,16 @@ public class AndroidIntentBridge implements IntentBridge {
             // same intent updates that shortcut in place and needs no free slot, which is the
             // common case and keeps working when the launcher is full.
             String donatedId = DONATED_PREFIX + intentId;
-            if (!capacity(ctx).admits(donatedId, 0)) {
-                Log.i(TAG, "Not donating \"" + intentId + "\": the launcher's shortcut quota is "
-                        + "full, and recording this one would evict something already there");
-                return;
+            synchronized (PUBLISH) {
+                if (!capacity(ctx).admits(donatedId, 0)) {
+                    Log.i(TAG, "Not donating \"" + intentId + "\": the launcher's shortcut quota "
+                            + "is full, and recording this one would evict something already "
+                            + "there");
+                    return;
+                }
+                pushShortcut(ctx, donatedId, label, label,
+                        uriFor(targetId, effectiveParams, ctx), null, true);
             }
-            pushShortcut(ctx, donatedId, label, label,
-                    uriFor(targetId, effectiveParams, ctx), null, true);
         } catch (Throwable t) {
             Log.w(TAG, "Could not donate " + intentId, t);
         }
@@ -613,52 +632,62 @@ public class AndroidIntentBridge implements IntentBridge {
         // Deliberately shallow parsing: the payload is a known shape produced by the framework's
         // own serializer, and pulling in a JSON dependency for the port would cost every app.
         List<String[]> entries = CN1IntentJson.entities(entitiesJson);
-        ShortcutCapacity capacity = capacity(ctx);
-        int published = 0;
-        int slotsUsed = 0;
-        for (String[] entry : entries) {
-            // Checked per entry rather than against one number up front, because an entry that
-            // re-indexes an entity already published updates it in place and takes no slot.
-            // A budget computed once would either refuse those updates when the launcher is
-            // full, or count them as room for new ids that is not there.
-            if (!capacity.admits(shortcutIdFor(entry[0]), slotsUsed)) {
-                // The launcher caps how many it will show. Truncating silently would look like
-                // indexing randomly failing, so it is reported once -- and the two reasons read
-                // differently to whoever has to act on them.
-                if (capacity.getFree() == 0) {
-                    Log.i(TAG, "Not indexing: the launcher's shortcut quota is already full, "
-                            + "and publishing content here would evict something already there");
-                } else {
-                    Log.i(TAG, "Indexed " + published
-                            + " item(s); Android limits how many shortcuts an app may publish");
-                }
-                break;
-            }
-            String uid = entry[0];
-            String title = entry[1];
-            String subtitle = entry[2];
-            try {
-                String imageName = entry.length > 3 ? entry[3] : null;
-                String openUri = SCHEME + "://open?uid=" + Uri.encode(uid);
-                String nonce = CN1IntentNonce.get(ctx);
-                if (nonce != null) {
-                    openUri += "&n=" + Uri.encode(nonce);
-                }
-                // Indexing publishes content the user has not necessarily touched.
-                String shortcutId = shortcutIdFor(uid);
-                pushShortcut(ctx, shortcutId, title, subtitle, Uri.parse(openUri),
-                        imageFor(images, imageName), false);
-                synchronized (indexed) {
-                    if (!indexed.contains(shortcutId)) {
-                        indexed.add(shortcutId);
+        // The whole publication is one critical section, not just the capacity read: releasing
+        // between entries would let a donation take the slot this loop had already counted on,
+        // and the next push would evict rather than fill. The section is bounded -- it can
+        // publish at most the launcher's quota, a handful of shortcuts -- and it runs off the
+        // EDT on both paths, so the cost of holding it is a background call waiting for another
+        // background call.
+        synchronized (PUBLISH) {
+            ShortcutCapacity capacity = capacity(ctx);
+            int published = 0;
+            int slotsUsed = 0;
+            for (String[] entry : entries) {
+                // Checked per entry rather than against one number up front, because an
+                // entry that re-indexes an entity already published updates it in place and
+                // takes no slot. A budget computed once would either refuse those updates
+                // when the launcher is full, or count them as room for new ids that is not
+                // there.
+                if (!capacity.admits(shortcutIdFor(entry[0]), slotsUsed)) {
+                    // The launcher caps how many it will show. Truncating silently would look like
+                    // indexing randomly failing, so it is reported once -- and the two reasons read
+                    // differently to whoever has to act on them.
+                    if (capacity.getFree() == 0) {
+                        Log.i(TAG, "Not indexing: the launcher's shortcut quota is already "
+                                + "full, and publishing content here would evict something "
+                                + "already there");
+                    } else {
+                        Log.i(TAG, "Indexed " + published
+                                + " item(s); Android limits how many shortcuts an app may publish");
                     }
+                    break;
                 }
-                if (capacity.consumesSlot(shortcutId)) {
-                    slotsUsed++;
+                String uid = entry[0];
+                String title = entry[1];
+                String subtitle = entry[2];
+                try {
+                    String imageName = entry.length > 3 ? entry[3] : null;
+                    String openUri = SCHEME + "://open?uid=" + Uri.encode(uid);
+                    String nonce = CN1IntentNonce.get(ctx);
+                    if (nonce != null) {
+                        openUri += "&n=" + Uri.encode(nonce);
+                    }
+                    // Indexing publishes content the user has not necessarily touched.
+                    String shortcutId = shortcutIdFor(uid);
+                    pushShortcut(ctx, shortcutId, title, subtitle, Uri.parse(openUri),
+                            imageFor(images, imageName), false);
+                    synchronized (indexed) {
+                        if (!indexed.contains(shortcutId)) {
+                            indexed.add(shortcutId);
+                        }
+                    }
+                    if (capacity.consumesSlot(shortcutId)) {
+                        slotsUsed++;
+                    }
+                    published++;
+                } catch (Throwable t) {
+                    Log.w(TAG, "Could not index " + uid, t);
                 }
-                published++;
-            } catch (Throwable t) {
-                Log.w(TAG, "Could not index " + uid, t);
             }
         }
     }
