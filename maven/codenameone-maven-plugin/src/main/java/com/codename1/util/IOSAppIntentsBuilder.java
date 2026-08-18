@@ -444,6 +444,18 @@ public final class IOSAppIntentsBuilder {
         for (Map<String, Object> intent : withPhrases) {
             sb.append("        AppShortcut(\n");
             sb.append("            intent: ").append(structName(str(intent, "id"))).append("(),\n");
+            // Every declared phrase is emitted. There is no per-shortcut phrase cap to apply:
+            // review reported one of ten, and measurement says otherwise. Against Xcode 26.3
+            // (Swift 6.2.4, iOS 26.2 SDK) an AppShortcut carrying eleven phrases exports
+            // cleanly and all eleven appear in extract.actionsdata -- not truncated, not
+            // warned about.
+            //
+            // The same run is its own control: eleven *shortcuts* is a halting error reading
+            // "Found 11 App Shortcuts, but each app may have at most 10", which is why
+            // MAX_APP_SHORTCUTS exists a few lines up. appintentsmetadataprocessor enforces
+            // the caps it has and names them exactly, so its silence about phrases is a fact
+            // rather than an omission. Capping here would delete phrases the platform accepts,
+            // and a phrase the developer wrote is the entire way a user reaches the intent.
             sb.append("            phrases: [\n");
             List<String> ph = phrases(intent);
             for (int i = 0; i < ph.size(); i++) {

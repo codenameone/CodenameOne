@@ -609,6 +609,7 @@ public class AndroidIntentBridge implements IntentBridge {
                                     + "publishing without knowing that could evict it"));
                     return;
                 }
+                // The push reports usage itself when it lands; a refusal has already said so.
                 pushShortcut(ctx, donatedId, label, label,
                         uriFor(targetId, effectiveParams, ctx), null, true);
             }
@@ -680,8 +681,14 @@ public class AndroidIntentBridge implements IntentBridge {
                     }
                     // Indexing publishes content the user has not necessarily touched.
                     String shortcutId = shortcutIdFor(uid);
-                    pushShortcut(ctx, shortcutId, title, subtitle, Uri.parse(openUri),
-                            imageFor(images, imageName), false);
+                    if (!pushShortcut(ctx, shortcutId, title, subtitle, Uri.parse(openUri),
+                            imageFor(images, imageName), false)) {
+                        // The launcher refused it, so it is not indexed content: recording the
+                        // id would have removeFromIndex and clearIndex chase a shortcut that
+                        // does not exist, and counting the slot would shrink a budget nothing
+                        // occupies. The push has already said why.
+                        continue;
+                    }
                     synchronized (indexed) {
                         if (!indexed.contains(shortcutId)) {
                             indexed.add(shortcutId);
@@ -1058,11 +1065,21 @@ public class AndroidIntentBridge implements IntentBridge {
     /// content told the launcher that every published entity had been used, which competes with
     /// genuinely used shortcuts for placement and can evict them. Indexing publishes content;
     /// donation reports an action.
-    private void pushShortcut(Context ctx, String id, String shortLabel, String longLabel,
+    /// Publishes one shortcut, and says whether the platform accepted it.
+    ///
+    /// The answer used to be discarded. pushDynamicShortcut returns false when the app is
+    /// rate-limited -- ShortcutManager throttles updates until the app next comes to the
+    /// foreground -- and the reflective call still completed, so the caller recorded content
+    /// the launcher had refused: an indexed id added to the published set and a slot counted
+    /// against a capacity the shortcut never occupied, or a donation reporting usage for a
+    /// shortcut that was not there. addDynamicShortcuts answers the same question on older
+    /// platforms and was ignored in the same way.
+    private boolean pushShortcut(Context ctx, String id, String shortLabel, String longLabel,
                                Uri data, byte[] png, boolean report) {
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
-            return;
+            // Nothing was published, and the caller must not record one.
+            return false;
         }
         // Re-publishing does not undo a disable. removeFromIndex disables the id so a cached
         // long-lived or pinned copy stops being surfaced, and Android keeps it disabled until
@@ -1108,26 +1125,47 @@ public class AndroidIntentBridge implements IntentBridge {
             // An icon is optional; a shortcut without one is still usable.
         }
         ShortcutInfo info = b.build();
-        // pushDynamicShortcut makes room by evicting the least-used shortcut instead of failing
-        // once the app is at the platform cap, which is what a donation wants. Same story as
-        // above: reflective, with the older API as the fallback rather than an error.
-        if (Build.VERSION.SDK_INT < API_PUSH_DYNAMIC
-                || !invokeQuietly(manager, "pushDynamicShortcut",
-                        new Class[]{ShortcutInfo.class}, new Object[]{info})) {
-            try {
-                manager.addDynamicShortcuts(Arrays.asList(info));
-            } catch (IllegalArgumentException e) {
-                // Thrown once the app is at the platform's shortcut cap. Losing a suggestion is
-                // not worth failing the caller's action over.
-                Log.i(TAG, "At the shortcut limit; not publishing " + id);
+        // Reflective because the compile-time android.jar predates the method, with the older
+        // API as the fallback rather than an error. Null means the platform does not have it;
+        // FALSE means it has it and refused, which is a different fact and no longer thrown
+        // away.
+        PlatformAnswer pushed = Build.VERSION.SDK_INT < API_PUSH_DYNAMIC
+                ? PlatformAnswer.ABSENT
+                : callBoolean(manager, "pushDynamicShortcut",
+                        new Class[]{ShortcutInfo.class}, new Object[]{info});
+        boolean published;
+        if (pushed == PlatformAnswer.ABSENT) {
+            published = addDynamicShortcut(manager, info, id);
+        } else {
+            published = pushed == PlatformAnswer.ACCEPTED;
+            if (!published) {
+                // Rate limiting, most often: ShortcutManager throttles updates until the app is
+                // next in the foreground. Nothing is wrong with the shortcut, so this is worth
+                // saying once rather than failing the caller's action.
+                Log.i(TAG, "The launcher refused \"" + id + "\" for now, most likely rate "
+                        + "limiting; it was not published");
             }
         }
-        if (report) {
+        if (report && published) {
             try {
                 manager.reportShortcutUsed(id);
             } catch (Throwable ignored) {
                 // Usage reporting is a hint to the launcher, never load bearing.
             }
+        }
+        return published;
+    }
+
+    /// The pre-API-31 publication, whose own boolean answer matters for the same reason.
+    private static boolean addDynamicShortcut(ShortcutManager manager, ShortcutInfo info,
+                                               String id) {
+        try {
+            return manager.addDynamicShortcuts(Arrays.asList(info));
+        } catch (IllegalArgumentException e) {
+            // Thrown once the app is at the platform's shortcut cap. Losing a suggestion is
+            // not worth failing the caller's action over.
+            Log.i(TAG, "At the shortcut limit; not publishing " + id);
+            return false;
         }
     }
 
@@ -1156,6 +1194,31 @@ public class AndroidIntentBridge implements IntentBridge {
             return target.getClass().getMethod(method, signature).invoke(target, args);
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /// What a platform method that may not exist had to say.
+    ///
+    /// Three outcomes, not two: the method can be absent, which means fall back to the older
+    /// API, or present and refuse, which means the launcher declined and there is nothing to
+    /// fall back to. invokeQuietly collapses those -- it reports whether the *call* happened --
+    /// so using it for a method whose false means "refused" promoted a refusal into a success.
+    /// A boxed Boolean would say it too, at the price of a null that every caller must
+    /// remember to test, which SpotBugs rightly refuses.
+    private enum PlatformAnswer { ABSENT, ACCEPTED, REFUSED }
+
+    /// Calls a method that may not exist here and keeps *its* answer.
+    private static PlatformAnswer callBoolean(Object target, String method, Class[] signature,
+                                               Object[] args) {
+        try {
+            java.lang.reflect.Method m = target.getClass().getMethod(method, signature);
+            Object result = m.invoke(target, args);
+            if (result instanceof Boolean && !((Boolean) result).booleanValue()) {
+                return PlatformAnswer.REFUSED;
+            }
+            return PlatformAnswer.ACCEPTED;
+        } catch (Throwable t) {
+            return PlatformAnswer.ABSENT;
         }
     }
 
