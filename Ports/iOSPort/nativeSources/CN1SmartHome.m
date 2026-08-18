@@ -81,6 +81,20 @@ static NSMutableDictionary *cn1homeUndelivered = nil;
 // Without it a drain would report every polled trait as changed every time.
 static NSMutableDictionary *cn1homeLastPolled = nil;
 
+// Watched characteristics whose enableNotification: failed, keyed
+// "subscriptionId \t accessoryId \t serviceId \t traitId". HomeKit is the
+// backend the framework reports as push, so one of these cannot simply be
+// left to drainChanges(): an app told isPushDelivery() is true never calls
+// it. They are polled and retried on a timer instead, until the registration
+// takes.
+static NSMutableSet *cn1homeNotifyFailed = nil;
+static BOOL cn1homeRecoveryArmed = NO;
+
+// Seconds between recovery passes. Long enough that a permanently broken
+// accessory costs almost nothing, short enough that a light that dropped off
+// Wi-Fi for a moment feels live again when it comes back.
+#define CN1_HOME_RECOVERY_SECONDS 10
+
 // The request id of a start() that is waiting for the first
 // homeManagerDidUpdateHomes:. Zero when nothing is waiting.
 static JAVA_INT cn1homePendingStart = 0;
@@ -1391,6 +1405,26 @@ static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
     // Usually the first of the two to fire, and the one that carries a denial:
     // a user who refuses gets no database load worth waiting for.
     cn1homeResolvePendingAuth(NO);
+    JAVA_INT auth = cn1homeAuthStatus();
+    if (cn1homePendingStart != 0
+            && (auth == CN1_HOME_AUTH_DENIED
+                || auth == CN1_HOME_AUTH_RESTRICTED)) {
+        // start() waits for homeManagerDidUpdateHomes:, and on a refusal
+        // there may be no database load left to deliver it -- so without this
+        // the first refresh() and everything afterStart() deferred behind it
+        // would sit pending for the life of the process. The availability is
+        // built here rather than read back through homeAvailability(),
+        // because that one answers PERMISSION_REQUIRED while the homes have
+        // not loaded, which on a refusal they never will.
+        JAVA_INT pending = cn1homePendingStart;
+        cn1homePendingStart = 0;
+        com_codename1_impl_ios_IOSHomeCallbacks_started___int_int_java_lang_String(
+            getThreadLocalData(), pending,
+            auth == CN1_HOME_AUTH_RESTRICTED
+                    ? CN1_HOME_AVAIL_RESTRICTED
+                    : CN1_HOME_AVAIL_PERMISSION_DENIED,
+            JAVA_NULL);
+    }
     // And it also fires when the user changes their mind in Settings while
     // the app is running, with nothing else to announce it. An app that
     // greyed its controls out on a refusal would leave them grey after the
@@ -1611,6 +1645,7 @@ static void cn1homeInit(void) {
         cn1homeWatches = [[NSMutableDictionary alloc] init];
         cn1homeUndelivered = [[NSMutableDictionary alloc] init];
         cn1homeLastPolled = [[NSMutableDictionary alloc] init];
+        cn1homeNotifyFailed = [[NSMutableSet alloc] init];
         cn1homeAccessoryObjects = [[NSMutableDictionary alloc] init];
         cn1homeHomeObjects = [[NSMutableDictionary alloc] init];
         cn1homeDelegate = [[CN1HomeDelegate alloc] init];
@@ -1629,6 +1664,104 @@ static void cn1homeOnMain(void (^block)(void)) {
         return;
     }
     dispatch_async(dispatch_get_main_queue(), block);
+}
+
+static void cn1homeArmRecovery(void);
+
+/// Polls and re-registers the characteristics whose notification failed.
+///
+/// enableNotification: failing is not rare -- a bridge that is busy, an
+/// accessory that just came back on the network -- and the subscription that
+/// hit it was already handed to the caller as push, because
+/// SupportsEventNotification said the characteristic reports changes. So
+/// there is nobody to fall back on: an app that trusts isPushDelivery() never
+/// calls drainChanges(), and without this the listener would sit on the value
+/// it had when registration failed for as long as the screen stays open, even
+/// after the accessory recovered.
+///
+/// Both halves matter. The read is what keeps the subscription delivering
+/// while notifications are off, and the retry is what ends the polling: once
+/// HomeKit accepts the registration the entry is dropped and the ordinary
+/// push path takes over again.
+static void cn1homeRunRecovery(void) {
+    cn1homeRecoveryArmed = NO;
+    if ([cn1homeNotifyFailed count] == 0) {
+        return;
+    }
+    for (NSString *stateKey in [cn1homeNotifyFailed allObjects]) {
+        NSArray *parts = [stateKey componentsSeparatedByString:@"\t"];
+        if ([parts count] != 4) {
+            [cn1homeNotifyFailed removeObject:stateKey];
+            continue;
+        }
+        NSString *subscriptionId = [parts objectAtIndex:0];
+        NSString *accessoryId = [parts objectAtIndex:1];
+        NSString *serviceId = [parts objectAtIndex:2];
+        NSString *traitId = [parts objectAtIndex:3];
+        NSString *key = cn1homeReadingKey(accessoryId, serviceId, traitId);
+        NSSet *watched = [cn1homeWatches objectForKey:subscriptionId];
+        if (watched == nil || ![watched containsObject:key]) {
+            // The subscription went away. Nothing to recover, and leaving it
+            // here would keep the timer alive for the life of the process.
+            [cn1homeNotifyFailed removeObject:stateKey];
+            [cn1homeLastPolled removeObjectForKey:stateKey];
+            continue;
+        }
+        HMService *service = cn1homeFindService(accessoryId, serviceId);
+        HMCharacteristic *c = cn1homeFindCharacteristic(service, traitId);
+        if (c == nil) {
+            // Out of the graph for the moment -- an accessory being
+            // re-added, a home still loading. Kept, because the next pass is
+            // exactly when it is worth looking again.
+            continue;
+        }
+        if ([[c properties] containsObject:HMCharacteristicPropertyReadable]) {
+            [c readValueWithCompletionHandler:^(NSError *error) {
+                if (error != nil) {
+                    return;
+                }
+                NSString *record = cn1homeEncodeReading(accessoryId, serviceId,
+                                                        traitId, [c value],
+                                                        nil, nil);
+                NSString *current = cn1homeReadingWithoutTimestamp(record);
+                NSString *previous = [cn1homeLastPolled objectForKey:stateKey];
+                [cn1homeLastPolled setObject:current forKey:stateKey];
+                if (previous == nil || [previous isEqualToString:current]) {
+                    return;
+                }
+                com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
+                    getThreadLocalData(),
+                    fromNSString(getThreadLocalData(), subscriptionId),
+                    fromNSString(getThreadLocalData(), record));
+            }];
+        }
+        [c enableNotification:YES completionHandler:^(NSError *error) {
+            if (error != nil) {
+                return;
+            }
+            [cn1homeNotifyFailed removeObject:stateKey];
+            [cn1homeLastPolled removeObjectForKey:stateKey];
+        }];
+    }
+    cn1homeArmRecovery();
+}
+
+/// Schedules the next recovery pass, if one is wanted and none is scheduled.
+///
+/// dispatch_after rather than an NSTimer: the timer would have to be owned,
+/// invalidated and released by hand under MRC on every path that empties the
+/// set, and the armed flag is the whole of the state this needs.
+static void cn1homeArmRecovery(void) {
+    if (cn1homeRecoveryArmed || [cn1homeNotifyFailed count] == 0) {
+        return;
+    }
+    cn1homeRecoveryArmed = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                 (int64_t) (CN1_HOME_RECOVERY_SECONDS
+                                            * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        cn1homeRunRecovery();
+    });
 }
 
 // ---------------------------------------------------------------------
@@ -1756,6 +1889,7 @@ void com_codename1_impl_ios_IOSNative_homeStop__(
         [cn1homeWatches removeAllObjects];
         [cn1homeUndelivered removeAllObjects];
         [cn1homeLastPolled removeAllObjects];
+        [cn1homeNotifyFailed removeAllObjects];
     });
 }
 
@@ -2373,11 +2507,25 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
                 // The subscription is still registered -- failing the whole
                 // thing because one sensor refused would take the other
                 // nineteen down with it -- but the caller has to be told
-                // that what it is watching may now be stale. This is the one
-                // backend with no polling fallback: if the registration
-                // failed and nothing said so, the listener would sit on the
-                // last value it saw for as long as the screen is open, even
-                // after the accessory came back.
+                // that what it is watching may now be stale.
+                //
+                // And told once is not enough. This handle was already
+                // reported as push, so the app will never call
+                // drainChanges(); a resync flag on its own would get the
+                // caller a single re-read and then silence for the life of
+                // the screen. The characteristic goes onto the recovery
+                // path, which polls it and keeps retrying the registration
+                // until HomeKit takes it.
+                NSString *stateKey = [NSString stringWithFormat:@"%@\t%@",
+                                      subId,
+                                      cn1homeReadingKey(accessoryId,
+                                                        serviceId, traitId)];
+                [cn1homeNotifyFailed addObject:stateKey];
+                [cn1homeLastPolled setObject:cn1homeReadingWithoutTimestamp(
+                     cn1homeEncodeReading(accessoryId, serviceId, traitId,
+                                          [c value], nil, nil))
+                                      forKey:stateKey];
+                cn1homeArmRecovery();
                 com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
                     getThreadLocalData(),
                     fromNSString(getThreadLocalData(), subId));
@@ -2410,6 +2558,11 @@ void com_codename1_impl_ios_IOSNative_homeUnsubscribe___java_lang_String(
             for (NSString *polled in [cn1homeLastPolled allKeys]) {
                 if ([polled hasPrefix:prefix]) {
                     [cn1homeLastPolled removeObjectForKey:polled];
+                }
+            }
+            for (NSString *failed in [cn1homeNotifyFailed allObjects]) {
+                if ([failed hasPrefix:prefix]) {
+                    [cn1homeNotifyFailed removeObject:failed];
                 }
             }
         }
@@ -2487,9 +2640,16 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                     [parts objectAtIndex:0], [parts objectAtIndex:1]);
                 HMCharacteristic *c = cn1homeFindCharacteristic(
                     service, [parts objectAtIndex:2]);
+                // A characteristic whose notification registration failed is
+                // polled here too, not only by the recovery timer: an app
+                // that drains anyway should not have to wait out the timer
+                // for the one trait that lost its registration.
+                BOOL degraded = [cn1homeNotifyFailed containsObject:
+                                 [NSString stringWithFormat:@"%@\t%@",
+                                  subscriptionId, key]];
                 if (c == nil
-                        || [[c properties] containsObject:
-                            HMCharacteristicPropertySupportsEventNotification]
+                        || (!degraded && [[c properties] containsObject:
+                            HMCharacteristicPropertySupportsEventNotification])
                         || ![[c properties] containsObject:
                             HMCharacteristicPropertyReadable]) {
                     continue;
