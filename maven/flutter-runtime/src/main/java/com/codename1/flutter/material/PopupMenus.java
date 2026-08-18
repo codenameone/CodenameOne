@@ -36,6 +36,9 @@ public final class PopupMenus {
 
     private static com.codename1.ui.Dialog openMenu;
     private static Element openRoot;
+    /** The page behind the menu, and the tint it had before we cleared it. */
+    private static com.codename1.ui.Form tinted;
+    private static int savedTint;
 
     private PopupMenus() {
     }
@@ -101,13 +104,40 @@ public final class PopupMenus {
             d.setBlurBackgroundRadius(-1);
             d.getContentPane().getAllStyles().setPadding(0, 0, 0, 0);
             d.getContentPane().getAllStyles().setMargin(0, 0, 0, 0);
+            // No arrow: CN1 draws a speech bubble pointing at the anchor, and a Material
+            // menu is a plain rounded card. The arrow rides on the border, so replacing the
+            // border with a rounded one removes the point and keeps the surface.
+            d.getDialogStyle().setBorder(com.codename1.ui.plaf.RoundRectBorder.create()
+                    .cornerRadius(1f)
+                    .shadowOpacity(30));
+            // And no scrim: a dialog TINTS the page behind it, which reads as modal, while
+            // a menu is a light touch. The tint lives on the page rather than on us, so it
+            // is cleared there and put back when the menu closes.
+            tinted = com.codename1.ui.Display.getInstance().getCurrent();
+            if (tinted != null) {
+                savedTint = tinted.getTintColor();
+                tinted.setTintColor(0);
+            }
         } catch (Throwable t) {
             // chrome is cosmetic; a themed popup still works
         }
     }
 
+    /** Puts back the tint the page had before the menu covered it. */
+    private static void restoreTint() {
+        if (tinted != null) {
+            try {
+                tinted.setTintColor(savedTint);
+            } catch (Throwable t) {
+                // best effort: a wrong tint is better than a failed dismiss
+            }
+            tinted = null;
+        }
+    }
+
     /** Closes the open menu, if any. */
     public static void dismiss() {
+        restoreTint();
         if (openRoot != null) {
             FlutterUI.unmountTree(openRoot);
             openRoot = null;

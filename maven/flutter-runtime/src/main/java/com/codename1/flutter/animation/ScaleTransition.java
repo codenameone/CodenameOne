@@ -1,11 +1,13 @@
 package com.codename1.flutter.animation;
 
 import com.codename1.flutter.Alignment;
+import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.Widget;
+import com.codename1.flutter.widgets.Transform;
 
 /**
- * Animates the scale of its child from an {@link Animation} — Flutter's
- * {@code ScaleTransition}. This pass hosts the child; the scale transform is
- * deferred.
+ * Scales its child about its centre from an {@link Animation} — Flutter's
+ * {@code ScaleTransition}.
  */
 public class ScaleTransition extends AnimatedChildWidget {
 
@@ -14,6 +16,7 @@ public class ScaleTransition extends AnimatedChildWidget {
 
     public void scale(Animation<Double> v) {
         this.scale = v;
+        listenable(v);
     }
 
     public void alignment(Alignment v) {
@@ -22,5 +25,11 @@ public class ScaleTransition extends AnimatedChildWidget {
 
     public Animation<Double> getScale() {
         return scale;
+    }
+
+    @Override
+    public Widget build(BuildContext context) {
+        return Transform.scale(null, Double.valueOf(valueOf(scale, 1.0)),
+                null, null, null, alignment, null, null, getChild());
     }
 }

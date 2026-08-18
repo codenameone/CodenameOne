@@ -37,7 +37,8 @@ public class CupertinoScrollbar extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("CupertinoScrollbar", "no scrollbar is drawn");
+        // CN1's scrollables draw their own scrollbar, so wrapping one adds nothing. This
+        // is a genuine pass-through rather than a missing feature.
         return child;
     }
 }

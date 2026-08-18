@@ -1,16 +1,14 @@
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
 
 /**
  * Rotates its {@code child} by an integral number of quarter turns — Flutter's
- * {@code RotatedBox}. Unlike {@code Transform.rotate}, the rotation also affects
- * layout (a 1- or 3-turn box swaps width/height). This pass hosts the child
- * un-rotated; the quarter-turn count is captured for a later render pass.
+ * {@code RotatedBox}. Unlike {@code Transform.rotate}, the rotation also affects layout: a
+ * 1- or 3-turn box swaps width and height.
  */
-public class RotatedBox extends StatelessWidget {
+public class RotatedBox extends Widget {
 
     private long quarterTurns;
     private Widget child;
@@ -32,8 +30,7 @@ public class RotatedBox extends StatelessWidget {
     }
 
     @Override
-    public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("RotatedBox", "rotation is ignored");
-        return child;
+    public Element createElement() {
+        return new RotatedBoxRenderElement(this);
     }
 }

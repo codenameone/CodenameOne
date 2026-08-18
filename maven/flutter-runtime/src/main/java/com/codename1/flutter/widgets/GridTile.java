@@ -6,9 +6,10 @@ import com.codename1.flutter.Widget;
 
 /**
  * A single tile of a Material grid — Flutter's {@code GridTile}. An optional
- * {@code header}/{@code footer} band (typically a {@link GridTileBar}) overlays
- * the main {@code child}. This pass renders the {@code child}; overlaying the
- * header/footer via a Stack is deferred.
+ * {@code header}/{@code footer} band (typically a {@link GridTileBar}) overlays the main
+ * {@code child}, pinned to the top and bottom edges.
+ *
+ * <p>Both bands were dropped before, so every tile in the grid demo lost its caption.
  */
 public class GridTile extends StatelessWidget {
 
@@ -42,7 +43,31 @@ public class GridTile extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("GridTile", "the tile header/footer are not rendered");
-        return child;
+        if (header == null && footer == null) {
+            return child;
+        }
+        dart.core.DartList<Widget> layers = new dart.core.DartList<Widget>();
+        if (child != null) {
+            layers.add(Positioned.fill(null, null, null, null, null, child));
+        }
+        if (header != null) {
+            Positioned p = new Positioned();
+            p.top(0);
+            p.left(0);
+            p.right(0);
+            p.child(header);
+            layers.add(p);
+        }
+        if (footer != null) {
+            Positioned p = new Positioned();
+            p.bottom(0);
+            p.left(0);
+            p.right(0);
+            p.child(footer);
+            layers.add(p);
+        }
+        Stack stack = new Stack();
+        stack.children(layers);
+        return stack;
     }
 }

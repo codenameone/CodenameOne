@@ -11,9 +11,12 @@ import com.codename1.flutter.Widget;
 
 /**
  * Paints a decoration (or image) as part of the Material so ink splashes render
- * above it — Flutter's {@code Ink} (and its {@code Ink.image} named
- * constructor). Signature-only: hosts the child; the decoration/image is
- * captured for later Material-aware painting.
+ * above it — Flutter's {@code Ink} (and its {@code Ink.image} named constructor).
+ *
+ * <p>The decoration is painted by delegating to a {@link com.codename1.flutter.widgets.Container},
+ * which already knows how to paint a colour, a box decoration and a background image. It
+ * used to render only the child, so an Ink used for a card's tinted or pictured background
+ * came out blank.
  */
 public class Ink extends StatelessWidget {
 
@@ -49,7 +52,33 @@ public class Ink extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("Ink", "the ink decoration is not painted");
-        return child;
+        com.codename1.flutter.widgets.Container box =
+                new com.codename1.flutter.widgets.Container();
+        if (color != null) {
+            box.color(color);
+        }
+        if (decoration != null) {
+            box.decoration(decoration);
+        } else if (image != null) {
+            com.codename1.flutter.DecorationImage backdrop = new com.codename1.flutter.DecorationImage();
+            backdrop.image(image);
+            if (fit != null) {
+                backdrop.fit(fit);
+            }
+            com.codename1.flutter.BoxDecoration d = new com.codename1.flutter.BoxDecoration();
+            d.image(backdrop);
+            box.decoration(d);
+        }
+        if (padding != null) {
+            box.padding(padding);
+        }
+        if (width > 0) {
+            box.width(width);
+        }
+        if (height > 0) {
+            box.height(height);
+        }
+        box.child(child);
+        return box;
     }
 }

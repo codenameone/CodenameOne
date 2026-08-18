@@ -93,9 +93,95 @@ public class OpenContainer<T> extends StatelessWidget {
         return closedBuilder;
     }
 
+    /**
+     * The closed state: the {@code closedBuilder}'s widget on a Material surface, tappable
+     * to open.
+     *
+     * <p>It rendered NOTHING before — an empty box — which took the whole motion demo with
+     * it, eighteen containers' worth of it. The transform itself (the closed card growing
+     * into the page) is a compositing effect we do not have; opening pushes the built page
+     * as a route instead, so the demo is navigable and shows both of its states even though
+     * the growth between them is a cut rather than a morph.</p>
+     */
     @Override
-    public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("OpenContainer", "the container transform renders nothing");
-        return new SizedBox();
+    public Widget build(final BuildContext context) {
+        if (closedBuilder == null) {
+            return new SizedBox();
+        }
+        Widget closed = closedBuilder.call(context, new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                open(context);
+            }
+        });
+        com.codename1.flutter.material.Material surface =
+                new com.codename1.flutter.material.Material();
+        if (closedColor != null) {
+            surface.color(closedColor);
+        }
+        if (closedElevation != null) {
+            surface.elevation(closedElevation.doubleValue());
+        }
+        if (closedShape != null) {
+            surface.shape(closedShape);
+        }
+        surface.clipBehavior(com.codename1.flutter.Clip.antiAlias);
+        if (!tappable) {
+            surface.child(closed);
+            return surface;
+        }
+        com.codename1.flutter.material.InkWell tap =
+                new com.codename1.flutter.material.InkWell();
+        tap.child(closed);
+        tap.onTap(new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                open(context);
+            }
+        });
+        surface.child(tap);
+        return surface;
+    }
+
+    /** Pushes the opened page; closing it pops back and reports through {@code onClosed}. */
+    private void open(BuildContext context) {
+        if (openBuilder == null) {
+            return;
+        }
+        com.codename1.flutter.navigation.MaterialPageRoute<T> route =
+                new com.codename1.flutter.navigation.MaterialPageRoute<T>();
+        route.builder(new dart.runtime.Funcs.Func1<BuildContext, Widget>() {
+            @Override
+            public Widget call(BuildContext routeContext) {
+                Widget page = openBuilder.call(routeContext, new dart.runtime.Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        close(routeContext);
+                    }
+                });
+                if (openColor == null) {
+                    return page;
+                }
+                com.codename1.flutter.material.Material surface =
+                        new com.codename1.flutter.material.Material();
+                surface.color(openColor);
+                if (openElevation != null) {
+                    surface.elevation(openElevation.doubleValue());
+                }
+                surface.child(page);
+                return surface;
+            }
+        });
+        com.codename1.flutter.navigation.Navigator.push(context, route);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void close(BuildContext context) {
+        com.codename1.flutter.navigation.Navigator.pop(context);
+        if (onClosed instanceof dart.runtime.Funcs.VoidFunc1) {
+            ((dart.runtime.Funcs.VoidFunc1<Object>) onClosed).call(null);
+        } else if (onClosed instanceof dart.runtime.Funcs.VoidFunc0) {
+            ((dart.runtime.Funcs.VoidFunc0) onClosed).call();
+        }
     }
 }

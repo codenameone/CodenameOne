@@ -5,10 +5,13 @@ import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 
 /**
- * The text-direction-aware form of {@link Positioned} used inside a
- * {@code Stack}: {@code start}/{@code end} resolve to left/right against the
- * ambient text direction — Flutter's {@code PositionedDirectional}. This pass
- * hosts the child without applying the insets; positioning is deferred.
+ * The text-direction-aware form of {@link Positioned} used inside a {@code Stack}:
+ * {@code start}/{@code end} resolve to left/right against the ambient text direction —
+ * Flutter's {@code PositionedDirectional}.
+ *
+ * <p>It hosted the child and dropped every inset, so anything positioned this way landed
+ * wherever the Stack happened to put it. Resolving to a real {@link Positioned} is all it
+ * needs: the ambient direction decides which edge {@code start} means.</p>
  */
 public class PositionedDirectional extends StatelessWidget {
 
@@ -62,7 +65,35 @@ public class PositionedDirectional extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("PositionedDirectional", "directional positioning is ignored");
-        return child;
+        boolean rtl = Directionality.of(context) == com.codename1.flutter.TextDirection.rtl;
+        Positioned p = new Positioned();
+        if (start != null) {
+            if (rtl) {
+                p.right(start.doubleValue());
+            } else {
+                p.left(start.doubleValue());
+            }
+        }
+        if (end != null) {
+            if (rtl) {
+                p.left(end.doubleValue());
+            } else {
+                p.right(end.doubleValue());
+            }
+        }
+        if (top != null) {
+            p.top(top.doubleValue());
+        }
+        if (bottom != null) {
+            p.bottom(bottom.doubleValue());
+        }
+        if (width != null) {
+            p.width(width.doubleValue());
+        }
+        if (height != null) {
+            p.height(height.doubleValue());
+        }
+        p.child(child);
+        return p;
     }
 }

@@ -1,7 +1,6 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.Clip;
-import com.codename1.flutter.FlutterErrorReport;
 import com.codename1.flutter.Widget;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
@@ -21,7 +20,6 @@ import com.codename1.ui.Graphics;
  */
 public class ClipRectRenderElement extends EffectRenderElement {
 
-    private boolean reportedPassThrough;
 
     public ClipRectRenderElement(Widget widget) {
         super(widget);
@@ -41,12 +39,8 @@ public class ClipRectRenderElement extends EffectRenderElement {
 
     @Override
     protected void paintWithEffect(Graphics g, Container pane, Runnable paintChildren) {
-        if (behavior() == Clip.none && !reportedPassThrough) {
-            // Clip.none asks for NO clipping, and the nested pane clips regardless - so say
-            // so rather than quietly cutting content the caller expected to overflow.
-            reportedPassThrough = true;
-            FlutterErrorReport.unimplemented("ClipRect", "clipBehavior: Clip.none still clips to the bounds");
-        }
+        // Clip.none never reaches here: ClipRect gives it a pass-through element instead,
+        // since this element's pane clips whatever the behaviour asks for.
         paintChildren.run();
     }
 }

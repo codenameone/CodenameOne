@@ -22,6 +22,10 @@ public class DataColumn {
         this.tooltip = v;
     }
 
+    public Funcs.VoidFunc2<Long, Boolean> getOnSort() {
+        return onSort;
+    }
+
     public void numeric(boolean v) {
         this.numeric = v;
     }

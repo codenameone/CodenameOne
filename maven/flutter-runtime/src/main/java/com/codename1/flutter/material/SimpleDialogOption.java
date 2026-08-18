@@ -7,9 +7,11 @@ import com.codename1.flutter.Widget;
 
 /**
  * A single tappable option inside a {@link SimpleDialog} — Flutter's
- * {@code SimpleDialogOption}. Tapping fires {@code onPressed} (conventionally to
- * pop the dialog with a value). This pass hosts the {@code child}; the tap
- * gesture is captured for a later interactive pass.
+ * {@code SimpleDialogOption}. Tapping fires {@code onPressed} (conventionally to pop the
+ * dialog with a value).
+ *
+ * <p>The tap used to go nowhere, which made a SimpleDialog a list you could read and not
+ * answer. Padding follows Material's option metrics (16lp horizontal, 8lp vertical).
  */
 public class SimpleDialogOption extends StatelessWidget {
 
@@ -39,7 +41,15 @@ public class SimpleDialogOption extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("SimpleDialogOption", "renders the child without option padding or tap handling");
-        return child;
+        com.codename1.flutter.widgets.Padding pad = new com.codename1.flutter.widgets.Padding();
+        pad.padding(padding != null ? padding : EdgeInsets.symmetric(8, 16));
+        pad.child(child);
+        if (!(onPressed instanceof dart.runtime.Funcs.VoidFunc0)) {
+            return pad;
+        }
+        InkWell tap = new InkWell();
+        tap.child(pad);
+        tap.onTap((dart.runtime.Funcs.VoidFunc0) onPressed);
+        return tap;
     }
 }

@@ -1,17 +1,15 @@
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.Element;
 import com.codename1.flutter.Offset;
-import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 
 /**
- * Translates its {@code child} by an {@link Offset} expressed as a fraction of
- * the child's own size before painting — Flutter's {@code FractionalTranslation}.
- * This pass hosts the child unshifted; applying the fractional offset at paint
- * time is deferred, so the parameters are captured only for API shape.
+ * Translates its {@code child} by an {@link Offset} expressed as a fraction of the child's
+ * own size before painting — Flutter's {@code FractionalTranslation}.
  */
-public class FractionalTranslation extends StatelessWidget {
+public class FractionalTranslation extends Widget
+        implements FractionalTranslationRenderElement.FractionSource {
 
     private Offset translation;
     private boolean transformHitTests = true;
@@ -38,8 +36,22 @@ public class FractionalTranslation extends StatelessWidget {
     }
 
     @Override
-    public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("FractionalTranslation", "translation is ignored");
+    public Offset fraction() {
+        return translation;
+    }
+
+    @Override
+    public Widget child() {
         return child;
+    }
+
+    @Override
+    public com.codename1.flutter.foundation.Listenable driver() {
+        return null;   // a static translation: nothing to follow
+    }
+
+    @Override
+    public Element createElement() {
+        return new FractionalTranslationRenderElement(this);
     }
 }

@@ -34,8 +34,16 @@ public class ClipRect extends Widget implements HasChild {
         return child;
     }
 
+    /**
+     * {@code Clip.none} means DO NOT CLIP, so it must not get the clipping pane at all —
+     * that pane clips regardless of what the behaviour says, which is why asking for no
+     * clipping used to cut the content anyway and merely report that it had.
+     */
     @Override
     public Element createElement() {
+        if (clipBehavior == Clip.none) {
+            return new PassThroughRenderElement(this);
+        }
         return new ClipRectRenderElement(this);
     }
 }

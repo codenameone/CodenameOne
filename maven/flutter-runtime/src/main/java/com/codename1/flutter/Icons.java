@@ -38,6 +38,7 @@ public final class Icons {
     public static final IconData check = new IconData(FontImage.MATERIAL_CHECK);
     public static final IconData check_circle = new IconData(FontImage.MATERIAL_CHECK_CIRCLE);
     public static final IconData check_circle_outline = new IconData(FontImage.MATERIAL_CHECK_CIRCLE_OUTLINE);
+    public static final IconData chevron_left = new IconData(FontImage.MATERIAL_CHEVRON_LEFT);
     public static final IconData chevron_right = new IconData(FontImage.MATERIAL_CHEVRON_RIGHT);
     public static final IconData close = new IconData(FontImage.MATERIAL_CLOSE);
     public static final IconData code = new IconData(FontImage.MATERIAL_CODE);
