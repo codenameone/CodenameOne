@@ -117,10 +117,21 @@ public interface IntentBridge {
     /// invocation that runtime has nothing on screen, so without this the destination is
     /// created and never seen.
     ///
+    /// **True means the application is forward, not that a launch was requested.** The
+    /// framework navigates as soon as this returns, so a port that posts an asynchronous launch
+    /// and answers true immediately has the route built against a runtime that is about to be
+    /// torn down -- on Android, by the `stopContext` that follows a headless handler. A port
+    /// whose launch is asynchronous must wait, and must bound that wait so a launch that never
+    /// completes degrades rather than hangs.
+    ///
     /// **False is a legitimate answer, not a failure.** iOS does not let an application bring
     /// itself forward; there, foregrounding is decided before the handler runs, by the
     /// `openAppWhenRun` the build derives from `opensRoute`. A port that answers false is
     /// telling the framework to say so rather than leaving the developer to discover it on a
     /// device.
+    ///
+    /// Never called on the event dispatch thread by a platform-dispatched invocation. An
+    /// in-process `Intents#invoke` may reach it from any thread, including the EDT, which is
+    /// why a port must answer immediately when the application is already forward.
     boolean requestForeground();
 }

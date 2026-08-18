@@ -373,6 +373,31 @@ public final class IntentSerializer {
         return null;
     }
 
+    /// The first parameter whose value the wire format cannot carry, or null when every
+    /// value can cross.
+    ///
+    /// Dropping such a value is right in a *result* -- the rest of the document survives, and
+    /// the alternative is losing the dialog and the snippet to one unrepresentable number. It
+    /// is wrong in *parameters*, because a parameter that goes missing is not reported as
+    /// invalid: the far side simply sees it as absent and runs the declared default instead.
+    /// The caller asked for one thing and got another, with nothing anywhere saying so. So the
+    /// parameter doors ask this first and refuse, rather than serializing and hoping.
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: the values to check; null and empty carry fine
+    static String unrepresentable(Map<String, Object> params) {
+        if (params == null) {
+            return null;
+        }
+        for (Map.Entry<String, Object> e : params.entrySet()) {
+            if (e.getValue() != null && toWire(e.getValue()) == null) {
+                return e.getKey();
+            }
+        }
+        return null;
+    }
+
     /// A name for this blob that no other blob in the same request will take.
     ///
     /// The name was a 32-bit content hash, which is fine as a cache key and wrong as an

@@ -215,7 +215,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         EntityDef def = new EntityDef();
         def.type = type;
         def.binaryName = cls.getBinaryName();
+        // getStringOrDefault only fills in when the element is absent, and an explicitly
+        // written title="" -- or one of spaces -- is present. It then travels into intents.json
+        // and becomes an empty iOS TypeDisplayRepresentation, so the entity picker shows a blank
+        // where the type name belongs. A title that is not a title falls back to the same place
+        // an omitted one does.
         def.title = ann.getStringOrDefault("title", type);
+        if (def.title == null || def.title.trim().length() == 0) {
+            def.title = type;
+        }
         def.indexed = ann.getBoolOrDefault("indexed", false);
 
         def.idAccessor = findAccessor(cls, ENTITY_ID_DESC, ctx, "@EntityId");
@@ -678,8 +686,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             if (Double.isNaN(d) || Double.isInfinite(d)) {
                 return false;
             }
-            return !"float".equals(p.kind)
-                    || (d >= -Float.MAX_VALUE && d <= Float.MAX_VALUE);
+            if (!"float".equals(p.kind)) {
+                return true;
+            }
+            // Both ends, for the same reason the generated requiredFloat checks both: too large
+            // becomes Infinity and too small becomes zero, and a default of 1e-100 that reaches
+            // the handler as 0.0f is a declaration the build accepted and the app does not
+            // honour. The build is the only place that can still say so.
+            return d >= -Float.MAX_VALUE && d <= Float.MAX_VALUE
+                    && (d == 0.0d || (float) d != 0.0f);
         } catch (NumberFormatException e) {
             return false;
         }
@@ -1404,7 +1419,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("            throw new IllegalArgumentException(d\n");
         sb.append("                    + \" is out of range for \" + k);\n");
         sb.append("        }\n");
-        sb.append("        return (float) d;\n");
+        // The range check is one-sided: it catches the magnitudes float cannot hold, and misses
+        // the ones it rounds away. 1e-100 is a finite non-zero double that becomes exactly 0.0f,
+        // so a caller who supplied a value would have the handler run on none -- silently, and
+        // indistinguishably from having passed zero. Losing precision to float is expected;
+        // losing the number is not.
+        sb.append("        float f = (float) d;\n");
+        sb.append("        if (f == 0.0f && d != 0.0d) {\n");
+        sb.append("            throw new IllegalArgumentException(d\n");
+        sb.append("                    + \" is too small to represent as a float for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return f;\n");
         sb.append("    }\n\n");
 
         sb.append("    private static boolean requiredBoolean(Map<String, Object> p, String k) {\n");

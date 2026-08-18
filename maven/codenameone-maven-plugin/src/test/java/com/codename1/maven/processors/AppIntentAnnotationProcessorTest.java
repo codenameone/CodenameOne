@@ -434,6 +434,17 @@ public class AppIntentAnnotationProcessorTest {
                     loader.loadClass("com.codename1.intents.IntentContext"));
 
             assertRejected(invoke, registry, "set_ratio", "r", Double.valueOf(1e100), "range");
+            // The other end of the same problem: a finite non-zero double that float rounds to
+            // exactly zero. Accepting it runs the handler on a value the caller never supplied.
+            assertRejected(invoke, registry, "set_ratio", "r", Double.valueOf(1e-100), "too small");
+            assertRejected(invoke, registry, "set_ratio", "r", Double.valueOf(-1e-100), "too small");
+
+            // Zero itself is a value, not an underflow.
+            Map<String, Object> zero = new LinkedHashMap<String, Object>();
+            zero.put("r", Double.valueOf(0.0));
+            invoke.invoke(registry, "set_ratio", zero, null);
+            assertEquals(0f,
+                    loader.loadClass("com.example.Handlers").getField("seen").getFloat(null), 0f);
 
             Map<String, Object> ok = new LinkedHashMap<String, Object>();
             ok.put("r", Double.valueOf(1.5));
@@ -1190,6 +1201,34 @@ public class AppIntentAnnotationProcessorTest {
         run(classes, true);
 
         assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
+    /// An explicitly written title="" is *present*, so the absent-only fallback never fired and
+    /// the blank travelled into intents.json as an empty iOS TypeDisplayRepresentation --
+    /// an entity picker with no type name on it.
+    @Test
+    public void aBlankEntityTitleFallsBackToTheTypeId() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Playlist",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "@IntentEntity(value = \"playlist\", title = \"   \")\n"
+                                + "public class Playlist {\n"
+                                + "  @EntityId public String getId() { return \"1\"; }\n"
+                                + "  @EntityTitle public String getName() { return \"Focus\"; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "  public static Playlist byId(String id) { return null; }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        ProcessorContext ctx = run(classes, true);
+
+        String manifest = manifest(ctx);
+        assertFalse("a blank title must not reach the manifest",
+                manifest.contains("\"title\": \"   \""));
+        assertTrue("it falls back to the type id, as an omitted title does",
+                manifest.contains("\"title\": \"playlist\""));
     }
 
     /// Keeping the later of two same-kind queries picks a resolver by declaration order, which

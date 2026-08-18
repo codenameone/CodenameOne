@@ -122,6 +122,15 @@ public final class DynamicIntent {
             bound.remove(name);
             return this;
         }
+        if (IntentSerializer.toWire(value) == null) {
+            // The same reasoning as the null branch, for a value that is not null but cannot
+            // cross: recording it would show the parameter as supplied while donation dropped
+            // it on the way out, so the shortcut would run on the default. Refusing here keeps
+            // the parameter visible and suppliable, which is what "I have no usable value for
+            // this" has to mean.
+            bound.remove(name);
+            return this;
+        }
         bound.put(name, value);
         return this;
     }

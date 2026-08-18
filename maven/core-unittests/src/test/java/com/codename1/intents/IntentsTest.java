@@ -1365,6 +1365,34 @@ class IntentsTest {
         assertNull(b.indexedJson);
     }
 
+    /// A donation is durable, so a value the wire cannot carry must stop the donation rather
+    /// than be dropped from it: the recorded shortcut would otherwise replay the parameter's
+    /// default weeks later, doing something other than the thing it was learned from.
+    @Test
+    void anUnrepresentableDonationValueIsRefused() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("ratio", Double.valueOf(Double.POSITIVE_INFINITY));
+        Intents.donate("known", params);
+
+        assertNull(b.donatedId, "a donation that cannot carry its values is not a donation");
+    }
+
+    /// Binding a value the wire cannot carry leaves the parameter unbound rather than
+    /// appearing bound, so it stays visible and suppliable instead of silently defaulting.
+    @Test
+    void anUnrepresentableBindingIsNotRecorded() {
+        DynamicIntent i = new DynamicIntent("nan_ride", "log_workout", "Log a ride")
+                .bind("ratio", Double.valueOf(Double.NaN));
+
+        assertFalse(i.getBoundParameters().containsKey("ratio"));
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

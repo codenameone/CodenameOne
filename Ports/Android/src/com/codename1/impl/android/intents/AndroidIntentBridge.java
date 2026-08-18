@@ -82,6 +82,11 @@ public class AndroidIntentBridge implements IntentBridge {
     private static final long FOREGROUND_WAIT_MILLIS = 15000L;
     private static final long FOREGROUND_POLL_MILLIS = 50L;
 
+    /// How long requestForeground waits for the Activity it launched. Deliberately shorter than
+    /// CN1IntentService's BACKSTOP_MARGIN_SECONDS: the service must not give up on the latch
+    /// while this is still waiting.
+    private static final long FOREGROUND_LAUNCH_WAIT_MILLIS = 3000L;
+
     private final List<String> indexed = new ArrayList<String>();
     /// A cold-start request waiting for the declaration table to exist.
     private static final List<String> PARKED = new ArrayList<String>();
@@ -390,7 +395,39 @@ public class AndroidIntentBridge implements IntentBridge {
     }
 
     public boolean requestForeground() {
-        return requestForegroundStatic();
+        if (isForegrounded()) {
+            // Already forward: an in-app invoke, or a shortcut that resumed a live app. Nothing
+            // to launch and nothing to wait for, so this stays a fast path -- which matters,
+            // because Intents.invoke is synchronous and its caller may be the EDT.
+            return true;
+        }
+        if (!requestForegroundStatic()) {
+            return false;
+        }
+        // startActivity() only *posts* the launch. It returns long before the Activity has
+        // resumed, and the framework navigates the moment this method does -- so the routed
+        // Form was built against the service's context and then torn down by the stopContext()
+        // that follows the handler, with the Activity attaching to a runtime that no longer had
+        // it. Waiting here is what makes "true" mean the app is forward rather than merely
+        // asked to be.
+        //
+        // Bounded well under CN1IntentService's backstop margin: overrunning it would have the
+        // service stop the context in the middle of the navigation this wait exists to protect.
+        // A launch slower than that degrades to the previous behaviour rather than hanging.
+        long deadline = System.currentTimeMillis() + FOREGROUND_LAUNCH_WAIT_MILLIS;
+        while (System.currentTimeMillis() < deadline) {
+            if (isForegrounded()) {
+                return true;
+            }
+            try {
+                Thread.sleep(FOREGROUND_POLL_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        Log.w(TAG, "The app did not come forward in time for a routed intent result");
+        return false;
     }
 
     /// Brings the app forward. Static because it reads nothing but the application context, and

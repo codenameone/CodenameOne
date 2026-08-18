@@ -448,6 +448,20 @@ public final class Intents {
                     + "through the assistant, which confirms first.");
             return;
         }
+        String lost = IntentSerializer.unrepresentable(params);
+        if (lost != null) {
+            // A donation is durable: the platform keeps these values and replays them when the
+            // user taps the shortcut, possibly weeks later. A value the wire cannot carry --
+            // a NaN, an infinity, an object of no declared type -- would be dropped on the way
+            // out, and the tap would then run the handler on the parameter's *default* rather
+            // than on what was donated. That is a shortcut which does something other than the
+            // thing it was learned from, and there is no later moment at which it gets
+            // corrected. Refusing loses only a suggestion.
+            logDiagnostic("Not donating \"" + intentId + "\": the value bound to \"" + lost
+                    + "\" cannot be carried to the platform, and a shortcut recorded without it "
+                    + "would run on that parameter's default instead.");
+            return;
+        }
         try {
             b.donate(intentId, IntentSerializer.serializeParams(params));
         } catch (Throwable t) {
