@@ -31,6 +31,7 @@ import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1105,8 +1106,17 @@ public final class Intents {
     /// longer anything a caller has to supply.
     private static IntentDeclaration describeDynamic(DynamicIntent dyn, IntentDeclaration base) {
         List<IntentParameterInfo> remaining = new ArrayList<IntentParameterInfo>();
+        Map<String, Object> bound = dyn.getBoundParameters();
         for (IntentParameterInfo p : base.getParameters()) {
-            if (!dyn.getBoundParameters().containsKey(p.getName())) {
+            // Bound is not the same as satisfied. A binding the declared type cannot accept --
+            // "abc" for an int, a value outside a closed vocabulary -- would otherwise hide the
+            // parameter from this declaration, so neither the simulator nor a model schema
+            // offers any way to correct it, while dispatch rejects it later in the coercion.
+            // The parameterization and every donation made from it are then unusable with
+            // nothing on either side saying why. A binding that cannot be honoured leaves the
+            // parameter visible, where it can be supplied -- and a supplied value wins over a
+            // bound one, so surfacing it is also the repair.
+            if (!bound.containsKey(p.getName()) || !satisfies(p, bound.get(p.getName()))) {
                 remaining.add(p);
             }
         }
@@ -1114,6 +1124,78 @@ public final class Intents {
                 base.isHeadless(), base.isDiscoverable(), base.isDestructive(),
                 base.getOpensRoute(), base.getTimeoutSeconds(),
                 Collections.<String>emptyList(), remaining, base.getExposure());
+    }
+
+    /// Whether a bound value is one the generated coercion could accept for this parameter.
+    ///
+    /// Mirrors that coercion rather than restating it loosely: a whole number may arrive as a
+    /// number or as text, a boolean accepts only the four spellings the coercion accepts, and a
+    /// closed vocabulary is matched as text because that is how the coercion matches it. Being
+    /// stricter here would surface a parameter that would in fact have run; being looser would
+    /// leave the invalid binding hidden, which is the defect this exists to close.
+    ///
+    /// A `DATE` supplied as text is the one case answered optimistically. The ISO-8601 grammar
+    /// lives in the generated coercion, and duplicating it in core would give two parsers to
+    /// keep in agreement -- a worse bug than the one it would catch. Such a value is rejected
+    /// at dispatch as before.
+    private static boolean satisfies(IntentParameterInfo p, Object value) {
+        if (value == null) {
+            return false;
+        }
+        IntentParameterType type = p.getType();
+        if (!p.getOptions().isEmpty()) {
+            return value instanceof String && p.getOptions().contains(value);
+        }
+        if (type == IntentParameterType.STRING) {
+            return value instanceof String || value instanceof Character;
+        }
+        if (type == IntentParameterType.BOOLEAN) {
+            if (value instanceof Boolean) {
+                return true;
+            }
+            if (value instanceof Number) {
+                double d = ((Number) value).doubleValue();
+                return d == 0 || d == 1;
+            }
+            String t = value.toString().trim();
+            return "true".equals(t) || "false".equals(t) || "1".equals(t) || "0".equals(t);
+        }
+        if (type == IntentParameterType.INTEGER) {
+            if (value instanceof Number) {
+                double d = ((Number) value).doubleValue();
+                return !Double.isNaN(d) && !Double.isInfinite(d) && d == Math.floor(d);
+            }
+            if (value instanceof String) {
+                try {
+                    Long.parseLong(((String) value).trim());
+                    return true;
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+        if (type == IntentParameterType.NUMBER) {
+            if (value instanceof Number) {
+                double d = ((Number) value).doubleValue();
+                return !Double.isNaN(d) && !Double.isInfinite(d);
+            }
+            if (value instanceof String) {
+                try {
+                    double d = Double.parseDouble(((String) value).trim());
+                    return !Double.isNaN(d) && !Double.isInfinite(d);
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+        if (type == IntentParameterType.DATE) {
+            return value instanceof Date || value instanceof Number || value instanceof String;
+        }
+        // An entity binds as the entity or as the id the BY_ID query resolves; whether that id
+        // names anything is the query's answer to give, not this method's.
+        return value instanceof AppEntity || value instanceof String;
     }
 
     /// Runs the activities that arrived before the declarations did, dropping any the

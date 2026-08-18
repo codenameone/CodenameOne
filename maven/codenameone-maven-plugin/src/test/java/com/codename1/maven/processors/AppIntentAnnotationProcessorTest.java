@@ -1203,6 +1203,27 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// The runtime IntentParameterInfo falls back from a blank prompt to the parameter name, so
+    /// a blank surviving into intents.json described the same declaration one way in the
+    /// simulator and another on the device -- an iOS @Parameter(title:) with nothing in it.
+    @Test
+    public void aBlankParameterPromptFallsBackToTheParameterName() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"set_count\", title = \"Set\")\n"
+                        + "public static IntentResult set(\n"
+                        + "        @IntentParam(value = \"count\", title = \"   \") int count) {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        ProcessorContext ctx = run(classes, true);
+
+        String manifest = manifest(ctx);
+        assertFalse("a blank prompt must not reach the manifest",
+                manifest.contains("\"title\": \"   \""));
+        assertTrue("it falls back to the parameter name, as the runtime does",
+                manifest.contains("\"title\": \"count\""));
+    }
+
     /// An explicitly written title="" is *present*, so the absent-only fallback never fired and
     /// the blank travelled into intents.json as an empty iOS TypeDisplayRepresentation --
     /// an entity picker with no type name on it.

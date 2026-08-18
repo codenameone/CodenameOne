@@ -164,6 +164,14 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    private static IntentDeclaration declarationWithIntParam(String id, String param) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
+                "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
+                Arrays.asList(new IntentParameterInfo(param, "How many?",
+                        IntentParameterType.INTEGER, true, null, null, null)),
+                Arrays.asList(Exposure.ASSISTANT));
+    }
+
     @AfterEach
     void tearDown() {
         Intents.reset();
@@ -1391,6 +1399,45 @@ class IntentsTest {
                 .bind("ratio", Double.valueOf(Double.NaN));
 
         assertFalse(i.getBoundParameters().containsKey("ratio"));
+    }
+
+    /// Bound is not satisfied. A binding the declared type cannot accept used to hide the
+    /// parameter, so nothing could correct it while dispatch rejected it in the coercion --
+    /// the parameterization and every donation from it unusable, with no way to see why.
+    @Test
+    void aBindingTheTypeCannotAcceptLeavesTheParameterVisible() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithIntParam("count_it", "count"));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("count_abc", "count_it", "Count")
+                .bind("count", "abc"));
+
+        IntentDeclaration derived = Intents.getDeclaration("count_abc");
+        assertNotNull(derived);
+        assertNotNull(derived.getParameter("count"),
+                "a binding the coercion would reject has to stay correctable");
+    }
+
+    /// The same declaration must not read one way here and another on the device.
+    @Test
+    void aWhitespaceOnlyParameterPromptFallsBackToTheName() {
+        IntentParameterInfo p = new IntentParameterInfo("count", "   ",
+                IntentParameterType.INTEGER, true, null, null, null);
+
+        assertEquals("count", p.getTitle());
+    }
+
+    /// A binding the type does accept still hides the parameter, which is the whole point of
+    /// a parameterization -- this widened what is checked, not what is hidden.
+    @Test
+    void aValidBindingStillSatisfiesItsParameter() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithIntParam("count_it", "count"));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("count_5", "count_it", "Count five")
+                .bind("count", Integer.valueOf(5)));
+
+        assertNull(Intents.getDeclaration("count_5").getParameter("count"));
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id

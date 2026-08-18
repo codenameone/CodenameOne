@@ -515,7 +515,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
             ParamDef pd = new ParamDef();
             pd.name = p.getString("value");
+            // getStringOrDefault fills in only when the element is absent, and an explicitly
+            // written title="" -- or one of spaces -- is present. It reached intents.json and
+            // became an iOS @Parameter(title:) with no visible prompt, while the runtime
+            // IntentParameterInfo fell back to the name: the same declaration described one way
+            // in the simulator and another on the device. Both now normalize the same way.
             pd.title = p.getStringOrDefault("title", pd.name == null ? "" : pd.name);
+            if (pd.title == null || pd.title.trim().length() == 0) {
+                pd.title = pd.name == null ? "" : pd.name;
+            }
             pd.required = p.getBoolOrDefault("required", true);
             pd.defaultValue = p.getStringOrDefault("defaultValue", "");
             pd.descriptor = desc;
