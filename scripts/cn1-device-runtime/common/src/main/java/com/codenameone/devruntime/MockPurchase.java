@@ -117,13 +117,38 @@ public class MockPurchase extends Purchase {
         complete(sku, true);
     }
 
+    /**
+     * Refunds what was bought, because {@link #isRefundable(String)} says it
+     * can be.
+     *
+     * <p>{@code Purchase.refund} is a no-op in the base class, so inheriting it
+     * while advertising the capability would leave refund-handling code
+     * unexercised -- the SKU still owned, no callback delivered -- which is
+     * precisely the path this mock exists to let somebody test.</p>
+     */
+    public void refund(String sku) {
+        DeviceRuntimeMocks.warnOnce("in-app purchase");
+        owned.removeElement(sku);
+        subscriptions.remove(sku);
+        deliverRefund(sku);
+    }
+
     public void unsubscribe(String sku) {
         owned.removeElement(sku);
         subscriptions.remove(sku);
-        PurchaseCallback c = callback();
-        if (c != null) {
-            c.itemRefunded(sku);
-        }
+        deliverRefund(sku);
+    }
+
+    /// On the event thread, for the same reason a purchase is.
+    private void deliverRefund(final String sku) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                PurchaseCallback c = callback();
+                if (c != null) {
+                    c.itemRefunded(sku);
+                }
+            }
+        });
     }
 
     /**

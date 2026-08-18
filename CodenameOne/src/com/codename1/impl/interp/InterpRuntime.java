@@ -1020,6 +1020,32 @@ public final class InterpRuntime {
         }
     }
 
+    /// Whether a thrown value is an Error, interpreted or not.
+    ///
+    /// A pushed `class MyError extends Error` is an InterpObject, so a host
+    /// `instanceof Error` says no and the initializer's own error would be
+    /// replaced by ExceptionInInitializerError -- which JLS 12.4.2 says happens
+    /// only for a non-Error, and which would make `catch (MyError)` miss.
+    private boolean isError(Object thrown) {
+        if (thrown instanceof Error) {
+            return true;
+        }
+        if (thrown instanceof InterpObject) {
+            InterpObject io = (InterpObject) thrown;
+            if (io.hostPeer instanceof Error) {
+                return true;
+            }
+            try {
+                return isInstanceOf(io, "java/lang/Error");
+            } catch (Throwable cannotTell) {
+                // The hierarchy could not be walked; treat it as not an Error,
+                // which wraps rather than loses it.
+                return false;
+            }
+        }
+        return false;
+    }
+
     /// What an interpreted failure actually carries: the thrown object when it
     /// arrived in the interpreter's carrier, the throwable itself otherwise.
     private static Object unwrapInterpreted(Throwable failure) {
@@ -1167,7 +1193,7 @@ public final class InterpRuntime {
                     // through unwrapped, as the spec says, and so does
                     // cancellation, which is not the program's failure at all.
                     Object thrown = unwrapInterpreted(failure);  //NOPMD AvoidInstanceofChecksInCatchClause - the carrier has to be looked through
-                    if (thrown instanceof Error) {
+                    if (isError(thrown)) {
                         throw failure;
                     }
                     ExceptionInInitializerError wrapped = new ExceptionInInitializerError(
@@ -2035,6 +2061,17 @@ public final class InterpRuntime {
         }
     }
 
+    /// Names the thing an enum was asked to compare itself to.
+    private static String describeForCompare(Object other) {
+        if (other == null) {
+            return "null";
+        }
+        if (other instanceof InterpObject) {
+            return ((InterpObject) other).type.getName().replace('/', '.');
+        }
+        return other.getClass().getName();
+    }
+
     /// Whether two constants belong to the same enum, looking through the
     /// anonymous subclass a constant with a class body gets.
     private static boolean sameEnum(InterpObject a, InterpObject b) {
@@ -2077,14 +2114,18 @@ public final class InterpRuntime {
         if ("hashCode".equals(name)) {
             return Integer.valueOf(System.identityHashCode(io));
         }
-        if ("compareTo".equals(name) && args.length == 1 && args[0] instanceof InterpObject
-                && ((InterpObject) args[0]).type != io.type) {  //NOPMD CompareObjectsWithEquals - one class object
-            // Java compares constants of one enum and throws otherwise.
-            // Returning an ordering instead quietly corrupts any sorted
-            // collection the two ended up in together.
-            InterpObject other = (InterpObject) args[0];
-            if (other.enumOrdinal < 0 || !sameEnum(io, other)) {
-                throw new ClassCastException(other.type.getName().replace('/', '.')
+        if ("compareTo".equals(name) && args.length == 1) {
+            // Java compares constants of one enum and throws otherwise --
+            // including for null and for something that is not an enum at all,
+            // which a raw Comparable call can supply. Returning an ordering
+            // instead quietly corrupts any sorted collection the two ended up
+            // in together.
+            Object other = args[0];
+            boolean comparable = other instanceof InterpObject
+                    && ((InterpObject) other).enumOrdinal >= 0
+                    && sameEnum(io, (InterpObject) other);
+            if (!comparable) {
+                throw new ClassCastException(describeForCompare(other)
                         + " is not comparable to " + io.type.getName().replace('/', '.'));
             }
         }

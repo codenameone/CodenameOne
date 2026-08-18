@@ -283,8 +283,12 @@ public class DeviceRuntimeService {
         final boolean[] served = new boolean[1];
         SocketConnection sc = new SocketConnection() {
             public void connectionEstablished(InputStream is, OutputStream os) {
-                served[0] = true;
-                handle(is, os, isLoopback(host));
+                // Only when the peer actually spoke the push protocol.
+                // Something else listening on this port -- and 18234 on
+                // loopback is not ours by right -- would otherwise count as a
+                // successful dial, and the loop would keep going back to it
+                // instead of falling back to the sweep that finds the desktop.
+                served[0] = handle(is, os, isLoopback(host));
             }
 
             public void connectionError(int errorCode, String message) {
@@ -733,6 +737,19 @@ public class DeviceRuntimeService {
             }
         });
         if (failure[0] != null) {
+            // Detach before reporting. The entry point may have shown a form or
+            // registered a listener before it threw, and those callbacks would
+            // go on running a program the desktop was just told had failed --
+            // and isProgramLoaded() would agree that it is loaded.
+            rt.detach();
+            if (runtime == rt) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
+                runtime = null;
+                loadedName = "";
+                loadedSource = "";
+                CodenameOneImplementation.clearLocalResources();
+                applyPushedTheme(null);
+            }
+            status = "failed to start";
             throw failure[0];
         }
         // Form.show() queues the switch rather than performing it inline, so the

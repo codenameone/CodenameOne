@@ -108,7 +108,14 @@ class InterpIOSNative {
     static native int classIdOf(Object value);
 
     /** Allocates an object array whose component type is the given class id. */
-    static native Object newObjectArray(int classId, int length);
+    /**
+     * Allocates a reference array of the class named by {@code arrayClassId}.
+     *
+     * <p>The id is the *array* class -- {@code [Ljava/lang/String;} -- not its
+     * component, because that is what the allocation needs and what a checkcast
+     * against `String[]` compares.</p>
+     */
+    static native Object newObjectArray(int arrayClassId, int length);
 
     /** True when the running binary carries invoke thunks. */
     static native boolean isInterpHostBuild();

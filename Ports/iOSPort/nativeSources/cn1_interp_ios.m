@@ -500,18 +500,23 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_classObjectById___int_R_java_
 }
 
 JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_newObjectArray___int_int_R_java_lang_Object(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT classId, JAVA_INT length) {
+        CODENAME_ONE_THREAD_STATE, JAVA_INT arrayClassId, JAVA_INT length) {
     if (length < 0) {
         throwException(threadStateData,
                 __NEW_INSTANCE_java_lang_NegativeArraySizeException(threadStateData));
         return JAVA_NULL;
     }
-    /* Every reference array has the same layout, so an Object[] serves for any
-       component type. The interpreter tracks the real element type itself; the
-       only thing lost is an ArrayStoreException the JVM would raise, which is
-       recorded as a limitation rather than papered over. */
-    return allocArray(threadStateData, length, &class_array1__java_lang_Object,
-                      sizeof(JAVA_OBJECT), 1);
+    /* The array's own clazz when the build registered one, so a host array
+       carries its real type: `(String[]) value` is a checkcast against the
+       array class, and an Object[] fails it however its elements look. Rank 1
+       to 3 of every class is registered by the interp-host build; anything
+       else -- deeper ranks, or an array of a class only the bundle has -- gets
+       the Object[] the interpreter uses for its own arrays anyway. */
+    struct clazz* arrayClass = cn1_reflect_clazz_for(arrayClassId);
+    if (arrayClass == NULL) {
+        arrayClass = (struct clazz*)&class_array1__java_lang_Object;
+    }
+    return allocArray(threadStateData, length, arrayClass, sizeof(JAVA_OBJECT), 1);
 }
 
 /*

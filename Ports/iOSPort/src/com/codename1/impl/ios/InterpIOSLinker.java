@@ -312,8 +312,21 @@ public class InterpIOSLinker implements InterpLinker {
             case K_LONG:    return new long[length];
             case K_FLOAT:   return new float[length];
             case K_DOUBLE:  return new double[length];
-            default:        return new Object[length];
+            default:        return InterpIOSNative.newObjectArray(
+                    arrayClassId(componentDescriptor), length);
         }
+    }
+
+    /**
+     * The class id of an array with this component, or -1.
+     *
+     * <p>The interp-host build publishes a class row per array rank keyed by
+     * the descriptor, so this is a lookup. It answers -1 for a component the
+     * app does not have -- an array of a bundle-only class -- and the caller
+     * then gets the untyped array the interpreter uses for its own.</p>
+     */
+    private int arrayClassId(String componentDescriptor) {
+        return symbols.classId("[" + componentDescriptor);
     }
 
     public Object newMultiArray(String arrayDescriptor, int[] dimensions) throws Throwable {
@@ -323,7 +336,11 @@ public class InterpIOSLinker implements InterpLinker {
         if (dimensions.length == 1) {
             return newArray(arrayDescriptor.substring(1), dimensions[0]);
         }
-        Object[] outer = new Object[dimensions[0]];
+        // The outer array's own type too, for the same reason: `(String[][]) v`
+        // is a checkcast against the outer array class.
+        Object outerArray = InterpIOSNative.newObjectArray(
+                symbols.classId(arrayDescriptor), dimensions[0]);
+        Object[] outer = (Object[]) outerArray;
         int[] rest = new int[dimensions.length - 1];
         System.arraycopy(dimensions, 1, rest, 0, rest.length);
         for (int i = 0; i < dimensions[0]; i++) {

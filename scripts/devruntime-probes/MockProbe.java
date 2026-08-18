@@ -44,6 +44,8 @@ public class MockProbe {
                         + " listing=" + p.isItemListingSupported()
                         + " price=" + (products.length > 0 ? products[0].getLocalizedPrice() : "none")
                         + " owned=" + p.wasPurchased("com.example.pro");
+                p.refund("com.example.pro");
+                purchaseResult = purchaseResult + " afterRefund=" + p.wasPurchased("com.example.pro");
             }
         } catch (Throwable t) {
             purchaseResult = "threw " + t.getClass().getName() + ": " + t.getMessage();
