@@ -652,6 +652,16 @@ public final class HomeWire {
                 if (!trait.acceptsEnumValue(value)) {
                     return null;
                 }
+                // Named, now that the ordinal is known to be in the trait's
+                // domain. The wire carries a number and nothing else, and a
+                // value decoded without its constant's name was unequal to
+                // the one an app builds with ofEnum for that same constant --
+                // so comparing a reading against a desired state, which is
+                // the most ordinary thing to do with one, was always false.
+                TraitValue named = trait.enumValue((int) numeric);
+                if (named != null) {
+                    value = named;
+                }
                 break;
             default:
                 TraitUnit unit = TraitUnit.forWireId(unitWireId);

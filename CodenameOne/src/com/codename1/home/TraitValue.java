@@ -203,6 +203,20 @@ public final class TraitValue {
                 TraitUnit.NONE, 0, false);
     }
 
+    /// The same value with the constant's name attached, for
+    /// [Trait#enumValue(int)].
+    ///
+    /// The codec decodes an ordinal and the trait knows what that ordinal is
+    /// called, so a reading arrives named -- which is what makes it equal to
+    /// the value an app builds with [#ofEnum(java.lang.Enum)] for the same
+    /// constant. Unnamed, a lock that reported SECURED did not equal
+    /// `ofEnum(LockState.SECURED)`, so the obvious desired-versus-actual
+    /// comparison was false for every reading that ever came off a bridge.
+    static TraitValue ofEnumNamed(String name, int ordinal) {
+        return new TraitValue(TraitValueKind.ENUM, ordinal, name,
+                TraitUnit.NONE, 0, false);
+    }
+
     /// This value with the platform's own ordinal attached.
     ///
     /// Used by the ports where the canonical mapping is lossy, so an app can
@@ -303,8 +317,10 @@ public final class TraitValue {
 
     /// The name of the enum constant this value was built from.
     ///
-    /// `null` for a value the codec decoded from a wire ordinal, which has no
-    /// constant in hand. Present for every value an application builds, which
+    /// `null` only for a value built straight from an ordinal with
+    /// [#ofEnumOrdinal(int)] and never resolved against a trait. Present for
+    /// every value an application builds and for every reading the codec
+    /// decodes -- the trait names the ordinal there -- which
     /// is what lets [Trait#acceptsEnumValue(TraitValue)] tell one domain enum
     /// from another -- ParparVM's `Enum.getDeclaringClass()` returns `null`,
     /// so the type itself is not available to check.

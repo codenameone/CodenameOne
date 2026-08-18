@@ -814,6 +814,29 @@ public final class Trait {
     /// #### Returns
     ///
     /// `true` when this is not a choice trait, or the value fits its domain
+    /// The value an ordinal names in this trait's domain.
+    ///
+    /// The codec's way of turning a wire ordinal into the same value an
+    /// application would have built for that constant: named, so it is equal
+    /// to one built with [TraitValue#ofEnum(java.lang.Enum)]. Reading it back
+    /// unnamed made every reading unequal to the value a caller was comparing
+    /// it against.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ordinal`: an ordinal in this trait's domain
+    ///
+    /// #### Returns
+    ///
+    /// the named value, or `null` when this trait has no enum domain or the
+    /// ordinal is outside it
+    public TraitValue enumValue(int ordinal) {
+        if (enumNames == null || ordinal < 0 || ordinal >= enumNames.length) {
+            return null;
+        }
+        return TraitValue.ofEnumNamed(enumNames[ordinal], ordinal);
+    }
+
     public boolean acceptsEnumValue(TraitValue value) {
         if (enumNames == null || value == null
                 || value.getKind() != TraitValueKind.ENUM) {

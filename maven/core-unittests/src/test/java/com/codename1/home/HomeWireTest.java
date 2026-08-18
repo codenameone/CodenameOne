@@ -190,6 +190,32 @@ class HomeWireTest {
     }
 
     /**
+     * A decoded reading equals the value an app builds for the same constant.
+     *
+     * <p>The wire carries an ordinal and nothing else, so a decoded enum
+     * value used to arrive with no constant name while the value an app
+     * builds with {@code ofEnum} carries one -- and the two were therefore
+     * unequal. Comparing a reading against a desired state is the most
+     * ordinary thing anyone does with one, and it was false every time.</p>
+     */
+    @Test
+    void aDecodedEnumEqualsTheValueAnAppBuilds() {
+        TraitReading secured = TraitReading.of("l", "1", Trait.LOCK_STATE,
+                TraitValue.ofEnum(LockState.SECURED), 0);
+        TraitValue decoded =
+                HomeWire.decodeReading(HomeWire.encodeReading(secured))
+                        .getValue();
+
+        assertEquals(TraitValue.ofEnum(LockState.SECURED), decoded,
+                "a decoded SECURED must equal the SECURED an app builds");
+        assertEquals(TraitValue.ofEnum(LockState.SECURED).hashCode(),
+                decoded.hashCode(),
+                "and hash with it, or a map keyed on values misses");
+        assertEquals("SECURED", decoded.getEnumName(),
+                "the trait names the ordinal the wire carried");
+    }
+
+    /**
      * A trait a newer port knows and this build does not is a row to skip, not
      * a delivery to abandon.
      */
