@@ -3088,7 +3088,7 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                     com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
                         getThreadLocalData(),
                         fromNSString(getThreadLocalData(), subscriptionId));
-                } else {
+                } else if (cn1homeStillNeeded(subscriptionId, key)) {
                     NSArray *parts =
                             [key componentsSeparatedByString:@"\t"];
                     NSString *record = cn1homeEncodeReading(
@@ -3103,6 +3103,12 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                     NSString *previous = [cn1homeLastPolled
                                           objectForKey:stateKey];
                     NSString *current = cn1homeReadingWithoutTimestamp(record);
+                    // Checked again here, not only at the top: this read
+                    // was in flight while the screen closed, unsubscribe
+                    // deleted the baseline on its way out, and writing one
+                    // back leaves an entry no watch and no recovery record
+                    // will ever clean up -- one per screen, for the life of
+                    // the process.
                     if (previous == nil) {
                         // No baseline, which normally cannot happen: it is
                         // taken when the subscription registers, precisely so
