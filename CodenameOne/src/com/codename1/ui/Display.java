@@ -3386,6 +3386,14 @@ public final class Display extends CN1Constants {
                     if (desktop.getFocusedWindow() == w) { //NOPMD CompareObjectsWithEquals
                         desktop.setFocusedWindow(null);
                     }
+                    if (w != null) {
+                        // The fifth way a window stops being reachable, after hide,
+                        // minimize, dispose and modal blocking. The physical key-up
+                        // goes to whatever has focus now, so without this a held key
+                        // repeats into this window for as long as it stays open and
+                        // a pressed component stays latched.
+                        w.cancelPendingInput();
+                    }
                     break;
                 case CLOSE_REQUESTED:
                     if (w != null) {
@@ -3587,7 +3595,13 @@ public final class Display extends CN1Constants {
 
         // might happen when returning from a deinitialized version of Codename One,
         // or when a window was disposed while its events were still in flight
-        if (f == null || (isUserInputEvent(type) && isBlockedByModal(windowId)
+        // A packet already queued when the window was hidden would otherwise be
+        // dispatched into an invisible tree -- and a press among them would re-arm
+        // the very timers the hide just cancelled. Cancelling at the transition
+        // cannot close that race on its own, because these are already in flight.
+        boolean hidden = windowId > 0 && f instanceof Window && !((Window) f).isWindowShowing();
+        if (f == null || (isUserInputEvent(type) && hidden)
+                || (isUserInputEvent(type) && isBlockedByModal(windowId)
                 && !completesAcceptedPress(type, windowId, offset, inputEventStackTmp))) {
             // A press that is being filtered must not leave its long-press timer
             // armed. The timer is charged off the event dispatch thread when the

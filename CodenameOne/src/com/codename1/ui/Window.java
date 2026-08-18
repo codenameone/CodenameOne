@@ -2350,15 +2350,17 @@ public class Window extends Container implements TopLevelContainer {
     /// Ends every gesture in flight because the window has left the user's reach.
     ///
     /// Called from every path that does that -- `#hide()`, a native minimize through
-    /// `#hideNotify()`, and `#dispose()` -- rather than from whichever one was last
-    /// reported. A window that goes away mid-gesture leaves three kinds of state
+    /// `#hideNotify()`, `#dispose()`, and losing focus to another application --
+    /// rather than from whichever one was last reported. Losing focus counts: the
+    /// key-up goes to whoever has focus now, so a held key would otherwise repeat
+    /// here forever. A window that goes away mid-gesture leaves three kinds of state
     /// behind, and all three have to be undone together:
     ///
     /// an activated drag and drop, whose component `Component` has already hidden and
     /// which only `dragFinishedImpl` restores; a pressed component, latched in its
     /// pressed state with no release coming; and the framework's own recorded targets
     /// and timers, which otherwise keep firing into a tree nobody can see.
-    private void cancelPendingInput() {
+    void cancelPendingInput() {
         if (dragged != null && dragged.isDragAndDropInitialized()) {
             // Finished outside the window so no drop target is found: the user never
             // completed the drag, the window simply went away. This still restores

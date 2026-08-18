@@ -1861,6 +1861,51 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void losingFocusCancelsHeldInput() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("focus loss", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        Display.getInstance().windowKeyPressed(w.getWindowId(), 69);
+        DisplayTest.flushEdt();
+        // The user switches to another application while holding the key. The
+        // key-up goes to whoever has focus now, so nothing else would ever stop
+        // this window repeating.
+        Display.getInstance().windowFocusChanged(w.getWindowId(), false);
+        DisplayTest.flushEdt();
+        boolean armed = keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(armed, "losing focus must cancel input held in the window");
+    }
+
+    @FormTest
+    void aPacketQueuedBeforeHideDoesNotRestartTheGesture() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("late packet", new BorderLayout());
+        Button b = new Button("press me");
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Queued, then the window is hidden before the event dispatch thread drains
+        // it. Dispatching the press re-latches the component the hide just
+        // unlatched, with no release coming -- the timer is armed at queue time, so
+        // the observable damage is the component's state rather than the timer's.
+        Display.getInstance().windowPointerPressed(w.getWindowId(),
+                new int[]{150}, new int[]{120});
+        w.hide();
+        DisplayTest.flushEdt();
+        boolean latched = b.getState() == Button.STATE_PRESSED;
+        w.dispose();
+
+        assertFalse(latched,
+                "a packet queued before the hide must not re-latch the component");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
