@@ -94,6 +94,12 @@ int CN1MacMonitorForMainWindow(void);
 /** Applies a resizability change to a window that may already have a scene. */
 void CN1MacWindowSetResizable(int slot, BOOL resizable);
 
+/** Applies a decoration change to a window that may already have a scene. */
+void CN1MacWindowSetDecorated(int slot, BOOL decorated);
+
+/** Records a minimum size and applies it to an existing scene. */
+void CN1MacWindowSetMinimumSize(int slot, int width, int height);
+
 /* Invoked from the scene delegate when a Codename One window scene connects, so
  * a scene the system restored on launch is adopted rather than orphaned. */
 void CN1MacWindowSceneConnected(UIWindowScene* scene);

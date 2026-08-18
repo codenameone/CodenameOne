@@ -114,6 +114,7 @@ extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
 @end
 
 static void CN1MacWindowReportLayout(int windowId, int width, int height);
+static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
 
 /* The view controller a Codename One window scene is rooted at. */
 @interface CN1MacWindowController : UIViewController
@@ -325,6 +326,14 @@ typedef struct {
      * consulted only at creation, because the scene arrives later and the size
      * restrictions can only be applied once it exists. */
     int resizable;
+    /* The requested minimum, in pixels, or 0 for none. Recorded for the same reason
+     * as resizable: the scene does not exist when the request is made. */
+    int minWidth;
+    int minHeight;
+    /* Whether the application asked for a decorated window. Catalyst cannot remove
+     * the frame, but it can hide the title bar's title and toolbar, which is the
+     * part an application replacing the chrome cares about. */
+    int decorated;
     /* The geometry asked for but not yet granted, in pixels, or 0 when nothing is
      * outstanding. A recycled scene reports the *previous* window's size the moment
      * it is adopted, before the new geometry request lands, and delivering that would
@@ -532,6 +541,7 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     g_macWindows[slot].pendingHeight = height;
     g_macWindows[slot].pendingTitle = [title retain];
     g_macWindows[slot].resizable = resizable ? 1 : 0;
+    g_macWindows[slot].decorated = decorated ? 1 : 0;
 
     const int generation = g_macWindows[slot].generation;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -680,6 +690,7 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
     w->controller.content = w->content;
     /* After the view exists, since every recognizer attaches to it. */
     [w->controller cn1InstallWindowRecognizers];
+    CN1MacWindowApplyDecoration(scene, w->decorated);
 
     w->window.rootViewController = w->controller;
     /* Honour the visibility last asked for rather than always showing: a window
@@ -713,8 +724,9 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
         w->staleLayoutDropped = 0;
         if (scene.sizeRestrictions != nil) {
             if (w->resizable) {
-                scene.sizeRestrictions.minimumSize =
-                        CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
+                CGFloat minW = w->minWidth > 0 ? w->minWidth / scale : MIN(pointWidth, 120);
+                CGFloat minH = w->minHeight > 0 ? w->minHeight / scale : MIN(pointHeight, 120);
+                scene.sizeRestrictions.minimumSize = CGSizeMake(minW, minH);
                 scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
             } else {
                 /* Pinned both ways, which is how Catalyst expresses a fixed size.
@@ -1196,6 +1208,75 @@ void CN1MacWindowSetResizable(int slot, BOOL resizable) {
         } else {
             scene.sizeRestrictions.minimumSize = CGSizeMake(pointWidth, pointHeight);
             scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
+        }
+    });
+}
+
+/* Hides or shows the scene's title bar chrome. Catalyst cannot remove the window
+ * frame the way an undecorated desktop window does, but it can hide the title and
+ * the toolbar, which is what an application supplying its own chrome needs -- and
+ * without it setDecorated(false) changed the framework's state while the window
+ * kept a standard title bar, and could show two sets of chrome at once. */
+static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated) {
+    if (scene == nil) {
+        return;
+    }
+    if (@available(macCatalyst 13.0, *)) {
+        UITitlebar* bar = scene.titlebar;
+        if (bar != nil) {
+            bar.titleVisibility = decorated ? UITitlebarTitleVisibilityVisible
+                    : UITitlebarTitleVisibilityHidden;
+            if (!decorated) {
+                bar.toolbar = nil;
+            }
+        }
+    }
+}
+
+/* Applies a decoration change to a window that may already have a scene, and
+ * records it for a scene adopted later. */
+void CN1MacWindowSetDecorated(int slot, BOOL decorated) {
+    CN1MacWindow* w = slotAt(slot);
+    if (w == NULL) {
+        return;
+    }
+    pthread_mutex_lock(&g_slotLock);
+    w->decorated = decorated ? 1 : 0;
+    UIWindowScene* scene = w->scene;
+    pthread_mutex_unlock(&g_slotLock);
+    if (scene == nil) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1MacWindowApplyDecoration(scene, decorated ? 1 : 0);
+    });
+}
+
+/* Records a minimum size and applies it to an existing scene. Codename One
+ * geometry is in pixels and UIKit's in points, hence the screen scale. */
+void CN1MacWindowSetMinimumSize(int slot, int width, int height) {
+    CN1MacWindow* w = slotAt(slot);
+    if (w == NULL) {
+        return;
+    }
+    pthread_mutex_lock(&g_slotLock);
+    w->minWidth = width > 0 ? width : 0;
+    w->minHeight = height > 0 ? height : 0;
+    UIWindowScene* scene = w->scene;
+    int resizable = w->resizable;
+    pthread_mutex_unlock(&g_slotLock);
+    if (scene == nil || !resizable) {
+        /* A fixed window's restrictions are pinned to its size; a minimum would
+         * fight that. */
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (scene.sizeRestrictions == nil) {
+            return;
+        }
+        CGFloat scale = scene.screen != nil ? scene.screen.scale : 1.0;
+        if (width > 0 && height > 0) {
+            scene.sizeRestrictions.minimumSize = CGSizeMake(width / scale, height / scale);
         }
     });
 }

@@ -240,6 +240,12 @@ public final class IOSNative {
     /// Applies a resizability change to a window that may already have a scene.
     native void macWindowSetResizable(int slot, boolean resizable);
 
+    /// Applies a decoration change to a window that may already have a scene.
+    native void macWindowSetDecorated(int slot, boolean decorated);
+
+    /// Records a minimum size and applies it to an existing scene.
+    native void macWindowSetMinimumSize(int slot, int width, int height);
+
     native boolean macWindowReopen(int slot);
 
     /** Enables or disables touch input, used while a modal window blocks this one. */

@@ -46,6 +46,20 @@ import com.codename1.ui.Window;
  * this manager is never offered to a build that could not actually open a
  * window.</p>
  *
+ * <p><b>Operations Catalyst cannot express.</b> These stay on the SPI's no-op
+ * defaults, and are listed here rather than left to be discovered one at a time:
+ * {@code setAlwaysOnTop}, {@code setUtilityWindow}, {@code minimize},
+ * {@code restore} and {@code toggleMaximize} have no public UIKit equivalent for a
+ * {@code UIWindowScene} -- AppKit owns that behaviour and Catalyst does not expose
+ * it. {@code setModal} is a no-op because modality is decided by the framework and
+ * enforced through {@code setInputEnabled}, which this port does implement, so
+ * there is no native flag to set. {@code setPaintDirtyRegionClip} is an
+ * optimisation the Java SE port also leaves out.</p>
+ *
+ * <p>{@code setDecorated} is partial by necessity: Catalyst cannot remove the
+ * window frame, so it hides the title bar's title and toolbar, which is the part an
+ * application supplying its own chrome needs.</p>
+ *
  * @author Shai Almog
  */
 public class MacWindowManager extends WindowManager {
@@ -323,6 +337,30 @@ public class MacWindowManager extends WindowManager {
         int s = slot(p);
         if (s >= 0) {
             IOSImplementation.nativeInstance.macWindowSetResizable(s, resizable);
+        }
+    }
+
+    @Override
+    public void setDecorated(Object p, boolean decorated) {
+        // Catalyst cannot remove the window frame the way an undecorated desktop
+        // window does, but it can hide the title bar's title and toolbar, which is
+        // what an application supplying its own chrome needs. Without this the
+        // framework reported the window as undecorated while it kept a standard
+        // title bar -- and could show two sets of chrome at once.
+        int s = slot(p);
+        if (s >= 0) {
+            IOSImplementation.nativeInstance.macWindowSetDecorated(s, decorated);
+        }
+    }
+
+    @Override
+    public void setMinimumSize(Object p, int width, int height) {
+        // Window.sizeChangedInternal deliberately does not clamp, so without this
+        // the constraint existed only in the getter and the user could resize below
+        // it.
+        int s = slot(p);
+        if (s >= 0) {
+            IOSImplementation.nativeInstance.macWindowSetMinimumSize(s, width, height);
         }
     }
 

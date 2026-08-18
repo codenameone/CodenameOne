@@ -2390,6 +2390,18 @@ void com_codename1_impl_ios_IOSNative_macWindowShow___int_boolean(CN1_THREAD_STA
 #endif
 }
 
+void com_codename1_impl_ios_IOSNative_macWindowSetDecorated___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetDecorated(slot, decorated == JAVA_TRUE ? YES : NO);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetMinimumSize___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetMinimumSize(slot, width, height);
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetResizable(slot, resizable == JAVA_TRUE ? YES : NO);

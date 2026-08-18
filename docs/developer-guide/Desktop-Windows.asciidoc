@@ -327,6 +327,15 @@ content is rendered into an off-screen raster and presented to the scene's view,
 than the window owning a second GPU surface. Native peers and text editing still use the
 scene's real view hierarchy, so they behave normally.
 
+Some window controls have no Mac Catalyst equivalent, because AppKit owns the
+behaviour and Catalyst doesn't expose it to a `UIWindowScene`. `setAlwaysOnTop`,
+`setUtilityWindow`, `minimize`, `restore` and `toggleMaximize` do nothing there; the
+getters keep reporting whatever the application set, so treat them as requests the
+platform may decline. `setDecorated(false)` is partial: it hides the title bar's
+title and toolbar -- which is what an application supplying its own chrome needs --
+but the window frame itself stays. Modality, the minimum window size and
+resizability all work.
+
 Scenes also arrive asynchronously. `show()` asks the system to activate one and is
 handed it back later, so a window exists for a moment before its scene does, and a closed
 window's scene is kept for the next one rather than destroyed -- asking for a scene
