@@ -3581,15 +3581,32 @@ public class IPhoneBuilder extends Executor {
                 for (String matterPrivacyKey : new String[] {
                         "ios.NSBluetoothAlwaysUsageDescription",
                         "ios.NSLocalNetworkUsageDescription"}) {
-                    if ("false".equalsIgnoreCase(
-                            request.getArg(matterPrivacyKey, null))) {
+                    // Blank is a refusal too, from either source. An empty
+                    // hint survives applyCatalogPlistEntry -- it only fills a
+                    // MISSING value -- and an empty string in ios.plistInject
+                    // suppresses the generated default outright, so the app
+                    // reaches Bluetooth with an empty purpose string, which
+                    // iOS treats exactly as it treats none.
+                    String supplied = request.getArg(matterPrivacyKey, null);
+                    if (supplied == null) {
+                        supplied = WatchNativeBuilder.injectedPlistString(
+                                request,
+                                matterPrivacyKey.substring("ios.".length()));
+                    } else if (supplied.trim().length() == 0) {
+                        supplied = "false";
+                    }
+                    if (supplied != null && supplied.trim().length() == 0) {
+                        supplied = "false";
+                    }
+                    if ("false".equalsIgnoreCase(supplied)) {
                         throw new BuildException(
                                 "This app adds Matter accessories but sets "
                                 + matterPrivacyKey + "=false. Commissioning "
                                 + "uses Bluetooth to reach a new accessory "
                                 + "and the local network to find it "
                                 + "afterwards, and iOS terminates an app that "
-                                + "does either without a purpose string. "
+                                + "does either without a purpose string -- "
+                                + "and an empty one is no string at all. "
                                 + "Supply one, or set "
                                 + "ios.home.commissioning=false.");
                     }
@@ -3618,9 +3635,22 @@ public class IPhoneBuilder extends Executor {
                 // would be guessing at their formatting.
                 String injected = request.getArg("ios.plistInject", "");
                 if (injected.contains("NSBonjourServices")) {
+                    List<String> declared = injectedBonjourServices(injected);
                     for (String service : new String[] {"_matter._tcp",
                             "_matterc._udp"}) {
-                        if (!injected.contains(service)) {
+                        // Whole entries, not a substring of the fragment: a
+                        // comment mentioning the service, or a longer name
+                        // like _matter._tcp.preview., is not the service type
+                        // iOS matches mDNS traffic against.
+                        boolean serviceDeclared = false;
+                        for (String entry : declared) {
+                            if (entry.equals(service)
+                                    || entry.equals(service + ".")) {
+                                serviceDeclared = true;
+                                break;
+                            }
+                        }
+                        if (!serviceDeclared) {
                             throw new BuildException(
                                     "This app adds Matter accessories and "
                                     + "declares NSBonjourServices through "
@@ -5264,6 +5294,45 @@ public class IPhoneBuilder extends Executor {
                     + " where it is.");
         }
         return usesHomeOwnFabric;
+    }
+
+    /**
+     * The service types an injected NSBonjourServices array actually lists.
+     *
+     * <p>Whole entries, because that is what iOS matches mDNS traffic
+     * against: a substring search over the fragment accepts a comment that
+     * mentions the service, or a longer name that merely starts with it, and
+     * the generated array is suppressed either way -- so discovery fails on a
+     * build that passed its check.</p>
+     *
+     * @param injected the ios.plistInject fragment
+     * @return the strings inside the array, trimmed, in document order
+     */
+    private static List<String> injectedBonjourServices(String injected) {
+        List<String> out = new ArrayList<String>();
+        int key = injected.indexOf("NSBonjourServices");
+        if (key < 0) {
+            return out;
+        }
+        int open = injected.indexOf("<array", key);
+        int close = open < 0 ? -1 : injected.indexOf("</array>", open);
+        if (open < 0 || close < 0) {
+            return out;
+        }
+        String body = injected.substring(open, close);
+        int at = 0;
+        while (true) {
+            int start = body.indexOf("<string>", at);
+            if (start < 0) {
+                return out;
+            }
+            int end = body.indexOf("</string>", start);
+            if (end < 0) {
+                return out;
+            }
+            out.add(body.substring(start + "<string>".length(), end).trim());
+            at = end + 1;
+        }
     }
 
     private static boolean isSmartHomeSetupPayload(String cls) {

@@ -1736,6 +1736,35 @@ static void cn1homeInit(void) {
         cn1homeAccessoryObjects = [[NSMutableDictionary alloc] init];
         cn1homeHomeObjects = [[NSMutableDictionary alloc] init];
         cn1homeDelegate = [[CN1HomeDelegate alloc] init];
+        // HomeKit's delegate callbacks are a foreground stream: an app that
+        // is suspended while a light is switched hears nothing about it and
+        // wakes holding the old value. The subscription is push, so the app
+        // is not polling either -- it would show that value until the
+        // accessory happened to move again.
+        //
+        // Coming back to the foreground is therefore a resync, for every live
+        // subscription: the flag says "what you are holding may be stale",
+        // which is exactly what a gap in the stream means. Registered once,
+        // for the life of the process, because the alternative is a
+        // registration per subscription and the answer is the same for all of
+        // them.
+        [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIApplicationDidBecomeActiveNotification
+                        object:nil
+                         queue:[NSOperationQueue mainQueue]
+                    usingBlock:^(NSNotification *note) {
+            if ([cn1homeWatches count] == 0) {
+                return;
+            }
+            // The graph too: an accessory added or removed while the app
+            // slept is a change no delegate reported either.
+            cn1homeRebuildSnapshot();
+            for (NSString *subscriptionId in [cn1homeWatches allKeys]) {
+                com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
+                    getThreadLocalData(),
+                    fromNSString(getThreadLocalData(), subscriptionId));
+            }
+        }];
     });
 }
 
