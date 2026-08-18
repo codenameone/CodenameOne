@@ -68,6 +68,16 @@ public final class InterpThrowable extends RuntimeException {
     /// this rather than for [#getThrown], or it misses every subclass the
     /// pushed program declares of the very type the method promises.
     public Throwable hostThrowable() {
+        return hostThrowableOf(thrown);
+    }
+
+    /// The host throwable standing for a thrown interpreted value, or null.
+    ///
+    /// Shared with the interpreter, which has the same question to answer when
+    /// it wraps an initializer failure: an ExceptionInInitializerError whose
+    /// cause is null tells the catching code nothing about what actually went
+    /// wrong.
+    static Throwable hostThrowableOf(Object thrown) {
         if (thrown instanceof Throwable) {
             return (Throwable) thrown;
         }

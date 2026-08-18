@@ -1220,8 +1220,12 @@ public final class InterpRuntime {
                     if (isError(thrown)) {
                         throw failure;
                     }
+                    // The peer when the failure is a pushed exception class:
+                    // an ExceptionInInitializerError whose getCause() is null
+                    // says nothing about what actually went wrong, and the peer
+                    // is the throwable host code was given.
                     ExceptionInInitializerError wrapped = new ExceptionInInitializerError(
-                            thrown instanceof Throwable ? (Throwable) thrown : null);
+                            InterpThrowable.hostThrowableOf(thrown));
                     throw new InterpThrowable(wrapped, interpretedStackFor(failure));
                 }
             }
@@ -2179,6 +2183,29 @@ public final class InterpRuntime {
         }
         if ("isInstance".equals(name) && args.length == 1) {
             return isInstanceOf(args[0], c.getName()) ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("isAssignableFrom".equals(name) && args.length == 1) {
+            // The other type test Java offers without reflection, and the
+            // hierarchy to answer it with is already here. A host class is
+            // never a subtype of one only the bundle has, so anything that is
+            // not an interpreted token answers false.
+            if (args[0] == null) {
+                throw new InterpThrowable(new NullPointerException(
+                        "isAssignableFrom(null)"), snapshotStack());
+            }
+            if (!(args[0] instanceof InterpClass)) {
+                return Boolean.FALSE;
+            }
+            InterpClass other = (InterpClass) args[0];
+            if (c.isArray() || other.isArray()) {
+                // Array covariance follows the components; an array is
+                // assignable to nothing else here but itself.
+                return c.isArray() && other.isArray()
+                        && Boolean.TRUE.equals(classCall(c.arrayComponent, "isAssignableFrom",
+                                new Object[] {other.arrayComponent}))
+                        ? Boolean.TRUE : Boolean.FALSE;
+            }
+            return other.isSubclassOfInterp(c.getName()) ? Boolean.TRUE : Boolean.FALSE;
         }
         if ("getSuperclass".equals(name) && args.length == 0) {
             if (c.isArray()) {

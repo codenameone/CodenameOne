@@ -118,6 +118,30 @@ public class InterpHostSubclassTest {
         }
     }
 
+    /**
+     * An unchecked framework exception, so a pushed subclass can be thrown from
+     * a static initializer -- which Java forbids for a checked one.
+     */
+    public static class HostTrouble extends RuntimeException {
+        public HostTrouble(String message) {
+            super(message);
+        }
+    }
+
+    /** Its shim. */
+    public static final class HostTroubleShim extends HostTrouble implements InterpBacked {
+        private final InterpObject $interp;
+
+        HostTroubleShim(InterpObject o, String message) {
+            super(message);
+            this.$interp = o;
+        }
+
+        public InterpObject getInterpObject() {
+            return $interp;
+        }
+    }
+
     /** The shim for it, as the generator would emit one for a class shim. */
     public static final class HostFailureShim extends HostFailure implements InterpBacked {
         private final InterpObject $interp;
@@ -207,6 +231,9 @@ public class InterpHostSubclassTest {
         private static final String HOST_FAILURE =
                 HostFailure.class.getName().replace('.', '/');
 
+        private static final String HOST_TROUBLE =
+                HostTrouble.class.getName().replace('.', '/');
+
         public String peerClassName(Object peer) {
         // The JVM reports this faithfully; only ParparVM does not.
         return peer == null ? null : peer.getClass().getName().replace('.', '/');
@@ -215,11 +242,16 @@ public class InterpHostSubclassTest {
     public boolean canExtend(String hostSuperclassName) {
             return hostSuperclassName == null || "java/lang/Object".equals(hostSuperclassName)
                     || HOST_BASE.equals(hostSuperclassName)
-                    || HOST_FAILURE.equals(hostSuperclassName);
+                    || HOST_FAILURE.equals(hostSuperclassName)
+                    || HOST_TROUBLE.equals(hostSuperclassName);
         }
 
         public Object createPeer(InterpObject object, String hostSuperclassName,
                                  String[] hostInterfaceNames, String descriptor, Object[] args) {
+            if (HOST_TROUBLE.equals(hostSuperclassName)) {
+                return new HostTroubleShim(object,
+                        args.length > 0 && args[0] instanceof String ? (String) args[0] : null);
+            }
             if (HOST_FAILURE.equals(hostSuperclassName)) {
                 return new HostFailureShim(object,
                         args.length > 0 && args[0] instanceof String ? (String) args[0] : null);
@@ -416,6 +448,44 @@ public class InterpHostSubclassTest {
         }
         assertNotNull(caught, "a pushed IOException subclass should reach catch (IOException)");
         assertEquals("mine", caught.getMessage());
+    }
+
+    /**
+     * What {@code catch (ExceptionInInitializerError)} learns about the
+     * failure. JLS 12.4.2 wraps a non-Error initializer failure, and the
+     * wrapper's whole value is its cause -- which was null whenever the pushed
+     * program threw a class of its own, since the interpreted object is not
+     * itself a Throwable. The peer is.
+     */
+    @Test
+    @DisplayName("an initializer failure keeps the interpreted exception as its cause")
+    void initializerFailuresCarryTheirCause() throws Throwable {
+        InterpRuntime rt = load("Initializes",
+                "public class Initializes {\n"
+              + "  static class Mine extends com.codename1.impl.interp.InterpHostSubclassTest.HostTrouble {\n"
+              + "    Mine() { super(\"from clinit\"); }\n"
+              + "  }\n"
+              + "  static class Holder { static int V; static { if (V == 0) { throwIt(); } } }\n"
+              + "  static void throwIt() { throw new Mine(); }\n"
+              + "  public static int touch() { return Holder.V; }\n"
+              + "  public static void main(String[] a) {}\n"
+              + "}\n");
+        Throwable caught = null;
+        try {
+            rt.invoke(rt.getBundle().findClass("Initializes").declaredMethod("touch", "()I"),
+                    null, new Object[0]);
+        } catch (Throwable t) {
+            caught = t;
+        }
+        assertNotNull(caught, "the initializer should fail");
+        Object thrown = caught instanceof InterpThrowable
+                ? ((InterpThrowable) caught).getThrown() : caught;
+        assertTrue(thrown instanceof ExceptionInInitializerError,
+                "JLS 12.4.2 wraps a non-Error failure, got " + thrown);
+        Throwable cause = ((ExceptionInInitializerError) thrown).getCause();
+        assertNotNull(cause, "the wrapper must say what went wrong");
+        assertEquals("from clinit", cause.getMessage(),
+                "the cause should be the peer of the interpreted exception");
     }
 
     private static final String SUBCLASS_SOURCE =

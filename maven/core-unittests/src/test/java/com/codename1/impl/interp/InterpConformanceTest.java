@@ -364,6 +364,24 @@ class InterpConformanceTest {
                 + " try { Color.valueOf(\"PINK\"); } catch (IllegalArgumentException e) {"
                 + "   System.out.println(\"no PINK\"); }"
                 + "}}"));
+        // isAssignableFrom over pushed types: the hierarchy is in the bundle,
+        // and it is the other type test Java offers without reflection.
+        out.add(c("ClassAssignability",
+                "public class ClassAssignability {"
+                + " interface Marker {}"
+                + " static class Base implements Marker {}"
+                + " static class Child extends Base {}"
+                + " static class Other {}"
+                + " public static void main(String[] a) {"
+                + " System.out.println(Base.class.isAssignableFrom(Child.class));"
+                + " System.out.println(Child.class.isAssignableFrom(Base.class));"
+                + " System.out.println(Base.class.isAssignableFrom(Base.class));"
+                + " System.out.println(Marker.class.isAssignableFrom(Child.class));"
+                + " System.out.println(Base.class.isAssignableFrom(Other.class));"
+                + " System.out.println(Base.class.isAssignableFrom(String.class));"
+                + " System.out.println(Base[].class.isAssignableFrom(Base[].class));"
+                + " System.out.println(Base[].class.isAssignableFrom(Child[].class));"
+                + "}}"));
         // An enum constant that overrides toString. The interpreter answers
         // name() itself, and answering it for toString as well made the
         // override apply to interpreted callers and not to host ones -- so the
