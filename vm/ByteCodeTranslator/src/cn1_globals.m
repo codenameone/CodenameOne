@@ -390,11 +390,38 @@ static _Atomic long long cn1PacingClaimed = 0;
 // cn1LowMemoryParkStampMs: zero-initialized per thread with no malloc'd-not-zeroed trap.
 static __thread long long cn1MyPacingClaim = 0;
 
+// GC epoch this thread's claim belongs to; see cn1PacingExpireThreadClaim.
+static __thread int cn1MyPacingClaimEpoch = 0;
+
 static void cn1PacingReleaseThreadClaim(void) {
     if(cn1MyPacingClaim != 0) {
         atomic_fetch_sub_explicit(&cn1PacingClaimed, cn1MyPacingClaim,
                                   memory_order_relaxed);
         cn1MyPacingClaim = 0;
+    }
+}
+
+// Drop this thread's accumulated claim once a collection boundary has passed.
+//
+// A claim covers the window between allocating a block and writing to it, which is
+// invisible to phys_footprint. The tempting release point is the thread's NEXT check --
+// "by now it must have written the last one" -- but that is not something Java
+// guarantees: `a = new byte[32MB]; b = new byte[32MB];` allocates both before touching
+// either, and releasing a's claim while allocating b hands back a reservation for pages
+// that are still absent from the footprint. So claims ACCUMULATE within a cycle window
+// instead, which over-counts a thread holding several untouched blocks -- and
+// over-counting is the safe direction, since it only paces harder.
+//
+// A cycle boundary is a sound expiry point: a block allocated before it has either been
+// written (so phys_footprint counts it and the claim would double-charge) or is garbage
+// (so the sweep reclaimed it and the claim is meaningless). Every pacing park requests a
+// collection, so under pressure boundaries arrive continuously and the accumulation
+// stays small.
+static void cn1PacingExpireThreadClaim(void) {
+    int epochNow = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+    if(cn1MyPacingClaimEpoch != epochNow) {
+        cn1PacingReleaseThreadClaim();
+        cn1MyPacingClaimEpoch = epochNow;
     }
 }
 
@@ -3397,7 +3424,7 @@ static JAVA_BOOLEAN cn1PacingTryAdmit(long headroom, long long need, long long p
                                                  claimed + pendingBytes,
                                                  memory_order_acq_rel,
                                                  memory_order_relaxed)) {
-            cn1MyPacingClaim = pendingBytes;
+            cn1MyPacingClaim += pendingBytes;
             return JAVA_TRUE;
         }
         // claimed was reloaded by the failed exchange; re-test against the new total.
@@ -3463,7 +3490,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // Release this thread's previous claim first: by the time it allocates again, the
     // earlier block has been written and the kernel has counted it, so holding the claim
     // any longer would double-charge it.
-    cn1PacingReleaseThreadClaim();
+    cn1PacingExpireThreadClaim();
     long long need = pendingBytes + CN1_PACING_HEADROOM_MARGIN;
     if(cn1PacingTraceOn()) {
         atomic_fetch_add_explicit(&cn1PacingBoundedChecks, 1, memory_order_relaxed);
@@ -3475,7 +3502,8 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                                                      memory_order_relaxed)) {
         }
     }
-    if(cn1PacingTryAdmit(procHeadroom, need, pendingBytes)) {
+    JAVA_BOOLEAN admitted = cn1PacingTryAdmit(procHeadroom, need, pendingBytes);
+    if(admitted) {
         return;
     }
     if(cn1PacingTraceOn()) {
@@ -3509,6 +3537,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             break;                       // budget disappeared under us; nothing to honour
         }
         if(cn1PacingTryAdmit(headroomNow, need, pendingBytes)) {
+            admitted = JAVA_TRUE;
             break;
         }
         // Decide whether waiting is still buying anything, on COMPLETED collections
@@ -3531,9 +3560,9 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // thread's admission test for the window before the kernel counts it. Claiming only
     // on the success path would leave exactly the over-admission the claim exists to
     // prevent, in the case where memory is tightest.
-    if(cn1MyPacingClaim == 0 && pendingBytes > 0) {
+    if(!admitted && pendingBytes > 0) {
         atomic_fetch_add_explicit(&cn1PacingClaimed, pendingBytes, memory_order_relaxed);
-        cn1MyPacingClaim = pendingBytes;
+        cn1MyPacingClaim += pendingBytes;
     }
     // Honour a stop-the-world before resuming, exactly like every other park here: the
     // loop above can exit while a mark is still running and the collector believes this
