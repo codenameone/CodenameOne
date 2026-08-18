@@ -131,6 +131,23 @@ public class BufferedGraphics extends HTML5Graphics {
         upcoming.add(operation);
     }
 
+    /**
+     * Image draws report the rectangle they land in.
+     *
+     * <p>Review asked for the source alpha to be taken into account, so that an image which is
+     * transparent where the glyphs are does not send them back to the canvas. There is no way to
+     * ask that question here without reading the image's pixels, and pixel reads are what this
+     * port cannot do: every one is a round trip that parks the worker on a main-thread answer,
+     * and CI has a lint whose whole purpose is to keep them out of the drawing path -- per draw,
+     * per frame, it would be ruinous.</p>
+     *
+     * <p>So the rectangle stands, and the error it can make is the cheaper of the two. Reporting
+     * a draw that turned out to be transparent costs that component its promotion: its text is
+     * drawn on the canvas instead of the DOM, still in the right place, still saying the same
+     * thing, no longer selectable. Not reporting one that turned out to be opaque leaves text
+     * floating above an image that should have hidden it -- a frame showing something the
+     * application did not draw.</p>
+     */
     @Override
     public void drawImage(Object img, int x, int y) {
         // An empty clip must cull every draw; a degenerate empty-clip path on

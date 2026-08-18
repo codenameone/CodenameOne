@@ -561,6 +561,10 @@ public final class JavaScriptSemanticOverlay {
 
     private void applyCustomActions(Entry entry, AccessibilityNodeSnapshot node) {
         Set<String> desired = null;
+        // A node the framework reports as disabled offers nothing to activate. An action does not
+        // have to know its component is disabled -- most are built without asking -- so a control
+        // for one would let a screen reader work a node it announces as unavailable.
+        boolean usable = node.getEnabled() == null || node.getEnabled().booleanValue();
         String owner = ownerId(entry);
         if (entry.customActions != null && !owner.equals(entry.actionOwnerId)) {
             // The node's identifier changed, so every control still pointing at the old one
@@ -575,7 +579,7 @@ public final class JavaScriptSemanticOverlay {
         List<AccessibilityAction> actions = node.getActions();
         for (int i = 0; i < actions.size(); i++) {
             AccessibilityAction action = actions.get(i);
-            if (!action.isEnabled() || isStandardWebAction(action.getId())) {
+            if (!usable || !action.isEnabled() || isStandardWebAction(action.getId())) {
                 continue;
             }
             if (desired == null) {
