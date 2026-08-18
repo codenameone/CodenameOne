@@ -11272,6 +11272,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         int depth = historyStack.size();
         int previousIndex = f == null ? -1 : historyStack.lastIndexOf(f);
+        if (previousIndex >= 0 && previousIndex == depth - 1) {
+            // The form already on screen. One navigation can arrive here twice: dismissing a
+            // menu restores the form underneath it and then shows it again, and when the form
+            // being shown is the one being restored both arrivals name the same form. Nothing
+            // moved, so nothing is pushed -- an entry here is one the user has to press Back
+            // through to get out of a screen they never left.
+            return;
+        }
         // The direction comes from the framework rather than from which form appeared: an
         // application can legitimately show an earlier form again as forward navigation --
         // A, B, then A again -- and treating that as a back would spend entries the user can
