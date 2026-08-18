@@ -1132,6 +1132,15 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// - `height`: the new height
     public void setWindowSize(int width, int height) {
+        if (nativePeer == null) {
+            // Only the size. Routing through setWindowBounds before the window exists
+            // would hand the port the placeholder (0,0) as though the application had
+            // chosen it, and every port then skips the window manager's own
+            // placement -- which is the opposite of what this method promises.
+            pendingWidth = width;
+            pendingHeight = height;
+            return;
+        }
         Rectangle current = getWindowBounds();
         setWindowBounds(current.getX(), current.getY(), width, height);
     }
@@ -1240,6 +1249,17 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// the monitor showing this window
     public Monitor getMonitor() {
+        if (nativePeer == null) {
+            // No peer to ask yet. Answer from the location the application requested
+            // rather than caching the primary monitor: centerOnDesktop() would
+            // otherwise recentre a pre-positioned window back onto the primary
+            // display, and the cached fallback would leave scale and density stale
+            // once the window did appear.
+            if (pendingPositionSet) {
+                return Desktop.getInstance().getMonitorAt(pendingX, pendingY);
+            }
+            return Desktop.getInstance().getPrimaryMonitor();
+        }
         if (currentMonitor == null) {
             currentMonitor = Desktop.getInstance().getMonitorFor(this);
         }
@@ -1548,6 +1568,12 @@ public class Window extends Container implements TopLevelContainer {
         if (nativePeer != null && (nativeVisible || iconified)) {
             nativeVisible = false;
             iconified = false;
+            // A key handler can hide its own window, and the window stays registered
+            // while hidden -- so a repeat or long press armed by the press that got
+            // us here would go on firing into a component tree the user cannot see,
+            // and keep the event dispatch thread awake. The key-up may never arrive
+            // either, once the native window has lost focus.
+            Display.getInstance().windowInputCancelled(this);
             // A window the user can no longer reach must not go on blocking the ones
             // behind it. Without this a modal hidden through HIDE_ON_CLOSE stays at the
             // top of the modal stack -- and where the platform implements modality

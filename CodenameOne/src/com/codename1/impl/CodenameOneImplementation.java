@@ -9244,6 +9244,13 @@ public abstract class CodenameOneImplementation {
     /// Resolves the top level a wheel gesture should play into: the window with the
     /// given id, or the current form for the main surface.
     private Container wheelRoot(Display d, int windowId) {
+        // Modality is rechecked on every step, not only when the wheel arrived. The
+        // gesture is played as four queued steps and an unconsumed wheel listener can
+        // show a modal in between, after which the remaining synthetic press, drags
+        // and release would scroll or activate content behind it.
+        if (d.isWindowInputBlocked(windowId)) {
+            return null;
+        }
         if (windowId > 0) {
             return com.codename1.ui.Desktop.getInstance().windowById(windowId);
         }

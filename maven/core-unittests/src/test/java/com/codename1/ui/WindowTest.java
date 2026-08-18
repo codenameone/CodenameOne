@@ -1752,6 +1752,44 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void hidingAWindowCancelsItsKeyTimers() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("hide timers", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // A key handler can hide its own window. The window stays registered, so a
+        // repeat armed by the press that got us here would keep firing into a tree
+        // the user cannot see -- and the key-up may never arrive once the native
+        // window has lost focus.
+        Display.getInstance().windowKeyPressed(w.getWindowId(), 67);
+        DisplayTest.flushEdt();
+        w.hide();
+        boolean armed = keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(armed, "hiding a window must cancel the timers armed for it");
+    }
+
+    @FormTest
+    void settingOnlyTheSizeLeavesPlacementToTheWindowManager() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("size only", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        // The documented pre-show call. Routing it through setWindowBounds handed the
+        // port the placeholder (0,0) as though the application had chosen it.
+        w.setWindowSize(420, 260);
+        w.show();
+        boolean positionSet = wm.getLastWindow().isPositionSet();
+        w.dispose();
+
+        assertFalse(positionSet,
+                "setting only the size must leave the position unspecified");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

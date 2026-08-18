@@ -4185,6 +4185,26 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Cancels every input timer and recorded press for a window that is no longer
+    /// reachable, without deregistering it. Called when a window is hidden: it stays
+    /// registered, so a repeat armed before it went away would keep firing into a
+    /// component tree the user cannot see.
+    void windowInputCancelled(Window w) {
+        int id = w.getWindowId();
+        cancelKeyRepeat(id);
+        cancelLongPress(id);
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
+                keyPressTargets[iter] = null;
+                keyPressCodes[iter] = 0;
+            }
+            if (pointerPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
+                pointerPressTargets[iter] = null;
+                pointerPressWindows[iter] = 0;
+            }
+        }
+    }
+
     void windowDisposed(Window w) {
         modalWindows.remove(w);
         syncNativeModalBlocking();
@@ -4203,6 +4223,23 @@ public final class Display extends CN1Constants {
         cancelKeyRepeat(w.getWindowId());
         cancelLongPress(w.getWindowId());
         releaseDragHistory(w.getWindowId());
+    }
+
+    /// Whether input aimed at the given window is currently blocked by a modal.
+    ///
+    /// Public because the implementation needs it: a wheel gesture is played as four
+    /// steps queued on the event dispatch thread, and a listener can show a modal
+    /// between the first check and the last step.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// #### Returns
+    ///
+    /// true when input to that window is currently blocked
+    public boolean isWindowInputBlocked(int windowId) {
+        return isBlockedByModal(windowId);
     }
 
     /// Indicates whether input aimed at the given window is currently blocked by a
