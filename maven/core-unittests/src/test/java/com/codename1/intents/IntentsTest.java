@@ -2228,6 +2228,48 @@ class IntentsTest {
         }
     }
 
+    /// Bringing the app forward cannot be undone, so it has to be decided before it happens.
+    ///
+    /// requestForeground posts the launch and only then waits for the Activity to arrive. If
+    /// the deadline expired during that wait, the navigation recheck further down correctly
+    /// refused to route -- but the app had already appeared, for an action the platform had
+    /// been told was stopped. The user watched the app open itself and land nowhere.
+    @Test
+    void anExpiredDeadlineDoesNotBringTheAppForward() throws Exception {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        try {
+            Class<?> guardClass = Class.forName(
+                    "com.codename1.intents.Intents$CompletionGuard");
+            java.lang.reflect.Constructor<?> ctor =
+                    guardClass.getDeclaredConstructor(IntentCompletion.class);
+            ctor.setAccessible(true);
+            Object guard = ctor.newInstance(new Object[]{null});
+
+            // The deadline has already answered the platform.
+            java.lang.reflect.Method timeout = guardClass.getDeclaredMethod(
+                    "deliverTimeout", IntentResult.class);
+            timeout.setAccessible(true);
+            timeout.invoke(guard, IntentResult.failed("stopped"));
+
+            IntentDeclaration headless = new IntentDeclaration("known", "Known", "", true, true,
+                    false, "", 5, Collections.<String>emptyList(),
+                    Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT));
+
+            java.lang.reflect.Method navigate = Intents.class.getDeclaredMethod(
+                    "navigateIfRequested", IntentResult.class, IntentDeclaration.class,
+                    Map.class, guardClass);
+            navigate.setAccessible(true);
+            navigate.invoke(null, IntentResult.opens("/orders/42"), headless, null, guard);
+
+            assertEquals(0, b.foregroundRequests,
+                    "the platform was told the action stopped, so the app must not be launched");
+        } finally {
+            Intents.setBridge(null);
+        }
+    }
+
     /// The queue exists because the activity arrived before the dispatcher did, so an update
     /// that changed the declaration lands exactly here: the request was judged against what a
     /// previous launch recorded, and what runs it is what the app declares now.

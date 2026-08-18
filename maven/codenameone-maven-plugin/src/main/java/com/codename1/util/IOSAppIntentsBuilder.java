@@ -194,9 +194,37 @@ public final class IOSAppIntentsBuilder {
     /// Disambiguated by position rather than by content so the result is stable: the same
     /// declaration always produces the same enum, which matters because these names appear in
     /// metadata the system keeps.
+    /// Members the generated AppEnum already declares, which a case may not also be called.
+    ///
+    /// An enum case shares a namespace with the type's static members, so an option that
+    /// sanitizes to one of these is an invalid redeclaration and the iOS build fails on an
+    /// otherwise legal Java declaration. Backticks do not help: the collision is the name, not
+    /// its spelling. `rawValue` and `allCases` are here for the same reason -- the raw-value
+    /// conformance synthesizes one and AppEnum's CaseIterable the other.
+    private static final String[] RESERVED_ENUM_MEMBERS = {
+        "typeDisplayRepresentation", "caseDisplayRepresentations", "rawValue", "allCases",
+    };
+
+    /// Identifiers the generated AppIntent struct already spells, which a parameter may not
+    /// reuse.
+    ///
+    /// `perform` is the protocol method every generated struct declares, and Swift does not let
+    /// a property and a method of the same type share a name -- so a parameter innocently named
+    /// "perform" was an invalid redeclaration. `params` is the dictionary perform() builds; a
+    /// property of that name is shadowed by the local, which compiles, silently serializes the
+    /// accumulator into itself, and sends the handler an empty value instead of the user's.
+    ///
+    /// Only instance-level names belong here. A parameter named "title" or "description" is
+    /// fine: those are static members, and Swift allows a static and an instance member to
+    /// share a name.
+    private static final String[] RESERVED_INTENT_MEMBERS = {"perform", "params"};
+
     private static List<String> caseNames(List<String> options) {
         List<String> out = new ArrayList<String>();
         List<String> taken = new ArrayList<String>();
+        for (int i = 0; i < RESERVED_ENUM_MEMBERS.length; i++) {
+            taken.add(RESERVED_ENUM_MEMBERS[i]);
+        }
         for (String option : options) {
             String base = legalIdentifier(sanitize(option));
             String candidate = base;
@@ -564,6 +592,9 @@ public final class IOSAppIntentsBuilder {
     private static Map<String, String> paramIdentifiers(List<Map<String, Object>> params) {
         Map<String, String> out = new LinkedHashMap<String, String>();
         List<String> taken = new ArrayList<String>();
+        for (int i = 0; i < RESERVED_INTENT_MEMBERS.length; i++) {
+            taken.add(RESERVED_INTENT_MEMBERS[i]);
+        }
         for (Map<String, Object> p : params) {
             String raw = str(p, "name");
             String base = legalIdentifier(sanitize(raw));

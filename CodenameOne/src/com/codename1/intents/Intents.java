@@ -1662,6 +1662,15 @@ public final class Intents {
         // A declared opensRoute has already brought the app forward -- that is what the flag is
         // for. A route the handler decided on at runtime has not, and if it ran headless the
         // destination would otherwise be built somewhere nobody can see.
+        // Checked before the app is asked forward, not only before the navigation. Bringing an
+        // app to the front is not something that can be taken back: requestForeground posts the
+        // launch and then waits for the Activity to arrive, and if the deadline expires during
+        // that wait the recheck below correctly suppresses the route -- but the app has already
+        // appeared, for an action the platform was told had been stopped. The user sees the app
+        // open itself and land nowhere.
+        if (fromResult && guard != null && guard.answered()) {
+            return;
+        }
         if (fromResult && decl != null && decl.runsHeadless() && !requestForeground(decl)) {
             // The app is staying where it is, so building the destination would change what
             // this application shows next without anyone having seen it happen -- a screen the

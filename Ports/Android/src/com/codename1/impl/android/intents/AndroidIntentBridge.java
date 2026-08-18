@@ -684,6 +684,9 @@ public class AndroidIntentBridge implements IntentBridge {
                     if (capacity.consumesSlot(shortcutId)) {
                         slotsUsed++;
                     }
+                    // After the slot is counted, so the first occurrence spends one and any
+                    // repeat of the same id in this batch is seen for what it is: an update.
+                    capacity.markPublished(shortcutId);
                     published++;
                 } catch (Throwable t) {
                     Log.w(TAG, "Could not index " + uid, t);
@@ -895,6 +898,18 @@ public class AndroidIntentBridge implements IntentBridge {
         /// Whether publishing this id consumes one of the empty slots.
         boolean consumesSlot(String id) {
             return !existing.contains(id);
+        }
+
+        /// Records an id this run has just published.
+        ///
+        /// One index() call can name the same entity twice -- the payload is whatever the
+        /// application assembled -- and the second push updates the shortcut the first one
+        /// created rather than adding another. Without this the batch counted a slot for each
+        /// occurrence and stopped early, refusing later entries the launcher had room for.
+        void markPublished(String id) {
+            if (!existing.contains(id)) {
+                existing.add(id);
+            }
         }
 
         int getFree() {

@@ -89,6 +89,67 @@ class IOSAppIntentsBuilderTest {
     /// Options are application strings, so two legal and quite different ones reduce to the
     /// same Swift identifier -- and a duplicated `case` does not degrade at runtime, it fails
     /// to compile the iOS target, in a file the developer never wrote.
+    /// `perform` is the one method every generated AppIntent struct declares, and Swift does
+    /// not let a property and a method of the same type share a name -- so a parameter a
+    /// developer was entitled to call "perform" made the whole iOS target fail to compile with
+    /// an invalid redeclaration, and backticks could not help because the collision is the name
+    /// rather than its spelling.
+    @Test
+    void aParameterNamedPerformDoesNotCollideWithTheProtocolMethod() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("run_it", "Run it",
+                        "params", Arrays.asList(param("perform", "string")))),
+                new ArrayList<Map<String, Object>>());
+
+        assertFalse(swift.contains("var `perform`:"),
+                "a property named perform is an invalid redeclaration next to func perform():\n"
+                        + swift);
+        assertTrue(swift.contains("func perform()"), swift);
+        assertTrue(swift.contains("params[\"perform\"]"),
+                "the payload key must stay the name the handler declared:\n" + swift);
+    }
+
+    /// The dictionary perform() builds is called params. A parameter of that name declared a
+    /// property the local then shadowed -- which compiles, and quietly serializes the
+    /// accumulator into itself, so the handler received an empty object rather than the value
+    /// the user supplied. A silent wrong answer rather than a build failure.
+    @Test
+    void aParameterNamedParamsIsNotShadowedByTheAccumulator() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("send_it", "Send it",
+                        "params", Arrays.asList(param("params", "string")))),
+                new ArrayList<Map<String, Object>>());
+
+        assertFalse(swift.contains("var `params`:"),
+                "the parameter property must not reuse the accumulator's name -- the local "
+                        + "dictionary shadows it and the payload serializes into itself:\n"
+                        + swift);
+        assertTrue(swift.contains("params[\"params\"]"),
+                "the payload key must stay the declared name:\n" + swift);
+    }
+
+    /// An enum case shares a namespace with the type's static members, so an option that
+    /// sanitizes to one of AppEnum's generated metadata properties is an invalid redeclaration
+    /// -- an iOS build failing on an option string that is perfectly legal Java.
+    @Test
+    void anOptionNamedLikeAppEnumMetadataDoesNotRedeclareIt() {
+        Map<String, Object> p = param("kind", "string",
+                "options", Arrays.asList("typeDisplayRepresentation",
+                        "caseDisplayRepresentations", "rawValue", "allCases"));
+        Map<String, Object> i = intent("pick_it", "Pick it");
+        i.put("params", Arrays.asList(p));
+
+        String swift = intentsSwift(Arrays.asList(i), new ArrayList<Map<String, Object>>());
+
+        for (String reserved : new String[] {"typeDisplayRepresentation",
+                "caseDisplayRepresentations", "rawValue", "allCases"}) {
+            assertFalse(swift.contains("case `" + reserved + "` = "),
+                    "case " + reserved + " collides with a generated member:\n" + swift);
+            assertTrue(swift.contains("= \"" + reserved + "\""),
+                    "the raw value must survive, it is what the platform matches:\n" + swift);
+        }
+    }
+
     @Test
     void collidingOptionsGetDistinctSwiftCases() {
         Map<String, Object> p = param("kind", "string",
