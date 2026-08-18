@@ -1787,7 +1787,10 @@ public final class GenerateInterpShims {
         w.println("        try {");
         w.println("            $r = " + call + ";");
         w.println("        } catch (com.codename1.impl.interp.InterpThrowable $t) {");
-        w.println("            Object $thrown = $t.getThrown();");
+        // hostThrowable, not getThrown: a pushed exception class arrives as an
+        // InterpObject whose peer is the host exception, and only the peer can
+        // match a catch clause.
+        w.println("            Throwable $thrown = $t.hostThrowable();");
         for (Class<?> e : checked) {
             w.println("            if ($thrown instanceof " + typeName(e) + ") {");
             w.println("                throw (" + typeName(e) + ") $thrown;");

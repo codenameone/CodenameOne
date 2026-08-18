@@ -106,6 +106,32 @@ public class InterpHostSubclassTest {
         }
     }
 
+    /**
+     * A framework exception a pushed program may subclass.
+     *
+     * <p>{@code CalendarException}, {@code IOException} -- an interpreted class
+     * extending one is ordinary, and what host code catches is its peer.</p>
+     */
+    public static class HostFailure extends java.io.IOException {
+        public HostFailure(String message) {
+            super(message);
+        }
+    }
+
+    /** The shim for it, as the generator would emit one for a class shim. */
+    public static final class HostFailureShim extends HostFailure implements InterpBacked {
+        private final InterpObject $interp;
+
+        HostFailureShim(InterpObject o, String message) {
+            super(message);
+            this.$interp = o;
+        }
+
+        public InterpObject getInterpObject() {
+            return $interp;
+        }
+    }
+
     /** Stands in for a generated shim, written exactly as the generator emits one. */
     public static final class HostBaseShim extends HostBase implements InterpBacked {
         private final InterpObject $interp;
@@ -154,7 +180,7 @@ public class InterpHostSubclassTest {
                         : $runtime.dispatch($interp, "risky", "()Ljava/lang/String;",
                                 new Object[]{});
             } catch (InterpThrowable t) {
-                Object thrown = t.getThrown();
+                Throwable thrown = t.hostThrowable();
                 if (thrown instanceof java.io.IOException) {
                     throw (java.io.IOException) thrown;
                 }
@@ -178,6 +204,9 @@ public class InterpHostSubclassTest {
         private static final String HOST_BASE =
                 HostBase.class.getName().replace('.', '/');
 
+        private static final String HOST_FAILURE =
+                HostFailure.class.getName().replace('.', '/');
+
         public String peerClassName(Object peer) {
         // The JVM reports this faithfully; only ParparVM does not.
         return peer == null ? null : peer.getClass().getName().replace('.', '/');
@@ -185,11 +214,16 @@ public class InterpHostSubclassTest {
 
     public boolean canExtend(String hostSuperclassName) {
             return hostSuperclassName == null || "java/lang/Object".equals(hostSuperclassName)
-                    || HOST_BASE.equals(hostSuperclassName);
+                    || HOST_BASE.equals(hostSuperclassName)
+                    || HOST_FAILURE.equals(hostSuperclassName);
         }
 
         public Object createPeer(InterpObject object, String hostSuperclassName,
                                  String[] hostInterfaceNames, String descriptor, Object[] args) {
+            if (HOST_FAILURE.equals(hostSuperclassName)) {
+                return new HostFailureShim(object,
+                        args.length > 0 && args[0] instanceof String ? (String) args[0] : null);
+            }
             if (!HOST_BASE.equals(hostSuperclassName)) {
                 return null;
             }
@@ -350,6 +384,38 @@ public class InterpHostSubclassTest {
         }
         assertNotNull(caught, "the declared exception should reach its own catch clause");
         assertEquals("boom", caught.getMessage());
+    }
+
+    /**
+     * The pushed program's own subclass of a declared exception has to reach the
+     * same catch clause. It arrives as an InterpObject whose peer is the host
+     * exception, so a shim that inspected the InterpObject matched nothing and
+     * rethrew the interpreter's carrier -- past a catch for the very type the
+     * method declares.
+     */
+    @Test
+    @DisplayName("a pushed subclass of a declared exception is caught as that exception")
+    void interpretedExceptionSubclassesCrossAsTheirPeer() throws Throwable {
+        InterpRuntime rt = load("Thrower",
+                "public class Thrower extends com.codename1.impl.interp.InterpHostSubclassTest.HostBase {\n"
+              + "  static class Mine extends com.codename1.impl.interp.InterpHostSubclassTest.HostFailure {\n"
+              + "    Mine() { super(\"mine\"); }\n"
+              + "  }\n"
+              + "  public String risky() throws java.io.IOException { throw new Mine(); }\n"
+              + "  public static Object make() { return new Thrower(); }\n"
+              + "  public static void main(String[] a) {}\n"
+              + "}\n");
+        HostBase peer = (HostBase) rt.invoke(rt.getBundle().findClass("Thrower")
+                .declaredMethod("make", "()Ljava/lang/Object;"), null, new Object[0]);
+
+        java.io.IOException caught = null;
+        try {
+            peer.risky();
+        } catch (java.io.IOException e) {
+            caught = e;
+        }
+        assertNotNull(caught, "a pushed IOException subclass should reach catch (IOException)");
+        assertEquals("mine", caught.getMessage());
     }
 
     private static final String SUBCLASS_SOURCE =

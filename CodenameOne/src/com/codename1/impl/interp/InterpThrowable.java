@@ -59,6 +59,27 @@ public final class InterpThrowable extends RuntimeException {
         return thrown;
     }
 
+    /// The host throwable this carries, or null when there is none.
+    ///
+    /// A pushed `class MyFailure extends IOException` arrives as an
+    /// InterpObject whose *peer* is the IOException -- the peer is the object
+    /// host code was handed, and the only one a `catch (IOException)` can
+    /// match. A shim putting a declared exception back therefore has to ask for
+    /// this rather than for [#getThrown], or it misses every subclass the
+    /// pushed program declares of the very type the method promises.
+    public Throwable hostThrowable() {
+        if (thrown instanceof Throwable) {
+            return (Throwable) thrown;
+        }
+        if (thrown instanceof InterpObject) {
+            Object peer = ((InterpObject) thrown).hostPeer;
+            if (peer instanceof Throwable) {
+                return (Throwable) peer;
+            }
+        }
+        return null;
+    }
+
     /// The interpreted call stack at the throw, innermost first, formatted as
     /// `Class.method(File:line)`.
     public String[] getInterpretedStack() {
