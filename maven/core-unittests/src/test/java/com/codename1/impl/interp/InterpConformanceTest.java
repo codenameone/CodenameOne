@@ -391,6 +391,24 @@ class InterpConformanceTest {
                 + " System.out.println(Object[].class.isAssignableFrom(Base[].class));"
                 + " System.out.println(Runnable.class.isAssignableFrom(Base[].class));"
                 + "}}"));
+        // A private method is not virtual, and from JDK 11 javac emits
+        // invokevirtual for one anyway -- so resolving from the receiver runs
+        // the subclass's same-named method instead of the one written.
+        out.add(c("PrivateNotVirtual",
+                "public class PrivateNotVirtual {"
+                + " static class Base {"
+                + "   private String label() { return \"base\"; }"
+                + "   String value() { return \"value:\" + label(); }"
+                + "   String direct() { return label(); } }"
+                + " static class Child extends Base {"
+                + "   private String label() { return \"child\"; }"
+                + "   String childValue() { return \"child:\" + label(); } }"
+                + " public static void main(String[] a) {"
+                + " System.out.println(new Child().value());"
+                + " System.out.println(new Child().direct());"
+                + " System.out.println(new Child().childValue());"
+                + " System.out.println(new Base().value());"
+                + "}}"));
         // An enum constant that overrides toString. The interpreter answers
         // name() itself, and answering it for toString as well made the
         // override apply to interpreted callers and not to host ones -- so the

@@ -85,6 +85,15 @@ public final class InterpMethod {
         return (accessFlags & 0x0020) != 0;
     }
 
+    /// Whether this method is private, which is what makes it not virtual.
+    ///
+    /// javac emits `invokevirtual` for a private method from JDK 11 onwards
+    /// (nestmates replaced the synthetic access bridges), so the opcode alone
+    /// no longer says whether dispatch follows the receiver.
+    public boolean isPrivate() {
+        return (accessFlags & 0x0002) != 0;
+    }
+
     public boolean isAbstract() {
         return (accessFlags & 0x0400) != 0;
     }

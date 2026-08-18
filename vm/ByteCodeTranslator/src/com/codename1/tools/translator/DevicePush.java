@@ -602,12 +602,24 @@ public final class DevicePush {
             return direct;
         }
         if (!loopbackOnly) {
-            String scanned = scanForDevice(port);
-            if (scanned != null) {
+            if (discoveredDevice == null) {
+                String scanned = scanForDevice(port);
+                if (scanned != null) {
+                    // Pinned for the rest of this push. A push is up to three
+                    // exchanges -- try, pair, try again -- each its own
+                    // connection, and scanning again each time picks whichever
+                    // device answers first. With two runtimes on the network
+                    // that means pairing one phone and then pushing to the
+                    // other, which correctly reports that it is not paired.
+                    discoveredDevice = scanned;
+                    System.out.println("device at " + scanned);
+                }
+            }
+            if (discoveredDevice != null) {
                 // A fresh connection to the address that answered: the probe
                 // consumed the one it asked on.
                 Socket direct = new Socket();
-                direct.connect(new InetSocketAddress(scanned, port), 4000);
+                direct.connect(new InetSocketAddress(discoveredDevice, port), 4000);
                 return direct;
             }
             System.out.println("no device answered; waiting for one to call in");
@@ -647,6 +659,10 @@ public final class DevicePush {
 
     /// An address given on the command line, tried before any searching.
     private static String explicitDevice;
+
+    /// The address a scan found, kept for the whole push so the pairing and the
+    /// push that follows it reach the same device.
+    private static String discoveredDevice;
 
     private static boolean rejectedAsUnpaired() {
         return lastRejection != null && lastRejection.indexOf("not paired") >= 0;

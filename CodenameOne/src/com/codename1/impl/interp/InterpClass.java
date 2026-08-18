@@ -300,7 +300,15 @@ public final class InterpClass {
         java.util.Enumeration e = source.vtable.keys();
         while (e.hasMoreElements()) {
             Object k = e.nextElement();
-            target.put(k, source.vtable.get(k));
+            InterpMethod m = (InterpMethod) source.vtable.get(k);
+            // Private methods are not inherited. Copying one down means a
+            // subclass that declares no such method resolves to the parent's,
+            // which Java would have reported as a compile error and which here
+            // silently runs code the subclass cannot even name.
+            if (m.isPrivate()) {
+                continue;
+            }
+            target.put(k, m);
         }
     }
 

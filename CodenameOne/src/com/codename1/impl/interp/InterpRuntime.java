@@ -1797,7 +1797,15 @@ public final class InterpRuntime {
                     m = declaring.resolve(name, desc);
                 }
             } else {
-                m = io.type.resolve(name, desc);
+                // A private method is not virtual, and the opcode no longer
+                // says so: from JDK 11 javac emits invokevirtual for one,
+                // nestmates having replaced the synthetic bridges. Resolving
+                // from the receiver would make `Base.value()` calling its own
+                // private `label()` land on a `label()` that Child happens to
+                // declare -- a different answer, silently.
+                InterpClass named = bundle.findClass(owner);
+                InterpMethod direct = named == null ? null : named.declaredMethod(name, desc);
+                m = direct != null && direct.isPrivate() ? direct : io.type.resolve(name, desc);
             }
             if (m != null && !m.isAbstract()) {
                 pushBoxed(f, returnKind, invokeInterpreted(m, io, args));
@@ -2040,15 +2048,13 @@ public final class InterpRuntime {
         }
     }
 
-    /**
-     * Whether a host class is a supertype of an interpreted one.
-     *
-     * <p>The interpreted class itself is nothing to the host, but its
-     * supertypes are: the host class it extends and every host interface it
-     * declares, transitively. If the receiver is assignable from any of them it
-     * is assignable from the pushed class, which is exactly what a program
-     * asking `Runnable.class.isAssignableFrom(Task.class)` wants to know.</p>
-     */
+    /// Whether a host class is a supertype of an interpreted one.
+    ///
+    /// The interpreted class itself is nothing to the host, but its supertypes
+    /// are: the host class it extends and every host interface it declares,
+    /// transitively. If the receiver is assignable from any of them it is
+    /// assignable from the pushed class, which is exactly what a program asking
+    /// `Runnable.class.isAssignableFrom(Task.class)` wants to know.
     private boolean assignableFromInterp(Object hostClass, InterpClass c) throws Throwable {
         if (c.isArray()) {
             return assignableFromInterpArray(hostClass, c);
@@ -2075,14 +2081,12 @@ public final class InterpRuntime {
         return false;
     }
 
-    /**
-     * Whether a host class is a supertype of an interpreted array type.
-     *
-     * <p>An array token records only its component, so the walk above finds no
-     * supertypes at all for one -- and yet every array in Java is an Object, a
-     * Cloneable and a Serializable, and {@code Base[]} is an {@code S[]} for
-     * every host supertype S of Base. Both are ordinary things to ask.</p>
-     */
+    /// Whether a host class is a supertype of an interpreted array type.
+    ///
+    /// An array token records only its component, so the walk above finds no
+    /// supertypes at all for one -- and yet every array in Java is an Object, a
+    /// Cloneable and a Serializable, and `Base[]` is an `S[]` for every host
+    /// supertype S of Base. Both are ordinary things to ask.
     private boolean assignableFromInterpArray(Object hostClass, InterpClass c) throws Throwable {
         if (assignableToHostNamed(hostClass, "java/lang/Object")
                 || assignableToHostNamed(hostClass, "java/lang/Cloneable")
