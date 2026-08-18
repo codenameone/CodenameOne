@@ -1727,7 +1727,12 @@ public final class Display extends CN1Constants {
                     // move: without saying so, this arrival takes whatever direction that form
                     // has left over and a port that keeps browser history in step reads it as a
                     // step forward, pushing an entry for a form that was already behind.
-                    current.setShownWithReverse(true);
+                    //
+                    // At the head of the queue, because this arrival comes first: when the form
+                    // being revealed is also the one being shown, its own direction is already
+                    // waiting, and appending would have this restoration take that one and leave
+                    // this one for the show.
+                    current.insertShownWithReverse(true);
                 }
                 impl.setCurrentForm(current);
             }

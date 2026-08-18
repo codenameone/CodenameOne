@@ -181,24 +181,88 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     /**
+     * Reports a stroked draw. A stroke paints along its line and nowhere else, so what it covers
+     * is where that line runs, widened by the stroke it is drawn with.
+     */
+    private void noteStrokeCover(final float[][] outline, int strokeWidth) {
+        if (outline == null || outline.length == 0) {
+            return;
+        }
+        final int reach = Math.max(1, strokeWidth) / 2 + 1;
+        float minX = Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE;
+        float maxY = -Float.MAX_VALUE;
+        for (int p = 0; p + 1 < outline.length; p += 2) {
+            for (int i = 0; i < outline[p].length; i++) {
+                minX = Math.min(minX, outline[p][i]);
+                maxX = Math.max(maxX, outline[p][i]);
+                minY = Math.min(minY, outline[p + 1][i]);
+                maxY = Math.max(maxY, outline[p + 1][i]);
+            }
+        }
+        if (maxX < minX || maxY < minY) {
+            return;
+        }
+        noteCanvasCover((int) Math.floor(minX) - reach, (int) Math.floor(minY) - reach,
+                (int) Math.ceil(maxX - minX) + 2 * reach, (int) Math.ceil(maxY - minY) + 2 * reach,
+                new JavaScriptTextLayer.CoverTest() {
+                    @Override
+                    public boolean covers(int x, int y, int w, int h) {
+                        return outlineMeetsRect(outline,
+                                com.codename1.ui.geom.PathIterator.WIND_NON_ZERO, false,
+                                x - reach, y - reach, w + 2 * reach, h + 2 * reach);
+                    }
+                });
+    }
+
+    private static float[][] segmentOutline(int x1, int y1, int x2, int y2) {
+        return new float[][] { new float[] { x1, x2 }, new float[] { y1, y2 } };
+    }
+
+    private static float[][] rectOutline(int x, int y, int width, int height) {
+        return new float[][] {
+            new float[] { x, x + width, x + width, x },
+            new float[] { y, y, y + height, y + height }
+        };
+    }
+
+    /**
      * A coverage test for a rounded rectangle, whose corners are cut away.
      */
     private static JavaScriptTextLayer.CoverTest roundRectCoverTest(int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
+        final float[][] outline = roundRectOutline(x, y, width, height, arcWidth, arcHeight);
+        if (outline == null) {
+            return null;
+        }
+        return new JavaScriptTextLayer.CoverTest() {
+            @Override
+            public boolean covers(int rectX, int rectY, int rectW, int rectH) {
+                return outlineMeetsRect(outline, rectX, rectY, rectW, rectH);
+            }
+        };
+    }
+
+    /**
+     * The perimeter of a rounded rectangle, traced once round, clockwise on screen, each corner a
+     * quarter ellipse that ends where the next one begins: top-right from its top point to its
+     * right point, down the right side, and so on. The straight sides are the lines between one
+     * corner's last point and the next corner's first. Walking the corners in any other order
+     * joins points that are not neighbours and folds the outline across itself.
+     *
+     * @return the outline, or null when there is no rounding to speak of
+     */
+    private static float[][] roundRectOutline(int x, int y, int width, int height,
+            int arcWidth, int arcHeight) {
         int rx = Math.min(Math.max(0, arcWidth) / 2, width / 2);
         int ry = Math.min(Math.max(0, arcHeight) / 2, height / 2);
         if (rx <= 0 || ry <= 0) {
             return null;
         }
-        // Traced once round the perimeter, clockwise on screen, each corner a quarter ellipse
-        // that ends where the next one begins: top-right from its top point to its right point,
-        // down the right side, and so on. The straight sides are the lines between one corner's
-        // last point and the next corner's first. Walking the corners in any other order joins
-        // points that are not neighbours and folds the outline across itself, which would then
-        // report a draw as missing text it lands squarely on.
         int perCorner = 6;
         int points = 4 * (perCorner + 1);
-        final float[][] outline = new float[][] { new float[points], new float[points] };
+        float[][] outline = new float[][] { new float[points], new float[points] };
         int at = 0;
         int[][] corners = new int[][] {
             { x + width - rx, y + ry, 90 },
@@ -219,12 +283,20 @@ public class BufferedGraphics extends HTML5Graphics {
                 at++;
             }
         }
-        return new JavaScriptTextLayer.CoverTest() {
-            @Override
-            public boolean covers(int rectX, int rectY, int rectW, int rectH) {
-                return outlineMeetsRect(outline, rectX, rectY, rectW, rectH);
-            }
-        };
+        return outline;
+    }
+
+    private static float[][] polygonOutline(int[] xPoints, int[] yPoints, int nPoints) {
+        if (xPoints == null || yPoints == null || nPoints <= 0) {
+            return null;
+        }
+        int count = Math.min(nPoints, Math.min(xPoints.length, yPoints.length));
+        float[][] outline = new float[][] { new float[count], new float[count] };
+        for (int i = 0; i < count; i++) {
+            outline[0][i] = xPoints[i];
+            outline[1][i] = yPoints[i];
+        }
+        return outline;
     }
 
     /**
@@ -236,6 +308,29 @@ public class BufferedGraphics extends HTML5Graphics {
      */
     private static JavaScriptTextLayer.CoverTest arcCoverTest(int x, int y, int width, int height,
             int startAngle, int arcAngle) {
+        final float[][] outline = arcOutline(x, y, width, height, startAngle, arcAngle, true);
+        if (outline == null) {
+            return null;
+        }
+        return new JavaScriptTextLayer.CoverTest() {
+            @Override
+            public boolean covers(int rectX, int rectY, int rectW, int rectH) {
+                return outlineMeetsRect(outline, rectX, rectY, rectW, rectH);
+            }
+        };
+    }
+
+    /**
+     * The outline of an arc: the sector a fill paints, or just the curve a stroke follows.
+     *
+     * <p>The bounding rectangle of an arc holds a good deal the arc never reaches -- the corners
+     * of a full ellipse's box, and everything outside the wedge of a partial one.</p>
+     *
+     * @param wedge true to close the sector through its centre, as a fill does
+     * @return the outline, or null for a degenerate arc
+     */
+    private static float[][] arcOutline(int x, int y, int width, int height,
+            int startAngle, int arcAngle, boolean wedge) {
         if (width <= 0 || height <= 0) {
             return null;
         }
@@ -246,10 +341,11 @@ public class BufferedGraphics extends HTML5Graphics {
         int span = Math.abs(arcAngle) >= 360 ? 360 : Math.abs(arcAngle);
         int steps = Math.max(8, span / 4);
         boolean whole = span >= 360;
-        int points = steps + 1 + (whole ? 0 : 1);
-        final float[][] outline = new float[][] { new float[points], new float[points] };
+        boolean centre = wedge && !whole;
+        int points = steps + 1 + (centre ? 1 : 0);
+        float[][] outline = new float[][] { new float[points], new float[points] };
         int at = 0;
-        if (!whole) {
+        if (centre) {
             // The straight edges of a wedge run from the centre out to each end of the arc.
             outline[0][at] = (float) cx;
             outline[1][at] = (float) cy;
@@ -264,12 +360,7 @@ public class BufferedGraphics extends HTML5Graphics {
             outline[1][at] = (float) (cy - ry * Math.sin(radians));
             at++;
         }
-        return new JavaScriptTextLayer.CoverTest() {
-            @Override
-            public boolean covers(int rectX, int rectY, int rectW, int rectH) {
-                return outlineMeetsRect(outline, rectX, rectY, rectW, rectH);
-            }
-        };
+        return outline;
     }
 
     /**
@@ -355,10 +446,20 @@ public class BufferedGraphics extends HTML5Graphics {
      * inside the outline, or an edge crossing one of its sides.
      */
     private static boolean outlineMeetsRect(float[][] outline, int x, int y, int w, int h) {
-        return outlineMeetsRect(outline, com.codename1.ui.geom.PathIterator.WIND_NON_ZERO, x, y, w, h);
+        return outlineMeetsRect(outline, com.codename1.ui.geom.PathIterator.WIND_NON_ZERO, true,
+                x, y, w, h);
     }
 
     private static boolean outlineMeetsRect(float[][] outline, int winding,
+            int x, int y, int w, int h) {
+        return outlineMeetsRect(outline, winding, true, x, y, w, h);
+    }
+
+    /**
+     * @param filled true for a draw that paints what the outline encloses, false for one that
+     * paints only along it -- a stroke, which leaves what it surrounds untouched
+     */
+    private static boolean outlineMeetsRect(float[][] outline, int winding, boolean filled,
             int x, int y, int w, int h) {
         if (outline == null || outline.length == 0) {
             // Nothing to go by, so treat the draw as reaching the text: leaving a run above a
@@ -380,6 +481,11 @@ public class BufferedGraphics extends HTML5Graphics {
                     return true;
                 }
             }
+        }
+        if (!filled) {
+            // Nothing crosses the rectangle, and a stroke paints only where its line runs -- a
+            // rectangle drawn around a label leaves the label alone.
+            return false;
         }
         // No boundary passes through the rectangle, so the rectangle is either entirely painted
         // or entirely not. Which one is decided across every subpath at once, under the rule the
@@ -470,12 +576,7 @@ public class BufferedGraphics extends HTML5Graphics {
         // Like a filled shape, a polygon reaches what it encloses rather than what its bounding
         // rectangle does -- and any part of the text it reaches is enough to send that text back
         // to the canvas.
-        int count = Math.min(nPoints, Math.min(xPoints.length, yPoints.length));
-        final float[][] outline = new float[][] { new float[count], new float[count] };
-        for (int i = 0; i < count; i++) {
-            outline[0][i] = xPoints[i];
-            outline[1][i] = yPoints[i];
-        }
+        final float[][] outline = polygonOutline(xPoints, yPoints, nPoints);
         noteCanvasCover(minX, minY, maxX - minX, maxY - minY,
                 new JavaScriptTextLayer.CoverTest() {
                     @Override
@@ -587,6 +688,7 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
+        noteStrokeCover(arcOutline(x, y, width, height, startAngle, arcAngle, false), 1);
         addOp(new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
@@ -632,16 +734,19 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawRect(int x, int y, int width, int height) {
+        noteStrokeCover(rectOutline(x, y, width, height), 1);
         primitiveRenderAdapter.drawRect(x, y, width, height);
     }
 
     @Override
     public void drawLine(int x1, int y1, int x2, int y2) {
+        noteStrokeCover(segmentOutline(x1, y1, x2, y2), 1);
         primitiveRenderAdapter.drawLine(x1, y1, x2, y2);
     }
 
     @Override
     public void drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        noteStrokeCover(roundRectOutline(x, y, width, height, arcWidth, arcHeight), 1);
         addOp(new DrawRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
@@ -654,6 +759,7 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+        noteStrokeCover(polygonOutline(xPoints, yPoints, nPoints), 1);
         addOp(new DrawPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
@@ -665,6 +771,10 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawShape(Shape shape, Stroke stroke) {
+        if (shape != null) {
+            noteStrokeCover(outlineOf(shape),
+                    stroke == null ? 1 : (int) Math.ceil(stroke.getLineWidth()));
+        }
         shapeGradientRenderAdapter.drawShape(shape, stroke);
     }
     

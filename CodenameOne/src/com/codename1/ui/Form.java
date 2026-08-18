@@ -1424,6 +1424,16 @@ public class Form extends Container {
         pendingReverse.add(Boolean.valueOf(value));
     }
 
+    /// Puts a direction at the head of the queue, for a form change that happens before
+    /// anything already waiting -- a menu folding away to reveal this form, which arrives before
+    /// the show that asked for it.
+    void insertShownWithReverse(boolean value) {
+        if (pendingReverse == null) {
+            pendingReverse = new ArrayList<Boolean>();
+        }
+        pendingReverse.add(0, Boolean.valueOf(value));
+    }
+
     /// Takes the direction belonging to the form change that is arriving now.
     boolean consumeShownWithReverse() {
         if (pendingReverse == null || pendingReverse.isEmpty()) {
