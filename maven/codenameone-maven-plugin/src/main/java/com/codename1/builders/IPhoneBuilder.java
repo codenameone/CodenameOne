@@ -3340,15 +3340,35 @@ public class IPhoneBuilder extends Executor {
                 // with a duplicate key is not a plist that reliably keeps
                 // either value. Said out loud, because the consequence
                 // (openEcosystemApp finding nothing) is otherwise a mystery.
-                if (!homeSchemeDeclared
-                        && request.getArg("ios.plistInject", "")
-                                .contains("LSApplicationQueriesSchemes")) {
-                    log("ios.plistInject already declares "
-                            + "LSApplicationQueriesSchemes, so com.apple.Home "
-                            + "was not added for you. Add it to that array or "
-                            + "SmartHome.openEcosystemApp() will report the "
-                            + "Apple Home app missing on devices that have "
-                            + "it.");
+                if (!homeSchemeDeclared && WatchNativeBuilder
+                        .injectedPlistKeys(request)
+                        .contains("LSApplicationQueriesSchemes")) {
+                    // The KEY, and then what its array actually lists. A
+                    // fragment that merely mentions the name -- in a comment,
+                    // or inside an unrelated string -- declares nothing, and
+                    // reading that as a declaration skipped the hint and
+                    // shipped a plist with no com.apple.Home entry at all,
+                    // which is the exact outcome this block exists to
+                    // prevent. A fragment that does list the scheme needs no
+                    // warning either.
+                    boolean listed = false;
+                    for (String entry : WatchNativeBuilder
+                            .injectedPlistStringArray(request,
+                                    "LSApplicationQueriesSchemes")) {
+                        if ("com.apple.Home".equals(entry)) {
+                            listed = true;
+                            break;
+                        }
+                    }
+                    if (!listed) {
+                        log("ios.plistInject already declares "
+                                + "LSApplicationQueriesSchemes, so "
+                                + "com.apple.Home was not added for you. Add "
+                                + "it to that array or "
+                                + "SmartHome.openEcosystemApp() will report "
+                                + "the Apple Home app missing on devices that "
+                                + "have it.");
+                    }
                     homeSchemeDeclared = true;
                 }
                 if (!homeSchemeDeclared) {
@@ -3674,9 +3694,15 @@ public class IPhoneBuilder extends Executor {
                 // list. Refused instead, naming the service to add: the
                 // fragment is the developer's own XML and rewriting it here
                 // would be guessing at their formatting.
-                String injected = request.getArg("ios.plistInject", "");
-                if (injected.contains("NSBonjourServices")) {
-                    List<String> declared = injectedBonjourServices(injected);
+                // The key, not its name anywhere in the fragment. A
+                // comment that mentions NSBonjourServices declares nothing,
+                // and taking it for a declaration refused a build whose
+                // plist was fine while suppressing the array the app needs.
+                if (WatchNativeBuilder.injectedPlistKeys(request)
+                        .contains("NSBonjourServices")) {
+                    List<String> declared = WatchNativeBuilder
+                            .injectedPlistStringArray(request,
+                                    "NSBonjourServices");
                     for (String service : new String[] {"_matter._tcp",
                             "_matterc._udp"}) {
                         // Whole entries, not a substring of the fragment: a
@@ -5353,45 +5379,6 @@ public class IPhoneBuilder extends Executor {
                     + " where it is.");
         }
         return usesHomeOwnFabric;
-    }
-
-    /**
-     * The service types an injected NSBonjourServices array actually lists.
-     *
-     * <p>Whole entries, because that is what iOS matches mDNS traffic
-     * against: a substring search over the fragment accepts a comment that
-     * mentions the service, or a longer name that merely starts with it, and
-     * the generated array is suppressed either way -- so discovery fails on a
-     * build that passed its check.</p>
-     *
-     * @param injected the ios.plistInject fragment
-     * @return the strings inside the array, trimmed, in document order
-     */
-    private static List<String> injectedBonjourServices(String injected) {
-        List<String> out = new ArrayList<String>();
-        int key = injected.indexOf("NSBonjourServices");
-        if (key < 0) {
-            return out;
-        }
-        int open = injected.indexOf("<array", key);
-        int close = open < 0 ? -1 : injected.indexOf("</array>", open);
-        if (open < 0 || close < 0) {
-            return out;
-        }
-        String body = injected.substring(open, close);
-        int at = 0;
-        while (true) {
-            int start = body.indexOf("<string>", at);
-            if (start < 0) {
-                return out;
-            }
-            int end = body.indexOf("</string>", start);
-            if (end < 0) {
-                return out;
-            }
-            out.add(body.substring(start + "<string>".length(), end).trim());
-            at = end + 1;
-        }
     }
 
     private static boolean isSmartHomeSetupPayload(String cls) {

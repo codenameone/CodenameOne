@@ -75,6 +75,31 @@ public class SmartHomeScannerParityTest {
     }
 
     /**
+     * An add-device request that expires without a screen frees the bridge.
+     *
+     * <p>A CommissioningRequest timeout fails the waiting caller in the framework, which knows
+     * nothing about the Android delegate's parked callback. When Play services answers neither
+     * listener -- no IntentSender, no failure -- nothing else ever cleared it, so every later
+     * commission() was refused with BUSY for the life of the process while no screen was in front
+     * of the user. The reclaim is deliberately limited to a request that never launched: once the
+     * sheet is up the answer is the user's to give, and it arrives through the activity result.</p>
+     */
+    @Test
+    public void anExpiredUnlaunchedRequestStopsBlockingTheBridge() throws Exception {
+        File f = new File("src/main/resources/com/codename1/builders/home/"
+                + "MatterCommissioningBridge.javas");
+        assertTrue(f.exists(), "the injected bridge must be readable: " + f.getAbsolutePath());
+        String bridge = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+
+        assertTrue(bridge.contains("if (pendingCommission != null && expiredWithNoScreen()) {"),
+                "the expiry has to be reclaimed BEFORE the BUSY refusal, or it never runs");
+        assertTrue(bridge.contains("commissionDeadline > 0 && !commissionLaunched"),
+                "a request with no limit never expires, and a launched one is the user's");
+        assertTrue(bridge.contains("commissionLaunched = true;"),
+                "the flag has to be set once the screen is really up");
+    }
+
+    /**
      * Commissioning is tracked separately on both sides, because it costs an
      * entire generated Xcode target on iOS and a Play services dependency on
      * Android. If one side stopped distinguishing it, an app that only reads

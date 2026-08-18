@@ -880,54 +880,110 @@ class WatchNativeBuilder {
         if (inject == null) {
             return null;
         }
+        int value = injectedValueAt(inject, key);
+        if (value < 0) {
+            return null;
+        }
+        int element = nextElementAt(inject, value);
+        // Present, and with no element for a value: text, or nothing at all. Not the key's
+        // absence, which is what the caller has to tell it from.
+        return element < 0 ? "" : tagAt(inject, element);
+    }
+
+    /// The strings inside the array a {@code ios.plistInject} fragment gives {@code key}, trimmed
+    /// and in document order.
+    ///
+    /// Empty both for a key the fragment does not carry and for one whose value is not an array of
+    /// strings; a caller that has to tell those apart asks {@link #injectedPlistValueTag} first.
+    ///
+    /// The array belonging to the KEY. Found by searching for the key's name and reading the next
+    /// {@code <array>} after it, a fragment that mentions the name in a comment first took the
+    /// array of whatever key came next -- so a plist that declared the value perfectly well was
+    /// reported as not declaring it.
+    static java.util.List<String> injectedPlistStringArray(BuildRequest request, String key) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String inject = request.getArg("ios.plistInject", null);
+        if (inject == null) {
+            return out;
+        }
+        int value = injectedValueAt(inject, key);
+        int element = value < 0 ? -1 : nextElementAt(inject, value);
+        if (element < 0 || !"array".equals(tagAt(inject, element))) {
+            return out;
+        }
+        int body = contentAfterOpenTag(inject, "array", element);
+        int end = body < 0 ? -1 : closeOfElement(inject, body, "</array>");
+        if (end < 0) {
+            return out;
+        }
+        int at = body;
+        while (true) {
+            int start = contentAfterOpenTag(inject, "string", at);
+            if (start < 0 || start > end) {
+                return out;
+            }
+            int close = closeOfString(inject, start);
+            if (close < 0 || close > end) {
+                return out;
+            }
+            out.add(plistStringContent(inject.substring(start, close)).trim());
+            at = close + 1;
+        }
+    }
+
+    /// Where the value belonging to {@code key} begins -- just past its {@code </key>} -- or -1
+    /// when the fragment does not carry the key.
+    private static int injectedValueAt(String inject, String key) {
         int at = 0;
         while (true) {
             int content = contentAfterOpenTag(inject, "key", at);
             if (content < 0) {
-                return null;
+                return -1;
             }
             int close = closeOfElement(inject, content, "</key>");
             if (close < 0) {
-                return null;
+                return -1;
             }
             at = close + 1;
             if (!key.equals(plistStringContent(inject.substring(content, close)).trim())) {
                 continue;
             }
-            int after = inject.indexOf('>', close);
-            if (after < 0) {
-                return "";
-            }
-            // The element that FOLLOWS the key, not the next one of a given kind anywhere after
-            // it. Whitespace, comments and CDATA sit between them in real fragments and none of
-            // them is the value.
-            int i = after + 1;
-            while (i < inject.length()) {
-                if (Character.isWhitespace(inject.charAt(i))) {
-                    i++;
-                    continue;
-                }
-                int skipped = skipMarkupBefore(inject, i, i);
-                if (skipped < 0) {
-                    return "";
-                }
-                if (skipped != i) {
-                    i = skipped;
-                    continue;
-                }
-                if (inject.charAt(i) != '<') {
-                    return "";
-                }
-                StringBuilder tag = new StringBuilder();
-                for (int j = i + 1; j < inject.length()
-                        && Character.isLetterOrDigit(inject.charAt(j)); j++) {
-                    tag.append(inject.charAt(j));
-                }
-                return tag.toString().toLowerCase();
-            }
-            // The key is the last thing in the fragment: present, and with no value at all.
-            return "";
+            int end = inject.indexOf('>', close);
+            return end < 0 ? -1 : end + 1;
         }
+    }
+
+    /// The {@code <} of the next real element at or after {@code from}, or -1 when what follows is
+    /// text or nothing. Whitespace, comments and CDATA sit between a key and its value in real
+    /// fragments and none of them is the value.
+    private static int nextElementAt(String inject, int from) {
+        int i = from;
+        while (i < inject.length()) {
+            if (Character.isWhitespace(inject.charAt(i))) {
+                i++;
+                continue;
+            }
+            int skipped = skipMarkupBefore(inject, i, i);
+            if (skipped < 0) {
+                return -1;
+            }
+            if (skipped != i) {
+                i = skipped;
+                continue;
+            }
+            return inject.charAt(i) == '<' ? i : -1;
+        }
+        return -1;
+    }
+
+    /// The element name at an opening tag, lowercased. Empty for an end tag, which is not one.
+    private static String tagAt(String inject, int element) {
+        StringBuilder tag = new StringBuilder();
+        for (int j = element + 1; j < inject.length()
+                && Character.isLetterOrDigit(inject.charAt(j)); j++) {
+            tag.append(inject.charAt(j));
+        }
+        return tag.toString().toLowerCase(java.util.Locale.ENGLISH);
     }
 
     static String injectedPlistString(BuildRequest request, String key) {

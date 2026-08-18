@@ -119,6 +119,21 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
     /// to a caller that asked for something else -- and on success open the
     /// old request's sheet.
     private int commissionGeneration;
+    /// When the parked request's own limit expires, or 0 when it has none.
+    ///
+    /// A CommissioningRequest timeout fails the waiting caller in the
+    /// framework, which knows nothing about this field -- so a request Play
+    /// services never answers at all left the callback parked here forever
+    /// and every later commission() refused with BUSY for the life of the
+    /// process, with no screen in front of the user to justify it.
+    private long commissionDeadline;
+    /// Whether the add-device screen actually went up for the parked request.
+    ///
+    /// Expiry only frees this bridge while nothing was launched. Once the
+    /// sheet is on the user's screen the flow is theirs to finish or cancel,
+    /// and it answers through the activity result -- reclaiming the slot then
+    /// would hand that answer to whoever asked next.
+    private boolean commissionLaunched;
 
     private MatterCommissioningBridge() {
     }
@@ -195,6 +210,8 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
     @Override
     public void stop() {
         pendingCommission = null;
+        commissionDeadline = 0;
+        commissionLaunched = false;
         // Anything still in flight now belongs to nobody.
         commissionGeneration++;
     }
@@ -400,6 +417,20 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                             + " again once it has finished");
             return;
         }
+        if (pendingCommission != null && expiredWithNoScreen()) {
+            // The parked request asked for a limit, that limit has passed and
+            // no add-device screen ever went up: Play services answered
+            // neither its success nor its failure listener. The framework
+            // already failed that caller with TIMEOUT, so nothing is waiting
+            // on this callback and no screen is in front of the user -- and
+            // without this the slot stayed occupied for the life of the
+            // process and every later request was refused with BUSY.
+            pendingCommission = null;
+            commissionDeadline = 0;
+            // So the abandoned request's IntentSender, if it ever arrives, is
+            // dropped rather than opening a sheet for this one.
+            commissionGeneration++;
+        }
         if (pendingCommission != null) {
             // Play services shows one add-device UI at a time, and a second
             // request would replace the parked callback so the first caller
@@ -409,8 +440,8 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             // A CommissioningRequest timeout fails the waiting caller in the
             // framework rather than here, because nothing in this API can
             // close a sheet Play services owns -- so a limit that expires
-            // frees the caller, and this stays refused until the user is
-            // actually done with the screen in front of them.
+            // frees the caller, and this stays refused while the user is
+            // actually looking at the screen in front of them.
             callback.onError("BUSY",
                     "an add-device flow is already running");
             return;
@@ -427,6 +458,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             request.setDeviceNameHint(suggestedName);
         }
         pendingCommission = callback;
+        commissionLaunched = false;
         final int generation = ++commissionGeneration;
         // The caller's own limit, kept so a sender that arrives after it has
         // expired is dropped rather than opening a sheet for a request the
@@ -435,6 +467,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
         // accessory may be up a ladder.
         final long deadline = timeoutMillis > 0
                 ? System.currentTimeMillis() + timeoutMillis : 0;
+        commissionDeadline = deadline;
         final CommissioningRequest built = request.build();
         Matter.getCommissioningClient(activity)
                 .commissionDevice(built)
@@ -452,6 +485,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                                 && System.currentTimeMillis() > deadline) {
                             Callback waiting = pendingCommission;
                             pendingCommission = null;
+                            commissionDeadline = 0;
                             if (waiting != null) {
                                 waiting.onError("TIMEOUT",
                                         "the add-device screen took longer to"
@@ -473,12 +507,23 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                         // and there is nothing to restore here.
                         Callback waiting = pendingCommission;
                         pendingCommission = null;
+                        commissionDeadline = 0;
                         if (waiting != null) {
                             waiting.onError("COMMISSIONING_FAILED",
                                     failure.getMessage());
                         }
                     }
                 });
+    }
+
+    /// Whether the parked request has passed its own limit without ever
+    /// putting a screen in front of the user.
+    ///
+    /// A request with no limit never expires -- somebody adding an accessory
+    /// may be up a ladder, and the caller asked for exactly that.
+    private boolean expiredWithNoScreen() {
+        return commissionDeadline > 0 && !commissionLaunched
+                && System.currentTimeMillis() > commissionDeadline;
     }
 
     private void launch(final Activity activity, IntentSender sender) {
@@ -491,6 +536,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             // this flow's result to that screen.
             Callback waiting = pendingCommission;
             pendingCommission = null;
+            commissionDeadline = 0;
             if (waiting != null) {
                 waiting.onError("BUSY",
                         "another screen took over while the add-device"
@@ -514,6 +560,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                 cn1.restoreIntentResultListener();
                 Callback waiting = pendingCommission;
                 pendingCommission = null;
+                commissionDeadline = 0;
                 if (waiting == null) {
                     return;
                 }
@@ -550,10 +597,16 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             // this flow would be answered with the first run's outcome.
             cn1.startIntentSenderForResult(sender, REQUEST_COMMISSION,
                     null, 0, 0, 0);
+            // Set only once the screen is really up, and this is the point
+            // after which an expiring limit no longer frees the slot: the
+            // answer is the user's to give now, and it arrives through the
+            // listener registered above.
+            commissionLaunched = true;
         } catch (IntentSender.SendIntentException cannotStart) {
             cn1.restoreIntentResultListener();
             Callback waiting = pendingCommission;
             pendingCommission = null;
+            commissionDeadline = 0;
             if (waiting != null) {
                 waiting.onError("COMMISSIONING_FAILED",
                         cannotStart.getMessage());

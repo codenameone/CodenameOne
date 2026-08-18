@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -964,6 +965,39 @@ class WatchNativeBuilderTest {
                 "the element that follows the key, not the next string anywhere after it");
         assertNull(WatchNativeBuilder.injectedPlistValueTag(req, "CFBundleVersion"),
                 "a key the fragment does not carry is absent, and takes the default");
+    }
+
+    /**
+     * The array belongs to the key, not to whatever mentioned its name first.
+     *
+     * <p>Read by finding the name with {@code indexOf} and taking the next {@code <array>}, a
+     * fragment that mentions {@code NSBonjourServices} in a comment took the array of the key that
+     * came after the comment -- so a plist that listed both Matter services perfectly well was
+     * refused for listing neither, and the same shape suppressed the generated
+     * {@code com.apple.Home} query scheme.</p>
+     */
+    @Test
+    void injectedArraysBelongToTheirOwnKey() {
+        BuildRequest req = request();
+        req.putArgument("ios.plistInject",
+                "<!-- NSBonjourServices goes here one day -->"
+                + "<key>LSApplicationQueriesSchemes</key>"
+                + "<array><string>com.apple.Home</string></array>"
+                + "<key>NSBonjourServices</key><array>"
+                + "<string>_matter._tcp.</string><string>_matterc._udp.</string></array>");
+
+        assertEquals(Arrays.asList("com.apple.Home"),
+                WatchNativeBuilder.injectedPlistStringArray(
+                        req, "LSApplicationQueriesSchemes"),
+                "a comment naming another key is not that key's value");
+        assertEquals(Arrays.asList("_matter._tcp.", "_matterc._udp."),
+                WatchNativeBuilder.injectedPlistStringArray(req, "NSBonjourServices"),
+                "the array that follows the real key, wherever the name appeared before it");
+        assertTrue(WatchNativeBuilder.injectedPlistStringArray(req, "CFBundleVersion").isEmpty(),
+                "a key the fragment does not carry has no array");
+        assertTrue(WatchNativeBuilder.injectedPlistStringArray(
+                        req, "NSBluetoothAlwaysUsageDescription").isEmpty(),
+                "and neither has one whose value is not an array");
     }
 
     /**
