@@ -161,9 +161,7 @@ static void cn1BrowserCreateOnMain(void* p) {
     /* Set before anything reads it: calloc leaves it 0, which is a *valid* desktop
      * window slot, so adding the view to "slot 0" targeted a window that does not
      * exist and the browser was never placed in any overlay at all. */
-    if (b != 0) {
-        b->slot = req->slot;
-    }
+    b->slot = req->slot;
     WebKitUserContentManager* mgr = p_webkit_user_content_manager_new();
     pthread_mutex_init(&b->lock, 0);
     p_webkit_user_content_manager_register_script_message_handler(mgr, "cn1");
