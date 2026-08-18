@@ -382,6 +382,22 @@ static long cn1ProcessHeadroom(void) {
     return -1;          // this platform has no per-process limit
 }
 
+// Bytes admitted for dirtying but not yet reflected in phys_footprint; see
+// cn1PacingTryAdmit. Declared here rather than beside the rest of the pacing state
+// because collectThreadResources, far above it, has to be able to hand a claim back.
+static _Atomic long long cn1PacingClaimed = 0;
+// This thread's outstanding claim. __thread rather than a ThreadLocalData field, matching
+// cn1LowMemoryParkStampMs: zero-initialized per thread with no malloc'd-not-zeroed trap.
+static __thread long long cn1MyPacingClaim = 0;
+
+static void cn1PacingReleaseThreadClaim(void) {
+    if(cn1MyPacingClaim != 0) {
+        atomic_fetch_sub_explicit(&cn1PacingClaimed, cn1MyPacingClaim,
+                                  memory_order_relaxed);
+        cn1MyPacingClaim = 0;
+    }
+}
+
 // Monotonic milliseconds, used to pace the low-memory allocation throttle.
 // Monotonic (not wall clock) so a clock adjustment cannot make the throttle
 // either fire on every allocation or stop firing for hours.
@@ -1160,6 +1176,14 @@ void collectThreadResources(struct ThreadLocalData *current)
     cn1BibopRetireThreadPages();
     // LEVER A: flush any unaccounted per-thread bytes into the global GC trigger.
     CN1_BIBOP_FLUSH_BYTES(current);
+    // Release this thread's pacing claim. A claim is normally handed back at the
+    // thread's NEXT allocation check, so a thread that is admitted and then exits would
+    // never return it -- and unlike a thread that merely goes idle, there is nothing
+    // left to hand it back later. Allocator-thread churn would accumulate phantom
+    // reservations until admission could never succeed and every allocator paced its
+    // full budget on every check. Runs on the dying thread, so the __thread claim is
+    // reachable here, same as the pages and bytes above.
+    cn1PacingReleaseThreadClaim();
 #endif
     if(current->utf8Buffer != 0) {
         free(current->utf8Buffer);
@@ -3238,17 +3262,6 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #define CN1_PACING_PROGRESS_EPSILON (1024L*1024)
 #endif
 
-// Bytes admitted for dirtying but not yet reflected in phys_footprint. A thread claims
-// its block at admission and releases the claim at its next check, by which time the
-// caller has written to it and the kernel has counted it. Without this, concurrent
-// mutators all observe the same headroom before any of them dirties anything and each
-// independently decides it fits: sixteen 16MB blocks all pass against 160MB of headroom
-// and then collectively dirty 256MB. The margin bounds what ONE thread may take on top
-// of what is already counted; it cannot bound what N threads take simultaneously.
-static _Atomic long long cn1PacingClaimed = 0;
-// This thread's outstanding claim. __thread rather than a ThreadLocalData field, matching
-// cn1LowMemoryParkStampMs: zero-initialized per thread with no malloc'd-not-zeroed trap.
-static __thread long long cn1MyPacingClaim = 0;
 // How much legacy allocation the PROCESS may do between two pacing evaluations. This
 // bounds the overshoot past the cap, so it has to stay well under the smallest cap the
 // clamp can produce; it is deliberately independent of CN1_LEGACY_GC_TRIGGER_BYTES,
@@ -3450,11 +3463,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // Release this thread's previous claim first: by the time it allocates again, the
     // earlier block has been written and the kernel has counted it, so holding the claim
     // any longer would double-charge it.
-    if(cn1MyPacingClaim != 0) {
-        atomic_fetch_sub_explicit(&cn1PacingClaimed, cn1MyPacingClaim,
-                                  memory_order_relaxed);
-        cn1MyPacingClaim = 0;
-    }
+    cn1PacingReleaseThreadClaim();
     long long need = pendingBytes + CN1_PACING_HEADROOM_MARGIN;
     if(cn1PacingTraceOn()) {
         atomic_fetch_add_explicit(&cn1PacingBoundedChecks, 1, memory_order_relaxed);
@@ -3515,6 +3524,16 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                 barrenCycles++;          // a whole cycle bought nothing
             }
         }
+    }
+    // GIVING UP STILL DIRTIES THE BLOCK. If the wait ended on barren cycles or the
+    // backstop rather than on admission, this thread proceeds to write its block anyway
+    // -- so the block has to be claimed regardless, or it is invisible to every other
+    // thread's admission test for the window before the kernel counts it. Claiming only
+    // on the success path would leave exactly the over-admission the claim exists to
+    // prevent, in the case where memory is tightest.
+    if(cn1MyPacingClaim == 0 && pendingBytes > 0) {
+        atomic_fetch_add_explicit(&cn1PacingClaimed, pendingBytes, memory_order_relaxed);
+        cn1MyPacingClaim = pendingBytes;
     }
     // Honour a stop-the-world before resuming, exactly like every other park here: the
     // loop above can exit while a mark is still running and the collector believes this
