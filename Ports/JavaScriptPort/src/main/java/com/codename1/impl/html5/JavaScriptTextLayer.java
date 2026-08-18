@@ -94,6 +94,9 @@ public final class JavaScriptTextLayer {
         private int clipY;
         private int clipW;
         private int clipH;
+        // The stacking index this run carries. A repaint of part of the screen leaves it alone:
+        // the run keeps the place in the order it already had.
+        private int zIndex;
         private int claimedPass;
         // Where the run landed, in Codename One pixels, and the draw order it was promoted at.
         // Both are needed to tell whether something drawn on the canvas afterwards covers it.
@@ -377,8 +380,9 @@ public final class JavaScriptTextLayer {
         int useClipY = clipY;
         int useClipW = clipW;
         int useClipH = clipH;
-        if (run.clipX != Integer.MIN_VALUE && run.lastX == x && run.lastY == y
-                && isRegionNarrowing(run, clipX, clipY, clipW, clipH)) {
+        boolean regionNarrowed = run.clipX != Integer.MIN_VALUE && run.lastX == x && run.lastY == y
+                && isRegionNarrowing(run, clipX, clipY, clipW, clipH);
+        if (regionNarrowed) {
             useClipX = run.clipX;
             useClipY = run.clipY;
             useClipW = run.clipW;
@@ -406,13 +410,23 @@ public final class JavaScriptTextLayer {
         // higher numbers from an earlier full frame. Left monotonic, every index remains
         // comparable with every other, and the most recently painted run is on top -- which is
         // what the canvas would have done.
-        drawSequence++;
-        if (drawSequence == Integer.MAX_VALUE) {
-            // Unreachable in practice; renumber from a clean slate rather than wrap.
-            drawSequence = 1;
-            reattachedThisFrame = true;
+        if (regionNarrowed && run.zIndex > 0) {
+            // Redrawn only because the region being repainted happens to touch it, under the
+            // clip it already had. Its place in the order was settled when the frame that drew
+            // it ran, and taking a new index here would lift it over everything that has not
+            // repainted -- over a component drawn on top of it, outside the region anything was
+            // repainted in.
+            clipCss.append("z-index:").append(run.zIndex).append(";");
+        } else {
+            drawSequence++;
+            if (drawSequence == Integer.MAX_VALUE) {
+                // Unreachable in practice; renumber from a clean slate rather than wrap.
+                drawSequence = 1;
+                reattachedThisFrame = true;
+            }
+            run.zIndex = drawSequence;
+            clipCss.append("z-index:").append(drawSequence).append(";");
         }
-        clipCss.append("z-index:").append(drawSequence).append(";");
         String clipDeclaration = clipCss.toString();
         if (!clipDeclaration.equals(run.clipCss)) {
             run.clipStyle.setCssText(clipDeclaration);
@@ -446,6 +460,13 @@ public final class JavaScriptTextLayer {
         if (!str.equals(run.content)) {
             run.text.setTextContent(str);
             run.content = str;
+            if (regionNarrowed) {
+                // The canvas would have changed only the part of this line the repaint reached;
+                // a DOM run changes as a whole. The rest of the line now shows text nothing
+                // repainted, so the frame is brought back into agreement by repainting all of
+                // it -- which is what the reattach flag asks for at flush time.
+                reattachedThisFrame = true;
+            }
         }
         run.lastY = y;
         run.lastX = x;
