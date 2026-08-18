@@ -1753,12 +1753,18 @@ static void cn1homeInit(void) {
                         object:nil
                          queue:[NSOperationQueue mainQueue]
                     usingBlock:^(NSNotification *note) {
-            if ([cn1homeWatches count] == 0) {
+            if (cn1homeManager == nil || !cn1homeHomesLoaded) {
+                // Nothing has connected yet, so there is nothing to be stale
+                // about and nobody to tell.
                 return;
             }
-            // The graph too: an accessory added or removed while the app
-            // slept is a change no delegate reported either.
+            // The graph first, and unconditionally: an accessory added, a
+            // room renamed or a scene created while the app slept is a change
+            // no delegate reported either, and a structure listener is not
+            // tied to a subscription -- an app with no subscriptions at all
+            // still has a graph on screen.
             cn1homeRebuildSnapshot();
+            cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil, nil);
             for (NSString *subscriptionId in [cn1homeWatches allKeys]) {
                 com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
                     getThreadLocalData(),

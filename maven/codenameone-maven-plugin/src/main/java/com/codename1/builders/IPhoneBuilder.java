@@ -1414,7 +1414,9 @@ public class IPhoneBuilder extends Executor {
                             // string and carry a restricted entitlement for
                             // machinery it explicitly turned off.
                         } else if (!"com/codename1/home/SmartHome".equals(cls)
-                                && !isSmartHomeAvailabilityType(cls)) {
+                                && !isSmartHomeAvailabilityType(cls)
+                                && !SmartHomeManifestFragments
+                                        .isCommissioningCapabilityType(cls)) {
                             // Naming any type beyond the facade and the
                             // capability enums means the app is working with
                             // accessories. The facade alone is decided by the

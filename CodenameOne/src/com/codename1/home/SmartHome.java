@@ -631,7 +631,13 @@ public final class SmartHome {
         }
         int id = nextRequestId();
         EdtResult<Object> result = pendingIdentify.open(id);
-        b.identify(id, accessory.getId());
+        // Through the start path, like every other identifier-taking
+        // operation: on iOS the native knows no accessory at all until the
+        // home database has loaded, so an app acting on an accessory it kept
+        // -- across a stop(), or from its own storage -- was told
+        // ACCESSORY_NOT_FOUND on every cold launch for an accessory that was
+        // right there.
+        afterStart(new IssueIdentify(b, id, accessory.getId()));
         return result;
     }
 
@@ -1026,6 +1032,25 @@ public final class SmartHome {
     /// A read waiting for the backend. Named rather than anonymous so it
     /// carries no synthetic reference to the enclosing instance (SpotBugs
     /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    /// Asks an accessory to identify itself, once the backend is connected.
+    private static final class IssueIdentify implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String accessoryId;
+
+        IssueIdentify(HomeBridge bridge, int id, String accessoryId) {
+            this.bridge = bridge;
+            this.id = id;
+            this.accessoryId = accessoryId;
+        }
+
+        @Override
+        public void run() {
+            bridge.identify(id, accessoryId);
+        }
+    }
+
     private static final class IssueRead implements Runnable {
 
         private final HomeBridge bridge;

@@ -191,6 +191,22 @@ public final class SubscriptionState {
                 if (disposed) {
                     return;
                 }
+                if (!heldSteps.isEmpty()) {
+                    steps = new ArrayList<TraitReading>(heldSteps);
+                    heldSteps.clear();
+                }
+            }
+            // Queued BEFORE the gate opens, deliberately. Clearing
+            // awaitingInitial first let a push arriving on another thread --
+            // HomeKit's callbacks come in on the platform's own queue -- see
+            // an open gate and, with a zero window, queue its newer value
+            // ahead of this one. The listener then ended with the older
+            // snapshot as the last thing it was told.
+            dispatch(new TraitChangeBatch(id, readings, true, false));
+            synchronized (this) {
+                if (disposed) {
+                    return;
+                }
                 awaitingInitial = false;
                 // resyncRequired counts as something held: markResyncRequired
                 // deliberately does not deliver while the initial read is in
@@ -200,12 +216,7 @@ public final class SubscriptionState {
                 // initial read delivered those values looking perfectly
                 // healthy and never said they could not be trusted.
                 held = !pending.isEmpty() || resyncRequired;
-                if (!heldSteps.isEmpty()) {
-                    steps = new ArrayList<TraitReading>(heldSteps);
-                    heldSteps.clear();
-                }
             }
-            dispatch(new TraitChangeBatch(id, readings, true, false));
             // Changes that arrived while the read was in flight. They are
             // newer than what it snapshotted, so they go out immediately
             // after it rather than waiting for the window -- otherwise the
