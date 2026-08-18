@@ -2081,7 +2081,12 @@ public final class Intents {
         final IntentContext ctx = new IntentContext(inv.source, inv.headless,
                 System.currentTimeMillis() + timeout * 1000L);
         final CompletionGuard guard = new CompletionGuard(inv.completion);
-        final int timeoutMillis = timeout * 1000;
+        // A long, like the deadline two lines above. As an int this overflowed for any budget
+        // past 2147483 seconds -- which the build accepts and setDefaultTimeout accepts -- and
+        // a negative wait made awaitCompletion report a timeout immediately: the platform was
+        // told the action was stopped while the handler was still running its side effects, and
+        // the context it held said it had weeks left.
+        final long timeoutMillis = timeout * 1000L;
 
         Runnable body = new Runnable() {
             @Override

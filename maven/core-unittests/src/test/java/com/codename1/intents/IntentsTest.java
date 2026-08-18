@@ -2387,6 +2387,51 @@ class IntentsTest {
         assertTrue(seen.isEmpty());
     }
 
+    /// Milliseconds are a long. As an int the watchdog's wait overflowed for any budget past
+    /// 2147483 seconds -- which the build accepts -- and a negative wait reports a timeout at
+    /// once: the platform was told the action was stopped while the handler was still running,
+    /// and the context it held said it had weeks left.
+    @Test
+    void aVeryLongBudgetDoesNotTimeOutImmediately() throws Exception {
+        Intents.setDispatcher(new IntentDispatcher() {
+            public List<IntentDeclaration> describe() {
+                return Arrays.asList(new IntentDeclaration("known", "Known", "", true, true,
+                        false, "", 2147484, Collections.<String>emptyList(),
+                        Collections.<IntentParameterInfo>emptyList(),
+                        Arrays.asList(Exposure.ASSISTANT)));
+            }
+
+            public IntentResult invoke(String id, Map<String, Object> params, IntentContext c) {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return IntentResult.spoken("done");
+            }
+
+            public List<AppEntity> queryEntities(String t, String k, String a) {
+                return Collections.emptyList();
+            }
+        });
+
+        final java.util.concurrent.CountDownLatch answered =
+                new java.util.concurrent.CountDownLatch(1);
+        final List<IntentResult> reported = new ArrayList<IntentResult>();
+        Intents.dispatchInvocation("known", null, IntentSource.SHORTCUT, true,
+                new IntentCompletion() {
+                    public void onIntentResult(IntentResult r) {
+                        reported.add(r);
+                        answered.countDown();
+                    }
+                });
+
+        assertTrue(answered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertFalse(reported.get(0).isFailed(),
+                "a budget of weeks must not expire before a handler that took 200ms");
+        assertEquals("done", reported.get(0).getDialog());
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail
