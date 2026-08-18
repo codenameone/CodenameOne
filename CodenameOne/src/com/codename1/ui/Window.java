@@ -488,6 +488,18 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     void registerAnimatedInternal(Animation cmp) {
+        // The component's own flag has to move with the list, exactly as Form does it:
+        // deregisterAnimatedInternal returns early when the flag is clear, so leaving
+        // it unset makes the removal a no-op and the component stays registered for
+        // good. A fading scrollbar is enough to do it, and hasAnimations() then never
+        // goes false again -- the event dispatch thread stops being able to sleep.
+        if (cmp instanceof Component) {
+            Component c = (Component) cmp;
+            if (c.internalRegisteredAnimated) {
+                return;
+            }
+            c.internalRegisteredAnimated = true;
+        }
         if (!internalAnimatableComponents.contains(cmp)) {
             internalAnimatableComponents.add(cmp);
             repaint();
@@ -497,6 +509,13 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     void deregisterAnimatedInternal(Animation cmp) {
+        if (cmp instanceof Component) {
+            Component c = (Component) cmp;
+            if (!c.internalRegisteredAnimated) {
+                return;
+            }
+            c.internalRegisteredAnimated = false;
+        }
         internalAnimatableComponents.remove(cmp);
     }
 

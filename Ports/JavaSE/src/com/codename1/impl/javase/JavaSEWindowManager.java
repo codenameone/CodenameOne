@@ -64,7 +64,57 @@ public class JavaSEWindowManager extends WindowManager {
 
     JavaSEWindowManager(JavaSEPort port) {
         this.port = port;
+        watchMonitorTopology();
     }
+
+    /**
+     * Reports monitors being attached, removed or reconfigured.
+     *
+     * <p>AWT has no notification for this -- {@code GraphicsEnvironment} is a
+     * snapshot -- so the device set is sampled on a daemon timer and the framework is
+     * told only when it actually changes. Without this the documented
+     * {@code Desktop.addMonitorListener()} never fires and windows keep stale
+     * per-monitor scale after a display is unplugged.</p>
+     */
+    private void watchMonitorTopology() {
+        final java.util.Timer timer = new java.util.Timer("cn1-monitor-watch", true);
+        timer.schedule(new java.util.TimerTask() {
+            private String last = topologySignature();
+
+            @Override
+            public void run() {
+                String now = topologySignature();
+                if (!now.equals(last)) {
+                    last = now;
+                    Display.getInstance().monitorsChanged();
+                }
+            }
+        }, MONITOR_POLL_MS, MONITOR_POLL_MS);
+    }
+
+    /** Cheap fingerprint of the attached displays: count, bounds and scale. */
+    private static String topologySignature() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            for (GraphicsDevice device : devices()) {
+                GraphicsConfiguration cfg = device.getDefaultConfiguration();
+                Rectangle b = cfg.getBounds();
+                AffineTransform tx = cfg.getDefaultTransform();
+                sb.append(device.getIDstring()).append(':')
+                        .append(b.x).append(',').append(b.y).append(',')
+                        .append(b.width).append('x').append(b.height).append('@')
+                        .append(tx.getScaleX()).append(';');
+            }
+        } catch (Throwable err) {
+            // A display being reconfigured mid-query throws in AWT; the next tick sees
+            // the settled state, so a failed sample is not worth reporting.
+            return "unavailable";
+        }
+        return sb.toString();
+    }
+
+    /** Two seconds is imperceptible for a display change and costs nothing. */
+    private static final int MONITOR_POLL_MS = 2000;
 
     /**
      * One native window: its frame, the canvas Codename One paints into, and the id

@@ -110,7 +110,8 @@ typedef enum {
     CN1_EVENT_WINDOW_MONITOR = 15,    /* window moved to a different monitor */
     CN1_EVENT_WINDOW_SHOWN = 16,
     CN1_EVENT_WINDOW_HIDDEN = 17,
-    CN1_EVENT_WINDOW_MOVED = 18
+    CN1_EVENT_WINDOW_MOVED = 18,
+    CN1_EVENT_MONITORS_CHANGED = 19
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */

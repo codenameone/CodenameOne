@@ -269,6 +269,31 @@ static gboolean cn1DesktopOnKey(GtkWidget* widget, GdkEventKey* e, gpointer data
 /* Minimize and restore. Without this the framework goes on treating a minimized
  * window as displayed: it keeps painting it, and an animation in it keeps the event
  * dispatch thread awake indefinitely. */
+/* Displays being attached, removed or reconfigured. Connected once, the first time
+ * a window is created, because GdkDisplay outlives every window. */
+static void cn1DesktopMonitorsChanged(GdkDisplay* display, GdkMonitor* monitor, gpointer data) {
+    (void) display;
+    (void) monitor;
+    (void) data;
+    cn1LinuxPushWindowEvent(0, CN1_EVENT_MONITORS_CHANGED, 0, 0, 0);
+}
+
+static int cn1DesktopMonitorWatchInstalled;
+
+static void cn1DesktopWatchMonitors(void) {
+    GdkDisplay* display;
+    if (cn1DesktopMonitorWatchInstalled) {
+        return;
+    }
+    display = gdk_display_get_default();
+    if (display == 0) {
+        return;
+    }
+    cn1DesktopMonitorWatchInstalled = 1;
+    g_signal_connect(display, "monitor-added", G_CALLBACK(cn1DesktopMonitorsChanged), 0);
+    g_signal_connect(display, "monitor-removed", G_CALLBACK(cn1DesktopMonitorsChanged), 0);
+}
+
 static gboolean cn1DesktopOnWindowState(GtkWidget* widget, GdkEventWindowState* e,
         gpointer data) {
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
@@ -385,6 +410,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     g_signal_connect(w->drawingArea, "scroll-event", G_CALLBACK(cn1DesktopOnScroll), w);
     g_signal_connect(w->window, "key-press-event", G_CALLBACK(cn1DesktopOnKey), w);
     g_signal_connect(w->window, "key-release-event", G_CALLBACK(cn1DesktopOnKey), w);
+    cn1DesktopWatchMonitors();
     g_signal_connect(w->window, "window-state-event", G_CALLBACK(cn1DesktopOnWindowState), w);
     g_signal_connect(w->window, "delete-event", G_CALLBACK(cn1DesktopOnDelete), w);
     g_signal_connect(w->window, "focus-in-event", G_CALLBACK(cn1DesktopOnFocus), w);
@@ -725,107 +751,176 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowSetState___int_int(
     cn1LinuxRunOnMainAndWait(cn1DesktopStateOnMain, &op);
 }
 
-/* ---- monitors ---- */
+/* ---- monitors ----
+ *
+ * GDK is not thread safe and these are called from the Codename One event
+ * dispatch thread, so every one of them marshals onto the GTK main thread the
+ * same way the window operations above do. Reading the display directly from the
+ * EDT raced GTK's own use of it.
+ */
 
-JAVA_INT com_codename1_impl_linux_LinuxNative_monitorCount___R_int(CODENAME_ONE_THREAD_STATE) {
+typedef struct {
+    int monitor;
+    int workArea;
+    int result;
+    int x;
+    int y;
+    int width;
+    int height;
+} CN1MonitorOp;
+
+static void cn1MonitorCountOnMain(void* arg) {
+    CN1MonitorOp* op = (CN1MonitorOp*) arg;
     GdkDisplay* display = gdk_display_get_default();
+    int n;
+    op->result = 1;
     if (display == 0) {
-        return 1;
+        return;
     }
-    {
-        int n = gdk_display_get_n_monitors(display);
-        return n > 0 ? n : 1;
-    }
+    n = gdk_display_get_n_monitors(display);
+    op->result = n > 0 ? n : 1;
 }
 
-JAVA_INT com_codename1_impl_linux_LinuxNative_primaryMonitor___R_int(CODENAME_ONE_THREAD_STATE) {
+JAVA_INT com_codename1_impl_linux_LinuxNative_monitorCount___R_int(CODENAME_ONE_THREAD_STATE) {
+    CN1MonitorOp op;
+    memset(&op, 0, sizeof(op));
+    cn1LinuxRunOnMainAndWait(cn1MonitorCountOnMain, &op);
+    return op.result;
+}
+
+static void cn1PrimaryMonitorOnMain(void* arg) {
+    CN1MonitorOp* op = (CN1MonitorOp*) arg;
     GdkDisplay* display = gdk_display_get_default();
     GdkMonitor* primary;
     int count;
     int iter;
+    op->result = 0;
     if (display == 0) {
-        return 0;
+        return;
     }
     primary = gdk_display_get_primary_monitor(display);
     count = gdk_display_get_n_monitors(display);
     for (iter = 0; iter < count; iter++) {
         if (gdk_display_get_monitor(display, iter) == primary) {
-            return iter;
+            op->result = iter;
+            return;
         }
     }
-    return 0;
 }
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_monitorBounds___int_boolean_int_1ARRAY(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
+JAVA_INT com_codename1_impl_linux_LinuxNative_primaryMonitor___R_int(CODENAME_ONE_THREAD_STATE) {
+    CN1MonitorOp op;
+    memset(&op, 0, sizeof(op));
+    cn1LinuxRunOnMainAndWait(cn1PrimaryMonitorOnMain, &op);
+    return op.result;
+}
+
+static void cn1MonitorBoundsOnMain(void* arg) {
+    CN1MonitorOp* op = (CN1MonitorOp*) arg;
     GdkDisplay* display = gdk_display_get_default();
     GdkMonitor* mon;
     GdkRectangle r;
-    JAVA_INT* arr;
-    if (out == JAVA_NULL || display == 0) {
+    op->result = 0;
+    if (display == 0) {
         return;
     }
-    mon = gdk_display_get_monitor(display, monitor);
+    mon = gdk_display_get_monitor(display, op->monitor);
     if (mon == 0) {
         mon = gdk_display_get_primary_monitor(display);
     }
     if (mon == 0) {
         return;
     }
-    if (workArea == JAVA_TRUE) {
+    if (op->workArea) {
         gdk_monitor_get_workarea(mon, &r);
     } else {
         gdk_monitor_get_geometry(mon, &r);
     }
+    op->x = r.x;
+    op->y = r.y;
+    op->width = r.width;
+    op->height = r.height;
+    op->result = 1;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_monitorBounds___int_boolean_int_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
+    CN1MonitorOp op;
+    JAVA_INT* arr;
+    if (out == JAVA_NULL) {
+        return;
+    }
+    memset(&op, 0, sizeof(op));
+    op.monitor = monitor;
+    op.workArea = workArea == JAVA_TRUE ? 1 : 0;
+    cn1LinuxRunOnMainAndWait(cn1MonitorBoundsOnMain, &op);
+    if (!op.result) {
+        return;
+    }
     arr = (JAVA_INT*) (*(JAVA_ARRAY) out).data;
     if ((int) (*(JAVA_ARRAY) out).length >= 4) {
-        arr[0] = r.x;
-        arr[1] = r.y;
-        arr[2] = r.width;
-        arr[3] = r.height;
+        arr[0] = op.x;
+        arr[1] = op.y;
+        arr[2] = op.width;
+        arr[3] = op.height;
     }
+}
+
+static void cn1MonitorScaleOnMain(void* arg) {
+    CN1MonitorOp* op = (CN1MonitorOp*) arg;
+    GdkDisplay* display = gdk_display_get_default();
+    GdkMonitor* mon;
+    op->result = 1;
+    if (display == 0) {
+        return;
+    }
+    mon = gdk_display_get_monitor(display, op->monitor);
+    if (mon == 0) {
+        return;
+    }
+    op->result = gdk_monitor_get_scale_factor(mon);
 }
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_monitorScale___int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT monitor) {
-    GdkDisplay* display = gdk_display_get_default();
-    GdkMonitor* mon;
-    if (display == 0) {
-        return 1;
-    }
-    mon = gdk_display_get_monitor(display, monitor);
-    if (mon == 0) {
-        return 1;
-    }
-    return gdk_monitor_get_scale_factor(mon);
+    CN1MonitorOp op;
+    memset(&op, 0, sizeof(op));
+    op.monitor = monitor;
+    cn1LinuxRunOnMainAndWait(cn1MonitorScaleOnMain, &op);
+    return op.result;
 }
 
-/*
- * Physical dots per inch, derived from the monitor's reported millimetre size.
- * GTK exposes only an integer scale factor, which is too coarse to describe a
- * display's real resolution, so this reports the measured value and lets the Java
- * side keep the integer factor separately.
- */
-JAVA_INT com_codename1_impl_linux_LinuxNative_monitorDpi___int_R_int(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT monitor) {
+static void cn1MonitorDpiOnMain(void* arg) {
+    CN1MonitorOp* op = (CN1MonitorOp*) arg;
     GdkDisplay* display = gdk_display_get_default();
     GdkMonitor* mon;
     GdkRectangle r;
     int widthMm;
+    op->result = 96;
     if (display == 0) {
-        return 96;
+        return;
     }
-    mon = gdk_display_get_monitor(display, monitor);
+    mon = gdk_display_get_monitor(display, op->monitor);
     if (mon == 0) {
-        return 96;
+        return;
     }
     gdk_monitor_get_geometry(mon, &r);
     widthMm = gdk_monitor_get_width_mm(mon);
     if (widthMm <= 0 || r.width <= 0) {
-        return 96;
+        return;
     }
-    return (int) ((r.width * 25.4) / widthMm + 0.5);
+    op->result = (int) ((r.width * 25.4) / widthMm + 0.5);
 }
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_monitorDpi___int_R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT monitor) {
+    CN1MonitorOp op;
+    memset(&op, 0, sizeof(op));
+    op.monitor = monitor;
+    cn1LinuxRunOnMainAndWait(cn1MonitorDpiOnMain, &op);
+    return op.result;
+}
+
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_monitorForWindow___int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot) {
