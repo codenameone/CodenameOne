@@ -167,4 +167,4 @@ And one structural point: by default Codename One isn't a Matter controller. The
 
 Read the generated `CN1MatterSetup/RequestHandler.swift` before you turn it on. The implementation ships in every commissioning build, commented out, precisely so that what you enable is code you have read.
 
-What it does *not* buy you is a way to talk to the accessory over that fabric: Codename One has no API for that yet, and reads and writes still go through the ecosystem. What it buys is that the accessory is already commissioned when such an API arrives, and that `CommissioningResult.wasCommissionedToThisApp()` can be true. Android's Play Services commissioning can't do it at all, and ignores the request.
+What it doesn't buy you is a way to talk to the accessory over that fabric: Codename One has no API for that yet, and reads and writes still go through the ecosystem. What it buys is that the accessory is already commissioned when such an API arrives, and that `CommissioningResult.wasCommissionedToThisApp()` can be true. Android's Play Services commissioning can't do it at all, and ignores the request.

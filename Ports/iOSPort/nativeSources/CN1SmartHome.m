@@ -971,6 +971,42 @@ static BOOL cn1homeHasNoValueNow(HMService *service, NSString *traitId) {
 // reports, is how the two get confused.
 #define CN1_HOME_MODE_AUTO 3
 
+/// Whether a scene leaves this thermostat in AUTO, where its single setpoint
+/// means nothing.
+///
+/// The scene's own mode action decides it wherever it sits in the list, and
+/// the thermostat's current mode decides it when the scene sets none.
+///
+/// #### Parameters
+///
+/// - `accessories`, `services`, `traits`, `numbers`: the scene's actions
+///
+/// - `index`: the setpoint action being judged
+///
+/// - `service`: the service that action names
+///
+/// #### Returns
+///
+/// `true` when the setpoint would be meaningless once the scene has run
+static BOOL cn1homeSceneEndsInAuto(NSArray *accessories, NSArray *services,
+                                   NSArray *traits, NSArray *numbers,
+                                   NSUInteger index, HMService *service) {
+    for (NSUInteger j = 0; j < [traits count]; j++) {
+        if (![[traits objectAtIndex:j]
+              isEqualToString:@"target_heating_cooling"]
+                || ![[accessories objectAtIndex:j]
+                     isEqualToString:[accessories objectAtIndex:index]]
+                || ![[services objectAtIndex:j]
+                     isEqualToString:[services objectAtIndex:index]]) {
+            continue;
+        }
+        return j < [numbers count]
+                && (int) [[numbers objectAtIndex:j] doubleValue]
+                    == CN1_HOME_MODE_AUTO;
+    }
+    return cn1homeHasNoValueNow(service, @"target_temperature");
+}
+
 /// The value to report for a trait, honouring the modes that erase one.
 ///
 /// Every path that turns a live characteristic into a reading goes through
@@ -3308,6 +3344,25 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                     [accessories objectAtIndex:i], [services objectAtIndex:i]);
                 HMCharacteristic *c = cn1homeFindCharacteristic(
                     service, [traits objectAtIndex:i]);
+                // A scene is one instant, not a sequence, so the setpoint is
+                // judged against the mode the scene LEAVES the thermostat in
+                // -- wherever in the list that mode action happens to be. In
+                // AUTO the single setpoint means nothing, and writing it
+                // anyway hides a number in a characteristic this API reports
+                // as absent, ready to surface the next time the thermostat
+                // leaves AUTO. The local store drops the same action.
+                if ([[traits objectAtIndex:i]
+                     isEqualToString:@"target_temperature"]
+                        && cn1homeSceneEndsInAuto(accessories, services,
+                                                  traits, numbers, i,
+                                                  service)) {
+                    remaining--;
+                    if (remaining == 0) {
+                        done();
+                        return;
+                    }
+                    continue;
+                }
                 NSArray *entry = cn1homeEntryFor([traits objectAtIndex:i]);
                 int conversion = entry == nil ? -1
                         : [[entry objectAtIndex:3] intValue];

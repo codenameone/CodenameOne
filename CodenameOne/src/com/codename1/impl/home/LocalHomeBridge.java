@@ -39,10 +39,12 @@ import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// An app-private simulated home, used by the simulator, the desktop ports and
 /// the JavaScript port.
@@ -676,11 +678,29 @@ public class LocalHomeBridge implements HomeBridge {
             String[] authorizationData) {
         String[] lines = new String[traitIds.length];
         List<TraitReading> changed = new ArrayList<TraitReading>();
+        // Which thermostats this batch takes OUT of AUTO, worked out before
+        // any of it is applied. A batch is one instruction: "heat, to 21" is
+        // the mode and the setpoint together, and judging the setpoint
+        // against the mode that happens to precede it in an array made the
+        // same two writes succeed or fail depending on which order the
+        // caller listed them -- and disagree with the device, where the whole
+        // batch is searched for the mode change.
+        Set<String> leavingAuto = new HashSet<String>();
+        for (int i = 0; i < traitIds.length; i++) {
+            if (Trait.TARGET_HEATING_COOLING.getId().equals(traitIds[i])
+                    && kinds[i] == TraitValueKind.ENUM.ordinal()
+                    && (int) numericValues[i]
+                        != HeatingCoolingMode.AUTO.ordinal()) {
+                leavingAuto.add(key(accessoryIds[i], serviceIds[i], ""));
+            }
+        }
         synchronized (this) {
             for (int i = 0; i < traitIds.length; i++) {
                 lines[i] = writeOne(accessoryIds[i], serviceIds[i],
                         traitIds[i], kinds[i], numericValues[i],
-                        stringValues[i], unitWireIds[i], changed);
+                        stringValues[i], unitWireIds[i], changed,
+                        leavingAuto.contains(key(accessoryIds[i],
+                                serviceIds[i], "")));
             }
         }
         recordChanges(changed);
@@ -689,7 +709,8 @@ public class LocalHomeBridge implements HomeBridge {
 
     private String writeOne(String accessoryId, String serviceId,
             String traitId, int kind, double numeric, String text,
-            int unitWireId, List<TraitReading> changed) {
+            int unitWireId, List<TraitReading> changed,
+            boolean batchLeavesAuto) {
         String[] f = new String[6];
         f[0] = accessoryId;
         f[1] = serviceId;
@@ -741,7 +762,7 @@ public class LocalHomeBridge implements HomeBridge {
                             + " can be asked for");
         }
         if (Trait.TARGET_TEMPERATURE.getId().equals(traitId)
-                && inAutoMode(accessoryId, serviceId)) {
+                && inAutoMode(accessoryId, serviceId) && !batchLeavesAuto) {
             // The read answers absent here, so accepting the write would
             // store a number nothing can ever read back -- and a simulator
             // test would pass on a setpoint the thermostat is not working to.
