@@ -194,15 +194,34 @@ public class SecureStorage {
     ///
     /// an identifier safe to embed in a storage name, never null and never empty
     protected static String applicationNamespace() {
-        String id = null;
-        try {
-            id = Display.getInstance().getProperty("package_name", null);
-            if (id == null || id.length() == 0) {
-                id = Display.getInstance().getProperty("AppName", null);
+        return applicationNamespace(null);
+    }
+
+    /// The same identifier, for a port that knows the application before `Display` can say.
+    ///
+    /// The simulator is that case: it builds its store while the port is still coming up, so
+    /// `Display` cannot answer yet -- and it has the launcher's main class in hand, which is where
+    /// its `package_name` comes from in the first place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `preferred`: an identity the port already knows, or null to ask `Display`
+    ///
+    /// #### Returns
+    ///
+    /// an identifier safe to embed in a storage name, never null and never empty
+    protected static String applicationNamespace(String preferred) {
+        String id = preferred;
+        if (id == null || id.length() == 0) {
+            try {
+                id = Display.getInstance().getProperty("package_name", null);
+                if (id == null || id.length() == 0) {
+                    id = Display.getInstance().getProperty("AppName", null);
+                }
+            } catch (RuntimeException tooEarly) {
+                // Asked before Display is ready, which is not a reason to fail an entry lookup.
+                id = null;
             }
-        } catch (RuntimeException tooEarly) {
-            // Asked before Display is ready, which is not a reason to fail an entry lookup.
-            id = null;
         }
         if (id == null || id.length() == 0) {
             // A build that stamped neither. A constant rather than something that looks unique
@@ -210,6 +229,11 @@ public class SecureStorage {
             // pretended otherwise would hide it.
             return "cn1app";
         }
+        return sanitizeNamespace(id);
+    }
+
+    /// Reduces an identity to what a storage name, a preferences node or a keychain service holds.
+    private static String sanitizeNamespace(String id) {
         StringBuilder b = new StringBuilder(id.length());
         for (int iter = 0; iter < id.length(); iter++) {
             char c = id.charAt(iter);

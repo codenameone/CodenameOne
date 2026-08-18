@@ -75,10 +75,77 @@ public final class JavaSESecureStorage extends SecureStorage {
         this.plainPrefs = java.util.prefs.Preferences.userRoot().node(PLAIN_NODE);
     }
 
+    /**
+     * The node this application's entries live in, under the shared one.
+     *
+     * <p>The simulator runs every project on one machine under one OS user, and this class kept
+     * every account in one fixed Preferences node -- so two projects that both asked for a managed
+     * key under the same alias read each other's key, and forgetting it in either one removed the
+     * only copy either had. The device ports are separated by an OS sandbox; here the separation
+     * has to be written down.</p>
+     *
+     * <p>Resolved per call rather than in the constructor: this object is built while the port is
+     * coming up, before {@code Display} can answer what the application is, and an answer cached
+     * from that moment would name every project the same thing.</p>
+     */
+    private java.util.prefs.Preferences appNode(java.util.prefs.Preferences shared) {
+        return shared.node(applicationNamespace(launcherPackage()));
+    }
+
+    /**
+     * The package of the class the simulator was launched with, or null if there is none.
+     *
+     * <p>Preferred over asking {@code Display}, because this object is built while the port is
+     * still coming up: {@code Display} answers {@code package_name} from this very property once
+     * it is running, so this is the same identity a moment earlier.</p>
+     */
+    private static String launcherPackage() {
+        String mainClass = System.getProperty("MainClass", null);
+        if (mainClass == null) {
+            return null;
+        }
+        int lastDot = mainClass.lastIndexOf('.');
+        return lastDot > 0 ? mainClass.substring(0, lastDot) : mainClass;
+    }
+
+    /**
+     * Moves an entry an earlier run left in the shared node into this application's own.
+     *
+     * <p>The value moves as it is: the salt behind the key stays in the shared node, so ciphertext
+     * written before this split still decrypts with the same key afterwards. Written to the new
+     * place before it is dropped from the old one, because for a managed database key this entry
+     * is the only copy there is.</p>
+     *
+     * @param shared the node entries used to live in
+     * @param key the preference key
+     * @return the value, or null when there was nothing to adopt
+     */
+    private String adoptSharedEntry(java.util.prefs.Preferences shared, String key) {
+        String stored = shared.get(key, null);
+        if (stored == null) {
+            return null;
+        }
+        java.util.prefs.Preferences mine = appNode(shared);
+        mine.put(key, stored);
+        try {
+            mine.flush();
+            shared.remove(key);
+            shared.flush();
+        } catch (BackingStoreException cannotMove) {
+            // The value is still readable where it was, which is what the caller is given.
+            Log.e(cannotMove);
+        }
+        return stored;
+    }
+
     @Override
     public AsyncResource<String> get(final String reason, final String account) {
         final AsyncResource<String> result = new AsyncResource<String>();
-        final String stored = prefs.get(account, null);
+        String mine = appNode(prefs).get(account, null);
+        if (mine == null) {
+            mine = adoptSharedEntry(prefs, account);
+        }
+        final String stored = mine;
         if (stored == null) {
             result.error(new BiometricException(BiometricError.UNKNOWN,
                     "No secure storage entry for account: " + account));
@@ -107,7 +174,7 @@ public final class JavaSESecureStorage extends SecureStorage {
                     "Simulator: biometrics not enabled for secure storage write"));
             return result;
         }
-        prefs.put(account, value);
+        appNode(prefs).put(account, value);
         result.complete(Boolean.TRUE);
         return result;
     }
@@ -115,6 +182,9 @@ public final class JavaSESecureStorage extends SecureStorage {
     @Override
     public AsyncResource<Boolean> remove(String reason, String account) {
         AsyncResource<Boolean> result = new AsyncResource<Boolean>();
+        appNode(prefs).remove(account);
+        // The shared node too, so an entry written before the split cannot be read back after a
+        // caller was told it was removed.
         prefs.remove(account);
         result.complete(Boolean.TRUE);
         return result;
@@ -137,14 +207,18 @@ public final class JavaSESecureStorage extends SecureStorage {
             c.init(Cipher.ENCRYPT_MODE, plainKey());
             byte[] enc = c.doFinal(value.getBytes("UTF-8"));
             Base64.Encoder b64 = Base64.getEncoder();
-            plainPrefs.put(VALUE_PREFIX + account,
+            appNode(plainPrefs).put(VALUE_PREFIX + account,
                     b64.encodeToString(c.getIV()) + ":" + b64.encodeToString(enc));
+            // Anything an earlier run left in the shared node goes, now that this one holds the
+            // current value: leaving it would have a later read fall back to a stale secret.
+            plainPrefs.remove(VALUE_PREFIX + account);
             // flush(), and its outcome is this method's answer. Preferences writes back
             // on its own schedule, so returning true said the secret was stored while it
             // was still only in memory -- and the simulator is killed abruptly all the
             // time, by the run button and by the IDE. The same reasoning as the Android
             // tier committing rather than applying: a write that reports success has to
             // have happened.
+            appNode(plainPrefs).flush();
             plainPrefs.flush();
             return true;
         } catch (Exception e) {
@@ -160,6 +234,12 @@ public final class JavaSESecureStorage extends SecureStorage {
         }
         // The stored string, not the decrypted value: an entry whose ciphertext will not decrypt
         // still exists, and reporting it absent is what would let a caller overwrite it.
+        if (appNode(plainPrefs).get(VALUE_PREFIX + account, null) != null) {
+            return ENTRY_PRESENT;
+        }
+        // Absent here is not absent: an earlier run wrote it in the shared node, and reporting
+        // nothing is what would have ManagedKeys generate a second key over a database the first
+        // one encrypted.
         return plainPrefs.get(VALUE_PREFIX + account, null) != null ? ENTRY_PRESENT : ENTRY_ABSENT;
     }
 
@@ -168,7 +248,10 @@ public final class JavaSESecureStorage extends SecureStorage {
         if (account == null) {
             return null;
         }
-        String stored = plainPrefs.get(VALUE_PREFIX + account, null);
+        String stored = appNode(plainPrefs).get(VALUE_PREFIX + account, null);
+        if (stored == null) {
+            stored = adoptSharedEntry(plainPrefs, VALUE_PREFIX + account);
+        }
         if (stored == null) {
             return null;
         }
@@ -194,8 +277,10 @@ public final class JavaSESecureStorage extends SecureStorage {
         if (account == null) {
             return false;
         }
+        appNode(plainPrefs).remove(VALUE_PREFIX + account);
         plainPrefs.remove(VALUE_PREFIX + account);
         try {
+            appNode(plainPrefs).flush();
             // Same for the removal, and it matters more: this is the credential a logout
             // clears, so an unflushed deletion is one that comes back on the next launch.
             plainPrefs.flush();
