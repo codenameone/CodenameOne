@@ -770,6 +770,7 @@ public final class JavaScriptSemanticOverlay {
         String owner = ownerId(entry);
         control.setAttribute("aria-controls", owner);
         control.setAttribute("aria-describedby", owner);
+        applyMaxLength(control, node);
         if (!obscured) {
             setControlValue(control, textEntryValue(node));
         }
@@ -815,6 +816,28 @@ public final class JavaScriptSemanticOverlay {
         });
         actionsContainer().appendChild(control);
         return control;
+    }
+
+    /**
+     * Holds a SET_TEXT control to the same length limit as the field it writes to.
+     *
+     * <p>Without it the control is the long way round an application's own limit, and not just
+     * for the one edit: TextArea.setText() raises maxSize to fit whatever it is given, so a value
+     * typed past the limit here moves the limit permanently.</p>
+     *
+     * @param element the control
+     * @param node the field's snapshot, whose component carries the limit
+     */
+    private void applyMaxLength(HTMLElement element, AccessibilityNodeSnapshot node) {
+        Component owner = node.getComponent();
+        int max = owner instanceof TextArea ? ((TextArea) owner).getMaxSize() : 0;
+        if (max > 0) {
+            element.setAttribute("maxlength", String.valueOf(max));
+        } else {
+            // No limit to keep -- and an attribute left over from a field that used to have one
+            // would be a limit the application no longer asks for.
+            element.removeAttribute("maxlength");
+        }
     }
 
     /**
@@ -905,6 +928,7 @@ public final class JavaScriptSemanticOverlay {
             // to set a new value, not to carry the old one.
             return;
         }
+        applyMaxLength(element, node);
         if (element.getAttribute(ATTRIBUTE_EDITING) != null) {
             return;
         }
