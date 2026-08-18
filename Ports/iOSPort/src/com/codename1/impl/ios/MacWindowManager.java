@@ -92,6 +92,13 @@ public class MacWindowManager extends WindowManager {
         return p instanceof Peer ? (Peer) p : null;
     }
 
+    /// Slot of the window hosting the given component, or -1 for the application's
+    /// main scene. The native editor needs it to land in the right window's view.
+    static int slotForComponent(com.codename1.ui.Component cmp) {
+        Object peer = com.codename1.ui.Display.getInstance().getWindowPeerForComponent(cmp);
+        return peer == null ? -1 : slot(peer);
+    }
+
     private static int slot(Object p) {
         Peer w = peer(p);
         return w == null ? -1 : w.slot;

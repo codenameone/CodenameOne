@@ -23,6 +23,9 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
+#if TARGET_OS_MACCATALYST
+#import "CN1MacWindows.h"
+#endif
 #import "EAGLView.h"
 #ifdef CN1_USE_METAL
 #import "METALView.h"
@@ -1224,9 +1227,22 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
         }
         editingComponent.opaque = NO;
-        [[CodenameOne_GLViewController instance].view addSubview:editingComponent];
+        UIView* editHost = [CodenameOne_GLViewController instance].view;
+#if TARGET_OS_MACCATALYST
+        {
+            /* A field inside a Codename One window belongs in that window's view.
+             * Added to the main controller's view unconditionally, the editor stayed
+             * on the main surface while the user typed into a secondary window. iOS
+             * keeps the original path exactly. */
+            UIView* windowHost = CN1MacWindowEditingHostView();
+            if (windowHost != nil) {
+                editHost = windowHost;
+            }
+        }
+#endif
+        [editHost addSubview:editingComponent];
         [editingComponent becomeFirstResponder];
-        [[CodenameOne_GLViewController instance].view resignFirstResponder];
+        [editHost resignFirstResponder];
         [editingComponent setNeedsDisplay];
         
     });

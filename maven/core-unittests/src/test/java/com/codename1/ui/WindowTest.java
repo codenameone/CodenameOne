@@ -1906,6 +1906,53 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aOneShotTimerBoundToAWindowStopsAfterFiring() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("one shot", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        final int[] fired = new int[1];
+        // A one-shot deregistered itself from the *current form* rather than from the
+        // window it was bound to, so it stayed in the window's animation list and
+        // fired again every interval, forever.
+        com.codename1.ui.util.UITimer t =
+                com.codename1.ui.util.UITimer.timer(1, false, w, new Runnable() {
+                    @Override
+                    public void run() {
+                        fired[0]++;
+                    }
+                });
+        // Driven directly rather than through the paint loop: what changed is which
+        // top level the one-shot deregisters itself from, and the animation pass is
+        // not what this needs to observe.
+        int registeredBefore;
+        int registeredAfter;
+        try {
+            java.lang.reflect.Field af = Window.class.getDeclaredField("animatableComponents");
+            af.setAccessible(true);
+            java.util.ArrayList<?> anims = (java.util.ArrayList<?>) af.get(w);
+            registeredBefore = anims.size();
+            java.lang.reflect.Method tick =
+                    com.codename1.ui.util.UITimer.class.getDeclaredMethod("testEllapse");
+            tick.setAccessible(true);
+            Thread.sleep(3);
+            tick.invoke(t);
+            registeredAfter = ((java.util.ArrayList<?>) af.get(w)).size();
+        } catch (Exception err) {
+            throw new RuntimeException(err);
+        }
+        w.dispose();
+
+        // Firing is what deregisters a one-shot. It used to deregister from the
+        // current form instead, leaving it in the window's list to fire forever.
+        assertEquals(1, fired[0], "the timer must have fired");
+        assertEquals(1, registeredBefore, "it registers with the window it is bound to");
+        assertEquals(0, registeredAfter, "and deregisters from that same window");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

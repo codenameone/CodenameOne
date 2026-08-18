@@ -238,6 +238,9 @@ public final class IOSNative {
 
     /** Requests a scene again after one was destroyed without the app getting a say. */
     /// Applies a resizability change to a window that may already have a scene.
+    /// Records which window is being edited, so the native editor lands in its view.
+    native void macWindowSetEditingSlot(int slot);
+
     native void macWindowSetResizable(int slot, boolean resizable);
 
     /// Applies a decoration change to a window that may already have a scene.

@@ -1203,6 +1203,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return;
             }
             Container parentForm = parentTop.asContainer();
+            // Tell the native side which window is being edited, so the editor is
+            // added to that window's view rather than the main surface's. Cleared to
+            // -1 for a field on the main form, since the slot is process wide.
+            nativeInstance.macWindowSetEditingSlot(
+                    parentTop instanceof Form ? -1 : MacWindowManager.slotForComponent(cmp));
             if (parentForm.getClientProperty("asyncEditing") != null) {
                 Object async = parentForm.getClientProperty("asyncEditing");
                 if (async instanceof Boolean) {

@@ -1294,6 +1294,26 @@ void CN1MacWindowSetMinimumSize(int slot, int width, int height) {
     });
 }
 
+/* The window whose field is being edited, or -1 for the application's main
+ * surface. There is one native editor at a time -- IOSImplementation keeps a single
+ * currentEditing -- so a single slot is enough to route it, and it avoids threading
+ * a window through the twenty-odd argument editStringAt bridge. */
+static int g_editingSlot = -1;
+
+void CN1MacWindowSetEditingSlot(int slot) {
+    g_editingSlot = slot;
+}
+
+/* The view the native editor should be added to. Returns nil for the main surface,
+ * which leaves the caller on its existing path. */
+UIView* CN1MacWindowEditingHostView(void) {
+    if (g_editingSlot < 0) {
+        return nil;
+    }
+    CN1MacWindow* w = slotAt(g_editingSlot);
+    return w == NULL ? nil : w->content;
+}
+
 int CN1MacMonitorForMainWindow(void) {
     NSArray<UIScreen*>* screens = [UIScreen screens];
     UIScreen* main = nil;

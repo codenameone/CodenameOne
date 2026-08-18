@@ -100,6 +100,12 @@ void CN1MacWindowSetDecorated(int slot, BOOL decorated);
 /** Records a minimum size and applies it to an existing scene. */
 void CN1MacWindowSetMinimumSize(int slot, int width, int height);
 
+/** Records which window is being edited, so the native editor lands in its view. */
+void CN1MacWindowSetEditingSlot(int slot);
+
+/** The view the native editor belongs in, or nil for the application's main view. */
+UIView* CN1MacWindowEditingHostView(void);
+
 /* Invoked from the scene delegate when a Codename One window scene connects, so
  * a scene the system restored on launch is adopted rather than orphaned. */
 void CN1MacWindowSceneConnected(UIWindowScene* scene);

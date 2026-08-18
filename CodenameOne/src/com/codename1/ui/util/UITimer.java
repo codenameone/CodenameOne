@@ -161,7 +161,16 @@ public class UITimer {
         long t = System.currentTimeMillis();
         if (t - lastEllapse >= ms) {
             if (!repeat) {
-                Display.getInstance().getCurrent().deregisterAnimated(i);
+                // Deregistered from whatever this timer was bound to, not from the
+                // current form. Those are the same thing for the Form overloads,
+                // which is why it went unnoticed, but a timer bound to a Window was
+                // never deregistered -- so a one-shot kept firing every interval
+                // forever. Falling back to the current form keeps the behaviour of
+                // the no-parent convenience overload, which binds to it.
+                TopLevelContainer target = bound != null ? bound : Display.getInstance().getCurrent();
+                if (target != null) {
+                    target.deregisterAnimated(i);
+                }
             }
             lastEllapse = t;
             i.run();

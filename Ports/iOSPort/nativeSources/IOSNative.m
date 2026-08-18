@@ -2402,6 +2402,12 @@ void com_codename1_impl_ios_IOSNative_macWindowSetMinimumSize___int_int_int(CN1_
 #endif
 }
 
+void com_codename1_impl_ios_IOSNative_macWindowSetEditingSlot___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetEditingSlot(slot);
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetResizable(slot, resizable == JAVA_TRUE ? YES : NO);
