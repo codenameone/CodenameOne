@@ -82,6 +82,9 @@ public class AndroidIntentBridge implements IntentBridge {
     private static final long FOREGROUND_WAIT_MILLIS = 15000L;
     /// Stamped on every shortcut published for an indexed entity, so clearIndex can tell this
     /// framework's rows from the application's own without guessing.
+    /// What the launcher will show of a label before it truncates anyway.
+    private static final int MAX_LABEL_CHARS = 40;
+
     private static final String INDEXED_PREFIX = "cn1entity:";
 
     /// Stamped on a donated shortcut, so it cannot collide with the immutable manifest shortcut
@@ -966,7 +969,19 @@ public class AndroidIntentBridge implements IntentBridge {
             return "";
         }
         // The launcher truncates hard; trimming here keeps the visible text predictable.
-        return s.length() > 40 ? s.substring(0, 40) : s;
+        if (s.length() <= MAX_LABEL_CHARS) {
+            return s;
+        }
+        // Cut on a character rather than on a code unit. A supplementary character -- an emoji
+        // in a title -- is a surrogate pair, and a cut that lands between the halves leaves a
+        // lone surrogate: the launcher shows a replacement glyph, or refuses the label. One
+        // code unit earlier is a whole character, and one character shorter than a limit is not
+        // something anyone notices.
+        int end = MAX_LABEL_CHARS;
+        if (Character.isHighSurrogate(s.charAt(end - 1))) {
+            end--;
+        }
+        return s.substring(0, end);
     }
 
     /// Builds the shortcut URI. The headless flag rides along so the trampoline can route a

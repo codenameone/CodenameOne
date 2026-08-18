@@ -2121,6 +2121,8 @@ class IntentsTest {
         assertTrue(schema.contains("\"type\":[\"string\",\"integer\"]"),
                 "epoch milliseconds are a number, and the description says to send them: "
                         + schema);
+        assertTrue(schema.contains("9223372036854775807"),
+                "and bounded to what IntentDates will actually take: " + schema);
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id

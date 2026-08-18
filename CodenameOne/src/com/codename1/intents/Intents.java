@@ -719,6 +719,11 @@ public final class Intents {
                 both.add("string");
                 both.add("integer");
                 prop.put("type", both);
+                // And bounded, for the same reason every other numeric property is: IntentDates
+                // refuses a number outside the range a long holds, so without these a model
+                // could write a schema-valid epoch that is rejected before the handler runs.
+                prop.put("minimum", Long.valueOf(Long.MIN_VALUE));
+                prop.put("maximum", Long.valueOf(Long.MAX_VALUE));
             }
             properties.put(p.getName(), prop);
             if (p.isRequired()) {
