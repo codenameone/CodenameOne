@@ -698,11 +698,13 @@ public class Window extends Container implements TopLevelContainer {
         }
 
         // The styles can differ without the preferred size actually moving, so only
-        // revalidate when it really did.
+        // revalidate when it really did. Form had this test inverted and is fixed to
+        // match; getting it wrong drops the revalidate in exactly the case that needs
+        // one.
         if (trigger) {
             cmp.setShouldCalcPreferredSize(true);
             Dimension d = cmp.getPreferredSize();
-            if (prefW != d.getWidth() || prefH != d.getHeight()) {
+            if (prefW == d.getWidth() && prefH == d.getHeight()) {
                 cmp.setShouldCalcPreferredSize(false);
                 trigger = false;
             }
@@ -2044,13 +2046,37 @@ public class Window extends Container implements TopLevelContainer {
 
     /// {@inheritDoc}
     ///
+    /// The keyboard counterpart of `#longPointerPress(int, int)`, and broken the same
+    /// way: `Display` dispatches a long key press to the top level, `Component`'s
+    /// implementation is empty, so holding a key inside a window reached nothing.
+    /// Found by checking what else shares that dispatch site rather than waiting for
+    /// it to be reported.
+    @Override
+    protected void longKeyPress(int keyCode) {
+        if (focused != null && focused.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
+            focused.longKeyPress(keyCode);
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
     /// `Component`'s implementation only fires listeners attached to this window, so
     /// without this a long press on a button inside a window reached nothing --
     /// neither the component nor its context menu.
     @Override
     public void longPointerPress(int x, int y) {
+        // Listeners registered on the window itself run first and can consume the
+        // gesture, the same order Form uses. Forwarding to the child without this
+        // silently dropped every addLongPressListener attached to the window.
+        if (longPressListeners != null && longPressListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
+            longPressListeners.fireActionEvent(ev);
+            if (ev.isConsumed()) {
+                return;
+            }
+        }
         // A long press is the touch equivalent of a right click, so it is a context
-        // menu request first, exactly as on a Form.
+        // menu request next, exactly as on a Form.
         Component ctxCmp = resolveComponentAt(x, y);
         if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
             return;

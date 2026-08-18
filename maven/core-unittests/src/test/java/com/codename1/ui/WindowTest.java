@@ -1148,6 +1148,37 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aLongKeyPressInAWindowReachesTheFocusedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("long key", new BorderLayout());
+        final int[] longKeys = new int[1];
+        Component target = new Component() {
+            @Override
+            public boolean isFocusable() {
+                return true;
+            }
+
+            @Override
+            protected void longKeyPress(int keyCode) {
+                longKeys[0]++;
+            }
+        };
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(target);
+
+        // Display dispatches a long key press to the top level and Component's
+        // implementation is empty, so without an override it reached nothing -- the
+        // keyboard twin of the long-press defect.
+        w.longKeyPress(-95);
+        int count = longKeys[0];
+        w.dispose();
+
+        assertEquals(1, count, "a long key press must reach the focused component");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

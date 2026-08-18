@@ -354,8 +354,24 @@ static CN1MacWindow* slotAt(int slot) {
  * old geometry on its way out. Once it matches, the window is free again and every
  * later layout (a user resize) passes straight through.
  */
+/* Guards the pending queue and the slot table's lifecycle fields. Both are
+ * touched from two threads: scene requests and deliveries run on UIKit's main
+ * queue, while create and destroy are called from the Codename One event
+ * dispatch thread. Without it a dispose racing a scene delivery could pop a
+ * half-compacted queue, or adopt a scene into a slot as it was being cleared,
+ * misassigning or orphaning a native scene.
+ *
+ * The event dispatch thread never blocks on the main queue while holding this,
+ * so it cannot deadlock against UIKit. The …Locked helpers assume it is held. */
+static pthread_mutex_t g_slotLock = PTHREAD_MUTEX_INITIALIZER;
+
 static void CN1MacWindowReportLayout(int windowId, int width, int height) {
     int iter;
+    int drop = 0;
+    /* Same critical section as the writer in CN1MacWindowSetBounds: the decision to
+     * drop this layout and the clearing of the request have to see one consistent
+     * set of the handshake fields. */
+    pthread_mutex_lock(&g_slotLock);
     for (iter = 0; iter < CN1_MAC_MAX_WINDOWS; iter++) {
         CN1MacWindow* w = &g_macWindows[iter];
         if (!w->inUse || w->windowId != windowId) {
@@ -372,7 +388,8 @@ static void CN1MacWindowReportLayout(int windowId, int width, int height) {
                  * does not have. */
                 if (!w->staleLayoutDropped) {
                     w->staleLayoutDropped = 1;
-                    return;
+                    drop = 1;
+                    break;
                 }
             }
             w->awaitingWidth = 0;
@@ -381,6 +398,12 @@ static void CN1MacWindowReportLayout(int windowId, int width, int height) {
         }
         break;
     }
+    pthread_mutex_unlock(&g_slotLock);
+    if (drop) {
+        return;
+    }
+    /* Outside the lock: this re-enters Codename One, which must never happen while
+     * holding a lock the event dispatch thread can be waiting on. */
     CN1MacWindowDeliverResize(windowId, width, height);
 }
 
@@ -407,16 +430,7 @@ static int slotForSceneLocked(UIWindowScene* scene) {
 static int g_pendingSlots[CN1_MAC_MAX_WINDOWS];
 static int g_pendingCount;
 
-/* Guards the pending queue and the slot table's lifecycle fields. Both are
- * touched from two threads: scene requests and deliveries run on UIKit's main
- * queue, while create and destroy are called from the Codename One event
- * dispatch thread. Without it a dispose racing a scene delivery could pop a
- * half-compacted queue, or adopt a scene into a slot as it was being cleared,
- * misassigning or orphaning a native scene.
- *
- * The event dispatch thread never blocks on the main queue while holding this,
- * so it cannot deadlock against UIKit. The …Locked helpers assume it is held. */
-static pthread_mutex_t g_slotLock = PTHREAD_MUTEX_INITIALIZER;
+
 
 static void pushPendingSlotLocked(int slot) {
     if (g_pendingCount < CN1_MAC_MAX_WINDOWS) {
@@ -880,13 +894,22 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
     if (w == NULL) {
         return;
     }
+    /* The five geometry handshake fields move together and are read by
+     * CN1MacWindowReportLayout on UIKit's main thread. Updated unlocked, a layout
+     * callback landing mid-update could accept a recycled scene's old size, or clear
+     * a request that had only half arrived -- either way the framework lays out at
+     * dimensions the native window does not have. */
+    UIWindowScene* scene;
+    UIWindow* window;
+    pthread_mutex_lock(&g_slotLock);
     w->pendingWidth = width;
     w->pendingHeight = height;
     w->awaitingWidth = width;
     w->awaitingHeight = height;
     w->staleLayoutDropped = 0;
-    UIWindowScene* scene = w->scene;
-    UIWindow* window = w->window;
+    scene = w->scene;
+    window = w->window;
+    pthread_mutex_unlock(&g_slotLock);
     dispatch_async(dispatch_get_main_queue(), ^{
         /* Codename One geometry is in pixels, UIKit's is in points. */
         CGFloat scale = (window != nil && window.screen != nil) ? window.screen.scale : 1.0;

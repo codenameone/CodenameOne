@@ -2975,13 +2975,15 @@ public class Form extends Container implements TopLevelContainer {
             fireFocusLost(cmp);
         }
 
-        //if the styles are different there is a chance the preffered size is
-        //still the same therefore make sure there is a real need to preform
-        //a revalidate
+        // The styles can differ without the preferred size actually moving, so only
+        // revalidate when it really did. The test used to be inverted -- it cleared
+        // the trigger when the size *changed*, which dropped the revalidate in
+        // exactly the case that needs one and left neighbouring components at their
+        // old positions until some unrelated layout came along.
         if (trigger) {
             cmp.setShouldCalcPreferredSize(true);
             Dimension d = cmp.getPreferredSize();
-            if (prefW != d.getWidth() || prefH != d.getHeight()) {
+            if (prefW == d.getWidth() && prefH == d.getHeight()) {
                 cmp.setShouldCalcPreferredSize(false);
                 trigger = false;
             }
