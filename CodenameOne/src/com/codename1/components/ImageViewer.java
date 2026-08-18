@@ -27,7 +27,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.ImageFactory;
@@ -1122,9 +1121,12 @@ public class ImageViewer extends Component {
             updatePositions();
             repaint();
             if (image.isAnimation()) {
-                Form f = getComponentForm();
-                if (f != null) {
-                    f.registerAnimated(this);
+                // The top level, matching every other registration here: inside a
+                // Window getComponentForm() is null, so swapping in an animated image
+                // silently stopped animating it.
+                TopLevelContainer swapTop = getTopLevelContainer();
+                if (swapTop != null) {
+                    swapTop.registerAnimated(this);
                 }
             }
         }

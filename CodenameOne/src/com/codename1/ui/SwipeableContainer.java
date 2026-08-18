@@ -154,11 +154,15 @@ public class SwipeableContainer extends Container {
     @Override
     protected void deinitialize() {
         waitForRelease = false;
-        Form form = this.getComponentForm();
-        if (form != null) {
-            form.removePointerPressedListener(press);
-            form.removePointerReleasedListener(release);
-            form.removePointerDraggedListener(drag);
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so a swipeable there never released its listeners -- and
+        // never installed them in the first place, in initComponent below.
+        TopLevelContainer top = this.getTopLevelContainer();
+        if (top != null) {
+            Container c = top.asContainer();
+            c.removePointerPressedListener(press);
+            c.removePointerReleasedListener(release);
+            c.removePointerDraggedListener(drag);
         }
         super.deinitialize();
     }
@@ -167,11 +171,12 @@ public class SwipeableContainer extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        Form form = this.getComponentForm();
-        if (form != null && swipeActivated) {
-            form.addPointerPressedListener(press);
-            form.addPointerReleasedListener(release);
-            form.addPointerDraggedListener(drag);
+        TopLevelContainer top = this.getTopLevelContainer();
+        if (top != null && swipeActivated) {
+            Container c = top.asContainer();
+            c.addPointerPressedListener(press);
+            c.addPointerReleasedListener(release);
+            c.addPointerDraggedListener(drag);
         }
     }
 
@@ -240,7 +245,7 @@ public class SwipeableContainer extends Container {
         if (!open) {
             return;
         }
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             if (openedToRight) {
                 int topX = topWrapper.getX();
@@ -400,11 +405,11 @@ public class SwipeableContainer extends Container {
             }
             final int x = evt.getX();
             final int y = evt.getY();
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
             if (f == null) {
                 return;
             }
-            Component cmp = f.getComponentAt(x, y);
+            Component cmp = f.asContainer().getComponentAt(x, y);
             if (!waitForRelease && !contains(cmp)) {
                 return;
             }

@@ -612,9 +612,12 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
-        Form f = getComponentForm();
-        if (f != null) {
-            f.deregisterAnimated(this);
+        // Through the top level, matching the registration: resolving the form here
+        // left an animation registered inside a Window for the life of the window,
+        // because getComponentForm() is null there and the release was skipped.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.deregisterAnimated(this);
         }
 
         if (getIcon() != null) {

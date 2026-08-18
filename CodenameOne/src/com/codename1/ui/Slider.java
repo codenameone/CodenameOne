@@ -185,10 +185,10 @@ public class Slider extends Label implements ActionSource {
     @Override
     public void deinitialize() {
         if (infinite) {
-            Form f = getComponentForm();
-            if (f != null) {
-                f.deregisterAnimatedInternal(this);
-            }
+            // Matches the registration, which goes through the top level. Resolving
+            // the form here leaked the animation for every infinite slider inside a
+            // Window, where that form is null.
+            TopLevelSupport.deregisterAnimatedInternal(this, this);
         }
     }
 

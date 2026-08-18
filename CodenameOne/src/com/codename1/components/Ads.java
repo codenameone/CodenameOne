@@ -28,7 +28,6 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -163,8 +162,11 @@ public class Ads extends Container implements HTMLCallback {
     /// {@inheritDoc}
     @Override
     public boolean animate() {
-        Form parent = getComponentForm();
-        if (parent == null || !parent.isVisible()) {
+        // The top level's visibility rather than an enclosing Form's: getComponentForm()
+        // is null by design inside a Window, so this returned immediately there and the
+        // refresh the registration had just been fixed to enable never actually ran.
+        TopLevelContainer parent = getTopLevelContainer();
+        if (parent == null || !parent.asContainer().isVisible()) {
             return false;
         }
         long t = System.currentTimeMillis();

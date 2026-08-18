@@ -2080,6 +2080,29 @@ class WindowTest extends UITestBase {
         assertEquals(before, sw.isValue(),
                 "the value flips when the animation finishes, not on release");
 
+        // The guard around a registration matters as much as the registration. Several
+        // of these sites sat inside an `if (getComponentForm() != null)`, so migrating
+        // only the call left it unreachable in a Window -- a fix that changed nothing.
+        // Toolbar was the worst of them: hideToolbar() compared the current Form with a
+        // null one and took its early return, and the following showToolbar() then went
+        // down its hidden branch and dereferenced that null form.
+        // Hidden on a window that is not on screen, which is the path that used to
+        // strand the toolbar: hideToolbar() took its early return and marked the
+        // toolbar invisible, and showToolbar() then went down its hidden branch and
+        // dereferenced the null form.
+        Window off = new Window("offscreen", new BorderLayout());
+        off.setWindowSize(400, 300);
+        Toolbar tb = new Toolbar();
+        off.setToolbar(tb);
+        off.revalidate();
+        tb.hideToolbar();
+        assertFalse(tb.isVisible(),
+                "a toolbar hidden while its window is off screen is hidden outright");
+        tb.showToolbar();
+        assertTrue(tb.isVisible(),
+                "and showing it again must bring it back rather than throw");
+        off.dispose();
+
         // ImageViewer registers the same way from its animated setZoom path, which is
         // an ordinary operation rather than an edge case.
         com.codename1.components.ImageViewer viewer =

@@ -2826,53 +2826,68 @@ public class Toolbar extends Container {
     /// Hide the Toolbar if it is currently showing
     public void hideToolbar() {
         showing = false;
-        if (Display.INSTANCE.getCurrent() != getComponentForm()) { //NOPMD CompareObjectsWithEquals
+        // Resolved against this toolbar's own top level. Comparing the current Form
+        // with getComponentForm() took the early return for every toolbar in a Window,
+        // where that form is null by design -- so the animated hide never ran, and the
+        // matching show then went down its own hidden branch and threw.
+        TopLevelContainer top = getTopLevelContainer();
+        // Identity, not equality: the question is whether the surface on screen is
+        // this very toolbar's own top level.
+        boolean onScreen;
+        if (top instanceof Window) {
+            onScreen = ((Window) top).isWindowShowing();
+        } else {
+            onScreen = Display.INSTANCE.getCurrent() == top; //NOPMD CompareObjectsWithEquals
+        }
+        if (!onScreen) {
             setVisible(false);
             setHidden(true);
             return;
         }
         if (actualPaneInitialH == 0) {
-            Form f = getComponentForm();
-            if (f != null) {
-                initVars(f.getActualPane());
+            Container actual = TopLevelSupport.actualPaneOf(top);
+            if (actual != null) {
+                initVars(actual);
             }
         }
         hideShowMotion = Motion.createSplineMotion(getY(), -getHeight(), 300);
-        // The top level rather than the form: getComponentForm() is null
-        // by design inside a Window, so this both threw and left the
-        // animation unregistered there.
-        TopLevelContainer topLevel = getTopLevelContainer();
-        if (topLevel != null) {
-            topLevel.registerAnimated(this);
-        }
+        top.registerAnimated(this);
         hideShowMotion.start();
     }
 
     /// Show the Toolbar if it is currently not showing
     public void showToolbar() {
         showing = true;
+        TopLevelContainer top = getTopLevelContainer();
+        if (top == null) {
+            // Not in a hierarchy: there is nothing to animate against, and the old
+            // code dereferenced a null form here.
+            setVisible(true);
+            setHidden(false);
+            return;
+        }
         if (!isVisible()) {
             setVisible(true);
             setHidden(false);
-            getComponentForm().animateLayout(200);
+            top.asContainer().animateLayout(200);
             return;
         }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
-        // The top level rather than the form: getComponentForm() is null
-        // by design inside a Window, so this both threw and left the
-        // animation unregistered there.
-        TopLevelContainer topLevel = getTopLevelContainer();
-        if (topLevel != null) {
-            topLevel.registerAnimated(this);
-        }
+        top.registerAnimated(this);
         hideShowMotion.start();
     }
 
     @Override
     public boolean animate() {
         if (hideShowMotion != null) {
-            Form f = getComponentForm();
-            final Container actualPane = f.getActualPane();
+            TopLevelContainer top = getTopLevelContainer();
+            final Container actualPane = TopLevelSupport.actualPaneOf(top);
+            if (actualPane == null) {
+                // Removed from its hierarchy mid-animation. Nothing left to move, and
+                // dereferencing the top level here is what used to throw.
+                hideShowMotion = null;
+                return false;
+            }
             int val = hideShowMotion.getValue();
             setY(val);
             if (!layered) {
@@ -2880,10 +2895,10 @@ public class Toolbar extends Container {
                 actualPane.setHeight(actualPaneInitialH - val);
                 actualPane.doLayout();
             }
-            f.repaint();
+            top.asContainer().repaint();
             boolean finished = hideShowMotion.isFinished();
             if (finished) {
-                f.deregisterAnimated(this);
+                top.deregisterAnimated(this);
                 hideShowMotion = null;
             }
             return !finished;

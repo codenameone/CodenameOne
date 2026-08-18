@@ -223,6 +223,28 @@ final class TopLevelSupport {
         }
     }
 
+    /// The content area a top level lays its children out in.
+    ///
+    /// `getActualPane` is package private on both `Form` and `Window`, so like the
+    /// internal animation registration it cannot sit on the public interface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to ask, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the actual pane, or null when there is no top level
+    static Container actualPaneOf(TopLevelContainer top) {
+        if (top instanceof Form) {
+            return ((Form) top).getActualPane();
+        }
+        if (top instanceof Window) {
+            return ((Window) top).getActualPane();
+        }
+        return null;
+    }
+
     /// Throws when the running platform has no windowing system, so that misuse
     /// fails at the point of construction rather than at the first paint.
     ///

@@ -883,6 +883,11 @@ public class Picker extends Button {
                 buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
 
+                // Deliberately a Form and not the top level. This popup is an
+                // InteractionDialog, which is documented as unsupported inside a
+                // Window (it shows on the current form's layered pane), so a picker in
+                // a window fails here with a clear message rather than opening its
+                // popup over the wrong surface.
                 Form form = getComponentForm();
                 if (form == null) {
                     throw new RuntimeException("Attempt to show interaction dialog while button is not on form.  Illegal state");
