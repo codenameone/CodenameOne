@@ -233,6 +233,49 @@ public class BufferedGraphics extends HTML5Graphics {
                 });
     }
 
+    /**
+     * The active shape clip as a coverage test, or null when the clip is a plain rectangle --
+     * already handled exactly by the bounds intersection -- or when it cannot be compared in the
+     * coordinates the text is in.
+     */
+    private JavaScriptTextLayer.CoverTest clipShapeCoverTest() {
+        if (!isClipShape) {
+            return null;
+        }
+        // Text is only promoted under an identity transform, so the clip is only comparable to
+        // it while it too is untransformed. Anything else keeps the bounding-rectangle answer.
+        if (clipTransform != null && !clipTransform.isIdentity()) {
+            return null;
+        }
+        if (transform != null && !transform.isIdentity()) {
+            return null;
+        }
+        final float[][] outline = outlineOf(clipShape);
+        if (outline == null || outline.length == 0) {
+            return null;
+        }
+        final int winding = windingOf(clipShape);
+        return new JavaScriptTextLayer.CoverTest() {
+            @Override
+            public boolean covers(int x, int y, int w, int h) {
+                return outlineMeetsRect(outline, winding, true, x, y, w, h);
+            }
+        };
+    }
+
+    /**
+     * A draw covers text only where both the draw's own outline and the clip reach it.
+     */
+    private static JavaScriptTextLayer.CoverTest bothCover(final JavaScriptTextLayer.CoverTest a,
+            final JavaScriptTextLayer.CoverTest b) {
+        return new JavaScriptTextLayer.CoverTest() {
+            @Override
+            public boolean covers(int x, int y, int w, int h) {
+                return a.covers(x, y, w, h) && b.covers(x, y, w, h);
+            }
+        };
+    }
+
     private static float[][] segmentOutline(int x1, int y1, int x2, int y2) {
         return new float[][] { new float[] { x1, x2 }, new float[] { y1, y2 } };
     }
@@ -685,6 +728,14 @@ public class BufferedGraphics extends HTML5Graphics {
         y = top;
         w = right - left;
         h = bottom - top;
+        // A shape clip has been reduced to its bounding rectangle above, and a fill of that
+        // rectangle would then be read as covering text the clip actually protects -- text
+        // inside the bounding box but outside the shape. Detaching a run costs its component
+        // the DOM for the rest of the form's life, so the clip's own outline gets a say.
+        JavaScriptTextLayer.CoverTest clipTest = clipShapeCoverTest();
+        if (clipTest != null) {
+            test = test == null ? clipTest : bothCover(test, clipTest);
+        }
         if (transform == null || transform.isIdentity()) {
             layer.noteCanvasCover(x, y, w, h, test);
             return;
