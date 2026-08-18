@@ -272,6 +272,22 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                         + "right shape would be invoked instead of the one you annotated.");
                 continue;
             }
+            if (expected != null && expected.endsWith("Ljava/util/List;")
+                    && !returnsListOf(m, cls.getBinaryName())) {
+                // The descriptor is erased, so every List looks alike here -- List<String>
+                // passes a check that only sees java/util/List. The generated adapter then
+                // takes each element as the entity type, and on ParparVM a failed CHECKCAST
+                // does not throw: it reads entity members out of whatever was in the list and
+                // crashes natively, where no Java catch can see it. The generic signature is
+                // the only place the element type survives, so it is what gets checked.
+                ctx.error(cls, "@EntityQuery(" + kind + ") on " + cls.getBinaryName() + "."
+                        + m.getName() + " must return " + describeQuery(kind, cls.getBinaryName())
+                        + ". A raw List, or a List of anything else, compiles here and then "
+                        + "hands the generated adapter an object that is not a "
+                        + cls.getBinaryName().substring(cls.getBinaryName().lastIndexOf('.') + 1)
+                        + ".");
+                continue;
+            }
             String existing = def.queries.get(kind);
             if (existing != null) {
                 // Silently keeping the later one picks a resolver by declaration order, which
@@ -313,6 +329,18 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "(Ljava/lang/String;)Ljava/util/List;";
         }
         return null;
+    }
+
+    /// Whether this method's generic signature says it returns a List of exactly this entity.
+    ///
+    /// False for a raw List too: without a type argument the class file records no signature
+    /// at all, and an unchecked list is exactly the case being guarded against.
+    private static boolean returnsListOf(MethodInfo m, String binaryName) {
+        String signature = m.getSignature();
+        if (signature == null) {
+            return false;
+        }
+        return signature.endsWith("Ljava/util/List<L" + binaryName.replace('.', '/') + ";>;");
     }
 
     /// The same shape, written the way a developer wrote it.
@@ -437,15 +465,22 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                 def.phrases.add((String) o);
             }
         }
-        for (Object o : asList(ann.get("exposure"))) {
+        Object declaredExposure = ann.get("exposure");
+        for (Object o : asList(declaredExposure)) {
             String e = enumConstant(o);
             if (e != null) {
                 def.exposure.add(e);
             }
         }
-        if (def.exposure.isEmpty()) {
+        if (def.exposure.isEmpty() && declaredExposure == null) {
+            // Only when the element was left out. An explicitly written exposure = {} is a
+            // choice -- no platform consumer at all, reachable through Intents.invoke and
+            // nothing else -- and defaulting it to ASSISTANT published a capability to Siri and
+            // to the launcher that had asked for neither. Absent and empty are different
+            // answers, and ASM reports them differently: null against an empty array.
             def.exposure.add("ASSISTANT");
         }
+
 
         readParameters(cls, m, def, ctx);
 

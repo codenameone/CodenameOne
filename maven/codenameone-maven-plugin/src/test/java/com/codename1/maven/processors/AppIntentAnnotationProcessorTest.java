@@ -1374,6 +1374,74 @@ public class AppIntentAnnotationProcessorTest {
                 manifest.contains("\"title\": \"playlist\""));
     }
 
+    /// The descriptor is erased, so every List looks alike -- List<String> passed a check that
+    /// only saw java/util/List. The generated adapter then takes each element as the entity,
+    /// and on ParparVM a failed CHECKCAST does not throw: it reads entity members out of a
+    /// String and crashes natively, where no Java catch can see it.
+    @Test
+    public void anEntityQueryReturningTheWrongListTypeIsRejected() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Playlist",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "import java.util.List;\n"
+                                + "@IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "public class Playlist {\n"
+                                + "  @EntityId public String getId() { return \"1\"; }\n"
+                                + "  @EntityTitle public String getName() { return \"F\"; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "  public static Playlist byId(String id) { return null; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.SUGGESTED)\n"
+                                + "  public static List<String> recent() { return null; }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        assertError(classes, "must return public static List<Playlist>");
+    }
+
+    /// A raw List records no signature at all, which is the same hole with less to see.
+    @Test
+    public void anEntityQueryReturningARawListIsRejected() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Playlist",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "import java.util.List;\n"
+                                + "@IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "public class Playlist {\n"
+                                + "  @EntityId public String getId() { return \"1\"; }\n"
+                                + "  @EntityTitle public String getName() { return \"F\"; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "  public static Playlist byId(String id) { return null; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.SEARCH)\n"
+                                + "  @SuppressWarnings(\"rawtypes\")\n"
+                                + "  public static List matching(String q) { return null; }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        assertError(classes, "must return public static List<Playlist>");
+    }
+
+    /// An explicitly written exposure = {} is a choice -- no platform consumer at all,
+    /// reachable through Intents.invoke and nothing else. Defaulting it to ASSISTANT published
+    /// a capability to Siri and to the launcher that had asked for neither.
+    @Test
+    public void anExplicitlyEmptyExposureIsNotWidenedToAssistant() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"internal_only\", title = \"Internal\", exposure = {})\n"
+                        + "public static IntentResult run() {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        ProcessorContext ctx = run(classes, true);
+
+        String manifest = manifest(ctx);
+        assertFalse("an empty exposure must not become ASSISTANT:\n" + manifest,
+                manifest.contains("ASSISTANT"));
+    }
+
     /// Keeping the later of two same-kind queries picks a resolver by declaration order, which
     /// nobody chose -- and for BY_ID it decides what every entity id in the app resolves to.
     @Test

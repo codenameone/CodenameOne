@@ -172,6 +172,13 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    private static IntentDeclaration modelIntent(String id, boolean destructive) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, destructive,
+                "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.MODEL));
+    }
+
     private static IntentDeclaration declarationWithNumericParam(String id, String param,
                                                                  IntentParameterType type,
                                                                  int bits) {
@@ -1817,6 +1824,28 @@ class IntentsTest {
         Intents.donate("count_long", params);
 
         assertEquals("count_long", b.donatedId);
+    }
+
+    /// A Tool is a name, a schema and a handler: nowhere in it to say "ask first", and
+    /// IntentTool.invoke dispatches immediately. So a destructive capability projected here
+    /// would let a model delete or spend because it inferred a call, while every other surface
+    /// refuses or confirms.
+    @Test
+    void aDestructiveIntentIsNotOfferedAsAModelTool() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(modelIntent("wipe_all", true));
+        d.declarations.add(modelIntent("log_run", false));
+        Intents.setDispatcher(d);
+
+        List<com.codename1.ai.Tool> tools = Intents.asTools();
+
+        List<String> names = new ArrayList<String>();
+        for (com.codename1.ai.Tool t : tools) {
+            names.add(t.getName());
+        }
+        assertFalse(names.contains("wipe_all"),
+                "a model must not be able to run a destructive action on inference alone");
+        assertTrue(names.contains("log_run"), "and the rest of the projection is unaffected");
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id

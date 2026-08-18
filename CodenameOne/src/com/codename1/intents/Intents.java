@@ -656,6 +656,24 @@ public final class Intents {
             if (!d.isExposedTo(Exposure.MODEL)) {
                 continue;
             }
+            if (d.isDestructive()) {
+                // A Tool is a name, a schema and a handler: there is nowhere in it to say "ask
+                // first", and IntentTool.invoke dispatches immediately. So projecting a
+                // destructive capability here would let a model delete, send or spend because
+                // it inferred a call -- while every other surface refuses or confirms. The
+                // static shortcut builder refuses one, the trampoline's unauthenticated policy
+                // refuses one, donate() refuses one, and the generated App Intent confirms
+                // before it runs. This is the same door.
+                //
+                // MODEL exposure says the capability is eligible for a model, not that any
+                // particular call was consented to. An application that really wants this can
+                // still build its own Tool around the handler, where it decides what
+                // confirmation means; what it cannot do is get one by accident from here.
+                logDiagnostic("Not offering \"" + d.getId() + "\" as a model tool: it is "
+                        + "destructive, and a Tool has no way to confirm before it runs. It "
+                        + "remains available through the assistant, which confirms first.");
+                continue;
+            }
             out.add(new Tool(d.getId(), toolDescription(d), toolSchema(d), new IntentTool(d)));
         }
         return out;
