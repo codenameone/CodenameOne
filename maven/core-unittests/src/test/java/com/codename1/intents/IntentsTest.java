@@ -1089,6 +1089,38 @@ class IntentsTest {
         assertEquals("shop:42", ok.getId());
     }
 
+    /// The constructor rejects a colon in the type; these paths take a type without ever
+    /// building an entity, so they never reached that check. removeFromIndex("shop:order","42")
+    /// composes the uid "shop:order:42" -- exactly what new AppEntity("shop","order:42")
+    /// publishes -- so the call did not fail, it deleted somebody else's content.
+    @Test
+    void theStringKeyedIndexPathsEnforceTheSameTypeRule() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+
+        try {
+            Intents.removeFromIndex("shop:order", "42");
+            fail("a colon in the type collides with another entity's identifier");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("may not contain"), e.getMessage());
+        }
+        try {
+            Intents.clearIndex("shop:order");
+            fail("clearing matches by uid prefix, so it collides the same way");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("may not contain"), e.getMessage());
+        }
+        assertNull(b.removedJson);
+        assertEquals("unset", b.clearedType);
+
+        // The legitimate forms still work, including a colon in the id.
+        Intents.removeFromIndex("order", "shop:42");
+        assertNotNull(b.removedJson);
+        assertTrue(b.removedJson.contains("order:shop:42"));
+        Intents.clearIndex("order");
+        assertEquals("order", b.clearedType);
+    }
+
     @Test
     void indexedEntitiesAndRemovalsAgreeOnACompositeUid() {
         FakeBridge b = new FakeBridge();

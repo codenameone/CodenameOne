@@ -532,6 +532,11 @@ public final class Intents {
         if (entityType == null || id == null) {
             return;
         }
+        // Same rule the constructor enforces, and this path never builds an entity so it never
+        // reached it. removeFromIndex("shop:order", "42") composes the uid "shop:order:42",
+        // which is exactly what new AppEntity("shop", "order:42") publishes -- so the call did
+        // not merely fail, it deleted somebody else's content.
+        AppEntity.checkType(entityType);
         IntentBridge b = bridgeInternal();
         if (b == null || !b.isIndexingSupported()) {
             return;
@@ -549,6 +554,11 @@ public final class Intents {
     ///
     /// - `entityType`: the type to clear, or null for all of this app's entries
     public static void clearIndex(String entityType) {
+        if (entityType != null) {
+            // Ports match a type by uid prefix, so clearIndex("shop:order") would sweep every
+            // entity of type "shop" whose id begins with "order:" -- the same collision.
+            AppEntity.checkType(entityType);
+        }
         IntentBridge b = bridgeInternal();
         if (b == null || !b.isIndexingSupported()) {
             return;

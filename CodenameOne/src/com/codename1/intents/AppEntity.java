@@ -67,6 +67,20 @@ public final class AppEntity {
     /// - `id`: the stable identifier of this instance. Colons are fine here: the uid splits at
     ///   the first one, so everything after it is the id.
     public AppEntity(String type, String id) {
+        checkType(type);
+        if (id == null || id.length() == 0) {
+            throw new IllegalArgumentException("id is required");
+        }
+        this.type = type;
+        this.id = id;
+    }
+
+    /// Enforces the one rule an entity type has to obey, in one place.
+    ///
+    /// Shared with the string-keyed paths on [Intents] -- removal and clearing take a type
+    /// without ever constructing an entity, so a check that lived only in this constructor
+    /// guarded half the surface. Package-private because those callers are its only users.
+    static void checkType(String type) {
         if (type == null || type.length() == 0) {
             throw new IllegalArgumentException("type is required");
         }
@@ -82,11 +96,6 @@ public final class AppEntity {
                     + "platforms store, so an entity declaring one cannot be resolved when the "
                     + "user taps it.");
         }
-        if (id == null || id.length() == 0) {
-            throw new IllegalArgumentException("id is required");
-        }
-        this.type = type;
-        this.id = id;
     }
 
     /// The entity type id.
