@@ -126,6 +126,11 @@ public class JavaSEIntentBridge implements IntentBridge {
             if (images != null) {
                 indexImages.putAll(images);
             }
+            // Reindexing the same uid with a new picture replaces its document and leaves the
+            // previous blob behind, so a session that updates one entity repeatedly grew
+            // forever and getIndexedImages() reported pictures nothing points at. Pruning only
+            // on removal covered half the ways an image stops being referenced.
+            pruneImages();
         }
     }
 

@@ -131,7 +131,18 @@ public class AndroidIntentBridge implements IntentBridge {
         // first tap after process death visibly open the app for an intent that declared
         // headless=true, and the trampoline had already foregrounded by then.
         com.codename1.intents.IntentDeclaration decl = Intents.getDeclaration(parked);
-        boolean headless = decl != null && decl.isHeadless();
+        // A route needs somewhere visible to land, exactly as the trampoline decides it.
+        boolean headless = decl != null && decl.isHeadless()
+                && decl.getOpensRoute().length() == 0;
+        if (!headless) {
+            // This runs from registerIntents, which the stub calls while the app instance is
+            // still being built -- before init()/start() have produced a Form. Dispatching a
+            // non-headless handler here would hand it the same absent window the foreground
+            // queue exists to wait for, so it joins that queue rather than taking a shortcut
+            // around it. Parameters were dropped at the door, so there are none to carry.
+            parkForegroundRequest(parked, null);
+            return;
+        }
         // The completion is what CN1IntentService.wakeRuntime waits on. Without it the service
         // that started this runtime has no idea when the handler finished, and tearing the
         // runtime down underneath a handler that was still working loses whatever it was doing.

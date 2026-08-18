@@ -287,6 +287,15 @@ class SimulatorIntents {
                     preselect = ids.size() - 1;
                 }
             }
+            if (declared.length() > 0 && !ids.contains(declared)) {
+                // A declared default need not be something SUGGESTED returns -- that query
+                // answers "what would this user pick now", not "what is valid". Leaving it out
+                // meant the form submitted the first suggestion instead, exercising a different
+                // request from the device, where the id resolves through BY_ID like any other.
+                labels.add(declared + "  (default)");
+                ids.add(declared);
+                preselect = ids.size() - 1;
+            }
             JComboBox box = new JComboBox(new DefaultComboBoxModel(
                     labels.toArray(new String[labels.size()])));
             // A declared default is what the runtime would substitute, so it is what the form
