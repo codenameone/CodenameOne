@@ -297,7 +297,7 @@ public final class IntentSerializer {
         if (img != null && (images != null || inlineImages)) {
             byte[] bytes = img.getImageData();
             if (bytes != null && bytes.length > 0) {
-                String name = "e" + Integer.toHexString(contentHash(bytes));
+                String name = imageName(bytes, images);
                 if (images != null) {
                     images.put(name, bytes);
                 }
@@ -368,6 +368,41 @@ public final class IntentSerializer {
             return value.toString();
         }
         return null;
+    }
+
+    /// A name for this blob that no other blob in the same request will take.
+    ///
+    /// The name was a 32-bit content hash, which is fine as a cache key and wrong as an
+    /// identity: two different thumbnails that collide got the same name and the second
+    /// overwrote the first, so one entity displayed another entity's picture on every platform.
+    /// The length narrows it further, and an actual collision is then resolved by comparing the
+    /// bytes -- exact, and cheaper than pulling in a digest the ParparVM runtime would have to
+    /// carry.
+    private static String imageName(byte[] bytes, Map<String, byte[]> images) {
+        String base = "e" + Integer.toHexString(contentHash(bytes)) + "_" + bytes.length;
+        if (images == null) {
+            return base;
+        }
+        String name = base;
+        for (int i = 1; ; i++) {
+            byte[] existing = images.get(name);
+            if (existing == null || sameBytes(existing, bytes)) {
+                return name;
+            }
+            name = base + "_" + i;
+        }
+    }
+
+    private static boolean sameBytes(byte[] a, byte[] b) {
+        if (a.length != b.length) {
+            return false;
+        }
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int contentHash(byte[] data) {

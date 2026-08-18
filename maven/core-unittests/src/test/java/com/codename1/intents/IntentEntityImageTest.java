@@ -84,6 +84,44 @@ class IntentEntityImageTest extends UITestBase {
     }
 
     /**
+     * The name was a 32-bit content hash, which is fine as a cache key and wrong as an
+     * identity: two different thumbnails that collide took the same name and the second
+     * overwrote the first, so one entity displayed another entity's picture. Two distinct
+     * images in one request must never share a key.
+     */
+    @FormTest
+    void twoDifferentThumbnailsNeverShareAName() {
+        byte[] a = png();
+        byte[] b = png();
+        b[10] = (byte) (b[10] ^ 0xFF);
+
+        Map<String, byte[]> images = new HashMap<String, byte[]>();
+        IntentSerializer.serializeEntities(Arrays.asList(
+                new AppEntity("order", "1").setTitle("One")
+                        .setImage(EncodedImage.create(a, 4, 4, false)),
+                new AppEntity("order", "2").setTitle("Two")
+                        .setImage(EncodedImage.create(b, 4, 4, false))), images);
+
+        assertEquals(2, images.size(), "two distinct pictures need two names");
+        for (Map.Entry<String, byte[]> e : images.entrySet()) {
+            assertTrue(Arrays.equals(e.getValue(), a) || Arrays.equals(e.getValue(), b));
+        }
+    }
+
+    /** The same picture twice is one blob, which is the point of hashing the content. */
+    @FormTest
+    void anIdenticalThumbnailIsStoredOnce() {
+        Map<String, byte[]> images = new HashMap<String, byte[]>();
+        IntentSerializer.serializeEntities(Arrays.asList(
+                new AppEntity("order", "1").setTitle("One")
+                        .setImage(EncodedImage.create(png(), 4, 4, false)),
+                new AppEntity("order", "2").setTitle("Two")
+                        .setImage(EncodedImage.create(png(), 4, 4, false))), images);
+
+        assertEquals(1, images.size());
+    }
+
+    /**
      * An entity with no image must not gain an empty field in either form, since the Swift side
      * reads its absence as "this entity has no thumbnail" rather than checking for emptiness.
      */

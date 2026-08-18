@@ -1180,6 +1180,22 @@ public final class Intents {
                 + "app for it.");
     }
 
+    /// What the generated coercion substitutes for an omitted value of this type, or null when
+    /// absence really does mean null.
+    ///
+    /// Only the primitives have one: a String, Date or entity parameter left out arrives as
+    /// null, and a URL containing "null" would route somewhere nobody asked for -- worse than
+    /// not navigating.
+    private static String implicitDefault(IntentParameterType type) {
+        if (type == IntentParameterType.INTEGER || type == IntentParameterType.NUMBER) {
+            return "0";
+        }
+        if (type == IntentParameterType.BOOLEAN) {
+            return "false";
+        }
+        return null;
+    }
+
     /// Fills a declared route template from the values the intent ran with, or returns null
     /// when there is no template or a placeholder has no value.
     private static String expandRoute(IntentDeclaration decl, Map<String, Object> params) {
@@ -1215,6 +1231,13 @@ public final class Intents {
                 if (p != null && p.getDefaultValue() != null
                         && p.getDefaultValue().length() > 0) {
                     value = p.getDefaultValue();
+                } else if (p != null) {
+                    // A primitive cannot be absent: the generated dispatcher hands the handler
+                    // the type's zero, so the route has to be built from that too. Reading only
+                    // explicit defaults meant "/items/{page}" with an optional int ran the
+                    // handler with page 0 and then left the foregrounded app on whatever screen
+                    // it was already showing -- the invocation half-happening.
+                    value = implicitDefault(p.getType());
                 }
             }
             if (value == null) {

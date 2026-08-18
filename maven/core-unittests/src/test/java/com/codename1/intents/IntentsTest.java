@@ -1089,6 +1089,65 @@ class IntentsTest {
         assertEquals("shop:42", ok.getId());
     }
 
+    /// A primitive cannot be absent -- the dispatcher hands the handler the type's zero -- so
+    /// the route has to be built from that too. Reading only explicit defaults meant the handler
+    /// ran and the foregrounded app stayed on whatever screen it was already showing.
+    @Test
+    void aRouteExpandsFromAPrimitivesImplicitDefault() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            IntentParameterInfo page = new IntentParameterInfo("page", "Which page?",
+                    IntentParameterType.INTEGER, false, null, null, null);
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", false, true, false,
+                    "/items/{page}", 5, Collections.<String>emptyList(),
+                    Arrays.asList(page), Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.ok();
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertEquals(Arrays.asList("/items/0"), navigated);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
+    /// A String left out arrives as null, and a URL containing "null" would route somewhere
+    /// nobody asked for -- worse than not navigating.
+    @Test
+    void aRouteWithAnAbsentStringDoesNotExpand() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            IntentParameterInfo tab = new IntentParameterInfo("tab", "Which tab?",
+                    IntentParameterType.STRING, false, null, null, null);
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", false, true, false,
+                    "/reports/{tab}", 5, Collections.<String>emptyList(),
+                    Arrays.asList(tab), Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.ok();
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertTrue(navigated.isEmpty(), "got " + navigated);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
     /// Whether an invocation actually runs headless is one question with one answer. It was
     /// being recomputed in four places -- the trampoline, the service's recheck, the parked
     /// path and the donation URI -- and each was fixed as a separate bug when it disagreed.
