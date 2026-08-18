@@ -326,7 +326,7 @@ class InterpIOSSymbols {
         return -1;
     }
 
-    private String superName(String internalName) {
+    String superName(String internalName) {
         Integer id = (Integer)classIds.get(internalName);
         if (id == null) {
             return null;

@@ -81,19 +81,33 @@ public class InterpIOSLinker implements InterpLinker {
         // A failure propagates. Java requires that a superclass initializer
         // throwing aborts the subclass's initialization, and swallowing it here
         // would let the subclass complete on top of a parent that never ran.
-        int id = symbols.classId(internalName);
-        if (id >= 0) {
-            InterpIOSNative.initializeClassById(id);
+        // The whole chain, top down. A generated __STATIC_INITIALIZER_ runs its
+        // own class's <clinit> and does not reach its parent's -- compiled code
+        // never needs it to, because entering the parent's constructor or
+        // reading its statics does that -- so initializing one class here would
+        // leave a grandparent's static block unrun.
+        String[] chain = new String[32];
+        int depth = 0;
+        String at = internalName;
+        while (at != null && depth < chain.length) {
+            chain[depth++] = at;
+            at = symbols.superName(at);
+        }
+        for (int i = depth - 1; i >= 0; i--) {
+            int id = symbols.classId(chain[i]);
+            if (id >= 0) {
+                InterpIOSNative.initializeClassById(id);
+            }
         }
     }
 
-    public boolean declaresDefaultMethod(String internalName) {
+    public void initializeDefaultBearingInterfaces(String internalName) {
         // The symbol table records a method's name, descriptor and staticness,
-        // not its access flags, so "is this a default method" cannot be
-        // answered here. False leaves an interface to initialize on its own
-        // first use, which is what happens on this platform anyway -- entering
-        // any of its methods runs its initializer.
-        return false;
+        // not its access flags, so "does this interface declare a default
+        // method" cannot be answered here -- and initializing every interface
+        // instead would run initializers Java does not. Each one initializes on
+        // its own first use, which on this platform is entry into any of its
+        // methods; only the ordering is lost.
     }
 
     public Object findClass(String internalName) {

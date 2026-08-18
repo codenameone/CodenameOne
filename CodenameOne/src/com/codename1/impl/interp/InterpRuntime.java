@@ -1256,14 +1256,13 @@ public final class InterpRuntime {
                 ensureInitialized(iface);
             }
         }
-        // Host interfaces too, and under the same rule: only the ones that
-        // declare a default method. The bundle does not record that -- the
-        // interface belongs to the app -- so the platform is asked.
+        // Host interfaces too, and under the same rule -- but the whole walk
+        // belongs to the platform. The bundle records only the interfaces a
+        // class declares directly, so an interpreted class implementing a host
+        // Child that extends a default-bearing host Parent is a hierarchy only
+        // the app can see.
         for (int i = 0; i < c.hostInterfaces.length; i++) {
-            String iface = externOwnerName(c.hostInterfaces[i]);
-            if (linker.declaresDefaultMethod(iface)) {
-                linker.initializeClass(iface);
-            }
+            linker.initializeDefaultBearingInterfaces(externOwnerName(c.hostInterfaces[i]));
         }
     }
 

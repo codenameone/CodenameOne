@@ -58,14 +58,16 @@ public interface InterpLinker {
     /// the child's rather than before it.
     void initializeClass(String internalName) throws Throwable;
 
-    /// Whether a host interface declares a default method.
+    /// Initializes the default-bearing interfaces at or above a host
+    /// interface, in the order JLS 12.4.1 requires.
     ///
-    /// Only those are initialized on an implementor's behalf (JLS 12.4.1), and
-    /// the bundle does not record it -- the interface belongs to the app, so
-    /// the platform is the only thing that can answer. False is the safe answer
-    /// for a platform that cannot tell: an interface initializes on its own
-    /// first use either way, and the only thing at stake is the order.
-    boolean declaresDefaultMethod(String internalName) throws Throwable;
+    /// The whole walk belongs to the platform, not to the interpreter: the
+    /// bundle records only the interfaces a class declares directly, and
+    /// whether any of them declares a default method is a fact about the app.
+    /// A platform that cannot tell does nothing, which leaves each interface to
+    /// initialize on its own first use -- the behaviour before any of this, and
+    /// wrong only in ordering.
+    void initializeDefaultBearingInterfaces(String internalName) throws Throwable;
 
     /// Constructs a host object.
     Object construct(Object hostClass, String descriptor, Object[] args) throws Throwable;

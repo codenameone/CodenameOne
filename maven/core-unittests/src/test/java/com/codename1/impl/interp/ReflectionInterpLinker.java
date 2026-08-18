@@ -73,17 +73,27 @@ public class ReflectionInterpLinker implements InterpLinker {
         this.loader = loader;
     }
 
-    public boolean declaresDefaultMethod(String internalName) {
+    public void initializeDefaultBearingInterfaces(String internalName) throws Throwable {
         Object c = findClass(internalName);
-        if (!(c instanceof Class) || !((Class<?>) c).isInterface()) {
-            return false;
+        if (c instanceof Class) {
+            initializeDefaultBearing((Class<?>) c, 0);
         }
-        for (java.lang.reflect.Method m : ((Class<?>) c).getDeclaredMethods()) {
+    }
+
+    private void initializeDefaultBearing(Class<?> iface, int depth) throws Throwable {
+        if (!iface.isInterface() || depth > 16) {
+            return;
+        }
+        for (Class<?> parent : iface.getInterfaces()) {
+            initializeDefaultBearing(parent, depth + 1);
+        }
+        for (java.lang.reflect.Method m : iface.getDeclaredMethods()) {
             if (m.isDefault()) {
-                return true;
+                Class.forName(iface.getName(), true,
+                        ReflectionInterpLinker.class.getClassLoader());
+                return;
             }
         }
-        return false;
     }
 
     public void initializeClass(String internalName) throws Throwable {
