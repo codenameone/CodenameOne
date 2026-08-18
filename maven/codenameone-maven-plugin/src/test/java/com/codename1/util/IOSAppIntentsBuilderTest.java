@@ -140,7 +140,7 @@ class IOSAppIntentsBuilderTest {
 
         assertTrue(swift.contains("struct CN1Intent_log_workout: AppIntent"));
         assertTrue(swift.contains("@Parameter(title: \"minutes\")"));
-        assertTrue(swift.contains("var minutes: Int"));
+        assertTrue(swift.contains("var `minutes`: Int"));
         assertTrue(swift.contains("CN1IntentBridge.run(id: \"log_workout\""),
                 "the Swift is a shell; the behaviour has to cross to Java");
     }
@@ -238,11 +238,11 @@ class IOSAppIntentsBuilderTest {
                 new ArrayList<Map<String, Object>>());
 
         assertTrue(swift.contains("enum CN1Choice_log_workout_kind: String, AppEnum"));
-        assertTrue(swift.contains("case run = \"run\""));
-        assertTrue(swift.contains("case ride = \"ride\""));
-        assertTrue(swift.contains("var kind: CN1Choice_log_workout_kind"),
+        assertTrue(swift.contains("case `run` = \"run\""));
+        assertTrue(swift.contains("case `ride` = \"ride\""));
+        assertTrue(swift.contains("var `kind`: CN1Choice_log_workout_kind"),
                 "the parameter has to be typed as the enum or the platform still takes free text");
-        assertTrue(swift.contains("kind.rawValue"),
+        assertTrue(swift.contains("`kind`.rawValue"),
                 "Java declared a String, so that is what must cross");
     }
 
@@ -254,7 +254,7 @@ class IOSAppIntentsBuilderTest {
                 new ArrayList<Map<String, Object>>());
 
         assertFalse(swift.contains("AppEnum"));
-        assertTrue(swift.contains("var note: String"));
+        assertTrue(swift.contains("var `note`: String"));
     }
 
     /// IntentResult.entity(...) writes no "value", so returning outcome.value gave Shortcuts an
@@ -277,8 +277,8 @@ class IOSAppIntentsBuilderTest {
                                 param("playlist", "entity", "entityType", "playlist")))),
                 Arrays.asList(entity("playlist", "Playlist", "BY_ID")));
 
-        assertTrue(swift.contains("var playlist: CN1Entity_playlist"));
-        assertTrue(swift.contains("playlist.id"),
+        assertTrue(swift.contains("var `playlist`: CN1Entity_playlist"));
+        assertTrue(swift.contains("`playlist`.id"),
                 "the app's own object never crosses; only its id does");
     }
 
@@ -403,9 +403,9 @@ class IOSAppIntentsBuilderTest {
                 Arrays.asList(intent("log_workout", "Log", "params", Arrays.asList(optional))),
                 new ArrayList<Map<String, Object>>());
 
-        assertTrue(swift.contains("var note: String?"), swift);
+        assertTrue(swift.contains("var `note`: String?"), swift);
         // Absent means absent: nothing is put in the map, so Java applies its own default.
-        assertTrue(swift.contains("if let v = note"), swift);
+        assertTrue(swift.contains("if let v = `note`"), swift);
     }
 
     @Test
@@ -415,8 +415,8 @@ class IOSAppIntentsBuilderTest {
                         "params", Arrays.asList(param("minutes", "int")))),
                 new ArrayList<Map<String, Object>>());
 
-        assertTrue(swift.contains("var minutes: Int\n"), swift);
-        assertFalse(swift.contains("var minutes: Int?"), swift);
+        assertTrue(swift.contains("var `minutes`: Int\n"), swift);
+        assertFalse(swift.contains("var `minutes`: Int?"), swift);
     }
 
     @Test
@@ -538,8 +538,12 @@ class IOSAppIntentsBuilderTest {
         assertEquals(2, enums.size());
     }
 
+    /// Every generated identifier is back-quoted, keyword or not. A table of keywords was the
+    /// wrong shape: it was missing associatedtype, inout and precedencegroup, and Swift adds
+    /// more with every release, so it could only ever be missing more later -- each omission an
+    /// illegal declaration in a file the developer never wrote.
     @Test
-    void aSwiftKeywordParameterIsEscaped() {
+    void everyGeneratedParameterIdentifierIsEscaped() {
         // Parameter names come from application code, so a Swift keyword is reachable rather
         // than theoretical, and an unescaped one is a compile error on a Mac only.
         String swift = intentsSwift(
@@ -548,6 +552,14 @@ class IOSAppIntentsBuilderTest {
                 new ArrayList<Map<String, Object>>());
 
         assertTrue(swift.contains("var `repeat`: Int"));
+
+        // And one that is not a keyword at all, so no table decides it. associatedtype was
+        // missing from the old list; nothing is missing from "always".
+        String other = intentsSwift(
+                Arrays.asList(intent("do_thing", "Do",
+                        "params", Arrays.asList(param("associatedtype", "string")))),
+                new ArrayList<Map<String, Object>>());
+        assertTrue(other.contains("var `associatedtype`: String"), other);
     }
 
     /// Swift ends a single-line literal at a carriage return exactly as it does at a newline,

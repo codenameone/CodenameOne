@@ -163,31 +163,19 @@ public final class IOSAppIntentsBuilder {
     /// metadata the system keeps.
     private static List<String> caseNames(List<String> options) {
         List<String> out = new ArrayList<String>();
+        List<String> taken = new ArrayList<String>();
         for (String option : options) {
-            String base = caseName(option);
+            String base = legalIdentifier(sanitize(option));
             String candidate = base;
-            for (int n = 2; out.contains(candidate); n++) {
-                // Inside the backticks when the base was a Swift keyword, so the result stays
-                // one escaped identifier rather than a keyword followed by a suffix.
-                candidate = base.startsWith("`") && base.endsWith("`")
-                        ? "`" + base.substring(1, base.length() - 1) + "_" + n + "`"
-                        : base + "_" + n;
+            for (int n = 2; taken.contains(candidate); n++) {
+                candidate = base + "_" + n;
             }
-            out.add(candidate);
+            taken.add(candidate);
+            out.add(escaped(candidate));
         }
         return out;
     }
 
-    /// A Swift case name for a declared option. Options are application strings, so they may be
-    /// anything; the raw value carries the real text and this only has to be a stable, legal
-    /// identifier. Uniqueness is caseNames' job, since it needs the whole list to see it.
-    private static String caseName(String option) {
-        String s = legalIdentifier(sanitize(option));
-        if (SWIFT_KEYWORDS.contains(s)) {
-            return "`" + s + "`";
-        }
-        return s;
-    }
 
     private void appendIntent(StringBuilder sb, Map<String, Object> intent) {
         String id = str(intent, "id");
@@ -512,6 +500,23 @@ public final class IOSAppIntentsBuilder {
         return id == null ? legalIdentifier(sanitize(rawName)) : id;
     }
 
+    /// Back-quotes a generated identifier, always.
+    ///
+    /// This used to consult a table of Swift keywords, and a table is the wrong shape for the
+    /// problem: the list was missing `associatedtype`, `inout`, `precedencegroup` and more, and
+    /// Swift adds keywords with every release, so it could only ever be missing more later.
+    /// Each omission is an illegal declaration in a generated file and a failed iOS build.
+    ///
+    /// Backticks are legal around *any* identifier, keyword or not -- checked against swiftc in
+    /// all three positions this emits: a property declaration, an enum case declaration, and a
+    /// case reference. So there is nothing to keep current.
+    ///
+    /// Deliberately not applied to a phrase's key path. A property wrapper's projected value is
+    /// `$name`, which is not the keyword, and swiftc accepts `\.$associatedtype` bare.
+    private static String escaped(String identifier) {
+        return "`" + identifier + "`";
+    }
+
     /// Makes an identifier that can start a Swift name. Sanitizing leaves digits and an empty
     /// string alone, and neither can begin one.
     private static String legalIdentifier(String s) {
@@ -527,10 +532,7 @@ public final class IOSAppIntentsBuilder {
     /// not the keyword, so a phrase interpolating it is written bare -- checked against the
     /// Swift compiler rather than assumed, since guessing wrong here fails only on a Mac.
     private static String varName(String identifier) {
-        if (SWIFT_KEYWORDS.contains(identifier)) {
-            return "`" + identifier + "`";
-        }
-        return identifier;
+        return escaped(identifier);
     }
 
     private static String sanitize(String s) {
@@ -592,19 +594,6 @@ public final class IOSAppIntentsBuilder {
             }
         }
         return sb.toString();
-    }
-
-    private static final List<String> SWIFT_KEYWORDS = new ArrayList<String>();
-    static {
-        String[] kw = {"class", "func", "var", "let", "if", "else", "for", "while", "return",
-                "struct", "enum", "protocol", "import", "in", "is", "as", "self", "super",
-                "true", "false", "nil", "switch", "case", "default", "where", "guard", "defer",
-                "repeat", "do", "try", "catch", "throw", "throws", "init", "deinit", "extension",
-                "operator", "static", "public", "private", "internal", "open", "final", "lazy",
-                "type", "id", "description", "title"};
-        for (String k : kw) {
-            SWIFT_KEYWORDS.add(k);
-        }
     }
 
     // ------------------------------------------------------------------
