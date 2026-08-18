@@ -98,38 +98,70 @@ public final class GenerateInterpShims {
     };
 
     /**
-     * Subsystems whose mere mention makes the build carry a native SDK.
+     * Subsystems this runtime deliberately does not carry.
+     *
+     * <p>Not because they are large -- see {@link #NATIVE_CAPABILITY_PREFIXES}
+     * for the ones that are, and are carried anyway -- but because each needs
+     * per-application configuration that a runtime hosting somebody else's
+     * program cannot supply, or must not carry at all.</p>
      *
      * <p>A shim is a compiled reference to the class it extends, and the
-     * Codename One build decides what to link by scanning the app for exactly
-     * such references. Generating the whole API therefore told the build that
-     * this app uses ML Kit, ARCore, CameraX, Android Auto, Health Connect and
-     * the widget gallery -- 300MB of native libraries across four ABIs, in an
-     * app that calls none of them. It also made the build demand a
-     * {@code surfaces.json}, which is what surfaced this at all.</p>
-     *
-     * <p>Excluding them costs the ability to <em>subclass</em> those types,
-     * which is rare. Calling them is unaffected at the language level: the
-     * classes are in the framework the runtime already carries. What is gone is
-     * the native half, so they behave the way a cn1lib without its native code
-     * behaves -- {@code isSupported()} false -- which is the documented
-     * contract for a device runtime rather than a new kind of failure.</p>
-     *
-     * <p>This is the difference between a 50MB runtime that debugs application
-     * logic and a 340MB one that nobody will sideload.</p>
+     * Codename One build decides what to link by scanning for exactly such
+     * references, so leaving these unshimmed is also what keeps their SDKs
+     * out. Pushed code that calls one gets the documented answer for a native
+     * half that is absent: {@code isSupported()} false, the same as a cn1lib
+     * whose native code was not compiled in.</p>
      */
     private static final String[] NATIVE_HEAVY_PREFIXES = {
-            "com/codename1/ai/",         // ML Kit: OCR, translation, labelling
-            "com/codename1/ar/",         // ARCore / ARKit
-            "com/codename1/camera/",     // CameraX
-            "com/codename1/surfaces/",   // the compiled widget gallery
-            "com/codename1/car/",        // Android Auto / CarPlay
-            "com/codename1/health/",     // Health Connect
-            "com/codename1/vr/",
-            "com/codename1/bluetooth/",
-            "com/codename1/payment/",    // billing client
-            "com/codename1/social/",     // sign-in SDKs
+            // Android Auto and CarPlay: a car app is a separate surface with
+            // its own manifest, templates and review process, and none of it
+            // can be driven from a pushed program.
+            "com/codename1/car/",
+            // Billing. A runtime that executes code somebody else wrote has no
+            // business carrying a purchase flow, and the design refuses the
+            // payment APIs at the linker for the same reason.
+            "com/codename1/payment/",
+            // Sign-in SDKs are bound to an application's own client ids and
+            // signing certificate, so they would fail for pushed code even with
+            // the SDK present.
+            "com/codename1/social/",
+            // Native maps need a Maps API key in the manifest. The runtime has
+            // no key to ship, so linking the SDK would buy a blank map.
             "com/codename1/maps/",
+    };
+
+    /**
+     * Subsystems the runtime carries the native half of, on purpose.
+     *
+     * <p>These are the reason to run on a device at all. A simulator can fake a
+     * layout; it cannot honestly imitate the camera, on-device inference, AR,
+     * the health store or a live activity, and a runtime that reported them
+     * unsupported would leave exactly the interesting half undebuggable.</p>
+     *
+     * <p>Linking and subclassing are different needs and the shim set serves
+     * only the second. The build decides what native SDK to link by scanning
+     * the app for references to the API that fronts it, and most of these types
+     * are final or have no accessible constructor -- {@code TextRecognizer} is
+     * final -- so no shim mentions them and the SDK is left out. The generator
+     * therefore emits a class declaring a field of each type: a field
+     * descriptor is what that scan reads, where a class literal is invisible to
+     * it (an LDC, not a type instruction).</p>
+     *
+     * <p>It is not free. ML Kit's bundled models and pipelines are 287MB of
+     * native libraries across four ABIs, which is what made an earlier build
+     * 323MB. The answer is an ABI split rather than dropping the feature: one
+     * ABI is 110MB, and a Play bundle delivers one ABI per device anyway.</p>
+     */
+    private static final String[] NATIVE_CAPABILITY_PREFIXES = {
+            "com/codename1/ai/",
+            "com/codename1/ar/",
+            "com/codename1/camera/",
+            "com/codename1/capture/",
+            "com/codename1/health/",
+            "com/codename1/media/",
+            "com/codename1/bluetooth/",
+            "com/codename1/vr/",
+            "com/codename1/surfaces/",
     };
 
     private GenerateInterpShims() {
@@ -224,10 +256,103 @@ public final class GenerateInterpShims {
             }
         }
 
+        writeNativeCapabilities(outDir, frameworkJar);
         writeRegistry(outDir, generated, okClasses, ifaceShims, okInterfaces);
         System.out.println("generated " + generated.size() + " class shims, "
                 + ifaceShims.size() + " interface shims, " + skipped + " skipped, "
                 + skippedByExclusion + " excluded, into " + outDir);
+    }
+
+    /**
+     * Writes the class that names every native-backed capability.
+     *
+     * <p>Class literals and nothing else. Each is a constant-pool entry, which
+     * is exactly what the Codename One build scans for when deciding which
+     * native SDK an app needs -- and none of them runs, so the app pays the
+     * link cost and no behaviour.</p>
+     *
+     * <p>Without this the runtime links a camera SDK only if some *shim*
+     * happens to mention the camera API, and most of these classes are final or
+     * have no accessible constructor, so they get no shim. The result was an
+     * app that reported "unsupported" for the very things a device is for.</p>
+     */
+    private static void writeNativeCapabilities(File dir, File jar) throws Exception {
+        List<String> names = new ArrayList<String>();
+        java.util.jar.JarFile jf = new java.util.jar.JarFile(jar);
+        try {
+            java.util.Enumeration<java.util.jar.JarEntry> e = jf.entries();
+            while (e.hasMoreElements()) {
+                String n = e.nextElement().getName();
+                if (!n.endsWith(".class") || !isNativeCapability(n) || n.indexOf('$') >= 0) {
+                    continue;
+                }
+                names.add(n.substring(0, n.length() - 6).replace('/', '.'));
+            }
+        } finally {
+            jf.close();
+        }
+        java.util.Collections.sort(names);
+
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(
+                new java.net.URL[]{ jar.toURI().toURL() },
+                GenerateInterpShims.class.getClassLoader());
+        List<String> referenced = new ArrayList<String>();
+        for (String name : names) {
+            try {
+                Class<?> c = Class.forName(name, false, loader);
+                if (java.lang.reflect.Modifier.isPublic(c.getModifiers())) {
+                    referenced.add(name);
+                }
+            } catch (Throwable notLoadable) {
+                // A class the framework jar names but this tool chain cannot
+                // load is not one the build will link either.
+            }
+        }
+        loader.close();
+
+        PrintWriter w = new PrintWriter(new File(dir, "InterpNativeCapabilities.java"), "UTF-8");
+        try {
+            header(w);
+            w.println("package com.codenameone.devruntime.gen;");
+            w.println();
+            w.println("/**");
+            w.println(" * The native capabilities this runtime carries, named so the build links");
+            w.println(" * them.");
+            w.println(" *");
+            w.println(" * <p>Generated, and nothing here runs: the class is never instantiated and");
+            w.println(" * the fields are never read. A field's descriptor is the reference -- the");
+            w.println(" * Codename One build decides which native SDK an app needs by scanning");
+            w.println(" * field and method descriptors, and a class literal is invisible to that");
+            w.println(" * scan because it is an LDC rather than a type instruction.</p>");
+            w.println(" *");
+            w.println(" * <p>Most of these types are final or have no accessible constructor, so no");
+            w.println(" * shim mentions them and without this file the runtime would report the");
+            w.println(" * camera, on-device inference, AR and the health store as unsupported --");
+            w.println(" * on a device that supports them, which is the one place it matters.</p>");
+            w.println(" */");
+            w.println("public final class InterpNativeCapabilities {");
+            int index = 0;
+            for (String name : referenced) {
+                w.println("    " + name + " c" + index + ";");
+                index++;
+            }
+            w.println();
+            w.println("    private InterpNativeCapabilities() {");
+            w.println("    }");
+            w.println("}");
+        } finally {
+            w.close();
+        }
+        System.out.println("native capabilities referenced: " + referenced.size());
+    }
+
+    private static boolean isNativeCapability(String entry) {
+        for (String p : NATIVE_CAPABILITY_PREFIXES) {
+            if (entry.startsWith(p)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

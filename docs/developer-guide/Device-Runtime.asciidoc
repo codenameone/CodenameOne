@@ -161,6 +161,27 @@ Closing it means carrying the component type with every interpreted array -- a w
 
 The shims are generated during the app build -- an `exec-maven-plugin` execution in `common/pom.xml` writes them to `target/generated-sources/shims` and `build-helper` adds that as a source root -- so nothing derived is committed. Generation is required to be reproducible for exactly the reason it might look safer to check the output in: two builds of the same commit must ship the same contract, and `scripts/generate-interp-shims.sh` asserts that alongside "every shim compiles" and "the load-bearing shims exist" after you edit `GenerateInterpShims`.
 
+=== What the runtime carries, and what it doesn't
+
+The point of running on a device is the half no simulator can imitate, so the runtime carries the native half of the camera, on-device inference, AR, the health store, media, Bluetooth, VR, and surfaces. Pushed code calling any of them reaches the real SDK on the real device.
+
+That needed a second mechanism. The build decides which native SDK to link by scanning the app for references to the API that fronts one, and it reads field and method descriptors -- a class literal is invisible to it, being an LDC rather than a type instruction. Most of these types are final or have no accessible constructor (`TextRecognizer` is final), so no shim mentions them, nothing references them and the SDK was left out: the runtime reported the interesting half unsupported on the one device that supported it. The generator now also emits `InterpNativeCapabilities`, a class declaring a field of each such type and nothing else. None of it runs.
+
+Four subsystems stay out, and none of them for size:
+
+* `com.codename1.car` -- Android Auto and CarPlay are separate surfaces with their own manifests, templates and review process, none of it drivable from a pushed program.
+* `com.codename1.payment` -- a runtime that executes somebody else's code has no business carrying a purchase flow, and the design refuses the payment APIs at the linker for the same reason.
+* `com.codename1.social` -- sign-in SDKs are bound to an application's own client ids and signing certificate, so they'd fail for pushed code even with the SDK present.
+* `com.codename1.maps` -- native maps need a Maps API key in the manifest, and the runtime has none to ship, so linking it would buy a blank map.
+
+Surfaces needs one thing from the runtime rather than an exclusion: widget kinds are compiled into an app, so the build demands a `surfaces.json`. The runtime declares two generic kinds, and a pushed program can use those. It's the same bargain as the permission union -- what the host declared is what the guest gets.
+
+==== The size, and what it costs
+
+ML Kit's bundled models and pipelines are 287MB of native libraries across four ABIs. A universal APK with everything linked is 323MB, which is why an earlier version of this dropped the whole group and shipped 11MB -- and with it the reason to use a device at all.
+
+The answer is an ABI split, not a smaller feature set. One ABI is **110MB**, `scripts/run-device-runtime-android.sh` builds `arm64-v8a` by default (`CN1_ANDROID_ABI` overrides), and that's every device worth testing on plus the only emulator image that runs at speed on an Apple-silicon Mac. The store job ships an app bundle, where Play delivers one ABI per device by itself.
+
 Two limits follow from the shim approach, and both are recorded rather than remembered.
 
 A class implementing several host interfaces at once has no shim, because a shim covers one supertype.

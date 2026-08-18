@@ -92,6 +92,20 @@ if [ "$SKIP_BUILD" = 0 ]; then
     /usr/bin/sed -i '' -e "s/compileSdkVersion 37/compileSdkVersion $API/" \
                        -e "s/targetSdkVersion 37/targetSdkVersion $API/" \
                        "$GRADLE_DIR/app/build.gradle"
+    # One ABI for a sideloadable APK. The runtime carries ML Kit, CameraX and
+    # ARCore on purpose -- they are the reason to debug on a device rather than
+    # in the simulator -- and ML Kit's bundled models are ~287MB of native
+    # libraries across four ABIs, which makes a universal APK 323MB. arm64 alone
+    # is 110MB, and arm64 is every device worth testing on and the only emulator
+    # image that runs at speed on an Apple-silicon Mac.
+    #
+    # The store build does not do this: it ships an app bundle, and Play
+    # delivers one ABI per device by itself.
+    ABI="${CN1_ANDROID_ABI:-arm64-v8a}"
+    if ! grep -q abiFilters "$GRADLE_DIR/app/build.gradle"; then
+        /usr/bin/sed -i '' -e "s/    defaultConfig {/    defaultConfig {\
+        ndk { abiFilters '$ABI' }/" "$GRADLE_DIR/app/build.gradle"
+    fi
     # The generated project has no local.properties -- the cloud build server
     # supplies the SDK location. Locally it has to be written.
     SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
