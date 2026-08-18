@@ -1415,11 +1415,16 @@ public class Form extends Container {
         if (pendingReverse == null) {
             pendingReverse = new ArrayList<Boolean>();
         }
-        // A setCurrent() can turn out not to change anything -- the form is already showing --
-        // and then nothing takes the direction it queued. Keeping the queue short means such an
-        // entry is dropped rather than shifting every later answer by one.
-        if (pendingReverse.size() > 3) {
-            pendingReverse.clear();
+        // Every entry is a display that is going to arrive, so none of them is dropped: a
+        // handful of shows and showBacks can be in flight at once when each is waiting on a
+        // transition, and clearing the queue to make room would hand the first arrival the last
+        // caller's direction. A display that changes nothing -- showing the form already up --
+        // returns before it records anything, so nothing accumulates here unspent.
+        //
+        // The bound is a leak guard rather than a policy: a hundred displays of one form waiting
+        // at once is not navigation, it is something stuck.
+        if (pendingReverse.size() >= 100) {
+            pendingReverse.remove(0);
         }
         pendingReverse.add(Boolean.valueOf(value));
     }
