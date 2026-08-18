@@ -2024,6 +2024,12 @@ class IntentsTest {
             }
         });
         try {
+            // A bridge that can foreground, because a route from a headless handler is only
+            // navigated when the app actually comes forward.
+            FakeBridge b = new FakeBridge();
+            b.canForeground = true;
+            Intents.setBridge(b);
+
             FakeDispatcher d = new FakeDispatcher();
             d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
                     "", 1, Collections.<String>emptyList(),
@@ -2054,6 +2060,44 @@ class IntentsTest {
                     "and told that it took too long, rather than nothing at all");
             released.countDown();
             caller.join(10000);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
+    /// iOS never lets an app foreground itself and Android can fail or time out, and the
+    /// route was built anyway -- so the application changed what it shows next while staying in
+    /// the background, and the user finds that screen already open on their next launch, for an
+    /// action they were told could not be shown.
+    @Test
+    void aRouteIsNotBuiltWhenTheAppCannotComeForward() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeBridge b = new FakeBridge();
+            b.canForeground = false;
+            Intents.setBridge(b);
+
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(declaration("known"));
+            d.next = IntentResult.opens("/orders/42");
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertTrue(navigated.isEmpty(),
+                    "the destination must not be built where nobody can see it");
+            assertEquals(1, b.foregroundRequests, "and it did ask first");
+
+            // When the app can come forward, the same result navigates as before.
+            b.canForeground = true;
+            Intents.invoke("known", null);
+            assertEquals(Arrays.asList("/orders/42"), navigated);
         } finally {
             com.codename1.router.Navigation.setDispatcher(null);
         }

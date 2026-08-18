@@ -1482,8 +1482,13 @@ public final class Intents {
         // A declared opensRoute has already brought the app forward -- that is what the flag is
         // for. A route the handler decided on at runtime has not, and if it ran headless the
         // destination would otherwise be built somewhere nobody can see.
-        if (fromResult && decl != null && decl.runsHeadless()) {
-            requestForeground(decl);
+        if (fromResult && decl != null && decl.runsHeadless() && !requestForeground(decl)) {
+            // The app is staying where it is, so building the destination would change what
+            // this application shows next without anyone having seen it happen -- a screen the
+            // user finds already open the next time they launch, for an action they were told
+            // could not be shown. The diagnostic requestForeground just logged says the
+            // destination will not be shown; this is what makes that true.
+            return;
         }
         try {
             // Marshals to the EDT itself and is a no-op when no route matches.
@@ -1495,18 +1500,22 @@ public final class Intents {
 
     /// Asks the port to bring the app forward for a route the handler chose at runtime, and
     /// says so plainly when the platform will not.
-    private static void requestForeground(IntentDeclaration decl) {
+    ///
+    /// #### Returns
+    ///
+    /// true when the application is forward and the route may be built
+    private static boolean requestForeground(IntentDeclaration decl) {
         IntentBridge b = bridgeInternal();
         if (b == null) {
-            return;
+            return false;
         }
         try {
             if (b.requestForeground()) {
-                return;
+                return true;
             }
         } catch (Throwable t) {
             logError(t);
-            return;
+            return false;
         }
         // iOS is the case that reaches here: an app cannot bring itself forward, so whether it
         // does is fixed before the handler runs. Naming the fix is the useful part -- declaring
@@ -1515,6 +1524,7 @@ public final class Intents {
                 + "platform does not let an app foreground itself, so the destination will not "
                 + "be shown. Declare opensRoute on the @AppIntent to have the platform open the "
                 + "app for it.");
+        return false;
     }
 
     /// Percent-encodes a route value, one UTF-8 byte at a time.

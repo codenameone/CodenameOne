@@ -76,7 +76,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 A `headless` intent can run in a process the system started only to answer it, with nothing on screen. That's what lets an assistant answer without your app appearing, and it's a real constraint rather than a flag.
 
-The default is `false`, and that costs something worth knowing: an intent that doesn't declare `headless` brings the app to the foreground when it runs, because a handler outside the contract below is allowed to touch a `Form` and there has to be somewhere to put it. Declaring `headless = true` is what buys the answer-in-place behaviour -- and what obliges you to earn it.
+The default is `false`, and that costs something worth knowing: an intent that doesn't declare `headless` brings the app to the foreground when it runs, so there's a window for it to act on. That isn't permission to touch one directly. No handler runs on the event dispatch thread, foreground or not -- see below -- so a foreground handler reaches the user interface the way every other background thread in Codename One does, through `Display.callSerially`. What foregrounding buys is that there's something on screen for that call to land on, and somewhere for a route to open. Declaring `headless = true` is what buys the answer-in-place behaviour -- and what obliges you to earn it.
 
 A headless handler *may* use `Storage`, `Preferences`, `Database`, `NetworkManager`, `Log`, surfaces publishing and `Intents.index`. It *must not* touch `Form`, `Dialog`, `Component`, `Display.getCurrent()`, the camera, capture, or anything else that needs a window: there is no window. It must also not call `Display.callSeriallyAndWait`, which can deadlock against a foregrounded event dispatch thread.
 

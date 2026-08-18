@@ -114,6 +114,11 @@ public @interface AppIntent {
     /// A headless handler must not touch `Form`, `Dialog`, or anything else
     /// needing a window; see the `com.codename1.intents` package documentation
     /// for the full contract.
+    ///
+    /// Leaving it false brings the app forward, which gives the handler a window to act on --
+    /// not permission to touch one from the handler's own thread. No handler runs on the event
+    /// dispatch thread, so a foreground handler updates the user interface through
+    /// `Display#callSerially`, as any background thread does.
     boolean headless() default false;
 
     /// True when the platform may offer this intent before the user has ever run

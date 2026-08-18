@@ -92,6 +92,13 @@
 /// app -- and a handler blocking the event thread there is a visible freeze.
 /// Since handlers are forbidden from touching UI, they do not need that thread.
 ///
+/// That holds for a foreground handler too. Not declaring `headless` brings the
+/// app forward, which gives the handler a window to act on rather than
+/// permission to touch one: it reaches the user interface through
+/// `Display#callSerially`, the way any background thread in this framework
+/// does. What foregrounding buys is that there is something on screen for that
+/// call to land on, and somewhere for a route to open.
+///
 /// `Intents#invoke` is the exception, and by construction rather than oversight:
 /// it is synchronous, so it runs the handler on whatever thread called it and
 /// returns the result to that caller. Calling it from the event dispatch thread
