@@ -33,9 +33,15 @@ package com.codename1.home;
 ///
 /// So on iOS: writing [#LOW], [#MEDIUM] or [#HIGH] is translated into a
 /// [Trait#FAN_SPEED] write of 33, 66 or 100 percent, and a **read never
-/// returns them** -- it answers [#AUTO] or [#ON]. If your UI needs to show the
-/// speed the user picked, read [Trait#FAN_SPEED] and render that; it works the
-/// same everywhere.
+/// returns them** -- it answers [#OFF], [#AUTO] or [#ON]. If your UI needs to
+/// show the speed the user picked, read [Trait#FAN_SPEED] and render that; it
+/// works the same everywhere.
+///
+/// [#OFF] is read from the power characteristic rather than from the mode,
+/// because that is where HomeKit keeps it -- a fan standing still still
+/// reports "manual" or "auto" as its mode. A subscription to [Trait#FAN_MODE]
+/// watches the power characteristic for the same reason, so switching the fan
+/// off is a mode change your listener hears.
 public enum FanMode {
 
     /// Not running.

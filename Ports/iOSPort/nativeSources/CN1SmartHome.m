@@ -647,10 +647,19 @@ static BOOL cn1homeToPortable(int conversion, id value, double *out,
             return YES;
         }
         case CN1_HC_FAN_MODE: {
-            // HomeKit 0 manual, 1 auto. Portable ON=4, AUTO=5. LOW, MEDIUM
-            // and HIGH are never read back -- FanMode's javadoc says so, and
-            // an app that needs the speed should read fan_speed.
-            *out = [n intValue] == 1 ? 5 : 4;
+            // HomeKit 0 manual, 1 auto. Portable ON=4, AUTO=5, OFF=0. LOW,
+            // MEDIUM and HIGH are never read back -- FanMode's javadoc says
+            // so, and an app that needs the speed should read fan_speed.
+            //
+            // A negative value is cn1homeValueForReading saying the fan's
+            // power characteristic is off. HomeKit leaves TargetFanState at
+            // manual or auto while the fan stands still, so the mode alone
+            // can never report the one state FanMode.OFF is defined as --
+            // and a read answered ON for a fan that was not running, which
+            // is the same untruth the write path already avoids by writing
+            // the power characteristic instead.
+            int hk = [n intValue];
+            *out = hk < 0 ? 0 : (hk == 1 ? 5 : 4);
             return YES;
         }
         default:
@@ -1014,6 +1023,74 @@ static BOOL cn1homeSceneEndsInAuto(NSArray *accessories, NSArray *services,
     return cn1homeHasNoValueNow(service, @"target_temperature");
 }
 
+/// Whether this fan's power characteristic says it is not running.
+///
+/// FanMode.OFF means "not running", and HomeKit has no mode for it:
+/// TargetFanState stays manual or auto while the fan is off. The power
+/// characteristic is the only thing that knows.
+///
+/// #### Parameters
+///
+/// - `service`: the fan service
+///
+/// #### Returns
+///
+/// `true` when the service has a power characteristic reading false
+static BOOL cn1homeFanIsOff(HMService *service) {
+    HMCharacteristic *power = cn1homeFindCharacteristic(service, @"on_off");
+    if (power == nil) {
+        return NO;
+    }
+    id value = [power value];
+    return [value isKindOfClass:[NSNumber class]] && ![value boolValue];
+}
+
+/// The trait whose meaning a dependency's movement changes.
+///
+/// A subscription never asks for the dependency itself -- it asks for the
+/// trait the dependency governs -- so this is what gets delivered when the
+/// dependency moves. Both pairs exist because HomeKit notifies per
+/// characteristic and neither governed trait's own characteristic changes:
+/// a thermostat entering AUTO erases its single setpoint without touching
+/// TargetTemperature, and a fan being switched off becomes FanMode.OFF
+/// without touching TargetFanState.
+///
+/// #### Parameters
+///
+/// - `dependencyTraitId`: the trait that moved
+///
+/// #### Returns
+///
+/// the trait to deliver instead, or `nil` when this trait governs nothing
+static NSString *cn1homeDependentTrait(NSString *dependencyTraitId) {
+    if ([dependencyTraitId isEqualToString:@"target_heating_cooling"]) {
+        return @"target_temperature";
+    }
+    if ([dependencyTraitId isEqualToString:@"on_off"]) {
+        return @"fan_mode";
+    }
+    return nil;
+}
+
+/// The dependency a trait's reading depends on, the other way round.
+///
+/// #### Parameters
+///
+/// - `traitId`: the trait being watched
+///
+/// #### Returns
+///
+/// the trait to register alongside it, or `nil` when it needs none
+static NSString *cn1homeDependencyTrait(NSString *traitId) {
+    if ([traitId isEqualToString:@"target_temperature"]) {
+        return @"target_heating_cooling";
+    }
+    if ([traitId isEqualToString:@"fan_mode"]) {
+        return @"on_off";
+    }
+    return nil;
+}
+
 /// The value to report for a trait, honouring the modes that erase one.
 ///
 /// Every path that turns a live characteristic into a reading goes through
@@ -1034,7 +1111,15 @@ static BOOL cn1homeSceneEndsInAuto(NSArray *accessories, NSArray *services,
 /// the characteristic's value, or nil when the trait has none right now
 static id cn1homeValueForReading(HMService *service, NSString *traitId,
                                  HMCharacteristic *c) {
-    return cn1homeHasNoValueNow(service, traitId) ? nil : [c value];
+    if (cn1homeHasNoValueNow(service, traitId)) {
+        return nil;
+    }
+    if ([traitId isEqualToString:@"fan_mode"] && cn1homeFanIsOff(service)) {
+        // Not the mode characteristic's value: the fan is not running, and
+        // OFF is the answer. cn1homeToPortable reads the negative as such.
+        return [NSNumber numberWithInt:-1];
+    }
+    return [c value];
 }
 
 /// Encodes a reading, with an explicit "when was this true" stamp.
@@ -1711,22 +1796,23 @@ static void cn1homeRebindWatches(NSString *accessoryId);
     NSString *accessoryId = cn1homeUuid([accessory uniqueIdentifier]);
     NSString *serviceId = cn1homeUuid([service uniqueIdentifier]);
     cn1homeDeliverChange(accessoryId, serviceId, traitId,
-        cn1homeHasNoValueNow(service, traitId) ? nil
-                                               : [characteristic value]);
+        cn1homeValueForReading(service, traitId, characteristic));
     // A thermostat crossing into or out of AUTO changes what
     // TARGET_TEMPERATURE means without touching the TargetTemperature
-    // characteristic, and HomeKit notifies per characteristic -- so a
-    // listener watching the setpoint hears nothing and keeps showing a
-    // number the accessory is no longer aiming for. The mode's own
-    // notification is the only signal there is, so the setpoint's update is
-    // sent from here too.
-    if ([traitId isEqualToString:@"target_heating_cooling"]) {
-        HMCharacteristic *setpoint = cn1homeFindCharacteristic(
-            service, @"target_temperature");
-        if (setpoint != nil) {
-            cn1homeDeliverChange(accessoryId, serviceId, @"target_temperature",
-                cn1homeHasNoValueNow(service, @"target_temperature")
-                    ? nil : [setpoint value]);
+    // characteristic, and a fan being switched off becomes FanMode.OFF
+    // without touching TargetFanState. HomeKit notifies per characteristic,
+    // so a listener watching either governed trait hears nothing and keeps
+    // showing a state the accessory left -- a number it is no longer aiming
+    // for, or a fan reported as running. The governing characteristic's own
+    // notification is the only signal there is, so the governed trait's
+    // update is sent from here too.
+    NSString *governed = cn1homeDependentTrait(traitId);
+    if (governed != nil) {
+        HMCharacteristic *dependent = cn1homeFindCharacteristic(service,
+                                                                governed);
+        if (dependent != nil) {
+            cn1homeDeliverChange(accessoryId, serviceId, governed,
+                cn1homeValueForReading(service, governed, dependent));
         }
     }
 }
@@ -2051,26 +2137,28 @@ static void cn1homeRunRecovery(void) {
                 NSString *previous = [cn1homeLastPolled objectForKey:stateKey];
                 [cn1homeLastPolled setObject:current forKey:stateKey];
                 if (previous != nil && ![previous isEqualToString:current]) {
-                    if (isDependency) {
-                        // The mode moved. The subscription never asked about
-                        // it -- what it asked about is the setpoint, which
-                        // has just started or stopped meaning something.
-                        HMCharacteristic *setpoint =
-                                cn1homeFindCharacteristic(
-                                    service, @"target_temperature");
-                        if (setpoint != nil) {
+                    NSString *governed = isDependency
+                            ? cn1homeDependentTrait(traitId) : nil;
+                    if (governed != nil) {
+                        // The governor moved. The subscription never asked
+                        // about it -- what it asked about is the trait it
+                        // governs, which has just started or stopped meaning
+                        // something.
+                        HMCharacteristic *dependent =
+                                cn1homeFindCharacteristic(service, governed);
+                        if (dependent != nil) {
                             com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
                                 getThreadLocalData(),
                                 fromNSString(getThreadLocalData(),
                                              subscriptionId),
                                 fromNSString(getThreadLocalData(),
                                     cn1homeEncodeReading(accessoryId,
-                                        serviceId, @"target_temperature",
+                                        serviceId, governed,
                                         cn1homeValueForReading(service,
-                                            @"target_temperature", setpoint),
+                                            governed, dependent),
                                         nil, nil)));
                         }
-                    } else {
+                    } else if (!isDependency) {
                         com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
                             getThreadLocalData(),
                             fromNSString(getThreadLocalData(), subscriptionId),
@@ -2979,14 +3067,16 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
             NSString *traitId = [traits objectAtIndex:i];
             [keys addObject:cn1homeReadingKey(accessoryId, serviceId,
                                               traitId)];
-            if ([traitId isEqualToString:@"target_temperature"]) {
-                // The mode is what decides whether this setpoint means
-                // anything at all -- see cn1homeDependencies. Registered
-                // even though nobody asked for it, and kept out of the
-                // watch set so its own changes are never delivered as if
-                // they had been.
+            NSString *governor = cn1homeDependencyTrait(traitId);
+            if (governor != nil) {
+                // What decides whether this trait means anything at all --
+                // the thermostat's mode for a setpoint, the power
+                // characteristic for a fan's mode. See cn1homeDependencies.
+                // Registered even though nobody asked for it, and kept out
+                // of the watch set so its own changes are never delivered as
+                // if they had been.
                 [deps addObject:cn1homeReadingKey(accessoryId, serviceId,
-                                                  @"target_heating_cooling")];
+                                                  governor)];
             }
             HMService *service = cn1homeFindService(accessoryId, serviceId);
             HMCharacteristic *c = cn1homeFindCharacteristic(service, traitId);
