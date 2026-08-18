@@ -1477,7 +1477,8 @@ public final class Intents {
     /// through the trampoline. Without this the app would foreground and then sit on whatever
     /// screen it happened to be showing, which is the failure an `opens` result exists to avoid.
     private static void navigateIfRequested(IntentResult r, IntentDeclaration decl,
-                                             Map<String, Object> params) {
+                                             Map<String, Object> params,
+                                             CompletionGuard guard) {
         if (r == null || r.isFailed()) {
             return;
         }
@@ -1505,11 +1506,44 @@ public final class Intents {
             return;
         }
         try {
-            // Marshals to the EDT itself and is a no-op when no route matches.
-            com.codename1.router.Navigation.dispatchExternalUrl(url);
+            navigateUnlessAlreadyAnswered(url, guard);
         } catch (Throwable t) {
             logError(t);
         }
+    }
+
+    /// Opens the route, unless the deadline answered the platform while this was waiting.
+    ///
+    /// The wait is the point. Navigation.dispatchExternalUrl hands the work to the event
+    /// dispatch thread and blocks, and a busy EDT can hold it past the budget -- at which point
+    /// the watchdog tells the platform the action was stopped. Without this check the screen
+    /// then changed anyway once the EDT freed up, so the assistant said one thing and the app
+    /// did the other.
+    ///
+    /// Rechecked on the event thread rather than before the hand-off, because the whole gap
+    /// being guarded against is the one between them. dispatchExternalUrl navigates directly
+    /// when it is already on that thread, so calling it from inside costs nothing.
+    private static void navigateUnlessAlreadyAnswered(final String url,
+                                                       final CompletionGuard guard) {
+        if (guard == null || !Display.isInitialized()
+                || Display.getInstance().isEdt()) {
+            if (guard == null || !guard.answered()) {
+                com.codename1.router.Navigation.dispatchExternalUrl(url);
+            }
+            return;
+        }
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                if (guard.answered()) {
+                    logDiagnostic("Not opening \"" + url + "\": the action was already reported "
+                            + "as timed out, and moving the user's screen afterwards would "
+                            + "contradict what the platform was told.");
+                    return;
+                }
+                com.codename1.router.Navigation.dispatchExternalUrl(url);
+            }
+        });
     }
 
     /// Asks the port to bring the app forward for a route the handler chose at runtime, and
@@ -1780,7 +1814,7 @@ public final class Intents {
         Outcome o = dispatchOnce(intentId, params, ctx);
         // The in-app path navigates unconditionally: the caller is blocked in this method and
         // there is no competing timeout to lose to.
-        navigateIfRequested(o.result, o.declaration, o.params);
+        navigateIfRequested(o.result, o.declaration, o.params, null);
         return o.result;
     }
 
@@ -1894,7 +1928,7 @@ public final class Intents {
                 // waiting forever for an answer that is already decided.
                 if (guard.claim()) {
                     try {
-                        navigateIfRequested(o.result, o.declaration, o.params);
+                        navigateIfRequested(o.result, o.declaration, o.params, guard);
                     } finally {
                         guard.deliver(o.result);
                     }
@@ -2020,6 +2054,13 @@ public final class Intents {
                 } catch (Throwable t) {
                     logError(t);
                 }
+            }
+        }
+
+        /// Whether the platform has already been told how this invocation ended.
+        boolean answered() {
+            synchronized (this) {
+                return delivered;
             }
         }
 

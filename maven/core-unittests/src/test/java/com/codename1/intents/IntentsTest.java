@@ -2125,6 +2125,52 @@ class IntentsTest {
                 "and bounded to what IntentDates will actually take: " + schema);
     }
 
+    /// A navigation that was already reported as timed out must not change the screen when it
+    /// finally gets the event thread: the platform said the action was stopped, and opening the
+    /// route afterwards says the opposite.
+    ///
+    /// Exercised through the decision itself. The path that matters recheck on the event
+    /// dispatch thread, and this harness has none -- so what is pinned here is the rule the
+    /// recheck applies, rather than the marshalling around it.
+    @Test
+    void aNavigationDoesNotRunOnceTheTimeoutHasAnswered() throws Exception {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            Class<?> guardClass = Class.forName(
+                    "com.codename1.intents.Intents$CompletionGuard");
+            java.lang.reflect.Constructor<?> ctor =
+                    guardClass.getDeclaredConstructor(IntentCompletion.class);
+            ctor.setAccessible(true);
+            Object guard = ctor.newInstance(new Object[]{null});
+
+            java.lang.reflect.Method navigate = Intents.class.getDeclaredMethod(
+                    "navigateUnlessAlreadyAnswered", String.class, guardClass);
+            navigate.setAccessible(true);
+
+            // Nobody has answered yet, so the route opens.
+            navigate.invoke(null, "/orders/1", guard);
+            assertEquals(Arrays.asList("/orders/1"), navigated);
+
+            // The deadline answers, and the same call now changes nothing.
+            java.lang.reflect.Method timeout = guardClass.getDeclaredMethod(
+                    "deliverTimeout", IntentResult.class);
+            timeout.setAccessible(true);
+            timeout.invoke(guard, IntentResult.failed("stopped"));
+
+            navigate.invoke(null, "/orders/2", guard);
+            assertEquals(Arrays.asList("/orders/1"), navigated,
+                    "the platform was told the action stopped; the screen must agree");
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

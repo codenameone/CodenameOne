@@ -15380,7 +15380,14 @@ void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang
     POOL_BEGIN();
     NSString *iid = toNSString(CN1_THREAD_STATE_PASS_ARG intentId);
     NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:iid];
-    activity.eligibleForPrediction = YES;
+    // eligibleForPrediction arrived in iOS 12, and this donation path is the one an app on a
+    // lower deployment target keeps -- indexing and donation need no App Intents and no newer
+    // floor, which is the whole reason the floor is not raised for them. Sending the setter to
+    // an older system is an unrecognized selector and a crash, where the honest outcome is
+    // simply that the system does not predict this activity.
+    if (@available(iOS 12.0, *)) {
+        activity.eligibleForPrediction = YES;
+    }
     activity.eligibleForSearch = YES;
     // The activity type has to be the machine id -- it is what the continuation path matches on
     // -- but the title is what Siri suggestions and Spotlight show a person. Using the id for
