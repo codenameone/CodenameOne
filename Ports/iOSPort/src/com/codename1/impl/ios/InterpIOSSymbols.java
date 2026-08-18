@@ -59,6 +59,16 @@ class InterpIOSSymbols {
      */
     private final Hashtable staticFieldIds = new Hashtable();
 
+    /**
+     * owner -> "id|descriptor" for one of its static fields.
+     *
+     * <p>Reading a static goes through a generated accessor, and that accessor
+     * runs the class's initializer first. It is the only handle Java has on
+     * ParparVM's per-class initializer, which is otherwise reached implicitly
+     * by entering a method of the class.</p>
+     */
+    private final Hashtable oneStaticField = new Hashtable();
+
     /** JVM internal class name -> class id. */
     private final Hashtable classIds = new Hashtable();
 
@@ -159,6 +169,9 @@ class InterpIOSSymbols {
                 String ownerName = (String)classNames.get(Integer.valueOf(p[1]));
                 if (ownerName != null) {
                     staticFieldIds.put(ownerName + "#" + p[3], Integer.valueOf(p[2]));
+                    if (oneStaticField.get(ownerName) == null) {
+                        oneStaticField.put(ownerName, p[2] + "|" + p[4]);
+                    }
                 }
             }
         }
@@ -272,6 +285,16 @@ class InterpIOSSymbols {
             }
         }
         return -1;
+    }
+
+    /**
+     * "id|descriptor" for one static field this class declares, or null.
+     *
+     * <p>Declared by this class exactly, not inherited: reading an inherited
+     * static initializes the class that declares it, which is the wrong one.</p>
+     */
+    String anyStaticField(String owner) {
+        return (String)oneStaticField.get(owner);
     }
 
     /** The instance field id for an access, searching up the superclass chain. */

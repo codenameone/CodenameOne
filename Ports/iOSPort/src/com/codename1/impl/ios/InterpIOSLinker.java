@@ -71,12 +71,34 @@ public class InterpIOSLinker implements InterpLinker {
     }
 
     public void initializeClass(String internalName) {
-        // ParparVM has no separate "initialize this class" entry point: a
-        // generated method body runs its class's initializer on first entry,
-        // and every route the interpreter takes into a host class -- a thunk, a
-        // constructor, a static-field accessor -- goes through one. So the
-        // ordering this exists to guarantee already holds here, and there is
-        // nothing to ask for.
+        // ParparVM has no "initialize this class" entry point of its own: a
+        // generated body runs its class's initializer on first entry, and every
+        // route into a host class goes through one. Reading a static field is
+        // the cheapest such route and the only one with no side effect of its
+        // own -- the generated accessor calls __STATIC_INITIALIZER_ first, and
+        // that function is idempotent.
+        //
+        // A class declaring no static field has nothing to read; its
+        // initializer then runs when something first enters it, which is what
+        // happened before this method existed.
+        String field = symbols.anyStaticField(internalName);
+        if (field == null) {
+            return;
+        }
+        int bar = field.indexOf('|');
+        if (bar <= 0) {
+            return;
+        }
+        try {
+            int fieldId = Integer.parseInt(field.substring(0, bar));
+            int kind = kindOf(field.substring(bar + 1));
+            InterpIOSNative.getStaticById(fieldId, kind, new long[1]);
+        } catch (Throwable initializerFailed) {
+            // The class initializer threw. Its own caller will see that when it
+            // touches the class; there is nothing useful to do from here, and
+            // failing the subclass's initialization for it would report the
+            // wrong class.
+        }
     }
 
     public Object findClass(String internalName) {

@@ -1256,6 +1256,14 @@ public final class InterpRuntime {
                 ensureInitialized(iface);
             }
         }
+        // Host interfaces as well. Whether one declares a default method is not
+        // something the bundle records, and asking the host is not worth a
+        // round trip per interface -- initializing it is idempotent and its
+        // static state is built by the app either way, so the only thing at
+        // stake is the order, which this fixes.
+        for (int i = 0; i < c.hostInterfaces.length; i++) {
+            linker.initializeClass(externOwnerName(c.hostInterfaces[i]));
+        }
     }
 
     // ---------------------------------------------------------------- fields
@@ -1948,6 +1956,20 @@ public final class InterpRuntime {
         }
     }
 
+    /// Whether two constants belong to the same enum, looking through the
+    /// anonymous subclass a constant with a class body gets.
+    private static boolean sameEnum(InterpObject a, InterpObject b) {
+        return declaringEnum(a) == declaringEnum(b);  //NOPMD CompareObjectsWithEquals - one class object
+    }
+
+    private static InterpClass declaringEnum(InterpObject o) {
+        InterpClass k = o.type;
+        while (k != null && k.superInterp != null && k.getName().indexOf('$') > 0) {
+            k = k.superInterp;
+        }
+        return k;
+    }
+
     /// java.lang.Enum's behaviour for an interpreted enum constant.
     ///
     /// Only the methods a constant inherits without overriding reach here;
@@ -1975,6 +1997,17 @@ public final class InterpRuntime {
         }
         if ("hashCode".equals(name)) {
             return Integer.valueOf(System.identityHashCode(io));
+        }
+        if ("compareTo".equals(name) && args.length == 1 && args[0] instanceof InterpObject
+                && ((InterpObject) args[0]).type != io.type) {  //NOPMD CompareObjectsWithEquals - one class object
+            // Java compares constants of one enum and throws otherwise.
+            // Returning an ordering instead quietly corrupts any sorted
+            // collection the two ended up in together.
+            InterpObject other = (InterpObject) args[0];
+            if (other.enumOrdinal < 0 || !sameEnum(io, other)) {
+                throw new ClassCastException(other.type.getName().replace('/', '.')
+                        + " is not comparable to " + io.type.getName().replace('/', '.'));
+            }
         }
         if ("compareTo".equals(name) && args.length == 1 && args[0] instanceof InterpObject) {
             return Integer.valueOf(io.enumOrdinal - ((InterpObject) args[0]).enumOrdinal);

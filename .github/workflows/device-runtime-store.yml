@@ -120,10 +120,15 @@ jobs:
         env:
           JAVA17_HOME: ${{ env.JAVA_HOME_17_X64 }}
         run: |
+          # A store rejects an upload that reuses a version code, and the app's
+          # version is a fixed 1.0 -- so every scheduled run after the first
+          # would be refused. The run number is monotonic and unique per repo,
+          # which is exactly what a build number has to be.
           cd scripts/cn1-device-runtime
           mvn -B -q package -DskipTests \
             -Dcodename1.platform=android \
             -Dcodename1.buildTarget=android-source \
+            -Dcodename1.android.versionCode=${{ github.run_number }} \
             -Dopen=false
 
       - name: Sign and assemble
@@ -190,10 +195,13 @@ jobs:
           JAVA17_HOME: ${{ env.JAVA_HOME_17_X64 }}
         run: |
           cd scripts/cn1-device-runtime
+          # As on Android: TestFlight refuses a build number it has seen, and
+          # the app's version stays 1.0 between releases.
           mvn -B -q package -DskipTests \
             -Dcodename1.platform=ios \
             -Dcodename1.buildTarget=ios-source \
             -Dcodename1.arg.ios.interpHost=true \
+            -Dcodename1.arg.ios.buildVersion=${{ github.run_number }} \
             -Dopen=false
 
       - name: Import signing material

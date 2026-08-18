@@ -139,7 +139,8 @@ public final class Pack {
     /// The class to enter: a main(String[]) if there is one, otherwise a
     /// Lifecycle subclass, which is what a real application has.
     private static String findEntryPoint(File root, List<File> classes) throws Exception {
-        String lifecycle = null;
+        Map<String,String> supers = new HashMap<String,String>();
+        Set<String> abstracts = new HashSet<String>();
         for (File f : classes) {
             org.objectweb.asm.tree.ClassNode cn = new org.objectweb.asm.tree.ClassNode();
             new org.objectweb.asm.ClassReader(Files.readAllBytes(f.toPath()))
@@ -151,8 +152,29 @@ public final class Pack {
                     return cn.name;
                 }
             }
-            if ("com/codename1/system/Lifecycle".equals(cn.superName)) {
-                lifecycle = cn.name;
+            supers.put(cn.name, cn.superName);
+            if ((cn.access & (org.objectweb.asm.Opcodes.ACC_ABSTRACT
+                    | org.objectweb.asm.Opcodes.ACC_INTERFACE)) != 0) {
+                abstracts.add(cn.name);
+            }
+        }
+        // Transitively, skipping the abstract ones and taking the deepest, as
+        // DevicePush does: a project whose app extends its own BaseApp extends
+        // Lifecycle has two descendants, and entering the wrong one runs a class
+        // that was never meant to be instantiated.
+        String lifecycle = null;
+        for (Map.Entry<String,String> e : supers.entrySet()) {
+            if (abstracts.contains(e.getKey())) continue;
+            String parent = e.getValue();
+            int guard = 0;
+            while (parent != null && guard++ < 64) {
+                if ("com/codename1/system/Lifecycle".equals(parent)) {
+                    if (lifecycle == null || depthOf(e.getKey(), supers) > depthOf(lifecycle, supers)) {
+                        lifecycle = e.getKey();
+                    }
+                    break;
+                }
+                parent = supers.get(parent);
             }
         }
         if (lifecycle != null) {
@@ -160,6 +182,13 @@ public final class Pack {
         }
         throw new IllegalStateException(
                 "no entry point: expected a main(String[]) or a Lifecycle subclass");
+    }
+
+    private static int depthOf(String name, Map<String,String> supers) {
+        int depth = 0;
+        String at = supers.get(name);
+        while (at != null && depth < 64) { depth++; at = supers.get(at); }
+        return depth;
     }
 
     private static void collect(File dir, List<File> out) {
