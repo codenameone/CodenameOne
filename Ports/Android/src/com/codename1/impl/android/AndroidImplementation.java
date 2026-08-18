@@ -6317,6 +6317,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// A non-headless handler is allowed to touch a `Form`, so the launcher tap can only ask for
     /// the app to be brought forward; running the handler has to wait until it is.
     public static void deliverPendingIntentRequests() {
+        // Order matters. The generated bootstrap installs the dispatcher before startContext
+        // has produced a bridge, so publication is deferred -- and until it happens the bridge
+        // never sees registerIntents, which is what judges a request the trampoline parked at a
+        // cold start. Draining the foreground queue alone left such a shortcut opening the app
+        // and running nothing.
+        com.codename1.intents.Intents.publishPendingDeclarations();
         com.codename1.impl.android.intents.AndroidIntentBridge.deliverPendingForegroundRequests();
     }
 

@@ -927,6 +927,21 @@ public final class Intents {
         }
     }
 
+    /// Framework/port entry point: resolves the platform bridge, which publishes any
+    /// declarations that were installed before one existed.
+    ///
+    /// The generated bootstrap installs the dispatcher before the port has booted -- from
+    /// `main()` on iOS, and before `startContext` on Android -- so the first publication finds
+    /// no bridge and is deferred. Something has to ask for the bridge afterwards or the
+    /// platform never learns the catalogue, and on Android a request parked at a cold start is
+    /// never judged, so the shortcut opens the app and runs nothing.
+    ///
+    /// Ports call this once the runtime is up. It is safe to call at any time and does nothing
+    /// when there is nothing owed.
+    public static void publishPendingDeclarations() {
+        bridgeInternal();
+    }
+
     /// Framework/port/test entry point: overrides the bridge resolved from the
     /// platform port. Passing null restores platform resolution.
     ///

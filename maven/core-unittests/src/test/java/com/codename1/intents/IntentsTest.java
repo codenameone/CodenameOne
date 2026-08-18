@@ -925,6 +925,45 @@ class IntentsTest {
         assertEquals(0, b.foregroundRequests);
     }
 
+    /// The generated bootstrap installs the dispatcher before the port has booted, so the first
+    /// publication finds no bridge and is deferred. Something has to ask afterwards -- and on
+    /// Android that flush is what makes registerIntents run, which is what judges a request
+    /// parked at a cold start. Without it the shortcut opened the app and ran nothing.
+    @Test
+    void declarationsInstalledBeforeTheBridgeArePublishedOnceItExists() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        // No bridge yet, exactly as on a cold start.
+        Intents.setDispatcher(d);
+
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        assertNull(b.registeredJson, "nothing published while there was nowhere to publish to");
+
+        Intents.publishPendingDeclarations();
+
+        assertNotNull(b.registeredJson, "the catalogue has to reach the platform eventually");
+        assertTrue(b.registeredJson.contains("known"));
+    }
+
+    /// And it must not publish twice: registerIntents is what consumes a parked request on
+    /// Android, so a second run would judge it again.
+    @Test
+    void aDeferredPublicationHappensOnlyOnce() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        Intents.publishPendingDeclarations();
+        b.registeredJson = null;
+
+        Intents.publishPendingDeclarations();
+
+        assertNull(b.registeredJson, "the debt was already settled");
+    }
+
     /// A donation becomes a launcher shortcut on Android and a suggested activity on iOS, and a
     /// tap on either dispatches the handler directly -- past the confirmation the generated App
     /// Intent performs, which is the entire promise of destructive=true. The static-shortcut
