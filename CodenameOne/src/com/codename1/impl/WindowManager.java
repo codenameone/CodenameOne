@@ -258,6 +258,28 @@ public abstract class WindowManager {
     public void setModal(Object peer, boolean modal, boolean applicationWide, Object ownerPeer) {
     }
 
+    /// Rebuilds a window's native surface after the platform destroyed it without
+    /// asking, and reports whether that succeeded.
+    ///
+    /// Only needed where the platform's own close control cannot be disabled: Mac
+    /// Catalyst hands a scene disconnect over after the fact, so a window a modal is
+    /// blocking can be closed by the user even though the framework forbids it. Being
+    /// able to put it back is what keeps that from breaking the modality contract.
+    ///
+    /// A port that cannot do this returns false and the window is disposed instead,
+    /// which is honest -- the surface really is gone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window peer
+    ///
+    /// #### Returns
+    ///
+    /// true if the native surface is being rebuilt
+    public boolean reopen(Object peer) {
+        return false;
+    }
+
     /// Enables or disables native input for one window.
     ///
     /// The framework calls this for every open window whenever the modal stack

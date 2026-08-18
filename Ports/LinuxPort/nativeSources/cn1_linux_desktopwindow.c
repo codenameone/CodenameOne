@@ -271,10 +271,55 @@ static gboolean cn1DesktopOnKey(GtkWidget* widget, GdkEventKey* e, gpointer data
  * dispatch thread awake indefinitely. */
 /* Displays being attached, removed or reconfigured. Connected once, the first time
  * a window is created, because GdkDisplay outlives every window. */
+static void cn1DesktopMonitorPropertyChanged(GObject* obj, GParamSpec* spec, gpointer data) {
+    (void) obj;
+    (void) spec;
+    (void) data;
+    cn1LinuxPushWindowEvent(0, CN1_EVENT_MONITORS_CHANGED, 0, 0, 0);
+}
+
+/*
+ * Watches an individual monitor's geometry, work area and scale. Changing the
+ * resolution, scale or rotation of a display that is already connected emits none
+ * of the display-level add/remove signals, so without these a reconfiguration
+ * never reached a listener and open windows kept stale geometry and density.
+ */
+static void cn1DesktopWatchMonitor(GdkMonitor* mon) {
+    if (mon == 0) {
+        return;
+    }
+    /* g_signal_connect is idempotent only by handler identity, so guard with a
+     * one-shot flag stored on the monitor itself. */
+    if (g_object_get_data(G_OBJECT(mon), "cn1-watched") != 0) {
+        return;
+    }
+    g_object_set_data(G_OBJECT(mon), "cn1-watched", (gpointer) 1);
+    g_signal_connect(mon, "notify::geometry",
+            G_CALLBACK(cn1DesktopMonitorPropertyChanged), 0);
+    g_signal_connect(mon, "notify::workarea",
+            G_CALLBACK(cn1DesktopMonitorPropertyChanged), 0);
+    g_signal_connect(mon, "notify::scale-factor",
+            G_CALLBACK(cn1DesktopMonitorPropertyChanged), 0);
+}
+
+/* Attaches the per-monitor watch to every monitor currently connected. */
+static void cn1DesktopWatchAllMonitors(GdkDisplay* display) {
+    int count;
+    int iter;
+    if (display == 0) {
+        return;
+    }
+    count = gdk_display_get_n_monitors(display);
+    for (iter = 0; iter < count; iter++) {
+        cn1DesktopWatchMonitor(gdk_display_get_monitor(display, iter));
+    }
+}
+
 static void cn1DesktopMonitorsChanged(GdkDisplay* display, GdkMonitor* monitor, gpointer data) {
-    (void) display;
     (void) monitor;
     (void) data;
+    /* A newly attached monitor needs its own property watch. */
+    cn1DesktopWatchAllMonitors(display);
     cn1LinuxPushWindowEvent(0, CN1_EVENT_MONITORS_CHANGED, 0, 0, 0);
 }
 
@@ -292,6 +337,7 @@ void cn1LinuxWatchMonitors(void) {
     cn1DesktopMonitorWatchInstalled = 1;
     g_signal_connect(display, "monitor-added", G_CALLBACK(cn1DesktopMonitorsChanged), 0);
     g_signal_connect(display, "monitor-removed", G_CALLBACK(cn1DesktopMonitorsChanged), 0);
+    cn1DesktopWatchAllMonitors(display);
 }
 
 static gboolean cn1DesktopOnWindowState(GtkWidget* widget, GdkEventWindowState* e,

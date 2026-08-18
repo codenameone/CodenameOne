@@ -1834,6 +1834,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().windowClosedNatively(windowId);
     }
 
+    /// Invoked when a display is attached, removed or changes mode.
+    public static void monitorsChangedCallback() {
+        Display.getInstance().monitorsChanged();
+    }
+
     /// Invoked when a window gains or loses keyboard focus.
     public static void windowFocusCallback(int windowId, boolean gained) {
         Display.getInstance().windowFocusChanged(windowId, gained);

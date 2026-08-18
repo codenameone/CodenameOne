@@ -36,6 +36,7 @@
  */
 extern void CN1MacWindowDeliverClose(int windowId);
 extern void CN1MacWindowDeliverClosed(int windowId);
+extern void CN1MacWindowDeliverMonitorsChanged(void);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
@@ -561,6 +562,88 @@ void CN1MacWindowDestroy(int slot) {
         [window release];
         [title release];
     });
+}
+
+/*
+ * Asks the system for a scene again after one was disconnected without the app
+ * getting a say. Reuses the slot, so the framework's peer and raster stay valid.
+ */
+BOOL CN1MacWindowReopen(int slot) {
+    CN1MacWindow* w = slotAt(slot);
+    if (w == NULL || w->scene != nil) {
+        return NO;
+    }
+    w->pendingVisible = 1;
+    const int generation = w->generation;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!g_macWindows[slot].inUse || g_macWindows[slot].generation != generation) {
+            return;
+        }
+        UIWindowScene* recycled = takeFreeScene();
+        pushPendingSlot(slot);
+        if (recycled != nil) {
+            CN1MacWindowSceneConnected(recycled);
+            [recycled release];
+            return;
+        }
+        if (@available(macCatalyst 13.0, *)) {
+            UISceneActivationRequestOptions* options =
+                    [[UISceneActivationRequestOptions alloc] init];
+            options.requestingScene = [UIApplication sharedApplication].connectedScenes.anyObject;
+            [[UIApplication sharedApplication] requestSceneSessionActivation:nil
+                                                                userActivity:nil
+                                                                     options:options
+                                                                errorHandler:^(NSError* error) {
+                NSLog(@"CN1: window scene reopen failed: %@", error);
+            }];
+            [options release];
+        }
+    });
+    return YES;
+}
+
+void CN1MacWindowSetInputEnabled(int slot, BOOL enabled) {
+    CN1MacWindow* w = slotAt(slot);
+    if (w == NULL) {
+        return;
+    }
+    UIWindow* window = w->window;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        /* Covers every touch inside the window while a modal blocks it. The scene's
+         * own title bar is AppKit chrome the app does not own, so its close button
+         * stays live -- see the note on CN1MacWindowSceneDisconnected. */
+        window.userInteractionEnabled = enabled;
+    });
+}
+
+/*
+ * Displays being attached, removed or reconfigured. UIScreen posts all three, and
+ * the app has no other way to learn about them, so a Codename One monitor listener
+ * depends entirely on these.
+ */
+@interface CN1MacScreenWatch : NSObject
+@end
+
+@implementation CN1MacScreenWatch
+- (void)screensChanged:(NSNotification*)note {
+    CN1MacWindowDeliverMonitorsChanged();
+}
+@end
+
+static CN1MacScreenWatch* g_screenWatch;
+
+void CN1MacWindowWatchScreens(void) {
+    if (g_screenWatch != nil) {
+        return;
+    }
+    g_screenWatch = [[CN1MacScreenWatch alloc] init];
+    NSNotificationCenter* nc = [NSNotificationCenter defaultCenter];
+    [nc addObserver:g_screenWatch selector:@selector(screensChanged:)
+               name:UIScreenDidConnectNotification object:nil];
+    [nc addObserver:g_screenWatch selector:@selector(screensChanged:)
+               name:UIScreenDidDisconnectNotification object:nil];
+    [nc addObserver:g_screenWatch selector:@selector(screensChanged:)
+               name:UIScreenModeDidChangeNotification object:nil];
 }
 
 void CN1MacWindowShow(int slot, BOOL visible) {

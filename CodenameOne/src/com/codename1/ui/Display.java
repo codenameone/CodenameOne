@@ -2902,7 +2902,15 @@ public final class Display extends CN1Constants {
                     break;
                 case CLOSED_NATIVELY:
                     if (w != null) {
-                        w.dispose();
+                        // A window a modal is blocking must not be closable. Where the
+                        // platform's close control cannot be disabled the close has
+                        // already happened, so the only way to honour the contract is
+                        // to put the window back; a port that cannot returns false and
+                        // the window is disposed, because the surface is genuinely gone.
+                        if (!Display.getInstance().isBlockedByModal(windowId)
+                                || !w.reopenNativeSurface()) {
+                            w.dispose();
+                        }
                     }
                     break;
                 default:

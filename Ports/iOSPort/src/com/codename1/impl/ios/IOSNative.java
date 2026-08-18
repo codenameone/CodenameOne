@@ -236,6 +236,15 @@ public final class IOSNative {
 
     native void macWindowSetState(int slot, int state);
 
+    /** Requests a scene again after one was destroyed without the app getting a say. */
+    native boolean macWindowReopen(int slot);
+
+    /** Enables or disables touch input, used while a modal window blocks this one. */
+    native void macWindowSetInputEnabled(int slot, boolean enabled);
+
+    /** Starts reporting display attach/remove/mode changes; idempotent. */
+    native void macWindowWatchScreens();
+
     /**
      * Presents one rendered frame. The pixels are the window's own raster; the
      * native side wraps them in a CGImage and assigns it to the view's layer.

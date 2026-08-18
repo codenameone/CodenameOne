@@ -1137,6 +1137,22 @@ public class Window extends Container implements TopLevelContainer {
         return getMonitor().getScale();
     }
 
+    /// Asks the port to rebuild this window's native surface after the platform
+    /// destroyed it unasked. See `com.codename1.impl.WindowManager#reopen(Object)`.
+    boolean reopenNativeSurface() {
+        if (nativePeer == null || disposing) {
+            return false;
+        }
+        if (!manager().reopen(nativePeer)) {
+            return false;
+        }
+        // The surface is being rebuilt, so nothing painted so far survives.
+        Display.impl.clearPaintSurface(paintSurface);
+        paintedOnce = false;
+        repaint();
+        return true;
+    }
+
     /// Invoked by the framework when the platform reports that the user moved this
     /// window. Nothing needs re-laying out -- only the position changed -- so this
     /// just reports it.

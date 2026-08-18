@@ -54,6 +54,10 @@ public class MacWindowManager extends WindowManager {
 
     MacWindowManager(IOSImplementation impl) {
         this.impl = impl;
+        // UIScreen notifications are the only way a Catalyst app learns that a
+        // display was attached, removed or changed mode, so a monitor listener
+        // depends entirely on this being installed.
+        IOSImplementation.nativeInstance.macWindowWatchScreens();
     }
 
     /** One native window: its slot, and the raster it is rendered through. */
@@ -173,6 +177,24 @@ public class MacWindowManager extends WindowManager {
     @Override
     public void setIcon(Object p, Image icon) {
         // A Mac window has no per-window icon.
+    }
+
+    @Override
+    public boolean reopen(Object p) {
+        int s = slot(p);
+        return s >= 0 && IOSImplementation.nativeInstance.macWindowReopen(s);
+    }
+
+    @Override
+    public void setInputEnabled(Object p, boolean enabled) {
+        int s = slot(p);
+        if (s >= 0) {
+            // Covers input inside the window. The scene's title bar belongs to
+            // AppKit rather than to the application, so its close button stays live
+            // even while the window is blocked -- Catalyst offers no way to disable
+            // it, and a close there is reported after the fact as a disposal.
+            IOSImplementation.nativeInstance.macWindowSetInputEnabled(s, enabled);
+        }
     }
 
     // ---- rendering ------------------------------------------------------------------

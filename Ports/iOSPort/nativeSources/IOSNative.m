@@ -2059,6 +2059,30 @@ void CN1MacWindowDeliverClosed(int windowId) {
     com_codename1_impl_ios_IOSImplementation_windowClosedNativelyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT slot, JAVA_BOOLEAN enabled) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetInputEnabled(slot, enabled == JAVA_TRUE);
+#endif
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowWatchScreens();
+#endif
+}
+
+void CN1MacWindowDeliverMonitorsChanged(void) {
+    com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE);
+}
+
 void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
     com_codename1_impl_ios_IOSImplementation_windowFocusCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, gained ? JAVA_TRUE : JAVA_FALSE);
 }

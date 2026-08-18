@@ -96,6 +96,15 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene);
  * it. Returns NO when the scene belongs to the application's main form. */
 BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
 
+/** Requests a scene again for a window whose scene was destroyed unasked. */
+BOOL CN1MacWindowReopen(int slot);
+
+/** Enables or disables touch input for a window, used while a modal blocks it. */
+void CN1MacWindowSetInputEnabled(int slot, BOOL enabled);
+
+/** Starts reporting display attach/remove/mode changes; idempotent. */
+void CN1MacWindowWatchScreens(void);
+
 /** The window id a scene belongs to, or -1 for the application's main scene. */
 int CN1MacWindowIdForScene(UIWindowScene* scene);
 
