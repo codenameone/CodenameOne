@@ -3842,6 +3842,13 @@ com_codename1_impl_ios_IOSNative_homeCommissioningStyle___R_int(
     }
 #endif
     return CN1_HOME_COMMISSION_OS_UI;
+#elif TARGET_OS_TV || TARGET_OS_WATCH || TARGET_OS_MACCATALYST || TARGET_OS_OSX
+    // Not an iOS build that left the extension out -- a slice where
+    // MatterSupport does not exist at all, which is why the header undefines
+    // the flag here. Commissioner.getStyle() is documented as NONE on
+    // watchOS, tvOS and macOS, and answering APP_HANDOFF instead had apps
+    // offering an Apple Home handoff these slices cannot perform.
+    return CN1_HOME_COMMISSION_NONE;
 #else
     // Not "none": the Apple Home app can still add the accessory, and telling
     // the app that is more useful than telling it nothing is possible.

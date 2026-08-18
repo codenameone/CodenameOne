@@ -581,21 +581,76 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
     private void launch(final Activity activity, IntentSender sender,
             final int generation) {
         final CodenameOneActivity cn1 = (CodenameOneActivity) activity;
-        if (cn1.isWaitingForResult()) {
-            // Re-checked here, not only in commission(): the Play services
-            // call that produces this IntentSender is asynchronous, and
-            // another screen can take the result channel while it runs.
-            // Registering then is silently ignored, so launching anyway hands
-            // this flow's result to that screen.
-            Callback waiting = claimCommission(generation);
-            if (waiting != null) {
-                waiting.onError("BUSY",
-                        "another screen took over while the add-device"
-                                + " screen was being prepared");
+        Callback refused = null;
+        String refusedError = null;
+        String refusedMessage = null;
+        // The whole launch under the lock, decision and screen together.
+        // Decided and then acted on, a stop() landing in between still opened
+        // the sheet: the result channel was taken for a request that no
+        // longer existed, so whatever started next was answered BUSY by a
+        // screen nobody was waiting on, and the sheet's own answer was
+        // discarded when it finally came back. Nothing in here calls
+        // application code, and the other holders of this lock do a handful
+        // of field writes each.
+        synchronized (commissionLock) {
+            if (generation != commissionGeneration) {
+                // Stopped or superseded while Play services was preparing the
+                // sender. Nothing to answer and nothing to open.
+                return;
             }
-            return;
+            if (cn1.isWaitingForResult()) {
+                // Re-checked here, not only in commission(): the Play
+                // services call that produces this IntentSender is
+                // asynchronous, and another screen can take the result
+                // channel while it runs. Registering then is silently
+                // ignored, so launching anyway hands this flow's result to
+                // that screen.
+                refused = claimCommission(generation);
+                refusedError = "BUSY";
+                refusedMessage = "another screen took over while the"
+                        + " add-device screen was being prepared";
+            } else {
+                cn1.setIntentResultListener(
+                        commissionResultListener(cn1, generation));
+                try {
+                    // Through the activity's own override, which resets the
+                    // queued results the way startActivityForResult does.
+                    // Called on the raw Activity it would be the inherited
+                    // one, and a second run of this flow would be answered
+                    // with the first run's outcome.
+                    cn1.startIntentSenderForResult(sender, REQUEST_COMMISSION,
+                            null, 0, 0, 0);
+                    // Set once the screen is really up, and this is the point
+                    // after which an expiring limit no longer frees the slot:
+                    // the answer is the user's to give now, and it arrives
+                    // through the listener registered above.
+                    commissionLaunched = true;
+                } catch (IntentSender.SendIntentException cannotStart) {
+                    cn1.restoreIntentResultListener();
+                    refused = claimCommission(generation);
+                    refusedError = "COMMISSIONING_FAILED";
+                    refusedMessage = cannotStart.getMessage();
+                }
+            }
         }
-        cn1.setIntentResultListener(new IntentResultListener() {
+        // Outside the lock: a callback runs application code, which can come
+        // straight back in here.
+        if (refused != null) {
+            refused.onError(refusedError, refusedMessage);
+        }
+    }
+
+    /// The activity result listener for one launched request.
+    ///
+    /// Its own method rather than an anonymous block inside the synchronized
+    /// launch, so the body it needs is not four levels deep.
+    ///
+    /// @param cn1 the activity the sheet was launched from
+    /// @param generation the request this sheet belongs to
+    /// @return the listener to register
+    private IntentResultListener commissionResultListener(
+            final CodenameOneActivity cn1, final int generation) {
+        return new IntentResultListener() {
             @Override
             public void onActivityResult(int requestCode, int resultCode,
                     Intent data) {
@@ -642,30 +697,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                             badResult.getMessage());
                 }
             }
-        });
-        try {
-            // Through the activity's own override, which resets the queued
-            // results the way startActivityForResult does. Called on the raw
-            // Activity it would be the inherited one, and a second run of
-            // this flow would be answered with the first run's outcome.
-            cn1.startIntentSenderForResult(sender, REQUEST_COMMISSION,
-                    null, 0, 0, 0);
-            // Set only once the screen is really up, and this is the point
-            // after which an expiring limit no longer frees the slot: the
-            // answer is the user's to give now, and it arrives through the
-            // listener registered above.
-            synchronized (commissionLock) {
-                if (generation == commissionGeneration) {
-                    commissionLaunched = true;
-                }
-            }
-        } catch (IntentSender.SendIntentException cannotStart) {
-            cn1.restoreIntentResultListener();
-            Callback waiting = claimCommission(generation);
-            if (waiting != null) {
-                waiting.onError("COMMISSIONING_FAILED",
-                        cannotStart.getMessage());
-            }
-        }
+        };
     }
+
 }
