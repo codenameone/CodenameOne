@@ -481,10 +481,17 @@ public final class PlatformFeatureCatalog {
         // express -- the ios.home.commissioning=false opt-out. A framework
         // named here is linked for real, so a second copy of the decision
         // here would link MatterSupport into a build that opted out.
+        //
+        // And no androidGradle or androidMinimumSdk either, for the startsWith
+        // reason the health entry above spells out: this prefix also covers
+        // com/codename1/home/commissioning/SetupPayload, which is a pure-Java
+        // parser for the string on an accessory's sticker. Naming
+        // play-services-home here would put a Play Services AAR -- and the
+        // API 21 floor that comes with it -- into an app that only checks
+        // whether a scanned code is well formed. AndroidGradleBuilder adds
+        // both inside the usesSmartHome gate, which is the one that knows the
+        // difference, and where the delegate that imports the AAR is injected.
         e.add(new Entry("com/codename1/home/")
-                .androidGradle("com.google.android.gms:play-services-home:"
-                        + "16.0.0-beta1")
-                .androidMinimumSdk(21)
                 .description("Smart home accessories (HomeKit, Matter, "
                         + "Google Home)"));
 

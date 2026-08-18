@@ -29,6 +29,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,6 +88,65 @@ public class SmartHomeScannerParityTest {
                 "the iOS scanner must separate the commissioning package");
         assertTrue(android.contains("com/codename1/home/commissioning/"),
                 "the Android scanner must separate the commissioning package");
+    }
+
+    /**
+     * Neither scanner treats the setup-payload parser as using smart home.
+     *
+     * <p>SetupPayload parses the string on an accessory's sticker and
+     * checksums it, in pure Java. An app that scans a code and says "that is
+     * not a Matter code" before deciding whether to commission anything is
+     * doing only that -- and on the strength of the package prefix alone it
+     * would be made to declare a HomeKit purpose string, carry two restricted
+     * entitlements, own an app group and ship a generated extension on iOS,
+     * and take a Play Services AAR plus Bluetooth permissions on Android. The
+     * build fails for want of the purpose string, or codesigning fails for
+     * want of the entitlement on the App ID.</p>
+     */
+    @Test
+    public void neitherScannerCountsTheSetupPayloadParser() throws Exception {
+        String ios = source("IPhoneBuilder");
+        String android = source("AndroidGradleBuilder");
+        for (String src : new String[] {ios, android}) {
+            assertTrue(src.contains("isSmartHomeSetupPayload"),
+                    "each scanner must exempt the pure-Java payload parser");
+            assertTrue(src.contains(
+                    "\"com/codename1/home/commissioning/SetupPayload\".equals(cls)"),
+                    "the exemption must name the parser exactly");
+            assertTrue(src.contains(
+                    "&& !isSmartHomeSetupPayload(cls)"),
+                    "the exemption must guard the package check itself, so it"
+                            + " reaches usesHomeCommissioning too");
+        }
+    }
+
+    /**
+     * The catalog names no Android dependency for smart home either.
+     *
+     * <p>Same startsWith problem as the iOS frameworks: the prefix covers the
+     * pure-Java payload parser, so play-services-home named here would land
+     * in an app that only validates a scanned code. AndroidGradleBuilder adds
+     * it inside the usesSmartHome gate, beside the delegate that imports
+     * it.</p>
+     */
+    @Test
+    public void theCatalogLeavesTheAndroidDependencyToTheBuilder()
+            throws Exception {
+        PlatformFeatureCatalog.Accumulator reader =
+                new PlatformFeatureCatalog.Accumulator();
+        reader.consume("com/codename1/home/SmartHome");
+        assertFalse(reader.hits().isEmpty(), "the entry must still match");
+        for (PlatformFeatureCatalog.Entry hit : reader.hits()) {
+            assertTrue(hit.androidGradleDeps().isEmpty(),
+                    "the smart home entry must name no Android dependency: "
+                            + hit.androidGradleDeps());
+        }
+        assertEquals(0, reader.minimumAndroidSdk(),
+                "and no Android floor either -- the builder raises it inside"
+                        + " the gate that knows the parser does not need it");
+        String android = source("AndroidGradleBuilder");
+        assertTrue(android.contains("play-services-home"),
+                "the builder must be the one that adds the dependency");
     }
 
     /**
@@ -228,15 +288,34 @@ public class SmartHomeScannerParityTest {
      * Play services home needs API 21, and letting Gradle's manifest merger
      * discover that produces an error naming a transitive dependency the
      * developer never wrote down.
+     *
+     * <p>Raised by the builder rather than the catalog, and for the same
+     * reason the dependency itself moved there: the catalog prefix also
+     * covers the pure-Java payload parser, and an app that only validates a
+     * scanned code should not have its minimum SDK raised for an AAR it never
+     * gets. The floor travels with the dependency, inside the one gate that
+     * knows the difference.</p>
      */
     @Test
-    public void theCatalogRaisesTheAndroidFloor() {
-        PlatformFeatureCatalog.Accumulator acc =
-                new PlatformFeatureCatalog.Accumulator();
-        acc.consume("com/codename1/home/SmartHome");
-        assertTrue(acc.minimumAndroidSdk() >= 21,
-                "expected the Play services home floor, got "
-                        + acc.minimumAndroidSdk());
+    public void theBuilderRaisesTheAndroidFloorInsideTheGate()
+            throws Exception {
+        String android = source("AndroidGradleBuilder");
+        assertTrue(android.contains(
+                "SmartHomeManifestFragments.MINIMUM_SDK"),
+                "the builder must raise the floor from the shared constant");
+        assertEquals(21, SmartHomeManifestFragments.MINIMUM_SDK,
+                "the floor is what play-services-home needs");
+        assertGatedBy(android, "smartHomeGradleDependency = \"    implementation \"",
+                "if (usesSmartHome)");
+        int gate = android.indexOf("if (usesSmartHome) {");
+        int dependency = android.indexOf(
+                "smartHomeGradleDependency = \"    implementation \"");
+        int floor = android.indexOf(
+                "SmartHomeManifestFragments.MINIMUM_SDK)", gate);
+        assertTrue(gate > 0 && dependency > gate && floor > dependency,
+                "the dependency and the floor both belong inside the gate,"
+                        + " in that order: gate=" + gate + " dependency="
+                        + dependency + " floor=" + floor);
     }
 
     /**

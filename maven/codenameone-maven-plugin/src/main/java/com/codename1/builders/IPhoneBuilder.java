@@ -1380,7 +1380,8 @@ public class IPhoneBuilder extends Executor {
                     // Smart home (com.codename1.home.*). Gated on actual usage so
                     // HomeKit, its entitlement and the CN1SmartHome natives are only
                     // added for apps that reference the API.
-                    if (cls.indexOf("com/codename1/home/") == 0) {
+                    if (cls.indexOf("com/codename1/home/") == 0
+                            && !isSmartHomeSetupPayload(cls)) {
                         usesSmartHome = true;
                         if (cls.indexOf("com/codename1/home/commissioning/") == 0) {
                             usesHomeCommissioning = true;
@@ -5118,6 +5119,31 @@ public class IPhoneBuilder extends Executor {
      * availability, branches on it, and possibly shows a typed error. None of
      * that reaches an accessory.</p>
      */
+    /**
+     * Whether {@code cls} is the Matter setup-payload parser, which needs
+     * nothing from the platform.
+     *
+     * <p>It lives in {@code com.codename1.home.commissioning} because that is
+     * where it belongs to a reader, but it is pure Java: it parses an
+     * {@code MT:} QR string or a manual pairing code and checksums it, and it
+     * never reaches a bridge, a native or an ecosystem SDK. An app that scans
+     * a code and tells the user it is malformed -- before deciding whether to
+     * commission at all, or to hand it to a hub over the network -- is doing
+     * exactly that and nothing more.</p>
+     *
+     * <p>Without this exemption the package prefix alone would make such an
+     * app declare a HomeKit purpose string, carry the restricted HomeKit and
+     * Matter entitlements, own an app group and ship a generated
+     * commissioning extension. It would fail the build for want of the
+     * purpose string, or codesigning for want of the entitlement on its App
+     * ID -- for a string parser.</p>
+     */
+    private static boolean isSmartHomeSetupPayload(String cls) {
+        return "com/codename1/home/commissioning/SetupPayload".equals(cls)
+                || cls.indexOf(
+                        "com/codename1/home/commissioning/SetupPayload$") == 0;
+    }
+
     private static boolean isSmartHomeAvailabilityType(String cls) {
         return "com/codename1/home/HomeAvailability".equals(cls)
                 || "com/codename1/home/HomeBackend".equals(cls)
