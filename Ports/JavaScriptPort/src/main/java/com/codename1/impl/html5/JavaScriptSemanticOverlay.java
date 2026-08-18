@@ -211,6 +211,14 @@ public final class JavaScriptSemanticOverlay {
 
         pruneRemovedNodes(live);
         reconcileChildOrder(container, rootOrder, roots, live);
+        if (actionsContainer != null) {
+            // Moved behind the tree every time it is rebuilt. The region is created the first
+            // time a node needs a control, which happens while the tree is still being walked --
+            // before the roots are attached -- so left where it was made it would sit ahead of
+            // the whole form, and a keyboard or screen-reader user would meet "Set text" before
+            // reaching the field it writes to. appendChild moves it rather than copying it.
+            container.appendChild(actionsContainer);
+        }
 
         if (pendingFocus != null) {
             // Recorded before the call, and that record is what tells the focus event apart
