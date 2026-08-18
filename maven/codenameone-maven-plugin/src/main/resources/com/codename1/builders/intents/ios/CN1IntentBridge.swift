@@ -177,6 +177,17 @@ public struct CN1IntentOutcome {
     public let ok: Bool
     public let value: String?
     public let dialog: String?
+    /// The route the handler asked to open, decoded but deliberately not acted on here.
+    ///
+    /// Nothing in this file opens it, and that is not an omission: the route table is Java, so
+    /// the framework navigates from there for every port -- Intents.navigateIfRequested runs on
+    /// the same result, expands a declared opensRoute when the handler named none, brings the
+    /// app forward when the run was headless, and rechecks the deadline before it changes what
+    /// is on screen. Opening the URL from Swift as well would navigate twice, and the second
+    /// one would skip all of that.
+    ///
+    /// It stays decoded because the outcome is meant to be a faithful reading of the result
+    /// JSON, and because it is what makes a wrong route visible when debugging one.
     public let openUrl: String?
     public let error: String?
     /// The snippet's node tree, in the surfaces schema, or nil.
