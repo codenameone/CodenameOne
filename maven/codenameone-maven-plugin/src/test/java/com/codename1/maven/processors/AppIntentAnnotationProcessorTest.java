@@ -1242,6 +1242,22 @@ public class AppIntentAnnotationProcessorTest {
         }
     }
 
+    /// A route placeholder pattern of [A-Za-z0-9_] could not see {ship-to}, so an undeclared
+    /// one passed validation, was accepted as an ordinary route variable, and then failed at
+    /// runtime where expandRoute looks the whole name up -- the handler ran, the app came
+    /// forward, and it navigated nowhere.
+    @Test
+    public void anUndeclaredRoutePlaceholderWithAHyphenIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"open_order\", title = \"Open\",\n"
+                        + "        opensRoute = \"/orders/{missing-id}\")\n"
+                        + "public static IntentResult open() {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        assertError(classes, "declares no parameter with that name");
+    }
+
     /// A parameter name may hold anything, and the placeholder pattern only matched
     /// [A-Za-z0-9_] -- so a phrase naming two such parameters passed a check that exists
     /// because Apple rejects exactly that, as a halting error producing no metadata at all.

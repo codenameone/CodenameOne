@@ -90,7 +90,7 @@ jobs:
       - name: Build plugin + cn1-ads-mock (JDK 8)
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
+          JAVA_HOME="$JDK_8_HOME" $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       - name: Build hellocodenameone-common (JDK 17)
@@ -183,7 +183,7 @@ jobs:
       - name: Build core + Linux port (JDK 8)
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux -am \
+          JAVA_HOME="$JDK_8_HOME" $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -pl linux -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       - name: Download suite classes
@@ -266,7 +266,7 @@ jobs:
           mkdir -p /tmp/cn1-cores
           rc=0
           $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B clean package -pl JavaAPI -am -DskipTests
-          mvn -B test -pl tests -am \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B test -pl tests -am \
             '-Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux' \
             '-Dsurefire.failIfNoSpecifiedTests=false' || rc=$?
           for core in /tmp/cn1-cores/core.*; do
@@ -366,8 +366,8 @@ jobs:
               export DISPLAY=:99
               sleep 2
               # core + Linux port (musl JDK8); the default cc on Alpine already links musl.
-              cd /cn1/maven && mvn -B -pl linux -am -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
-              cd /cn1/vm && mvn -B clean package -pl JavaAPI -am -DskipTests
+              cd /cn1/maven && /cn1/scripts/ci-mvn-retry.sh -B -pl linux -am -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
+              cd /cn1/vm && /cn1/scripts/ci-mvn-retry.sh -B clean package -pl JavaAPI -am -DskipTests
               /cn1/scripts/ci-mvn-retry.sh -B test -pl tests -am \
                 -Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux \
                 -Dsurefire.failIfNoSpecifiedTests=false

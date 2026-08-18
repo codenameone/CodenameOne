@@ -1800,6 +1800,25 @@ class IntentsTest {
         assertEquals("ratio_double", b.donatedId);
     }
 
+    /// Long.MAX_VALUE is exact as a long and rounds up to 2^63 as a double, so checking it
+    /// through a double rejected a value the declared type holds perfectly -- and the
+    /// invocation accepts, because the generated requiredLong reads an integral box directly.
+    @Test
+    void anExactLongAtTheBoundaryIsStillDonatable() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithNumericParam("count_long", "count",
+                IntentParameterType.INTEGER, 64));
+        Intents.setDispatcher(d);
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("count", Long.valueOf(Long.MAX_VALUE));
+        Intents.donate("count_long", params);
+
+        assertEquals("count_long", b.donatedId);
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

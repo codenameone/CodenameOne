@@ -1292,21 +1292,39 @@ public final class Intents {
             // runtime, and it is a guess either way -- which is why the width is carried now.
             int bits = p.getNumericWidthBits();
             boolean small = bits == 0 ? narrow : bits == 32;
-            double d;
+            if (type == IntentParameterType.INTEGER) {
+                // An integral box is exact and stays exact, which is what the generated
+                // requiredLong does before it considers anything else. Routing Long.MAX_VALUE
+                // through a double rounds it up to 2^63 and the range check then rejects a
+                // value the declared type holds perfectly -- so a donation was refused for a
+                // number the invocation itself accepts.
+                if (value instanceof Long || value instanceof Integer
+                        || value instanceof Short || value instanceof Byte) {
+                    return fitsIntegerWidth(((Number) value).longValue(), small);
+                }
+                if (value instanceof String) {
+                    try {
+                        return fitsIntegerWidth(Long.parseLong(((String) value).trim()), small);
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+                }
+                if (value instanceof Number) {
+                    return isWhole(((Number) value).doubleValue(), small);
+                }
+                return false;
+            }
             if (value instanceof Number) {
-                d = ((Number) value).doubleValue();
-            } else if (value instanceof String) {
+                return isFinite(((Number) value).doubleValue(), small);
+            }
+            if (value instanceof String) {
                 try {
-                    d = type == IntentParameterType.INTEGER
-                            ? Long.parseLong(((String) value).trim())
-                            : Double.parseDouble(((String) value).trim());
+                    return isFinite(Double.parseDouble(((String) value).trim()), small);
                 } catch (NumberFormatException e) {
                     return false;
                 }
-            } else {
-                return false;
             }
-            return type == IntentParameterType.INTEGER ? isWhole(d, small) : isFinite(d, small);
+            return false;
         }
         if (type == IntentParameterType.DATE) {
             return IntentDates.parse(value) != null;
@@ -1324,6 +1342,14 @@ public final class Intents {
         // An id resolves through the BY_ID query, and whether it names anything is that query's
         // answer to give rather than this method's.
         return value instanceof String;
+    }
+
+    /// Whether an exactly known whole number fits the declared width.
+    ///
+    /// Separate from the double-based check because a long is not a double: the two disagree at
+    /// the boundary, and only this one is right about a value that arrived as a long.
+    private static boolean fitsIntegerWidth(long v, boolean narrow) {
+        return !narrow || (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE);
     }
 
     /// A whole number an `INTEGER` parameter could hold, at `int` width or at `long` width.
@@ -1787,9 +1813,11 @@ public final class Intents {
             // dispatchInvocation promises an enforced deadline. A plain daemon thread needs
             // nothing from Display and is the one timer available this early; it exits as soon
             // as the guard completes, so an instant handler does not leave it parked.
-            Thread watcher = new Thread(watchdog, "CN1 Intent timeout");
-            watcher.setDaemon(true);
-            watcher.start();
+            // Not marked daemon: this runtime's Thread has no setDaemon, and it does not need
+            // one. The watchdog waits on the guard for at most the declared budget and then
+            // returns, so the longest it can hold a process open is that budget -- and it
+            // usually returns the moment the handler completes.
+            new Thread(watchdog, "CN1 Intent timeout").start();
             body.run();
             return;
         }

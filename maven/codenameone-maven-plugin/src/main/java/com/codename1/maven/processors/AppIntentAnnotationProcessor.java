@@ -97,7 +97,6 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
     private static final Pattern ID_PATTERN = Pattern.compile("[a-z][a-z0-9_]{2,63}");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Za-z0-9_]+)\\}");
-    private static final Pattern ROUTE_PLACEHOLDER = Pattern.compile("\\{([A-Za-z0-9_]+)\\}");
     /// Apple rejects an App Shortcut phrase that does not name the app.
     private static final String APP_NAME_TOKEN = "${applicationName}";
 
@@ -468,8 +467,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                     + "or make it discoverable.");
         }
         if (def.opensRoute.length() > 0) {
-            checkPlaceholders(cls, ctx, where, ROUTE_PLACEHOLDER, def.opensRoute, def,
-                    "opensRoute");
+            checkRoutePlaceholders(cls, ctx, where, def);
             if (!routeDeclared(def.opensRoute)) {
                 ctx.error(cls, "@AppIntent " + where + " opensRoute \"" + def.opensRoute
                         + "\" does not match any @Route in this project");
@@ -796,6 +794,40 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             sb.append(values.get(i));
         }
         return sb.toString();
+    }
+
+    /// Checks an opensRoute template's placeholders, reading it the way expandRoute reads it.
+    ///
+    /// A pattern of [A-Za-z0-9_] could not see "{ship-to}", and a parameter name is application
+    /// text -- so an undeclared placeholder with a hyphen in it passed here, was accepted by
+    /// routeDeclared as an ordinary route variable, and then failed at runtime where expandRoute
+    /// looks the whole name up and finds nothing. The handler ran, the app came forward, and it
+    /// navigated nowhere: the invocation half-happening, which is the failure opensRoute exists
+    /// to prevent.
+    ///
+    /// Unlike a phrase, an unresolvable placeholder here is always an error. A phrase may carry
+    /// a literal ${token} and the generator leaves it in the spoken text; a route with a name
+    /// nothing supplies simply cannot be built.
+    private void checkRoutePlaceholders(AnnotatedClass cls, ProcessorContext ctx, String where,
+                                         IntentDef def) {
+        String template = def.opensRoute;
+        int i = 0;
+        while (true) {
+            int open = template.indexOf('{', i);
+            if (open < 0) {
+                return;
+            }
+            int close = template.indexOf('}', open);
+            if (close < 0) {
+                return;
+            }
+            String name = template.substring(open + 1, close);
+            i = close + 1;
+            if (def.param(name) == null) {
+                ctx.error(cls, "@AppIntent " + where + " opensRoute references {" + name
+                        + "} but declares no parameter with that name");
+            }
+        }
     }
 
     private void checkPlaceholders(AnnotatedClass cls, ProcessorContext ctx, String where,
