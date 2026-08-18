@@ -90,7 +90,11 @@ public final class DynamicIntent {
     /// this parameterization, for chaining
     public DynamicIntent bind(Map<String, Object> params) {
         if (params != null) {
-            bound.putAll(params);
+            // Entry by entry rather than putAll: a map assembled from optional application data
+            // carries nulls, and each of those means the same as never having been bound.
+            for (Map.Entry<String, Object> e : params.entrySet()) {
+                bind(e.getKey(), e.getValue());
+            }
         }
         return this;
     }
@@ -106,9 +110,19 @@ public final class DynamicIntent {
     ///
     /// this parameterization, for chaining
     public DynamicIntent bind(String name, Object value) {
-        if (name != null) {
-            bound.put(name, value);
+        if (name == null) {
+            return this;
         }
+        if (value == null) {
+            // A null is not a value, so it is not a binding. Recording it would hide the
+            // parameter from this parameterization's declaration -- telling a model or the
+            // simulator that nothing is needed -- while dispatch still failed its required
+            // check and donation dropped it on the way out. Clearing is what "I have no value
+            // for this" has to mean, and it leaves the parameter visible and suppliable.
+            bound.remove(name);
+            return this;
+        }
+        bound.put(name, value);
         return this;
     }
 

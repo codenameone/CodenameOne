@@ -925,6 +925,36 @@ class IntentsTest {
         assertEquals(0, b.foregroundRequests);
     }
 
+    /// A null is not a value, so it must not count as a binding. Recording one hid the
+    /// parameter from the parameterization's declaration -- telling a model and the simulator
+    /// that nothing was needed -- while dispatch still failed its required check and donation
+    /// dropped it on the way out, leaving no way to repair the invocation.
+    @Test
+    void bindingAParameterToNullLeavesItUnbound() {
+        IntentParameterInfo kind = new IntentParameterInfo("kind", "What kind?",
+                IntentParameterType.STRING, true, null, null, null);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("log_workout", "Log", "", true, true, false,
+                "", 5, Collections.<String>emptyList(), Arrays.asList(kind),
+                Arrays.asList(Exposure.ASSISTANT)));
+        Intents.setDispatcher(d);
+
+        Map<String, Object> partial = new HashMap<String, Object>();
+        partial.put("kind", null);
+        Intents.registerDynamicIntent(new DynamicIntent("log_run", "log_workout", "Log a run")
+                .bind(partial));
+
+        IntentDeclaration derived = Intents.getDeclaration("log_run");
+        assertNotNull(derived);
+        assertNotNull(derived.getParameter("kind"),
+                "a parameter bound to null still has to be asked for");
+
+        // And binding null over a real value clears it rather than shadowing it.
+        DynamicIntent cleared = new DynamicIntent("log_ride", "log_workout", "Log a ride")
+                .bind("kind", "ride").bind("kind", null);
+        assertTrue(cleared.getBoundParameters().isEmpty());
+    }
+
     /// The generated bootstrap installs the dispatcher before the port has booted, so the first
     /// publication finds no bridge and is deferred. Something has to ask afterwards -- and on
     /// Android that flush is what makes registerIntents run, which is what judges a request
