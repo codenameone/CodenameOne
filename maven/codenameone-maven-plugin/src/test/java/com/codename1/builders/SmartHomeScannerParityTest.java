@@ -150,6 +150,42 @@ public class SmartHomeScannerParityTest {
     }
 
     /**
+     * Asking whether commissioning is possible is not commissioning.
+     *
+     * <p>An app that shows an "add accessory" button only where the platform
+     * has one calls Commissioner.isSupported() or getStyle(). Both are class
+     * references in the commissioning package, and on the package prefix
+     * alone they bought MatterSupport, the restricted setup-payload
+     * entitlement, an app group, a generated extension target and a raised
+     * deployment floor -- for a question whose answer may well be "no".</p>
+     */
+    @Test
+    public void aCapabilityProbeIsNotCommissioning() throws Exception {
+        assertTrue(SmartHomeManifestFragments.isCommissioningCapabilityType(
+                "com/codename1/home/commissioning/Commissioner"));
+        assertTrue(SmartHomeManifestFragments.isCommissioningCapabilityType(
+                "com/codename1/home/commissioning/CommissioningStyle"));
+        assertFalse(SmartHomeManifestFragments.isCommissioningCapabilityType(
+                "com/codename1/home/commissioning/CommissioningRequest"),
+                "building a request is intent to commission");
+
+        assertFalse(SmartHomeManifestFragments
+                .isCommissioningCall("isSupported"));
+        assertFalse(SmartHomeManifestFragments.isCommissioningCall("getStyle"));
+        assertTrue(SmartHomeManifestFragments.isCommissioningCall("commission"),
+                "and everything else counts, including a method added later");
+
+        for (String builder : new String[] {"IPhoneBuilder",
+                "AndroidGradleBuilder"}) {
+            String src = source(builder);
+            assertTrue(src.contains("isCommissioningCapabilityType"),
+                    builder + " must exempt the capability types");
+        }
+        assertTrue(source("IPhoneBuilder").contains("isCommissioningCall"),
+                "and decide Commissioner by the method, as it does SmartHome");
+    }
+
+    /**
      * The entitlement gate is iOS-only, and it must read the shared
      * classifier rather than a private copy.
      *

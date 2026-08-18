@@ -1395,7 +1395,15 @@ public class IPhoneBuilder extends Executor {
                     if (cls.indexOf("com/codename1/home/") == 0
                             && !isSmartHomeSetupPayload(cls)) {
                         usesSmartHome = true;
-                        if (cls.indexOf("com/codename1/home/commissioning/") == 0) {
+                        if (cls.indexOf("com/codename1/home/commissioning/") == 0
+                                && !SmartHomeManifestFragments
+                                        .isCommissioningCapabilityType(cls)) {
+                            // Commissioner and CommissioningStyle are left out: an
+                            // app asking whether it COULD add an accessory names
+                            // both and may never add one, and the answer used to
+                            // cost it MatterSupport, a restricted entitlement, an
+                            // app group, an extension target and a raised floor.
+                            // The Commissioner call decides it instead, below.
                             usesHomeCommissioning = true;
                             // The entitlement commissioning earns is applied
                             // below rather than here, because it is only
@@ -1534,6 +1542,18 @@ public class IPhoneBuilder extends Executor {
                     // SmartHome.getAvailability() asks whether HomeKit exists and
                     // reads nothing. Both are the same class reference, so the
                     // entitlement decision has to be made here.
+                    if ("com/codename1/home/commissioning/Commissioner"
+                            .equals(cls)) {
+                        // isSupported() and getStyle() ask whether this
+                        // platform can add an accessory; anything else adds
+                        // one. The class reference alone cannot tell them
+                        // apart, and the difference is an entire generated
+                        // extension target.
+                        if (SmartHomeManifestFragments
+                                .isCommissioningCall(method)) {
+                            usesHomeCommissioning = true;
+                        }
+                    }
                     if ("com/codename1/home/SmartHome".equals(cls)) {
                         usesSmartHome = true;
                         if (SmartHomeManifestFragments.isAccessoryDataCall(method)) {

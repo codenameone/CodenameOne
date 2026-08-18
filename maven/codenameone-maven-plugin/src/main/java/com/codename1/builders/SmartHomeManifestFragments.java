@@ -162,6 +162,50 @@ final class SmartHomeManifestFragments {
      *
      * @return method names that must never imply the HomeKit entitlement
      */
+    /**
+     * Whether a {@code com.codename1.home.commissioning} class means the app
+     * intends to COMMISSION, or only to ask whether it could.
+     *
+     * <p>An app that offers an "add accessory" button only when the platform
+     * can add one calls Commissioner.isSupported() or getStyle(), and those
+     * references alone used to buy it the whole expensive half of this
+     * feature: MatterSupport, the restricted setup-payload entitlement, an
+     * app group, a generated extension target and a raised deployment floor
+     * -- for a question whose answer might well be "no".</p>
+     *
+     * <p>Commissioner itself is decided by the method the app calls, exactly
+     * as SmartHome is above; CommissioningStyle is the enum that answer comes
+     * back as, and naming it commits to nothing.</p>
+     *
+     * @param cls internal class name, slash-separated
+     * @return true when the reference is a capability probe rather than a
+     *         commissioning flow
+     */
+    static boolean isCommissioningCapabilityType(String cls) {
+        return "com/codename1/home/commissioning/Commissioner".equals(cls)
+                || "com/codename1/home/commissioning/CommissioningStyle"
+                        .equals(cls);
+    }
+
+    /**
+     * Whether a Commissioner method actually commissions.
+     *
+     * <p>Only two of them do not, and they are the pair a capability probe
+     * calls. Anything else -- now or later -- counts as commissioning, for
+     * the same reason the accessory-data classifier works that way: a method
+     * nobody listed is far more likely to be a new way to add an accessory
+     * than a new way to ask about one.</p>
+     *
+     * @param method the method name
+     * @return true when the call means the app commissions accessories
+     */
+    static boolean isCommissioningCall(String method) {
+        if (method == null || method.length() == 0) {
+            return false;
+        }
+        return !"isSupported".equals(method) && !"getStyle".equals(method);
+    }
+
     static String[] availabilityOnlyCalls() {
         return new String[] {
             // getInstance first, because every call goes through it: an app

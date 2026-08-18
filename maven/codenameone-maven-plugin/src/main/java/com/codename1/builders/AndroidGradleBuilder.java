@@ -1959,7 +1959,13 @@ public class AndroidGradleBuilder extends Executor {
                             && !isSmartHomeSetupPayload(cls)) {
                         usesSmartHome = true;
                         if (cls.indexOf("com/codename1/home/commissioning/")
-                                == 0) {
+                                == 0
+                                && !SmartHomeManifestFragments
+                                    .isCommissioningCapabilityType(cls)) {
+                            // Commissioner and CommissioningStyle are left
+                            // out: an app asking whether it COULD add an
+                            // accessory names both and may never add one.
+                            // The Commissioner call decides it instead.
                             usesHomeCommissioning = true;
                         }
                     }
