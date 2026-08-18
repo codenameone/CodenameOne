@@ -157,6 +157,26 @@ class IOSAppIntentsBuilderTest {
                 "chosen by id, and the omitted ones are named rather than dropped quietly");
     }
 
+    /// Swift's Int is 64-bit and its Double is a double, so a Java int or float was offered
+    /// unbounded: the platform accepted 5000000000 or 1e100, completed the whole interaction,
+    /// and the generated coercion refused it before the handler ran.
+    @Test
+    void aNarrowerJavaTypeBoundsTheAppIntentParameter() {
+        Map<String, Object> i = intent("measure", "Measure");
+        i.put("params", Arrays.asList(param("count", "int"), param("ratio", "float"),
+                param("total", "long"), param("exact", "double")));
+
+        String swift = intentsSwift(Arrays.asList(i), new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("inclusiveRange: (-2147483648, 2147483647)"),
+                "an int cannot hold more than that:\n" + swift);
+        assertTrue(swift.contains("inclusiveRange: (-3.4028234663852886e38, "),
+                "and a float cannot hold more than that:\n" + swift);
+        // A long and a double are exactly what Swift offers, so they carry no range at all.
+        int ranges = swift.split("inclusiveRange").length - 1;
+        assertEquals(2, ranges, "only the narrower two are bounded:\n" + swift);
+    }
+
     @Test
     void everythingIsAvailabilityFencedSoALowerTargetStillBuilds() {
         String swift = intentsSwift(
@@ -179,7 +199,8 @@ class IOSAppIntentsBuilderTest {
                 new ArrayList<Map<String, Object>>());
 
         assertTrue(swift.contains("struct CN1Intent_log_workout: AppIntent"));
-        assertTrue(swift.contains("@Parameter(title: \"minutes\")"));
+        assertTrue(swift.contains("@Parameter(title: \"minutes\", inclusiveRange: "),
+                "a Java int is a 64-bit Swift Int, so it carries the narrower range:\n" + swift);
         assertTrue(swift.contains("var `minutes`: Int"));
         assertTrue(swift.contains("CN1IntentBridge.run(id: \"log_workout\""),
                 "the Swift is a shell; the behaviour has to cross to Java");

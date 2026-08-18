@@ -250,7 +250,8 @@ public final class IOSAppIntentsBuilder {
             String declaredType = hasChoices(p)
                     ? choiceEnumName(str(intent, "id"), paramIdentifier(intent, str(p, "name")))
                     : swiftType(type, str(p, "entityType"));
-            sb.append("    @Parameter(title: \"").append(swift(str(p, "title"))).append("\")\n");
+            sb.append("    @Parameter(title: \"").append(swift(str(p, "title")))
+                    .append("\"").append(inclusiveRange(type, hasChoices(p))).append(")\n");
             sb.append("    var ").append(varName(paramIdentifier(intent, str(p, "name"))))
                     .append(": ")
                     .append(declaredType).append(optional).append("\n\n");
@@ -505,6 +506,33 @@ public final class IOSAppIntentsBuilder {
 
     static String entityStructName(String entityType) {
         return "CN1Entity_" + sanitize(entityType);
+    }
+
+    /// The range clause for a parameter whose Swift type is wider than the Java one.
+    ///
+    /// Swift's Int is 64-bit and its Double is a double, so a Java int or float was offered to
+    /// Siri and the Shortcuts app without bounds -- the platform accepted 5000000000 or 1e100,
+    /// completed the whole interaction, and the generated coercion then refused it before the
+    /// handler ran. Bounding the parameter moves that refusal to where the value is entered.
+    ///
+    /// Float is not an option: App Intents rejects it as a parameter type outright
+    /// (IntentParameter requires _IntentValue, which Float does not conform to), so a Java
+    /// float stays a Double with a float's range on it.
+    ///
+    /// One case is not expressible. requiredFloat also refuses a non-zero value that rounds to
+    /// zero, and inclusiveRange cannot describe an interval with a hole in it -- so 1e-100 is
+    /// still accepted here and rejected at dispatch, with a message that says why.
+    private static String inclusiveRange(String type, boolean hasChoices) {
+        if (hasChoices) {
+            return "";
+        }
+        if ("int".equals(type)) {
+            return ", inclusiveRange: (-2147483648, 2147483647)";
+        }
+        if ("float".equals(type)) {
+            return ", inclusiveRange: (-3.4028234663852886e38, 3.4028234663852886e38)";
+        }
+        return "";
     }
 
     /// Legal, unique Swift identifiers for one intent's parameters, keyed by declared name.

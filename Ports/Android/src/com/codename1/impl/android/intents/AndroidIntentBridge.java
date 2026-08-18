@@ -108,8 +108,12 @@ public class AndroidIntentBridge implements IntentBridge {
 
     public boolean isHeadlessExecutionSupported() {
         // AndroidImplementation.startContext boots Display with a Service context, which is the
-        // same path background fetch already uses in production.
-        return true;
+        // same path background fetch already uses in production -- but only where something can
+        // ask it to. Every entry point on this platform is a shortcut, and shortcuts do not
+        // exist below N_MR1, so answering true there described a capability with no way to be
+        // invoked. An application reads these to decide what to offer, and would have offered a
+        // headless action that nothing could ever start.
+        return areIntentsSupported();
     }
 
     public boolean isVoiceInvocationSupported() {
