@@ -1202,6 +1202,11 @@ void CN1MacWindowSetResizable(int slot, BOOL resizable) {
     UIWindowScene* scene = w->scene;
     int pixelWidth = w->pendingWidth;
     int pixelHeight = w->pendingHeight;
+    /* Snapshotted under the lock with the rest: re-enabling resize has to put the
+     * application's own minimum back, not the fallback floor below. Replacing it left
+     * the window resizable below a minimum its Java getter still reported. */
+    int minPixelWidth = w->minWidth;
+    int minPixelHeight = w->minHeight;
     pthread_mutex_unlock(&g_slotLock);
     if (scene == nil) {
         /* No scene yet: adoption reads the flag. */
@@ -1215,8 +1220,17 @@ void CN1MacWindowSetResizable(int slot, BOOL resizable) {
         CGFloat pointWidth = pixelWidth / scale;
         CGFloat pointHeight = pixelHeight / scale;
         if (resizable) {
-            scene.sizeRestrictions.minimumSize =
-                    CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
+            if (minPixelWidth > 0 && minPixelHeight > 0) {
+                /* A configured minimum wins: it is what the framework reports, so it
+                 * has to be what the platform enforces. */
+                scene.sizeRestrictions.minimumSize =
+                        CGSizeMake(minPixelWidth / scale, minPixelHeight / scale);
+            } else {
+                /* No minimum configured, so fall back to a floor small enough not to
+                 * be a constraint in practice while keeping the window grabbable. */
+                scene.sizeRestrictions.minimumSize =
+                        CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
+            }
             scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
         } else {
             scene.sizeRestrictions.minimumSize = CGSizeMake(pointWidth, pointHeight);

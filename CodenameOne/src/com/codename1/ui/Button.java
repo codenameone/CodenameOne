@@ -556,7 +556,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         if ((pressedIcon != null && pressedIcon.isAnimation()) ||
                 (rolloverIcon != null && rolloverIcon.isAnimation()) ||
                 (disabledIcon != null && disabledIcon.isAnimation())) {
-            Form parent = getComponentForm();
+            TopLevelContainer parent = getTopLevelContainer();
             if (parent != null) {
                 // animations are always running so the internal animation isn't
                 // good enough. We never want to stop this sort of animation
@@ -1064,7 +1064,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             if (releaseFadeMotion.isFinished()) {
                 releaseFadeMotion = null;
                 releaseFadeImage = null;
-                Form f = getComponentForm();
+                TopLevelContainer f = getTopLevelContainer();
                 if (f != null) {
                     f.deregisterAnimated(this);
                 }
@@ -1113,7 +1113,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         releaseFadeImage = img;
         releaseFadeMotion = Motion.createEaseOutMotion(255, 0, releaseFadeDuration);
         releaseFadeMotion.start();
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             f.registerAnimated(this);
         }

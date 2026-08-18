@@ -343,9 +343,9 @@ public class Tabs extends Container {
     @Override
     void initComponentImpl() {
         super.initComponentImpl();
-        Form frm = getComponentForm();
+        TopLevelContainer frm = getTopLevelContainer();
         if (frm != null) {
-            frm.registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(frm, this);
             if (changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
                 Component f = getComponentForm().getFocused();
                 if (f != null && f.getParent() == tabsContainer) { //NOPMD CompareObjectsWithEquals
@@ -368,11 +368,11 @@ public class Tabs extends Container {
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
-        Form form = this.getComponentForm();
+        TopLevelContainer form = getTopLevelContainer();
         if (form != null) {
-            form.removePointerPressedListener(press);
-            form.removePointerReleasedListener(release);
-            form.removePointerDraggedListener(drag);
+            form.asContainer().removePointerPressedListener(press);
+            form.asContainer().removePointerReleasedListener(release);
+            form.asContainer().removePointerDraggedListener(drag);
         }
         super.deinitialize();
     }
@@ -381,11 +381,11 @@ public class Tabs extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        Form form = this.getComponentForm();
+        TopLevelContainer form = getTopLevelContainer();
         if (form != null && swipeActivated) {
-            form.addPointerPressedListener(press);
-            form.addPointerReleasedListener(release);
-            form.addPointerDraggedListener(drag);
+            form.asContainer().addPointerPressedListener(press);
+            form.asContainer().addPointerReleasedListener(release);
+            form.asContainer().addPointerDraggedListener(drag);
         }
     }
 
@@ -470,9 +470,9 @@ public class Tabs extends Container {
         // animation while the 550ms morph was still in flight, freezing the drop mid-travel.
         if ((slideToDestMotion == null || slideToDestMotion.isFinished())
                 && (indicatorAnimMotion == null || indicatorAnimMotion.isFinished())) {
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
             if (f != null) {
-                f.deregisterAnimatedInternal(this);
+                TopLevelSupport.deregisterAnimatedInternal(f, this);
             }
         }
     }
@@ -1365,7 +1365,7 @@ public class Tabs extends Container {
         // selection's bounds.
         startIndicatorAnimation(activeComponent, index);
 
-        Form form = getComponentForm();
+        TopLevelContainer form = getTopLevelContainer();
         if (slideToSelected && form != null) {
             int end;
             int start;
@@ -1378,7 +1378,7 @@ public class Tabs extends Container {
             }
             slideToDestMotion = createTabSlideMotion(start, end);
             slideToDestMotion.start();
-            form.registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(form, this);
             active = index;
         } else {
             if (selectionListener != null) {
@@ -1499,9 +1499,9 @@ public class Tabs extends Container {
         // Material underline path reads the same value as a plain position fraction.)
         indicatorAnimMotion = Motion.createLinearMotion(0, 100, animatedIndicatorDurationMs);
         indicatorAnimMotion.start();
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
-            f.registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(f, this);
         }
     }
 
@@ -1888,16 +1888,16 @@ public class Tabs extends Container {
         if (this.swipeActivated != swipeActivated) {
             this.swipeActivated = swipeActivated;
             if (isInitialized()) {
-                Form form = this.getComponentForm();
+                TopLevelContainer form = getTopLevelContainer();
                 if (form != null) {
                     if (swipeActivated) {
-                        form.addPointerPressedListener(press);
-                        form.addPointerReleasedListener(release);
-                        form.addPointerDraggedListener(drag);
+                        form.asContainer().addPointerPressedListener(press);
+                        form.asContainer().addPointerReleasedListener(release);
+                        form.asContainer().addPointerDraggedListener(drag);
                     } else {
-                        form.removePointerPressedListener(press);
-                        form.removePointerReleasedListener(release);
-                        form.removePointerDraggedListener(drag);
+                        form.asContainer().removePointerPressedListener(press);
+                        form.asContainer().removePointerReleasedListener(release);
+                        form.asContainer().removePointerDraggedListener(drag);
                     }
                 }
             }
@@ -2540,9 +2540,9 @@ public class Tabs extends Container {
                             int end = tabsGap;
                             slideToDestMotion = createTabSlideMotion(start, end);
                             slideToDestMotion.start();
-                            Form form = getComponentForm();
+                            TopLevelContainer form = getTopLevelContainer();
                             if (form != null) {
-                                form.registerAnimatedInternal(Tabs.this);
+                                TopLevelSupport.registerAnimatedInternal(form, Tabs.this);
                             }
                             evt.consume();
                         }
@@ -2567,9 +2567,9 @@ public class Tabs extends Container {
                             int end = tabsGap;
                             slideToDestMotion = createTabSlideMotion(start, end);
                             slideToDestMotion.start();
-                            Form form = getComponentForm();
+                            TopLevelContainer form = getTopLevelContainer();
                             if (form != null) {
-                                form.registerAnimatedInternal(Tabs.this);
+                                TopLevelSupport.registerAnimatedInternal(form, Tabs.this);
                             }
                             evt.consume();
                         }

@@ -503,21 +503,21 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     @Override
     protected void initComponent() {
         super.initComponent();
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             // To be able to send action events early.
             // https://github.com/codenameone/CodenameOne/issues/2472
-            f.addPointerPressedListener(formPressListener);
+            f.asContainer().addPointerPressedListener(formPressListener);
         }
     }
 
     @Override
     protected void deinitialize() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             // For sending action events early
             // https://github.com/codenameone/CodenameOne/issues/2472
-            f.removePointerPressedListener(formPressListener);
+            f.asContainer().removePointerPressedListener(formPressListener);
         }
         super.deinitialize();
     }

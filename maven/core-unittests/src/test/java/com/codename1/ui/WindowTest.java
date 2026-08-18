@@ -2140,4 +2140,81 @@ class WindowTest extends UITestBase {
         assertTrue(w.isWindowDisposed(),
                 "dispose must complete rather than throw on the way through teardown");
     }
+
+    @FormTest
+    void builtInComponentsInitialiseAndAnimateInsideAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("built ins", new BorderLayout());
+        w.setWindowSize(400, 300);
+
+        // AutoCompleteTextField registered its pointer listeners straight off
+        // getComponentForm() in initComponent, so the first show() of a window
+        // containing one threw before anything else could run.
+        AutoCompleteTextField auto =
+                new AutoCompleteTextField("alpha", "beta", "gamma");
+        w.add(BorderLayout.NORTH, auto);
+
+        // A Label with an animated icon registered through a local Form variable in
+        // checkAnimation() -- the indirect form the first sweep's direct-call grep did
+        // not match -- so the icon stayed frozen.
+        Label animated = new Label(makeAnimatedImage());
+        w.add(BorderLayout.CENTER, animated);
+
+        w.show();
+        w.revalidate();
+
+        assertTrue(w.isWindowShowing(),
+                "showing a window with built-in components must not throw");
+
+        // The label's registration is silently skipped rather than throwing when it
+        // resolves a null form, so "did not throw" proves nothing about it. The window's
+        // own animation list is the observable: the icon animates only if the label is
+        // in it.
+        assertTrue(windowAnimates(w, animated),
+                "a label with an animated icon must register with the window it lives "
+                        + "in; resolving the form instead leaves the icon frozen");
+
+        w.dispose();
+    }
+
+    /// True when the window has the given component in its animation list. Read
+    /// reflectively because the list is private -- and it is the only observable that
+    /// separates "registered with the window" from "silently skipped", which is what
+    /// the null-form guard does.
+    private static boolean windowAnimates(Window w, Object cmp) {
+        try {
+            java.lang.reflect.Field f =
+                    Window.class.getDeclaredField("animatableComponents");
+            f.setAccessible(true);
+            return ((java.util.List) f.get(w)).contains(cmp);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// An image that reports itself as an animation, which is what drives the
+    /// registration path under test.
+    private static Image makeAnimatedImage() {
+        return new Image(null) {
+            @Override
+            public boolean isAnimation() {
+                return true;
+            }
+
+            @Override
+            public boolean animate() {
+                return false;
+            }
+
+            @Override
+            public int getWidth() {
+                return 8;
+            }
+
+            @Override
+            public int getHeight() {
+                return 8;
+            }
+        };
+    }
 }

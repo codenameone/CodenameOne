@@ -223,6 +223,39 @@ final class TopLevelSupport {
         }
     }
 
+    /// Registers an animation with an already resolved top level.
+    ///
+    /// The `Component` overload covers the common case; this one is for callers that
+    /// hold the top level in a local, or that register something other than themselves.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to register with, may be null
+    ///
+    /// - `a`: the animation to register
+    static void registerAnimatedInternal(TopLevelContainer top, Animation a) {
+        if (top instanceof Form) {
+            ((Form) top).registerAnimatedInternal(a);
+        } else if (top instanceof Window) {
+            ((Window) top).registerAnimatedInternal(a);
+        }
+    }
+
+    /// The counterpart to `#registerAnimatedInternal(TopLevelContainer, Animation)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to deregister from, may be null
+    ///
+    /// - `a`: the animation to deregister
+    static void deregisterAnimatedInternal(TopLevelContainer top, Animation a) {
+        if (top instanceof Form) {
+            ((Form) top).deregisterAnimatedInternal(a);
+        } else if (top instanceof Window) {
+            ((Window) top).deregisterAnimatedInternal(a);
+        }
+    }
+
     /// The content area a top level lays its children out in.
     ///
     /// `getActualPane` is package private on both `Form` and `Window`, so like the

@@ -1362,7 +1362,7 @@ public class TextField extends TextArea {
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             f.deregisterAnimated(this);
         }
@@ -1371,8 +1371,11 @@ public class TextField extends TextArea {
             if (useSoftkeys) {
                 removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);
             } else {
-                if (f != null) {
-                    f.setClearCommand(originalClearCommand);
+                // Form only: the clear command lives on the soft button bar, which a
+                // Window has no equivalent of -- commands there reach the desktop menu
+                // instead. Nothing to restore when there is no such bar.
+                if (f instanceof Form) {
+                    ((Form) f).setClearCommand(originalClearCommand);
                 }
                 originalClearCommand = null;
             }
@@ -1730,7 +1733,7 @@ public class TextField extends TextArea {
 
         // text field relies too much on animation to use internal animations
 //        getComponentForm().registerAnimated(this);
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             f.registerAnimated(this);
         }

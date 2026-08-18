@@ -1154,9 +1154,9 @@ public class List<T> extends Component implements ActionSource {
     }
 
     private void initListMotion() {
-        Form p = getComponentForm();
+        TopLevelContainer p = getTopLevelContainer();
         if (p != null) {
-            p.registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(p, this);
         }
         listMotion = Motion.createSplineMotion(0, destination, getScrollAnimationSpeed());
         listMotion.start();
@@ -2086,9 +2086,9 @@ public class List<T> extends Component implements ActionSource {
                 fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
                         Integer.MAX_VALUE, speed, 0.0007f);
                 fixedDraggedPosition = fixedDraggedAnimationPosition;
-                Form p = getComponentForm();
+                TopLevelContainer p = getTopLevelContainer();
                 if (p != null) {
-                    p.registerAnimatedInternal(this);
+                    TopLevelSupport.registerAnimatedInternal(p, this);
                 }
                 fixedDraggedMotion.start();
             }

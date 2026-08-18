@@ -659,7 +659,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     void checkAnimation() {
         super.checkAnimation();
         if (icon != null && icon.isAnimation()) {
-            Form parent = getComponentForm();
+            TopLevelContainer parent = getTopLevelContainer();
             if (parent != null) {
                 // animations are always running so the internal animation isn't
                 // good enough. We never want to stop this sort of animation
@@ -1076,9 +1076,9 @@ public class Label extends Component implements IconHolder, TextHolder {
             return;
         }
         if (!isCellRenderer()) {
-            Form parent = getComponentForm();
+            TopLevelContainer parent = getTopLevelContainer();
             if (parent != null) {
-                parent.registerAnimatedInternal(this);
+                TopLevelSupport.registerAnimatedInternal(parent, this);
             }
         }
         tickerStartTime = AnimationTime.now();
