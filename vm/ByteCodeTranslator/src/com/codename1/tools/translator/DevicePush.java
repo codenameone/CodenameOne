@@ -217,7 +217,7 @@ public final class DevicePush {
      * otherwise a {@code Lifecycle} subclass, which is what a real application
      * has.
      */
-    private static String findEntryPoint(List<File> classes) throws IOException {
+    static String findEntryPoint(List<File> classes) throws IOException {
         java.util.Map<String, String> supers = new java.util.HashMap<String, String>();
         java.util.Set<String> abstractClasses = new java.util.HashSet<String>();
         for (File f : classes) {
@@ -241,22 +241,22 @@ public final class DevicePush {
         // meant to be instantiated.
         String lifecycle = null;
         for (java.util.Map.Entry<String, String> e : supers.entrySet()) {
-            if (abstractClasses.contains(e.getKey())) {
+            if (abstractClasses.contains(e.getKey()) || !descendsFromLifecycle(e.getKey(), supers)) {
                 continue;
             }
-            String parent = e.getValue();
-            int guard = 0;
-            while (parent != null && guard++ < 64) {
-                if ("com/codename1/system/Lifecycle".equals(parent)) {
-                    // Deepest wins: with BaseApp and MyApp both descending from
-                    // Lifecycle, MyApp is the application.
-                    if (lifecycle == null || depthOf(e.getKey(), supers)
-                            > depthOf(lifecycle, supers)) {
-                        lifecycle = e.getKey();
-                    }
-                    break;
-                }
-                parent = supers.get(parent);
+            if (lifecycle == null) {
+                lifecycle = e.getKey();
+                continue;
+            }
+            // Deepest wins: with BaseApp and MyApp both descending from
+            // Lifecycle, MyApp is the application. A genuine tie is broken by
+            // name, because entries arrive in hash order and an entry point
+            // that changes between two identical pushes is worse than either
+            // answer.
+            int mine = depthOf(e.getKey(), supers);
+            int best = depthOf(lifecycle, supers);
+            if (mine > best || (mine == best && e.getKey().compareTo(lifecycle) < 0)) {
+                lifecycle = e.getKey();
             }
         }
         if (lifecycle != null) {
@@ -266,11 +266,32 @@ public final class DevicePush {
                 "no entry point: expected a main(String[]) or a Lifecycle subclass");
     }
 
+    /**
+     * Whether a class reaches Lifecycle through its superclasses.
+     *
+     * <p>Bounded by what has been seen, not by a count: a chain of classes is
+     * acyclic, and a count refused a hierarchy for being deep -- reporting that
+     * a project with an entry point has none.</p>
+     */
+    private static boolean descendsFromLifecycle(String name,
+                                                 java.util.Map<String, String> supers) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        String parent = supers.get(name);
+        while (parent != null && seen.add(parent)) {
+            if ("com/codename1/system/Lifecycle".equals(parent)) {
+                return true;
+            }
+            parent = supers.get(parent);
+        }
+        return false;
+    }
+
     /** How far a class sits below the deepest ancestor the bundle knows. */
     private static int depthOf(String name, java.util.Map<String, String> supers) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
         int depth = 0;
         String at = supers.get(name);
-        while (at != null && depth < 64) {
+        while (at != null && seen.add(at)) {
             depth++;
             at = supers.get(at);
         }

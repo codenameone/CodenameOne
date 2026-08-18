@@ -164,17 +164,15 @@ public final class Pack {
         // that was never meant to be instantiated.
         String lifecycle = null;
         for (Map.Entry<String,String> e : supers.entrySet()) {
-            if (abstracts.contains(e.getKey())) continue;
-            String parent = e.getValue();
-            int guard = 0;
-            while (parent != null && guard++ < 64) {
-                if ("com/codename1/system/Lifecycle".equals(parent)) {
-                    if (lifecycle == null || depthOf(e.getKey(), supers) > depthOf(lifecycle, supers)) {
-                        lifecycle = e.getKey();
-                    }
-                    break;
-                }
-                parent = supers.get(parent);
+            if (abstracts.contains(e.getKey()) || !descendsFromLifecycle(e.getKey(), supers)) continue;
+            if (lifecycle == null) { lifecycle = e.getKey(); continue; }
+            // Deepest wins, and a genuine tie is broken by name: entries arrive
+            // in hash order, and an entry point that changes between two
+            // identical pushes is worse than either answer.
+            int mine = depthOf(e.getKey(), supers);
+            int best = depthOf(lifecycle, supers);
+            if (mine > best || (mine == best && e.getKey().compareTo(lifecycle) < 0)) {
+                lifecycle = e.getKey();
             }
         }
         if (lifecycle != null) {
@@ -184,10 +182,24 @@ public final class Pack {
                 "no entry point: expected a main(String[]) or a Lifecycle subclass");
     }
 
+    // Bounded by what has been seen rather than by a count, as DevicePush is:
+    // a superclass chain is acyclic, and a count refused a hierarchy for being
+    // deep -- reporting no entry point for a project that has one.
+    private static boolean descendsFromLifecycle(String name, Map<String,String> supers) {
+        Set<String> seen = new HashSet<String>();
+        String parent = supers.get(name);
+        while (parent != null && seen.add(parent)) {
+            if ("com/codename1/system/Lifecycle".equals(parent)) return true;
+            parent = supers.get(parent);
+        }
+        return false;
+    }
+
     private static int depthOf(String name, Map<String,String> supers) {
+        Set<String> seen = new HashSet<String>();
         int depth = 0;
         String at = supers.get(name);
-        while (at != null && depth < 64) { depth++; at = supers.get(at); }
+        while (at != null && seen.add(at)) { depth++; at = supers.get(at); }
         return depth;
     }
 
