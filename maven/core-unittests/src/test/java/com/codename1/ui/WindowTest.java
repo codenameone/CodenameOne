@@ -1710,6 +1710,48 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aReleaseDuringAPressCallbackFindsItsAcceptedPress() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("nested press", new BorderLayout());
+        final int[] released = new int[1];
+        final boolean[] reentered = new boolean[1];
+        Component target = new Component() {
+            @Override
+            public void pointerPressed(int x, int y) {
+                if (!reentered[0]) {
+                    reentered[0] = true;
+                    // Stands in for a callback entering a nested loop (showModal)
+                    // during which the physical release is processed.
+                    int[] px = new int[]{150};
+                    int[] py = new int[]{120};
+                    Display.getInstance().windowPointerReleased(w.getWindowId(), px, py);
+                    DisplayTest.flushEdt();
+                }
+            }
+
+            @Override
+            public void pointerReleased(int x, int y) {
+                released[0]++;
+            }
+        };
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(target);
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        Display.getInstance().windowPointerPressed(w.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        int count = released[0];
+        w.dispose();
+
+        // Recording the press only after the callback returned meant a release
+        // processed inside it saw no accepted press.
+        assertEquals(1, count, "a release during the press callback must find its press");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

@@ -108,6 +108,10 @@ public class Window extends Container implements TopLevelContainer {
     /// hidden: it is still open, and still modal if it was.
     private boolean iconified;
 
+    /// Mirrors Form's flag of the same name, read from the same property.
+    private final boolean revalidateFromRoot =
+            "true".equals(CN.getProperty("Form.revalidateFromRoot", "true"));
+
     /// Held while a caller owns the right to start an animation; see
     /// `#grabAnimationLock()`.
     private boolean animationLock;
@@ -639,7 +643,10 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     boolean isRevalidateFromRoot() {
-        return true;
+        // The same property Form honours. Hardcoding true ignored an application that
+        // had turned it off, so a window revalidated from the root while its forms
+        // did not.
+        return revalidateFromRoot;
     }
 
     // ---- focus -----------------------------------------------------------------------
@@ -772,7 +779,34 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public boolean isSingleFocusMode() {
-        return false;
+        // Computed as Form computes it, rather than hardcoded. Single focus mode
+        // changes key handling -- with one focusable there is nothing to traverse to,
+        // so the arrow keys belong to the component -- and returning a constant made
+        // a one-control window behave differently from the identical Form.
+        return countFocusables(getActualPane()) + countFocusables(windowLayeredPane) < 2;
+    }
+
+    /// Focusable components in a subtree, used by `#isSingleFocusMode()`.
+    private static int countFocusables(Container root) {
+        if (root == null) {
+            return 0;
+        }
+        int count = 0;
+        int len = root.getComponentCount();
+        for (int iter = 0; iter < len; iter++) {
+            Component c = root.getComponentAt(iter);
+            if (c instanceof Container) {
+                count += countFocusables((Container) c);
+            }
+            if (c.isFocusable()) {
+                count++;
+            }
+            if (count > 1) {
+                // Only the "fewer than two" answer matters; stop early.
+                return count;
+            }
+        }
+        return count;
     }
 
     /// {@inheritDoc}

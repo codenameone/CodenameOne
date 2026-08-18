@@ -3669,8 +3669,14 @@ public final class Display extends CN1Constants {
                     yArray1[0] = inputEventStackTmp[offset];
                     offset++;
                     currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
-                    f.pointerPressed(xArray1, yArray1);
+                    // Recorded before the dispatch, not after. A pressed callback can
+                    // enter a nested loop -- showModal() does -- and the matching
+                    // release can be processed inside it; with the record made
+                    // afterwards that release saw no accepted press and was
+                    // discarded, and the record then landed stale, latching the
+                    // component and misrouting the next release.
                     rememberPointerPress(windowId, f);
+                    f.pointerPressed(xArray1, yArray1);
                     break;
                 case POINTER_PRESSED_MULTI: {
                     if (recursivePointerReleaseA) {
@@ -3684,8 +3690,9 @@ public final class Display extends CN1Constants {
                     int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array2.length + 1;
                     currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
-                    f.pointerPressed(array1, array2);
+                    // Same ordering as the single-pointer branch above.
                     rememberPointerPress(windowId, f);
+                    f.pointerPressed(array1, array2);
                     break;
                 }
                 case POINTER_RELEASED:
