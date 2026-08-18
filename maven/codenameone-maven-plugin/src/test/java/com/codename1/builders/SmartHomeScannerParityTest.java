@@ -75,6 +75,46 @@ public class SmartHomeScannerParityTest {
     }
 
     /**
+     * The purpose string that ships is the one the renderer will use.
+     *
+     * <p>{@code ios.plistInject} wins in the Info.plist renderer -- a generated value is emitted
+     * only for a key the fragment does not declare -- so validating the direct hint approved a
+     * disclosure the plist then dropped. An app with a perfectly good
+     * {@code ios.NSHomeKitUsageDescription} shipped the fragment's {@code <false/>} and was
+     * terminated the moment it touched HomeKit.</p>
+     */
+    @Test
+    public void thePurposeStringValidatedIsTheOneThatShips() {
+        BuildRequest hintOnly = new BuildRequest();
+        hintOnly.putArgument("ios.NSHomeKitUsageDescription", "control your lights");
+        assertEquals("control your lights",
+                IPhoneBuilder.effectivePurposeString(hintOnly, "ios.NSHomeKitUsageDescription"),
+                "with no fragment the hint is what ships");
+
+        BuildRequest overridden = new BuildRequest();
+        overridden.putArgument("ios.NSHomeKitUsageDescription", "control your lights");
+        overridden.putArgument("ios.plistInject",
+                "<key>NSHomeKitUsageDescription</key><false/>");
+        assertEquals("false",
+                IPhoneBuilder.effectivePurposeString(overridden, "ios.NSHomeKitUsageDescription"),
+                "the fragment wins in the renderer, so it has to win here");
+
+        BuildRequest injected = new BuildRequest();
+        injected.putArgument("ios.plistInject",
+                "<key>NSHomeKitUsageDescription</key><string>see your home</string>");
+        assertEquals("see your home",
+                IPhoneBuilder.effectivePurposeString(injected, "ios.NSHomeKitUsageDescription"),
+                "and a fragment that declares a real string is a real disclosure");
+
+        BuildRequest blank = new BuildRequest();
+        blank.putArgument("ios.plistInject",
+                "<key>NSHomeKitUsageDescription</key><string>   </string>");
+        assertEquals("false",
+                IPhoneBuilder.effectivePurposeString(blank, "ios.NSHomeKitUsageDescription"),
+                "an empty purpose string is no string at all to iOS");
+    }
+
+    /**
      * An add-device request that expires without a screen frees the bridge.
      *
      * <p>A CommissioningRequest timeout fails the waiting caller in the framework, which knows

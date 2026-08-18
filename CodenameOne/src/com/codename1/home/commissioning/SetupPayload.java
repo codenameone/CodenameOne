@@ -206,12 +206,29 @@ public final class SetupPayload {
         if (s.length() < prefix.length()) {
             return false;
         }
-        return s.substring(0, prefix.length()).toUpperCase()
-                .equals(prefix.toUpperCase());
+        return upperAscii(s.substring(0, prefix.length()))
+                .equals(upperAscii(prefix));
+    }
+
+    /// Uppercases the ASCII letters and leaves everything else alone.
+    ///
+    /// Not `String.toUpperCase()`, which uses the device's locale: in Turkish
+    /// a lowercase `i` becomes a dotted capital `I` that is not in base 38,
+    /// so a sticker that scans everywhere else was rejected as malformed on a
+    /// phone set to Turkish. The alphabet here is ASCII by specification, and
+    /// `toUpperCase(Locale)` is not in the profile this code targets.
+    private static String upperAscii(String s) {
+        char[] out = s.toCharArray();
+        for (int i = 0; i < out.length; i++) {
+            if (out[i] >= 'a' && out[i] <= 'z') {
+                out[i] = (char) (out[i] - ('a' - 'A'));
+            }
+        }
+        return new String(out);
     }
 
     private static SetupPayload parseQr(String text) {
-        String body = text.substring(QR_PREFIX.length()).toUpperCase();
+        String body = upperAscii(text.substring(QR_PREFIX.length()));
         if (body.length() != QR_PAYLOAD_CHARS) {
             throw new IllegalArgumentException(
                     "this is not a standard Matter QR payload: expected "

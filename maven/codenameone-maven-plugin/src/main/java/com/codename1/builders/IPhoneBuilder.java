@@ -3399,13 +3399,12 @@ public class IPhoneBuilder extends Executor {
                 // failed a build whose generated plist carries a perfectly
                 // good disclosure. WatchNativeBuilder resolves the same two
                 // sources for the watch.
-                String homeUsage = trimToNull(request.getArg(
-                        "ios.NSHomeKitUsageDescription", null));
-                if (homeUsage == null) {
-                    homeUsage = trimToNull(WatchNativeBuilder
-                            .injectedPlistString(request,
-                                    "NSHomeKitUsageDescription"));
-                }
+                // Whichever of the two the RENDERER will use, not whichever
+                // is set. ios.plistInject wins there, so a fragment carrying
+                // this key as <false/> beside a perfectly good hint used to
+                // pass -- and the plist shipped the false.
+                String homeUsage = trimToNull(effectivePurposeString(request,
+                        "ios.NSHomeKitUsageDescription"));
                 if ("false".equalsIgnoreCase(homeUsage)) {
                     homeUsage = null;
                 }
@@ -3419,7 +3418,10 @@ public class IPhoneBuilder extends Executor {
                       + "HomeKit privacy string.\n"
                       + "  Add ios.NSHomeKitUsageDescription=<why your app "
                       + "needs the user's home>\n"
-                      + "to codenameone_settings.properties. iOS terminates "
+                      + "to codenameone_settings.properties. If ios.plistInject "
+                      + "declares the key, ITS value is the one that ships -- "
+                      + "make that a nonblank string.\n"
+                      + "iOS terminates "
                       + "an app that reaches HomeKit without it, and "
                       + "Codename One does not inject a placeholder: Apple "
                       + "reviews this text against your app's behaviour and "
@@ -3640,30 +3642,13 @@ public class IPhoneBuilder extends Executor {
                     // suppresses the generated default outright, so the app
                     // reaches Bluetooth with an empty purpose string, which
                     // iOS treats exactly as it treats none.
-                    String supplied = request.getArg(matterPrivacyKey, null);
-                    if (supplied == null) {
-                        // What KIND of value the fragment gives the key, before its text.
-                        // injectedPlistString answers null both for a key that is not there and
-                        // for one given <false/>, and the two need opposite handling: the first
-                        // takes the generated default, the second cannot, because the renderer
-                        // drops the default for a key the fragment already carries. Read as
-                        // "absent", <false/> shipped a commissioning app whose purpose string was
-                        // the boolean false.
-                        String bare = matterPrivacyKey.substring("ios.".length());
-                        String tag = WatchNativeBuilder.injectedPlistValueTag(
-                                request, bare);
-                        if (tag == null) {
-                            supplied = null;
-                        } else if (!"string".equals(tag)) {
-                            supplied = "false";
-                        } else {
-                            supplied = WatchNativeBuilder.injectedPlistString(
-                                    request, bare);
-                            if (supplied == null) {
-                                supplied = "false";
-                            }
-                        }
-                    }
+                    // The value the RENDERER will use. ios.plistInject wins there, and
+                    // injectedPlistString alone cannot tell a key that is absent from one
+                    // given <false/> -- the first takes the generated default, the second
+                    // cannot, because the renderer drops the default for a key the fragment
+                    // already carries. Read as "absent", <false/> shipped a commissioning app
+                    // whose purpose string was the boolean false.
+                    String supplied = effectivePurposeString(request, matterPrivacyKey);
                     if (supplied != null && supplied.trim().length() == 0) {
                         supplied = "false";
                     }
@@ -5390,6 +5375,33 @@ public class IPhoneBuilder extends Executor {
                     + " where it is.");
         }
         return usesHomeOwnFabric;
+    }
+
+    /// The purpose string that will actually reach the rendered Info.plist for a hint key.
+    ///
+    /// ios.plistInject WINS: the renderer emits a generated value only for a key the fragment
+    /// does not already declare, so a build validated against the direct hint approved a
+    /// disclosure the plist then dropped in favour of the injected one -- and an app with a
+    /// perfectly good ios.NSHomeKitUsageDescription shipped with the fragment's <false/> and was
+    /// terminated the moment it touched HomeKit.
+    ///
+    /// Answers "false" for a declared key whose value is not a nonblank string, which every
+    /// caller treats as a refusal, and null when neither source supplies one.
+    ///
+    /// @param request the build request
+    /// @param hintKey the ios.NS*UsageDescription hint
+    /// @return the effective value, "false", or null
+    static String effectivePurposeString(BuildRequest request, String hintKey) {
+        String bare = hintKey.substring("ios.".length());
+        String tag = WatchNativeBuilder.injectedPlistValueTag(request, bare);
+        if (tag != null) {
+            if (!"string".equals(tag)) {
+                return "false";
+            }
+            String injected = WatchNativeBuilder.injectedPlistString(request, bare);
+            return injected == null || injected.trim().length() == 0 ? "false" : injected;
+        }
+        return request.getArg(hintKey, null);
     }
 
     private static boolean isSmartHomeSetupPayload(String cls) {

@@ -25,6 +25,8 @@ package com.codename1.home;
 import com.codename1.home.commissioning.SetupPayload;
 import org.junit.jupiter.api.Test;
 
+import java.util.Locale;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,6 +57,33 @@ class SetupPayloadTest {
         assertFalse(p.isFromQrCode());
         assertTrue(p.isShortDiscriminator(),
                 "a typed code carries only four discriminator bits");
+    }
+
+    /**
+     * A lowercase payload parses on a phone set to Turkish.
+     *
+     * <p>{@code String.toUpperCase()} follows the device's locale, and in
+     * Turkish a lowercase {@code i} becomes a dotted capital that is not in
+     * base 38 -- so a sticker that scans everywhere else was rejected as
+     * malformed, in one language, on the device the user actually owns.</p>
+     */
+    @Test
+    void aLowercasePayloadParsesInEveryLocale() {
+        String code = qrCode(0, 0xFFF1, 0x8000, 0, 4, 3840, 20202021, 0);
+        Locale was = Locale.getDefault();
+        try {
+            Locale.setDefault(new Locale("tr", "TR"));
+            SetupPayload upper = SetupPayload.parse(code);
+            SetupPayload lower = SetupPayload.parse(
+                    code.substring(0, 3) + code.substring(3).toLowerCase(
+                            Locale.ENGLISH));
+            assertEquals(upper.getPasscode(), lower.getPasscode(),
+                    "the base 38 alphabet is ASCII, whatever the phone's"
+                            + " language is");
+            assertEquals(upper.getDiscriminator(), lower.getDiscriminator());
+        } finally {
+            Locale.setDefault(was);
+        }
     }
 
     /**
