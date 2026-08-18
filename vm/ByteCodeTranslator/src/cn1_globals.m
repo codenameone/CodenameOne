@@ -3203,17 +3203,52 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #define CN1_PACING_HEADROOM_MARGIN (64LL*1024*1024)
 #endif
 
-// Safety cap on a park: 200000 * 50us = 10s. A collector that is dead or wedged
-// degrades to footprint growth rather than a permanent hang.
-#ifndef CN1_PACING_MAX_SPINS
-#define CN1_PACING_MAX_SPINS 200000
+// Poll interval for a budgeted wait. What we are waiting for is a completed collection,
+// which takes hundreds of milliseconds, so 50us granularity bought nothing and cost a
+// headroom probe 20000 times a second on a thread that is doing no work anyway.
+#ifndef CN1_PACING_WAIT_SLEEP_US
+#define CN1_PACING_WAIT_SLEEP_US 1000
 #endif
 
-// How often a parked thread re-requests collection, in spins. 4000 * 50us = 200ms,
-// which matches the collector's own high-frequency cadence.
-#ifndef CN1_PACING_GC_REQUEST_SPINS
-#define CN1_PACING_GC_REQUEST_SPINS 4000
+// Absolute backstop on a budgeted wait: 10000 * 1ms = 10s, matching the unbudgeted
+// spin's bound. A collector that is dead or wedged degrades to footprint growth rather
+// than a permanent hang. Normally the barren-cycle rule below ends the wait far sooner.
+#ifndef CN1_PACING_MAX_WAIT_SPINS
+#define CN1_PACING_MAX_WAIT_SPINS 10000
 #endif
+
+// How often a parked thread re-requests collection, in poll intervals: 200ms, matching
+// the collector's own high-frequency cadence.
+#ifndef CN1_PACING_GC_REQUEST_SPINS
+#define CN1_PACING_GC_REQUEST_SPINS 200
+#endif
+
+// Give up after this many CONSECUTIVE completed collections that freed nothing useful.
+// Waiting on a fixed timeout is the wrong rule in both directions: it abandons a
+// collection that is still returning memory, and it keeps waiting long after collection
+// has stopped helping. bibopGcEpoch is published at cycle START, so two advances mean at
+// least one full mark-and-sweep completed in between -- the earlier version could give up
+// mid-sweep, having never seen a completed collection at all.
+#ifndef CN1_PACING_BARREN_CYCLES
+#define CN1_PACING_BARREN_CYCLES 2
+#endif
+
+// Headroom gain that counts as a collection having helped.
+#ifndef CN1_PACING_PROGRESS_EPSILON
+#define CN1_PACING_PROGRESS_EPSILON (1024L*1024)
+#endif
+
+// Bytes admitted for dirtying but not yet reflected in phys_footprint. A thread claims
+// its block at admission and releases the claim at its next check, by which time the
+// caller has written to it and the kernel has counted it. Without this, concurrent
+// mutators all observe the same headroom before any of them dirties anything and each
+// independently decides it fits: sixteen 16MB blocks all pass against 160MB of headroom
+// and then collectively dirty 256MB. The margin bounds what ONE thread may take on top
+// of what is already counted; it cannot bound what N threads take simultaneously.
+static _Atomic long long cn1PacingClaimed = 0;
+// This thread's outstanding claim. __thread rather than a ThreadLocalData field, matching
+// cn1LowMemoryParkStampMs: zero-initialized per thread with no malloc'd-not-zeroed trap.
+static __thread long long cn1MyPacingClaim = 0;
 // How much legacy allocation the PROCESS may do between two pacing evaluations. This
 // bounds the overshoot past the cap, so it has to stay well under the smallest cap the
 // clamp can produce; it is deliberately independent of CN1_LEGACY_GC_TRIGGER_BYTES,
@@ -3335,6 +3370,27 @@ static long long cn1PacingVolume(int which) {
     return (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed);
 }
 
+// Atomically admit this thread if the live budget, minus what other threads have already
+// been admitted to dirty, still covers this block plus the margin. Test and claim must be
+// one step: a plain check followed by a separate add lets every waiter observe the same
+// pre-claim total and admit together, which is the whole failure this guards.
+static JAVA_BOOLEAN cn1PacingTryAdmit(long headroom, long long need, long long pendingBytes) {
+    long long claimed = atomic_load_explicit(&cn1PacingClaimed, memory_order_relaxed);
+    for(;;) {
+        if((long long)headroom - claimed < need) {
+            return JAVA_FALSE;
+        }
+        if(atomic_compare_exchange_weak_explicit(&cn1PacingClaimed, &claimed,
+                                                 claimed + pendingBytes,
+                                                 memory_order_acq_rel,
+                                                 memory_order_relaxed)) {
+            cn1MyPacingClaim = pendingBytes;
+            return JAVA_TRUE;
+        }
+        // claimed was reloaded by the failed exchange; re-test against the new total.
+    }
+}
+
 static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendingBytes) {
     if(get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
         return;
@@ -3362,7 +3418,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         int spins = 0;
         while(cn1PacingVolume(which) > (long long)cap &&
               get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
-              spins++ < CN1_PACING_MAX_SPINS) {
+              spins++ < 200000) {
             usleep(50);
         }
         while(threadStateData->threadBlockedByGC) {
@@ -3384,11 +3440,21 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // every thread and every non-Java allocation is already in it, and it is the exact
     // figure the process is killed against. So ask it directly.
     //
-    // A thread is admitted only when the budget can absorb the block it is about to
-    // dirty plus a margin, and it waits on REAL reclamation -- headroom rises when sweep
-    // frees memory, not when a cycle merely starts. The margin covers what other threads
-    // may dirty between their own checks and, importantly, native allocation that never
-    // passes through here at all (an image buffer, a Metal texture, a glyph atlas).
+    // What phys_footprint does NOT include is a block that has been allocated but not yet
+    // written -- calloc'd pages cost nothing until touched. That window is why admission
+    // still needs a shared reservation: without one, N mutators all read the same
+    // headroom before any of them dirties anything and each independently concludes it
+    // fits. cn1PacingClaimed carries those in-flight blocks so every thread sees what the
+    // others are about to spend.
+    //
+    // Release this thread's previous claim first: by the time it allocates again, the
+    // earlier block has been written and the kernel has counted it, so holding the claim
+    // any longer would double-charge it.
+    if(cn1MyPacingClaim != 0) {
+        atomic_fetch_sub_explicit(&cn1PacingClaimed, cn1MyPacingClaim,
+                                  memory_order_relaxed);
+        cn1MyPacingClaim = 0;
+    }
     long long need = pendingBytes + CN1_PACING_HEADROOM_MARGIN;
     if(cn1PacingTraceOn()) {
         atomic_fetch_add_explicit(&cn1PacingBoundedChecks, 1, memory_order_relaxed);
@@ -3400,7 +3466,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                                                      memory_order_relaxed)) {
         }
     }
-    if((long long)procHeadroom >= need) {
+    if(cn1PacingTryAdmit(procHeadroom, need, pendingBytes)) {
         return;
     }
     if(cn1PacingTraceOn()) {
@@ -3411,29 +3477,48 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     threadStateData->threadActive = JAVA_FALSE;
     int spins = 0;
-    while(spins < CN1_PACING_MAX_SPINS &&
+    int lastEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+    int barrenCycles = 0;
+    long bestHeadroom = procHeadroom;
+    while(spins < CN1_PACING_MAX_WAIT_SPINS &&
+          barrenCycles < CN1_PACING_BARREN_CYCLES &&
           get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
         // Keep asking for collection while we wait. Requesting once is not enough: a
         // parked thread allocates nothing, so isHighFrequencyGC() goes false and the
         // collector drops to its 30s idle wait -- and we would then sit out the whole
-        // spin budget waiting for reclamation nobody was doing. Re-requested on a cycle-
-        // length cadence rather than every iteration, since System.gc() only sets forceGc
-        // and notifies; the collector picks it up after its current pass.
+        // budget waiting for reclamation nobody was doing.
         if((spins % CN1_PACING_GC_REQUEST_SPINS) == 0) {
             JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
             threadStateData->nativeAllocationMode = JAVA_TRUE;
             java_lang_System_gc__(threadStateData);
             threadStateData->nativeAllocationMode = wasNam;
         }
-        usleep(50);
+        usleep((JAVA_INT)CN1_PACING_WAIT_SLEEP_US);
         spins++;
-        if((long long)cn1ProcessHeadroom() >= need) {
+        long headroomNow = cn1ProcessHeadroom();
+        if(headroomNow < 0) {
+            break;                       // budget disappeared under us; nothing to honour
+        }
+        if(cn1PacingTryAdmit(headroomNow, need, pendingBytes)) {
             break;
+        }
+        // Decide whether waiting is still buying anything, on COMPLETED collections
+        // rather than on elapsed time. bibopGcEpoch is published at cycle start, so an
+        // advance means the previous cycle's mark and sweep both finished.
+        int epochNow = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+        if(epochNow != lastEpoch) {
+            lastEpoch = epochNow;
+            if(headroomNow > bestHeadroom + CN1_PACING_PROGRESS_EPSILON) {
+                bestHeadroom = headroomNow;
+                barrenCycles = 0;        // still returning memory; keep waiting
+            } else {
+                barrenCycles++;          // a whole cycle bought nothing
+            }
         }
     }
     // Honour a stop-the-world before resuming, exactly like every other park here: the
-    // loop above can exit via the safety cap while a mark is still running and the
-    // collector believes this thread is paused.
+    // loop above can exit while a mark is still running and the collector believes this
+    // thread is paused.
     while(threadStateData->threadBlockedByGC) {
         usleep((JAVA_INT)(500));
     }
