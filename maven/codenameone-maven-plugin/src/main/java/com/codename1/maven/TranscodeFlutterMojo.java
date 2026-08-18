@@ -29,7 +29,8 @@ import java.nio.file.StandardCopyOption;
  * <ul>
  *   <li>{@code src/main/flutter/**&#47;*.dart} — Dart sources (whole-program
  *       transpile; subdirectories allowed)</li>
- *   <li>{@code src/main/flutter/assets/**} — bundled assets, flattened into the
+ *   <li>{@code src/main/flutter/assets/**} and {@code src/main/flutter/packages/**} —
+ *       bundled assets, flattened into the
  *       build output (Codename One resources are flat on every port) so
  *       {@code Image.asset(...)} resolves</li>
  * </ul>
@@ -148,20 +149,33 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
      * {@code FlutterAssets} recomputes when resolving {@code Image.asset(...)}.</p>
      */
     private void copyAssets() throws MojoExecutionException {
-        File assets = new File(flutterSourceDir, "assets");
-        if (!assets.isDirectory()) {
-            return;
-        }
         File outDir = new File(project.getBuild().getOutputDirectory());
+        int count = 0;
         try {
-            Files.createDirectories(outDir.toPath());
-            // "assets/" stays in the Flutter asset key, matching pubspec paths
-            int count = flattenInto(assets, "assets", outDir);
-            getLog().info("Flattened " + count + " Flutter asset(s) into the build output");
+            // Both roots a pubspec asset key can start with. "assets/" is an app's own
+            // bundle; "packages/" is one it pulls from a dependency, which is how the
+            // gallery ships its artwork (packages/flutter_gallery_assets/assets/...).
+            // Only "assets/" was copied before, so every packaged asset key resolved to
+            // nothing on every port - the images were simply absent.
+            for (String root : ASSET_ROOTS) {
+                File dir = new File(flutterSourceDir, root);
+                if (!dir.isDirectory()) {
+                    continue;
+                }
+                Files.createDirectories(outDir.toPath());
+                // the root stays in the Flutter asset key, matching pubspec paths
+                count += flattenInto(dir, root, outDir);
+            }
+            if (count > 0) {
+                getLog().info("Flattened " + count + " Flutter asset(s) into the build output");
+            }
         } catch (IOException e) {
             throw new MojoExecutionException("Failed copying Flutter assets", e);
         }
     }
+
+    /** The directory names under {@code src/main/flutter} that hold bundled assets. */
+    private static final String[] ASSET_ROOTS = {"assets", "packages"};
 
     private int flattenInto(File dir, String assetPrefix, File outDir) throws IOException {
         File[] children = dir.listFiles();

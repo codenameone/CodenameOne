@@ -5420,6 +5420,42 @@ public final class JavaEmitter {
         return emitCtorCall(className, java.util.Collections.<TypeRef>emptyList(), args, posNode, ctx);
     }
 
+    /**
+     * Widgets that look a model up BY TYPE, and so need the Dart type argument at runtime.
+     *
+     * <p>Java erases {@code Selector<A, S>}, so the runtime cannot recover {@code A} and used
+     * to ask the provider chain for the nearest value of ANY type. With more than one model
+     * in scope that is right only by luck: Reply has its localizations and its EmailStore
+     * above the same Selector, took the localizations, and failed — visibly as a cast error
+     * on the desktop, and on iOS as a wrong object that flowed on until an unrelated switch
+     * matched nothing and the page came up blank.</p>
+     */
+    private static boolean readsProvidedValueByType(String className) {
+        return className.equals("Selector") || className.equals("Consumer");
+    }
+
+    /**
+     * Emits {@code tmp.providedType(A.class)} for those widgets.
+     *
+     * <p>Only for a plain class: a generic or dynamic argument has no class literal, and the
+     * runtime's Object default (nearest provider) remains — no worse than before.</p>
+     */
+    private void emitProvidedTypeToken(String tmp, String className, List<TypeRef> typeArgs,
+            Ctx ctx) {
+        if (!readsProvidedValueByType(className) || typeArgs.isEmpty()) {
+            return;
+        }
+        TypeRef a = typeArgs.get(0);
+        if (a == null) {
+            return;
+        }
+        String javaName = javaType(a, false, ctx);
+        if (javaName == null || javaName.indexOf('<') >= 0 || javaName.equals("Object")) {
+            return;
+        }
+        ctx.writer().line(tmp + ".providedType(" + javaName + ".class);");
+    }
+
     private Out emitCtorCall(String className, List<TypeRef> typeArgs, Args args, Node posNode, Ctx ctx) {
         // dart:core intrinsics whose Java stub has no matching named-arg constructor:
         // route to the canonical factory rather than the generic allocate-then-setters path.
@@ -5541,6 +5577,7 @@ public final class JavaEmitter {
         // allocate-then-setters (ANF)
         String tmp = ctx.newTemp();
         ctx.writer().line("var " + tmp + " = new " + simple + diamond + "(" + posArgs + ");");
+        emitProvidedTypeToken(tmp, className, typeArgs, ctx);
         for (NamedArg na : args.named) {
             TypeRef pt = null;
             for (Ast.Param p : namedParams) {

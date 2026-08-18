@@ -10,17 +10,24 @@ import dart.runtime.Funcs;
  * provider's {@code Consumer<T>}: rebuilds via {@code builder(context, value,
  * child)} with the nearest ancestor-provided value.
  *
- * <p>Known limitation (this pass): the Dart {@code <T>} on {@code Consumer<T>}
- * is a class-level type argument the transpiler currently drops, so the builder
- * receives the nearest provided value of ANY type and the builder closure's
- * concrete model parameter is not re-typed here. Correct when a single value is
- * in scope (the gallery's reply study); general multi-provider disambiguation
- * needs constructor-type-argument threading.</p>
+ * <p>The Dart type argument {@code T} is threaded in by the transpiler as a type token
+ * ({@link #providedType}), so the right model is found with several in scope. Without it
+ * the lookup took the NEAREST provided value of any type, which is only ever correct by
+ * luck — see {@link Selector} for what that cost.</p>
  */
 public class Consumer<T> extends StatelessWidget {
 
     private Funcs.Func3<BuildContext, T, Widget, Widget> builder;
     private Widget child;
+    private Class<?> providedType = Object.class;
+
+    /**
+     * The model type this consumer reads — the Dart {@code T}, emitted by the transpiler.
+     * Defaults to {@code Object}: the nearest provider of any type.
+     */
+    public void providedType(Class<?> v) {
+        this.providedType = v == null ? Object.class : v;
+    }
 
     public void builder(Funcs.Func3<BuildContext, T, Widget, Widget> v) {
         this.builder = v;
@@ -33,7 +40,7 @@ public class Consumer<T> extends StatelessWidget {
     @Override
     @SuppressWarnings("unchecked")
     public Widget build(BuildContext context) {
-        T value = (T) context.providerValueOfType(Object.class);
+        T value = (T) context.providerValueOfType(providedType);
         return builder == null ? child : builder.call(context, value, child);
     }
 }

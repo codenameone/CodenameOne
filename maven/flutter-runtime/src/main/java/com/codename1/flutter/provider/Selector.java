@@ -11,11 +11,12 @@ import dart.runtime.Funcs;
  * {@code S} of a provided value {@code A} changes. {@code selector(context, a)}
  * extracts the slice and {@code builder(context, s, child)} renders it.
  *
- * <p>Known limitation (shared with {@link Consumer}): the Dart {@code <A, S>}
- * type arguments the transpiler currently drops, so the {@code selector} closure
- * receives the nearest provided value as {@code Object} and its concrete model
- * type is not re-threaded here. Correct when a single value is in scope; general
- * disambiguation needs constructor-type-argument threading.</p>
+ * <p>The Dart type argument {@code A} is threaded in by the transpiler as a type token
+ * ({@link #providedType}), so the right model is found even when several are in scope.
+ * Without it the lookup took the NEAREST provided value of any type: Reply has both its
+ * localizations and its EmailStore above the Selector, got the localizations, and failed —
+ * with a ClassCastException on the desktop and, because the cast is unchecked there, a
+ * wrong object that flowed on until an unrelated switch matched nothing on iOS.</p>
  *
  * @param <A> the provided value type
  * @param <S> the selected slice type
@@ -26,6 +27,16 @@ public class Selector<A, S> extends StatelessWidget {
     private Funcs.Func3<BuildContext, S, Widget, Widget> builder;
     private Object shouldRebuild;
     private Widget child;
+    private Class<?> providedType = Object.class;
+
+    /**
+     * The model type this selector reads — the Dart {@code A}, emitted by the transpiler.
+     * Defaults to {@code Object}, which resolves to the nearest provider of any type and is
+     * only correct when a single value is in scope.
+     */
+    public void providedType(Class<?> v) {
+        this.providedType = v == null ? Object.class : v;
+    }
 
     public void selector(Funcs.Func2<BuildContext, A, S> v) {
         this.selector = v;
@@ -46,7 +57,7 @@ public class Selector<A, S> extends StatelessWidget {
     @Override
     @SuppressWarnings("unchecked")
     public Widget build(BuildContext context) {
-        A value = (A) context.providerValueOfType(Object.class);
+        A value = (A) context.providerValueOfType(providedType);
         S selected = selector == null ? (S) value : selector.call(context, value);
         return builder == null ? child : builder.call(context, selected, child);
     }
