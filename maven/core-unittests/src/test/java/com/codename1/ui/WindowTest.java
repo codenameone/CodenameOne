@@ -1615,6 +1615,33 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void theWindowAnimationLockBehavesLikeAForms() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("anim lock", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // An idle window must grant the lock, a second caller must be refused while
+        // it is held, and releasing must not throw. The previous implementation
+        // returned isAnimating() -- so it granted the lock only when something else
+        // was already animating -- and released by handing null to flushAnimation,
+        // which either invoked it on the spot or queued it for the event dispatch
+        // thread to invoke: an NPE either way.
+        boolean first = w.grabAnimationLock();
+        boolean second = w.grabAnimationLock();
+        w.releaseAnimationLock();
+        boolean afterRelease = w.grabAnimationLock();
+        w.releaseAnimationLock();
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertTrue(first, "an idle window must grant the lock");
+        assertFalse(second, "a second caller must be refused while it is held");
+        assertTrue(afterRelease, "and it must be grantable again after release");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

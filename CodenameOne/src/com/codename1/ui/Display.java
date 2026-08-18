@@ -3607,223 +3607,223 @@ public final class Display extends CN1Constants {
         dragHistoryCurrent = windowId;
         try {
 
-        // no need to synchronize since we are reading only and modifying the stack frame offset
-        offset++;
+            // no need to synchronize since we are reading only and modifying the stack frame offset
+            offset++;
 
-        switch (type) {
-            case KEY_PRESSED:
-                rememberKeyPress(inputEventStackTmp[offset], f);
-                f.keyPressed(inputEventStackTmp[offset]);
-                offset++;
-                break;
-            case KEY_RELEASED:
-                // pointer release can cycle into invoke and block which will cause this method
-                // to recurse if a pointer will be released while we are in an invoke and block state
-                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                //make sure the released event is sent to the same Form who got a
-                //pressed event
-                int releasedKey = inputEventStackTmp[offset];
-                Container xf = takeKeyPressTarget(releasedKey);
-                offset++;
-                if (xf != null) {
-                    // Delivered to the top level that saw the press, not to the one
-                    // the key-up packet names. A desktop window system sends key-up
-                    // to whatever is focused now, so releasing a key after focus has
-                    // moved reports the new window -- and matching on that dropped
-                    // the release, latching the pressed component in the old one.
-                    // For the single window case the two are the same top level, so
-                    // this is the behaviour that was always there.
-                    xf.keyReleased(releasedKey);
-                } else if (multiKeyMode) {
-                    // No record of the press: either it arrived before this window
-                    // existed or the tracking table was full. Multi key mode has
-                    // always delivered these anyway.
-                    f.keyReleased(releasedKey);
-                }
-                break;
-            case POINTER_PRESSED:
-                if (recursivePointerReleaseA) {
-                    recursivePointerReleaseB = true;
-                }
-                setDragOccured(windowId, false);
-                resetDragHistory(windowId);
-                pointerPressedAndNotReleasedOrDragged = true;
-                xArray1[0] = inputEventStackTmp[offset];
-                offset++;
-                yArray1[0] = inputEventStackTmp[offset];
-                offset++;
-                currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
-                f.pointerPressed(xArray1, yArray1);
-                rememberPointerPress(windowId, f);
-                break;
-            case POINTER_PRESSED_MULTI: {
-                if (recursivePointerReleaseA) {
-                    recursivePointerReleaseB = true;
-                }
-                setDragOccured(windowId, false);
-                resetDragHistory(windowId);
-                pointerPressedAndNotReleasedOrDragged = true;
-                int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array1.length + 1;
-                int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array2.length + 1;
-                currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
-                f.pointerPressed(array1, array2);
-                rememberPointerPress(windowId, f);
-                break;
-            }
-            case POINTER_RELEASED:
-                recursivePointerReleaseA = true;
-                pointerPressedAndNotReleasedOrDragged = false;
-
-                // pointer release can cycle into invoke and block which will cause this method
-                // to recurse if a pointer will be released while we are in an invoke and block state
-                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container x = takePointerPressTarget(windowId);
-
-                // make sure the released event is sent to the same Form that got a
-                // pressed event
-                int releasedX = inputEventStackTmp[offset];
-                offset++;
-                int releasedY = inputEventStackTmp[offset];
-                offset++;
-                if (x == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
-                    xArray1[0] = releasedX;
-                    yArray1[0] = releasedY;
+            switch (type) {
+                case KEY_PRESSED:
+                    rememberKeyPress(inputEventStackTmp[offset], f);
+                    f.keyPressed(inputEventStackTmp[offset]);
+                    offset++;
+                    break;
+                case KEY_RELEASED:
+                    // pointer release can cycle into invoke and block which will cause this method
+                    // to recurse if a pointer will be released while we are in an invoke and block state
+                    // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                    //make sure the released event is sent to the same Form who got a
+                    //pressed event
+                    int releasedKey = inputEventStackTmp[offset];
+                    Container xf = takeKeyPressTarget(releasedKey);
+                    offset++;
+                    if (xf != null) {
+                        // Delivered to the top level that saw the press, not to the one
+                        // the key-up packet names. A desktop window system sends key-up
+                        // to whatever is focused now, so releasing a key after focus has
+                        // moved reports the new window -- and matching on that dropped
+                        // the release, latching the pressed component in the old one.
+                        // For the single window case the two are the same top level, so
+                        // this is the behaviour that was always there.
+                        xf.keyReleased(releasedKey);
+                    } else if (multiKeyMode) {
+                        // No record of the press: either it arrived before this window
+                        // existed or the tracking table was full. Multi key mode has
+                        // always delivered these anyway.
+                        f.keyReleased(releasedKey);
+                    }
+                    break;
+                case POINTER_PRESSED:
+                    if (recursivePointerReleaseA) {
+                        recursivePointerReleaseB = true;
+                    }
+                    setDragOccured(windowId, false);
+                    resetDragHistory(windowId);
+                    pointerPressedAndNotReleasedOrDragged = true;
+                    xArray1[0] = inputEventStackTmp[offset];
+                    offset++;
+                    yArray1[0] = inputEventStackTmp[offset];
+                    offset++;
                     currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
-                    f.pointerReleased(xArray1, yArray1);
+                    f.pointerPressed(xArray1, yArray1);
+                    rememberPointerPress(windowId, f);
+                    break;
+                case POINTER_PRESSED_MULTI: {
+                    if (recursivePointerReleaseA) {
+                        recursivePointerReleaseB = true;
+                    }
+                    setDragOccured(windowId, false);
+                    resetDragHistory(windowId);
+                    pointerPressedAndNotReleasedOrDragged = true;
+                    int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += array1.length + 1;
+                    int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += array2.length + 1;
+                    currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
+                    f.pointerPressed(array1, array2);
+                    rememberPointerPress(windowId, f);
+                    break;
                 }
-                recursivePointerReleaseA = false;
-                recursivePointerReleaseB = false;
-                // The gesture is over, so hand the ring back. Reclaimed here rather
-                // than only on disposal: entries were held for the life of the
-                // window, so a handful of long-lived windows could exhaust the table
-                // and leave a later window unable to record drag state at all.
-                // After the dispatch, since the release handlers read it.
-                //
-                // Unless a newer gesture has already started in this window: a
-                // release handler can enter invokeAndBlock, whose nested loop
-                // dispatches a fresh press, and that press records a target. Freeing
-                // the ring then would strip the replacement gesture of its velocity.
-                if (!hasPointerPressTarget(windowId)) {
-                    releaseDragHistory(windowId);
-                }
-                break;
-            case POINTER_RELEASED_MULTI:
-                recursivePointerReleaseA = true;
-                pointerPressedAndNotReleasedOrDragged = false;
+                case POINTER_RELEASED:
+                    recursivePointerReleaseA = true;
+                    pointerPressedAndNotReleasedOrDragged = false;
 
-                // pointer release can cycle into invoke and block which will cause this method
-                // to recurse if a pointer will be released while we are in an invoke and block state
-                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container xy = takePointerPressTarget(windowId);
+                    // pointer release can cycle into invoke and block which will cause this method
+                    // to recurse if a pointer will be released while we are in an invoke and block state
+                    // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                    Container x = takePointerPressTarget(windowId);
 
-                // make sure the released event is sent to the same Form that got a
-                // pressed event
-                int[] releasedMultiX = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += releasedMultiX.length + 1;
-                int[] releasedMultiY = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += releasedMultiY.length + 1;
-                if (xy == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
-                    currentPointerEvent = impl.buildPointerEvent(releasedMultiX[0], releasedMultiY[0], false);
-                    f.pointerReleased(releasedMultiX, releasedMultiY);
+                    // make sure the released event is sent to the same Form that got a
+                    // pressed event
+                    int releasedX = inputEventStackTmp[offset];
+                    offset++;
+                    int releasedY = inputEventStackTmp[offset];
+                    offset++;
+                    if (x == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
+                        xArray1[0] = releasedX;
+                        yArray1[0] = releasedY;
+                        currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
+                        f.pointerReleased(xArray1, yArray1);
+                    }
+                    recursivePointerReleaseA = false;
+                    recursivePointerReleaseB = false;
+                    // The gesture is over, so hand the ring back. Reclaimed here rather
+                    // than only on disposal: entries were held for the life of the
+                    // window, so a handful of long-lived windows could exhaust the table
+                    // and leave a later window unable to record drag state at all.
+                    // After the dispatch, since the release handlers read it.
+                    //
+                    // Unless a newer gesture has already started in this window: a
+                    // release handler can enter invokeAndBlock, whose nested loop
+                    // dispatches a fresh press, and that press records a target. Freeing
+                    // the ring then would strip the replacement gesture of its velocity.
+                    if (!hasPointerPressTarget(windowId)) {
+                        releaseDragHistory(windowId);
+                    }
+                    break;
+                case POINTER_RELEASED_MULTI:
+                    recursivePointerReleaseA = true;
+                    pointerPressedAndNotReleasedOrDragged = false;
+
+                    // pointer release can cycle into invoke and block which will cause this method
+                    // to recurse if a pointer will be released while we are in an invoke and block state
+                    // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                    Container xy = takePointerPressTarget(windowId);
+
+                    // make sure the released event is sent to the same Form that got a
+                    // pressed event
+                    int[] releasedMultiX = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += releasedMultiX.length + 1;
+                    int[] releasedMultiY = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += releasedMultiY.length + 1;
+                    if (xy == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
+                        currentPointerEvent = impl.buildPointerEvent(releasedMultiX[0], releasedMultiY[0], false);
+                        f.pointerReleased(releasedMultiX, releasedMultiY);
+                    }
+                    recursivePointerReleaseA = false;
+                    recursivePointerReleaseB = false;
+                    // The gesture is over, so hand the ring back. Reclaimed here rather
+                    // than only on disposal: entries were held for the life of the
+                    // window, so a handful of long-lived windows could exhaust the table
+                    // and leave a later window unable to record drag state at all.
+                    // After the dispatch, since the release handlers read it.
+                    //
+                    // Unless a newer gesture has already started in this window: a
+                    // release handler can enter invokeAndBlock, whose nested loop
+                    // dispatches a fresh press, and that press records a target. Freeing
+                    // the ring then would strip the replacement gesture of its velocity.
+                    if (!hasPointerPressTarget(windowId)) {
+                        releaseDragHistory(windowId);
+                    }
+                    break;
+                case POINTER_DRAGGED: {
+                    setDragOccured(windowId, true);
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    int timestamp = inputEventStackTmp[offset];
+                    offset++;
+                    updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
+                    pointerPressedAndNotReleasedOrDragged = false;
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, false);
+                    f.pointerDragged(xArray1, yArray1);
+                    break;
                 }
-                recursivePointerReleaseA = false;
-                recursivePointerReleaseB = false;
-                // The gesture is over, so hand the ring back. Reclaimed here rather
-                // than only on disposal: entries were held for the life of the
-                // window, so a handful of long-lived windows could exhaust the table
-                // and leave a later window unable to record drag state at all.
-                // After the dispatch, since the release handlers read it.
-                //
-                // Unless a newer gesture has already started in this window: a
-                // release handler can enter invokeAndBlock, whose nested loop
-                // dispatches a fresh press, and that press records a target. Freeing
-                // the ring then would strip the replacement gesture of its velocity.
-                if (!hasPointerPressTarget(windowId)) {
-                    releaseDragHistory(windowId);
+                case POINTER_DRAGGED_MULTI: {
+                    setDragOccured(windowId, true);
+                    pointerPressedAndNotReleasedOrDragged = false;
+                    int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += array1.length + 1;
+                    int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += array2.length + 1;
+                    currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
+                    f.pointerDragged(array1, array2);
+                    break;
                 }
-                break;
-            case POINTER_DRAGGED: {
-                setDragOccured(windowId, true);
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                int timestamp = inputEventStackTmp[offset];
-                offset++;
-                updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
-                pointerPressedAndNotReleasedOrDragged = false;
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, false);
-                f.pointerDragged(xArray1, yArray1);
-                break;
+                case POINTER_HOVER: {
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    int timestamp = inputEventStackTmp[offset];
+                    offset++;
+                    updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
+                    f.pointerHover(xArray1, yArray1);
+                    break;
+                }
+                case POINTER_HOVER_RELEASED: {
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
+                    f.pointerHoverReleased(xArray1, yArray1);
+                    break;
+                }
+                case POINTER_HOVER_PRESSED: {
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
+                    f.pointerHoverPressed(xArray1, yArray1);
+                    break;
+                }
+                case SIZE_CHANGED:
+                    int w = inputEventStackTmp[offset];
+                    offset++;
+                    int h = inputEventStackTmp[offset];
+                    offset++;
+                    f.sizeChangedInternal(w, h);
+                    break;
+                case HIDE_NOTIFY:
+                    f.hideNotify();
+                    break;
+                case SHOW_NOTIFY:
+                    f.showNotify();
+                    break;
+                default:
+                    break;
             }
-            case POINTER_DRAGGED_MULTI: {
-                setDragOccured(windowId, true);
-                pointerPressedAndNotReleasedOrDragged = false;
-                int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array1.length + 1;
-                int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array2.length + 1;
-                currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
-                f.pointerDragged(array1, array2);
-                break;
-            }
-            case POINTER_HOVER: {
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                int timestamp = inputEventStackTmp[offset];
-                offset++;
-                updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
-                f.pointerHover(xArray1, yArray1);
-                break;
-            }
-            case POINTER_HOVER_RELEASED: {
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
-                f.pointerHoverReleased(xArray1, yArray1);
-                break;
-            }
-            case POINTER_HOVER_PRESSED: {
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
-                f.pointerHoverPressed(xArray1, yArray1);
-                break;
-            }
-            case SIZE_CHANGED:
-                int w = inputEventStackTmp[offset];
-                offset++;
-                int h = inputEventStackTmp[offset];
-                offset++;
-                f.sizeChangedInternal(w, h);
-                break;
-            case HIDE_NOTIFY:
-                f.hideNotify();
-                break;
-            case SHOW_NOTIFY:
-                f.showNotify();
-                break;
-            default:
-                break;
-        }
-        return offset;
+            return offset;
 
         } finally {
             dragHistoryCurrent = previousDragHistory;

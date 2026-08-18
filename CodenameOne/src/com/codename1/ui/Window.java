@@ -108,6 +108,10 @@ public class Window extends Container implements TopLevelContainer {
     /// hidden: it is still open, and still modal if it was.
     private boolean iconified;
 
+    /// Held while a caller owns the right to start an animation; see
+    /// `#grabAnimationLock()`.
+    private boolean animationLock;
+
     /// Vibration length for a tactile touch, in milliseconds; -1 until read from the
     /// look and feel, the same value `Form` uses so a window feels like the rest of
     /// the application.
@@ -529,13 +533,26 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public boolean grabAnimationLock() {
-        return animMananger.isAnimating();
+        // A real lock, as Form keeps: whether an animation happens to be running is
+        // not the same question as whether this caller now owns the right to start
+        // one. Returning isAnimating() inverted the contract -- callers acquired the
+        // "lock" precisely when something else was already animating, and failed to
+        // acquire it when the window was idle.
+        if (animationLock) {
+            return false;
+        }
+        animationLock = true;
+        return true;
     }
 
     /// {@inheritDoc}
     @Override
     public void releaseAnimationLock() {
-        animMananger.flushAnimation(null);
+        // Simply drops the lock. The previous version handed null to
+        // flushAnimation, which either invoked it immediately (an NPE on the spot
+        // when nothing was animating) or queued it for updateAnimations to invoke
+        // later (an NPE on the event dispatch thread when the queue drained).
+        animationLock = false;
     }
 
     boolean hasAnimations() {
