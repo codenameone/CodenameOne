@@ -1653,6 +1653,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // The text layer sits above the canvas but below the semantic tree. It carries the
         // visible text, so it is hidden from assistive technology -- the semantic tree is what
         // announces content, and without aria-hidden every label would be read twice.
+        //
+        // It takes no pointer events, which means a drag across a label does not begin a native
+        // text selection. Review asked for that to change; it does not, and the reason is that
+        // the canvas owns hit testing here. Pointer routing decides between the canvas and the
+        // native peers behind it by probing canvas alpha, and every gesture the application
+        // reacts to -- a tap on a button, a drag that scrolls a list, a swipe that opens a side
+        // menu -- arrives as a pointer event on the canvas. A span that answered pointer events
+        // would swallow the gestures that land on text, which is most of the interactive surface
+        // of a Codename One form, and forwarding a synthesized copy to the canvas afterwards
+        // gives the application either a doubled gesture or none, depending on which event is
+        // cancelled to let the selection through.
+        //
+        // What the layer does deliver is real text in the document: find-in-page matches it,
+        // the browser reads it, assistive technology can select and copy through the semantic
+        // tree, and it rasterizes as text rather than as pixels. Pointer selection would need
+        // the port's input path to accept synthesized events and to tell a selection drag from
+        // an application drag before either has finished -- a change to input, not to this
+        // layer, and not one to make quietly at the end of a rendering change.
         textLayerContainer = (HTMLElement)document.createElement("div");
         textLayerContainer.setAttribute("id", "cn1-text-layer");
         textLayerContainer.setAttribute("aria-hidden", "true");

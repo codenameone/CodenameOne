@@ -38,6 +38,12 @@ from it. Two DOM layers sit above the canvas, which is itself marked
   rebuild-per-invalidation discarded DOM focus and text selection on every
   `CHANGE_BOUNDS`, which is raised by every `setX/setY/setWidth/setHeight`.
 
+The layer takes no pointer events: the canvas owns hit testing, so a drag across
+a label does not start a native selection. Find-in-page, the browser's own text
+handling and assistive technology all reach the text; pointer selection would
+mean teaching the port's input path to tell a selection drag from an application
+drag, which is a change to input rather than to this layer.
+
 Text that stays on the canvas, by design:
 
 - offscreen targets (transition buffers, `paintLock`, `ComponentImage`,
