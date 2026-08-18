@@ -57,6 +57,15 @@
 #import <TargetConditionals.h>
 #import <mach/mach.h>
 #import <mach/mach_host.h>
+// os_proc_available_memory reports the bytes this PROCESS has left before it hits
+// its dirty-memory limit -- the figure the kernel actually meters an app against,
+// and the one the GC pacing cap needs (issue #5537). It is API_UNAVAILABLE(macos),
+// which covers Mac Catalyst too, so it is only reachable on a real iOS/tvOS/watchOS
+// target; the __has_include keeps an older SDK compiling.
+#if TARGET_OS_IPHONE && !TARGET_OS_MACCATALYST && __has_include(<os/proc.h>)
+#import <os/proc.h>
+#define CN1_HAS_PROC_AVAILABLE_MEMORY 1
+#endif
 #else
 #include <time.h>
 #ifndef _WIN32
@@ -215,13 +224,16 @@ static JAVA_BOOLEAN isEdt(long threadId) {
 #endif
  }
 
-// AVAILABLE memory (not just free_count) -- used ONLY by the dynamic GC pacing cap, kept separate
-// from get_free_memory so the existing heap-threshold sizing (init_gc_thresholds) is unchanged.
-// iOS/macOS keep RAM full of reclaimable file cache, so free_count alone is always tiny (~100MB)
-// and badly under-reports what the process can still allocate; inactive + purgeable pages are
-// reclaimable under pressure, so free + inactive + purgeable ~= the real headroom the collector
-// can safely let a high-throughput thread run into. Non-OBJC Apple (bench/desktop) lacks the mach
-// vm_statistics headers here, so it falls back to half of physical RAM via sysctl.
+// AVAILABLE memory (not just free_count) -- the HOST-WIDE headroom reading, used by
+// the dynamic GC pacing cap on platforms that impose no per-process memory limit.
+// Where there IS such a limit, cn1ProcessHeadroom below supersedes this; see the
+// comment there for why the distinction is the whole of issue #5537.
+// iOS/macOS keep RAM full of reclaimable file cache, so free_count alone is always
+// tiny (~100MB) and badly under-reports what the process can still allocate; inactive
+// + purgeable pages are reclaimable under pressure, so free + inactive + purgeable ~=
+// the real headroom the collector can safely let a high-throughput thread run into.
+// Non-OBJC Apple (bench/desktop) lacks the mach vm_statistics headers here, so it
+// falls back to half of physical RAM via sysctl.
 static long cn1_available_memory(void)
  {
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -245,6 +257,112 @@ static long cn1_available_memory(void)
    return 1024L * 1024 * 100;
 #endif
  }
+
+// PER-PROCESS memory headroom: the bytes this process has left before the kernel
+// kills it, or 0 on a platform that imposes no such limit. This is the figure the
+// GC pacing cap has to be sized against, and using the host-wide reading instead is
+// the whole of issue #5537.
+//
+// iOS terminates an app that crosses its dirty-memory ceiling -- roughly 1.4GB on an
+// iPad -- with EXC_RESOURCE (RESOURCE_TYPE_MEMORY: high watermark memory limit
+// exceeded). That ceiling is a property of the PROCESS and has nothing to do with how
+// much RAM the device has spare, so cn1_available_memory's host-wide answer let
+// cn1BibopPacingCap hand a high-throughput thread fm/2 of slack -- gigabytes on a
+// large-RAM iPad. The mutator was licensed to run further ahead of the collector than
+// the process was allowed to exist, which is precisely the failure that function's own
+// comment warns about ("removing it unconditionally let the mutator outrun the
+// collector and balloon RSS to ~2GB"), reintroduced by measuring the wrong quantity.
+// A deep game-tree search hit it reproducibly on device while running fine in the
+// simulator and on Android, where no such per-process ceiling exists.
+//
+// os_proc_available_memory() is the documented cheap probe (equivalent to
+// task_vm_info.limit_bytes_remaining without task_info's cost). Apple advises against
+// caching the result, and the pacing cap consults it only on the rare page-acquire
+// path, so it is read live rather than through cn1CachedFreeMem.
+//
+// AMBIGUOUS ZERO. The call returns 0 both when the process has NO limit and when it
+// has already EXCEEDED one -- opposite meanings, and the second is the emergency where
+// pacing matters most, so it must not be read as "unlimited". They are separated by
+// history rather than by the call: a process that has ever reported a positive figure
+// demonstrably has a limit, so once that is latched a later 0 can only mean the budget
+// is gone. Before the first positive reading 0 is taken at face value as "no limit",
+// which is correct for macOS/Catalyst/Linux/Windows and for an SDK or OS too old to
+// have the symbol.
+// TEST HOOK. CN1_SIMULATE_PROC_MEMORY_LIMIT=<bytes> gives this process a synthetic
+// per-process ceiling. The clamp in cn1BibopPacingCap only engages under a hard
+// budget, and the only targets that impose one are iOS/tvOS/watchOS devices, so
+// without this hook the issue-5537 fix is untestable anywhere CI can run -- which is
+// how the bug survived in the first place. Off unless set. -1 = env not probed yet.
+// long long, NOT long: on the Windows LLP64 target long is 32-bit and this holds a
+// byte count that can exceed 2GB.
+static _Atomic long long cn1SimulatedProcLimit = -1;
+static long long cn1SimulatedProcLimitBytes(void) {
+    long long v = atomic_load_explicit(&cn1SimulatedProcLimit, memory_order_relaxed);
+    if(v < 0) {
+        const char* e = getenv("CN1_SIMULATE_PROC_MEMORY_LIMIT");
+        v = e ? atoll(e) : 0;
+        if(v < 0) {
+            v = 0;
+        }
+        atomic_store_explicit(&cn1SimulatedProcLimit, v, memory_order_relaxed);
+    }
+    return v;
+}
+
+// Bytes this process is metered at, for the simulated-limit hook only. phys_footprint
+// on Apple and RSS on Linux, matching what nativeMethods.m reports through Runtime, so
+// a test can compare the two readings directly. Anything else has no probe and simply
+// never reports a simulated limit.
+static long cn1ProcFootprintBytes(void) {
+#if defined(__APPLE__)
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if(task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) == KERN_SUCCESS) {
+        return (long)info.phys_footprint;
+    }
+    return 0;
+#elif defined(__linux__)
+    FILE* f = fopen("/proc/self/statm", "r");
+    if(f == 0) {
+        return 0;
+    }
+    unsigned long total = 0, resident = 0;
+    int n = fscanf(f, "%lu %lu", &total, &resident);
+    fclose(f);
+    long ps = sysconf(_SC_PAGESIZE);
+    if(n != 2 || ps <= 0) {
+        return 0;
+    }
+    return (long)(resident * (unsigned long)ps);
+#else
+    return 0;
+#endif
+}
+
+static _Atomic int cn1ProcHasMemoryLimit = 0;
+static long cn1ProcessHeadroom(void) {
+    long long simLimit = cn1SimulatedProcLimitBytes();
+    if(simLimit > 0) {
+        long long used = (long long)cn1ProcFootprintBytes();
+        if(used <= 0) {
+            return -1;      // no footprint probe on this platform; hook inert
+        }
+        return used >= simLimit ? 0 : (long)(simLimit - used);
+    }
+#ifdef CN1_HAS_PROC_AVAILABLE_MEMORY
+    if(__builtin_available(iOS 13.0, tvOS 13.0, watchOS 6.0, *)) {
+        size_t remaining = os_proc_available_memory();
+        if(remaining > 0) {
+            atomic_store_explicit(&cn1ProcHasMemoryLimit, 1, memory_order_relaxed);
+            return (long)remaining;
+        }
+        if(atomic_load_explicit(&cn1ProcHasMemoryLimit, memory_order_relaxed)) {
+            return 0;   // over the limit: no headroom, pace as hard as we can
+        }
+    }
+#endif
+    return -1;          // this platform has no per-process limit
+}
 
 // Monotonic milliseconds, used to pace the low-memory allocation throttle.
 // Monotonic (not wall clock) so a clock adjustment cannot make the throttle
@@ -320,6 +438,33 @@ static void cn1StartSimulatedMemoryWarnings(void) {
         fprintf(stderr, "[LOWMEM] simulating a memory warning every %ld ms\n",
                 cn1SimulateMemoryWarningMs);
     }
+}
+
+// Pacing-park accounting, reported by CN1_LOG_PACING_PARKS at exit and asserted on by
+// ProcessBudgetPacingIntegrationTest. Peak footprint alone is a poor regression signal
+// -- whether an unpaced mutator actually outruns the collector depends on how loaded
+// the machine is, and the same binary was measured peaking anywhere from 114MB to
+// 562MB on an idle laptop -- whereas "did backpressure engage, and on which path" is a
+// property of the code under test rather than of the runner.
+static _Atomic long cn1PacingParksBibop = 0;
+static _Atomic long cn1PacingParksLegacy = 0;
+static _Atomic int cn1PacingTrace = -1;
+static int cn1PacingTraceOn(void) {
+    int on = atomic_load_explicit(&cn1PacingTrace, memory_order_relaxed);
+    if(on < 0) {
+        on = getenv("CN1_LOG_PACING_PARKS") ? 1 : 0;
+        atomic_store_explicit(&cn1PacingTrace, on, memory_order_relaxed);
+    }
+    return on;
+}
+
+static void cn1ReportPacingParks(void) {
+    if(!cn1PacingTraceOn()) {
+        return;
+    }
+    fprintf(stderr, "[PACING] bibopParks=%ld legacyParks=%ld\n",
+            atomic_load_explicit(&cn1PacingParksBibop, memory_order_relaxed),
+            atomic_load_explicit(&cn1PacingParksLegacy, memory_order_relaxed));
 }
 
 static void cn1ReportLowMemoryParks(void) {
@@ -3007,6 +3152,13 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS
 #define CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS 50000
 #endif
+// Smallest slack the process-budget clamp will pace a thread down to. Below this a
+// thread that cannot get memory back stalls for the full spin budget on every page
+// acquire, which reads as a hang rather than as memory pressure; above it, an app
+// whose live set genuinely fills the budget still makes (slow) forward progress.
+#ifndef CN1_PACING_MIN_CAP
+#define CN1_PACING_MIN_CAP (4*1024*1024)
+#endif
 
 // Cached free-memory reading, refreshed once per GC cycle (cn1RefreshFreeMemCache, called from
 // codenameOneGCMark) so the dynamic pacing cap costs no per-page-acquire syscall.
@@ -3055,7 +3207,14 @@ static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
 static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     long trigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
     long base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER;
-    long fm = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
+    // PROCESS BUDGET FIRST (issue #5537). Where the platform caps what this process
+    // may hold, that cap -- not the device's spare RAM -- is what the slack has to fit
+    // inside; see cn1ProcessHeadroom. Everywhere else this is -1 and the host-wide
+    // once-per-cycle reading is used exactly as before, so nothing off iOS changes.
+    long procHeadroom = cn1ProcessHeadroom();
+    JAVA_BOOLEAN bounded = procHeadroom >= 0;
+    long fm = bounded ? procHeadroom
+                      : atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
     long cap = fm / 8;                                       // baseline: 1/8 of available RAM of slack
     if(cap < base) cap = base;                              // never tighter than before
     // High-throughput threads must not be starved by the collector. The EDT (UI/render thread)
@@ -3071,7 +3230,82 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
         long hi = fm / 2;
         if(hi > cap) cap = hi;
     }
+    if(bounded) {
+        // Under a hard process ceiling every clause above is a THROUGHPUT preference,
+        // not a licence to exceed the budget -- and `base` is an absolute 72MB floor
+        // that would happily authorize 72MB of fresh garbage with 10MB left to live.
+        // Clamp to half the remaining budget: the mutator may spend at most half of
+        // what is left before backpressure engages, so the cap tightens geometrically
+        // as the footprint climbs and pacing slack alone can never reach the ceiling.
+        // It reopens on its own as the collector hands memory back, which for the
+        // allocate-and-drop workload in issue #5537 is essentially all of it.
+        long ceiling = fm / 2;
+        if(cap > ceiling) cap = ceiling;
+        // ...but never pace so tightly that a genuinely-live heap makes no progress.
+        // A heap with nothing left to reclaim would otherwise spend the full 10s spin
+        // budget at every page acquire, turning a memory problem into an apparent hang.
+        if(cap < CN1_PACING_MIN_CAP) cap = CN1_PACING_MIN_CAP;
+    }
     return cap;
+}
+
+// Backpressure: bound the footprint when the collector falls behind, by parking the
+// allocating thread until uncollected volume (*counter) drops back under the cap.
+//
+// This wait MUST be a GC safepoint -- otherwise the collector blocks waiting for this
+// spinning thread to become scannable and never advances, so the counter never resets
+// and the spin livelocks (observed as an MtStress hang). Mark the thread inactive (as
+// the legacy alloc-path park does) so the collector can scan/pass it; restore on exit.
+// Bounded spin with a safety cap so a dead/stuck GC degrades to footprint growth,
+// never a permanent hang.
+//
+// Shared by both allocation paths, which is the point: they hold separate counters and
+// only the BiBOP one was ever paced (issue #5537). Each paces its own volume rather
+// than the sum, so no path gets a tighter bound than it had -- the legacy path simply
+// gains one it never had.
+// Which uncollected-volume counter a park is waiting on. The two are separate types
+// (the legacy one is long long: on the Windows LLP64 target long is 32-bit and it
+// accumulates raw allocation bytes), so the caller names the counter rather than
+// passing a pointer to it.
+#define CN1_PACE_BIBOP  0
+#define CN1_PACE_LEGACY 1
+
+static long long cn1PacingVolume(int which) {
+    if(which == CN1_PACE_LEGACY) {
+        return atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
+    }
+    return (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed);
+}
+
+static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which) {
+    long cap = cn1BibopPacingCap(threadStateData);
+    if(cn1PacingVolume(which) <= (long long)cap ||
+       get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
+        return;
+    }
+    if(cn1PacingTraceOn()) {
+        atomic_fetch_add_explicit(which == CN1_PACE_LEGACY ? &cn1PacingParksLegacy
+                                                           : &cn1PacingParksBibop,
+                                  1, memory_order_relaxed);
+    }
+    CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
+    threadStateData->threadActive = JAVA_FALSE;
+    int spins = 0;
+    while(cn1PacingVolume(which) > (long long)cap &&
+          get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
+          spins++ < 200000) {
+        usleep(50);
+    }
+    // The spin can exit via the safety cap while a mark is STILL RUNNING and the
+    // collector believes this thread is paused (it already scanned our roots).
+    // Waking mid-drain violates snapshot-at-the-beginning: we could load a grey
+    // object's field into a local and null the field -- the referent would never
+    // be marked and gets swept while reachable. Honor the GC pause before
+    // resuming, exactly like every other park in the codebase.
+    while(threadStateData->threadBlockedByGC) {
+        usleep((JAVA_INT)(500));
+    }
+    threadStateData->threadActive = JAVA_TRUE;
 }
 
 static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
@@ -3119,35 +3353,7 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
         threadStateData->nativeAllocationMode = wasNam;
     }
 #ifndef CN1_BIBOP_NO_PACING
-    // Backpressure: bound RSS when the collector falls behind. This wait MUST be a
-    // GC safepoint -- otherwise the collector blocks waiting for this spinning
-    // thread to become scannable and never advances, so bibopBytesSinceGc never
-    // resets and the spin livelocks (observed as an MtStress hang). Mark the thread
-    // inactive (as the legacy alloc-path park does) so the collector can scan/pass
-    // it; restore on exit. Bounded spin with a safety cap so a dead/stuck GC
-    // degrades to RSS growth, never a permanent hang.
-    long __pacingCap = cn1BibopPacingCap(threadStateData);
-    if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > __pacingCap &&
-       get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
-        CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
-        threadStateData->threadActive = JAVA_FALSE;
-        int spins = 0;
-        while(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > __pacingCap &&
-              get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
-              spins++ < 200000) {
-            usleep(50);
-        }
-        // The spin can exit via the safety cap while a mark is STILL RUNNING and the
-        // collector believes this thread is paused (it already scanned our roots).
-        // Waking mid-drain violates snapshot-at-the-beginning: we could load a grey
-        // object's field into a local and null the field -- the referent would never
-        // be marked and gets swept while reachable. Honor the GC pause before
-        // resuming, exactly like every other park in the codebase.
-        while(threadStateData->threadBlockedByGC) {
-            usleep((JAVA_INT)(500));
-        }
-        threadStateData->threadActive = JAVA_TRUE;
-    }
+    cn1PacingPark(threadStateData, CN1_PACE_BIBOP);
 #endif
 }
 
@@ -5704,6 +5910,33 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             threadStateData->nativeAllocationMode = wasNam;
         }
     }
+#ifndef CN1_BIBOP_NO_PACING
+    // BACKPRESSURE for the legacy path (issue #5537). The trigger above only
+    // SCHEDULES an asynchronous cycle and returns; it never makes the allocating
+    // thread wait. The only thing that did was the pending-table check near the top
+    // of this function, and that is a COUNT (CN1_MAX_HEAP_SIZE, itself derived from
+    // free RAM divided by a 128-byte average object) -- so a thread allocating
+    // objects above CN1_BIBOP_MAX_OBJECT could run hundreds of megabytes to
+    // gigabytes ahead of the collector before anything stalled it. Every array a
+    // program allocates is above that threshold, which is why a game-tree search
+    // churning board arrays could take the process past the iOS ceiling with a live
+    // set of almost nothing.
+    //
+    // Gated on the crossing already computed above, so the common case costs one
+    // comparison on an integer we are holding anyway, and the cap is only consulted
+    // once legacy volume since the last cycle has passed the 24MB trigger.
+    if(prevLegacyBytes + (long long)size > CN1_LEGACY_GC_TRIGGER_BYTES
+       && constantPoolObjects != 0
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+       // Same bracket gate as the trigger: without conservative roots a thread inside
+       // a native-allocation bracket must not be parked, since its half-built objects
+       // are not rooted and the collector could sweep them while it waits.
+       && !threadStateData->nativeAllocationMode
+#endif
+       ) {
+        cn1PacingPark(threadStateData, CN1_PACE_LEGACY);
+    }
+#endif
 #endif
     return o;
 }
@@ -7339,6 +7572,7 @@ void initConstantPool() {
     // Low-memory throttle diagnostics and the CN1_SIMULATE_MEMORY_WARNING_MS test
     // hook. Both are no-ops unless their environment variable is set.
     atexit(cn1ReportLowMemoryParks);
+    atexit(cn1ReportPacingParks);
     cn1StartSimulatedMemoryWarnings();
 
     // it will wait two seconds unless an explicit GC occurs

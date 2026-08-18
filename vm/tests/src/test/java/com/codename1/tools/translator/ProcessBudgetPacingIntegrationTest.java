@@ -1,0 +1,372 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.tools.translator;
+
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+/**
+ * Regression guard for the issue-5537 process-budget pacing fix.
+ *
+ * <p>The GC's backpressure decides how far a mutator may run ahead of the collector,
+ * and it was sized against the DEVICE's free RAM. On a platform with a per-process
+ * memory ceiling those are unrelated quantities: iOS kills an app that crosses its
+ * dirty-memory limit -- roughly 1.4GB on an iPad -- with EXC_RESOURCE
+ * (RESOURCE_TYPE_MEMORY), whatever the device has spare. cn1BibopPacingCap handed a
+ * high-throughput thread half of the host-wide reclaimable figure, which on a
+ * large-RAM iPad is gigabytes, so the mutator was licensed to run further ahead of
+ * the collector than the process was allowed to exist. A deep game-tree search hit
+ * that reproducibly on device while running fine in the simulator, on Android and on
+ * Windows -- none of which impose such a ceiling.</p>
+ *
+ * <p>Two things were wrong and both are covered here. The cap now comes from
+ * {@code cn1ProcessHeadroom} (os_proc_available_memory on iOS), and it is clamped to
+ * half the REMAINING budget so the 72MB static floor cannot authorize 72MB of fresh
+ * garbage with 10MB left to live. And the legacy allocation path -- everything above
+ * CN1_BIBOP_MAX_OBJECT, which is every array a program allocates -- now has byte-based
+ * backpressure at all; it previously had only an asynchronous trigger that scheduled a
+ * cycle without ever making the allocating thread wait.</p>
+ *
+ * <p>The clamp only engages under a hard per-process budget, and the only targets that
+ * impose one are iOS/tvOS/watchOS devices -- which is precisely why the defect survived
+ * so long. The {@code CN1_SIMULATE_PROC_MEMORY_LIMIT} hook supplies a synthetic ceiling
+ * so the mechanism is reachable on a machine CI can actually run, in the same spirit as
+ * {@code CN1_SIMULATE_MEMORY_WARNING_MS} in {@link LowMemoryThrottleIntegrationTest}.</p>
+ *
+ * <p>The same binary is run twice over the same workload, so the only variable is
+ * whether a budget is declared:</p>
+ *
+ * <ul>
+ * <li><b>Control</b> -- no hook. The host-wide reading applies exactly as before and
+ *     nothing may pace, which is asserted directly on the park counters. That is the
+ *     evidence the fix costs nothing off iOS, and it is deterministic.</li>
+ * <li><b>Treatment</b> -- a {@value #SIMULATED_LIMIT_MB}MB budget. The peak must stay
+ *     inside it.</li>
+ * </ul>
+ *
+ * <p>The control's PEAK is reported but deliberately not asserted on. Whether an
+ * unpaced mutator actually outruns the collector is up to the scheduler: the identical
+ * binary was measured peaking at 98MB, 553MB and 626MB on three consecutive runs of an
+ * idle laptop. The bounded run's park COUNT is not asserted either, for the same reason
+ * (0, 1, 2 and 8 across repetitions). What does not vary is the bound itself -- across
+ * every run measured, the bounded peak stayed between 111MB and 176MB against a 256MB
+ * budget -- and that the control paces nothing at all.</p>
+ *
+ * <p>Teeth were confirmed by ablation rather than assumed. With the legacy-path
+ * backpressure removed and everything else in place, the bounded run peaks at 472MB
+ * against the 256MB budget and this guard fails; with the fix whole it peaks at
+ * 131MB.</p>
+ *
+ * <p>The bound asserted is not a tuned threshold, it is the invariant the clamp
+ * provides: at any pacing point with footprint F under budget L the thread may grow to
+ * F + (L-F)/2 = (L+F)/2, which is strictly less than L for every F. The footprint
+ * therefore approaches the ceiling geometrically and never reaches it, however fast the
+ * mutator allocates and however far behind the collector falls. A regression that
+ * restores host-wide sizing, or drops the legacy path's backpressure, blows straight
+ * through it.</p>
+ *
+ * <p>Tagged {@code benchmark}: it needs a translate-and-build and churns
+ * ~768MB through a live set of one block.</p>
+ */
+@Tag("benchmark")
+class ProcessBudgetPacingIntegrationTest {
+
+    /**
+     * Synthetic per-process budget for the treatment run. Comfortably above the
+     * baseline footprint of a translated hello-world plus one live block, so the
+     * workload is never starved of room to run, and far below what the control run
+     * reaches -- otherwise the guard would pass on a machine where the collector
+     * happened to keep up.
+     */
+    private static final long SIMULATED_LIMIT_MB = 256;
+
+    private static final long SIMULATED_LIMIT_BYTES = SIMULATED_LIMIT_MB * 1024 * 1024;
+    private static final long SIMULATED_LIMIT_KB = SIMULATED_LIMIT_MB * 1024;
+
+    @Test
+    void anAllocatingThreadStaysInsideTheProcessMemoryBudget() throws Exception {
+        Parser.cleanup();
+
+        List<Path> tempDirs = new ArrayList<>();
+        try {
+            runPacingLoad(tempDirs);
+        } finally {
+            for (Path dir : tempDirs) {
+                deleteRecursively(dir);
+            }
+        }
+    }
+
+    private void runPacingLoad(List<Path> tempDirs) throws Exception {
+        Path sourceDir = Files.createTempDirectory("process-budget-pacing-sources");
+        Path classesDir = Files.createTempDirectory("process-budget-pacing-classes");
+        Path javaApiDir = Files.createTempDirectory("process-budget-pacing-javaapi");
+        tempDirs.add(sourceDir);
+        tempDirs.add(classesDir);
+        tempDirs.add(javaApiDir);
+
+        Path source = sourceDir.resolve("ProcessBudgetPacingApp.java");
+        Files.write(source, loadAppSource().getBytes(StandardCharsets.UTF_8));
+
+        CompilerHelper.CompilerConfig config = selectCompiler();
+        if (config == null) {
+            fail("No compatible compiler available for process-budget pacing integration test");
+        }
+        assertTrue(CompilerHelper.isJavaApiCompatible(config),
+                "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+
+        List<String> compileArgs = new ArrayList<>();
+        compileArgs.add("-source");
+        compileArgs.add(config.targetVersion);
+        compileArgs.add("-target");
+        compileArgs.add(config.targetVersion);
+        if (CompilerHelper.useClasspath(config)) {
+            compileArgs.add("-classpath");
+            compileArgs.add(javaApiDir.toString());
+        } else {
+            compileArgs.add("-bootclasspath");
+            compileArgs.add(javaApiDir.toString());
+            compileArgs.add("-Xlint:-options");
+        }
+        compileArgs.add("-d");
+        compileArgs.add(classesDir.toString());
+        compileArgs.add(source.toString());
+
+        int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
+        assertEquals(0, compileResult,
+                "ProcessBudgetPacingApp should compile. " + CompilerHelper.getLastErrorLog());
+
+        String javaResult = extractLine(runJavaMain(config, classesDir, javaApiDir), "RESULT=");
+        assertTrue(javaResult.startsWith("RESULT="), "JavaSE should produce RESULT=");
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+
+        Path outputDir = Files.createTempDirectory("process-budget-pacing-output");
+        tempDirs.add(outputDir);
+        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "ProcessBudgetPacingApp");
+
+        Path distDir = outputDir.resolve("dist");
+        Path cmakeLists = distDir.resolve("CMakeLists.txt");
+        assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "ProcessBudgetPacingApp-src");
+
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+        List<String> cmakeArgs = new ArrayList<>(Arrays.asList(
+                "cmake", "-S", distDir.toString(), "-B", buildDir.toString(),
+                "-DCMAKE_BUILD_TYPE=Release"));
+        cmakeArgs.addAll(CompilerHelper.cmakeToolchainArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeArgs, distDir);
+        CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        Path executable = buildDir.resolve("ProcessBudgetPacingApp");
+        assertTrue(Files.exists(executable), "ParparVM build should produce a runnable executable");
+
+        // CONTROL: no declared budget, so cn1ProcessHeadroom reports "no limit", the
+        // host-wide reading applies exactly as before and nothing here may pace.
+        Map<String, String> controlEnv = new HashMap<String, String>();
+        controlEnv.put("CN1_LOG_PACING_PARKS", "1");
+        String controlOutput = runVm(executable, buildDir, controlEnv);
+        assertEquals(javaResult, extractLine(controlOutput, "RESULT="),
+                "JavaSE and ParparVM should agree\n--- ParparVM control ---\n" + controlOutput);
+        long controlPeakKb = parseValue(controlOutput, "PEAK_FOOTPRINT_KB=");
+
+        // TREATMENT: identical binary, identical work, a declared budget.
+        Map<String, String> boundedEnv = new HashMap<String, String>();
+        boundedEnv.put("CN1_LOG_PACING_PARKS", "1");
+        boundedEnv.put("CN1_SIMULATE_PROC_MEMORY_LIMIT", Long.toString(SIMULATED_LIMIT_BYTES));
+        String boundedOutput = runVm(executable, buildDir, boundedEnv);
+        assertTrue(boundedOutput.contains("PROCESS_BUDGET_PACING_DONE"),
+                "The load must finish under a memory budget, not stall. Output: " + boundedOutput);
+        assertEquals(javaResult, extractLine(boundedOutput, "RESULT="),
+                "Pacing must not change the result\n--- ParparVM bounded ---\n" + boundedOutput);
+        long boundedPeakKb = parseValue(boundedOutput, "PEAK_FOOTPRINT_KB=");
+
+        System.err.println("[ProcessBudgetPacingIntegrationTest] controlPeakKb=" + controlPeakKb
+                + " boundedPeakKb=" + boundedPeakKb + " limitKb=" + SIMULATED_LIMIT_KB
+                + " control " + pacing(controlOutput) + " bounded " + pacing(boundedOutput));
+
+        // THE INVARIANT. Under a declared budget the peak must stay inside it. This is
+        // not a tuned threshold: at any pacing point with footprint F under budget L the
+        // thread may grow to F + (L-F)/2 = (L+F)/2 < L, for every F, so the footprint
+        // approaches the ceiling geometrically and never reaches it however far behind
+        // the collector falls. Measured with the legacy-path backpressure ablated out
+        // and everything else in place, the same run peaked at 472MB against this 256MB
+        // budget -- i.e. dead on device.
+        assertTrue(boundedPeakKb < SIMULATED_LIMIT_KB,
+                "Under a declared " + SIMULATED_LIMIT_KB + "KB process budget the allocating"
+                        + " thread peaked at " + boundedPeakKb + "KB, so the process would have"
+                        + " been killed. This is the issue-5537 signature: backpressure sized"
+                        + " against something other than the budget the process is metered"
+                        + " against. The unbounded control peaked at " + controlPeakKb + "KB."
+                        + "\n--- bounded ---\n" + boundedOutput);
+
+        // AND THE OTHER DIRECTION, which is what keeps this fix from costing throughput
+        // everywhere else: with no budget declared, no allocation may be paced at all.
+        // Unlike a peak, this is deterministic -- it is a property of the code rather
+        // than of how loaded the machine is -- so it is the half of the guard that
+        // cannot go quiet. (The bounded run's park count is NOT asserted for exactly
+        // that reason: measured at 0, 1, 2 and 8 across repetitions of an identical run,
+        // because whether the mutator outruns the collector at all is up to the
+        // scheduler. Its peak is bounded either way, which is the property that matters.)
+        assertEquals(0, parsePacing(controlOutput, "legacyParks="),
+                "No process budget was declared, so the legacy path must not pace a single"
+                        + " allocation -- pacing where there is no ceiling to respect is pure"
+                        + " throughput loss on every non-iOS target.\n--- control ---\n"
+                        + controlOutput);
+        assertEquals(0, parsePacing(controlOutput, "bibopParks="),
+                "No process budget was declared, so the BiBOP path must not pace either."
+                        + "\n--- control ---\n" + controlOutput);
+    }
+
+    private long parsePacing(String output, String key) {
+        String line = pacing(output);
+        for (String token : line.split("\\s+")) {
+            if (token.startsWith(key)) {
+                return Long.parseLong(token.substring(key.length()).trim());
+            }
+        }
+        fail("VM did not report " + key + " -- the CN1_LOG_PACING_PARKS tracer did not fire, so"
+                + " the guard cannot observe whether backpressure engaged. Output: " + output);
+        return -1;
+    }
+
+    private String pacing(String out) {
+        for (String line : out.split("\\R")) {
+            if (line.startsWith("[PACING] ")) {
+                return line.trim();
+            }
+        }
+        return "[PACING] <absent>";
+    }
+
+    /** Same preference order as the other translate-and-build guards. */
+    private CompilerHelper.CompilerConfig selectCompiler() {
+        String[] preferredTargets = {"11", "17", "21", "25", "1.8"};
+        for (String target : preferredTargets) {
+            List<CompilerHelper.CompilerConfig> configs = CompilerHelper.getAvailableCompilers(target);
+            for (CompilerHelper.CompilerConfig config : configs) {
+                if (CompilerHelper.isJavaApiCompatible(config)) {
+                    return config;
+                }
+            }
+        }
+        return null;
+    }
+
+    private long parseValue(String output, String prefix) {
+        String line = extractLine(output, prefix);
+        if (line.isEmpty()) {
+            fail("Missing " + prefix + " in output: " + output);
+        }
+        return Long.parseLong(line.substring(prefix.length()).trim());
+    }
+
+    private String loadAppSource() throws Exception {
+        java.io.InputStream in = ProcessBudgetPacingIntegrationTest.class
+                .getResourceAsStream("/com/codename1/tools/translator/ProcessBudgetPacingApp.java");
+        assertNotNull(in, "ProcessBudgetPacingApp.java test resource should exist");
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+            return reader.lines().collect(Collectors.joining("\n")) + "\n";
+        }
+    }
+
+    private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir)
+            throws Exception {
+        String javaExe = config.jdkHome.resolve("bin").resolve("java").toString();
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            javaExe += ".exe";
+        }
+        ProcessBuilder pb = new ProcessBuilder(javaExe, "-cp",
+                classesDir + System.getProperty("path.separator") + javaApiDir,
+                "ProcessBudgetPacingApp");
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+        String output;
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
+        }
+        assertEquals(0, process.waitFor(), "JVM run should exit cleanly. Output: " + output);
+        return output;
+    }
+
+    private String runVm(Path executable, Path workingDir, Map<String, String> env) throws Exception {
+        ProcessBuilder builder = new ProcessBuilder(executable.toString());
+        builder.directory(workingDir.toFile());
+        builder.environment().putAll(env);
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        String output;
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
+        }
+        assertEquals(0, process.waitFor(),
+                "ParparVM run should exit cleanly (env " + env + "). Output: " + output);
+        return output;
+    }
+
+    private String extractLine(String output, String prefix) {
+        for (String line : output.split("\\R")) {
+            if (line.startsWith(prefix)) {
+                return line.trim();
+            }
+        }
+        return "";
+    }
+
+    private void deleteRecursively(Path dir) throws Exception {
+        if (dir == null || !Files.exists(dir)) {
+            return;
+        }
+        Files.walk(dir)
+                .sorted((a, b) -> b.getNameCount() - a.getNameCount())
+                .forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (Exception ignored) {
+                        // Best effort: a leftover temp dir must not fail the guard.
+                    }
+                });
+    }
+}
