@@ -245,10 +245,12 @@ public final class JavaScriptSemanticOverlay {
         if (node == null || !live.add(id)) {
             return;
         }
+        AccessibilityNodeSnapshot parent = parentId == -1
+                ? null : nodes.get(Long.valueOf(parentId));
         Entry entry = obtain(node);
         applyParent(entry, parentId);
-        applyAttributes(entry, node);
-        applyGeometry(entry, node, parentId == -1 ? null : nodes.get(Long.valueOf(parentId)), ratio);
+        applyAttributes(entry, node, nodes, parent);
+        applyGeometry(entry, node, parent, ratio);
         applyText(entry, node);
         applyListeners(entry, node);
         applyCustomActions(entry, node);
@@ -305,8 +307,9 @@ public final class JavaScriptSemanticOverlay {
         entry.parentId = parentId;
     }
 
-    private void applyAttributes(Entry entry, AccessibilityNodeSnapshot node) {
-        Map<String, String> desired = describe(node);
+    private void applyAttributes(Entry entry, AccessibilityNodeSnapshot node,
+            Map<Long, AccessibilityNodeSnapshot> nodes, AccessibilityNodeSnapshot parent) {
+        Map<String, String> desired = describe(node, nodes, parent);
         for (Iterator<Map.Entry<String, String>> it = desired.entrySet().iterator(); it.hasNext();) {
             Map.Entry<String, String> attribute = it.next();
             String name = attribute.getKey();
@@ -1057,7 +1060,8 @@ public final class JavaScriptSemanticOverlay {
      * Builds the full ARIA attribute set for a node. The result is diffed against the last
      * applied set, so this method describes rather than writes.
      */
-    private Map<String, String> describe(AccessibilityNodeSnapshot node) {
+    private Map<String, String> describe(AccessibilityNodeSnapshot node,
+            Map<Long, AccessibilityNodeSnapshot> nodes, AccessibilityNodeSnapshot parent) {
         Map<String, String> out = new LinkedHashMap<String, String>();
         out.put(ATTRIBUTE_NODE_ID, String.valueOf(node.getId()));
         String role = ariaRole(node.getRole());
@@ -1065,9 +1069,16 @@ public final class JavaScriptSemanticOverlay {
         // listitem has no selected state in ARIA, and a list has no multi-selectable state, so a
         // framework list projected as a plain list reaches a screen reader as structure with no
         // indication of what is chosen.
-        if (node.getRole() == AccessibilityRole.LIST && isSelectableCollection(node)) {
+        if (node.getRole() == AccessibilityRole.LIST && isSelectableCollection(node, nodes)) {
             role = "listbox";
-        } else if (node.getRole() == AccessibilityRole.LIST_ITEM && node.getSelected() != null) {
+        } else if (node.getRole() == AccessibilityRole.LIST_ITEM && parent != null
+                && parent.getRole() == AccessibilityRole.LIST
+                && isSelectableCollection(parent, nodes)) {
+            // Asked of the list rather than of the item: an option belongs to a listbox, so a
+            // selected item whose list stayed a plain list would be an option with no listbox
+            // over it, and an unselected item beside a selected one has to be an option too --
+            // a listbox's children are all options, and one that is not breaks the group a
+            // screen reader reads the selection from.
             role = "option";
         }
         if (role != null) {
@@ -1246,13 +1257,29 @@ public final class JavaScriptSemanticOverlay {
      * @param node the collection node
      * @return true when the collection is one the user selects within
      */
-    private boolean isSelectableCollection(AccessibilityNodeSnapshot node) {
+    private boolean isSelectableCollection(AccessibilityNodeSnapshot node,
+            Map<Long, AccessibilityNodeSnapshot> nodes) {
         AccessibilityCollectionInfo collection = node.getCollectionInfo();
         if (collection != null
                 && collection.getSelectionMode() != AccessibilityCollectionInfo.SELECTION_NONE) {
             return true;
         }
-        return node.getSelected() != null;
+        if (node.getSelected() != null) {
+            return true;
+        }
+        // A list built by hand can carry the selection on its items and describe neither a
+        // collection nor a selected state of its own. Its items still have to be options, and an
+        // option under a plain list is a hierarchy assistive technology may refuse to read the
+        // selection from, so the items are what decides.
+        List<Long> children = node.getChildIds();
+        for (int i = 0; i < children.size(); i++) {
+            AccessibilityNodeSnapshot child = nodes.get(children.get(i));
+            if (child != null && child.getRole() == AccessibilityRole.LIST_ITEM
+                    && child.getSelected() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String ariaRole(AccessibilityRole role) {
