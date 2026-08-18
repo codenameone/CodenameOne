@@ -7496,7 +7496,7 @@ public class AndroidGradleBuilder extends Executor {
                     ? (String) intent.get("title") : (String) id;
             String labelRes = "cn1_shortcut_" + ((String) id);
             strings.append("    <string name=\"").append(labelRes).append("\">")
-                    .append(xmlEscape(label)).append("</string>\n");
+                    .append(androidStringValue(label)).append("</string>\n");
             // The headless flag rides in the URI so the trampoline can route a cold-start tap
             // without the declaration table, which is not installed yet at that point.
             Object headlessValue = intent.get("headless");
@@ -7594,6 +7594,34 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return true;
+    }
+
+    /// A string-resource *value*, which is not the same thing as XML-escaped text.
+    ///
+    /// AAPT applies its own escaping layer inside the XML, and an intent title is application
+    /// text that will eventually contain an apostrophe -- "Today's workout" is the obvious one.
+    /// XML has nothing to say about an apostrophe, so it arrived at AAPT bare and AAPT rejected
+    /// the resource, failing the Android build on a title the developer was entitled to write.
+    /// The app_name resource in this same builder has escaped apostrophes for exactly this
+    /// reason for years; nothing else here had learned it.
+    ///
+    /// Applied before xmlEscape rather than after, which is the part that is easy to get wrong:
+    /// xmlEscape turns a double quote into `&quot;`, so escaping afterwards would never see one
+    /// and the bare quote would reach AAPT, where a lone quote is a string-trimming directive
+    /// rather than a character. Backslash goes first for the same reason within this method.
+    private static String androidStringValue(String s) {
+        if (s == null) {
+            return "";
+        }
+        String escaped = s.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\"", "\\\"");
+        if (escaped.startsWith("@") || escaped.startsWith("?")) {
+            // Leading @ is a resource reference and leading ? a theme attribute; a title may
+            // legitimately begin with either.
+            escaped = "\\" + escaped;
+        }
+        return xmlEscape(escaped);
     }
 
     private static String xmlEscape(String s) {

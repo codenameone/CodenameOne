@@ -527,10 +527,27 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             pd.required = p.getBoolOrDefault("required", true);
             pd.defaultValue = p.getStringOrDefault("defaultValue", "");
             pd.descriptor = desc;
+            boolean duplicateOption = false;
             for (Object o : asList(p.get("options"))) {
                 if (o instanceof String) {
+                    if (pd.options.contains(o)) {
+                        // The generated iOS AppEnum maps each option to a case with the option
+                        // as its raw value, and Swift rejects two cases sharing one. So a
+                        // vocabulary that lists a value twice does not merely offer it twice:
+                        // it fails to compile the app, in a file the developer never wrote.
+                        // Sanitized collisions are handled in the generator by disambiguating
+                        // the identifier; a repeated raw value has no such repair, because the
+                        // values are what the platform matches on.
+                        ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                                + " lists the option \"" + o + "\" more than once");
+                        duplicateOption = true;
+                        break;
+                    }
                     pd.options.add((String) o);
                 }
+            }
+            if (duplicateOption) {
+                continue;
             }
             if (pd.name == null || pd.name.length() == 0) {
                 ctx.error(cls, "@IntentParam on " + def.where + " parameter " + i

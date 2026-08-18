@@ -86,6 +86,37 @@ class IOSAppIntentsBuilderTest {
                 .buildAppTargetFileMap().get("CN1AppIntents.swift");
     }
 
+    /// Options are application strings, so two legal and quite different ones reduce to the
+    /// same Swift identifier -- and a duplicated `case` does not degrade at runtime, it fails
+    /// to compile the iOS target, in a file the developer never wrote.
+    @Test
+    void collidingOptionsGetDistinctSwiftCases() {
+        Map<String, Object> p = param("kind", "string",
+                "options", Arrays.asList("in-person", "in person", "in_person"));
+        Map<String, Object> i = intent("book_it", "Book it");
+        i.put("params", Arrays.asList(p));
+
+        String swift = intentsSwift(Arrays.asList(i), new ArrayList<Map<String, Object>>());
+
+        // Every raw value survives -- that is what the platform matches on.
+        assertTrue(swift.contains("= \"in-person\""));
+        assertTrue(swift.contains("= \"in person\""));
+        assertTrue(swift.contains("= \"in_person\""));
+
+        // And no identifier is declared twice.
+        List<String> cases = new ArrayList<String>();
+        for (String line : swift.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("case ") && t.contains(" = \"")) {
+                String name = t.substring(5, t.indexOf(" = \""));
+                assertFalse(cases.contains(name),
+                        "duplicate Swift case \"" + name + "\" would not compile:\n" + swift);
+                cases.add(name);
+            }
+        }
+        assertEquals(3, cases.size());
+    }
+
     @Test
     void everythingIsAvailabilityFencedSoALowerTargetStillBuilds() {
         String swift = intentsSwift(

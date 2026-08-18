@@ -129,29 +129,58 @@ public final class IOSAppIntentsBuilder {
             }
             String name = choiceEnumName(id, str(p, "name"));
             List<String> opts = options(p);
+            List<String> cases = caseNames(opts);
             sb.append("@available(iOS 16.0, *)\n");
             sb.append("enum ").append(name).append(": String, AppEnum {\n");
-            for (String option : opts) {
-                sb.append("    case ").append(caseName(option)).append(" = \"")
-                        .append(swift(option)).append("\"\n");
+            for (int i = 0; i < opts.size(); i++) {
+                sb.append("    case ").append(cases.get(i)).append(" = \"")
+                        .append(swift(opts.get(i))).append("\"\n");
             }
             sb.append("\n    static var typeDisplayRepresentation: TypeDisplayRepresentation =\n");
             sb.append("        TypeDisplayRepresentation(name: \"")
                     .append(swift(str(p, "title"))).append("\")\n");
             sb.append("    static var caseDisplayRepresentations: [").append(name)
                     .append(": DisplayRepresentation] = [\n");
-            for (String option : opts) {
-                sb.append("        .").append(caseName(option)).append(": \"")
-                        .append(swift(option)).append("\",\n");
+            for (int i = 0; i < opts.size(); i++) {
+                sb.append("        .").append(cases.get(i)).append(": \"")
+                        .append(swift(opts.get(i))).append("\",\n");
             }
             sb.append("    ]\n");
             sb.append("}\n\n");
         }
     }
 
+    /// Legal, unique Swift case names for a parameter's options, in the order given.
+    ///
+    /// Sanitizing each option independently was not enough to keep the promise below. Options
+    /// are application strings, so two legal and quite different ones -- "in-person" and
+    /// "in person" -- reduce to the same identifier, and the generated enum then declared
+    /// `case in_person` twice. That does not degrade at runtime: the iOS target fails to
+    /// compile, for a Swift file the developer did not write and cannot easily read.
+    ///
+    /// Disambiguated by position rather than by content so the result is stable: the same
+    /// declaration always produces the same enum, which matters because these names appear in
+    /// metadata the system keeps.
+    private static List<String> caseNames(List<String> options) {
+        List<String> out = new ArrayList<String>();
+        for (String option : options) {
+            String base = caseName(option);
+            String candidate = base;
+            for (int n = 2; out.contains(candidate); n++) {
+                // Inside the backticks when the base was a Swift keyword, so the result stays
+                // one escaped identifier rather than a keyword followed by a suffix.
+                candidate = base.startsWith("`") && base.endsWith("`")
+                        ? "`" + base.substring(1, base.length() - 1) + "_" + n + "`"
+                        : base + "_" + n;
+            }
+            out.add(candidate);
+        }
+        return out;
+    }
+
     /// A Swift case name for a declared option. Options are application strings, so they may be
     /// anything; the raw value carries the real text and this only has to be a stable, legal
-    /// identifier that does not collide.
+    /// identifier. Uniqueness is caseNames' job, since it needs the whole list to see it.
     private static String caseName(String option) {
         String s = sanitize(option);
         if (s.length() == 0 || !Character.isLetter(s.charAt(0))) {

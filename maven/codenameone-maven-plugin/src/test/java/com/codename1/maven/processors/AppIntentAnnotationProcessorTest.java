@@ -1203,6 +1203,24 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// The generated iOS AppEnum maps each option to a case whose raw value is the option, and
+    /// Swift rejects two cases sharing a raw value -- so a vocabulary listing one twice fails
+    /// the app's compile rather than merely offering it twice. A sanitized collision the
+    /// generator can disambiguate; a repeated raw value it cannot, because the value is what
+    /// the platform matches on.
+    @Test
+    public void aRepeatedOptionIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"book_it\", title = \"Book\")\n"
+                        + "public static IntentResult book(\n"
+                        + "        @IntentParam(value = \"kind\",\n"
+                        + "                options = {\"run\", \"ride\", \"run\"}) String kind) {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        assertError(classes, "more than once");
+    }
+
     /// The runtime IntentParameterInfo falls back from a blank prompt to the parameter name, so
     /// a blank surviving into intents.json described the same declaration one way in the
     /// simulator and another on the device -- an iOS @Parameter(title:) with nothing in it.

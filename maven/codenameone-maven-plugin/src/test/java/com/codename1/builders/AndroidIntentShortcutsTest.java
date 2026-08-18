@@ -85,6 +85,28 @@ class AndroidIntentShortcutsTest {
         return (String) f.get(b);
     }
 
+    /// A shortcut label is application text, so it will eventually contain an apostrophe.
+    /// XML has nothing to say about one, so it reached AAPT bare and AAPT rejected the
+    /// resource -- an Android build failing on a title the developer was entitled to write.
+    @Test
+    public void anApostropheInATitleIsEscapedForAapt(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"intents\":[{\"id\":\"log_workout\","
+                + "\"title\":\"Today's \\\"big\\\" workout\",\"headless\":false,"
+                + "\"discoverable\":true,\"destructive\":false,\"opensRoute\":\"\","
+                + "\"exposure\":[\"ASSISTANT\"],\"params\":[]}],\"entities\":[]}");
+
+        File values = new File(new File(dir.toFile(), "res"), "values");
+        String strings = new String(Files.readAllBytes(
+                new File(values, "cn1_shortcuts_strings.xml").toPath()),
+                Charset.forName("UTF-8"));
+
+        assertTrue(strings.contains("Today\\'s"),
+                "an unescaped apostrophe fails the Android build:\n" + strings);
+        assertTrue(strings.contains("\\&quot;big\\&quot;"),
+                "the quote needs the resource escape too, and it has to be applied before the "
+                        + "XML escape or there is no quote left to see:\n" + strings);
+    }
+
     /// res/xml is not processed for manifest placeholders, so ${applicationId} written there
     /// reaches the launcher literally and the explicit component cannot resolve -- every
     /// generated static shortcut would open nothing at all.

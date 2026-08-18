@@ -137,10 +137,25 @@ public class CN1IntentService extends IntentService {
             Log.w(TAG, "Shortcut for \"" + id + "\" asked for headless, but the declaration is "
                     + "not; running it in the foreground instead");
             AndroidIntentBridge.parkForegroundRequest(id, data.getQueryParameter("p"));
-            AndroidIntentBridge.requestForegroundStatic();
+            // Released *before* the launch, and the order is the whole fix. stopContext takes
+            // one of two paths and both are destructive once an Activity has registered: with
+            // contexts remaining it calls instance.deinitialize(), which tears down the UI
+            // resources of the Activity that just started. requestForegroundStatic only posts
+            // the launch, so stopping afterwards was a race with the Activity's own startContext
+            // -- a fast launch lost its window, a slow one did not, and nothing in between said
+            // which had happened.
+            //
+            // Letting go first makes this deterministic: the service is the only context here
+            // (Display was not initialized, which is why it was started), so this is a clean
+            // teardown of a runtime nothing is using yet. The parked request is a static field
+            // and outlives it; the Activity boots its own runtime and drains the queue through
+            // registerIntents. Nothing needs the runtime in between -- the launch reads only the
+            // package manager.
             if (shouldStopContext) {
                 AndroidImplementation.stopContext(this);
+                shouldStopContext = false;
             }
+            AndroidIntentBridge.requestForegroundStatic();
             return;
         }
         try {
@@ -159,7 +174,14 @@ public class CN1IntentService extends IntentService {
         } catch (Throwable t) {
             Log.e(TAG, "Intent " + id + " failed", t);
         } finally {
-            if (shouldStopContext) {
+            // Not when an Activity has taken the runtime over. A headless handler may return a
+            // route, and the framework then brings the app forward and navigates before this
+            // runs -- so by here the Activity may hold the runtime this service started, and
+            // stopContext would reach its non-empty branch and deinitialize the UI it just
+            // built. Holding the claim instead leaves one stale entry in activeContexts, which
+            // costs a full deinitialize the app would otherwise get on its last context; that
+            // is the smaller harm by a wide margin, and the process is on its way out anyway.
+            if (shouldStopContext && AndroidImplementation.getActivity() == null) {
                 AndroidImplementation.stopContext(this);
             }
         }
@@ -220,7 +242,10 @@ public class CN1IntentService extends IntentService {
         } catch (Throwable t) {
             Log.e(TAG, "Could not start the runtime for a parked request", t);
         } finally {
-            if (shouldStopContext) {
+            // Same rule as run(): what registerIntents dispatched may have brought the app
+            // forward, and stopping this context with an Activity registered deinitializes the
+            // UI that Activity just built.
+            if (shouldStopContext && AndroidImplementation.getActivity() == null) {
                 AndroidImplementation.stopContext(this);
             }
         }
