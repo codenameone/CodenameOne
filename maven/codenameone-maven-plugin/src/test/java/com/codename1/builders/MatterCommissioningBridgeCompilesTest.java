@@ -90,7 +90,9 @@ public class MatterCommissioningBridgeCompilesTest {
         List<File> sources = new ArrayList<File>();
         sources.add(copied.toFile());
         sources.add(delegate);
-        collectJava(new File(STUBS), sources);
+        Path stubs = tmp.resolve("stubs");
+        copyStubs(new File(STUBS).toPath(), stubs);
+        collectJava(stubs.toFile(), sources);
         assertTrue(sources.size() > 10, "the stub tree must be there: " + STUBS);
 
         Path out = tmp.resolve("classes");
@@ -113,6 +115,25 @@ public class MatterCommissioningBridgeCompilesTest {
         }
         assertTrue(ok && errors.length() == 0,
                 "the injected Matter bridge does not compile:" + errors);
+    }
+
+    /// Copies the stub tree, renaming each `.javas` to the `.java` javac insists on.
+    private static void copyStubs(final Path from, final Path to) throws IOException {
+        Files.walkFileTree(from, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                    throws IOException {
+                if (!file.toString().endsWith(".javas")) {
+                    return FileVisitResult.CONTINUE;
+                }
+                String relative = from.relativize(file).toString();
+                Path target = to.resolve(
+                        relative.substring(0, relative.length() - "s".length()));
+                Files.createDirectories(target.getParent());
+                Files.copy(file, target);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private static void collectJava(File dir, final List<File> out) throws IOException {
