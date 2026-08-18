@@ -4067,6 +4067,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean pendingDelayedWindowRepaint;
 
         private void queueSizeChangeEvent(int w, int h, boolean revalidate, boolean forceRevalidate, boolean resetGraphics, boolean delayedWindowRepaint) {
+            if (windowId != 0) {
+                // This canvas is a secondary window's, and this path resizes the
+                // *main* surface: laying out a secondary frame would have resized the
+                // main form's hierarchy to the secondary canvas's dimensions. The
+                // guard is here rather than at the call sites because all three of
+                // them -- setBounds and both branches of ancestorResized -- are
+                // primary-canvas logic that a secondary canvas also runs, being the
+                // same class and the same listener.
+                //
+                // A secondary window reports its own size through
+                // JavaSEWindowManager's componentResized, which tags the event with
+                // the window id.
+                return;
+            }
             synchronized (pendingSizeChangeLock) {
                 pendingSizeChangeWidth = w;
                 pendingSizeChangeHeight = h;

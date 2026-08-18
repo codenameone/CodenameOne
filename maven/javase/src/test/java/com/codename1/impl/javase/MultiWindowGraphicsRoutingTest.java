@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -103,5 +104,40 @@ class MultiWindowGraphicsRoutingTest {
         Graphics2D imageGraphics = port.getGraphics(port.getNativeGraphics(mutable.getImage()));
         assertFalse(port.isScreenGraphics(imageGraphics),
                 "a mutable image's graphics must never be treated as a screen buffer");
+    }
+
+    @Test
+    void layingOutASecondaryCanvasDoesNotResizeTheMainSurface() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port);
+
+        // C.setBounds and both branches of ancestorResized are primary-canvas logic
+        // that a secondary canvas runs too, being the same class and the same
+        // listener. They funnel into queueSizeChangeEvent, which resizes the *main*
+        // surface -- so merely laying out a secondary frame resized the main form's
+        // hierarchy to the secondary canvas's dimensions.
+        JavaSEPort.C secondary = port.createWindowCanvas(7);
+
+        // Driven through the funnel rather than through setBounds. setBounds only
+        // reaches it when no skin is loaded, so a setBounds-based test passes with
+        // the guard removed and proves nothing -- which is exactly what the first
+        // version of this test did.
+        java.lang.reflect.Method queue = JavaSEPort.C.class.getDeclaredMethod(
+                "queueSizeChangeEvent", int.class, int.class,
+                boolean.class, boolean.class, boolean.class, boolean.class);
+        queue.setAccessible(true);
+        queue.invoke(secondary, 137, 91, false, false, false, false);
+
+        // The queued flag is cleared again once the queued runnable runs, so it is
+        // not a reliable probe from here. The recorded width is not cleared, so it
+        // still shows whether the main-surface resize was staged at all.
+        java.lang.reflect.Field width =
+                JavaSEPort.C.class.getDeclaredField("pendingSizeChangeWidth");
+        width.setAccessible(true);
+        // -1 is the field's initial value, i.e. nothing was ever staged.
+        assertEquals(-1, width.getInt(secondary),
+                "a secondary canvas must not stage a main-surface resize; its own size "
+                        + "is reported window-tagged through componentResized");
     }
 }
