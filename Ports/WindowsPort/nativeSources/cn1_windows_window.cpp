@@ -415,7 +415,9 @@ static int cn1WinMoveMask(WPARAM wParam) {
  * MI_WP_SIGNATURE 0xFF515700, with bit 0x80 distinguishing pen from touch). We
  * use it to flag the synthesized mouse event as a touch / pen so the
  * cross-platform PointerEvent type is correct on touch-enabled PCs. */
-static int cn1WinTouchFlag(void) {
+/* Shared with the desktop window proc so a touch or pen contact keeps its source
+ * inside a Window, rather than arriving classified as a mouse. */
+int cn1WinTouchFlag(void) {
     LONG_PTR extra = GetMessageExtraInfo();
     if ((extra & 0xFFFFFF00) == 0xFF515700) {
         return (extra & 0x80) ? CN1_PE_PEN_FLAG : CN1_PE_TOUCH_FLAG;

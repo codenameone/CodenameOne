@@ -272,6 +272,11 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
 /* Same, but tagged with the desktop window the event came from. */
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode);
 
+/* CN1_PE_TOUCH_FLAG / CN1_PE_PEN_FLAG for the message being handled, or 0 for a
+ * real mouse. Windows promotes touch and pen contacts to mouse messages and only
+ * distinguishes them through GetMessageExtraInfo. */
+int cn1WinTouchFlag(void);
+
 #ifdef WM_GESTURE
 /* Handles a WM_GESTURE for the given window, pushing pinch / rotate events tagged
  * with windowId (0 is the main window). Returns non-zero when the gesture was

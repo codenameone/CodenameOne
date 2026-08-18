@@ -942,6 +942,36 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aKeyReleaseArrivingOnAnotherWindowStillReachesThePressTarget() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Press on the main form, then have the *window* report the release. That is
+        // what a desktop window system does: key-up goes to whatever holds focus at
+        // the time, so it names the window the user moved to rather than the one the
+        // key went down in. Recording the press target is not enough on its own --
+        // it has to be where the release is delivered, not merely something the
+        // packet is checked against.
+        Display.getInstance().keyPressed(-93);
+        Display.getInstance().windowKeyReleased(w.getWindowId(), -93);
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertEquals(1, mainKeys.pressed);
+        assertEquals(1, mainKeys.released,
+                "the release belongs to the component that saw the press");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

@@ -66,7 +66,7 @@ typedef struct {
      * Windows port's pendingResize: GTK reports a resize on its own thread while
      * the event dispatch thread may be painting through g.cr, and freeing the
      * context or surface underneath it crashes or corrupts the frame. */
-    int pendingResize;
+    volatile int pendingResize;
     int pendingW;
     int pendingH;
     /* Held while GTK reads the surface to blit it, and while the drawing thread

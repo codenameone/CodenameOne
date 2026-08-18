@@ -257,27 +257,33 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
          * leaving its pressed component stuck down. */
         case WM_LBUTTONDOWN:
             SetCapture(hwnd);
-            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam, CN1_PE_MASK_PRIMARY);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam,
+                    CN1_PE_MASK_PRIMARY | cn1WinTouchFlag());
             return 0;
         case WM_LBUTTONUP:
             cn1WinDesktopReleaseCaptureIfIdle(wParam, MK_LBUTTON);
-            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam, CN1_PE_MASK_PRIMARY);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam,
+                    CN1_PE_MASK_PRIMARY | cn1WinTouchFlag());
             return 0;
         case WM_RBUTTONDOWN:
             SetCapture(hwnd);
-            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam, CN1_PE_MASK_SECONDARY);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam,
+                    CN1_PE_MASK_SECONDARY | cn1WinTouchFlag());
             return 0;
         case WM_RBUTTONUP:
             cn1WinDesktopReleaseCaptureIfIdle(wParam, MK_RBUTTON);
-            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam, CN1_PE_MASK_SECONDARY);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam,
+                    CN1_PE_MASK_SECONDARY | cn1WinTouchFlag());
             return 0;
         case WM_MBUTTONDOWN:
             SetCapture(hwnd);
-            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam, CN1_PE_MASK_MIDDLE);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam,
+                    CN1_PE_MASK_MIDDLE | cn1WinTouchFlag());
             return 0;
         case WM_MBUTTONUP:
             cn1WinDesktopReleaseCaptureIfIdle(wParam, MK_MBUTTON);
-            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam, CN1_PE_MASK_MIDDLE);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam,
+                    CN1_PE_MASK_MIDDLE | cn1WinTouchFlag());
             return 0;
         case WM_MOUSEMOVE:
             if ((wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON)) != 0) {
@@ -285,7 +291,8 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                 if (wParam & MK_LBUTTON) { mask |= CN1_PE_MASK_PRIMARY; }
                 if (wParam & MK_RBUTTON) { mask |= CN1_PE_MASK_SECONDARY; }
                 if (wParam & MK_MBUTTON) { mask |= CN1_PE_MASK_MIDDLE; }
-                cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_DRAGGED, lParam, mask);
+                cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_DRAGGED, lParam,
+                        mask | cn1WinTouchFlag());
             }
             return 0;
         case WM_MOUSEWHEEL:

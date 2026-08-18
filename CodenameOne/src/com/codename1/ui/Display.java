@@ -3170,7 +3170,19 @@ public final class Display extends CN1Constants {
                 int releasedKey = inputEventStackTmp[offset];
                 Container xf = takeKeyPressTarget(releasedKey);
                 offset++;
-                if (xf == f || multiKeyMode) { //NOPMD CompareObjectsWithEquals
+                if (xf != null) {
+                    // Delivered to the top level that saw the press, not to the one
+                    // the key-up packet names. A desktop window system sends key-up
+                    // to whatever is focused now, so releasing a key after focus has
+                    // moved reports the new window -- and matching on that dropped
+                    // the release, latching the pressed component in the old one.
+                    // For the single window case the two are the same top level, so
+                    // this is the behaviour that was always there.
+                    xf.keyReleased(releasedKey);
+                } else if (multiKeyMode) {
+                    // No record of the press: either it arrived before this window
+                    // existed or the tracking table was full. Multi key mode has
+                    // always delivered these anyway.
                     f.keyReleased(releasedKey);
                 }
                 break;

@@ -106,6 +106,22 @@ static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native wid
 static GtkWidget* cn1Fixed = 0;         /* GtkFixed overlay hosting positioned native peers */
 static GtkWidget* cn1AccessibilityFixed = 0; /* transparent GTK/ATK semantic hierarchy */
 static CN1Graphics cn1WindowG;          /* the on-screen / headless back buffer */
+/* Back-buffer replacement is deferred to the drawing thread. GTK reports a resize
+ * on its own thread, while the event dispatch thread paints through cn1WindowG.cr
+ * for the whole frame -- destroying the context or surface underneath it is a use
+ * after free, not merely a torn frame. cn1OnConfigure records the new size and
+ * flushGraphics applies it between frames, the same shape the secondary desktop
+ * windows and the Windows port use. */
+static volatile int cn1PendingResize;
+static int cn1PendingW;
+static int cn1PendingH;
+/* Held while GTK blits the surface and while the drawing thread swaps it: those
+ * are the two places one thread can destroy what the other is reading. */
+static pthread_mutex_t cn1BufferLock = PTHREAD_MUTEX_INITIALIZER;
+
+/* Applies a resize recorded by cn1OnConfigure. Must run on the drawing thread,
+ * between frames. */
+static void cn1ApplyPendingResize(void);
 static int cn1DisplayWidth = 800;
 static int cn1DisplayHeight = 600;
 static int cn1WindowOpen = 0;
@@ -215,15 +231,33 @@ static void cn1ResizeBackBuffer(int w, int h) {
     cairo_matrix_init_identity(&cn1WindowG.transform);
 }
 
+static void cn1ApplyPendingResize(void) {
+    if (!cn1PendingResize) {
+        return;
+    }
+    pthread_mutex_lock(&cn1BufferLock);
+    /* Re-checked under the lock: GTK can record another resize between the test
+     * above and here. */
+    if (cn1PendingResize) {
+        cn1ResizeBackBuffer(cn1PendingW, cn1PendingH);
+        cn1PendingResize = 0;
+    }
+    pthread_mutex_unlock(&cn1BufferLock);
+}
+
 /* ------------------------------------------------------ GTK callbacks */
 
 static gboolean cn1OnDraw(GtkWidget* widget, cairo_t* cr, gpointer data) {
     (void) widget;
     (void) data;
+    /* Locked so the drawing thread cannot swap the surface out from under this
+     * blit. */
+    pthread_mutex_lock(&cn1BufferLock);
     if (cn1WindowG.surface) {
         cairo_set_source_surface(cr, cn1WindowG.surface, 0, 0);
         cairo_paint(cr);
     }
+    pthread_mutex_unlock(&cn1BufferLock);
     return FALSE;
 }
 
@@ -233,7 +267,13 @@ static gboolean cn1OnConfigure(GtkWidget* widget, GdkEventConfigure* e, gpointer
     if (e->width != cn1DisplayWidth || e->height != cn1DisplayHeight) {
         cn1DisplayWidth = e->width;
         cn1DisplayHeight = e->height;
-        cn1ResizeBackBuffer(cn1DisplayWidth, cn1DisplayHeight);
+        /* Recorded, not applied: this is the GTK thread and the event dispatch
+         * thread may be part way through a frame on the current buffer. */
+        pthread_mutex_lock(&cn1BufferLock);
+        cn1PendingW = cn1DisplayWidth;
+        cn1PendingH = cn1DisplayHeight;
+        cn1PendingResize = 1;
+        pthread_mutex_unlock(&cn1BufferLock);
         cn1LinuxPushEvent(CN1_EVENT_SIZE_CHANGED, cn1DisplayWidth, cn1DisplayHeight, 0);
     }
     return FALSE;
@@ -726,6 +766,11 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_flushGraphics___long_int_int_int_
         r->x = x; r->y = y; r->w = width; r->h = height;
         gdk_threads_add_idle(cn1QueueDrawIdle, r);
     }
+    /* The frame is finished and the next has not started, which is the only point
+     * on this thread where replacing the buffer cannot pull it out from under a
+     * paint in progress. Cairo is immediate mode, so there is no frame-open hook
+     * to hang this on the way the Direct2D port does. */
+    cn1ApplyPendingResize();
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pollEvent___int_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {

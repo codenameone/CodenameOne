@@ -260,7 +260,8 @@ static void CN1MacWindowReportLayout(int windowId, int width, int height) {
     CN1MacWindowDeliverResize(windowId, width, height);
 }
 
-static int slotForScene(UIWindowScene* scene) {
+/* Assumes g_slotLock is held: the table it scans is mutated by both threads. */
+static int slotForSceneLocked(UIWindowScene* scene) {
     int iter;
     for (iter = 0; iter < CN1_MAC_MAX_WINDOWS; iter++) {
         if (g_macWindows[iter].inUse && g_macWindows[iter].scene == scene) {
@@ -433,9 +434,13 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
  * scene delegate, which is the only place a scene object becomes available.
  */
 BOOL CN1MacWindowAdoptScene(UIWindowScene* scene) {
-    if (g_pendingCount <= 0 || slotForScene(scene) >= 0) {
-        // Nothing is waiting, or this scene was already adopted: it belongs to the
-        // application's main form.
+    BOOL claimed;
+    pthread_mutex_lock(&g_slotLock);
+    // Nothing is waiting, or this scene was already adopted: it belongs to the
+    // application's main form.
+    claimed = g_pendingCount > 0 && slotForSceneLocked(scene) < 0;
+    pthread_mutex_unlock(&g_slotLock);
+    if (!claimed) {
         return NO;
     }
     CN1MacWindowSceneConnected(scene);
@@ -447,8 +452,14 @@ BOOL CN1MacWindowAdoptScene(UIWindowScene* scene) {
  * scene delegate route activation and disconnection without knowing about slots.
  */
 int CN1MacWindowIdForScene(UIWindowScene* scene) {
-    int slot = slotForScene(scene);
-    return slot < 0 ? -1 : g_macWindows[slot].windowId;
+    int windowId;
+    pthread_mutex_lock(&g_slotLock);
+    {
+        int slot = slotForSceneLocked(scene);
+        windowId = slot < 0 ? -1 : g_macWindows[slot].windowId;
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    return windowId;
 }
 
 /*
@@ -462,16 +473,32 @@ int CN1MacWindowIdForScene(UIWindowScene* scene) {
  * a request and is vetoable.
  */
 void CN1MacWindowSceneDisconnected(UIWindowScene* scene) {
-    int slot = slotForScene(scene);
-    if (slot < 0) {
-        return;
-    }
+    /* Locked against CN1MacWindowDestroy, which snapshots this same slot and
+     * clears it. Unsynchronized, the two interleaved badly in both directions:
+     * teardown could snapshot w->scene after this released it but before it was
+     * nilled, and then message or release a deallocated scene, or this could read
+     * w->windowId after teardown had zeroed the slot and report the close under a
+     * window id that no longer meant anything. */
+    UIWindowScene* dead = nil;
+    int windowId = -1;
+    pthread_mutex_lock(&g_slotLock);
     {
-        CN1MacWindow* w = &g_macWindows[slot];
-        /* The scene is gone, so it must not be recycled or presented into. */
-        [w->scene release];
-        w->scene = nil;
-        CN1MacWindowDeliverClosed(w->windowId);
+        int slot = slotForSceneLocked(scene);
+        if (slot >= 0) {
+            CN1MacWindow* w = &g_macWindows[slot];
+            /* The scene is gone, so it must not be recycled or presented into. */
+            dead = w->scene;
+            w->scene = nil;
+            windowId = w->windowId;
+        }
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    /* Both outside the lock: -release can run arbitrary teardown, and delivering
+     * the close re-enters Codename One, which must never happen while holding a
+     * lock the event dispatch thread can be waiting on. */
+    [dead release];
+    if (windowId >= 0) {
+        CN1MacWindowDeliverClosed(windowId);
     }
 }
 
