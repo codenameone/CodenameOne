@@ -726,7 +726,9 @@ public final class Intents {
         public String invoke(String argumentsJson) throws Exception {
             Map<String, Object> args = null;
             if (argumentsJson != null && argumentsJson.length() > 0) {
-                args = com.codename1.io.JSONParser.parseJSON(argumentsJson);
+                // Through the shared parser: a model writing a large id must not have it
+                // rounded into a different, still-plausible number.
+                args = IntentSerializer.parsePayload(argumentsJson);
             }
             ToolCompletion done = new ToolCompletion();
             dispatchInvocation(declaration.getId(), args, IntentSource.MODEL, false, done);

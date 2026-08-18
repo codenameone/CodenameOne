@@ -107,7 +107,7 @@ final class CN1IntentJson {
             return null;
         }
         try {
-            return JSONParser.parseJSON(json);
+            return com.codename1.intents.IntentSerializer.parsePayload(json);
         } catch (Throwable t) {
             Log.w(TAG, "Could not read an index document", t);
             return null;

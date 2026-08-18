@@ -22,11 +22,15 @@
  */
 package com.codename1.intents;
 
+import com.codename1.io.JSONParser;
 import com.codename1.io.JSONWriter;
 import com.codename1.io.Log;
 import com.codename1.surfaces.SurfaceSerializer;
 import com.codename1.ui.EncodedImage;
 import com.codename1.util.Base64;
+
+import java.io.IOException;
+import java.io.StringReader;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -147,7 +151,7 @@ public final class IntentSerializer {
         }
         if (paramsJson != null && paramsJson.length() > 0) {
             try {
-                Map<String, Object> supplied = com.codename1.io.JSONParser.parseJSON(paramsJson);
+                Map<String, Object> supplied = parsePayload(paramsJson);
                 if (supplied != null) {
                     out.putAll(supplied);
                 }
@@ -313,6 +317,29 @@ public final class IntentSerializer {
     /// `instanceof` test. On iOS a failed cast does not throw, so a
     /// `catch (ClassCastException)` here would be dead code guarding a native
     /// crash.
+    /// Parses an intent payload, keeping whole numbers as `Long`.
+    ///
+    /// The convenience `JSONParser.parseJSON` defaults to materialising every number as a
+    /// `Double`, which silently rounds anything past 2^53: an id of 9007199254740993 arrives as
+    /// ...992, still integral, so every downstream check accepts it and the handler acts on a
+    /// number the caller never sent. Ids of that size are ordinary -- snowflake ids, database
+    /// keys -- and the corruption is invisible at every layer.
+    ///
+    /// Every path that reads an intent payload goes through this, in core and in the ports, so
+    /// the guarantee does not depend on remembering it at six call sites.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the document; null or empty yields null
+    public static Map<String, Object> parsePayload(String json) throws IOException {
+        if (json == null || json.length() == 0) {
+            return null;
+        }
+        JSONParser parser = new JSONParser();
+        parser.setUseLongsInstance(true);
+        return parser.parseJSON(new StringReader(json));
+    }
+
     private static Object toWire(Object value) {
         if (value == null) {
             return null;

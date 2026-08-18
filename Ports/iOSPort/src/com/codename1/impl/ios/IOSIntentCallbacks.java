@@ -187,7 +187,7 @@ final class IOSIntentCallbacks {
             return null;
         }
         try {
-            return JSONParser.parseJSON(json);
+            return IntentSerializer.parsePayload(json);
         } catch (Throwable t) {
             Log.e(t);
             return null;

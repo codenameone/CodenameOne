@@ -738,6 +738,21 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// The title names the action everywhere a person sees it -- the Shortcuts app, the iOS
+    /// LocalizedStringResource, the Android label resource -- so blank produces an unnamed
+    /// action or metadata the platform rejects, neither of which points back at the declaration.
+    @Test
+    public void aBlankTitleIsRejected() throws Exception {
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"\")\n"
+                        + "public static void log() { }\n")),
+                "blank title");
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"   \")\n"
+                        + "public static void log() { }\n")),
+                "blank title");
+    }
+
     /// A boxed primitive looks nullable and is not: the wire format cannot say "absent" for a
     /// number, so an omitted value becomes the type's zero, which the handler cannot tell from
     /// a supplied one.

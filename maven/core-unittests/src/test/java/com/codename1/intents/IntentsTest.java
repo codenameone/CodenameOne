@@ -1089,6 +1089,20 @@ class IntentsTest {
         assertEquals("shop:42", ok.getId());
     }
 
+    /// The convenience parser materialises every number as a Double, which rounds anything past
+    /// 2^53 into a different, still-integral number -- so every downstream check accepts it and
+    /// the handler acts on an id the caller never sent. Snowflake ids and database keys are
+    /// routinely that large, and nothing about the corruption is visible at any layer.
+    @Test
+    void aLargeIntegerSurvivesTheWireIntact() throws Exception {
+        Map<String, Object> parsed = IntentSerializer.parsePayload("{\"id\": 9007199254740993}");
+
+        assertNotNull(parsed);
+        Object v = parsed.get("id");
+        assertTrue(v instanceof Long, "a whole number has to stay whole, got " + v.getClass());
+        assertEquals(9007199254740993L, ((Long) v).longValue());
+    }
+
     /// The constructor rejects a colon in the type; these paths take a type without ever
     /// building an entity, so they never reached that check. removeFromIndex("shop:order","42")
     /// composes the uid "shop:order:42" -- exactly what new AppEntity("shop","order:42")

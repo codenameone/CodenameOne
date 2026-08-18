@@ -361,6 +361,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         def.methodName = m.getName();
         def.returnsResult = returnsResult;
         def.title = ann.getStringOrDefault("title", id);
+        if (def.title.trim().length() == 0) {
+            // The title is the only thing a person ever sees for this capability: it names the
+            // action in the Shortcuts app, becomes the iOS LocalizedStringResource, and is the
+            // Android shortcut's label resource. Blank produces an unnamed action, or metadata
+            // the platform rejects -- neither of which points back here.
+            ctx.error(cls, "@AppIntent " + def.where + " has a blank title. It is what names "
+                    + "this action everywhere the user sees it, so it needs visible text.");
+            return;
+        }
         def.description = ann.getStringOrDefault("description", "");
         def.headless = ann.getBoolOrDefault("headless", false);
         def.discoverable = ann.getBoolOrDefault("discoverable", true);

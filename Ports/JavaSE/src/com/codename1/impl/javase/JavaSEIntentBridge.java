@@ -227,7 +227,7 @@ public class JavaSEIntentBridge implements IntentBridge {
             return null;
         }
         try {
-            return new JSONParser().parseJSON(new java.io.StringReader(json));
+            return com.codename1.intents.IntentSerializer.parsePayload(json);
         } catch (Throwable t) {
             return null;
         }
