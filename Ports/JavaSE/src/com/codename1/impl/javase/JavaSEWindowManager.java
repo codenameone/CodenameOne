@@ -135,6 +135,13 @@ public class JavaSEWindowManager extends WindowManager {
         /// elevation a modal window gets so releasing modality cannot clear it.
         boolean explicitAlwaysOnTop;
         boolean modalElevated;
+        /// The requested minimum, in the device pixels Codename One lays out in. AWT
+        /// wants logical units, and the two differ by the backing scale of whatever
+        /// monitor the window is on -- which changes when the user drags it to another
+        /// display -- so the request is kept in its original units and re-converted
+        /// rather than converted once at the point of the call.
+        int minWidth;
+        int minHeight;
 
         /**
          * The frame operations that only exist on a top level window. An owned window
@@ -252,6 +259,10 @@ public class JavaSEWindowManager extends WindowManager {
                         int now = monitorIndexOf(p);
                         if (now != p.monitorIndex) {
                             p.monitorIndex = now;
+                            // The minimum is held in Codename One pixels, so the AWT
+                            // constraint means something different on a display with
+                            // another backing scale and has to be re-converted.
+                            applyMinimumSize(p);
                             Display.getInstance().windowMonitorChanged(windowId);
                         }
                     }
@@ -406,20 +417,46 @@ public class JavaSEWindowManager extends WindowManager {
     }
 
     @Override
-    public void setMinimumSize(Object peerObj, final int width, final int height) {
-        final Peer p = peer(peerObj);
+    public void setMinimumSize(Object peerObj, int width, int height) {
+        Peer p = peer(peerObj);
         if (p != null) {
-            runOnAwt(new Runnable() {
-                @Override
-                public void run() {
-                    if (width > 0 && height > 0) {
-                        p.frame.setMinimumSize(new Dimension(width, height));
-                    } else {
-                        p.frame.setMinimumSize(null);
-                    }
-                }
-            });
+            p.minWidth = width;
+            p.minHeight = height;
+            applyMinimumSize(p);
         }
+    }
+
+    /**
+     * Pushes the stored minimum to AWT in AWT's own units.
+     *
+     * The SPI supplies the minimum in the device pixels Codename One lays out in,
+     * while {@code java.awt.Window.setMinimumSize} takes logical units -- the same
+     * distinction {@link #scaled} applies in the other direction when reporting a
+     * window's size. Handing the device value straight to AWT made a requested 320
+     * pixel minimum a 640 device pixel floor on a 2x display, and the meaning changed
+     * again whenever the window was dragged to a monitor with a different scale, so
+     * this is re-applied on a monitor change rather than converted once.
+     */
+    private void applyMinimumSize(final Peer p) {
+        final int w = p.minWidth;
+        final int h = p.minHeight;
+        if (p.frame == null) {
+            return;
+        }
+        final double scale = getMonitorScale(monitorIndexOf(p));
+        runOnAwt(new Runnable() {
+            @Override
+            public void run() {
+                if (w > 0 && h > 0) {
+                    double s = scale > 0 ? scale : 1.0;
+                    p.frame.setMinimumSize(new Dimension(
+                            Math.max(1, (int) Math.round(w / s)),
+                            Math.max(1, (int) Math.round(h / s))));
+                } else {
+                    p.frame.setMinimumSize(null);
+                }
+            }
+        });
     }
 
     @Override

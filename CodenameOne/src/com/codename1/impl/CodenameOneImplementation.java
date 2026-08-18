@@ -3117,6 +3117,80 @@ public abstract class CodenameOneImplementation {
     private int currentPointerModifiers;
     private boolean currentPointerHovering;
 
+    /// Ring of pointer metadata snapshots, one per queued pointer packet.
+    ///
+    /// The metadata a port reports is a single mutable record, but a port queues pointer
+    /// events off the event dispatch thread and the `PointerEvent` is not built until
+    /// the event is dispatched. A port that drains a burst -- the Win32 pump translates
+    /// queued messages before returning, and the GTK drain does the same -- therefore
+    /// overwrote the record several times before any of those events were dispatched,
+    /// and every one of them came out carrying the *last* packet's button and device
+    /// type. A secondary window's right click or pen event read as a left mouse click,
+    /// which is enough to lose a context menu or a stylus callback.
+    ///
+    /// A snapshot is taken when the packet is queued and restored when it is
+    /// dispatched, so each event keeps the metadata that arrived with it. Sized well
+    /// past the number of pointer packets the input stack can hold, so a slot cannot be
+    /// recycled while its packet is still queued.
+    private static final int POINTER_METADATA_SLOTS = 512;
+    private final int[] pointerMetadataInts =
+            new int[POINTER_METADATA_SLOTS * 4];
+    private final float[] pointerMetadataFloats =
+            new float[POINTER_METADATA_SLOTS * 4];
+    private final boolean[] pointerMetadataHovering =
+            new boolean[POINTER_METADATA_SLOTS];
+    private int pointerMetadataNext;
+
+    /// Snapshots the current pointer metadata and returns the slot holding it.
+    ///
+    /// #### Returns
+    ///
+    /// the slot to hand back to `#selectPointerEventMetadata(int)` when the matching
+    /// packet is dispatched
+    public int capturePointerEventMetadata() {
+        int slot;
+        synchronized (pointerMetadataHovering) {
+            slot = pointerMetadataNext;
+            pointerMetadataNext = (pointerMetadataNext + 1) % POINTER_METADATA_SLOTS;
+        }
+        int i = slot * 4;
+        pointerMetadataInts[i] = currentPointerButton;
+        pointerMetadataInts[i + 1] = currentPointerButtonMask;
+        pointerMetadataInts[i + 2] = currentPointerType;
+        pointerMetadataInts[i + 3] = currentPointerModifiers;
+        int f = slot * 4;
+        pointerMetadataFloats[f] = currentPointerPressure;
+        pointerMetadataFloats[f + 1] = currentPointerTiltX;
+        pointerMetadataFloats[f + 2] = currentPointerTiltY;
+        pointerMetadataFloats[f + 3] = currentPointerContactSize;
+        pointerMetadataHovering[slot] = currentPointerHovering;
+        return slot;
+    }
+
+    /// Restores the metadata snapshotted into the given slot, so the event about to be
+    /// dispatched builds its `PointerEvent` from the values that arrived with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: a slot from `#capturePointerEventMetadata()`, or a negative value to
+    ///   leave the current metadata alone
+    public void selectPointerEventMetadata(int slot) {
+        if (slot < 0 || slot >= POINTER_METADATA_SLOTS) {
+            return;
+        }
+        int i = slot * 4;
+        currentPointerButton = pointerMetadataInts[i];
+        currentPointerButtonMask = pointerMetadataInts[i + 1];
+        currentPointerType = pointerMetadataInts[i + 2];
+        currentPointerModifiers = pointerMetadataInts[i + 3];
+        int f = slot * 4;
+        currentPointerPressure = pointerMetadataFloats[f];
+        currentPointerTiltX = pointerMetadataFloats[f + 1];
+        currentPointerTiltY = pointerMetadataFloats[f + 2];
+        currentPointerContactSize = pointerMetadataFloats[f + 3];
+        currentPointerHovering = pointerMetadataHovering[slot];
+    }
+
     /// Resets the rich pointer metadata back to its defaults. Ports may call this between
     /// gestures so stale button or pressure values do not leak into unrelated events.
     public void resetPointerEventMetadata() {

@@ -283,6 +283,14 @@ public final class Display extends CN1Constants {
     /// where we only synchronize on the very minimal point of switching between the stacks
     /// and adding to the active stack.
     private int[] inputEventStack = new int[1000];
+    /// Pointer metadata slot per queued packet, indexed by the packet's type-word
+    /// offset in `inputEventStack`. Kept beside the stack rather than inside the packet
+    /// so the packet layout -- and every offset computation and `skipEvent` count that
+    /// depends on it -- is unchanged. A slot is only written when a pointer packet is
+    /// queued and only read for a pointer type at that same offset, so it is always the
+    /// slot belonging to the packet being dispatched.
+    private int[] pointerMetaStack = new int[1000];
+    private int[] pointerMetaStackTmp = new int[1000];
     private int inputEventStackPointer;
     private int[] inputEventStackTmp = new int[1000];
     private int inputEventStackPointerTmp;
@@ -1383,14 +1391,22 @@ public final class Display extends CN1Constants {
             lastDragOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
+            // The metadata slots are addressed by offset into the stack being
+            // dispatched, so they have to change hands with it; leaving them behind
+            // would have every packet read the slot of whatever packet last occupied
+            // that offset in the other buffer.
+            int[] qtMeta = pointerMetaStackTmp;
+            pointerMetaStackTmp = pointerMetaStack;
 
             // We have a special flag here for a case where the input event stack might still be processing this can
             // happen if an event callback calls something like invokeAndBlock while processing and might reach
             // this code again
             if (qt[qt.length - 1] == Integer.MAX_VALUE) {
                 inputEventStack = new int[qt.length];
+                pointerMetaStack = new int[qt.length];
             } else {
                 inputEventStack = qt;
+                pointerMetaStack = qtMeta;
                 qt[qt.length - 1] = 0;
             }
         }
@@ -1400,10 +1416,13 @@ public final class Display extends CN1Constants {
         int actualTmpPointer = inputEventStackPointerTmp;
         inputEventStackPointerTmp = 0;
         int[] actualStack = inputEventStackTmp;
+        // Copied to the stack for the same reason as the event stack itself: a nested
+        // invokeAndBlock can swap the field while this loop is still dispatching.
+        int[] actualMeta = pointerMetaStackTmp;
         int offset = 0;
         actualStack[actualStack.length - 1] = Integer.MAX_VALUE;
         while (offset < actualTmpPointer) {
-            offset = handleEvent(offset, actualStack);
+            offset = handleEvent(offset, actualStack, actualMeta);
         }
 
         actualStack[actualStack.length - 1] = 0;
@@ -2471,6 +2490,7 @@ public final class Display extends CN1Constants {
             if (!hasInputEventStackCapacity(3)) {
                 return;
             }
+            pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = x;
@@ -2489,6 +2509,7 @@ public final class Display extends CN1Constants {
             if (!hasInputEventStackCapacity(3 + x.length + y.length)) {
                 return;
             }
+            pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = x.length;
@@ -2514,6 +2535,10 @@ public final class Display extends CN1Constants {
             }
             try {
                 if (lastDragOffset > -1 && lastDragWindowId == windowId) {
+                    // A coalesced drag replaces the queued one, so it must also carry
+                    // the newest metadata rather than the metadata of the drag it
+                    // just overwrote. The type word sits one slot before the payload.
+                    pointerMetaStack[lastDragOffset - 1] = impl.capturePointerEventMetadata();
                     inputEventStack[lastDragOffset] = x;
                     inputEventStack[lastDragOffset + 1] = y;
                     inputEventStack[lastDragOffset + 2] = (int) (System.currentTimeMillis() - displayInitTime);
@@ -2521,6 +2546,7 @@ public final class Display extends CN1Constants {
                     if (!hasInputEventStackCapacity(4)) {
                         return;
                     }
+                    pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
                     inputEventStack[inputEventStackPointer] = POINTER_DRAGGED | (windowId << 8);
                     inputEventStackPointer++;
                     lastDragOffset = inputEventStackPointer;
@@ -2549,6 +2575,7 @@ public final class Display extends CN1Constants {
                 if (!hasInputEventStackCapacity(4)) {
                     return;
                 }
+                pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
                 inputEventStack[inputEventStackPointer] = type;
                 inputEventStackPointer++;
                 inputEventStack[inputEventStackPointer] = x;
@@ -3043,6 +3070,25 @@ public final class Display extends CN1Constants {
     /// window system, and dropping those left the hierarchy at stale dimensions once
     /// the modal closed -- painting and hit testing then disagreed with the native
     /// canvas until something else forced a resize.
+    /// True for the event types that carry rich pointer metadata, i.e. the ones whose
+    /// dispatch builds a `com.codename1.ui.events.PointerEvent`.
+    private static boolean isPointerEvent(int type) {
+        switch (type) {
+            case POINTER_PRESSED:
+            case POINTER_RELEASED:
+            case POINTER_DRAGGED:
+            case POINTER_PRESSED_MULTI:
+            case POINTER_RELEASED_MULTI:
+            case POINTER_DRAGGED_MULTI:
+            case POINTER_HOVER:
+            case POINTER_HOVER_PRESSED:
+            case POINTER_HOVER_RELEASED:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static boolean isUserInputEvent(int type) {
         switch (type) {
             case POINTER_PRESSED:
@@ -3578,13 +3624,22 @@ public final class Display extends CN1Constants {
     }
 
     /// Invoked on the EDT to propagate the event
-    private int handleEvent(int offset, int[] inputEventStackTmp) {
+    private int handleEvent(int offset, int[] inputEventStackTmp, int[] pointerMetaTmp) {
         // The window id is packed into the high bits of the type word. Window 0 is
         // the main surface, and for it the packed word is numerically identical to
         // what it always was, so the main path is unchanged.
         int packed = inputEventStackTmp[offset];
         int type = packed & 0xFF;
         int windowId = packed >>> 8;
+
+        // Restore the metadata that arrived with this packet. The port reports it into
+        // a single mutable record, and a port that drains a burst of pointer messages
+        // overwrites that record several times before any of them is dispatched -- so
+        // without this every event in the burst would build its PointerEvent from the
+        // last packet's button and device type.
+        if (isPointerEvent(type) && offset < pointerMetaTmp.length) {
+            impl.selectPointerEventMetadata(pointerMetaTmp[offset]);
+        }
 
         Container f;
         if (windowId == 0) {
@@ -3870,7 +3925,7 @@ public final class Display extends CN1Constants {
     /// Consumes one event's payload without dispatching it, so that a packet aimed at
     /// a window that has gone away does not desynchronise the rest of the batch.
     ///
-    /// The lengths here mirror the switch in `#handleEvent(int, int[])` exactly; the
+    /// The lengths here mirror the switch in `#handleEvent(int, int[], int[])` exactly; the
     /// multi touch forms are self describing, each array being a length followed by
     /// that many values.
     ///

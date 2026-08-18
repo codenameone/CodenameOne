@@ -102,4 +102,50 @@ class PointerMetadataTest extends UITestBase {
     void getCurrentPointerEventNeverNull() {
         assertNotNull(display.getCurrentPointerEvent());
     }
+
+    @Test
+    void eachQueuedPointerEventKeepsTheMetadataThatArrivedWithIt() {
+        // A port reports pointer metadata into a single mutable record immediately
+        // before queueing the event, but the PointerEvent is not built until the event
+        // is dispatched. A port that drains a burst -- the Win32 pump translates queued
+        // messages before returning, and the GTK drain does the same -- therefore
+        // overwrote that record several times before any of the burst was dispatched,
+        // and every event came out carrying the *last* one's button and device type.
+        // A secondary window's right click or pen event read as a left mouse click,
+        // which loses a context menu or a stylus callback.
+        Form f = new Form("burst");
+        final java.util.List<Integer> buttons = new java.util.ArrayList<Integer>();
+        final java.util.List<Integer> types = new java.util.ArrayList<Integer>();
+        f.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                buttons.add(Integer.valueOf(display.getPointerButton()));
+                types.add(Integer.valueOf(display.getPointerType()));
+            }
+        });
+        f.show();
+        flushSerialCalls();
+
+        // Two presses queued back to back, exactly as a drained burst arrives, with no
+        // dispatch in between.
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_SECONDARY,
+                PointerEvent.MASK_SECONDARY, PointerEvent.TYPE_STYLUS, 0.5f, 0, 0, 0, 0, false);
+        display.pointerPressed(new int[]{10}, new int[]{10});
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY,
+                PointerEvent.MASK_PRIMARY, PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+        display.pointerPressed(new int[]{20}, new int[]{20});
+
+        flushSerialCalls();
+
+        assertEquals(2, buttons.size(), "both queued presses should have dispatched");
+        assertEquals(PointerEvent.BUTTON_SECONDARY, buttons.get(0).intValue(),
+                "the first press must keep its own button; taking the record as it "
+                        + "stands at dispatch time gives it the second press's");
+        assertEquals(PointerEvent.TYPE_STYLUS, types.get(0).intValue(),
+                "and its own device type");
+        assertEquals(PointerEvent.BUTTON_PRIMARY, buttons.get(1).intValue());
+        assertEquals(PointerEvent.TYPE_MOUSE, types.get(1).intValue());
+
+        implementation.resetPointerEventMetadata();
+    }
 }

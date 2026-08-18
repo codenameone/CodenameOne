@@ -44,6 +44,11 @@
 #include <gtk/gtk.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdlib.h>
+
+/* Defined in cn1_linux_window.c beside the main window's capture, which reads
+ * the same kind of cairo surface. */
+int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outData, int* outLen);
 
 typedef struct {
     GtkWidget* window;
@@ -912,6 +917,44 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_desktopWindowGraphics___int_R_lon
     return (JAVA_LONG) (intptr_t) cn1LinuxDesktopGraphics(slot);
 }
 
+/* Reads a desktop window's own back buffer back as PNG bytes.
+ *
+ * Window.capture() falls back to re-rendering the component tree when a port
+ * cannot read its window back, which produces the content the window *should*
+ * be showing rather than the pixels it actually has -- so the windowed
+ * screenshot goldens could not tell a correct window from one whose raster and
+ * hierarchy disagree. This is the real readback.
+ *
+ * Taken under bufferLock for the same reason the GTK draw handler holds it: the
+ * drawing thread swaps the surface on a resize, and reading one that is being
+ * destroyed underneath is a use-after-free. Pending resizes are applied first
+ * through cn1LinuxDesktopGraphics so the capture is the size the window
+ * currently is, not the size it was before the last configure. */
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_captureDesktopWindowToPngBytes___int_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT slot) {
+    CN1LinuxWindow* w;
+    unsigned char* data = 0;
+    int len = 0;
+    int ok = 0;
+    JAVA_OBJECT arr;
+    cn1LinuxDesktopGraphics(slot);
+    w = slotAt(slot);
+    if (w == 0) {
+        return JAVA_NULL;
+    }
+    pthread_mutex_lock(&w->bufferLock);
+    if (w->g.surface != 0) {
+        ok = cn1LinuxSurfaceToPng(w->g.surface, &data, &len);
+    }
+    pthread_mutex_unlock(&w->bufferLock);
+    if (!ok) {
+        return JAVA_NULL;
+    }
+    arr = cn1LinuxNewByteArray(threadStateData, data, len);
+    free(data);
+    return arr;
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowFlush___int_int_int_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot, JAVA_INT x, JAVA_INT y,
         JAVA_INT width, JAVA_INT height) {
@@ -1133,6 +1176,7 @@ static void cn1MonitorDpiOnMain(void* arg) {
     GdkMonitor* mon;
     GdkRectangle r;
     int widthMm;
+    int scale;
     op->result = 96;
     if (display == 0) {
         return;
@@ -1143,10 +1187,20 @@ static void cn1MonitorDpiOnMain(void* arg) {
     }
     gdk_monitor_get_geometry(mon, &r);
     widthMm = gdk_monitor_get_width_mm(mon);
+    /* gdk_monitor_get_geometry reports application (logical) pixels while the
+     * physical width is millimetres of glass, so dividing one by the other on a
+     * scaled monitor understates the density by exactly the scale factor -- a 2x
+     * HiDPI panel came out at roughly half its real DPI, which is enough to have
+     * Monitor.getDotsPerInch() lie and getMonitorDensity() classify it as a low
+     * density display. */
+    scale = gdk_monitor_get_scale_factor(mon);
+    if (scale < 1) {
+        scale = 1;
+    }
     if (widthMm <= 0 || r.width <= 0) {
         return;
     }
-    op->result = (int) ((r.width * 25.4) / widthMm + 0.5);
+    op->result = (int) ((r.width * (double) scale * 25.4) / widthMm + 0.5);
 }
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_monitorDpi___int_R_int(
