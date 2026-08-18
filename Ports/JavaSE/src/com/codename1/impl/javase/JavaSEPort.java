@@ -17318,15 +17318,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void deleteDB(String databaseName) throws IOException {
         File f = getDatabaseFile(databaseName);
-        if (f.exists()) {
-            if (!f.delete()) {
-                throw new IOException("Failed to delete database file "+f+".  It may be in use.  Make sure to close the database connection before deleting the database.");
-            }
-            
-        }
-        // The companions too, for the reason databaseSidecarPaths gives: a crash leaves rows in
-        // them, and deleting the file alone leaves that data on disk under a name nobody looks
-        // at. One that was never created is nothing to do.
+        // The companions first, so removing the database itself is the last destructive step: a
+        // failure before it leaves a database the caller can really delete again, rather than an
+        // error reported over a database that is already gone. See databaseSidecarPaths.
+        // A crash leaves rows in them, and deleting the database alone leaves that data on disk
+        // under a name nobody looks at. One that was never created is nothing to do.
         String[] sidecars = databaseSidecarPaths(f.getAbsolutePath());
         for (int iter = 0; iter < sidecars.length; iter++) {
             File sidecar = new File(sidecars[iter]);
@@ -17334,6 +17330,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 throw new IOException("Failed to delete " + sidecar + ", which holds part of the "
                         + "database. It may be in use; close the database connection first.");
             }
+        }
+        if (f.exists()) {
+            if (!f.delete()) {
+                throw new IOException("Failed to delete database file "+f+".  It may be in use.  Make sure to close the database connection before deleting the database.");
+            }
+            
         }
     }
     

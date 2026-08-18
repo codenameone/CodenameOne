@@ -6960,22 +6960,28 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
         return false;
       }
       if (cn1SqlitePool) {
-        cn1SqlitePool.unlink(cn1SqliteDbPath(n));
-        // The rollback journal as well. The pool holds it as a separate entry, so unlinking the
-        // database alone left a file holding the pages of an interrupted transaction, under a
-        // name reopening the database reads back. (This VFS has no shared memory and so no WAL,
-        // but the whole set is unlinked anyway: it costs nothing when the entry is absent, and
-        // it does not have to be revisited if that ever changes.)
-        // Unwrapped, like the unlink above it. The pool answers a name it never had by returning
-        // false, so the entries this database never created cost nothing and raise nothing; it
-        // throws only when it held the entry and could not release it, and that has to reach the
-        // guard. Swallowing it would report a deletion that did not happen while a file holding
-        // database pages stayed in the pool, which is the whole of what deleting the working
-        // files is for.
+        // The rollback journal first, and the database itself last. The pool holds each as its own
+        // entry, so unlinking the database alone left a file holding the pages of an interrupted
+        // transaction, under a name reopening the database reads back. (This VFS has no shared
+        // memory and so no WAL, but the whole set is unlinked anyway: it costs nothing when the
+        // entry is absent, and it does not have to be revisited if that ever changes.)
+        //
+        // Order matters as much as the set does. Removing the database first and then failing on a
+        // companion reported a failure over a database that was already gone -- the caller is told
+        // to retry what cannot be retried, and reads the error as its data being intact. With the
+        // database last, anything that throws before it leaves a database that really can be
+        // deleted again.
+        //
+        // Unwrapped, all of them. The pool answers a name it never had by returning false, so the
+        // entries this database never created cost nothing and raise nothing; it throws only when
+        // it held the entry and could not release it, and that has to reach the guard. Swallowing
+        // it would report a deletion that did not happen while a file holding database pages
+        // stayed in the pool, which is the whole of what deleting the working files is for.
         const cn1SqliteSidecars = ["-journal", "-wal", "-shm"];
         for (let i = 0; i < cn1SqliteSidecars.length; i++) {
           cn1SqlitePool.unlink(cn1SqliteDbPath(n) + cn1SqliteSidecars[i]);
         }
+        cn1SqlitePool.unlink(cn1SqliteDbPath(n));
       } else {
         const anchor = cn1SqliteMemoryAnchors.get(cn1SqliteDbPath(n));
         if (anchor) {

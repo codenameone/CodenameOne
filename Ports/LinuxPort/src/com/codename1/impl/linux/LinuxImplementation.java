@@ -3328,13 +3328,15 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public void deleteDB(String databaseName) throws java.io.IOException {
         String path = resolveDatabasePath(databaseName);
-        LinuxNative.sqlDbDelete(path);
-        // The companions too, for the reason databaseSidecarPaths gives. A name that is not there
-        // is the documented no-op in the native binding.
+        // The companions first, so removing the database itself is the last destructive step: a
+        // failure before it leaves a database the caller can really delete again, rather than an
+        // error reported over a database that is already gone. See databaseSidecarPaths.
+        // A name that is not there is the documented no-op in the native binding.
         String[] sidecars = databaseSidecarPaths(path);
         for (int iter = 0; iter < sidecars.length; iter++) {
             LinuxNative.sqlDbDelete(sidecars[iter]);
         }
+        LinuxNative.sqlDbDelete(path);
     }
 
     @Override

@@ -9785,6 +9785,15 @@ public abstract class CodenameOneImplementation {
     /// Listed here rather than in each port so that every one of them deletes the same set. The
     /// deletion itself stays with the port, because only it knows how to remove a file.
     ///
+    /// **Delete these before the database, not after.** Removing the database first and then
+    /// failing on a companion reports a failure over a database that is already gone: the caller
+    /// is told to retry something that cannot be retried, and reasonably reads the error as its
+    /// data being intact. Taking the companions first makes the database file the last
+    /// destructive step, so any failure before it leaves a database the caller really can delete
+    /// again. It also keeps the invariant that matters on the next open, since a journal that
+    /// outlives its database is read as a hot one against whatever is created under that name
+    /// next.
+    ///
     /// #### Parameters
     ///
     /// - `databasePathOrName`: what the port would delete for the database itself
