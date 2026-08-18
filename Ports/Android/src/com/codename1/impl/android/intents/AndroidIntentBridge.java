@@ -575,6 +575,19 @@ public class AndroidIntentBridge implements IntentBridge {
             // leaving the parameterless static shortcut in place. For an intent with optional
             // parameters that meant the tap ran the declared defaults instead of the values
             // the user had actually chosen, which is the whole content of a donation.
+            // The same capacity question indexing asks. pushDynamicShortcut evicts the least
+            // recently used dynamic shortcut once the cap is reached, and with the quota full
+            // of manifest shortcuts and ones the application published itself, the thing
+            // evicted would be one of the application's -- a launcher action removed in order
+            // to record that the user did something. A donation is a hint; it is not worth
+            // that. Slots this framework already owns are counted as available, so replacing
+            // an earlier donation of its own still works.
+            if (publishableSlots(ctx) < 1) {
+                Log.i(TAG, "Not donating \"" + intentId + "\": this app's own shortcuts already "
+                        + "fill the launcher's quota, and recording this one would evict one of "
+                        + "them");
+                return;
+            }
             pushShortcut(ctx, DONATED_PREFIX + intentId, label, label,
                     uriFor(targetId, effectiveParams, ctx), null, true);
         } catch (Throwable t) {
@@ -600,7 +613,7 @@ public class AndroidIntentBridge implements IntentBridge {
         // Deliberately shallow parsing: the payload is a known shape produced by the framework's
         // own serializer, and pulling in a JSON dependency for the port would cost every app.
         List<String[]> entries = CN1IntentJson.entities(entitiesJson);
-        int budget = indexingBudget(ctx);
+        int budget = publishableSlots(ctx);
         int published = 0;
         for (String[] entry : entries) {
             if (published >= budget) {
@@ -754,7 +767,7 @@ public class AndroidIntentBridge implements IntentBridge {
         }
     }
 
-    /// How many entities this app may still publish as shortcuts.
+    /// How many shortcuts this framework may still publish, whether indexing or donating.
     ///
     /// Asked of the platform rather than assumed. getMaxShortcutCountPerActivity() is the
     /// *combined* static and dynamic quota, and the manifest shortcuts the build wrote are
@@ -763,7 +776,7 @@ public class AndroidIntentBridge implements IntentBridge {
     /// reserves room by emitting fewer static shortcuts than the smallest quota; this is the
     /// other half, spending only what is actually left.
     @TargetApi(Build.VERSION_CODES.N_MR1)
-    private static int indexingBudget(Context ctx) {
+    private static int publishableSlots(Context ctx) {
         // The cast stays outside the guard, as it does in publishedIds: a cast inside a
         // catch(Throwable) block reads as relying on ClassCastException, which ParparVM does
         // not throw -- and the repo's gate rejects the shape wherever it appears.
