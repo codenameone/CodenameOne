@@ -964,6 +964,36 @@ static BOOL cn1homeHasNoValueNow(HMService *service, NSString *traitId) {
             && [value intValue] == 3;
 }
 
+// HeatingCoolingMode.AUTO's ordinal, which is what a write of the mode
+// arrives as: the wire carries the canonical ordinal, and cn1homeToHomeKit
+// turns it into HomeKit's own value on the way out. Named because reading a
+// bare 3 out of a batch, next to the separate 3 that HomeKit's characteristic
+// reports, is how the two get confused.
+#define CN1_HOME_MODE_AUTO 3
+
+/// The value to report for a trait, honouring the modes that erase one.
+///
+/// Every path that turns a live characteristic into a reading goes through
+/// here, because the rule is about the trait rather than about the path: a
+/// setpoint read one way and polled another must not disagree about whether
+/// the thermostat has a single target at all.
+///
+/// #### Parameters
+///
+/// - `service`: the service the characteristic belongs to
+///
+/// - `traitId`: the canonical trait
+///
+/// - `c`: the characteristic
+///
+/// #### Returns
+///
+/// the characteristic's value, or nil when the trait has none right now
+static id cn1homeValueForReading(HMService *service, NSString *traitId,
+                                 HMCharacteristic *c) {
+    return cn1homeHasNoValueNow(service, traitId) ? nil : [c value];
+}
+
 /// Encodes a reading, with an explicit "when was this true" stamp.
 ///
 /// Zero means "the backend cannot say", which TraitReading.getTimestampMillis
@@ -1756,7 +1786,9 @@ static void cn1homeRebindWatches(NSString *accessoryId) {
                 [cn1homeNotifyFailed removeObject:stateKey];
                 [cn1homeLastPolled setObject:cn1homeReadingWithoutTimestamp(
                      cn1homeEncodeReading(accessoryId, serviceId, traitId,
-                                          [c value], nil, nil))
+                                          cn1homeValueForReading(service,
+                                                                 traitId, c),
+                                          nil, nil))
                                       forKey:stateKey];
                 continue;
             }
@@ -1769,7 +1801,9 @@ static void cn1homeRebindWatches(NSString *accessoryId) {
                 [cn1homeNotifyFailed addObject:stateKey];
                 [cn1homeLastPolled setObject:cn1homeReadingWithoutTimestamp(
                      cn1homeEncodeReading(accessoryId, serviceId, traitId,
-                                          [c value], nil, nil))
+                                          cn1homeValueForReading(service,
+                                                                 traitId, c),
+                                          nil, nil))
                                       forKey:stateKey];
                 cn1homeArmRecovery();
             }];
@@ -1830,7 +1864,14 @@ static void cn1homeRunRecovery(void) {
         NSString *traitId = [parts objectAtIndex:3];
         NSString *key = cn1homeReadingKey(accessoryId, serviceId, traitId);
         NSSet *watched = [cn1homeWatches objectForKey:subscriptionId];
-        if (watched == nil || ![watched containsObject:key]) {
+        NSSet *depends = [cn1homeDependencies objectForKey:subscriptionId];
+        // A dependency is recovered like anything else, but it is not the
+        // trait the caller asked about: what its movement means to them is
+        // the setpoint's update, so that is what gets delivered below.
+        BOOL isDependency = ![watched containsObject:key]
+                && [depends containsObject:key];
+        if (!isDependency && (watched == nil
+                              || ![watched containsObject:key])) {
             // The subscription went away. Nothing to recover, and leaving it
             // here would keep the timer alive for the life of the process.
             [cn1homeNotifyFailed removeObject:stateKey];
@@ -1858,16 +1899,40 @@ static void cn1homeRunRecovery(void) {
         [c readValueWithCompletionHandler:^(NSError *error) {
             if (error == nil) {
                 NSString *record = cn1homeEncodeReading(accessoryId, serviceId,
-                                                        traitId, [c value],
+                                                        traitId,
+                                                        cn1homeValueForReading(
+                                                            service, traitId,
+                                                            c),
                                                         nil, nil);
                 NSString *current = cn1homeReadingWithoutTimestamp(record);
                 NSString *previous = [cn1homeLastPolled objectForKey:stateKey];
                 [cn1homeLastPolled setObject:current forKey:stateKey];
                 if (previous != nil && ![previous isEqualToString:current]) {
-                    com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
-                        getThreadLocalData(),
-                        fromNSString(getThreadLocalData(), subscriptionId),
-                        fromNSString(getThreadLocalData(), record));
+                    if (isDependency) {
+                        // The mode moved. The subscription never asked about
+                        // it -- what it asked about is the setpoint, which
+                        // has just started or stopped meaning something.
+                        HMCharacteristic *setpoint =
+                                cn1homeFindCharacteristic(
+                                    service, @"target_temperature");
+                        if (setpoint != nil) {
+                            com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
+                                getThreadLocalData(),
+                                fromNSString(getThreadLocalData(),
+                                             subscriptionId),
+                                fromNSString(getThreadLocalData(),
+                                    cn1homeEncodeReading(accessoryId,
+                                        serviceId, @"target_temperature",
+                                        cn1homeValueForReading(service,
+                                            @"target_temperature", setpoint),
+                                        nil, nil)));
+                        }
+                    } else {
+                        com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
+                            getThreadLocalData(),
+                            fromNSString(getThreadLocalData(), subscriptionId),
+                            fromNSString(getThreadLocalData(), record));
+                    }
                 }
             }
             cn1homeRetryNotification(c, stateKey);
@@ -2461,6 +2526,50 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                       @"this service does not have that trait", nil]])];
                 continue;
             }
+            // The single setpoint means nothing in AUTO -- the thermostat
+            // is working to the two thresholds -- so a read of it answers
+            // absent and the local store refuses the write. HomeKit would
+            // take it: it would change a characteristic this API cannot
+            // report back, and tell the caller their target was applied.
+            // Refused here too, so the simulator and the device agree.
+            //
+            // Unless the same batch is also leaving AUTO. Setting the mode
+            // and its setpoint together is the ordinary way to ask for
+            // "heat, to 21", and HomeKit applies the writes as a batch --
+            // refusing on the mode the thermostat is about to leave would
+            // make that impossible to express.
+            if ([traitId isEqualToString:@"target_temperature"]
+                    && cn1homeHasNoValueNow(service, traitId)) {
+                BOOL leavingAuto = NO;
+                for (NSUInteger j = 0; j < count; j++) {
+                    if (j == i
+                            || ![[traits objectAtIndex:j]
+                                 isEqualToString:@"target_heating_cooling"]
+                            || ![[accessories objectAtIndex:j]
+                                 isEqualToString:accessoryId]
+                            || ![[services objectAtIndex:j]
+                                 isEqualToString:serviceId]) {
+                        continue;
+                    }
+                    if (j < [numbers count]
+                            && (int) [[numbers objectAtIndex:j] doubleValue]
+                                != CN1_HOME_MODE_AUTO) {
+                        leavingAuto = YES;
+                        break;
+                    }
+                }
+                if (!leavingAuto) {
+                    [records replaceObjectAtIndex:i
+                                       withObject:cn1homeJoinFields(
+                        [base arrayByAddingObjectsFromArray:
+                         [NSArray arrayWithObjects:@"0", @"INVALID_ARGUMENT",
+                          @"this thermostat is in AUTO, where there is no"
+                          " single target; set the heating and cooling"
+                          " thresholds instead", nil]])];
+                    outstanding--;
+                    continue;
+                }
+            }
             NSArray *entry = cn1homeEntryFor(traitId);
             int conversion = [[entry objectAtIndex:3] intValue];
             double numeric = i < [numbers count]
@@ -2637,7 +2746,9 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
                                                            traitId)];
                 NSString *baseline = cn1homeReadingWithoutTimestamp(
                     cn1homeEncodeReading(accessoryId, serviceId, traitId,
-                                         [c value], nil, nil));
+                                         cn1homeValueForReading(service,
+                                                                traitId, c),
+                                         nil, nil));
                 [cn1homeLastPolled setObject:baseline forKey:baselineKey];
                 continue;
             }
@@ -2664,7 +2775,9 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
                 [cn1homeNotifyFailed addObject:stateKey];
                 [cn1homeLastPolled setObject:cn1homeReadingWithoutTimestamp(
                      cn1homeEncodeReading(accessoryId, serviceId, traitId,
-                                          [c value], nil, nil))
+                                          cn1homeValueForReading(service,
+                                                                 traitId, c),
+                                          nil, nil))
                                       forKey:stateKey];
                 cn1homeArmRecovery();
                 com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
@@ -2688,17 +2801,39 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
                                                     [parts objectAtIndex:1]);
             HMCharacteristic *c = cn1homeFindCharacteristic(
                 service, [parts objectAtIndex:2]);
-            // A mode that cannot notify is left alone: every HomeKit
-            // thermostat's TargetHeatingCoolingState reports changes, and
-            // the alternative -- pushing the setpoint onto the polling path
-            // over a presence change its encoded value does not carry --
-            // would be machinery with nothing to test it against.
-            if (c != nil
-                    && [[c properties] containsObject:
-                        HMCharacteristicPropertySupportsEventNotification]) {
-                [c enableNotification:YES
-                    completionHandler:^(NSError *ignored) { }];
+            if (c == nil) {
+                continue;
             }
+            NSString *depStateKey = [NSString stringWithFormat:@"%@\t%@",
+                                     subId, key];
+            NSString *depBaseline = cn1homeReadingWithoutTimestamp(
+                cn1homeEncodeReading([parts objectAtIndex:0],
+                                     [parts objectAtIndex:1],
+                                     [parts objectAtIndex:2],
+                                     [c value], nil, nil));
+            if (![[c properties] containsObject:
+                  HMCharacteristicPropertySupportsEventNotification]) {
+                // A mode that cannot notify -- and the recovery pass is how
+                // the setpoint keeps moving anyway, since nothing else will
+                // ever tell this subscription that AUTO began or ended.
+                [cn1homeNotifyFailed addObject:depStateKey];
+                [cn1homeLastPolled setObject:depBaseline forKey:depStateKey];
+                cn1homeArmRecovery();
+                continue;
+            }
+            [c enableNotification:YES completionHandler:^(NSError *error) {
+                if (error == nil) {
+                    return;
+                }
+                // Same recovery path as a watched trait, and for the same
+                // reason: with no registration on the mode, crossing into
+                // AUTO produces no derived setpoint update at all, and the
+                // subscription this belongs to is push -- nobody is going to
+                // drain it.
+                [cn1homeNotifyFailed addObject:depStateKey];
+                [cn1homeLastPolled setObject:depBaseline forKey:depStateKey];
+                cn1homeArmRecovery();
+            }];
         }
         [cn1homeDependencies setObject:deps forKey:subId];
         [subId release];
@@ -2816,6 +2951,11 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
         NSMutableArray *pollSubs = [NSMutableArray array];
         NSMutableArray *pollKeys = [NSMutableArray array];
         NSMutableArray *pollChars = [NSMutableArray array];
+        // Kept alongside the characteristic because the encoding needs it:
+        // whether a setpoint has a value at all is a question about the
+        // service's mode, not about the characteristic -- see
+        // cn1homeValueForReading.
+        NSMutableArray *pollServices = [NSMutableArray array];
         for (NSString *subscriptionId in cn1homeWatches) {
             for (NSString *key in [cn1homeWatches
                                    objectForKey:subscriptionId]) {
@@ -2844,6 +2984,7 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                 [pollSubs addObject:subscriptionId];
                 [pollKeys addObject:key];
                 [pollChars addObject:c];
+                [pollServices addObject:service];
             }
         }
         if ([pollChars count] == 0) {
@@ -2855,6 +2996,7 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
         __block int polled = 0;
         for (NSUInteger i = 0; i < [pollChars count]; i++) {
             HMCharacteristic *c = [pollChars objectAtIndex:i];
+            HMService *polledService = [pollServices objectAtIndex:i];
             NSString *subscriptionId = [pollSubs objectAtIndex:i];
             NSString *key = [pollKeys objectAtIndex:i];
             [c readValueWithCompletionHandler:^(NSError *error) {
@@ -2873,7 +3015,10 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                             [key componentsSeparatedByString:@"\t"];
                     NSString *record = cn1homeEncodeReading(
                         [parts objectAtIndex:0], [parts objectAtIndex:1],
-                        [parts objectAtIndex:2], [c value], nil, nil);
+                        [parts objectAtIndex:2],
+                        cn1homeValueForReading(polledService,
+                                               [parts objectAtIndex:2], c),
+                        nil, nil);
                     // Compared without the timestamp, which is the last
                     // field and moves on every read: comparing whole records
                     // would report every poll as a change.
