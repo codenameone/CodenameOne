@@ -734,22 +734,28 @@ public class BufferedGraphics extends HTML5Graphics {
         if (!alphaIndependent && getAlpha() <= 0) {
             return;
         }
-        // Clipped first, in the coordinates the clip is kept in, and only then projected: the
-        // tracker holds the clip in user space while a projected rectangle is in screen space,
-        // and intersecting one with the other compares two different spaces.
-        int clipLeft = clipBoundsTracker.getX();
-        int clipTop = clipBoundsTracker.getY();
-        int left = Math.max(x, clipLeft);
-        int top = Math.max(y, clipTop);
-        int right = Math.min(x + w, clipLeft + clipBoundsTracker.getWidth());
-        int bottom = Math.min(y + h, clipTop + clipBoundsTracker.getHeight());
+        // The clip and the draw are compared where the canvas applies them: on screen. The clip
+        // is fixed in the coordinates it was installed in and the draw is in the coordinates in
+        // force now, and those need not be the same -- clip screen x=0..50, translate by 100,
+        // then fill x=-100..50 and the canvas paints screen x=0..50. Intersecting the two as
+        // though they shared a space put that report at screen x=100..150: text the fill really
+        // did cover was left above it, which is the mistake that shows on screen.
+        float[] drawRect = projectRect(x, y, w, h, transform);
+        float[] clipRect = projectRect(clipBoundsTracker.getX(), clipBoundsTracker.getY(),
+                clipBoundsTracker.getWidth(), clipBoundsTracker.getHeight(), clipTransform);
+        if (drawRect == null || clipRect == null) {
+            // A transform the platform will not project. The draw is treated as covering what it
+            // was asked to cover, which is the wider answer and the safe one.
+            layer.noteCanvasCover(x, y, w, h, null);
+            return;
+        }
+        float left = Math.max(drawRect[0], clipRect[0]);
+        float top = Math.max(drawRect[1], clipRect[1]);
+        float right = Math.min(drawRect[2], clipRect[2]);
+        float bottom = Math.min(drawRect[3], clipRect[3]);
         if (right <= left || bottom <= top) {
             return;
         }
-        x = left;
-        y = top;
-        w = right - left;
-        h = bottom - top;
         // A shape clip has been reduced to its bounding rectangle above, and a fill of that
         // rectangle would then be read as covering text the clip actually protects -- text
         // inside the bounding box but outside the shape. Detaching a run costs its component
@@ -760,14 +766,38 @@ public class BufferedGraphics extends HTML5Graphics {
                     : bothCover(test, clipTest, clipBoundsTracker.getX(), clipBoundsTracker.getY(),
                             clipBoundsTracker.getWidth(), clipBoundsTracker.getHeight());
         }
+        int reportX = (int) Math.floor(left);
+        int reportY = (int) Math.floor(top);
+        int reportW = (int) Math.ceil(right - left);
+        int reportH = (int) Math.ceil(bottom - top);
         if (transform == null || transform.isIdentity()) {
-            layer.noteCanvasCover(x, y, w, h, test);
+            layer.noteCanvasCover(reportX, reportY, reportW, reportH, test);
             return;
         }
-        // Where the image lands, not where it was asked for: text is only promoted under an
-        // identity transform, but a transform set afterwards moves everything drawn through it.
-        // Comparing the untransformed rectangle would miss an image that ends up over the text
-        // and leave the glyphs floating above it.
+        Transform inverse = null;
+        try {
+            inverse = getInverseTransform();
+        } catch (Throwable ignored) {
+            // A transform with no inverse -- degenerate, or one the platform will not invert --
+            // leaves the projected bounding box as the whole answer.
+        }
+        layer.noteCanvasCover(reportX, reportY, reportW, reportH, unprojected(test, inverse));
+    }
+
+    /**
+     * A rectangle in the coordinates a transform maps to the screen, as left, top, right, bottom.
+     *
+     * @param x the rectangle's x in the transform's own coordinates
+     * @param y its y
+     * @param w its width
+     * @param h its height
+     * @param t the transform those coordinates are in, or null for none
+     * @return the enclosing screen rectangle, or null if the transform will not project
+     */
+    private static float[] projectRect(float x, float y, float w, float h, Transform t) {
+        if (t == null || t.isIdentity()) {
+            return new float[] { x, y, x + w, y + h };
+        }
         float minX = Float.MAX_VALUE;
         float minY = Float.MAX_VALUE;
         float maxX = -Float.MAX_VALUE;
@@ -778,32 +808,16 @@ public class BufferedGraphics extends HTML5Graphics {
             corner[0] = (i == 0 || i == 3) ? x : x + w;
             corner[1] = (i < 2) ? y : y + h;
             try {
-                transform.transformPoint(corner, out);
+                t.transformPoint(corner, out);
             } catch (Throwable ignored) {
-                // A transform the platform will not project -- treat the draw as covering what
-                // it was asked to cover, which is what the clipped rectangle says.
-                layer.noteCanvasCover(x, y, w, h, test);
-                return;
+                return null;
             }
             minX = Math.min(minX, out[0]);
             minY = Math.min(minY, out[1]);
             maxX = Math.max(maxX, out[0]);
             maxY = Math.max(maxY, out[1]);
         }
-        // The outline test belongs to untransformed coordinates, so the text is brought to it
-        // rather than the test being dropped: the projected bounding box of a rotated bar is
-        // mostly empty, and reporting all of it detaches text the bar never crossed -- for good,
-        // since a detached component stays on the canvas.
-        Transform inverse = null;
-        try {
-            inverse = getInverseTransform();
-        } catch (Throwable ignored) {
-            // A transform with no inverse -- degenerate, or one the platform will not invert --
-            // leaves the projected bounding box as the whole answer.
-        }
-        layer.noteCanvasCover((int) Math.floor(minX), (int) Math.floor(minY),
-                (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY),
-                unprojected(test, inverse));
+        return new float[] { minX, minY, maxX, maxY };
     }
 
     /**
