@@ -98,6 +98,12 @@ public final class JavaScriptSemanticOverlay {
     private static final String ATTRIBUTE_EDITING = "data-cn1-editing";
 
     /**
+     * Records whether a SET_TEXT control was built for an obscured field, so a field that
+     * changes between masked and revealed is noticed on the next snapshot.
+     */
+    private static final String ATTRIBUTE_OBSCURED = "data-cn1-obscured";
+
+    /**
      * Retained state for a single semantic node. Everything the diff needs to decide whether a
      * DOM write is required lives here, so no property is ever read back from the host.
      */
@@ -720,6 +726,9 @@ public final class JavaScriptSemanticOverlay {
         // the old one.
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
         input.setAttribute("type", obscured ? "password" : "text");
+        if (obscured) {
+            input.setAttribute(ATTRIBUTE_OBSCURED, "1");
+        }
         input.setAttribute("aria-label", label);
         String owner = ownerId(entry);
         input.setAttribute("aria-controls", owner);
@@ -777,13 +786,30 @@ public final class JavaScriptSemanticOverlay {
                 || !(element instanceof HTMLInputElement)) {
             return;
         }
-        if (node.getObscured() != null && node.getObscured().booleanValue()) {
+        HTMLInputElement input = (HTMLInputElement) element;
+        boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
+        if (obscured != (element.getAttribute(ATTRIBUTE_OBSCURED) != null)) {
+            // A field can be masked and revealed while it stays in the tree -- the eye button on
+            // a password field. A control left as it was would either keep typing in the clear
+            // into a field that is now a secret, or go on masking one that no longer is.
+            input.setAttribute("type", obscured ? "password" : "text");
+            if (obscured) {
+                element.setAttribute(ATTRIBUTE_OBSCURED, "1");
+                // Cleared even mid-edit: what it holds became a secret, and a secret does not
+                // stay in the document waiting for focus to leave.
+                input.setValue("");
+            } else {
+                element.removeAttribute(ATTRIBUTE_OBSCURED);
+            }
+        }
+        if (obscured) {
+            // A masked field's contents are never written into the document; the control exists
+            // to set a new value, not to carry the old one.
             return;
         }
         if (element.getAttribute(ATTRIBUTE_EDITING) != null) {
             return;
         }
-        HTMLInputElement input = (HTMLInputElement) element;
         String value = textEntryValue(node);
         if (!value.equals(input.getValue())) {
             input.setValue(value);
