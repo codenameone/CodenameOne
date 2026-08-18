@@ -158,6 +158,12 @@ typedef struct { int w, h; int slot; CN1Browser* result; } CN1BrowserCreateReq;
 static void cn1BrowserCreateOnMain(void* p) {
     CN1BrowserCreateReq* req = (CN1BrowserCreateReq*) p;
     CN1Browser* b = (CN1Browser*) calloc(1, sizeof(CN1Browser));
+    /* Set before anything reads it: calloc leaves it 0, which is a *valid* desktop
+     * window slot, so adding the view to "slot 0" targeted a window that does not
+     * exist and the browser was never placed in any overlay at all. */
+    if (b != 0) {
+        b->slot = req->slot;
+    }
     WebKitUserContentManager* mgr = p_webkit_user_content_manager_new();
     pthread_mutex_init(&b->lock, 0);
     p_webkit_user_content_manager_register_script_message_handler(mgr, "cn1");
@@ -186,7 +192,6 @@ static void cn1BrowserCreateOnMain(void* p) {
     b->view = p_webkit_web_view_new_with_user_content_manager(mgr);
     g_signal_connect(b->view, "load-changed", G_CALLBACK(cn1BrowserLoadChanged), b);
     cn1LinuxOverlayAdd(b->slot, b->view, 0, 0, req->w > 0 ? req->w : 1, req->h > 0 ? req->h : 1);
-    b->slot = req->slot;
     req->result = b;
 }
 
