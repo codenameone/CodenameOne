@@ -268,9 +268,14 @@ public final class CommissioningRequest {
     /// It is a request method rather than a build hint because a call is
     /// something the build can SEE: the scanner reads this one and generates
     /// the extension accordingly, so an app that asks for the capability gets
-    /// it without also having to remember a hint. Where the call is invisible
-    /// -- behind reflection, say -- `ios.home.commissioning.fabric=true` says
-    /// the same thing.
+    /// it without also having to remember a hint.
+    ///
+    /// Where the build cannot read the call -- an argument computed at run
+    /// time, or one call saying `true` while another says `false` -- it
+    /// refuses rather than guessing, and names
+    /// `ios.home.commissioning.fabric` as the way to settle it. Guessing
+    /// either way is worse than stopping: "off" ships an app whose request is
+    /// quietly ignored, and "on" ships a Matter controller nobody asked for.
     ///
     /// [CommissioningResult#wasCommissionedToThisApp()] reports what actually
     /// happened for each accessory.

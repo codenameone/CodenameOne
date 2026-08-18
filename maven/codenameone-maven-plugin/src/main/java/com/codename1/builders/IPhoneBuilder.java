@@ -319,6 +319,12 @@ public class IPhoneBuilder extends Executor {
     // a mode the developer configures somewhere the build cannot read -- or
     // by ios.home.commissioning.fabric for a call behind reflection.
     private boolean usesHomeOwnFabric;
+    // A setCommissionToThisApp call whose argument the scanner could not
+    // read, or one that says false while another says true. Either way the
+    // build cannot honour what the app asked for -- the extension is one
+    // generated file with one behaviour -- so it refuses instead of picking.
+    private boolean homeFabricAmbiguous;
+    private boolean usesHomeOwnFabricDeclined;
 
     /// Whether the generated Xcode project gets the MatterAddDeviceExtension
     /// target. True only when the app referenced
@@ -1491,9 +1497,18 @@ public class IPhoneBuilder extends Executor {
                     // just declined it.
                     if ("com/codename1/home/commissioning/CommissioningRequest"
                             .equals(cls)
-                            && "setCommissionToThisApp".equals(method)
-                            && Boolean.TRUE.equals(value)) {
-                        usesHomeOwnFabric = true;
+                            && "setCommissionToThisApp".equals(method)) {
+                        if (value == null) {
+                            // The argument is computed, so the build cannot
+                            // tell what it will be. Collapsing that to "off"
+                            // ships an app whose request is ignored; to "on"
+                            // ships a Matter controller nobody asked for.
+                            homeFabricAmbiguous = true;
+                        } else if (value.booleanValue()) {
+                            usesHomeOwnFabric = true;
+                        } else {
+                            usesHomeOwnFabricDeclined = true;
+                        }
                     }
                     if (HealthManifestFragments.enablesSensorWriteThrough(
                             cls, method, value)) {
@@ -5222,10 +5237,33 @@ public class IPhoneBuilder extends Executor {
      * @param request the build request
      * @return true when the scanner saw the call or the hint asks for it
      */
-    private boolean matterOwnFabric(BuildRequest request) {
-        return usesHomeOwnFabric
-                || "true".equalsIgnoreCase(request.getArg(
-                        "ios.home.commissioning.fabric", "false"));
+    private boolean matterOwnFabric(BuildRequest request)
+            throws BuildException {
+        String hint = request.getArg("ios.home.commissioning.fabric", null);
+        if (hint != null) {
+            // The hint settles it, whatever the code says: it exists for the
+            // build whose call the scanner cannot read, and a developer who
+            // wrote it down has answered the question this refuses over.
+            return "true".equalsIgnoreCase(hint);
+        }
+        if (homeFabricAmbiguous || (usesHomeOwnFabric
+                && usesHomeOwnFabricDeclined)) {
+            throw new BuildException(
+                    "This app calls"
+                    + " CommissioningRequest.setCommissionToThisApp() with"
+                    + (homeFabricAmbiguous ? " a value this build cannot read"
+                            : " both true and false")
+                    + ", and the answer has to be the same for the whole"
+                    + " build: the machinery that commissions onto a fabric"
+                    + " of your own is an app extension generated now and run"
+                    + " outside your process, so nothing at run time can turn"
+                    + " it on or off per accessory.\n"
+                    + "  Set ios.home.commissioning.fabric=true to build with"
+                    + " it, or =false to build without it. The build hint is"
+                    + " read in preference to the code, so the call can stay"
+                    + " where it is.");
+        }
+        return usesHomeOwnFabric;
     }
 
     private static boolean isSmartHomeSetupPayload(String cls) {
@@ -5677,7 +5715,7 @@ public class IPhoneBuilder extends Executor {
      * <p>Only reached when the scanner saw {@code com.codename1.home.commissioning}.</p>
      */
     private void appendMatterExtensionTarget(StringBuilder sb, BuildRequest request, File distDir)
-            throws IOException {
+            throws IOException, BuildException {
         String name = MatterExtensionBuilder.EXTENSION_NAME;
         String displayName = request.getArg("ios.home.commissioning.displayName",
                 request.getDisplayName() == null ? name : request.getDisplayName());

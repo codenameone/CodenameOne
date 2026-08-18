@@ -1786,12 +1786,40 @@ static void cn1homeRebindWatches(NSString *accessoryId) {
                                                     [parts objectAtIndex:1]);
             HMCharacteristic *dep = cn1homeFindCharacteristic(
                 service, [parts objectAtIndex:2]);
-            if (dep != nil
-                    && [[dep properties] containsObject:
-                        HMCharacteristicPropertySupportsEventNotification]) {
-                [dep enableNotification:YES
-                      completionHandler:^(NSError *ignored) { }];
+            if (dep == nil) {
+                continue;
             }
+            NSString *depStateKey = [NSString stringWithFormat:@"%@\t%@",
+                                     subscriptionId, key];
+            NSString *depBaseline = cn1homeReadingWithoutTimestamp(
+                cn1homeEncodeReading(accessoryId, [parts objectAtIndex:1],
+                                     [parts objectAtIndex:2], [dep value],
+                                     nil, nil));
+            if (![[dep properties] containsObject:
+                  HMCharacteristicPropertySupportsEventNotification]) {
+                // The replacement cannot notify. Same answer as a mode that
+                // never could: the recovery pass polls it, because nothing
+                // else will ever tell this subscription that AUTO began or
+                // ended.
+                [cn1homeNotifyFailed addObject:depStateKey];
+                [cn1homeLastPolled setObject:depBaseline forKey:depStateKey];
+                cn1homeArmRecovery();
+                continue;
+            }
+            [dep enableNotification:YES completionHandler:^(NSError *error) {
+                if (error == nil) {
+                    [cn1homeNotifyFailed removeObject:depStateKey];
+                    [cn1homeLastPolled removeObjectForKey:depStateKey];
+                    return;
+                }
+                // And a failure here is not swallowed either. Discarded, the
+                // setpoint watch this dependency exists for hears nothing
+                // when the thermostat crosses into AUTO -- for good, since
+                // nothing retries.
+                [cn1homeNotifyFailed addObject:depStateKey];
+                [cn1homeLastPolled setObject:depBaseline forKey:depStateKey];
+                cn1homeArmRecovery();
+            }];
         }
     }
     for (NSString *subscriptionId in [cn1homeWatches allKeys]) {
