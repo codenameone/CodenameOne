@@ -27,6 +27,7 @@ import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.html5.js.dom.HTMLInputElement;
 import com.codename1.ui.Component;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.accessibility.AccessibilityAction;
@@ -89,6 +90,12 @@ public final class JavaScriptSemanticOverlay {
     }
 
     private static final String ATTRIBUTE_NODE_ID = "data-cn1-accessibility-id";
+
+    /**
+     * Marks a SET_TEXT control while it holds focus, so a snapshot arriving mid-edit does
+     * not overwrite what is being typed.
+     */
+    private static final String ATTRIBUTE_EDITING = "data-cn1-editing";
 
     /**
      * Retained state for a single semantic node. Everything the diff needs to decide whether a
@@ -589,7 +596,7 @@ public final class JavaScriptSemanticOverlay {
             if (entry.customActions == null) {
                 entry.customActions = new HashMap<String, HTMLElement>();
             }
-            String label = action.getLabel() == null ? action.getId() : action.getLabel();
+            String label = controlLabel(action, node);
             HTMLElement existing = entry.customActions.get(action.getId());
             if (existing != null) {
                 // An application can replace an action with the same id and a new label -- an
@@ -597,15 +604,18 @@ public final class JavaScriptSemanticOverlay {
                 // announcing the old wording until the action is removed entirely.
                 if (!label.equals(entry.customActionLabels.get(action.getId()))) {
                     existing.setAttribute("aria-label", label);
-                    existing.setTextContent(label);
+                    if (!(existing instanceof HTMLInputElement)) {
+                        existing.setTextContent(label);
+                    }
                     entry.customActionLabels.put(action.getId(), label);
                 }
+                syncSetTextControl(existing, action.getId(), node);
                 continue;
             }
             if (entry.customActionLabels == null) {
                 entry.customActionLabels = new HashMap<String, String>();
             }
-            entry.customActions.put(action.getId(), createCustomAction(entry, action, label));
+            entry.customActions.put(action.getId(), createCustomAction(entry, node, action, label));
             entry.customActionLabels.put(action.getId(), label);
         }
         if (entry.customActions == null) {
@@ -624,8 +634,11 @@ public final class JavaScriptSemanticOverlay {
         }
     }
 
-    private HTMLElement createCustomAction(Entry entry, final AccessibilityAction action,
-            String label) {
+    private HTMLElement createCustomAction(Entry entry, AccessibilityNodeSnapshot node,
+            final AccessibilityAction action, String label) {
+        if (AccessibilityAction.SET_TEXT.equals(action.getId())) {
+            return createSetTextControl(entry, node, action, label);
+        }
         final long nodeId = entry.id;
         HTMLElement button = document.createElement("button");
         button.setAttribute("type", "button");
@@ -654,6 +667,127 @@ public final class JavaScriptSemanticOverlay {
         // list items as children, which the scroll actions were breaking.
         actionsContainer().appendChild(button);
         return button;
+    }
+
+    /**
+     * What a custom-action control announces itself as.
+     *
+     * <p>An action the application named is announced by that name. One the framework added has
+     * only an id -- "setText" tells a screen-reader user nothing about which field it writes to,
+     * so it is named after the field instead, and after what it does when the field has no name
+     * of its own. A name inferred from the field's own contents is not used: that is its value,
+     * and it would have the control announce the text it is meant to replace.</p>
+     *
+     * @param action the action being exposed
+     * @param node the node it acts on
+     * @return the control's label, never null
+     */
+    private String controlLabel(AccessibilityAction action, AccessibilityNodeSnapshot node) {
+        if (action.getLabel() != null) {
+            return action.getLabel();
+        }
+        if (!AccessibilityAction.SET_TEXT.equals(action.getId())) {
+            return action.getId();
+        }
+        boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
+        String name = node.getLabel();
+        if (obscured || isDerivedFromContent(node, name)) {
+            name = node.getHint();
+        }
+        return name == null || name.length() == 0 ? "Set text" : name;
+    }
+
+    /**
+     * The control for SET_TEXT: an input, because the action takes the text to set.
+     *
+     * <p>A button cannot carry a value, so a field only ever reached through one could be
+     * cleared, never written. This is a real input, so a screen reader in forms mode types into
+     * it and the typed value is what reaches the framework -- the same handler a native editor
+     * would have called.</p>
+     *
+     * @param entry the node the control acts on
+     * @param node that node's snapshot, read for the value the field already holds
+     * @param action the SET_TEXT action being exposed
+     * @param label the action's label, which names the control
+     * @return the control, already attached to the actions region
+     */
+    private HTMLElement createSetTextControl(Entry entry, AccessibilityNodeSnapshot node,
+            final AccessibilityAction action, String label) {
+        final long nodeId = entry.id;
+        final HTMLInputElement input = (HTMLInputElement) document.createElement("input");
+        // An obscured field's contents must never be written into the document, so its control
+        // is a password input that starts empty: it can set a new value without ever carrying
+        // the old one.
+        boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
+        input.setAttribute("type", obscured ? "password" : "text");
+        input.setAttribute("aria-label", label);
+        String owner = ownerId(entry);
+        input.setAttribute("aria-controls", owner);
+        input.setAttribute("aria-describedby", owner);
+        if (!obscured) {
+            input.setValue(textEntryValue(node));
+        }
+        input.getStyle().setCssText(
+                "position:absolute;opacity:0.001;pointer-events:none;width:1px;height:1px;");
+        EventListener commit = new EventListener() {
+            @Override
+            public void handleEvent(Event event) {
+                // The overlay root carries handlers of its own, and this is not one of the
+                // node's own actions -- it must not read as input on anything above it.
+                event.stopPropagation();
+                dispatcher.performAction(nodeId, action.getId(), input.getValue());
+            }
+        };
+        // change fires when the user leaves the field, which is when a screen reader in forms
+        // mode has finished; input covers assistive technology that sets the value outright and
+        // never sends a change.
+        input.addEventListener("change", commit);
+        input.addEventListener("input", commit);
+        // Marked on the element rather than compared against document.activeElement, which this
+        // port's document binding does not expose.
+        input.addEventListener("focus", new EventListener() {
+            @Override
+            public void handleEvent(Event event) {
+                input.setAttribute(ATTRIBUTE_EDITING, "1");
+            }
+        });
+        input.addEventListener("blur", new EventListener() {
+            @Override
+            public void handleEvent(Event event) {
+                input.removeAttribute(ATTRIBUTE_EDITING);
+            }
+        });
+        actionsContainer().appendChild(input);
+        return input;
+    }
+
+    /**
+     * Brings a SET_TEXT control back in step with the field it writes to.
+     *
+     * <p>Skipped while the control has focus: overwriting what someone is in the middle of
+     * typing is worse than showing a value one keystroke behind.</p>
+     *
+     * @param element the control, which is only an input for SET_TEXT
+     * @param actionId the action the control performs
+     * @param node the field's current snapshot
+     */
+    private void syncSetTextControl(HTMLElement element, String actionId,
+            AccessibilityNodeSnapshot node) {
+        if (!AccessibilityAction.SET_TEXT.equals(actionId)
+                || !(element instanceof HTMLInputElement)) {
+            return;
+        }
+        if (node.getObscured() != null && node.getObscured().booleanValue()) {
+            return;
+        }
+        if (element.getAttribute(ATTRIBUTE_EDITING) != null) {
+            return;
+        }
+        HTMLInputElement input = (HTMLInputElement) element;
+        String value = textEntryValue(node);
+        if (!value.equals(input.getValue())) {
+            input.setValue(value);
+        }
     }
 
     /**
@@ -795,25 +929,25 @@ public final class JavaScriptSemanticOverlay {
 
     /**
      * Actions the browser already provides a way to perform, so the overlay does not add a
-     * button for them.
+     * control for them.
      *
      * <p>The scroll actions are NOT included: the projection is a div, not a native scroll
      * container, so nothing else would perform them, and a list exposes only the items it is
      * currently showing -- without a control for them there is no way to reach the rest. They
      * take no argument, so a custom control dispatches them correctly.</p>
      *
-     * <p>SET_TEXT is included deliberately, and review has asked twice about it. A custom action
+     * <p>SET_TEXT is not included either, and the reason it once was is worth recording. A
      * button can only dispatch with a null argument, which for SET_TEXT means replacing the
-     * field's contents with nothing -- a button that silently clears the field is worse than no
-     * button. Editing reaches the framework a different way here: the port puts a real native
-     * input over the field, and that input is what assistive technology and the browser both
-     * drive. Exposing SET_TEXT properly needs that input to be present before editing starts
-     * rather than created on demand, which is its own change.</p>
+     * field's contents with nothing, so it was left to the native input the port puts over a
+     * field being edited. That input is created on demand and only where
+     * useNativeOverlaysForTextFields() holds, which the default configuration does not, so a
+     * screen reader was left with a field it could focus and never change. SET_TEXT now gets a
+     * control that can carry a value -- a real input, not a button -- which is what an action
+     * taking an argument needed all along.</p>
      */
     private boolean isStandardWebAction(String id) {
         return AccessibilityAction.ACTIVATE.equals(id) || AccessibilityAction.FOCUS.equals(id)
-                || AccessibilityAction.INCREMENT.equals(id) || AccessibilityAction.DECREMENT.equals(id)
-                || AccessibilityAction.SET_TEXT.equals(id);
+                || AccessibilityAction.INCREMENT.equals(id) || AccessibilityAction.DECREMENT.equals(id);
     }
 
     /**

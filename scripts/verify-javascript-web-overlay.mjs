@@ -141,6 +141,27 @@ if (historyLength > initialHistoryLength) {
     + `(history.length=${historyLength})`);
 }
 
+// An editable field is reachable through the overlay only if something can carry the text to
+// set. A button cannot -- it dispatches with no argument -- so SET_TEXT gets an input, and this
+// asserts the field and its control are actually connected.
+const setText = await page.evaluate(() => {
+  const tree = document.getElementById('cn1-accessibility-tree');
+  const actions = document.getElementById('cn1-accessibility-actions');
+  if (!tree) return null;
+  const boxes = Array.from(tree.querySelectorAll('[role="textbox"],[role="searchbox"]'));
+  if (boxes.length === 0) return { fields: 0 };
+  const ids = boxes.map(b => b.getAttribute('id')).filter(Boolean);
+  const inputs = actions ? Array.from(actions.querySelectorAll('input')) : [];
+  const wired = inputs.filter(i => ids.includes(i.getAttribute('aria-controls')));
+  return { fields: boxes.length, inputs: inputs.length, wired: wired.length };
+});
+if (!setText || setText.fields === 0) {
+  console.log('SKIP  editable fields expose a control that can set text :: no field on screen');
+} else {
+  check('editable fields expose a control that can set text', setText.wired > 0,
+        `${setText.wired} control(s) for ${setText.fields} field(s)`);
+}
+
 // A reload keeps the entry it happened on, and with it any id this port stamped there before
 // the reload -- while the port's own counters start again from zero. An entry left claiming an
 // id above anything the new session pushed reads as being ahead of the app, so Back to it is

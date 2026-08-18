@@ -84,6 +84,9 @@ directly instead of through pixels.
 
 Known gaps in this area:
 
+- An editable field is reached through a SET_TEXT control in the actions region rather
+  than by typing into the semantic node itself, which is a div over a canvas. A native
+  input is still what appears once editing starts.
 - Drag-selection is not enabled. The layer takes no pointer events so the canvas
   keeps hit testing; find-in-page and assistive technology do not need hit
   testing, but selection does. Enabling it requires the pointer-routing rework.
