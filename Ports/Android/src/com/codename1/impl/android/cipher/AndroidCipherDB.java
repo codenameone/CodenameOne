@@ -410,25 +410,104 @@ class AndroidCipherDB extends Database {
     private java.util.List<String> connectionSettings;
 
     /**
+     * Every connection-scoped pragma this can read back and put on the replacement connection.
+     *
+     * <p>Checked one at a time against the engine rather than guessed: each of these reports a
+     * value, keeps it for the connection that set it, and is back at its default in the next
+     * connection -- so each is lost when a conversion swaps the file and reopens. They were
+     * being restored one at a time as somebody noticed another one missing, which is the wrong
+     * shape for a list where the whole class has the same failure.
+     *
+     * <p>What is deliberately absent: {@code defer_foreign_keys}, which SQLite clears at every
+     * commit and rollback, so restoring it after a conversion would set something that is about
+     * to clear itself; and {@code journal_mode}, which is persistent in the file and carried by
+     * the migration itself rather than by the connection.
+     */
+    private static final String[] CONNECTION_PRAGMAS = {
+        // Semantics: these decide whether a statement is refused or a row is written.
+        "foreign_keys",
+        "recursive_triggers",
+        "query_only",
+        "read_uncommitted",
+        "trusted_schema",
+        "legacy_alter_table",
+        "reverse_unordered_selects",
+        "cell_size_check",
+        // Durability, which is a promise to whoever set it rather than a preference.
+        "synchronous",
+        "fullfsync",
+        "checkpoint_fullfsync",
+        "secure_delete",
+        // Behaviour under contention and load.
+        "busy_timeout",
+        "cache_size",
+        "temp_store",
+        "threads",
+        "automatic_index",
+    };
+
+    /**
      * Reads back the connection-scoped settings this can restore.
      *
-     * <p>Only the ones SQLite will report. A pragma with no getter -- case_sensitive_like and
-     * ignore_check_constraints among them -- cannot be captured by anything short of the caller
-     * telling us, and silently losing those is documented on changeKey rather than pretended
-     * about here.
+     * <p>Only the ones SQLite will report, and only when it actually reports them: a pragma this
+     * build does not implement answers with no row at all, and reading that as zero would have
+     * this SET it to zero on the new connection -- turning a pragma that defaults to on, like
+     * {@code checkpoint_fullfsync}, off as a side effect of a key change. So a value that is not
+     * there is left alone.
+     *
+     * <p>A pragma with no getter -- {@code case_sensitive_like} and
+     * {@code ignore_check_constraints} among them -- cannot be captured by anything short of the
+     * caller telling us, and that is documented on changeKey rather than pretended about here.
      */
     private java.util.List<String> captureConnectionSettings() {
         java.util.List<String> settings = new java.util.ArrayList<String>();
-        // Semantics first: these two decide whether statements are refused or rows are written,
-        // which is the difference between a conversion that preserved the caller's database and
-        // one that quietly changed the rules it runs under.
-        settings.add("PRAGMA foreign_keys = " + readHeaderPragma("PRAGMA foreign_keys"));
-        settings.add("PRAGMA recursive_triggers = " + readHeaderPragma("PRAGMA recursive_triggers"));
-        // Not semantics but not cosmetic either: a caller that raised the busy timeout did it
-        // because its workload contends, and a connection back at zero starts failing instead of
-        // waiting.
-        settings.add("PRAGMA busy_timeout = " + readHeaderPragma("PRAGMA busy_timeout"));
+        for (String pragma : CONNECTION_PRAGMAS) {
+            String value = readOptionalPragma(pragma);
+            if (value != null) {
+                settings.add("PRAGMA " + pragma + " = " + value);
+            }
+        }
         return settings;
+    }
+
+    /**
+     * One pragma's value, or null when this build does not answer for it.
+     *
+     * @param pragma the pragma name
+     * @return the value as SQLite reported it, or null
+     */
+    private String readOptionalPragma(String pragma) {
+        try {
+            android.database.Cursor c = db.rawQuery("PRAGMA " + pragma, null);
+            try {
+                if (!c.moveToFirst() || c.getColumnCount() < 1) {
+                    return null;
+                }
+                String value = c.getString(0);
+                // Restored as a number where SQLite gave a number, and not quoted either way:
+                // every pragma in the list above takes a bare token, and a value that is not one
+                // is a value this does not understand well enough to put back.
+                return value != null && value.length() > 0 && isBarePragmaValue(value)
+                        ? value : null;
+            } finally {
+                c.close();
+            }
+        } catch (RuntimeException unsupported) {
+            return null;
+        }
+    }
+
+    /** Whether a reported pragma value is a bare token that can go straight back into SQL. */
+    private static boolean isBarePragmaValue(String value) {
+        for (int iter = 0; iter < value.length(); iter++) {
+            char c = value.charAt(iter);
+            boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || c == '-' || c == '_';
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
