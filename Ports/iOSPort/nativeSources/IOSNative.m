@@ -15185,6 +15185,22 @@ static void cn1IntentsEnsureStaging() {
     });
 }
 
+/// The Core Spotlight domain this framework owns.
+///
+/// Everything indexed through Intents lives under it, so clearing "everything this framework
+/// indexed" is a domain delete rather than deleting the application's entire Spotlight index --
+/// which is what it used to be, and which took content the app indexed itself along with it.
+#define CN1_INTENT_DOMAIN_ROOT @"com.codename1.intents"
+
+/// The subdomain an entity type is indexed under. Core Spotlight deletes a domain's subdomains
+/// with it, so this nests rather than being a separate namespace.
+static NSString *cn1IntentDomain(NSString *entityType) {
+    if (entityType == nil || [entityType length] == 0) {
+        return CN1_INTENT_DOMAIN_ROOT;
+    }
+    return [NSString stringWithFormat:@"%@.%@", CN1_INTENT_DOMAIN_ROOT, entityType];
+}
+
 /// The generated Swift bridge, present only when the app declares an @AppIntent. Absent is a
 /// normal state (an app may only index content), so callers must tolerate nil.
 static Class cn1IntentBridgeClass() {
@@ -15408,9 +15424,14 @@ void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD
                     }
                 }
             }
+            // The domain is namespaced under one this framework owns. It was the bare entity
+            // type, which is app-chosen and collides with any domain the app indexes into Core
+            // Spotlight itself -- and clearIndex(null) below deleted the app's entire index
+            // rather than this framework's part of it.
+            NSString *domain = cn1IntentDomain([e objectForKey:@"type"]);
             CSSearchableItem *item = [[[CSSearchableItem alloc]
                     initWithUniqueIdentifier:uid
-                            domainIdentifier:[e objectForKey:@"type"]
+                            domainIdentifier:domain
                                 attributeSet:attrs] autorelease];
             [items addObject:item];
         }
@@ -15460,13 +15481,17 @@ void com_codename1_impl_ios_IOSNative_intentsClearIndex___java_lang_String(CN1_T
     }
     POOL_BEGIN();
     CSSearchableIndex *index = [CSSearchableIndex defaultSearchableIndex];
-    if (entityType == JAVA_NULL) {
-        [index deleteAllSearchableItemsWithCompletionHandler:nil];
-    } else {
-        NSString *domain = toNSString(CN1_THREAD_STATE_PASS_ARG entityType);
-        [index deleteSearchableItemsWithDomainIdentifiers:[NSArray arrayWithObject:domain]
-                                        completionHandler:nil];
-    }
+    // Never deleteAllSearchableItems. This API clears what was indexed *through Intents*, and
+    // that call clears everything the application ever put in Core Spotlight -- including
+    // content indexed by native code or another library, which this framework did not publish
+    // and has no business removing. Core Spotlight deletes a domain's subdomains along with it,
+    // so the framework's own root domain is exactly the right scope for "all of ours", and one
+    // subdomain for "all of this type".
+    NSString *domain = (entityType == JAVA_NULL)
+            ? CN1_INTENT_DOMAIN_ROOT
+            : cn1IntentDomain(toNSString(CN1_THREAD_STATE_PASS_ARG entityType));
+    [index deleteSearchableItemsWithDomainIdentifiers:[NSArray arrayWithObject:domain]
+                                    completionHandler:nil];
     POOL_END();
 }
 

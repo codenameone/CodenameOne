@@ -80,6 +80,10 @@ public class AndroidIntentBridge implements IntentBridge {
     private static final int API_MATCH_FLAGS = 30;
     /// How long a parked foreground request waits for the app to actually appear.
     private static final long FOREGROUND_WAIT_MILLIS = 15000L;
+    /// Stamped on every shortcut published for an indexed entity, so clearIndex can tell this
+    /// framework's rows from the application's own without guessing.
+    private static final String INDEXED_PREFIX = "cn1entity:";
+
     private static final long FOREGROUND_POLL_MILLIS = 50L;
 
     /// How long requestForeground waits for the Activity it launched. Deliberately shorter than
@@ -530,11 +534,12 @@ public class AndroidIntentBridge implements IntentBridge {
                     openUri += "&n=" + Uri.encode(nonce);
                 }
                 // Indexing publishes content the user has not necessarily touched.
-                pushShortcut(ctx, uid, title, subtitle, Uri.parse(openUri),
+                String shortcutId = shortcutIdFor(uid);
+                pushShortcut(ctx, shortcutId, title, subtitle, Uri.parse(openUri),
                         imageFor(images, imageName), false);
                 synchronized (indexed) {
-                    if (!indexed.contains(uid)) {
-                        indexed.add(uid);
+                    if (!indexed.contains(shortcutId)) {
+                        indexed.add(shortcutId);
                     }
                 }
                 published++;
@@ -556,9 +561,13 @@ public class AndroidIntentBridge implements IntentBridge {
         if (uids.isEmpty()) {
             return;
         }
-        removeShortcuts(ctx, uids);
+        List<String> shortcutIds = new ArrayList<String>();
+        for (String uid : uids) {
+            shortcutIds.add(shortcutIdFor(uid));
+        }
+        removeShortcuts(ctx, shortcutIds);
         synchronized (indexed) {
-            indexed.removeAll(uids);
+            indexed.removeAll(shortcutIds);
         }
     }
 
@@ -651,13 +660,30 @@ public class AndroidIntentBridge implements IntentBridge {
         }
     }
 
-    /// An indexed id is `type:id`; an intent shortcut is a bare intent id and never matches a
-    /// type, which is what keeps clearIndex from removing the app's own launcher actions.
-    private static boolean matchesType(String uid, String entityType) {
-        if (entityType == null) {
-            return uid.indexOf(':') > 0;
+    /// The launcher-visible id an indexed entity is published under.
+    ///
+    /// The entity uid alone was used, and "does it contain a colon" was taken to mean "this
+    /// framework published it". The shortcut namespace is the whole application's, though, not
+    /// this framework's: an app that also publishes shortcuts from native code or another
+    /// library, under an id as ordinary as `chat:compose`, had it removed and disabled by a
+    /// clearIndex() that promises to clear only what was indexed through Intents. Ownership has
+    /// to be something this framework stamps, not a character anyone might use.
+    ///
+    /// The uid keeps travelling unprefixed in the tap URI, because that is the content
+    /// reference the framework resolves, not an Android identifier.
+    private static String shortcutIdFor(String uid) {
+        return INDEXED_PREFIX + uid;
+    }
+
+    /// Whether a published shortcut is an entity this framework indexed, and of this type.
+    private static boolean matchesType(String shortcutId, String entityType) {
+        if (!shortcutId.startsWith(INDEXED_PREFIX)) {
+            return false;
         }
-        return uid.startsWith(entityType + ":");
+        if (entityType == null) {
+            return true;
+        }
+        return shortcutId.startsWith(INDEXED_PREFIX + entityType + ":");
     }
 
     public void completeInvocation(String token, String resultJson, Map<String, byte[]> images) {

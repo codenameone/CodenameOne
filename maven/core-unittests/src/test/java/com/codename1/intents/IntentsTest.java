@@ -1517,6 +1517,48 @@ class IntentsTest {
                 "the coercion rejects a fraction rather than rounding it");
     }
 
+    /// The platforms replay a donation's saved arguments verbatim on tap, with no picker in
+    /// between, so a donation that could never run publishes a launcher entry or a Siri
+    /// suggestion that fails on every tap for as long as it survives.
+    @Test
+    void aDonationThatCouldNeverRunIsRefused() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithIntParam("count_it", "count"));
+        Intents.setDispatcher(d);
+
+        Intents.donate("count_it", new HashMap<String, Object>());
+        assertNull(b.donatedId, "a required parameter with no value would fail every tap");
+
+        Map<String, Object> wrong = new HashMap<String, Object>();
+        wrong.put("count", "abc");
+        Intents.donate("count_it", wrong);
+        assertNull(b.donatedId, "and so would a value the parameter cannot accept");
+
+        Map<String, Object> good = new HashMap<String, Object>();
+        good.put("count", Integer.valueOf(3));
+        Intents.donate("count_it", good);
+        assertEquals("count_it", b.donatedId, "a donation that can run is still donated");
+    }
+
+    /// A parameterization's own bindings satisfy its parameters, and the platform merges them
+    /// in -- so the donation must not be refused for values the binding already supplies.
+    @Test
+    void aParameterizationDonationCountsItsBoundValues() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithIntParam("count_it", "count"));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("count_3", "count_it", "Count three")
+                .bind("count", Integer.valueOf(3)));
+
+        Intents.donate("count_3", new HashMap<String, Object>());
+
+        assertEquals("count_3", b.donatedId);
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

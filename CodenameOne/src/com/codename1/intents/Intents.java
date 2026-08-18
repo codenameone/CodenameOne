@@ -449,6 +449,13 @@ public final class Intents {
                     + "through the assistant, which confirms first.");
             return;
         }
+        String unusable = donationProblem(decl, params);
+        if (unusable != null) {
+            // Same reasoning as the unrepresentable case below, one step earlier: a donation the
+            // handler could not run is a durable, permanently broken suggestion.
+            logDiagnostic("Not donating \"" + intentId + "\": " + unusable);
+            return;
+        }
         String lost = IntentSerializer.unrepresentable(params);
         if (lost != null) {
             // A donation is durable: the platform keeps these values and replays them when the
@@ -1124,6 +1131,39 @@ public final class Intents {
                 base.isHeadless(), base.isDiscoverable(), base.isDestructive(),
                 base.getOpensRoute(), base.getTimeoutSeconds(),
                 Collections.<String>emptyList(), remaining, base.getExposure());
+    }
+
+    /// Why this donation could never run, or null when it could.
+    ///
+    /// A donation is not an invocation, so nothing rejects it at the time it is made -- but the
+    /// platforms replay the saved arguments verbatim when the user taps the shortcut, with no
+    /// picker in between. A donation missing a required value, or carrying one its parameter
+    /// cannot accept, therefore publishes a launcher entry or a Siri suggestion that fails on
+    /// every tap, for as long as it survives. Refusing costs only a suggestion.
+    ///
+    /// The declaration is the authority on what is missing, and for a parameterization it is
+    /// the synthesized one -- whose parameters are exactly those the binding has not already
+    /// satisfied, which is what the platform will merge in.
+    private static String donationProblem(IntentDeclaration decl, Map<String, Object> params) {
+        for (IntentParameterInfo p : decl.getParameters()) {
+            Object supplied = params == null ? null : params.get(p.getName());
+            if (supplied == null) {
+                // A default stands in for an absent value, which is what makes an optional
+                // parameter optional. The build refuses required-with-a-default, so in practice
+                // only a runtime-built declaration reaches the second half of this.
+                if (p.isRequired() && (p.getDefaultValue() == null
+                        || p.getDefaultValue().length() == 0)) {
+                    return "it has no value for the required parameter \"" + p.getName()
+                            + "\", so every tap on the shortcut would fail.";
+                }
+                continue;
+            }
+            if (!satisfies(p, supplied)) {
+                return "the value given for \"" + p.getName() + "\" is not one that parameter "
+                        + "accepts, so every tap on the shortcut would fail.";
+            }
+        }
+        return null;
     }
 
     /// Whether a bound value is one the generated coercion could accept for this parameter.
