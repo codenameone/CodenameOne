@@ -434,7 +434,7 @@ jobs:
         # could not be resolved" before a single test had run -- a Maven Central failure, which a
         # missing plugin version fails identically on every attempt anyway.
         env:
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|Connection reset|Premature end of Content-Length'
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
         run: bash ../scripts/ci/retry.sh mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
