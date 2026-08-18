@@ -408,9 +408,11 @@ public final class DevicePush {
                 }
                 return ok;
             }
+            String desktopChallenge = hex(randomBytes(32));
             out.writeInt(V3);
             out.writeInt(FRAME_PUSH);
             out.writeUTF(peerId);
+            out.writeUTF(desktopChallenge);
             out.flush();
 
             if (in.readByte() != 1) {
@@ -421,12 +423,22 @@ public final class DevicePush {
             }
             String deviceId = in.readUTF();
             String challenge = in.readUTF();
+            String deviceProof = in.readUTF();
             // Which device answered decides which secret applies: one computer
             // may be paired with several phones, and the dial-in gives no
             // advance notice of which one this is.
             byte[] secret = secretFor(deviceId);
             if (secret == null) {
                 lastRejection = "this computer is not paired with this device";
+                System.out.println("FAILED: " + lastRejection);
+                return false;
+            }
+            // The device proves itself before the bundle leaves this process. A
+            // device id is public, so anything on the LAN could answer this
+            // dial claiming to be a paired phone, and the bundle carries the
+            // program's whole source.
+            if (!respond(secret, desktopChallenge, null).equals(deviceProof)) {
+                lastRejection = "the device on the other end did not authenticate";
                 System.out.println("FAILED: " + lastRejection);
                 return false;
             }

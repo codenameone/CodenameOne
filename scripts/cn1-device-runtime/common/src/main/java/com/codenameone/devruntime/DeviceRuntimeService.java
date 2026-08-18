@@ -444,10 +444,16 @@ public class DeviceRuntimeService {
      * <p>v3 opens with a frame type. {@code FRAME_PAIR} sends
      * {@code peerId, peerName}; the device prompts for the code, replies
      * {@code 1, deviceId, challenge}, reads the computer's response and replies
-     * again with the verdict. {@code FRAME_PUSH} sends {@code peerId}; the
-     * device replies {@code 1, deviceId, challenge}, then reads
+     * again with the verdict. {@code FRAME_PUSH} sends
+     * {@code peerId, desktopChallenge}; the device replies
+     * {@code 1, deviceId, challenge, answerToDesktopChallenge}, then reads
      * {@code response, length, bundle} and checks the response against the
      * challenge <em>and the bundle</em> before anything is run.</p>
+     *
+     * <p>Both ends prove possession of the secret, and the device proves it
+     * first: a device id is public, so an unauthenticated peer that answered
+     * the desktop's dial would otherwise be handed the bundle, which carries
+     * the program's whole source.</p>
      *
      * <p>The reply is a status byte and a UTF message either way, so the desktop
      * learns whether the program actually started rather than only that the
@@ -508,6 +514,7 @@ public class DeviceRuntimeService {
                         return true;
                     } else if (frame == FRAME_PUSH) {
                         String peerId = in.readUTF();
+                        String desktopChallenge = in.readUTF();
                         byte[] secret = DeviceRuntimePairing.secretFor(peerId);
                         if (secret == null) {
                             // Said precisely, so the push tool can offer to pair
@@ -520,6 +527,12 @@ public class DeviceRuntimeService {
                             out.writeByte(1);
                             out.writeUTF(DeviceRuntimePairing.deviceId());
                             out.writeUTF(challenge);
+                            // Authentication goes both ways. A device id is
+                            // public, so without this any host on the LAN could
+                            // answer the desktop's dial, claim to be a paired
+                            // device and be handed the bundle -- which carries
+                            // the program's whole source.
+                            out.writeUTF(InterpPairingSecret.respond(secret, desktopChallenge));
                             out.flush();
 
                             String response = in.readUTF();
@@ -752,13 +765,14 @@ public class DeviceRuntimeService {
         if (rt == null) {
             return;
         }
-        rt.requestCancel();
+        rt.detach();
         // Cancellation alone stops interpreted code that is *running*. A normal
         // Lifecycle program is not running when Stop is pressed: its start()
         // returned after showing a Form, and what remains is listeners the
-        // framework still holds. Detaching the runtime is what makes those
-        // callbacks stop, and putting the runtime's own screen back is what
-        // tells the user it worked.
+        // framework still holds -- each holding a peer that holds the runtime,
+        // so dropping this field alone would not stop them. detach() makes the
+        // runtime itself refuse every later callback; putting the runtime's own
+        // screen back is what tells the user it worked.
         runtime = null;
         loadedName = "";
         loadedSource = "";

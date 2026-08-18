@@ -128,6 +128,25 @@ public final class InterpRuntime {
 
     /// Asks the running program to stop at the next checkpoint. Safe to call
     /// from another thread -- this is what the Stop button uses.
+    /// True once the program has been stopped and must not run again.
+    private volatile boolean detached;  //NOPMD AvoidUsingVolatile - set from the UI thread, read on every callback
+
+    /// Ends this runtime for good: cancels what is running and refuses every
+    /// later callback.
+    ///
+    /// Stop cannot be only a cancellation. A normal Lifecycle program is not
+    /// running when the user presses it -- its start() returned after showing a
+    /// Form -- and what remains is listeners the framework still holds.
+    public void detach() {
+        detached = true;
+        requestCancel();
+    }
+
+    /// Whether this runtime has been stopped.
+    public boolean isDetached() {
+        return detached;
+    }
+
     public void requestCancel() {
         cancelRequested = true;
     }
@@ -232,7 +251,11 @@ public final class InterpRuntime {
     /// own hot paths -- which is why the miss returns immediately rather than
     /// raising anything.
     public Object dispatch(InterpObject object, String name, String descriptor, Object[] args) {
-        if (object == null) {
+        if (object == null || detached) {
+            // Detached: the program was stopped. Its peers are still held by
+            // framework listeners and timers, and cancellation only stops code
+            // that is currently running -- so a short callback arriving now
+            // would execute happily against a program the user has ended.
             return NOT_OVERRIDDEN;
         }
         InterpMethod m = object.getType().resolve(name, descriptor);
@@ -1041,9 +1064,11 @@ public final class InterpRuntime {
                 if (local == null && isInterpretedLeaf(literal)) {
                     // `Entry[].class` for a bundle-only Entry. There is no host
                     // class for it and asking the linker to load `[LEntry;`
-                    // fails before the program can so much as call getName();
-                    // the leaf's own token is the honest stand-in.
-                    local = bundle.findClass(leafOf(literal));
+                    // fails before the program can so much as call getName(),
+                    // so the interpreter makes a token of its own -- one per
+                    // rank, so `Entry[].class == Entry[].class` holds and
+                    // `Entry[].class != Entry.class` does too.
+                    local = arrayTokenFor(literal);
                 }
                 f.pushRef(local != null
                         ? (Object) local
@@ -1111,14 +1136,17 @@ public final class InterpRuntime {
                 // Java guarantees and with it any registration the parent does.
                 linker.initializeClass(externOwnerName(c.superExtern));
             }
-            // JLS 12.4.1: initializing a class initializes the superinterfaces
-            // that declare a default method, and only those. Reaching one
-            // through an interface that declares none does not initialize the
-            // intermediate interface -- so this walks the hierarchy but
-            // initializes only the interfaces that themselves declare a
-            // default method. Initializing more would run initializers Java
-            // never runs, which is as wrong as running them late.
-            initializeDefaultBearingInterfaces(c);
+            // JLS 12.4.1: initializing a *class* initializes the
+            // superinterfaces that declare a default method, and only those.
+            // Reaching one through an interface that declares none does not
+            // initialize the intermediate interface -- so this walks the
+            // hierarchy but initializes only the interfaces that themselves
+            // declare a default method. Initializing an interface, on the other
+            // hand, initializes none of its superinterfaces at all, which is why
+            // this is skipped for one.
+            if (!c.isInterface()) {
+                initializeDefaultBearingInterfaces(c);
+            }
             InterpMethod clinit = c.declaredMethod("<clinit>", "()V");
             if (clinit != null) {
                 try {
@@ -1157,6 +1185,18 @@ public final class InterpRuntime {
     /// has ever heard of the type.
     private boolean isInterpretedLeaf(String descriptor) {
         return bundle.findClass(leafOf(descriptor)) != null;
+    }
+
+    /// The token for an interpreted array type named by a descriptor.
+    private InterpClass arrayTokenFor(String descriptor) {
+        InterpClass t = bundle.findClass(leafOf(descriptor));
+        if (t == null) {
+            return null;
+        }
+        for (int i = 0; i < descriptor.length() && descriptor.charAt(i) == '['; i++) {
+            t = t.arrayType();
+        }
+        return t;
     }
 
     /// The class name at the bottom of a descriptor: `[[LEntry;` is `Entry`.
@@ -1514,6 +1554,18 @@ public final class InterpRuntime {
             // records MyForm -- and the host has never heard of that name. The
             // peer is a generated subclass of the real framework class, so
             // walking up from it finds the method exactly where it lives.
+            // Enum's own methods first when the receiver is a constant: an
+            // interpreted enum that implements a host interface gets an
+            // Object-based peer, and that peer does not inherit java.lang.Enum,
+            // so name() and ordinal() would be looked up on something that has
+            // never heard of them.
+            if (io.enumOrdinal >= 0) {
+                Object early = enumCall(io, name, args);
+                if (early != NOT_ENUM_METHOD) {
+                    pushBoxed(f, returnKind, early);
+                    return;
+                }
+            }
             if (io.hostPeer != null) {
                 // The peer's own class name, recorded when the factory built it
                 // rather than read back from getClass(). ParparVM derives
@@ -1687,11 +1739,16 @@ public final class InterpRuntime {
         InterpClass k = c;
         while (k != null) {
             if (k.superExtern >= 0) {
-                return resolveExternClass(k.superExtern);
+                // classObject, not the resolved handle: on iOS a resolved class
+                // is its numeric id, and a host method taking a Class wants the
+                // Class. Handing over the id makes the resource idiom fail on
+                // the platform it was most needed on.
+                return linker.classObject(resolveExternClass(k.superExtern));
             }
             k = k.superInterp;
         }
-        return linker.findClass("java/lang/Object");
+        Object object = linker.findClass("java/lang/Object");
+        return object == null ? null : linker.classObject(object);
     }
 
     private void replaceOnStack(InterpFrame f, Object placeholder, Object created) {
@@ -1750,6 +1807,12 @@ public final class InterpRuntime {
         if ("getName".equals(name) && args.length == 0) {
             return c.getName().replace('/', '.');
         }
+        if ("isArray".equals(name) && args.length == 0) {
+            return c.isArray() ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("getComponentType".equals(name) && args.length == 0) {
+            return c.arrayComponent;
+        }
         if ("getSimpleName".equals(name) && args.length == 0) {
             String n = c.getName();
             int slash = n.lastIndexOf('/');
@@ -1772,6 +1835,9 @@ public final class InterpRuntime {
         }
         if ("isInstance".equals(name) && args.length == 1) {
             return isInstanceOf(args[0], c.getName()) ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("getSimpleName".equals(name) && args.length == 0 && c.isArray()) {
+            return classCall(c.arrayComponent, "getSimpleName", args) + "[]";
         }
         if ("getSuperclass".equals(name) && args.length == 0) {
             if (c.superInterp != null) {
@@ -1869,6 +1935,16 @@ public final class InterpRuntime {
         }
         if ("ordinal".equals(name)) {
             return Integer.valueOf(io.enumOrdinal);
+        }
+        if ("getDeclaringClass".equals(name)) {
+            // The enum type, not the constant's own class: a constant with a
+            // class body is an anonymous subclass, and Java's contract is that
+            // every constant of an enum answers with the enum.
+            InterpClass k = io.type;
+            while (k != null && k.superInterp != null && k.getName().indexOf('$') > 0) {
+                k = k.superInterp;
+            }
+            return k;
         }
         if ("equals".equals(name) && args.length == 1) {
             // Enum identity is object identity: constants are singletons.
@@ -2172,7 +2248,13 @@ public final class InterpRuntime {
                 break;
             case InterpOpcodes.CALOAD: f.pushInt(((char[]) array)[index]); break;
             case InterpOpcodes.SALOAD: f.pushInt(((short[]) array)[index]); break;
-            default: f.pushRef(((Object[]) array)[index]); break;
+            default:
+                // AALOAD. Back to the interpreted object when the element is a
+                // peer: a host-typed array holds peers, and handing one to
+                // interpreted code means the next call -- owned by a class only
+                // the bundle has -- goes to a linker that cannot resolve it.
+                f.pushRef(fromHost(((Object[]) array)[index]));
+                break;
         }
     }
 

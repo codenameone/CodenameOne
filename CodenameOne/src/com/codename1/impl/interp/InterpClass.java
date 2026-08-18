@@ -137,9 +137,38 @@ public final class InterpClass {
         this.name = name;
     }
 
-    /// The JVM internal name (a/b/C).
+    /// The JVM internal name (a/b/C), or a descriptor for an array type.
     public String getName() {
         return name;
+    }
+
+    /// The element type when this token stands for an array type, else null.
+    ///
+    /// `Entry[].class` needs a token of its own: sharing the leaf's would make
+    /// `Entry[].class == Entry.class` true, `getName()` answer `Entry`, and
+    /// `isInstance` test the elements rather than the array.
+    InterpClass arrayComponent;
+
+    /// The token for an array of this type, created once and reused so
+    /// `Entry[].class == Entry[].class` holds.
+    synchronized InterpClass arrayType() {
+        if (arrayToken == null) {
+            InterpClass t = new InterpClass("[" + descriptorOf(this));
+            t.arrayComponent = this;
+            arrayToken = t;
+        }
+        return arrayToken;
+    }
+
+    private InterpClass arrayToken;
+
+    /// Whether this token stands for an array type.
+    public boolean isArray() {
+        return arrayComponent != null;
+    }
+
+    private static String descriptorOf(InterpClass c) {
+        return c.isArray() ? c.name : "L" + c.name + ";";
     }
 
     /// Whether this interpreted type is an interface. An interface has no

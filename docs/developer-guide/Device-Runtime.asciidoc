@@ -148,6 +148,17 @@ They would not be extensible on Android, which can neither patch a vtable nor lo
 
 The test stays, because the day Android grows an equivalent is the day this becomes worth doing.
 
+=== A known deviation, no ArrayStoreException for pushed types
+
+The interpreter represents every reference array as `Object[]`, because an array of a type only the bundle has can't be allocated as anything else -- the host has no such class to allocate. The array instance therefore carries no component type, and a store into it can't be checked:
+
+`A[] values = new A[1]; Object[] alias = values; alias[0] = new B();` succeeds here for unrelated pushed classes `A` and `B`, where Java throws `ArrayStoreException`.
+
+`instanceof` and `checkcast` against such an array answer by inspecting the elements, which is why the cast that follows still behaves. Against a *host* component type the host is asked instead and answers exactly, so this deviation is confined to arrays whose leaf class exists only in the bundle.
+
+Closing it means carrying the component type with every interpreted array -- a wrapper object around `Object[]`, threaded through every array opcode and every crossing into host code. That's a large change to the hottest paths in the interpreter for a mistake the compiler already rejects unless the program goes out of its way to alias the array. It's written down rather than done, and the deviation is asserted in `InterpRuntimeContractTest` so it stays a known one.
+
+
 The shims are generated during the app build -- an `exec-maven-plugin` execution in `common/pom.xml` writes them to `target/generated-sources/shims` and `build-helper` adds that as a source root -- so nothing derived is committed. Generation is required to be reproducible for exactly the reason it might look safer to check the output in: two builds of the same commit must ship the same contract, and `scripts/generate-interp-shims.sh` asserts that alongside "every shim compiles" and "the load-bearing shims exist" after you edit `GenerateInterpShims`.
 
 Two limits follow from the shim approach, and both are recorded rather than remembered.

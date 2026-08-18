@@ -744,8 +744,22 @@ public final class GenerateInterpShims {
         w.println("        Object $r = $runtime.dispatch($interp, \"" + m.getName() + "\", \""
                 + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "});");
         w.println("        if ($r == InterpRuntime.NOT_OVERRIDDEN) {");
-        w.println("            throw new AbstractMethodError(\"" + target.getName() + "."
-                + m.getName() + "\");");
+        if (m.isDefault()) {
+            // The interface's own default implementation. A pushed class that
+            // implements a host interface and does not override a default
+            // method is ordinary Java, and throwing here would make its peer
+            // fail on a method the interface plainly provides.
+            String call = target.getName() + ".super." + m.getName() + "(" + boxed + ")";
+            if (ret == Void.TYPE) {
+                w.println("            " + call + ";");
+                w.println("            return;");
+            } else {
+                w.println("            return " + call + ";");
+            }
+        } else {
+            w.println("            throw new AbstractMethodError(\"" + target.getName() + "."
+                    + m.getName() + "\");");
+        }
         w.println("        }");
         if (ret != Void.TYPE) {
             w.println("        return " + unbox(ret, "$r") + ";");

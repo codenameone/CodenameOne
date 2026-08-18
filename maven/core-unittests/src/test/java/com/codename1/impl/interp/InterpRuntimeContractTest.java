@@ -661,6 +661,31 @@ class InterpRuntimeContractTest {
         assertEquals(r[0].output, r[1].output);
     }
 
+    /// A deviation from the JVM, asserted so it stays a known one.
+    ///
+    /// An array of a pushed-only type is an `Object[]` -- there is no host class
+    /// to allocate one of -- so the instance carries no component type and a
+    /// store into it cannot be checked. Java throws ArrayStoreException here.
+    /// Closing it means a wrapper object around every interpreted array,
+    /// threaded through every array opcode and every crossing into host code:
+    /// see the developer guide for why that is written down rather than done.
+    @Test
+    @DisplayName("an aliased pushed-type array accepts a foreign element -- a known deviation")
+    void arrayStoreIsUncheckedForPushedTypes() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("ArrayStoreDeviation",
+                "public class ArrayStoreDeviation {"
+                + " static class A {}"
+                + " static class B {}"
+                + " public static void main(String[] x) {"
+                + "  Object[] alias = new A[1];"
+                + "  try { alias[0] = new B(); System.out.println(\"stored\"); }"
+                + "  catch (ArrayStoreException e) { System.out.println(\"refused\"); }"
+                + "}}");
+        assertEquals("refused", r[0].output.trim(), "the JVM checks the component type");
+        assertEquals("stored", r[1].output.trim(),
+                "the interpreter has no component type to check");
+    }
+
     /// Runs on the thread the wall-clock budget applies to.
     ///
     /// The budget is the event thread's rule -- a worker computing for ten
