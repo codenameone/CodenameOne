@@ -710,6 +710,15 @@ public final class Intents {
                 // forms the dispatcher actually parses.
                 prop.put("description", p.getTitle()
                         + " (an ISO-8601 date such as 2026-03-14, or epoch milliseconds)");
+                // And accept both in the type, not only in the prose. IntentDates takes an
+                // integral number as epoch milliseconds, so declaring string alone had a
+                // schema-enforcing caller reject a value the description had just recommended
+                // and the dispatcher would have parsed. A schema that disagrees with the
+                // coercion is a call the model could not have got right.
+                List<Object> both = new ArrayList<Object>();
+                both.add("string");
+                both.add("integer");
+                prop.put("type", both);
             }
             properties.put(p.getName(), prop);
             if (p.isRequired()) {

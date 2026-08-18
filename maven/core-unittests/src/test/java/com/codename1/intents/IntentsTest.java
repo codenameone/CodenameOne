@@ -2103,6 +2103,26 @@ class IntentsTest {
         }
     }
 
+    /// The description recommends epoch milliseconds and IntentDates parses them, so declaring
+    /// string alone had a schema-enforcing caller reject a value the schema had just
+    /// recommended -- a call the model could not have got right.
+    @Test
+    void aDateToolSchemaAcceptsBothFormsItParses() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("remind_me", "Remind", "", true, true, false,
+                "", 5, Collections.<String>emptyList(),
+                Arrays.asList(new IntentParameterInfo("when", "When?",
+                        IntentParameterType.DATE, true, null, null, null)),
+                Arrays.asList(Exposure.MODEL)));
+        Intents.setDispatcher(d);
+
+        String schema = Intents.asTools().get(0).getParametersJsonSchema();
+
+        assertTrue(schema.contains("\"type\":[\"string\",\"integer\"]"),
+                "epoch milliseconds are a number, and the description says to send them: "
+                        + schema);
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail
