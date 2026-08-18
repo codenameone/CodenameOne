@@ -107,6 +107,8 @@ The platform will usually allow around twenty seconds. Don't use them. A spoken 
 | Returned value | piped to the next action | result extras | shown
 |===
 
+An intent marked `destructive` is absent from parts of that table by design: it's not published as a launcher shortcut and not donated, because both run on a single tap with nothing between the tap and the action, and confirmation is the whole point of the flag. It stays available through the assistant and the Shortcuts app, which confirm first.
+
 *Android isn't Siri parity, and this framework doesn't pretend otherwise.* Android has no contract by which an assistant invokes an application capability and receives a typed result back, so phrases, system disambiguation and spoken results are iOS-only. Branch on `Intents.isVoiceInvocationSupported()`, not on `areIntentsSupported()`, when deciding whether to tell a user they can talk to your app.
 
 What Android does deliver is real: launcher shortcuts, dynamic shortcuts the system learns to suggest from donation, and genuinely headless execution -- the last of which is actually easier there than on iOS, because the Android port already boots without an Activity for background fetch.

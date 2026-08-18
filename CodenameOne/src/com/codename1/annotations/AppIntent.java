@@ -122,6 +122,12 @@ public @interface AppIntent {
 
     /// True when the platform should confirm with the user before running this.
     /// Set it on anything that deletes, sends, or spends.
+    ///
+    /// It also closes the paths that cannot confirm. A destructive intent is not published as
+    /// an Android launcher shortcut, is refused when an unauthenticated caller asks for it, and
+    /// is not donated -- each of those runs on a single tap with nothing in between. The
+    /// capability stays fully available through the assistant and the Shortcuts app, which
+    /// confirm first; what goes away is the one-tap route to it.
     boolean destructive() default false;
 
     /// A route template to open instead of answering in place, for example

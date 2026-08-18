@@ -267,14 +267,32 @@ class SimulatorIntents {
                         + " Type an id instead.");
                 return new TextEditor(field);
             }
-            String[] labels = new String[options.size()];
-            String[] ids = new String[options.size()];
+            List<String> labels = new ArrayList<String>();
+            List<String> ids = new ArrayList<String>();
+            String declared = p.getDefaultValue() == null ? "" : p.getDefaultValue();
+            if (!p.isRequired() && declared.length() == 0) {
+                // A combo always has a selection, so without a blank entry the form submits the
+                // first suggestion and the window exercises a request a device need not send:
+                // an optional entity with no default can simply be absent.
+                labels.add("");
+                ids.add("");
+            }
+            int preselect = 0;
             for (int i = 0; i < options.size(); i++) {
                 AppEntity e = options.get(i);
-                labels[i] = e.getTitle() == null ? e.getId() : e.getTitle() + "  (" + e.getId() + ")";
-                ids[i] = e.getId();
+                labels.add(e.getTitle() == null ? e.getId()
+                        : e.getTitle() + "  (" + e.getId() + ")");
+                ids.add(e.getId());
+                if (declared.length() > 0 && declared.equals(e.getId())) {
+                    preselect = ids.size() - 1;
+                }
             }
-            return new ChoiceEditor(new JComboBox(new DefaultComboBoxModel(labels)), ids);
+            JComboBox box = new JComboBox(new DefaultComboBoxModel(
+                    labels.toArray(new String[labels.size()])));
+            // A declared default is what the runtime would substitute, so it is what the form
+            // should start on rather than whichever entity the query happened to return first.
+            box.setSelectedIndex(preselect);
+            return new ChoiceEditor(box, ids.toArray(new String[ids.size()]));
         }
         if (!p.getOptions().isEmpty()) {
             List<String> choices = new ArrayList<String>();

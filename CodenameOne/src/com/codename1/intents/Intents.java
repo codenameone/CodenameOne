@@ -433,6 +433,21 @@ public final class Intents {
         if (!decl.isExposedTo(Exposure.ASSISTANT)) {
             return;
         }
+        if (decl.isDestructive()) {
+            // A donation becomes a launcher shortcut on Android and a suggested activity on
+            // iOS, and a tap on either dispatches the handler directly -- past the confirmation
+            // the generated App Intent performs, which is the entire promise of destructive=true.
+            // The Android static-shortcut generator and the trampoline's unauthenticated policy
+            // already refuse destructive intents for this reason; a donation is the same
+            // one-tap path and gets the same answer.
+            //
+            // The capability itself is unaffected: Siri and the Shortcuts app still offer it,
+            // and confirm before it runs, which is where a destructive action belongs.
+            logDiagnostic("Not donating \"" + intentId + "\": it is destructive, and a donated "
+                    + "shortcut runs on one tap with no confirmation. It remains available "
+                    + "through the assistant, which confirms first.");
+            return;
+        }
         try {
             b.donate(intentId, IntentSerializer.serializeParams(params));
         } catch (Throwable t) {

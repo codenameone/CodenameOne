@@ -925,6 +925,45 @@ class IntentsTest {
         assertEquals(0, b.foregroundRequests);
     }
 
+    /// A donation becomes a launcher shortcut on Android and a suggested activity on iOS, and a
+    /// tap on either dispatches the handler directly -- past the confirmation the generated App
+    /// Intent performs, which is the entire promise of destructive=true. The static-shortcut
+    /// generator and the trampoline's unauthenticated policy already refuse destructive intents;
+    /// a donation is the same one-tap path.
+    @Test
+    void donatingADestructiveIntentIsRefused() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("delete_all", "Delete everything", "",
+                true, true, true, "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.ASSISTANT)));
+        Intents.setDispatcher(d);
+
+        Intents.donate("delete_all", new HashMap<String, Object>());
+
+        assertNull(b.donatedId,
+                "a one-tap shortcut must not carry a capability that promised confirmation");
+    }
+
+    /// The capability itself is unaffected -- it is still declared, still invocable, and the
+    /// assistant still offers it with confirmation. Only the unconfirmed path is closed.
+    @Test
+    void aDestructiveIntentIsStillDeclaredAndInvocable() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, true,
+                "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.ASSISTANT)));
+        d.next = IntentResult.ok();
+        Intents.setDispatcher(d);
+
+        assertNotNull(Intents.getDeclaration("known"));
+        Intents.invoke("known", null);
+        assertEquals(Arrays.asList("known"), d.invoked);
+    }
+
     /// A parameterization registered at runtime is a declaration too -- donating one is the
     /// point of DynamicIntent, so the check must not refuse it.
     @Test
