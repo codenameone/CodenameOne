@@ -2671,7 +2671,14 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             // "heat, to 21", and HomeKit applies the writes as a batch --
             // refusing on the mode the thermostat is about to leave would
             // make that impossible to express.
-            BOOL waitsForMode = NO;
+            // The index of the mode write this setpoint waits on, not just
+            // "some mode write on this service": a batch may carry several,
+            // and only the one that leaves AUTO justifies the setpoint.
+            // Keyed by service, a successful AUTO write finishing first
+            // released the setpoint anyway -- and which of them finished
+            // first was down to the accessory, so the same batch behaved
+            // differently from run to run.
+            NSUInteger waitsForEntry = NSNotFound;
             if ([traitId isEqualToString:@"target_temperature"]
                     && cn1homeHasNoValueNow(service, traitId)) {
                 for (NSUInteger j = 0; j < count; j++) {
@@ -2696,11 +2703,13 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                     // landed and was reported as applied, which is precisely
                     // the "applied a target nothing can read back" this
                     // refusal exists to prevent.
-                    waitsForMode = cn1homeFindCharacteristic(
-                        service, @"target_heating_cooling") != nil;
+                    if (cn1homeFindCharacteristic(
+                            service, @"target_heating_cooling") != nil) {
+                        waitsForEntry = j;
+                    }
                     break;
                 }
-                if (!waitsForMode) {
+                if (waitsForEntry == NSNotFound) {
                     [records replaceObjectAtIndex:i
                                        withObject:cn1homeJoinFields(
                         [base arrayByAddingObjectsFromArray:
@@ -2838,9 +2847,9 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                     }];
                 }
             };
-            NSString *serviceKey = [NSString stringWithFormat:@"%@\t%@",
-                                    accessoryId, serviceId];
-            if (waitsForMode) {
+            if (waitsForEntry != NSNotFound) {
+                NSString *serviceKey = [NSString stringWithFormat:@"%lu",
+                                        (unsigned long) waitsForEntry];
                 void (^waiting)(BOOL) = ^(BOOL modeApplied) {
                     if (modeApplied) {
                         writeParts();
@@ -2870,10 +2879,12 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                 continue;
             }
             if ([traitId isEqualToString:@"target_heating_cooling"]) {
-                // This write is somebody's prerequisite. Its own answer is
-                // reported by writeParts as usual; releasing the setpoints
-                // that waited on it is the extra step.
-                releaseAfterMode = serviceKey;
+                // This write may be somebody's prerequisite -- the queue is
+                // keyed by THIS entry, so a second mode write in the same
+                // batch releases nothing that was not waiting on it. Its own
+                // answer is reported by writeParts as usual.
+                releaseAfterMode = [NSString stringWithFormat:@"%lu",
+                                    (unsigned long) i];
             }
             writeParts();
         }

@@ -5274,7 +5274,25 @@ public class IPhoneBuilder extends Executor {
             // The hint settles it, whatever the code says: it exists for the
             // build whose call the scanner cannot read, and a developer who
             // wrote it down has answered the question this refuses over.
-            return "true".equalsIgnoreCase(hint);
+            //
+            // Which is exactly why a typo cannot mean "no". Read as a plain
+            // boolean, "treu" silently selected the ecosystem-only build and
+            // overruled a setCommissionToThisApp(true) the scanner HAD seen,
+            // so the app shipped without the controller it asked for and
+            // nothing said why.
+            String settled = hint.trim();
+            if (!"true".equalsIgnoreCase(settled)
+                    && !"false".equalsIgnoreCase(settled)) {
+                throw new BuildException(
+                        "ios.home.commissioning.fabric must be true or false,"
+                        + " got '" + hint + "'. It decides whether this build"
+                        + " ships a Matter controller and commissions"
+                        + " accessories onto a fabric of your own, and it is"
+                        + " read in preference to the code -- so a value"
+                        + " neither this nor that would quietly build the"
+                        + " opposite of what the app asked for.");
+            }
+            return "true".equalsIgnoreCase(settled);
         }
         if (homeFabricAmbiguous || (usesHomeOwnFabric
                 && usesHomeOwnFabricDeclined)) {
