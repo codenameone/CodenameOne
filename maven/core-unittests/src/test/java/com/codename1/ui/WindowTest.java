@@ -2432,6 +2432,47 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void aBlockedWindowStillRefusesItsCloseRequest() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner", new BorderLayout());
+        owner.setWindowSize(400, 300);
+        owner.show();
+
+        final int[] closes = new int[1];
+        owner.addCloseListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                closes[0]++;
+            }
+        });
+
+        Window modal = new Window("modal", new BorderLayout());
+        modal.setWindowSize(200, 150);
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+        flushSerialCalls();
+
+        // A close arrives outside the packed input queue, so it bypasses the modality
+        // filter that guards every other event. The check moved onto the event dispatch
+        // thread -- the modal stack is mutated there, so reading it from the port's
+        // callback thread raced -- and this asserts the move kept the behaviour.
+        Display.getInstance().windowCloseRequested(owner.getWindowId());
+        flushSerialCalls();
+        assertEquals(0, closes[0],
+                "a window blocked by an application modal must not close");
+
+        modal.dispose();
+        flushSerialCalls();
+
+        Display.getInstance().windowCloseRequested(owner.getWindowId());
+        flushSerialCalls();
+        assertEquals(1, closes[0],
+                "and must close again once the modal is gone");
+
+        owner.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

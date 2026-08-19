@@ -204,13 +204,18 @@ public class LinuxWindowManager extends WindowManager {
 
     @Override
     public void setModal(Object peer, boolean modal, boolean applicationWide, Object ownerPeer) {
-        // Codename One blocks input itself; this only gives the window manager the
-        // hint it needs for correct stacking and focus. GTK modality is relative to the
-        // transient parent set at creation, so the scope is already expressed there and
-        // nothing else is disabled here.
+        // Codename One blocks input itself; this only gives the window manager the hint
+        // it needs for correct stacking and focus.
+        //
+        // Only for an application wide modal, though. gtk_window_set_modal() makes the
+        // window modal for the whole application rather than for its transient parent,
+        // so raising it for MODALITY_WINDOW made every other window and the main form
+        // unusable -- while Display.blocks() deliberately blocks only the owner. A
+        // window scoped modal expresses its scope through the per-window sensitivity
+        // wiring in setInputEnabled instead.
         int s = slot(peer);
         if (s >= 0) {
-            LinuxNative.desktopWindowSetFlag(s, FLAG_MODAL, modal);
+            LinuxNative.desktopWindowSetFlag(s, FLAG_MODAL, modal && applicationWide);
         }
     }
 

@@ -2971,13 +2971,11 @@ public final class Display extends CN1Constants {
     ///
     /// - `windowId`: the id the port was given when the window was created
     public void windowCloseRequested(int windowId) {
-        // A close arrives outside the packed input queue, so it bypasses the modality
-        // filter that guards every other event. A port that cannot disable a blocked
-        // window natively -- Catalyst has no such control -- would otherwise let the
-        // user close a window an application modal is supposed to be blocking.
-        if (isBlockedByModal(windowId)) {
-            return;
-        }
+        // Queued first, and the modality check made on the event dispatch thread inside
+        // the callback. The modal stack is mutated there by show, hide and dispose, so
+        // testing it from the port's callback thread raced: isBlockedByModal takes the
+        // stack's size and then indexes it, which a concurrent removal turns into an
+        // exception, and a stale read could let a blocked window's close through.
         callSerially(new WindowCallback(windowId, WindowCallback.CLOSE_REQUESTED));
     }
 
@@ -3454,7 +3452,13 @@ public final class Display extends CN1Constants {
                     }
                     break;
                 case CLOSE_REQUESTED:
-                    if (w != null) {
+                    // A close arrives outside the packed input queue, so it bypasses the
+                    // modality filter that guards every other event. A port that cannot
+                    // disable a blocked window natively -- Catalyst has no such control
+                    // -- would otherwise let the user close a window an application
+                    // modal is supposed to be blocking. Checked here rather than at the
+                    // callback, so the modal stack is only ever read on this thread.
+                    if (w != null && !Display.getInstance().isBlockedByModal(windowId)) {
                         w.closeRequested();
                     }
                     break;
