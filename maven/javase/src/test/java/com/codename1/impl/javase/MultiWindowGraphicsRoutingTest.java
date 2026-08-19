@@ -375,4 +375,44 @@ class MultiWindowGraphicsRoutingTest {
             w.dispose();
         }
     }
+
+    @Test
+    void theMonitorFingerprintSeesTheWorkArea() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+
+        // A taskbar or dock that moves edge, changes size or toggles auto-hide
+        // reconfigures the work area while leaving the monitor's bounds and scale
+        // identical. A fingerprint built only from bounds and scale is byte-identical
+        // across that change, so monitorsChanged() never fires: windows keep a stale
+        // work area and centerOnDesktop() can place one under the taskbar that just
+        // appeared.
+        java.lang.reflect.Method sig =
+                JavaSEWindowManager.class.getDeclaredMethod("topologySignature");
+        sig.setAccessible(true);
+        String actual = (String) sig.invoke(null);
+        assumeFalse("unavailable".equals(actual), "display was mid-reconfiguration");
+
+        // Rebuild the bounds-and-scale-only fingerprint the code used to produce, and
+        // require that the real one carries strictly more than it -- otherwise a
+        // work-area change is invisible to the poller.
+        StringBuilder boundsOnly = new StringBuilder();
+        for (java.awt.GraphicsDevice device
+                : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+            java.awt.GraphicsConfiguration cfg = device.getDefaultConfiguration();
+            java.awt.Rectangle b = cfg.getBounds();
+            boundsOnly.append(device.getIDstring()).append(':')
+                    .append(b.x).append(',').append(b.y).append(',')
+                    .append(b.width).append('x').append(b.height).append('@')
+                    .append(cfg.getDefaultTransform().getScaleX()).append(';');
+        }
+        assertNotEquals(boundsOnly.toString(), actual,
+                "the fingerprint must carry more than bounds and scale, or a taskbar "
+                        + "change never reaches monitorsChanged()");
+
+        java.awt.Insets in = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(
+                java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+                        .getDefaultScreenDevice().getDefaultConfiguration());
+        assertTrue(actual.contains(in.top + "," + in.left + "," + in.bottom + "," + in.right),
+                "the primary display's screen insets must appear in the fingerprint");
+    }
 }

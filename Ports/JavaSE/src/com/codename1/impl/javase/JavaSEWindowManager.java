@@ -92,18 +92,31 @@ public class JavaSEWindowManager extends WindowManager {
         }, MONITOR_POLL_MS, MONITOR_POLL_MS);
     }
 
-    /** Cheap fingerprint of the attached displays: count, bounds and scale. */
+    /**
+     * Cheap fingerprint of the attached displays: count, bounds, scale and screen
+     * insets.
+     *
+     * The insets matter as much as the bounds. A taskbar or dock that moves edge,
+     * changes size or toggles auto-hide reconfigures the work area while leaving the
+     * monitor's bounds and scale identical, so a fingerprint without them never fired
+     * monitorsChanged(): windows kept a stale work area and centerOnDesktop() could
+     * place one underneath the taskbar that had just appeared.
+     */
     private static String topologySignature() {
         StringBuilder sb = new StringBuilder();
         try {
+            Toolkit toolkit = Toolkit.getDefaultToolkit();
             for (GraphicsDevice device : devices()) {
                 GraphicsConfiguration cfg = device.getDefaultConfiguration();
                 Rectangle b = cfg.getBounds();
                 AffineTransform tx = cfg.getDefaultTransform();
+                Insets in = toolkit.getScreenInsets(cfg);
                 sb.append(device.getIDstring()).append(':')
                         .append(b.x).append(',').append(b.y).append(',')
                         .append(b.width).append('x').append(b.height).append('@')
-                        .append(tx.getScaleX()).append(';');
+                        .append(tx.getScaleX()).append('/')
+                        .append(in.top).append(',').append(in.left).append(',')
+                        .append(in.bottom).append(',').append(in.right).append(';');
             }
         } catch (Throwable err) {
             // A display being reconfigured mid-query throws in AWT; the next tick sees
