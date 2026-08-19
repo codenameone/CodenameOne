@@ -1076,13 +1076,13 @@ public final class GenerateInterpShims {
             w.println("            return new " + simpleName + "(rt, o" + cast + ");");
             w.println("        }");
         }
-        // The fallback is the no-argument peer, which only exists when the
-        // framework class has a no-argument constructor to chain to.
-        if (hasNoArgConstructor(target)) {
-            w.println("        return new " + simpleName + "(rt, o);");
-        } else {
-            w.println("        return null;   // no no-arg constructor to chain to");
-        }
+        // Anything else is a constructor this shim does not have -- one the
+        // device's API lacks, or one the generator could not emit. Substituting
+        // the no-argument peer would run a different constructor than the
+        // program wrote, silently losing both its arguments and whatever that
+        // constructor does; saying so names the class and the descriptor.
+        w.println("        throw new UnsupportedOperationException(\"" + typeName(target)
+                + " has no constructor \" + descriptor + \" on this device\");");
         w.println("    }");
         w.println();
     }

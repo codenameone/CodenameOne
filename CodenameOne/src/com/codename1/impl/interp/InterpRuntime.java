@@ -191,6 +191,30 @@ public final class InterpRuntime {
                 + " a Lifecycle to start");
     }
 
+    /// The pushed Lifecycle, when the program has one.
+    private InterpObject lifecycle;
+
+    /// Delivers `stop()` to the pushed Lifecycle, if it has one to receive.
+    ///
+    /// The platform calls stop before an application goes away, and a program
+    /// that acquired anything releases it there. Call it before [#detach],
+    /// which is what makes every later callback a no-op -- including this one.
+    ///
+    /// @return whether a stop() actually ran
+    public boolean stopLifecycle() throws Throwable {
+        InterpObject app = lifecycle;
+        if (app == null || detached) {
+            return false;
+        }
+        lifecycle = null;
+        // The interpreted override when there is one, the framework's own
+        // through the peer when there is not -- the same route init and start
+        // took, so a program that overrides nothing still behaves like the
+        // Lifecycle it is.
+        callLifecycle(app.getType(), app, "stop", "()V", new Object[0]);
+        return true;
+    }
+
     /// Whether this interpreted class has the named host class as a supertype.
     ///
     /// [InterpClass#isSubclassOfInterp] cannot answer it: as its name says, it
@@ -226,6 +250,11 @@ public final class InterpRuntime {
 
         Object target = app.hostPeer != null ? app.hostPeer : app;
         callLifecycle(c, app, "init", "(Ljava/lang/Object;)V", new Object[]{null});
+        // Held so stop() can be delivered later: a Lifecycle that opened a
+        // media player, a socket or a sensor releases it there, and detaching
+        // the runtime without calling it leaves those running against the
+        // runtime's own screen and the next pushed program.
+        lifecycle = app;
         callLifecycle(c, app, "start", "()V", new Object[0]);
         return target;
     }

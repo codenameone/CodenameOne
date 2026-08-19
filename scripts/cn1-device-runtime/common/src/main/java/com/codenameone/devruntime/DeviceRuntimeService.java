@@ -620,9 +620,8 @@ public class DeviceRuntimeService {
      * id and the device id -- so what an eavesdropper sees is a nonce and an
      * HMAC over it.</p>
      */
-    private void handlePairing(DataInputStream in, DataOutputStream out) throws IOException {
-        String peerId = in.readUTF();
-        String peerName = in.readUTF();
+    private void handlePairing(String peerId, String peerName,
+                               DataInputStream in, DataOutputStream out) throws IOException {
         String code = DeviceRuntimePairing.promptForCode(peerId, peerName);
         if (code == null) {
             out.writeByte(0);
@@ -746,13 +745,21 @@ public class DeviceRuntimeService {
                     }
                 } else if (version == PROTOCOL_V3) {
                     int frame = in.readInt();
-                    started.set();
                     if (frame == FRAME_PING) {
+                        started.set();
                         out.writeByte(1);
                         out.writeUTF(DeviceRuntimePairing.deviceId());
                         out.flush();
                         return true;
                     } else if (frame == FRAME_PAIR) {
+                        // The identity first, and only then the prompt. Both
+                        // fields are bounded and are the peer's to send at once;
+                        // claiming before reading them let anything that opened
+                        // a connection and stalled hold the single prompt slot
+                        // for the life of the app, refusing every real pairing.
+                        String peerId = in.readUTF();
+                        String peerName = in.readUTF();
+                        started.set();
                         // One prompt at a time, and a pause after a refusal.
                         // Nothing has authenticated yet at this point -- that is
                         // what pairing is for -- so anything on the network can
@@ -765,7 +772,7 @@ public class DeviceRuntimeService {
                             return true;
                         }
                         try {
-                            handlePairing(in, out);
+                            handlePairing(peerId, peerName, in, out);
                         } finally {
                             releasePairingPrompt();
                         }
@@ -773,6 +780,10 @@ public class DeviceRuntimeService {
                     } else if (frame == FRAME_PUSH) {
                         String peerId = in.readUTF();
                         String desktopChallenge = in.readUTF();
+                        // Same rule: the exchange is identified once its bounded
+                        // header has arrived, and only then may it wait as long
+                        // as it likes.
+                        started.set();
                         byte[] secret = DeviceRuntimePairing.secretFor(peerId);
                         if (secret == null) {
                             // Said precisely, so the push tool can offer to pair
@@ -983,8 +994,17 @@ public class DeviceRuntimeService {
         // still held by framework listeners and timers, and without this they
         // go on dispatching into the old runtime alongside the new one -- and
         // Stop, later, would only detach the newest.
-        InterpRuntime previous = runtime;
+        final InterpRuntime previous = runtime;
         if (previous != null) {
+            // The replaced program gets its stop() too, and on the event thread
+            // because that is where a Lifecycle's callbacks belong -- releasing
+            // a recorder or a sensor from a socket thread is not something the
+            // framework expects.
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                public void run() {
+                    stopLifecycleQuietly(previous);
+                }
+            });
             previous.detach();
         }
         ShimObjectFactory factory = new ShimObjectFactory();
@@ -1100,11 +1120,33 @@ public class DeviceRuntimeService {
         return runtime != null;
     }
 
+    /**
+     * Delivers stop() to a pushed Lifecycle, reporting rather than propagating.
+     *
+     * <p>Stopping has to finish. A program whose stop() throws is a program
+     * with a bug, not a reason to leave the runtime half-detached with its
+     * screen still owned by the thing the user asked to end.</p>
+     */
+    private void stopLifecycleQuietly(InterpRuntime rt) {
+        try {
+            if (rt.stopLifecycle()) {
+                System.out.println("CN1SS:DEVRUNTIME delivered stop() to the pushed program");
+            }
+        } catch (Throwable t) {
+            System.out.println("CN1SS:DEVRUNTIME the pushed program's stop() threw: " + t);
+        }
+    }
+
     public void stopProgram() {
         InterpRuntime rt = runtime;
         if (rt == null) {
             return;
         }
+        // stop() first, while the runtime still answers: a Lifecycle that
+        // opened a media player, a socket or a sensor releases it there, and
+        // detaching without delivering stop leaves those running against the
+        // runtime's own screen and against whatever is pushed next.
+        stopLifecycleQuietly(rt);
         rt.detach();
         // Cancellation alone stops interpreted code that is *running*. A normal
         // Lifecycle program is not running when Stop is pressed: its start()
