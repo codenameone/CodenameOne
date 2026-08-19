@@ -6296,6 +6296,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return surfaceBridge;
     }
 
+    private AndroidHomeBridge homeBridge;
+
+    /// Returns the smart-home bridge. Always returned rather than
+    /// conditionally null: the bridge answers honestly through
+    /// {@link AndroidSmartHomeSupport}, which is empty unless the builder
+    /// injected a delegate, so {@code SmartHome} reports NOT_SUPPORTED
+    /// without this getter needing to know how the app was built.
+    ///
+    /// Note that a delegate being present does not mean the graph is
+    /// readable. The ordinary Android answer is
+    /// {@code HomeAvailability.COMMISSIONING_ONLY}: Play services can add a
+    /// Matter accessory with no setup at all, while reading or controlling
+    /// one needs the Google Home APIs and a Google Cloud project only the
+    /// app's developer can create.
+    @Override
+    public com.codename1.home.spi.HomeBridge getHomeBridge() {
+        if (homeBridge == null) {
+            homeBridge = new AndroidHomeBridge();
+        }
+        return homeBridge;
+    }
+
     /// Invoked once the app has started (from the generated stub, next to
     /// `deliverPendingSharedContent`) to flush surface actions that arrived through the
     /// `CN1SurfaceActionActivity` trampoline before the app instance existed.

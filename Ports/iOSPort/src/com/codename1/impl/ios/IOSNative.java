@@ -561,7 +561,7 @@ public final class IOSNative {
     native boolean cn1VisionIsSupported(int feature, boolean mlKit);
     native String cn1VisionAnalyze(byte[] imageData, int feature, boolean mlKit,
                                    int rotationDegrees, int width, int height,
-                                   int frameFormat);
+                                   int frameFormat, String textScript);
     native boolean cn1LanguageIsSupported(int feature, boolean mlKit);
     native String cn1LanguageIdentify(String text, float minimumConfidence,
                                       boolean mlKit);
@@ -1270,6 +1270,133 @@ public final class IOSNative {
     /// Forgets that a path's value was received, so the next context update delivers it again.
     /// Used to recover a delivery the pending-delivery cap discarded.
     native void wearableForgetReceived(String path);
+
+    // --- Smart home (HomeKit, plus MatterSupport for commissioning) ---------
+    // Backs com.codename1.home. Compiled only when the builder flipped
+    // CN1_INCLUDE_HOMEKIT, which it does when the app references the package; without it every
+    // native below answers unsupported and the whole API reports NOT_SUPPORTED.
+    //
+    // Arrays cross as ONE newline-joined string in both directions rather than as String[].
+    // Building a Java array of Java strings from Objective-C means allocating on the ParparVM heap
+    // from whatever thread HomeKit called back on; joining costs a string concatenation on a side
+    // where that is free. IOSHomeBridge does the splitting. A field can never contain a newline or
+    // a tab because the native side replaces both with a space before joining -- the only fields
+    // carrying arbitrary text are user-chosen accessory, room and scene names, and a name that
+    // loses a line break is worth less than a record that survives.
+    //
+    // Every method taking a requestId returns immediately and answers later through
+    // IOSHomeCallbacks.
+
+    /** True when HomeKit is present and this build linked it. */
+    native boolean homeSupported();
+
+    /** The com.codename1.home.HomeAvailability ordinal for the current state. */
+    native int homeAvailability();
+
+    /** The com.codename1.home.HomeAuthorizationStatus ordinal. */
+    native int homeAuthorizationStatus();
+
+    /**
+     * What the build is missing that HomeKit needs -- the entitlement, the usage description --
+     * one sentence per line. Empty when nothing is missing.
+     */
+    native String homeConfigurationProblems();
+
+    /** Connects to HMHomeManager and loads the graph. Answers via IOSHomeCallbacks.started. */
+    native void homeStart(int requestId);
+
+    /** Releases the home manager and every delegate and observer. Idempotent. */
+    native void homeStop();
+
+    /** Prompts for access. Answers via IOSHomeCallbacks.authorization when the prompt closes. */
+    native void homeRequestAuthorization(int requestId);
+
+    /** Opens this app's page in Settings, the only recovery from a denied grant. */
+    native boolean homeOpenSettings();
+
+    /** Opens the Apple Home app so the user can create a home or add an accessory. */
+    native boolean homeOpenEcosystemApp();
+
+    /** The homes, one record per line. */
+    native String homeStructures();
+
+    /** The rooms of one home, one record per line. */
+    native String homeRooms(String structureId);
+
+    /** The zones of one home, one record per line. HomeKit is the only backend that has these. */
+    native String homeZones(String structureId);
+
+    /** The accessories of one home, one record per line. */
+    native String homeAccessories(String structureId);
+
+    /** The services of one accessory, one record per line. */
+    native String homeServices(String accessoryId);
+
+    /** The traits of one service, one record per line. */
+    native String homeTraits(String accessoryId, String serviceId);
+
+    /** Reloads the graph. Answers via IOSHomeCallbacks.refreshed. */
+    native void homeRefresh(int requestId);
+
+    /**
+     * Reads characteristics. The three lists are newline-joined and positionally aligned.
+     * Answers via IOSHomeCallbacks.readings.
+     */
+    native void homeReadTraits(int requestId, String accessoryIds, String serviceIds,
+            String traitIds, boolean allowCached);
+
+    /**
+     * Writes characteristics. All eight lists are newline-joined and positionally aligned;
+     * {@code authorizationData} carries a door-lock credential per write, which HomeKit ignores and
+     * which is carried because the SPI is shared with Matter. Answers via
+     * IOSHomeCallbacks.writeResults.
+     */
+    native void homeWriteTraits(int requestId, String accessoryIds, String serviceIds,
+            String traitIds, String kinds, String numericValues, String stringValues,
+            String unitWireIds, String authorizationData);
+
+    /** Starts watching characteristics. Changes arrive via IOSHomeCallbacks.changes. */
+    native void homeSubscribe(int requestId, String subscriptionId, String accessoryIds,
+            String serviceIds, String traitIds);
+
+    /** Stops watching and disables the underlying notifications. */
+    native void homeUnsubscribe(String subscriptionId);
+
+    /**
+     * Hands over changes gathered while nothing was listening. HomeKit does push, so this is
+     * usually empty -- it exists because the SPI is shared with backends that do not.
+     */
+    native void homeDrainChanges(int requestId);
+
+    /** The action sets of one home, one record per line. */
+    native String homeScenes(String structureId);
+
+    /** What one action set does, one record per line. */
+    native String homeSceneActions(String structureId, String sceneId);
+
+    /** Runs an action set. Answers via IOSHomeCallbacks.sceneResult. */
+    native void homeExecuteScene(int requestId, String structureId, String sceneId);
+
+    /** Creates an action set. Answers via IOSHomeCallbacks.sceneResult with the new scene. */
+    native void homeCreateScene(int requestId, String structureId, String name,
+            String accessoryIds, String serviceIds, String traitIds, String kinds,
+            String numericValues, String stringValues, String unitWireIds);
+
+    /** Deletes an action set. Answers via IOSHomeCallbacks.sceneResult. */
+    native void homeDeleteScene(int requestId, String structureId, String sceneId);
+
+    /** The com.codename1.home.commissioning.CommissioningStyle ordinal for this platform. */
+    native int homeCommissioningStyle();
+
+    /**
+     * Runs the MatterSupport add-device flow. Answers via
+     * IOSHomeCallbacks.commissioningResult when the OS sheet closes, however it closed.
+     */
+    native void homeCommission(int requestId, String setupPayload, String structureId,
+            String roomId, String suggestedName, int timeoutMillis);
+
+    /** Asks an accessory to identify itself. Answers via IOSHomeCallbacks.identifyResult. */
+    native void homeIdentify(int requestId, String accessoryId);
 
     // --- Secure storage (Security.framework keychain) -----------------------
 

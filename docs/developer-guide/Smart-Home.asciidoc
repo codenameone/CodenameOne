@@ -1,0 +1,172 @@
+== Smart Home
+
+Codename One ships a cross-platform smart-home API under `com.codename1.home` that reads the accessories in a user's home, reads and writes what they can do, watches them for change, runs scenes, and adds new Matter accessories.
+
+`SmartHome.getInstance()` is the single entry point and never returns `null`: ports without smart-home support return a fallback whose operations fail fast with `HomeError.NOT_SUPPORTED` and whose graph accessors return empty lists, so calling code needs no platform-specific `if`.
+
+Every callback -- `AsyncResource` results, change batches, structure events -- is delivered on the EDT, on every platform. That includes the desktop, the simulator and the JavaScript port, which marshal rather than answering on whichever thread called, so a read started from a worker thread can update the UI from its callback directly.
+
+=== The model
+
+A `HomeStructure` holds rooms (`HomeRoom`) and accessories (`Accessory`). An accessory has one or more services (`AccessoryService`) -- a two-gang wall switch is one accessory with two services -- and a service exposes traits (`Trait`).
+
+A trait is a canonical capability, not a platform identifier. `Trait.BRIGHTNESS` is the same constant whether the accessory is behind HomeKit or Matter, and the port maps it to `HMCharacteristicTypeBrightness` or to Level Control's `CurrentLevel` for you. No HomeKit characteristic string and no Matter cluster id ever reaches your code.
+
+Graph objects are immutable snapshots. Nothing on an `Accessory` calls into the platform when you read a getter; when the topology moves, a `HomeStructureListener` tells you to call `refresh()` and read the graph again once it completes.
+
+[options="header"]
+|===
+| Capability | iOS / iPadOS | watchOS / tvOS | Android (default) | Android (Home APIs) | Simulator / desktop
+| Read the accessory graph | yes | yes | *no* | yes | yes (synthetic)
+| Read and write traits | yes | yes | *no* | yes | yes
+| Run scenes | yes | yes | *no* | yes | yes
+| Create scenes | yes | yes | *no* | varies | yes
+| Live change delivery | yes (foreground) | yes (foreground) | *no* | *no* | *no*
+| Add a Matter accessory | yes | *no* | yes | yes | yes (synthetic)
+| Zones | yes | yes | *no* | *no* | *no*
+| Automations and triggers | *no* | *no* | *no* | *no* | *no*
+|===
+
+Branch through the capability queries -- `SmartHome.getAvailability()`, `AccessoryService.supports(...)`, `TraitSubscription.isPushDelivery()`, `Commissioner.isSupported()` -- rather than through platform detection.
+
+=== Quick start
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SmartHomeJava001Snippet.java[tag=smart-home-java-001,indent=0]
+----
+
+Check `getAvailability()` before anything else. Several of its states are recoverable by the user, and the recovery differs: sending someone to Google Play for a provider update when what they need is to open the Home app helps nobody.
+
+=== Android's default answer isn't "available"
+
+This is the one thing worth understanding before you design a screen.
+
+With no extra setup, an Android app can commission a Matter accessory into the user's Google Home and can do nothing else. The graph is empty and no trait can be read or written. `getAvailability()` reports `COMMISSIONING_ONLY`, and that state exists so the word `AVAILABLE` doesn't mean something different on Android than it does on iOS.
+
+Reading and controlling accessories on Android needs the Google Home APIs, which need a Google Cloud project and a Google Home Developer Console registration carrying the SHA-1 of your own signing key. Codename One can't create those on your behalf. That integration isn't in this release; commissioning is.
+
+`SmartHome.getConfigurationProblems()` explains the gap in text aimed at you rather than at your user -- log it or show it in a debug screen, and don't put it in front of somebody holding a phone.
+
+=== Reading and writing
+
+A read returns one `TraitReading` per requested trait, and **a partial success is the normal case**: three values and one unreachable accessory is a successful read with one failed row, not a failed operation.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SmartHomeJava003Snippet.java[tag=smart-home-java-003,indent=0]
+----
+
+Note the three-way branch. A reading can carry a value, carry an error, or carry neither -- and the third is the one that catches people. An accessory can legitimately have nothing to report: a sensor that hasn't measured yet, a light in white mode that has no meaningful hue. Nothing in this API substitutes a zero for a measurement that was never taken, so `hasValue()` has to be asked.
+
+Writing is the mirror image, and a batch write partly succeeding is equally normal -- "turn off every light" against a home with one dead bulb mostly worked.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SmartHomeJava002Snippet.java[tag=smart-home-java-002,indent=0]
+----
+
+Build controls from the accessory's own `TraitConstraint` rather than from the trait's nominal range. A dimmer whose floor is 10 percent says so there, and writing below the floor is **refused rather than clamped**: an app that asked for 5 percent and got 10 percent without being told never learns it was wrong.
+
+=== Values and units
+
+`TraitValue` is one type with kind-checked getters rather than a class per trait. There's no zero-argument `getDouble()` on purpose: `getDouble(TraitUnit)` makes you name the unit you expect and refuses a cross-dimension request, which is what stops a Celsius setpoint being rendered as Fahrenheit.
+
+Everything proportional is normalized to a percentage, so Matter's 0-254 level control and 0-10000 covering position never reach your code. Color temperature is in mireds, because that's what both platforms use natively -- and remember that **a higher mired value is a warmer light**. `TraitValue.getColorTemperatureKelvin()` converts if you would rather think in Kelvin.
+
+Where a mapping is lossy, `TraitValue.getRawPlatformValue()` carries the platform's own ordinal alongside the canonical one. Air quality has six levels on HomeKit and seven on Matter; the canonical enum follows Matter and the raw value is there for an app that needs to be exact.
+
+=== Watching for change
+
+**Nothing wakes your app for an accessory change.** HomeKit delivers changes only while your app is running in the foreground, and the Google Home APIs need a live signed-in client -- the home hub, not your app, is what reacts to a sensor while the phone is asleep.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SmartHomeJava004Snippet.java[tag=smart-home-java-004,indent=0]
+----
+
+Ask `isPushDelivery()` rather than assuming. Where it answers `false`, which is everywhere except HomeKit in the foreground, the listener fires only when you call `drainChanges()`. Wire that into the point where your app comes to the foreground.
+
+Within a subscription's window, changes are coalesced per accessory, service and trait, keeping only the newest value -- so dragging a dimmer produces one reading showing where it ended up rather than forty showing the journey. A batch is a state update, not an event log.
+
+Hold on to the `TraitSubscription` and stop it. A dropped one keeps its listener reachable and keeps the platform delivering.
+
+=== Scenes
+
+A scene is a named set of accessory states that can be applied in one go: HomeKit's action set, a Google Home scene. `TraitWrite.toSceneAction()` turns the changes a user just made into one.
+
+Automations -- a scene plus a trigger -- *aren't supported*. HomeKit, Google Home and Matter model triggers in three incompatible ways and Matter has none, so there's no honest common shape. `SmartHome.isAutomationSupported()` answers `false` everywhere, so an app can say why the feature it wanted isn't offered.
+
+=== Adding an accessory
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SmartHomeJava005Snippet.java[tag=smart-home-java-005,indent=0]
+----
+
+Two things about this flow.
+
+**The interaction isn't yours.** Both mobile backends hand it to an operating-system sheet, and the user may be several minutes -- they have to power the accessory on, hold a button, sometimes join it to Wi-Fi. There's no progress reporting. Don't put a short timeout or a determinate progress bar behind it.
+
+**Success doesn't always mean you got a device.** `wasCommissionedToThisApp()` is the difference between "the accessory was added to the user's home" and "your app can address it." On Android with Play services alone the answer is the former: you're told the name and nothing more. On iOS it's the former too -- Apple's sheet reports that the flow finished without saying what was added or which home it went to -- so refresh the graph and look at what's new. An app that assumes otherwise shows a "your new device" screen with nothing on it.
+
+`SetupPayload.parse()` validates a scanned QR or typed manual code in pure Java before any of that starts, so a mis-scanned sticker gets a message in your wording rather than an opaque failure inside the OS sheet.
+
+=== Build hints
+
+[source]
+----
+# iOS: required as soon as your app touches accessories. The build FAILS
+# without it, deliberately -- iOS terminates an app that reaches HomeKit with
+# no usage description, and Codename One will not invent privacy copy in your
+# name.
+codename1.arg.ios.NSHomeKitUsageDescription=Controls the lights and locks in your home
+
+# Optional. Opt out of the generated Matter add-device extension target.
+codename1.arg.ios.home.commissioning=false
+
+# Optional. The app group the extension and the app share; defaults to
+# group.<your.package.name>.
+codename1.arg.ios.home.appGroup=group.com.example.myapp
+
+# Optional. Refuse to install on a device without HomeKit.
+codename1.arg.ios.home.required=true
+----
+
+Everything else is automatic, and automatic in both directions: an app that never references `com.codename1.home` gets no HomeKit framework, no entitlement, no Play services dependency and no extra Xcode target. The build server decides by scanning your bytecode.
+
+Two consequences worth knowing:
+
+* The `com.apple.developer.homekit` entitlement is added only when your app actually touches accessories. An app that only calls `getAvailability()` links HomeKit and gets no entitlement -- which matters, because that entitlement has to be enabled on your App ID and signing without it fails. If your app does touch accessories, enable HomeKit for your App ID in the Apple developer console and regenerate your provisioning profile; the build checks and tells you if you haven't.
+* Commissioning is separated because on iOS it costs an entire generated app-extension target. That's why `com.codename1.home.commissioning` is its own package: referencing the package is what asks for the extension.
+
+=== Previewing in the simulator
+
+The simulator, the desktop ports and the JavaScript port run a local simulated house rather than reporting themselves unsupported. It's awkward rather than tidy on purpose -- a two-gang switch, a bridged pair of lights behind a hub, an unreachable socket, a thermostat in auto mode where `TARGET_TEMPERATURE` genuinely has no value, and a dimmer with a real floor -- because those are the shapes that break naive code.
+
+It also doesn't push changes and never completes an operation inline, matching what a real backend does. Code written against a store that answers instantly races the moment it meets one that doesn't.
+
+=== Not claimed in this release
+
+Stated plainly, because each of these has a query that answers rather than a silence:
+
+* *Automations, triggers and conditions.* Scenes only.
+* *Background accessory events.* Nothing wakes your app; see `isPushDelivery()`.
+* *Topology writes.* Creating homes, renaming rooms, moving accessories between rooms, inviting users. The graph is read-only.
+* *Cameras and video.* A camera is visible in the graph and there's no stream, snapshot or recording API.
+* *Security systems and alarm panels.* Matter has none in shipping releases, and a half-working alarm API is a safety problem rather than a feature gap.
+* *Matter events.* Only attributes, which is why `LockState.JAMMED` is unreachable outside HomeKit -- a jam is an event on Matter and an attribute on HomeKit.
+* *Energy, appliance and diagnostic clusters.*
+* *The Google Home APIs accessory graph on Android.* See above.
+
+And one structural point: by default Codename One isn't a Matter controller. There's no fabric of its own, no direct on-network commissioning and no Thread border-router interaction. Everything Matter goes through the operating system's ecosystem, so the Apple Home or Google Home app has to be installed and set up.
+
+=== Commissioning onto your own fabric
+
+`CommissioningRequest.setCommissionToThisApp(true)` asks for one thing more: that the accessory also join a Matter fabric your app owns, as a second administrator beside the user's home. On iOS the generated commissioning extension then carries Apple's own Matter stack, a fabric key it keeps in the keychain and the controller storage that fabric persists through -- so the build sees the call and switches that machinery on. Set `codename1.arg.ios.home.commissioning.fabric=true` if your call is somewhere the class scanner can't see, such as behind reflection, and `codename1.arg.ios.home.commissioning.vendorId` to your own Matter vendor id -- the default is the test vendor `0xFFF1`, which some accessories refuse.
+
+Apple's Matter framework starts at iOS 16.4, so an own-fabric extension is built for 16.4 while your app keeps the 16.1 floor MatterSupport asks for. On 16.1 through 16.3 the extension can't load, and `Commissioner.getStyle()` answers `ECOSYSTEM_APP_HANDOFF` there rather than `OS_OWNED_UI` -- the accessory is added in the Home app, exactly as in a build with no extension. Ask for the style before you offer the button and that difference is invisible to your user.
+
+Read the generated `CN1MatterSetup/RequestHandler.swift` before you turn it on. The implementation ships in every commissioning build, commented out, precisely so that what you enable is code you have read.
+
+What it doesn't buy you is a way to talk to the accessory over that fabric: Codename One has no API for that yet, and reads and writes still go through the ecosystem. What it buys is that the accessory is already commissioned when such an API arrives, and that `CommissioningResult.wasCommissionedToThisApp()` can be true. Android's Play Services commissioning can't do it at all, and ignores the request.

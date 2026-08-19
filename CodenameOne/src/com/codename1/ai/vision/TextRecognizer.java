@@ -22,15 +22,21 @@
  */
 package com.codename1.ai.vision;
 
-/// Creates reusable on-device OCR analyzers.
+/// Creates reusable on-device OCR analyzers. The default recognizes the Latin
+/// script; select {@link VisionOptions#textScript(TextScript)} to read Chinese,
+/// Devanagari, Japanese or Korean text.
 public final class TextRecognizer extends AbstractVisionAnalyzer<TextRecognitionResult> {
-    /// Creates an analyzer using the platform default backend and options.
+    /// Creates an analyzer using the platform default backend and options,
+    /// reading the Latin script.
     /// @see VisionOptions
     public TextRecognizer() {
         this(null);
     }
 
     /// Creates a reusable analyzer with explicit backend and result options.
+    /// The writing system comes from
+    /// {@link VisionOptions#textScript(TextScript)}.
+    ///
     /// @param options configuration captured by this analyzer; {@code null}
     ///        uses defaults
     public TextRecognizer(VisionOptions options) {

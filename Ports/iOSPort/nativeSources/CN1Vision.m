@@ -46,6 +46,32 @@
 #import <MLKitTextRecognitionCommon/MLKitTextRecognitionCommon.h>
 #define CN1_HAS_MLKIT_TEXT 1
 #endif
+/*
+ * One pod per writing system, each imported only when the build linked it.
+ *
+ * These must be real symbol references rather than an NSClassFromString
+ * lookup. The pods link as static frameworks -- the builder passes -ObjC only
+ * for ads builds or the ios.objC hint -- so an options class that nothing
+ * references is dropped by the linker, and the lookup would then return nil on
+ * a build whose Podfile did include the model. Naming the class here also gets
+ * it spell-checked by the compiler instead of at runtime.
+ */
+#if __has_include(<MLKitTextRecognitionChinese/MLKitTextRecognitionChinese.h>)
+#import <MLKitTextRecognitionChinese/MLKitTextRecognitionChinese.h>
+#define CN1_HAS_MLKIT_TEXT_CHINESE 1
+#endif
+#if __has_include(<MLKitTextRecognitionDevanagari/MLKitTextRecognitionDevanagari.h>)
+#import <MLKitTextRecognitionDevanagari/MLKitTextRecognitionDevanagari.h>
+#define CN1_HAS_MLKIT_TEXT_DEVANAGARI 1
+#endif
+#if __has_include(<MLKitTextRecognitionJapanese/MLKitTextRecognitionJapanese.h>)
+#import <MLKitTextRecognitionJapanese/MLKitTextRecognitionJapanese.h>
+#define CN1_HAS_MLKIT_TEXT_JAPANESE 1
+#endif
+#if __has_include(<MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>)
+#import <MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>
+#define CN1_HAS_MLKIT_TEXT_KOREAN 1
+#endif
 #if __has_include(<MLKitBarcodeScanning/MLKitBarcodeScanning.h>)
 #import <MLKitBarcodeScanning/MLKitBarcodeScanning.h>
 #define CN1_HAS_MLKIT_BARCODE 1
@@ -208,6 +234,28 @@ static NSString *cn1VisionError(NSError *error) {
     });
 }
 
+/*
+ * A capability failure rather than a runtime one: the analysis cannot run
+ * because this build or this OS lacks the model, not because it tried and
+ * broke. The symbolic code rides alongside the message so IOSVisionImpl can
+ * raise VisionException.UNSUPPORTED -- matching what Android reports for the
+ * same condition -- instead of leaving callers to pattern-match on English
+ * text to decide whether the ML Kit fallback is worth trying.
+ */
+static NSString *cn1VisionUnsupported(NSString *message) {
+    return cn1VisionJSON(@{
+        @"error": message,
+        @"errorCode": @"unsupported"
+    });
+}
+
+/*
+ * Defined further down with the Apple Vision helpers; both backends use a
+ * non-nil result as "a writing system other than the Latin default was
+ * selected", so the set of recognized script ids stays in one place.
+ */
+static NSArray<NSString *> *cn1VisionScriptSubtags(NSString *script);
+
 #if defined(CN1_HAS_MLKIT_VISION)
 static UIImageOrientation cn1UIImageOrientation(int rotation) {
     switch (rotation) {
@@ -246,8 +294,41 @@ static NSString *cn1MLKitBarcodeFormat(MLKBarcodeFormat format) {
 }
 #endif
 
+#if defined(CN1_HAS_MLKIT_TEXT)
+/*
+ * The recognizer options for a writing system, or nil when this build did not
+ * link that model. Latin needs no entry: it is the base recognizer's own
+ * options, which the caller supplies.
+ */
+static MLKCommonTextRecognizerOptions *cn1MLKitTextScriptOptions(
+        NSString *script) {
+#if defined(CN1_HAS_MLKIT_TEXT_CHINESE)
+    if ([script isEqualToString:@"chinese"]) {
+        return [[MLKChineseTextRecognizerOptions alloc] init];
+    }
+#endif
+#if defined(CN1_HAS_MLKIT_TEXT_DEVANAGARI)
+    if ([script isEqualToString:@"devanagari"]) {
+        return [[MLKDevanagariTextRecognizerOptions alloc] init];
+    }
+#endif
+#if defined(CN1_HAS_MLKIT_TEXT_JAPANESE)
+    if ([script isEqualToString:@"japanese"]) {
+        return [[MLKJapaneseTextRecognizerOptions alloc] init];
+    }
+#endif
+#if defined(CN1_HAS_MLKIT_TEXT_KOREAN)
+    if ([script isEqualToString:@"korean"]) {
+        return [[MLKKoreanTextRecognizerOptions alloc] init];
+    }
+#endif
+    return nil;
+}
+#endif
+
 static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
-                                       int feature, int rotation) {
+                                       int feature, int rotation,
+                                       NSString *textScript) {
 #if defined(CN1_HAS_MLKIT_VISION)
     UIImage *image = rawImage == NULL ? [UIImage imageWithData:data]
             : [UIImage imageWithCGImage:rawImage];
@@ -262,8 +343,18 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
 
     if (feature == 0) {
 #if defined(CN1_HAS_MLKIT_TEXT)
-        MLKTextRecognizer *recognizer = [MLKTextRecognizer textRecognizerWithOptions:
-                [[MLKTextRecognizerOptions alloc] init]];
+        MLKCommonTextRecognizerOptions *textOptions =
+                [[MLKTextRecognizerOptions alloc] init];
+        if (cn1VisionScriptSubtags(textScript) != nil) {
+            textOptions = cn1MLKitTextScriptOptions(textScript);
+            if (textOptions == nil) {
+                return cn1VisionUnsupported([NSString stringWithFormat:
+                        @"The ML Kit %@ text model is not linked into this "
+                         "build", textScript]);
+            }
+        }
+        MLKTextRecognizer *recognizer =
+                [MLKTextRecognizer textRecognizerWithOptions:textOptions];
         __block MLKText *result = nil;
         [recognizer processImage:vision completion:^(MLKText *text, NSError *error) {
             result = text;
@@ -511,8 +602,68 @@ static NSString *cn1ApplePoseLandmarkName(
     return name ?: @"unknown";
 }
 
+/*
+ * Primary language subtags whose text is written in a given script. Apple
+ * Vision is configured by language rather than by script, and which languages
+ * it recognizes grows with the OS, so the request is asked what it supports
+ * and the answer is filtered here instead of hard-coding a list per release.
+ */
+static NSArray<NSString *> *cn1VisionScriptSubtags(NSString *script) {
+    if ([script isEqualToString:@"chinese"]) {
+        return @[@"zh", @"yue"];
+    }
+    if ([script isEqualToString:@"devanagari"]) {
+        return @[@"hi", @"mr", @"ne", @"sa"];
+    }
+    if ([script isEqualToString:@"japanese"]) {
+        return @[@"ja"];
+    }
+    if ([script isEqualToString:@"korean"]) {
+        return @[@"ko"];
+    }
+    return nil;
+}
+
+static NSArray<NSString *> *cn1VisionSupportedLanguages(
+        VNRecognizeTextRequest *request) {
+    NSError *listError = nil;
+    if (@available(iOS 15.0, *)) {
+        return [request supportedRecognitionLanguagesAndReturnError:&listError];
+    }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    return [VNRecognizeTextRequest
+            supportedRecognitionLanguagesForTextRecognitionLevel:
+                    request.recognitionLevel
+            revision:request.revision
+            error:&listError];
+#pragma clang diagnostic pop
+}
+
+/*
+ * Every supported language written in the requested script, in the order the
+ * OS listed them. Matching is on the primary subtag so a regional or script
+ * variant such as ja-JP or zh-Hans is picked up without enumerating them.
+ */
+static NSArray<NSString *> *cn1VisionLanguagesForScript(
+        VNRecognizeTextRequest *request, NSString *script) {
+    NSArray<NSString *> *subtags = cn1VisionScriptSubtags(script);
+    if (subtags == nil) {
+        return @[];
+    }
+    NSMutableArray<NSString *> *selected = [NSMutableArray array];
+    for (NSString *language in cn1VisionSupportedLanguages(request) ?: @[]) {
+        NSString *primary = [language componentsSeparatedByString:@"-"].firstObject;
+        if (primary != nil && [subtags containsObject:primary]) {
+            [selected addObject:language];
+        }
+    }
+    return selected;
+}
+
 static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
-                                  int feature, int rotation) {
+                                  int feature, int rotation,
+                                  NSString *textScript) {
     NSError *error = nil;
     VNImageRequestHandler *handler = rawImage == NULL
             ? [[VNImageRequestHandler alloc] initWithData:data
@@ -524,6 +675,23 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
         if (@available(iOS 13.0, *)) {
             VNRecognizeTextRequest *request = [[VNRecognizeTextRequest alloc] init];
             request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
+            if (cn1VisionScriptSubtags(textScript) != nil) {
+                NSArray<NSString *> *languages =
+                        cn1VisionLanguagesForScript(request, textScript);
+                if (languages.count == 0) {
+                    // Leaving the request on its default languages would run
+                    // Latin OCR over the page and return confident nonsense,
+                    // so refuse instead: the caller can select the ML Kit
+                    // backend, which carries its own script model.
+                    return cn1VisionUnsupported([NSString stringWithFormat:
+                            @"Apple Vision on this OS version does not "
+                             "recognize the %@ script. Select "
+                             "VisionBackends.mlKitTextRecognition() to use the "
+                             "ML Kit model instead.", textScript]);
+                }
+                request.recognitionLanguages = languages;
+                request.usesLanguageCorrection = YES;
+            }
             if (![handler performRequests:@[request] error:&error]) {
                 return cn1VisionError(error);
             }
@@ -886,11 +1054,11 @@ static CGImageRef cn1VisionCreateRawImage(NSData *data, int width, int height,
 }
 #endif
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_boolean_int_int_int_int_R_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_boolean_int_int_int_int_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_OBJECT encodedImage, JAVA_INT feature, JAVA_BOOLEAN mlKit,
         JAVA_INT rotation, JAVA_INT width, JAVA_INT height,
-        JAVA_INT frameFormat) {
+        JAVA_INT frameFormat, JAVA_OBJECT textScript) {
 #if defined(INCLUDE_CN1_VISION) && !TARGET_OS_WATCH && !TARGET_OS_TV
     if (encodedImage == JAVA_NULL) {
         return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
@@ -904,9 +1072,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_
         return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
                 @"{\"error\":\"Invalid raw vision image\"}");
     }
+    NSString *script = textScript == JAVA_NULL ? @"latin"
+            : toNSString(CN1_THREAD_GET_STATE_PASS_ARG textScript);
     NSString *result = mlKit
-            ? cn1MLKitVisionPerform(data, rawImage, feature, rotation)
-            : cn1VisionPerform(data, rawImage, feature, rotation);
+            ? cn1MLKitVisionPerform(data, rawImage, feature, rotation, script)
+            : cn1VisionPerform(data, rawImage, feature, rotation, script);
     if (rawImage != NULL) CGImageRelease(rawImage);
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG result);
 #else

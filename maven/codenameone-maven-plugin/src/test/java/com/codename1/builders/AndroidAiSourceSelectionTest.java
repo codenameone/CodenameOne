@@ -66,6 +66,33 @@ class AndroidAiSourceSelectionTest {
     }
 
     @Test
+    void selectsOneSourcePerNonLatinTextScript() {
+        assertEquals("AndroidTextRecognitionChineseAdapter.java",
+                AndroidGradleBuilder.androidTextScriptAdapterSource(
+                        "com/codename1/ai/vision/TextScript", "chinese"));
+        assertEquals("AndroidTextRecognitionDevanagariAdapter.java",
+                AndroidGradleBuilder.androidTextScriptAdapterSource(
+                        "com/codename1/ai/vision/TextScript", "devanagari"));
+        assertEquals("AndroidTextRecognitionJapaneseAdapter.java",
+                AndroidGradleBuilder.androidTextScriptAdapterSource(
+                        "com/codename1/ai/vision/TextScript", "japanese"));
+        assertEquals("AndroidTextRecognitionKoreanAdapter.java",
+                AndroidGradleBuilder.androidTextScriptAdapterSource(
+                        "com/codename1/ai/vision/TextScript", "korean"));
+    }
+
+    @Test
+    void latinScriptNeedsNoSeparateSource() {
+        assertNull(AndroidGradleBuilder.androidTextScriptAdapterSource(
+                "com/codename1/ai/vision/TextScript", "latin"),
+                "Latin is what the base recognizer already reads");
+        assertNull(AndroidGradleBuilder.androidTextScriptAdapterSource(
+                "com/codename1/ai/vision/TextScript", "getId"));
+        assertNull(AndroidGradleBuilder.androidTextScriptAdapterSource(
+                "com/codename1/ai/vision/VisionBackends", "japanese"));
+    }
+
+    @Test
     void ignoresSharedApiAndUnrelatedClasses() {
         assertNull(AndroidGradleBuilder.androidAiAdapterSource(
                 "com/codename1/ai/vision/DocumentScanner"),

@@ -91,6 +91,57 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
+    void textScriptSelectorAddsOnlyThatScriptModel() {
+        PlatformFeatureCatalog.Accumulator acc =
+                new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/vision/TextRecognizer");
+        acc.consumeMethod("com/codename1/ai/vision/TextScript", "japanese");
+
+        boolean foundJapanese = false;
+        for (PlatformFeatureCatalog.Entry e : acc.hits()) {
+            for (String dependency : e.androidGradleDeps()) {
+                foundJapanese |= dependency.startsWith(
+                        "com.google.mlkit:text-recognition-japanese:");
+                assertFalse(dependency.startsWith(
+                        "com.google.mlkit:text-recognition-korean:"),
+                        "Unselected script models must not be bundled");
+                assertFalse(dependency.startsWith(
+                        "com.google.mlkit:text-recognition-chinese:"),
+                        "Unselected script models must not be bundled");
+            }
+            assertTrue(e.iosPods().isEmpty(),
+                    "Apple Vision reads the script itself; a script selector "
+                            + "alone must not pull an ML Kit pod");
+        }
+        assertTrue(foundJapanese, "expected the Japanese ML Kit bundle");
+    }
+
+    @Test
+    void iosScriptModelNeedsBothTheMlKitBackendAndTheScript() {
+        PlatformFeatureCatalog.Accumulator acc =
+                new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/vision/TextRecognizer");
+        acc.consumeMethod("com/codename1/ai/vision/VisionBackends",
+                "mlKitTextRecognition");
+        assertFalse(hasPod(acc, "GoogleMLKit/TextRecognitionJapanese"),
+                "The backend alone must not add a script model");
+
+        acc.consumeMethod("com/codename1/ai/vision/TextScript", "japanese");
+        assertTrue(hasPod(acc, "GoogleMLKit/TextRecognitionJapanese"));
+        assertFalse(hasPod(acc, "GoogleMLKit/TextRecognitionKorean"));
+    }
+
+    private static boolean hasPod(PlatformFeatureCatalog.Accumulator acc,
+                                  String pod) {
+        for (PlatformFeatureCatalog.Entry e : acc.hits()) {
+            if (e.iosPods().contains(pod)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Test
     void currentIosMlKitPodsRequireIos155() {
         PlatformFeatureCatalog.Accumulator acc =
                 new PlatformFeatureCatalog.Accumulator();
@@ -297,7 +348,7 @@ class PlatformFeatureCatalogTest {
                 }
             }
         }
-        assertEquals(22, checked,
+        assertEquals(26, checked,
                 "If an AI dependency is intentionally added or removed, "
                 + "update this lock count after verifying its Android floor");
     }

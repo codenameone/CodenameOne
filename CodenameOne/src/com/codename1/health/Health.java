@@ -29,7 +29,7 @@ import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
 import java.util.List;
-import com.codename1.impl.health.EdtResult;
+import com.codename1.impl.async.EdtResult;
 
 /// Entry point for the Codename One health API -- reading and writing
 /// health data, watching it for changes, recording workouts, and streaming

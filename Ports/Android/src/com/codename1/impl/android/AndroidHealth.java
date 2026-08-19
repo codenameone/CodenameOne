@@ -30,7 +30,7 @@ import com.codename1.health.HealthAvailability;
 import com.codename1.health.HealthStore;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
-import com.codename1.impl.health.EdtResult;
+import com.codename1.impl.async.EdtResult;
 
 /// The Android health entry point, backed by Health Connect through the
 /// injected [HealthConnectDelegate].

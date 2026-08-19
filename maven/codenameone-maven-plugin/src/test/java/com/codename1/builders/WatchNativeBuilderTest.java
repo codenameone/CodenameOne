@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -934,6 +935,91 @@ class WatchNativeBuilderTest {
         String plist = writeInfoPlist(req, tmp);
         assertTrue(plist.contains("<key>CFBundleShortVersionString</key>\n    <string>2.0</string>"),
                 "the watch carries the injected version, not its fallback: " + plist);
+    }
+
+    /**
+     * A key present with a non-string value is not an absent key.
+     *
+     * <p>{@code injectedPlistString} answers null for both, and the two need opposite handling:
+     * an absent key takes the generated default, while a key the fragment already carries
+     * suppresses that default in the renderer -- so treating {@code <false/>} as absent shipped a
+     * plist whose purpose string was the boolean false. The Matter privacy validation refuses on
+     * this tag.</p>
+     */
+    @Test
+    void injectedValueTagTellsAbsentFromNonString() {
+        BuildRequest req = request();
+        req.putArgument("ios.plistInject",
+                "<key>NSBluetoothAlwaysUsageDescription</key><false/>"
+                + "<key>NSLocalNetworkUsageDescription</key> <!-- why --> <string>find</string>"
+                + "<key>NSBonjourServices</key><array><string>_matter._tcp</string></array>");
+
+        assertEquals("false",
+                WatchNativeBuilder.injectedPlistValueTag(req, "NSBluetoothAlwaysUsageDescription"),
+                "<false/> is a value the fragment carries, not a missing key");
+        assertEquals("string",
+                WatchNativeBuilder.injectedPlistValueTag(req, "NSLocalNetworkUsageDescription"),
+                "a comment between the key and its value is not the value");
+        assertEquals("array",
+                WatchNativeBuilder.injectedPlistValueTag(req, "NSBonjourServices"),
+                "the element that follows the key, not the next string anywhere after it");
+        assertNull(WatchNativeBuilder.injectedPlistValueTag(req, "CFBundleVersion"),
+                "a key the fragment does not carry is absent, and takes the default");
+    }
+
+    /**
+     * The array belongs to the key, not to whatever mentioned its name first.
+     *
+     * <p>Read by finding the name with {@code indexOf} and taking the next {@code <array>}, a
+     * fragment that mentions {@code NSBonjourServices} in a comment took the array of the key that
+     * came after the comment -- so a plist that listed both Matter services perfectly well was
+     * refused for listing neither, and the same shape suppressed the generated
+     * {@code com.apple.Home} query scheme.</p>
+     */
+    @Test
+    void injectedArraysBelongToTheirOwnKey() {
+        BuildRequest req = request();
+        req.putArgument("ios.plistInject",
+                "<!-- NSBonjourServices goes here one day -->"
+                + "<key>LSApplicationQueriesSchemes</key>"
+                + "<array><string>com.apple.Home</string></array>"
+                + "<key>NSBonjourServices</key><array>"
+                + "<string>_matter._tcp.</string><string>_matterc._udp.</string></array>");
+
+        assertEquals(Arrays.asList("com.apple.Home"),
+                WatchNativeBuilder.injectedPlistStringArray(
+                        req, "LSApplicationQueriesSchemes"),
+                "a comment naming another key is not that key's value");
+        assertEquals(Arrays.asList("_matter._tcp.", "_matterc._udp."),
+                WatchNativeBuilder.injectedPlistStringArray(req, "NSBonjourServices"),
+                "the array that follows the real key, wherever the name appeared before it");
+        assertTrue(WatchNativeBuilder.injectedPlistStringArray(req, "CFBundleVersion").isEmpty(),
+                "a key the fragment does not carry has no array");
+        assertTrue(WatchNativeBuilder.injectedPlistStringArray(
+                        req, "NSBluetoothAlwaysUsageDescription").isEmpty(),
+                "and neither has one whose value is not an array");
+    }
+
+    /**
+     * A key's value is the element that follows it, not the next string in the fragment.
+     *
+     * <p>Scanning forward for the next {@code <string>} anywhere after the key, a key given
+     * {@code <false/>} answered with an unrelated later key's string -- so the HomeKit
+     * purpose-string check passed on a value the plist renderer keeps as the boolean false, and
+     * the app was terminated on the device for a disclosure the build had just approved.</p>
+     */
+    @Test
+    void aKeysValueIsItsOwnElement() {
+        BuildRequest req = request();
+        req.putArgument("ios.plistInject",
+                "<key>NSHomeKitUsageDescription</key><false/>"
+                + "<key>NSLocalNetworkUsageDescription</key><string>find them</string>");
+
+        assertNull(WatchNativeBuilder.injectedPlistString(req, "NSHomeKitUsageDescription"),
+                "<false/> is not a purpose string, and neither is the next key's value");
+        assertEquals("find them",
+                WatchNativeBuilder.injectedPlistString(req, "NSLocalNetworkUsageDescription"),
+                "a key whose own value is a string still resolves");
     }
 
     /**
