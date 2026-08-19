@@ -150,14 +150,23 @@ public class AndroidIntentBridge implements IntentBridge {
     /// every static shortcut, so the request is parked and judged here instead, against the same
     /// policy an unauthenticated request is always held to.
     public void registerIntents(String declarationsJson) {
-        String parked;
+        List<String> parked;
         synchronized (PARKED) {
-            parked = PARKED.isEmpty() ? null : PARKED.remove(0);
+            if (PARKED.isEmpty()) {
+                return;
+            }
+            parked = new ArrayList<String>(PARKED);
             PARKED.clear();
         }
-        if (parked == null) {
-            return;
+        // Indexed rather than a for-each: iterating a List compiles to a CHECKCAST, and the
+        // rest of this file keeps those out of anything that reads as exception-driven.
+        for (int i = 0; i < parked.size(); i++) {
+            runParkedRequest(parked.get(i));
         }
+    }
+
+    /// Settles one request that arrived before the declaration table existed.
+    private void runParkedRequest(String parked) {
         if (!CN1IntentTrampolineActivity.isSafeForUntrustedCallers(context(), parked)) {
             Log.w(TAG, "Refusing the parked unauthenticated request for \"" + parked + "\"");
             return;
@@ -190,7 +199,14 @@ public class AndroidIntentBridge implements IntentBridge {
         // that started this runtime has no idea when the handler finished, and tearing the
         // runtime down underneath a handler that was still working loses whatever it was doing.
         int budget = decl == null ? Intents.getDefaultTimeout() : decl.getTimeoutSeconds();
-        parkedBudgetSeconds = budget;
+        synchronized (PARKED) {
+            // The longest of them, because the service has to outlast every handler it woke
+            // the runtime for, not just the last one dispatched.
+            if (budget > parkedBudgetSeconds) {
+                parkedBudgetSeconds = budget;
+            }
+            parkedOutstanding++;
+        }
         Intents.dispatchInvocation(parked, null, IntentSource.SHORTCUT, headless,
                 new ParkedCompletion());
     }
@@ -202,14 +218,18 @@ public class AndroidIntentBridge implements IntentBridge {
         @Override
         public void onIntentResult(IntentResult r) {
             synchronized (PARKED) {
-                parkedFinished = true;
+                if (parkedOutstanding > 0) {
+                    parkedOutstanding--;
+                }
                 PARKED.notifyAll();
             }
         }
     }
 
-    /// Set once the parked invocation reports its outcome. Guarded by PARKED.
-    private static boolean parkedFinished;
+    /// How many dispatched parked invocations have not reported yet. A count rather than a
+    /// flag, because more than one can be in flight and the first to finish must not tell the
+    /// service that the rest are done. Guarded by PARKED.
+    private static int parkedOutstanding;
     /// The declared budget of whatever registerIntents dispatched, for the service to wait out.
     private static volatile int parkedBudgetSeconds;
 
@@ -234,7 +254,7 @@ public class AndroidIntentBridge implements IntentBridge {
                     // Widened before the addition: two ints whose sum can exceed what an int
                     // holds, and a negative deadline makes this return immediately.
                     + ((long) parkedBudgetSeconds + marginSeconds) * 1000L;
-            while (!parkedFinished) {
+            while (parkedOutstanding > 0) {
                 long remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
                     Log.w(TAG, "A parked intent did not complete within its budget");
@@ -243,7 +263,6 @@ public class AndroidIntentBridge implements IntentBridge {
                 PARKED.wait(remaining);
             }
             // Reset so a second cold start in the same process does not see a stale answer.
-            parkedFinished = false;
             parkedBudgetSeconds = 0;
         }
     }
@@ -473,12 +492,27 @@ public class AndroidIntentBridge implements IntentBridge {
             return;
         }
         synchronized (PARKED) {
-            // One is enough. A second tap before the runtime is up is the user pressing twice,
-            // not two things to run.
-            PARKED.clear();
+            // A repeat of the same id is the user pressing twice and collapses to one run.
+            // Two *different* ids are two different shortcuts, and keeping only the newest
+            // meant the first tap was silently dropped: the wake it caused started the runtime
+            // and ran the other request, and its own second wake found the runtime already up
+            // and returned with nothing to do. One user action, gone, with nothing logged.
+            if (PARKED.contains(intentId)) {
+                return;
+            }
+            if (PARKED.size() >= MAX_PARKED_REQUESTS) {
+                // Bounded because this list is filled from an exported entry point. Past a
+                // handful, the taps are not a person choosing actions.
+                Log.w(TAG, "Too many requests are waiting for the runtime; dropping \""
+                        + intentId + "\"");
+                return;
+            }
             PARKED.add(intentId);
         }
     }
+
+    /// How many distinct cold-start requests are held at once.
+    private static final int MAX_PARKED_REQUESTS = 8;
 
     public boolean requestForeground() {
         if (isForegrounded()) {
