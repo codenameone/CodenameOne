@@ -23,6 +23,7 @@
 package com.codename1.impl.ios;
 
 import com.codename1.intents.spi.IntentBridge;
+import com.codename1.ui.Display;
 
 import java.util.Map;
 
@@ -78,6 +79,19 @@ final class IOSIntentBridge implements IntentBridge {
     }
 
     public boolean requestForeground() {
+        // Already forward is already foregrounded. Intents.invoke can be called from the app
+        // itself while it is on screen -- for a declaration marked headless, which describes
+        // how the *platform* may run it and says nothing about an in-app caller -- and a
+        // handler returning opens() then asked for a transition that had already happened.
+        // Answering false made the framework suppress the route, so an in-app invocation
+        // succeeded and silently never opened its destination. The Android bridge has always
+        // answered this way; this door had not.
+        //
+        // isMinimized rather than "a Form exists": a backgrounded app still has a current Form,
+        // and treating that as foreground is what the paragraph below exists to prevent.
+        if (Display.isInitialized() && !Display.getInstance().isMinimized()) {
+            return true;
+        }
         // iOS gives an application no way to bring itself forward, and the workarounds that
         // appear to are rejected. Whether an intent opens the app is decided before its handler
         // runs, by the openAppWhenRun the build derives from opensRoute. Saying so lets the
