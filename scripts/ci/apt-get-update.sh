@@ -34,5 +34,19 @@ apt_update() {
 if ! apt_update; then
   echo "apt-get-update: first attempt failed or stalled; retrying once" >&2
   sleep 15
-  apt_update
+  if ! apt_update; then
+    # Not fatal, deliberately. This refreshes the package index; it is not the thing any
+    # job is here to do. The runner images ship with a populated index, so an install of
+    # ordinary packages usually still succeeds from it, and apt-get-install.sh is bounded
+    # and fails loudly with the package name when it genuinely cannot fetch something.
+    #
+    # Failing here instead turns an upstream mirror outage into a red PR that no change can
+    # fix: on 2026-08-19 archive.ubuntu.com stalled mid-fetch for two consecutive attempts
+    # -- the runner's own azure mirror having been Ign'd -- and every job that starts by
+    # refreshing apt would have failed for the duration, none of them for a reason in this
+    # repository.
+    echo "apt-get-update: index refresh did not complete; continuing with the existing" >&2
+    echo "  index. A package that genuinely cannot be fetched will fail the install step" >&2
+    echo "  by name." >&2
+  fi
 fi
