@@ -8,13 +8,16 @@ on:
     paths-ignore:
       - '.github/workflows/scripts-android.yml'
       - '.github/workflows/scripts-ios.yml'
-      - 'scripts/**'
-      - '!scripts/setup-workspace.sh'
-      # Every Maven step in this workflow and a dozen others runs through this wrapper, so a
-      # change to it that nothing exercises can merge and then break the whole matrix. Named
-      # here for the same reason setup-workspace.sh is: a later negation un-ignores it.
-      - '!scripts/ci-mvn-retry.sh'
-      - '!scripts/ci/retry.sh'
+      # scripts/** is deliberately NOT ignored. It used to be, with negations naming the
+      # scripts that had to keep running CI -- and those negations never did anything: GitHub
+      # honours '!' only in `paths`, never in `paths-ignore`, and the two filters cannot be
+      # combined for one event. So every exception written here was inert, and a change to
+      # setup-workspace.sh or to the Maven retry wrapper that a dozen workflows run every step
+      # through could merge without this matrix ever building it.
+      #
+      # Converting the whole list to a positive `paths` filter would fix the syntax and
+      # introduce a worse failure: anything omitted from that list silently stops being tested.
+      # Not ignoring these at all costs a few runs on script-only changes and cannot go quiet.
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
@@ -28,13 +31,16 @@ on:
     paths-ignore:
       - '.github/workflows/scripts-android.yml'
       - '.github/workflows/scripts-ios.yml'
-      - 'scripts/**'
-      - '!scripts/setup-workspace.sh'
-      # Every Maven step in this workflow and a dozen others runs through this wrapper, so a
-      # change to it that nothing exercises can merge and then break the whole matrix. Named
-      # here for the same reason setup-workspace.sh is: a later negation un-ignores it.
-      - '!scripts/ci-mvn-retry.sh'
-      - '!scripts/ci/retry.sh'
+      # scripts/** is deliberately NOT ignored. It used to be, with negations naming the
+      # scripts that had to keep running CI -- and those negations never did anything: GitHub
+      # honours '!' only in `paths`, never in `paths-ignore`, and the two filters cannot be
+      # combined for one event. So every exception written here was inert, and a change to
+      # setup-workspace.sh or to the Maven retry wrapper that a dozen workflows run every step
+      # through could merge without this matrix ever building it.
+      #
+      # Converting the whole list to a positive `paths` filter would fix the syntax and
+      # introduce a worse failure: anything omitted from that list silently stops being tested.
+      # Not ignoring these at all costs a few runs on script-only changes and cannot go quiet.
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
