@@ -32,6 +32,12 @@ on:
       - 'maven/windows/**'
       - 'scripts/windows/**'
       - 'scripts/hellocodenameone/**'
+      # This job's first step runs through both CI shell helpers, so a change to either has
+      # to be exercised here rather than merged untested -- the same reason every other
+      # consumer lists them.
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/retry.sh'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -42,6 +48,9 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'maven/windows/**'
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/retry.sh'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -67,11 +76,19 @@ jobs:
           # xvfb: the CN1 CSS compiler (codenameone-maven-plugin css goal) renders
           # via CEF/AWT and throws HeadlessException without a display, so the
           # hellocodenameone-common build below runs under a virtual X server.
-          sudo apt-get install -y cmake ninja-build unzip xvfb
-          wget -q https://apt.llvm.org/llvm.sh
+          # Every network call here is bounded and retried. On 2026-08-19 this step sat in
+          # its first line for a full hour and was cancelled having installed nothing, which
+          # then failed the screenshot-comment job downstream for a missing artifact. That is
+          # the same hang apt-get-install.sh was written for -- a hung mirror should cost one
+          # attempt, not the job -- and this workflow had never adopted it.
+          bash scripts/ci/apt-get-install.sh cmake ninja-build unzip xvfb
+          # apt.llvm.org is a single host with no mirror, and llvm.sh both adds its repo and
+          # installs from it, so it is the likeliest thing in this step to stall forever.
+          RETRY_ATTEMPTS=3 bash scripts/ci/retry.sh \
+            wget -q --timeout=30 --tries=3 -O llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 19
-          sudo apt-get install -y clang-19 lld-19 llvm-19
+          RETRY_ATTEMPTS=3 bash scripts/ci/retry.sh timeout 900 sudo ./llvm.sh 19
+          bash scripts/ci/apt-get-install.sh clang-19 lld-19 llvm-19
           echo "/usr/lib/llvm-19/bin" >> "$GITHUB_PATH"
           /usr/lib/llvm-19/bin/clang-cl --version
           /usr/lib/llvm-19/bin/lld-link --version 2>&1 | head -1 || true
