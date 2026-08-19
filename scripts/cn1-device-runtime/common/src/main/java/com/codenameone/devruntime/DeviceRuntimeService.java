@@ -384,6 +384,17 @@ public class DeviceRuntimeService {
             openEnded = true;
         }
 
+        /// Ends the open-ended phase and restarts the bounded grace.
+        ///
+        /// The human part of pairing is over the moment the dialog closes, and
+        /// what follows -- the response, the verdict -- is a round trip like
+        /// any other. Leaving the exchange open-ended let a peer that never
+        /// answered hold the waiters forever.
+        void endLongWait() {
+            openEnded = false;
+            identifiedAt = System.currentTimeMillis();
+        }
+
         boolean isIdentified() {
             return identifiedAt != 0;
         }
@@ -658,6 +669,9 @@ public class DeviceRuntimeService {
         }
     }
 
+    /// Gives the prompt slot back. Called when the dialog closes and again
+    /// from the frame's finally, so it has to be safe to call twice -- the
+    /// second call only pushes the cooldown out by a few milliseconds.
     private void releasePairingPrompt() {
         synchronized (pairingPromptOpen) {
             pairingPromptOpen[0] = false;
@@ -674,9 +688,15 @@ public class DeviceRuntimeService {
      * id and the device id -- so what an eavesdropper sees is a nonce and an
      * HMAC over it.</p>
      */
-    private void handlePairing(String peerId, String peerName,
+    private void handlePairing(String peerId, String peerName, Progress progress,
                                DataInputStream in, DataOutputStream out) throws IOException {
         String code = DeviceRuntimePairing.promptForCode(peerId, peerName);
+        // The dialog is closed: the prompt slot goes back so the next computer
+        // can pair, and the connection goes back to a bounded wait -- what
+        // remains is a round trip, and a peer that stops answering here must
+        // not hold the waiters for good.
+        progress.endLongWait();
+        releasePairingPrompt();
         if (code == null) {
             out.writeByte(0);
             out.writeUTF(DeviceRuntimePairing.lastFailure());
@@ -834,7 +854,7 @@ public class DeviceRuntimeService {
                             // slot was claimed, so it cannot be claimed by
                             // everything at once.
                             progress.allowLongWait();
-                            handlePairing(peerId, peerName, in, out);
+                            handlePairing(peerId, peerName, progress, in, out);
                         } finally {
                             releasePairingPrompt();
                         }
@@ -1032,6 +1052,10 @@ public class DeviceRuntimeService {
     }
 
     private String install(byte[] payload) throws Throwable {
+        // Before anything, parsing included: a stop pressed while the bundle is
+        // being read is a stop during this installation, and a snapshot taken
+        // later would record that stop as this install's own baseline.
+        final int generation = stopGeneration;
 
         InterpBundle bundle = InterpBundleReader.read(new ByteArrayInputStream(payload));
 
@@ -1041,11 +1065,11 @@ public class DeviceRuntimeService {
         // the resources and theme published here; doing it in this order means
         // a stop that lands mid-install ends the old program, not the new one's
         // assets, and the install then fails its own current-runtime check.
+        // A Stop arriving during an install tears down what is being
+        // published, and the counter above is how the installer notices rather
+        // than finishing on top of a teardown.
         retirePrevious();
-        // Everything from here is this program's: a Stop arriving during it
-        // tears down what is being published, and the counter is how the
-        // installer notices rather than finishing on top of a teardown.
-        final int generation = stopGeneration;
+        requireNotStopped(generation);
 
         // The program's own theme, CSS and images, published where the
         // framework looks for them. Cleared first so a program that ships no
@@ -1115,8 +1139,13 @@ public class DeviceRuntimeService {
             // Its stop() first: start() may have acquired a recorder or a
             // sensor before it threw, and stop is where a program releases
             // those -- after detaching, that callback would be a no-op like
-            // every other.
-            stopLifecycleQuietly(rt);
+            // every other. On the event thread, like every other lifecycle
+            // callback: this runs on the thread serving the push.
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                public void run() {
+                    stopLifecycleQuietly(rt);
+                }
+            });
             // Detach before reporting. The entry point may have shown a form or
             // registered a listener before it threw, and those callbacks would
             // go on running a program the desktop was just told had failed --
