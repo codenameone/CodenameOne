@@ -818,6 +818,16 @@ public class ImageViewer extends Component {
         if (image != null) {
             return new Dimension(image.getWidth(), image.getHeight());
         }
+        // The surface this viewer lives on, not the main display: inside a Window,
+        // getDisplayWidth() is the main window's and an empty viewer asked for the
+        // whole screen.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            Container c = top.asContainer();
+            if (c.getWidth() > 0 && c.getHeight() > 0) {
+                return new Dimension(c.getWidth(), c.getHeight());
+            }
+        }
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
 

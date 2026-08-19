@@ -1105,11 +1105,17 @@ public class SplitPane extends Container {
         @Override
         protected Dimension calcPreferredSize() {
             Display d = Display.getInstance();
+            // Spanning the surface this divider is on, not the main display: in a
+            // Window the divider asked for the whole screen's width or height.
+            TopLevelContainer top = getTopLevelContainer();
+            Container c = top == null ? null : top.asContainer();
+            int spanW = c != null && c.getWidth() > 0 ? c.getWidth() : d.getDisplayWidth();
+            int spanH = c != null && c.getHeight() > 0 ? c.getHeight() : d.getDisplayHeight();
             switch (orientation) {
                 case VERTICAL_SPLIT:
-                    return new Dimension(d.getDisplayWidth(), d.convertToPixels(dividerThicknessMM));
+                    return new Dimension(spanW, d.convertToPixels(dividerThicknessMM));
                 default:
-                    return new Dimension(d.convertToPixels(dividerThicknessMM), d.getDisplayHeight());
+                    return new Dimension(d.convertToPixels(dividerThicknessMM), spanH);
             }
         }
 

@@ -489,6 +489,25 @@ public class Window extends Container implements TopLevelContainer {
     /// - `cmd`: the command that was activated
     ///
     /// - `ev`: the event describing the activation
+    /// Notifies this window's command listeners of an activation whose command action
+    /// has already run.
+    ///
+    /// The counterpart of `Form`'s no-recurse dispatch, and needed for the same reason:
+    /// a `Button` backed by a `Command` invokes the command itself and then tells its
+    /// top level, which must not invoke it again.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command that was activated
+    ///
+    /// - `ev`: the event describing the activation
+    void dispatchCommandNoRecurse(Command cmd, ActionEvent ev) {
+        if (cmd == null || ev.isConsumed()) {
+            return;
+        }
+        commandListeners.fireActionEvent(ev);
+    }
+
     public void dispatchCommand(Command cmd, ActionEvent ev) {
         cmd.actionPerformed(ev);
         if (!ev.isConsumed()) {

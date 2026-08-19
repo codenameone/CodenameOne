@@ -721,9 +721,16 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             ActionEvent ev = new ActionEvent(cmd, this, x, y);
             dispatcher.fireActionEvent(ev);
             if (!ev.isConsumed()) {
-                Form f = getComponentForm();
-                if (f != null) {
-                    f.actionCommandImplNoRecurseComponent(cmd, ev);
+                // The top level rather than the form: getComponentForm() is null by
+                // design inside a Window, so a command-backed button there fired its
+                // own listeners and then told nobody -- the window's command listeners
+                // never saw the activation. Neither path re-invokes the command, which
+                // this method has already run.
+                TopLevelContainer top = getTopLevelContainer();
+                if (top instanceof Form) {
+                    ((Form) top).actionCommandImplNoRecurseComponent(cmd, ev);
+                } else if (top instanceof Window) {
+                    ((Window) top).dispatchCommandNoRecurse(cmd, ev);
                 }
             }
         } else {

@@ -504,11 +504,20 @@ public class TextSelection {
     /// - `enabled`
     public void setEnabled(boolean enabled) {
         if (enabled != this.enabled) {
+            // The top level rather than the form. getComponentForm() is null by design
+            // inside a Window, and this dereferenced it immediately -- so enabling text
+            // selection, which TopLevelContainer exposes on every top level, threw in
+            // every secondary window.
+            TopLevelContainer top = root.getTopLevelContainer();
+            if (top == null) {
+                // Not in a hierarchy: nothing to wire to, and the flag stays as it was
+                // rather than claiming a setup that did not happen.
+                return;
+            }
             this.enabled = enabled;
-            Component f = root.getComponentForm();
+            Component f = top.asContainer();
             if (enabled) {
-                Form form = f.getComponentForm();
-                form.setEnableCursors(true);
+                top.setEnableCursors(true);
                 f.addPointerPressedListener(pressListener);
                 f.addPointerDraggedListener(pressListener);
                 f.addPointerReleasedListener(pressListener);

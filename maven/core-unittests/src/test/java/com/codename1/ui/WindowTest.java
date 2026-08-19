@@ -2473,6 +2473,69 @@ class WindowTest extends UITestBase {
         owner.dispose();
     }
 
+    @FormTest
+    void aCommandBackedButtonNotifiesTheWindowsCommandListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("cmd button", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        final int[] commandRuns = new int[1];
+        Command cmd = new Command("Go") {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                commandRuns[0]++;
+            }
+        };
+        final int[] listenerSaw = new int[1];
+        w.addCommandListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                listenerSaw[0]++;
+            }
+        });
+
+        Button b = new Button(cmd);
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        w.revalidate();
+
+        // Button.fireActionEvent forwarded the post-command event through the form,
+        // null in a window, so the window's command listeners never saw the activation.
+        b.pressed();
+        b.released();
+        flushSerialCalls();
+
+        assertEquals(1, commandRuns[0], "the command runs exactly once");
+        assertEquals(1, listenerSaw[0],
+                "and the window's command listeners must be notified once");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void enablingTextSelectionInsideAWindowDoesNotThrow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("selection", new BorderLayout());
+        w.setWindowSize(300, 200);
+        TextArea area = new TextArea("selectable");
+        w.add(BorderLayout.CENTER, area);
+        w.show();
+        w.revalidate();
+
+        // TextSelection is exposed on every TopLevelContainer, but setEnabled resolved
+        // the root's form and dereferenced the null result, so enabling it threw in
+        // every secondary window.
+        TextSelection sel = w.getTextSelection();
+        assertNotNull(sel);
+        sel.setEnabled(true);
+        assertTrue(sel.isEnabled(), "text selection must enable inside a window");
+
+        sel.setEnabled(false);
+        assertFalse(sel.isEnabled());
+
+        w.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

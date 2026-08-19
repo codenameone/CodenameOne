@@ -818,7 +818,14 @@ public class Validator {
                     int emblemWidth = validationFailedEmblem.getWidth();
                     int emblemHeight = validationFailedEmblem.getHeight();
                     int drawX;
-                    if (xpos + emblemWidth > Display.getInstance().getDisplayWidth()) {
+                    // The owning surface's width, not the main display's. Component
+                    // coordinates are local to the window they live in, so a narrower
+                    // window clipped the emblem and a wider one flipped it needlessly.
+                    com.codename1.ui.TopLevelContainer emblemTop = c.getTopLevelContainer();
+                    int surfaceWidth = emblemTop == null
+                            ? Display.getInstance().getDisplayWidth()
+                            : emblemTop.asContainer().getWidth();
+                    if (xpos + emblemWidth > surfaceWidth) {
                         drawX = xpos - emblemWidth;
                     } else {
                         drawX = xpos - emblemWidth / 2;

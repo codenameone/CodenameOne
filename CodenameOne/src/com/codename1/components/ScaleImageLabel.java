@@ -104,7 +104,13 @@ public class ScaleImageLabel extends Label {
         if (i == null) {
             return new Dimension();
         }
-        int dw = Display.getInstance().getDisplayWidth();
+        // The surface this label lives on rather than the main display, so the
+        // oversized-preferred-width clamp below is measured against the window the
+        // label is actually in.
+        TopLevelContainer scaleTop = getTopLevelContainer();
+        int dw = scaleTop != null && scaleTop.asContainer().getWidth() > 0
+                ? scaleTop.asContainer().getWidth()
+                : Display.getInstance().getDisplayWidth();
         int iw = i.getWidth();
         int ih = i.getHeight();
 
