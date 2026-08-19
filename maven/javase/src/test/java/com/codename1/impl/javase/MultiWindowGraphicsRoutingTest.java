@@ -35,8 +35,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Guards the riskiest edit in the desktop-window work: the JavaSE port used to resolve
@@ -324,5 +326,53 @@ class MultiWindowGraphicsRoutingTest {
         assertTrue(commandRan[0], "the command itself must run");
         assertTrue(listenerSaw[0],
                 "and the window's command listeners must be notified");
+    }
+
+    @Test
+    void aCanvasResolvesHitTestsAndEditorFocusFromItsOwnWindow() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port);
+
+        // The main canvas answers with the current form, exactly as before.
+        JavaSEPort.C main = port.canvas;
+        if (main != null) {
+            java.lang.reflect.Method top =
+                    JavaSEPort.C.class.getDeclaredMethod("canvasTopLevel");
+            top.setAccessible(true);
+            assertSame(com.codename1.ui.CN.getCurrentForm(), top.invoke(main),
+                    "the main canvas must still resolve the current form");
+        }
+
+        // A secondary canvas must answer with the window it renders, not with whatever
+        // form happens to be current. Resolving the current form here is what made a
+        // peer in a window fail its hit test -- an unrelated main-form component at
+        // those window-local coordinates set cn1GrabbedDrag and swallowed the event --
+        // and made an editor focused in a window invisible to isPureEditorFocused().
+        assumeTrue(com.codename1.ui.Desktop.isSupported(), "needs a windowing system");
+        com.codename1.ui.Window w = new com.codename1.ui.Window("hit test");
+        w.setWindowSize(300, 200);
+        w.show();
+        // The desktop registry is populated on the event dispatch thread, so the id is
+        // not resolvable until it has run.
+        com.codename1.ui.Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+            }
+        });
+        JavaSEPort.C secondary = port.createWindowCanvas(w.getWindowId());
+        try {
+            java.lang.reflect.Method top =
+                    JavaSEPort.C.class.getDeclaredMethod("canvasTopLevel");
+            top.setAccessible(true);
+            Object resolved = top.invoke(secondary);
+            assertSame(w, resolved,
+                    "a secondary canvas must resolve the window it renders");
+            assertNotSame(com.codename1.ui.CN.getCurrentForm(), resolved,
+                    "and not the main form");
+        } finally {
+            secondary.disposeGestureListeners();
+            w.dispose();
+        }
     }
 }

@@ -2966,6 +2966,25 @@ public class JavaSEPort extends CodenameOneImplementation {
         /// sizing the surface, the backing buffer and the pointer mapping from the
         /// global one clipped or stretched the content and put hit testing out of
         /// step as soon as the window was moved to another display.
+        /// The top level this canvas actually renders, rather than whatever form is
+        /// current.
+        ///
+        /// Hit testing and focus lookups that resolved `Display.getCurrent()` were
+        /// answering about the main form even when the event arrived on a secondary
+        /// window's canvas: a peer in a window stopped receiving mouse input because an
+        /// unrelated main-form component at those window-local coordinates was not a
+        /// peer, and an editor focused in a window was not seen as focused at all.
+        ///
+        /// #### Returns
+        ///
+        /// this canvas's top level, or null when there is none
+        com.codename1.ui.TopLevelContainer canvasTopLevel() {
+            if (windowId == 0) {
+                return com.codename1.ui.CN.getCurrentForm();
+            }
+            return com.codename1.ui.Desktop.getInstance().windowById(windowId);
+        }
+
         double canvasScale() {
             if (windowId == 0) {
                 return retinaScale;
@@ -3696,7 +3715,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         // control key was down while a key was pressed.
         private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
         private boolean isPureEditorFocused() {
-            com.codename1.ui.Form f = com.codename1.ui.CN.getCurrentForm();
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             return f != null && (f.getFocused() instanceof com.codename1.ui.editor.EditorView);
         }
 
@@ -3908,11 +3927,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             this.mouseDown = true;
-            Form f = Display.getInstance().getCurrent();
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             if (f != null) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                Component cmp = f.getComponentAt(x, y);
+                Component cmp = f.asContainer().getComponentAt(x, y);
                 if (!(cmp instanceof PeerComponent)) {
                     cn1GrabbedDrag = true;
                 }
@@ -14446,9 +14465,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             int cn1Y = getCN1Y(e);
             if ((!peerGrabbedDrag || true) && Display.isInitialized()) {
                 if (!isOnCanvas(e)) return false;
-                Form f = Display.getInstance().getCurrent();
+                // The owning canvas's top level, not the current form: a peer in a
+                // secondary window was hit tested against the main form, and an
+                // unrelated non-peer at those coordinates set cn1GrabbedDrag and
+                // swallowed the event, so browser links and other native controls in
+                // the window stopped receiving mouse input.
+                com.codename1.ui.TopLevelContainer f = ownerCanvas().canvasTopLevel();
                 if (f != null) {
-                    Component cmp = f.getComponentAt(cn1X, cn1Y);
+                    Component cmp = f.asContainer().getComponentAt(cn1X, cn1Y);
                     //if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
                         // It's not a peer component, so we should pass the event to the canvas
                         e = SwingUtilities.convertMouseEvent(this, e, ownerCanvas());
