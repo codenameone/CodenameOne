@@ -51,7 +51,7 @@
     "pass": 158,
     "fail": 0,
     "skip": 13,
-    "not-run": 0
+    "not-run": 1
   },
   "tests": {
     "ARApiTest": {
@@ -401,6 +401,10 @@
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
       "status": "pass"
+    },
+    "IntentsApiTest": {
+      "feature": "intents",
+      "status": "not-run"
     },
     "Java17Tests": {
       "feature": "java-standard-apis",
