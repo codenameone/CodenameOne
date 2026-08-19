@@ -157,6 +157,8 @@ include::Bluetooth.asciidoc[]
 
 include::Health.asciidoc[]
 
+include::Smart-Home.asciidoc[]
+
 include::Printing.asciidoc[]
 
 include::Network-Connectivity.asciidoc[]

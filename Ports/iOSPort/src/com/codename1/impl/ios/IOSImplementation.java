@@ -368,6 +368,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isCarPlayConnected();
     }
 
+    private IOSHomeBridge homeBridge;
+
+    @Override
+    public com.codename1.home.spi.HomeBridge getHomeBridge() {
+        // Only meaningful in builds that linked the HomeKit natives
+        // (CN1_INCLUDE_HOMEKIT, flipped by the builder when the app references
+        // com.codename1.home). Always returned rather than conditionally null: the bridge's own
+        // isSupported() answers honestly through the natives, which stub to unsupported when the
+        // define is off, so SmartHome reports NOT_SUPPORTED without this getter having to know
+        // anything about how the app was built.
+        if (homeBridge == null) {
+            homeBridge = IOSHomeCallbacks.getBridge(nativeInstance);
+        }
+        return homeBridge;
+    }
+
     private IOSWearableBridge wearableBridge;
 
     @Override

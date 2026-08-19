@@ -55,6 +55,15 @@ permissions:
   issues: write
   packages: read
 
+env:
+  # Turn the ParparVM native-signature check on for every translation this
+  # workflow forks -- the Maven plugin, the ParparVM integration tests, the build
+  # scripts -- since a forked process inherits the environment. Deliberately NOT
+  # the translator's default: making the old soft failure hard would change the
+  # outcome of customer builds that succeed today, so it is ours to enforce, not
+  # theirs to trip over. See NativeSignatureVerifier.
+  CN1_NATIVE_VERIFY: strict
+
 concurrency:
   # Cancel superseded runs of this workflow for the same PR branch
   # (github.head_ref is set on pull_request events). On push to master
@@ -372,6 +381,20 @@ jobs:
         run: |
           $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -q -f vm/pom.xml -pl JavaAPI -am package -DskipTests
           scripts/check-cast-semantics.sh --require-all
+      # ParparVM encodes the whole Java signature in the C function name, so a
+      # native whose implementation is spelled even slightly differently is NOT a
+      # link error: nothing references the real symbol, the dead-code pass reads
+      # that as "unused" and drops the Java method, and the feature ships inert.
+      # ios/core come from the SpotBugs step and JavaAPI from the cast step; the
+      # two desktop ports are not built yet, so compile them here.
+      - name: Check native method signatures
+        if: ${{ matrix.java-version == 8 }}
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          mvn -B -q -f maven/pom.xml -pl windows,linux -am -DskipTests \
+            -Dcn1.binaries="${CN1_BINARIES}" compile
+          scripts/check-native-signatures.sh --require-all
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm

@@ -38,7 +38,7 @@ import com.codename1.util.AsyncResource;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import com.codename1.impl.health.EdtResult;
+import com.codename1.impl.async.EdtResult;
 
 /// Discovers and streams from standard Bluetooth SIG health sensors --
 /// heart-rate straps, power meters, speed and cadence sensors, foot pods,

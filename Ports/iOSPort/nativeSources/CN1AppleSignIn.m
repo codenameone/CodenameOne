@@ -133,7 +133,7 @@ API_AVAILABLE(ios(13.0))
 static id g_cn1AppleCurrentDelegate = nil;
 static id g_cn1AppleCurrentController = nil;
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     if (@available(iOS 13.0, *)) {
         return NSClassFromString(@"ASAuthorizationAppleIDProvider") != nil ? JAVA_TRUE : JAVA_FALSE;
@@ -141,7 +141,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported__(
     return JAVA_FALSE;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInIsLoggedIn__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInIsLoggedIn___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     if (@available(iOS 13.0, *)) {
         // fall through
@@ -171,7 +171,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_appleSignInSignOut__(
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCN1AppleUserDefaultsKey];
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT scopesObj, JAVA_OBJECT nonceObj) {
     if (@available(iOS 13.0, *)) {
         // fall through
@@ -233,12 +233,12 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java
 // AppleSignInNativeImpl, but ParparVM still needs symbols for the native
 // methods declared on IOSNative.java.
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInIsLoggedIn__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInIsLoggedIn___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
@@ -247,7 +247,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_appleSignInSignOut__(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT scopesObj, JAVA_OBJECT nonceObj) {
     return JAVA_NULL;
 }

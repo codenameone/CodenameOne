@@ -1257,8 +1257,27 @@ const jvm = {
       throw new Error("Negative array size");
     }
     const array = new Array(size);
+    // Primitive leaf arrays use Java's zero defaults. Reference arrays and
+    // unallocated outer dimensions remain null.
+    let defaultValue = null;
+    if (dimensions === 1) {
+      switch (componentClass) {
+        case "JAVA_BOOLEAN":
+        case "JAVA_BYTE":
+        case "JAVA_CHAR":
+        case "JAVA_SHORT":
+        case "JAVA_INT":
+        case "JAVA_FLOAT":
+        case "JAVA_DOUBLE":
+          defaultValue = 0;
+          break;
+        case "JAVA_LONG":
+          defaultValue = _L0;
+          break;
+      }
+    }
     for (let i = 0; i < size; i++) {
-      array[i] = null;
+      array[i] = defaultValue;
     }
     array.__class = this.arrayClassName(componentClass, dimensions);
     array.__classDef = this.getArrayClass(componentClass, dimensions);

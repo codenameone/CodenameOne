@@ -4779,6 +4779,18 @@ public final class Display extends CN1Constants {
         return impl.getWearableBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.home` API to reach HomeKit, the
+    /// Google Home APIs or a local simulated home, or null when this port has no smart-home
+    /// support. Internal -- application code uses `com.codename1.home.SmartHome` rather than this
+    /// bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the smart-home bridge, or null
+    public com.codename1.home.spi.HomeBridge getHomeBridge() {
+        return impl.getHomeBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
     /// surfaces (home-screen widgets and live activities), or null when unsupported on this port.
     /// Internal -- application code uses the `com.codename1.surfaces` API rather than this bridge

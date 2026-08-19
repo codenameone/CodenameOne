@@ -20,14 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.health;
+package com.codename1.impl.async;
 
 import com.codename1.util.AsyncResource;
 
 /// An [AsyncResource] that keeps the first outcome and ignores the
 /// rest.
 ///
-/// Every operation here is armed with a timeout, and `AsyncResource`
+/// Shared by the subsystems that front a platform service through an
+/// [AsyncResource] -- `com.codename1.health` and `com.codename1.home` --
+/// because the hazards below are properties of that shape, not of any one
+/// of them. The war stories are health's, since that is where they were
+/// paid for.
+///
+/// Operations of this kind are armed with a timeout, and `AsyncResource`
 /// itself allows a resource to be completed more than once -- so a
 /// platform call that answered after its timeout had fired ran the
 /// callbacks a second time. A write reported TIMEOUT and then
@@ -41,7 +47,7 @@ import com.codename1.util.AsyncResource;
 ///
 /// #### Both halves of every operation, not just the port-facing one
 ///
-/// This is also what the health API hands *back*, for the mirror-image
+/// This is also what those APIs hand *back*, for the mirror-image
 /// reason: the caller owns a public [AsyncResource] and may cancel it.
 /// While only the internal resource was a one-shot, cancelling a read or
 /// a write left the port free to answer afterwards -- and the plain
@@ -51,7 +57,7 @@ import com.codename1.util.AsyncResource;
 /// gets the same treatment as the other two, so it lives here rather
 /// than in each of the twenty-odd places an operation is started.
 ///
-/// It is public because those places span four packages and both mobile
+/// It is public because those places span several packages and both mobile
 /// ports; nothing outside the implementation needs it.
 /// Not final: [EdtResult] extends it to add the EDT hand-off that every
 /// caller-facing result needs. Internal resources -- the one a port completes,
