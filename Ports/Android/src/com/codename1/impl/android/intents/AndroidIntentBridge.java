@@ -1104,12 +1104,22 @@ public class AndroidIntentBridge implements IntentBridge {
         // Re-publishing does not undo a disable. removeFromIndex disables the id so a cached
         // long-lived or pinned copy stops being surfaced, and Android keeps it disabled until
         // something says otherwise -- so an entity that is removed and later indexed again
-        // would come back inert, or be refused outright. Harmless when the id was never
-        // disabled, which is the ordinary case.
-        try {
-            manager.enableShortcuts(Arrays.asList(id));
-        } catch (Throwable t) {
-            // An id the system has never seen is not an error worth reporting.
+        // would come back inert, or be refused outright.
+        //
+        // Whether it *was* disabled is worth knowing, because enabling is not free to get
+        // wrong in either direction. Enabling unconditionally and then failing to publish --
+        // the launcher can refuse, it rate-limits updates -- left the old copy live again with
+        // its previous label, URI and image: content the application had removed, reappearing
+        // because replacing it did not work. And disabling unconditionally on that failure
+        // would take down a shortcut that was working before this call. So the prior state is
+        // read, and restored if the publication does not happen.
+        boolean wasDisabled = hasDisabledCopy(manager, id);
+        if (wasDisabled) {
+            try {
+                manager.enableShortcuts(Arrays.asList(id));
+            } catch (Throwable t) {
+                // An id the system has never seen is not an error worth reporting.
+            }
         }
 
         Intent intent = new Intent(Intent.ACTION_VIEW, data);
@@ -1166,6 +1176,15 @@ public class AndroidIntentBridge implements IntentBridge {
                         + "limiting; it was not published");
             }
         }
+        if (!published && wasDisabled) {
+            // The replacement never landed, so put the id back the way this call found it
+            // rather than leaving removed content on screen.
+            try {
+                manager.disableShortcuts(Arrays.asList(id));
+            } catch (Throwable t) {
+                // Best effort: the copy is already stale, and there is nothing better to do.
+            }
+        }
         if (report && published) {
             try {
                 manager.reportShortcutUsed(id);
@@ -1174,6 +1193,59 @@ public class AndroidIntentBridge implements IntentBridge {
             }
         }
         return published;
+    }
+
+    /// Whether the launcher is still holding a disabled copy of this id.
+    ///
+    /// Pinned copies are readable on every version this port supports. Cached copies exist
+    /// only from API 30 and are reachable through getShortcuts(int), which is why the flag is
+    /// read from the class rather than written as a number -- a wrong constant here would
+    /// quietly answer about the wrong set.
+    @TargetApi(Build.VERSION_CODES.N_MR1)
+    private static boolean hasDisabledCopy(ShortcutManager manager, String id) {
+        if (disabledIn(manager.getClass(), manager, id, "getPinnedShortcuts", 0)) {
+            return true;
+        }
+        int cached = shortcutFlag("FLAG_MATCH_CACHED");
+        return cached != 0 && disabledIn(manager.getClass(), manager, id, "getShortcuts", cached);
+    }
+
+    /// Reads a ShortcutManager match flag by name, or 0 when this platform has no such flag.
+    private static int shortcutFlag(String name) {
+        try {
+            return ShortcutManager.class.getField(name).getInt(null);
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    /// True when the named accessor reports this id and reports it disabled.
+    private static boolean disabledIn(Class<?> type, ShortcutManager manager, String id,
+                                       String accessor, int flags) {
+        Object result;
+        try {
+            result = flags == 0
+                    ? type.getMethod(accessor).invoke(manager)
+                    : type.getMethod(accessor, int.class).invoke(manager,
+                            Integer.valueOf(flags));
+        } catch (Throwable t) {
+            return false;
+        }
+        // The iteration stays outside the handler: a for-each over List<ShortcutInfo> compiles
+        // to a CHECKCAST, and ParparVM does not throw for a failed cast, so a handler around
+        // one reads as relying on an exception that never arrives.
+        if (!(result instanceof List)) {
+            return false;
+        }
+        for (Object o : (List<?>) result) {
+            if (o instanceof ShortcutInfo) {
+                ShortcutInfo info = (ShortcutInfo) o;
+                if (id.equals(info.getId())) {
+                    return !info.isEnabled();
+                }
+            }
+        }
+        return false;
     }
 
     /// The pre-API-31 publication, whose own boolean answer matters for the same reason.
