@@ -494,50 +494,50 @@ static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
 }
 
 /*
- * Asks for a frame and keeps asking until the scene actually has it.
+ * Asks for a frame and keeps asking until the scene's *content* is the size wanted.
  *
- * A geometry preference is a request, not an instruction: the window manager may
- * ignore it, and when it does the scene keeps whatever size it already had -- in
- * practice Catalyst's 1024x768 default. Nothing retried, so a window that lost the
- * request stayed the wrong size for good. That is what left the windowed screenshot
- * suite intermittently short of captures: whichever test happened to lose a request
- * reported showing=true painted=true at 1024x768 and never became renderable at the
- * size it asked for.
+ * Two things make a single request unreliable. A geometry preference is a request,
+ * not an instruction: when the window manager ignores one the scene keeps the size
+ * it already had -- Catalyst's 1024x768 default -- and nothing asked again, which
+ * left the windowed screenshot suite intermittently short of captures. And the
+ * preference is a *system* frame, which includes the title bar, while what has to
+ * come out right is the content area Codename One lays out into. Asking for a system
+ * frame of the wanted content size therefore delivers content that is short by the
+ * height of the chrome.
  *
- * Bounded and self-cancelling: it stops as soon as the delivered size matches, so a
- * granted request costs one extra check, and a window the manager genuinely refuses
- * to resize stops asking rather than spinning.
+ * So this corrects rather than merely repeats: each round measures the delivered
+ * content, folds the shortfall into the next request, and stops as soon as the
+ * content matches. Chrome of any height converges in one correction; a manager that
+ * refuses the size stops asking after the attempt budget rather than spinning.
  *
- * The tradeoff is that a user who drags the window during the retry window is argued
- * with for up to that couple of seconds. That is acceptable here because retries only
- * follow an explicit request -- window creation, or the application calling
- * setBounds -- and never start on their own.
+ * The tradeoff is that a user who drags the window during those rounds is argued with
+ * for up to a couple of seconds. That is acceptable because this only ever follows an
+ * explicit request -- window creation -- and never starts on its own.
  */
-static void CN1MacWindowRequestGeometryRetrying(UIWindowScene* scene, CGRect frame,
-        int attemptsLeft) {
+static void CN1MacWindowConvergeGeometry(UIWindowScene* scene, CGSize wantedContent,
+        CGSize request, int attemptsLeft) {
     if (scene == nil || attemptsLeft <= 0) {
         return;
     }
-    CN1MacWindowRequestGeometry(scene, frame);
-    if (attemptsLeft <= 1) {
-        return;
-    }
-    /* Retained across the delay: this port builds without ARC, and the scene can be
-     * released by a disconnect while the check is queued. */
+    CN1MacWindowRequestGeometry(scene, CGRectMake(0, 0, request.width, request.height));
+    /* Retained across the delay: this port builds without ARC, and a disconnect can
+     * release the scene while the check is queued. */
     UIWindowScene* held = [scene retain];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (0.3 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (0.25 * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
-        CGRect got = held.coordinateSpace.bounds;
-        if (fabs(got.size.width - frame.size.width) > 1.0
-                || fabs(got.size.height - frame.size.height) > 1.0) {
-            CN1MacWindowRequestGeometryRetrying(held, frame, attemptsLeft - 1);
+        CGSize got = held.coordinateSpace.bounds.size;
+        CGFloat dw = wantedContent.width - got.width;
+        CGFloat dh = wantedContent.height - got.height;
+        if (fabs(dw) > 1.0 || fabs(dh) > 1.0) {
+            CGSize next = CGSizeMake(request.width + dw, request.height + dh);
+            CN1MacWindowConvergeGeometry(held, wantedContent, next, attemptsLeft - 1);
         }
         [held release];
     });
 }
 
-/* Roughly two and a half seconds of asking, well inside the screenshot harness's
- * ten second readiness deadline. */
+/* Enough rounds to absorb a correction and a few ignored requests, and short enough
+ * to stay well inside the screenshot harness's ten second readiness deadline. */
 #define CN1_GEOMETRY_ATTEMPTS 8
 
 static void dropPendingSlotLocked(int slot) {
@@ -791,8 +791,8 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
                 scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
             }
         }
-        CN1MacWindowRequestGeometryRetrying(scene,
-                CGRectMake(0, 0, pointWidth, pointHeight), CN1_GEOMETRY_ATTEMPTS);
+        CN1MacWindowConvergeGeometry(scene, CGSizeMake(pointWidth, pointHeight),
+                CGSizeMake(pointWidth, pointHeight), CN1_GEOMETRY_ATTEMPTS);
     }
     pthread_mutex_unlock(&g_slotLock);
 }
@@ -994,12 +994,11 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
     dispatch_async(dispatch_get_main_queue(), ^{
         /* Codename One geometry is in pixels, UIKit's is in points. */
         CGFloat scale = (window != nil && window.screen != nil) ? window.screen.scale : 1.0;
-        // Retried for the same reason adoption is: the request can be ignored, and
-        // nothing else would ever ask again. Only the size is compared -- the window
-        // manager is entitled to place the window where it likes.
-        CN1MacWindowRequestGeometryRetrying(scene,
-                CGRectMake(x / scale, y / scale, width / scale, height / scale),
-                CN1_GEOMETRY_ATTEMPTS);
+        // Deliberately a single request. setBounds is defined in native coordinates
+        // including chrome, so the system frame *is* what was asked for -- converging
+        // on a content size here would silently redefine the API.
+        CN1MacWindowRequestGeometry(scene,
+                CGRectMake(x / scale, y / scale, width / scale, height / scale));
     });
 }
 

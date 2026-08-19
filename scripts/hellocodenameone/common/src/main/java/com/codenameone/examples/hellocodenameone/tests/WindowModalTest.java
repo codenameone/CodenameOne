@@ -144,11 +144,14 @@ public class WindowModalTest extends BaseTest {
         return w.hasPaintedOnce()
                 && settled
                 && windowWidth > 0 && windowHeight > 0
-                && windowWidth <= requestedWidth && windowHeight <= requestedHeight
-                // ...and not implausibly smaller either. Chrome costs tens of pixels,
-                // never half the window: a much smaller size means the platform is
-                // still reporting a previous window's geometry.
-                && windowWidth * 4 >= requestedWidth * 3 && windowHeight * 4 >= requestedHeight * 3
+                // Exactly the size asked for. The old rule allowed anything down to
+                // three quarters, which was meant to catch a window still reporting a
+                // previous window's geometry -- and did not: a 700x500 background came
+                // back at a recycled scene's 600x450 and sailed through, so the golden
+                // recorded whichever size that run happened to get. A window that
+                // cannot be given its size should fail visibly rather than be captured
+                // at the wrong one.
+                && windowWidth == requestedWidth && windowHeight == requestedHeight
                 && probe != null
                 && probe.getWidth() == windowWidth
                 && probe.getHeight() == windowHeight;

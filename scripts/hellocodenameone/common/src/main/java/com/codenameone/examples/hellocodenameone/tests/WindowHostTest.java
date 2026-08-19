@@ -188,11 +188,11 @@ public abstract class WindowHostTest extends BaseTest {
                 && window.hasPaintedOnce()
                 && settled
                 && windowWidth > 0 && windowHeight > 0
-                && windowWidth <= width && windowHeight <= height
-                // ...and not implausibly smaller either. Chrome costs tens of pixels,
-                // never half the window: a much smaller size means the platform is
-                // still reporting a previous window's geometry.
-                && windowWidth * 4 >= width * 3 && windowHeight * 4 >= height * 3
+                // Exactly the size asked for. A tolerance here let a window that had
+                // kept a recycled scene's geometry be captured anyway, which put the
+                // wrong size in the golden; a window the platform will not size should
+                // fail visibly instead.
+                && windowWidth == width && windowHeight == height
                 && probe != null
                 && probe.getWidth() == windowWidth
                 && probe.getHeight() == windowHeight;
