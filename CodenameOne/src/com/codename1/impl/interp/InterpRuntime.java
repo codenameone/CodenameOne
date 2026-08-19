@@ -68,12 +68,24 @@ public final class InterpRuntime {
     /// main runs on the event thread and the socket thread is what answers the
     /// push. The pair is only ever read through an identity check, so the worst
     /// a race can do is decline to produce a stack.
-    private volatile Object lastThrown;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
-    private volatile String[] lastThrownStack;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
+    /// One record, published in one write: the throwable, the frames it came
+    /// from and the host call it happened in. Three separate fields could be
+    /// read half-updated -- another thread's frames beside this thread's
+    /// throwable -- which is a confidently wrong stack rather than a missing
+    /// one.
+    private static final class Failure {
+        private final Object thrown;
+        private final String[] stack;
+        private final String hostCall;
 
-    /// The host method being called when [#lastThrown] was thrown, if it was
-    /// thrown by one rather than by interpreted code.
-    private volatile String lastHostCall;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
+        Failure(Object thrown, String[] stack, String hostCall) {
+            this.thrown = thrown;
+            this.stack = stack;
+            this.hostCall = hostCall;
+        }
+    }
+
+    private volatile Failure lastFailure;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
 
     /// Execution state that belongs to one thread, not to the runtime.
     ///
@@ -2134,10 +2146,10 @@ public final class InterpRuntime {
             // interpreter's own stack and no message -- "java.lang.
             // UnsupportedOperationException" and nothing else -- which says
             // neither what was called nor from where.
-            if (lastThrown != t) {  //NOPMD CompareObjectsWithEquals - the same throwable instance, not an equal one
-                lastThrownStack = snapshotStack();
-                lastHostCall = owner.replace('/', '.') + "." + name + desc;
-                lastThrown = t;
+            Failure previous = lastFailure;
+            if (previous == null || previous.thrown != t) {  //NOPMD CompareObjectsWithEquals - the same throwable instance, not an equal one
+                lastFailure = new Failure(t, snapshotStack(),
+                        owner.replace('/', '.') + "." + name + desc);
             }
             throw t;
         } finally {
@@ -3208,9 +3220,7 @@ public final class InterpRuntime {
             // catching it, so the exception has to stay the exception. The
             // interpreted frames are recorded beside it instead, and
             // [#interpretedStackFor] hands them back if it escapes.
-            lastThrownStack = snapshotStack();
-            lastHostCall = null;
-            lastThrown = t;
+            lastFailure = new Failure(t, snapshotStack(), null);
             return (Throwable) t;
         }
         return new InterpThrowable(t, snapshotStack());
@@ -3222,12 +3232,14 @@ public final class InterpRuntime {
     /// trace, which names the interpreter's frames rather than the program's.
     /// This is the program's, recorded when it was thrown.
     public String[] interpretedStackFor(Throwable t) {
-        return lastThrown == t ? lastThrownStack : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
+        Failure f = lastFailure;
+        return f != null && f.thrown == t ? f.stack : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
     }
 
     /// The framework method that threw this, or null if interpreted code did.
     public String hostCallFor(Throwable t) {
-        return lastThrown == t ? lastHostCall : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
+        Failure f = lastFailure;
+        return f != null && f.thrown == t ? f.hostCall : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
     }
 
     private int findHandler(InterpMethod m, int insn, Object thrown) throws Throwable {

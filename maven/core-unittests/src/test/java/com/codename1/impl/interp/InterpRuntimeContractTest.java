@@ -88,6 +88,11 @@ class InterpRuntimeContractTest {
                 "/*\n * a block\n */\npackage com.example;\n"));
         assertEquals("", packageOf("public class A {}\n"));
         assertEquals("", packageOf("// package com.example;\npublic class A {}\n"));
+        // javac decodes \\uXXXX before it reads anything else, so this is a
+        // package declaration -- odd, legal, and invisible to a raw scan.
+        assertEquals("com.example",
+                packageOf("\\u0070ackage com.example;\npublic class A {}\n"));
+        assertEquals("", packageOf("\\\\u0070ackage com.example;\npublic class A {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {

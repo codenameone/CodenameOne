@@ -213,7 +213,7 @@ public class InterpBundleWriter {
         // line of perfectly ordinary Java, and reading it as the default
         // package stored the source under a key the runtime never looks up --
         // so the push was refused for missing source that had been supplied.
-        String code = stripComments(text);
+        String code = stripComments(decodeUnicodeEscapes(text));
         int i = 0;
         while (i < code.length()) {
             char c = code.charAt(i);
@@ -240,6 +240,60 @@ public class InterpBundleWriter {
             i++;
         }
         return "";
+    }
+
+    /**
+     * The source with `\\uXXXX` escapes decoded, as javac decodes them first.
+     *
+     * <p>Java processes unicode escapes before anything else, so
+     * `\\u0070ackage com.example;` is a package declaration -- odd, legal, and
+     * invisible to a scanner working on the raw text. Only an odd number of
+     * preceding backslashes starts an escape, which is what keeps `\\\\u0070`
+     * the two characters it is.</p>
+     */
+    private static String decodeUnicodeEscapes(String text) {
+        if (text.indexOf("\\u") < 0) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c != '\\') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int slashes = 0;
+            while (i < text.length() && text.charAt(i) == '\\') {
+                slashes++;
+                i++;
+            }
+            // A run of backslashes followed by u's: only an odd run escapes.
+            int us = 0;
+            while (i + us < text.length() && text.charAt(i + us) == 'u') {
+                us++;
+            }
+            if ((slashes & 1) == 1 && us > 0 && i + us + 4 <= text.length()) {
+                String hex = text.substring(i + us, i + us + 4);
+                try {
+                    char decoded = (char) Integer.parseInt(hex, 16);
+                    for (int k = 0; k < slashes - 1; k++) {
+                        out.append('\\');
+                    }
+                    out.append(decoded);
+                    i += us + 4;
+                    continue;
+                } catch (NumberFormatException notAnEscape) {
+                    // Malformed; javac would reject the file, and this scan has
+                    // no business deciding that. Left as written.
+                }
+            }
+            for (int k = 0; k < slashes; k++) {
+                out.append('\\');
+            }
+        }
+        return out.toString();
     }
 
     /**

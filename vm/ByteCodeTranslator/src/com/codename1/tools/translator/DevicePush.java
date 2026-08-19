@@ -437,6 +437,11 @@ public final class DevicePush {
                 out.writeInt(payload.length);
                 out.write(payload);
                 out.flush();
+                // The bundle is away; what follows is the device installing it
+                // and entering the program, which takes as long as the program
+                // takes. Timing out here would leave the desktop reporting a
+                // failed push for a program that is running.
+                s.setSoTimeout(0);
                 boolean ok = report(s);
                 if (!ok) {
                     System.exit(1);
@@ -481,6 +486,12 @@ public final class DevicePush {
             out.writeInt(payload.length);
             out.write(payload);
             out.flush();
+            // Past this point the device may be waiting for a person to approve
+            // the push, and then installing and starting the program. Discovery
+            // and authentication kept their deadlines; this part cannot have
+            // one, or a slow start is reported as a failure while the program
+            // runs.
+            s.setSoTimeout(0);
             return report(s);
         } finally {
             s.close();
