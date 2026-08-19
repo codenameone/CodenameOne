@@ -70,6 +70,11 @@ jobs:
       # clang (older clang-cl trips STL1000 "Unexpected compiler version"), so
       # pin LLVM 19 for the cross-build rather than the distro default.
       - name: Install LLVM 19 + CMake/Ninja
+        # Capped well inside the job's 60 minutes. The inner bounds give a stalled mirror a
+        # second chance; this one guarantees that however they compound, the step cannot eat
+        # the budget the build itself needs -- which is what happened twice on 2026-08-19,
+        # each time surfacing as "Artifact not found" in a different job.
+        timeout-minutes: 20
         run: |
           set -e
           bash scripts/ci/apt-get-update.sh
@@ -87,7 +92,10 @@ jobs:
           RETRY_ATTEMPTS=3 bash scripts/ci/retry.sh \
             wget -q --timeout=30 --tries=3 -O llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          RETRY_ATTEMPTS=3 bash scripts/ci/retry.sh timeout 900 sudo ./llvm.sh 19
+          # Two attempts of ten minutes, not three of fifteen: the point of a bound is to
+          # leave the job enough budget to do its actual work afterwards, and 3x900s is
+          # three quarters of the runner's hour.
+          RETRY_ATTEMPTS=2 bash scripts/ci/retry.sh timeout 600 sudo ./llvm.sh 19
           bash scripts/ci/apt-get-install.sh clang-19 lld-19 llvm-19
           echo "/usr/lib/llvm-19/bin" >> "$GITHUB_PATH"
           /usr/lib/llvm-19/bin/clang-cl --version
