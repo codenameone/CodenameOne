@@ -2117,9 +2117,6 @@ public final class Intents {
     }
 
     /// The entity type a parameter was declared to take, or null when it takes something else.
-    ///
-    /// Indexed rather than a for-each: this runs on every in-process invocation, and the
-    /// declaration list is short enough that the iterator would be the more expensive half.
     private static String declaredEntityType(IntentDeclaration decl, String name) {
         if (decl == null || name == null) {
             return null;
@@ -2128,8 +2125,7 @@ public final class Intents {
         if (ps == null) {
             return null;
         }
-        for (int i = 0; i < ps.size(); i++) {
-            IntentParameterInfo p = ps.get(i);
+        for (IntentParameterInfo p : ps) {
             if (p != null && name.equals(p.getName())) {
                 return p.getEntityType();
             }
