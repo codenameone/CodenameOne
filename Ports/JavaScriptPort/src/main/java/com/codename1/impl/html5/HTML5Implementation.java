@@ -11108,12 +11108,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * entry the app started on, or anything the host page pushed -- carry no id of ours and
      * read as being before everything.
      */
-    private int parseHistoryIndex(String state) {
-        if (state == null || !state.startsWith(HISTORY_STATE_PREFIX)) {
+    private int parseHistoryIndex(Object state) {
+        // Anything that is not one of this port's own stamps reads as being before everything,
+        // and a host page's router object is exactly that: not a string, and not ours.
+        if (!(state instanceof String)) {
+            return 0;
+        }
+        String text = (String) state;
+        if (!text.startsWith(HISTORY_STATE_PREFIX)) {
             return 0;
         }
         try {
-            return Integer.parseInt(state.substring(HISTORY_STATE_PREFIX.length()));
+            return Integer.parseInt(text.substring(HISTORY_STATE_PREFIX.length()));
         } catch (NumberFormatException e) {
             return 0;
         }

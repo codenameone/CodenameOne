@@ -26,10 +26,13 @@ package com.codename1.html5.js.dom;
  * Interface for the JavaScript PopStateEvent object.
  * https://developer.mozilla.org/en-US/docs/Web/API/PopStateEvent
  *
- * <p>The state is read as a string because popstate fires for forward traversal as well as
- * backward, and the two are only distinguishable by comparing the state the browser restored
- * against the one currently displayed.</p>
+ * <p>The state is read because popstate fires for forward traversal as well as backward, and
+ * the two are only distinguishable by comparing the state the browser restored against the one
+ * currently displayed. It is typed as Object rather than String: history state is any
+ * structured-cloneable value, and a page that embeds this canvas may keep its router's own
+ * object there. Binding it as a String would put that entry through a conversion it cannot
+ * satisfy, when all the port needs is to see that the value is not one of its own.</p>
  */
 public interface PopStateEvent extends Event {
-    String getState();
+    Object getState();
 }
