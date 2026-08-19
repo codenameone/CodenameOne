@@ -77,7 +77,8 @@ jobs:
         timeout-minutes: 20
         run: |
           set -e
-          bash scripts/ci/apt-get-update.sh
+          # No explicit index refresh here: apt-get-install.sh does one itself, and doing it
+          # twice doubles the time a stalling mirror can take before anything is installed.
           # xvfb: the CN1 CSS compiler (codenameone-maven-plugin css goal) renders
           # via CEF/AWT and throws HeadlessException without a display, so the
           # hellocodenameone-common build below runs under a virtual X server.

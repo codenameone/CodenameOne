@@ -30,8 +30,15 @@ if [ "${#missing[@]}" -eq 0 ]; then
 fi
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Refreshed once, outside the loop. It used to run on every attempt, and once the refresh
+# itself became bounded-and-retried that multiplied: three attempts each spending up to the
+# refresh's whole budget before trying to install. On 2026-08-19 a stalling mirror turned one
+# call into eighteen minutes of index fetching, which is what actually exhausted the Windows
+# cross-build's step budget -- the install never got a fair attempt. A stale index is not
+# what makes an install fail twice in a row anyway; an unreachable archive is, and refetching
+# it three times does not make it reachable.
+bash "$here/apt-get-update.sh" || true
 for attempt in 1 2 3; do
-  bash "$here/apt-get-update.sh" || true
   # A mirror that stops responding mid-download otherwise blocks until the job timeout.
   if timeout 600 sudo apt-get install -y --no-install-recommends "${missing[@]}"; then
     exit 0
