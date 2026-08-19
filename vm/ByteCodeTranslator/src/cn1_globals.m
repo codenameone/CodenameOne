@@ -417,6 +417,12 @@ static void cn1PacingReleaseThreadClaim(void) {
 // (so the sweep reclaimed it and the claim is meaningless). Every pacing park requests a
 // collection, so under pressure boundaries arrive continuously and the accumulation
 // stays small.
+// NOT held for live-but-untouched blocks, deliberately. A never-written array is not
+// footprint at all, so reserving for it past the boundary would charge the process for
+// memory that does not exist and throttle every allocator for the life of the app --
+// an unbounded over-reservation traded for a bounded under-reservation. Dirtying an
+// old block also never reaches the allocator, so no expiry policy could catch it; live
+// headroom paces on the next allocation once those pages are really written.
 static void cn1PacingExpireThreadClaim(void) {
     int epochNow = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
     if(cn1MyPacingClaimEpoch != epochNow) {
@@ -3554,6 +3560,11 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             }
         }
     }
+    // Proceeding here rather than failing the allocation is deliberate: ParparVM has no
+    // way to fail one. codenameOneGcMalloc answers a NULL calloc by forcing a cycle and
+    // recursing, so there is no OutOfMemoryError path to reuse, and the block is already
+    // allocated and registered by this point. Adding one belongs in its own change.
+    //
     // GIVING UP STILL DIRTIES THE BLOCK. If the wait ended on barren cycles or the
     // backstop rather than on admission, this thread proceeds to write its block anyway
     // -- so the block has to be claimed regardless, or it is invisible to every other
