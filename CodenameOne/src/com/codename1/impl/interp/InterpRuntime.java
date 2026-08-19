@@ -1218,8 +1218,21 @@ public final class InterpRuntime {
                     // the one case where a partly-built class must be visible.
                     return;
                 }
+                // Uninterruptibly, as JVMS 5.5 requires: waiting for another
+                // thread's <clinit> is not something the instruction that
+                // triggered it can report. An interrupt is remembered and
+                // reasserted, so the program still sees it at its next
+                // interruptible point rather than as a failure from a getstatic.
+                boolean interrupted = false;
                 while (c.initState == InterpClass.INIT_RUNNING) {
-                    c.wait();
+                    try {
+                        c.wait();
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
+                }
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
                 }
                 // Re-read the state the other thread left behind.
                 if (c.initState == InterpClass.INIT_FAILED) {
