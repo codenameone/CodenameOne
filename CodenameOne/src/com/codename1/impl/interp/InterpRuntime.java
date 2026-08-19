@@ -2016,6 +2016,22 @@ public final class InterpRuntime {
                 args[i] = hostClassFor((InterpClass) args[i]);
             }
         }
+        // Elements of a reference array cross the same way a scalar argument
+        // does: as their peers. `Arrays.sort(items)` where the items implement
+        // a host Comparable would otherwise hand the host a wrapper it can only
+        // fail to cast -- and the array is converted back afterwards, since a
+        // host method may reorder or replace elements in place and interpreted
+        // code has to find its own objects there again.
+        Vector arrays = null;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof Object[]) {
+                if (arrays == null) {
+                    arrays = new Vector();
+                }
+                arrays.addElement(args[i]);
+                toHostElements(args[i], new Vector());
+            }
+        }
         st.hostCallDepth++;
         // When this is the outermost host call, the wall clock it spends is not
         // the program's to answer for: invokeAndBlock, a network read or a
@@ -2052,9 +2068,53 @@ public final class InterpRuntime {
             }
             throw t;
         } finally {
+            if (arrays != null) {
+                for (int i = 0; i < arrays.size(); i++) {
+                    fromHostElements(arrays.elementAt(i), new Vector());
+                }
+            }
             st.hostCallDepth--;
             if (st.hostCallDepth == 0 && st.runStartMs > 0) {
                 st.runStartMs += System.currentTimeMillis() - hostCallStart;
+            }
+        }
+    }
+
+    /// Replaces peer-backed elements of a reference array with their peers.
+    ///
+    /// In place, and recursively for nested arrays, because the array itself is
+    /// the value being passed: a copy would lose whatever the host method did
+    /// to it. The seen list is what makes a self-referencing array terminate.
+    private static void toHostElements(Object array, Vector seen) {
+        if (!(array instanceof Object[]) || seen.contains(array)) {
+            return;
+        }
+        seen.addElement(array);
+        Object[] a = (Object[]) array;
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] instanceof InterpObject) {
+                InterpObject io = (InterpObject) a[i];
+                if (io.hostPeer != null) {
+                    a[i] = io.hostPeer;
+                }
+            } else if (a[i] instanceof Object[]) {
+                toHostElements(a[i], seen);
+            }
+        }
+    }
+
+    /// The reverse: peers become the interpreted objects they stand for again.
+    private static void fromHostElements(Object array, Vector seen) {
+        if (!(array instanceof Object[]) || seen.contains(array)) {
+            return;
+        }
+        seen.addElement(array);
+        Object[] a = (Object[]) array;
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] instanceof Object[]) {
+                fromHostElements(a[i], seen);
+            } else {
+                a[i] = fromHost(a[i]);
             }
         }
     }

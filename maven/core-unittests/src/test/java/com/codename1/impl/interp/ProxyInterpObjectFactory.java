@@ -83,14 +83,23 @@ public class ProxyInterpObjectFactory implements InterpObjectFactory {
         if (hostInterfaceNames == null || hostInterfaceNames.length == 0) {
             return null;
         }
-        Class[] ifaces = new Class[hostInterfaceNames.length];
+        // InterpBacked alongside them, exactly as a generated shim carries it:
+        // it is how a peer handed back by host code is recognised as standing
+        // for an interpreted object, and without it a value that made the round
+        // trip arrives as the peer and fails every cast to its own class.
+        Class[] ifaces = new Class[hostInterfaceNames.length + 1];
         for (int i = 0; i < hostInterfaceNames.length; i++) {
             ifaces[i] = Class.forName(hostInterfaceNames[i].replace('/', '.'));
         }
+        ifaces[hostInterfaceNames.length] = InterpBacked.class;
         return Proxy.newProxyInstance(getClass().getClassLoader(), ifaces,
                 new InvocationHandler() {
                     public Object invoke(Object proxy, Method method, Object[] args)
                             throws Throwable {
+                        if ("getInterpObject".equals(method.getName())
+                                && (args == null || args.length == 0)) {
+                            return object;
+                        }
                         String desc = descriptorOf(method);
                         InterpMethod m = object.getType().resolve(method.getName(), desc);
                         if (m == null) {

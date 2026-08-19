@@ -1059,6 +1059,16 @@ public class DeviceRuntimeService {
                 shown[0] = current == null ? null : current.getTitle();
             }
         });
+        // Stop can also land while the entry point was finishing -- a program
+        // that shows nothing leaves the runtime's own form and its Stop button
+        // on screen throughout. Reporting "running" then would overwrite the
+        // status the stop just set, and tell the desktop a push succeeded into
+        // a runtime that is no longer there.
+        if (runtime != rt || rt.isDetached()) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
+            status = "stopped before it started";
+            throw new IllegalStateException(
+                    "the program was stopped while its entry point ran");
+        }
         status = "running " + rt.getBundle().getMainClass();
         if (shown[0] != null) {
             return outcome[0] + "; showing \"" + shown[0] + "\"";

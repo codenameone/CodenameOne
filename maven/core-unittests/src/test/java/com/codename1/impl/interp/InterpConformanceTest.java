@@ -411,6 +411,27 @@ class InterpConformanceTest {
                 + " System.out.println(Member.class.getName());"
                 + "}}"
                 + "class Dollar$Name {}"));
+        // Pushed objects inside an array handed to a host method: the elements
+        // have to cross as their peers, and come back as themselves after the
+        // host has reordered them.
+        out.add(c("ArraysOfPushedObjects",
+                "import java.util.*;"
+                + "public class ArraysOfPushedObjects {"
+                + " static class Item implements Comparable {"
+                + "   final int v; Item(int v) { this.v = v; }"
+                + "   public int compareTo(Object o) { return v - ((Item)o).v; }"
+                + "   public String toString() { return \"i\" + v; } }"
+                + " public static void main(String[] a) {"
+                + " Item[] items = new Item[]{ new Item(3), new Item(1), new Item(2) };"
+                + " Arrays.sort(items);"
+                + " System.out.println(items[0] + \",\" + items[1] + \",\" + items[2]);"
+                + " System.out.println(items[0].v + \":\" + items[2].v);"
+                + " List l = new ArrayList();"
+                + " l.add(items[2]); l.add(items[0]);"
+                + " Collections.sort(l);"
+                + " System.out.println(l.get(0) + \",\" + l.get(1));"
+                + " System.out.println(((Item)l.get(0)).v);"
+                + "}}"));
         // A private method is not virtual, and from JDK 11 javac emits
         // invokevirtual for one anyway -- so resolving from the receiver runs
         // the subclass's same-named method instead of the one written.
