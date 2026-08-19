@@ -447,6 +447,15 @@ public final class LinuxNative {
 
     public static native boolean fileIsDirectory(String path);
 
+    /**
+     * Creates a file only if it does not exist: 1 created, 0 already there, -1 the attempt failed.
+     *
+     * <p>Decided by the operating system, so two processes racing cannot both be told they created
+     * it. {@code fileExists} followed by a write is two operations and answers both of them yes.
+     */
+    public static native int fileCreateExclusive(String path);
+
+
     public static native long fileLength(String path);
 
     public static native void fileDelete(String path);

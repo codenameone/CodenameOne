@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <dirent.h>
 #include <time.h>
 #include <libgen.h>
@@ -249,6 +250,30 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_fileExists___java_lang_String_
     const char* p = cn1JStr(threadStateData, path);
     struct stat st;
     return (p && stat(p, &st) == 0) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/*
+ * Creates a file only if it does not exist, and says which of the two happened.
+ *
+ * O_CREAT|O_EXCL is settled in the kernel, so two processes racing here cannot both be told they
+ * created it. That is what a first managed database key needs: without it both processes generate
+ * a key, each overwrites the other, and the database ends up encrypted under one that no longer
+ * exists anywhere.
+ *
+ * 1 created, 0 already there, -1 the attempt failed for another reason.
+ */
+JAVA_INT com_codename1_impl_linux_LinuxNative_fileCreateExclusive___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
+    const char* p = cn1JStr(threadStateData, path);
+    int fd;
+    if (p == NULL) {
+        return -1;
+    }
+    fd = open(p, O_CREAT | O_EXCL | O_WRONLY, 0600);
+    if (fd >= 0) {
+        close(fd);
+        return 1;
+    }
+    return errno == EEXIST ? 0 : -1;
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_fileIsDirectory___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {

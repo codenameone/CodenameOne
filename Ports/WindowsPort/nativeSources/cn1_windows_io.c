@@ -208,6 +208,35 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fileClose___long(CODENAME_ONE
     }
 }
 
+/*
+ * Creates a file only if it does not exist, and says which of the two happened.
+ *
+ * CREATE_NEW is decided by the filesystem, so two processes racing here cannot both be told they
+ * created it. That is what a first managed database key needs: without it both processes generate
+ * a key, each overwrites the other, and the database ends up encrypted under one that no longer
+ * exists anywhere.
+ *
+ * 1 created, 0 already there, -1 the attempt failed for another reason.
+ */
+JAVA_INT com_codename1_impl_windows_WindowsNative_fileCreateExclusive___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    HANDLE handle;
+    DWORD error;
+    if (path == NULL) {
+        return -1;
+    }
+    handle = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (handle != INVALID_HANDLE_VALUE) {
+        CloseHandle(handle);
+        free(path);
+        return 1;
+    }
+    error = GetLastError();
+    free(path);
+    return error == ERROR_FILE_EXISTS ? 0 : -1;
+}
+
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileExists___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);

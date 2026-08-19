@@ -443,6 +443,15 @@ public final class WindowsNative {
     public static native boolean fileExists(String path);
 
     /**
+     * Creates a file only if it does not exist: 1 created, 0 already there, -1 the attempt failed.
+     *
+     * <p>Decided by the operating system, so two processes racing cannot both be told they created
+     * it. {@code fileExists} followed by a write is two operations and answers both of them yes.
+     */
+    public static native int fileCreateExclusive(String path);
+
+
+    /**
      * The operating system's own answer to "which file is this", as a string.
      *
      * <p>Two names can reach one file: an 8.3 short name, a junction, a hard link. Comparing the

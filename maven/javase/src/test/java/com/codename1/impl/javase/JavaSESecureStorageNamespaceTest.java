@@ -129,4 +129,30 @@ public class JavaSESecureStorageNamespaceTest {
         assertNull(shared.get("v_cn1.db.key.shared", null),
                 "and it has been moved into this project's own node");
     }
+    @Test
+    public void creatingAKeyThatIsAlreadyThereTakesTheStoredOne() {
+        // What two simulator runs of one project race over. The loser must come away with the
+        // key that was stored rather than its own, or the database is encrypted with one of them
+        // and the store holds the other.
+        JavaSESecureStorage storage = storageFor("com.example.first.Main");
+        assertEquals("aaaa", storage.setIfAbsent("cn1.db.key.shared", "aaaa"),
+                "the first caller stores its own value");
+        assertEquals("aaaa", storage.setIfAbsent("cn1.db.key.shared", "bbbb"),
+                "the second is handed what is stored, not what it offered");
+        assertEquals("aaaa", storage.get("cn1.db.key.shared"), "and the store still holds it");
+    }
+
+    @Test
+    public void creatingAKeyIsSeparatePerProject() {
+        // The lock is per application and per account, so one project's first open does not
+        // decide another's.
+        JavaSESecureStorage first = storageFor("com.example.first.Main");
+        assertEquals("aaaa", first.setIfAbsent("cn1.db.key.shared", "aaaa"));
+
+        JavaSESecureStorage second = storageFor("com.example.second.Main");
+        assertEquals("bbbb", second.setIfAbsent("cn1.db.key.shared", "bbbb"),
+                "another project creates its own");
+        assertEquals("aaaa", storageFor("com.example.first.Main").get("cn1.db.key.shared"));
+    }
+
 }

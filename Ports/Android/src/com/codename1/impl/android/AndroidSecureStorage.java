@@ -278,6 +278,86 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
+    /**
+     * Creates an entry behind a gate the filesystem decides, so two processes cannot both create
+     * one.
+     *
+     * <p>An application can declare components with their own {@code android:process}, and the
+     * inherited implementation checks and then writes: both processes can find nothing stored,
+     * generate different managed database keys and each overwrite the other, after which the
+     * database is encrypted with a key that no longer exists. {@code createNewFile()} is decided
+     * by the filesystem and cannot be won twice, so exactly one caller writes.</p>
+     *
+     * <p>The caller that loses reports nothing rather than writing. It cannot read the winner's
+     * value either: {@code SharedPreferences} caches per process and offers no way to reload, so
+     * a process that had already opened the file will not see a write made by another one. That
+     * turns a permanent, silent corruption into a transient failure -- {@code ManagedKeys} raises
+     * KEY_UNAVAILABLE and the next launch, whose process reads the file fresh, finds the key.</p>
+     *
+     * @param account the account to create
+     * @param value the value to store when there is none
+     * @return the value now stored, or null when this caller did not store it and cannot read what
+     *   did
+     */
+    @Override
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        String existing = get(account);
+        if (existing != null) {
+            return existing;
+        }
+        java.io.File gate = gateFile(account);
+        if (gate == null) {
+            return super.setIfAbsent(account, value);
+        }
+        boolean created;
+        try {
+            created = gate.createNewFile();
+        } catch (java.io.IOException cannotCreate) {
+            Log.e(cannotCreate);
+            return super.setIfAbsent(account, value);
+        }
+        if (created) {
+            if (set(account, value)) {
+                return value;
+            }
+            // Nothing was stored, so the gate must not stay shut: the next caller has to be able
+            // to create the entry rather than be turned away from one that was never written.
+            if (!gate.delete()) {
+                // Worth saying out loud rather than dropping: while that file is there, every
+                // later attempt to create this key is refused, and the only thing that clears it
+                // is removing the file.
+                Log.p("Secure storage could not remove " + gate.getAbsolutePath()
+                        + " after a failed write, so creating '" + account
+                        + "' will be refused until that file is gone");
+            }
+            return null;
+        }
+        String stored = get(account);
+        if (stored != null) {
+            return stored;
+        }
+        // Another process holds the gate and this one cannot see its write. Reported rather than
+        // written over, which is the whole point of the gate.
+        return null;
+    }
+
+    /** The file whose creation decides which caller stores this account. */
+    private java.io.File gateFile(String account) {
+        try {
+            java.io.File dir = new java.io.File(AndroidNativeUtil.getActivity()
+                    .getApplicationContext().getFilesDir(), "cn1securestorage");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                return null;
+            }
+            return new java.io.File(dir, "gate-" + Integer.toHexString(account.hashCode()));
+        } catch (Throwable noContext) {
+            return null;
+        }
+    }
+
     @Override
     public int entryState(String account) {
         if (account == null) {

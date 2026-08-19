@@ -96,6 +96,79 @@ public class WindowsSecureStorage extends SecureStorage {
 
     /* -------------------------------------------------- non-prompting API */
 
+    /**
+     * Creates an entry through a gate the operating system decides, so two processes cannot both
+     * create one.
+     *
+     * <p>The inherited implementation checks and then writes, which is two operations: two runs of
+     * this application doing their first managed open can both find nothing stored, generate
+     * different keys and each overwrite the other, after which the database is encrypted with a
+     * key that no longer exists. Reading back afterwards does not close that -- both callers read
+     * their own write.</p>
+     *
+     * <p>{@code fileCreateExclusive} is the one operation here that cannot be won twice. The
+     * caller that creates the gate file stores the value; the caller that finds it already there
+     * reads what the winner stored, waiting briefly for it to land, and never writes.</p>
+     *
+     * @param account the account to create
+     * @param value the value to store when there is none
+     * @return the value now stored, which may be another process's, or null if it could not be
+     *   stored
+     */
+    @Override
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        String existing = get(account);
+        if (existing != null) {
+            return existing;
+        }
+        String gate = WindowsNative.storageDir() + "\\\\" + "cn1ss-gate-"
+                + applicationNamespace() + "-" + Integer.toHexString(account.hashCode());
+        int created;
+        try {
+            created = WindowsNative.fileCreateExclusive(gate);
+        } catch (Throwable cannotAsk) {
+            return super.setIfAbsent(account, value);
+        }
+        if (created == 1) {
+            if (set(account, value)) {
+                return value;
+            }
+            // Nothing was stored, so the gate must not stay shut: the next caller has to be able
+            // to create the entry rather than wait forever for one that was never written.
+            try {
+                WindowsNative.fileDelete(gate);
+            } catch (Throwable ignored) {
+                // Reported by the null below either way.
+            }
+            return null;
+        }
+        if (created != 0) {
+            // The gate could not be attempted at all, which says nothing about the entry.
+            return super.setIfAbsent(account, value);
+        }
+        // Another process created the gate and is writing the value. Its write is not instant, so
+        // this waits a moment for it rather than reporting an absence that is about to be wrong.
+        for (int iter = 0; iter < 50; iter++) {
+            String stored = get(account);
+            if (stored != null) {
+                return stored;
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        // It never arrived. Reported rather than written over: the other process may still be
+        // between its gate and its write, and overwriting it there is the failure this prevents.
+        return null;
+    }
+
+
     @Override
     public boolean set(String account, String value) {
         if (account == null || value == null) {

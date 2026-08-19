@@ -31,6 +31,10 @@ import com.codename1.io.Log;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileLock;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.prefs.BackingStoreException;
@@ -73,6 +77,96 @@ public final class JavaSESecureStorage extends SecureStorage {
         this.biometrics = biometrics;
         this.prefs = java.util.prefs.Preferences.userRoot().node(NODE);
         this.plainPrefs = java.util.prefs.Preferences.userRoot().node(PLAIN_NODE);
+    }
+
+    /**
+     * Creates an entry under a lock every process of this application takes, so two cannot both
+     * create one.
+     *
+     * <p>The inherited implementation checks and then writes, which is two operations: two
+     * simulator runs of the same project doing their first managed open can both find nothing
+     * stored, generate different keys and each overwrite the other, after which the database is
+     * encrypted with a key that no longer exists. Reading back afterwards does not close that --
+     * both callers read their own write.</p>
+     *
+     * <p>So the decision happens inside a file lock, which is the one mutual exclusion the JVM
+     * offers between processes rather than between threads. Preferences is read again inside it
+     * through {@code sync()}: this store caches per process, so without that the check would ask
+     * a copy taken before the other process wrote.</p>
+     *
+     * @param account the account to create
+     * @param value the value to store when there is none
+     * @return the value now stored, which may be another process's, or null if it could not be
+     *   stored
+     */
+    @Override
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        File lockFile = lockFileFor(account);
+        if (lockFile == null) {
+            // Nowhere to put the lock, which is not a reason to write blindly: the inherited
+            // behaviour is still the best available, and it says what it does and does not hold.
+            return super.setIfAbsent(account, value);
+        }
+        RandomAccessFile handle = null;
+        FileLock lock = null;
+        try {
+            handle = new RandomAccessFile(lockFile, "rw");
+            // Blocking, not tryLock: a caller that cannot take the lock has to wait for whoever
+            // holds it rather than proceed as though the entry were absent.
+            lock = handle.getChannel().lock();
+            try {
+                plainPrefs.sync();
+            } catch (BackingStoreException cannotRefresh) {
+                // Answered from this process's copy, which is what the inherited path does anyway.
+                Log.e(cannotRefresh);
+            }
+            String existing = get(account);
+            if (existing != null) {
+                return existing;
+            }
+            return set(account, value) ? value : null;
+        } catch (IOException cannotLock) {
+            Log.e(cannotLock);
+            return super.setIfAbsent(account, value);
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+        }
+    }
+
+    /**
+     * The file every process of this application locks to create this account.
+     *
+     * <p>Named from the application and the account, so one project's first open does not block
+     * another's, and kept in the temporary directory because it holds nothing: the lock is the
+     * file's existence being opened, not its contents.</p>
+     */
+    private File lockFileFor(String account) {
+        String dir = System.getProperty("java.io.tmpdir");
+        if (dir == null || dir.length() == 0) {
+            return null;
+        }
+        File locks = new File(dir, "cn1-securestorage-locks");
+        if (!locks.isDirectory() && !locks.mkdirs()) {
+            return null;
+        }
+        return new File(locks, applicationNamespace(launcherPackage()) + "-"
+                + Integer.toHexString(account.hashCode()) + ".lock");
     }
 
     /**
