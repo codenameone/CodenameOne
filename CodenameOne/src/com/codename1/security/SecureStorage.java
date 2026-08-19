@@ -178,6 +178,45 @@ public class SecureStorage {
     }
 
     /// The entry is there.
+    /// Stores a value only if this account has none, and reports what the store ended up holding.
+    ///
+    /// The operation a first-time key needs. Reading, generating and storing as three steps is
+    /// safe within one process and not between two: `synchronized` covers threads in one VM, while
+    /// an application can be opened from more than one -- Android components declared with their
+    /// own `android:process`, or simply two runs of a desktop build -- and both can see nothing
+    /// stored, generate different keys, and each overwrite the other. The database is then
+    /// encrypted with whichever key did not survive, and nothing can open it again.
+    ///
+    /// The return value is what makes racing callers agree: a caller that lost stores nothing and
+    /// is handed the value that won, so both go on to open the database with the same key.
+    ///
+    /// This default is the best a store with no create-if-absent of its own can do -- the check
+    /// and the write are still two operations, so a second process can land between them, and what
+    /// it prevents is the divergence rather than the race. A port whose store can do this in one
+    /// step overrides it; iOS does, because the keychain's own add fails when the item exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the account to create
+    ///
+    /// - `value`: the value to store if there is none
+    ///
+    /// #### Returns
+    ///
+    /// the value now stored, which may be another caller's, or null if the store cannot say
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        if (entryState(account) == ENTRY_ABSENT && set(account, value)) {
+            // Read back rather than assuming: another process may have written between the check
+            // and the write, and its value is the one to agree on.
+            String stored = get(account);
+            return stored != null ? stored : value;
+        }
+        return get(account);
+    }
+
     /// A name unique to this application, for a store the platform shares between applications.
     ///
     /// The mobile ports do not need this: an OS sandbox already separates one application's
@@ -233,16 +272,35 @@ public class SecureStorage {
     }
 
     /// Reduces an identity to what a storage name, a preferences node or a keychain service holds.
+    ///
+    /// Reversibly, which is the whole point of it: folding every character it cannot carry onto
+    /// one replacement made `com.acme.foo$bar` and `com.acme.foo_bar` the same namespace, and
+    /// "My App" and "My_App" as well -- so two applications that collide there share a store this
+    /// exists to keep apart, and forgetting a key in one takes the other's. The escape is the one
+    /// `ManagedKeys#accountName(String)` already uses on the account half of the same name, so
+    /// the two halves are encoded the same way.
     private static String sanitizeNamespace(String id) {
         StringBuilder b = new StringBuilder(id.length());
         for (int iter = 0; iter < id.length(); iter++) {
             char c = id.charAt(iter);
             boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9') || c == '.' || c == '-';
-            b.append(safe ? c : '_');
+            if (safe) {
+                b.append(c);
+            } else {
+                // Including the escape character itself, or "a%0020b" and "a b" would encode alike.
+                b.append('%');
+                b.append(HEX.charAt((c >> 12) & 0x0f));
+                b.append(HEX.charAt((c >> 8) & 0x0f));
+                b.append(HEX.charAt((c >> 4) & 0x0f));
+                b.append(HEX.charAt(c & 0x0f));
+            }
         }
         return b.toString();
     }
+
+    /// The digits `#sanitizeNamespace(String)` escapes with.
+    private static final String HEX = "0123456789abcdef";
 
     public static final int ENTRY_PRESENT = 1;
 

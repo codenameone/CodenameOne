@@ -113,7 +113,14 @@ final class ManagedKeys {
                     + " Supply a passphrase with DatabaseConfig.passphrase() instead.",
                     noRandomness);
         }
-        if (!storage.set(account, toHex(generated))) {
+        // Created rather than written, and the answer is what the store ended up holding. The
+        // synchronized above covers threads in this VM and nothing between two: an application
+        // can run in more than one process -- Android components with their own android:process,
+        // or two runs of a desktop build -- and both can find nothing stored and generate. Whoever
+        // lost the race takes the winner's key here instead of overwriting it, so the database is
+        // opened with the key the store actually has rather than the one this call made up.
+        String stored = storage.setIfAbsent(account, toHex(generated));
+        if (stored == null) {
             // Deliberately fatal. Carrying on with a key we cannot persist would
             // produce a database that can never be reopened, and falling back to a
             // derived or constant key would silently downgrade the protection the
@@ -122,7 +129,13 @@ final class ManagedKeys {
                     "This platform cannot store a managed database key. Supply a passphrase "
                     + "with DatabaseConfig.passphrase() instead.");
         }
-        return generated;
+        if (stored.length() != KEY_LENGTH * 2) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,
+                    "The managed database key for '" + alias + "' was stored by something else "
+                    + "and is not a key this can read. Refusing to overwrite it, because a "
+                    + "replacement would leave any database it encrypted unreadable.");
+        }
+        return fromHex(stored);
     }
 
     /// Removes the managed key for an alias.

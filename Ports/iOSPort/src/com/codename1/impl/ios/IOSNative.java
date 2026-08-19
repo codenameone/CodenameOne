@@ -1302,6 +1302,20 @@ public final class IOSNative {
     /** Synchronous keychain write without biometric prompting. */
     native boolean secureStorageSetPlain(String account, String value);
 
+    /**
+     * Creates a keychain item only if the account has none: 1 created, 0 already there, -1 failed.
+     *
+     * <p>The keychain's own add is what makes this atomic between processes, which
+     * {@link #secureStorageSetPlain(String, String)} is not -- it falls back to an update, so two
+     * processes creating a managed database key at the same moment would each overwrite the other
+     * and leave the database encrypted under a key nobody has.
+     *
+     * @param account the item to create
+     * @param value the value to store when there is none
+     * @return whether it was created, already present, or could not be attempted
+     */
+    native int secureStorageAddPlain(String account, String value);
+
     /** Synchronous keychain delete without biometric prompting. */
     native boolean secureStorageRemovePlain(String account);
 

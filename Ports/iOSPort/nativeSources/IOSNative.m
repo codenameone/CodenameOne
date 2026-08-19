@@ -16083,7 +16083,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_la
     return result;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String_R_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
     return com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String_R_int(CN1_THREAD_STATE_PASS_ARG me, account);
 }
 
@@ -16174,6 +16174,43 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageSetPlain___java_lang_
     result = (status == errSecSuccess) ? JAVA_TRUE : JAVA_FALSE;
     POOL_END();
     return result;
+}
+
+// Create only, which is the operation a first-time managed key needs. SecItemAdd refuses an item
+// that already exists rather than replacing it, and it refuses it in the keychain daemon -- so two
+// processes reaching here at the same moment cannot both believe they created the key, which is
+// what leaves a database encrypted under a key that was immediately overwritten.
+//
+// 1 created, 0 already there, -1 the keychain could not be asked.
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageAddPlain___java_lang_String_java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account, JAVA_OBJECT value) {
+    if (account == JAVA_NULL || value == JAVA_NULL) {
+        return -1;
+    }
+    JAVA_INT result;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *nsValue = toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSData *data = [nsValue dataUsingEncoding:NSUTF8StringEncoding];
+
+    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
+    [item setObject:data forKey:(__bridge id)kSecValueData];
+    [item setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock forKey:(__bridge id)kSecAttrAccessible];
+
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)item, NULL);
+    if (status == errSecSuccess) {
+        result = 1;
+    } else if (status == errSecDuplicateItem) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageAddPlain___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account, JAVA_OBJECT value) {
+    return com_codename1_impl_ios_IOSNative_secureStorageAddPlain___java_lang_String_java_lang_String_R_int(CN1_THREAD_STATE_PASS_ARG me, account, value);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
