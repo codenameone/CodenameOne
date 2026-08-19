@@ -2070,13 +2070,12 @@ public final class InterpRuntime {
         if (c.simpleName != null) {
             return c.simpleName;
         }
+        // No entry in the attribute at all: a top-level class, whose simple
+        // name is the last segment of its binary name -- including any `$` it
+        // carries, which belongs to the class's own identifier.
         String name = c.getName();
-        // No recorded name: top-level, whose simple name is the last segment,
-        // or anonymous, which has none. A top-level class has no `$` from the
-        // compiler -- one in the name belongs to the class itself.
         int slash = name.lastIndexOf('/');
-        String tail = slash < 0 ? name : name.substring(slash + 1);
-        return tail.indexOf('$') < 0 ? tail : "";
+        return slash < 0 ? name : name.substring(slash + 1);
     }
 
     /// Selects the method an `invokevirtual` actually runs.

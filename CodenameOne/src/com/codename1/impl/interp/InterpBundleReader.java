@@ -195,12 +195,14 @@ public final class InterpBundleReader {
         c.accessFlags = in.readInt();
         String src = in.readUTF();
         c.sourceFile = src.length() == 0 ? null : src;
-        // What javac's InnerClasses attribute called this class, or empty for a
-        // top-level one (whose simple name is the last segment of its binary
-        // name) and for an anonymous one (which has none at all). The two are
-        // told apart by whether the binary name has a `$` in it.
+        // What javac's InnerClasses attribute called this class. The flag says
+        // whether there was an entry at all: without one the class is top-level
+        // and its simple name is the last segment of its binary name, `$` and
+        // all; with one but no name it is anonymous, and its simple name is
+        // genuinely empty.
+        boolean recorded = in.readBoolean();
         String simple = in.readUTF();
-        c.simpleName = simple.length() == 0 ? null : simple;
+        c.simpleName = recorded ? simple : null;
 
         boolean superInterpreted = in.readBoolean();
         int superRef = in.readInt();

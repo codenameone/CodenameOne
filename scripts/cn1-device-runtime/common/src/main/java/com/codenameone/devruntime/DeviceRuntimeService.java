@@ -1000,10 +1000,21 @@ public class DeviceRuntimeService {
 
         final Throwable[] failure = new Throwable[1];
         final String[] outcome = new String[1];
+        final boolean[] stopped = new boolean[1];
         // On the event thread: a pushed program builds UI, and Codename One
         // requires that to happen there.
         Display.getInstance().callSeriallyAndWait(new Runnable() {
             public void run() {
+                // Stop can land between publishing this runtime and the event
+                // thread reaching here -- the wait above is exactly that
+                // window. Entering it anyway starts a program the user has
+                // already ended: runMain clears the cancel flag, so the entry
+                // point runs and shows a form while the service reports
+                // nothing loaded.
+                if (runtime != rt || rt.isDetached()) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
+                    stopped[0] = true;
+                    return;
+                }
                 try {
                     outcome[0] = runProgram(rt);
                 } catch (Throwable t) {
@@ -1011,6 +1022,11 @@ public class DeviceRuntimeService {
                 }
             }
         });
+        if (stopped[0]) {
+            status = "stopped before it started";
+            throw new IllegalStateException(
+                    "the program was stopped before its entry point ran");
+        }
         if (failure[0] != null) {
             // Detach before reporting. The entry point may have shown a form or
             // registered a listener before it threw, and those callbacks would

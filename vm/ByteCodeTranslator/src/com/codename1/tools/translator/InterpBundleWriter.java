@@ -321,23 +321,25 @@ public class InterpBundleWriter {
     /**
      * The simple name javac recorded for a class, or "" when it has none.
      *
-     * <p>An anonymous class answers "" here and the runtime reports "" for it,
-     * which is what {@code Class.getSimpleName()} does. A class with no
-     * InnerClasses entry naming itself is top-level, and its simple name is the
-     * last segment of its binary name -- which the runtime can work out, so
-     * this writes "" for that too rather than paying for a string.</p>
+     * <p>An anonymous class answers "" -- it has a simple name and that name is
+     * empty, which is what {@code Class.getSimpleName()} reports. A class with
+     * no InnerClasses entry naming itself is top-level and answers null: its
+     * simple name is the last segment of its binary name, which the runtime
+     * works out rather than paying for a string.</p>
      */
     private static String simpleNameOf(ClassNode cn) {
         if (cn.innerClasses == null) {
-            return "";
+            return null;
         }
         for (Object o : cn.innerClasses) {
             org.objectweb.asm.tree.InnerClassNode icn = (org.objectweb.asm.tree.InnerClassNode) o;
             if (cn.name.equals(icn.name)) {
+                // An entry with no name is an anonymous class: it has a simple
+                // name, and that name is empty.
                 return icn.innerName == null ? "" : icn.innerName;
             }
         }
-        return "";
+        return null;
     }
 
     private void writeClass(DataOutputStream out, ClassNode cn) throws IOException {
@@ -349,9 +351,16 @@ public class InterpBundleWriter {
         // `Outer$1Local` is a local class called Local, and both a nested class
         // and a top-level one may carry a `$` in their own identifier -- so
         // splitting the name cannot tell them apart, and only the attribute
-        // knows. Empty means "no simple name of its own": an anonymous class,
-        // or a top-level class whose simple name is the last segment.
-        out.writeUTF(simpleNameOf(cn));
+        // knows.
+        //
+        // The flag says whether javac recorded an entry for this class at all,
+        // which is what separates an anonymous class (an entry with no name,
+        // whose simple name really is empty) from a top-level one (no entry,
+        // whose simple name is the last segment of its binary name -- `$` and
+        // all, as `Price$USD` is entitled to be called).
+        String recorded = simpleNameOf(cn);
+        out.writeBoolean(recorded != null);
+        out.writeUTF(recorded == null ? "" : recorded);
 
         // A supertype is either interpreted (named, resolved after load) or an
         // extern. java/lang/Object is always an extern -- it is the host's.

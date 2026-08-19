@@ -396,6 +396,7 @@ class InterpConformanceTest {
         out.add(c("SimpleNames",
                 "public class SimpleNames {"
                 + " static class Member {}"
+                + " static class Inner$Part {}"
                 + " public static void main(String[] a) {"
                 + " class Local {}"
                 + " Runnable anon = new Runnable() { public void run() {} };"
@@ -405,8 +406,11 @@ class InterpConformanceTest {
                 + " System.out.println(\"[\" + anon.getClass().getSimpleName() + \"]\");"
                 + " System.out.println(Member[].class.getSimpleName());"
                 + " System.out.println(SimpleNames.class.getName());"
+                + " System.out.println(Dollar$Name.class.getSimpleName());"
+                + " System.out.println(Inner$Part.class.getSimpleName());"
                 + " System.out.println(Member.class.getName());"
-                + "}}"));
+                + "}}"
+                + "class Dollar$Name {}"));
         // A private method is not virtual, and from JDK 11 javac emits
         // invokevirtual for one anyway -- so resolving from the receiver runs
         // the subclass's same-named method instead of the one written.
