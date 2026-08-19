@@ -190,7 +190,9 @@ jobs:
         # tests to load the library. Also baked into the pr-ci-container image
         # (.ci/container/Dockerfile); this step covers running against the
         # previously published container before the rebuild propagates.
-        run: apt-get update -qq && apt-get install -y -qq libdbus-1-3
+        # Bounded, because a stalled mirror is a hang rather than a failure: three jobs on this
+        # branch sat in apt until their job limit, two of them for six hours.
+        run: timeout 300 apt-get update -qq && timeout 300 apt-get install -y -qq libdbus-1-3
       - name: Run JavaSE port unit tests
         if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher
@@ -219,7 +221,8 @@ jobs:
         # touch, which no single-platform test would catch, so check ours against the stock
         # sqlcipher client in both directions.
         run: |
-          apt-get update -qq && apt-get install -y -qq sqlcipher
+          # Bounded for the same reason as the libdbus install above.
+          timeout 300 apt-get update -qq && timeout 300 apt-get install -y -qq sqlcipher
           scripts/ci/db-cipher-interop.sh
       - name: Determine AI/ad cn1libs to build
         id: cn1libs

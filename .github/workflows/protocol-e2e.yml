@@ -57,7 +57,9 @@ jobs:
       - name: Ensure a virtual display (xvfb) for the simulator
         run: |
           if ! command -v xvfb-run >/dev/null 2>&1; then
-            (apt-get update && apt-get install -y xvfb) || true
+            # Bounded: the failure is already tolerated, but a mirror that stalls rather than
+            # refusing would hold the job instead of falling through.
+            (timeout 300 apt-get update && timeout 300 apt-get install -y xvfb) || true
           fi
 
       - name: Run REST / GraphQL / gRPC end-to-end
