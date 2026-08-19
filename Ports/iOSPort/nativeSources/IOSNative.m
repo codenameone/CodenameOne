@@ -15275,6 +15275,44 @@ static void cn1IntentsRetainActivity(NSUserActivity *activity) {
     }
 }
 
+/// How long a staged snippet directory is kept before the next invocation reclaims it.
+///
+/// Generous against the thing it has to outlive: an invocation is capped at 25 seconds by the
+/// framework and its snippet is rendered during the interaction, so ten minutes is orders of
+/// magnitude past any live reader while still bounding what accumulates.
+#define CN1_INTENT_IMAGE_TTL_SECONDS (10 * 60)
+
+/// Deletes staged directories from earlier invocations.
+///
+/// Each invocation writes its blobs under its own token, and nothing removed them: the
+/// completion path does not, and the SwiftUI view that reads them cannot, because it has no
+/// idea when the last reader is done. Left alone they accumulate for the life of the install
+/// -- image-heavy intents run many times a day -- and the caches directory is only reclaimed
+/// by iOS under storage pressure, which is not a plan.
+///
+/// Pruned by age at the moment the next one is staged, rather than deleted on completion:
+/// a snippet can still be on screen after perform() returns, so deleting it then would race
+/// the renderer for the picture the user is looking at.
+static void cn1IntentsPruneStagedImages(NSString *root) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray *names = [fm contentsOfDirectoryAtPath:root error:nil];
+    if (names == nil) {
+        return;
+    }
+    NSDate *cutoff = [NSDate dateWithTimeIntervalSinceNow:-CN1_INTENT_IMAGE_TTL_SECONDS];
+    for (NSString *name in names) {
+        NSString *path = [root stringByAppendingPathComponent:name];
+        NSDictionary *attrs = [fm attributesOfItemAtPath:path error:nil];
+        if (attrs == nil) {
+            continue;
+        }
+        NSDate *modified = [attrs objectForKey:NSFileModificationDate];
+        if (modified != nil && [modified compare:cutoff] == NSOrderedAscending) {
+            [fm removeItemAtPath:path error:nil];
+        }
+    }
+}
+
 /// Writes the staged blobs into a per-invocation directory and returns its path, or nil when
 /// there was nothing to write. The directory is under the caches folder, so the OS can reclaim
 /// it -- a snippet is transient and there is nothing to keep once it has been shown.
@@ -15295,8 +15333,10 @@ static NSString *cn1IntentsWriteStagedImages(NSString *token) {
     if ([caches count] == 0) {
         return nil;
     }
-    NSString *dir = [[caches objectAtIndex:0]
-            stringByAppendingPathComponent:[@"cn1intents/" stringByAppendingString:token]];
+    NSString *root = [[caches objectAtIndex:0] stringByAppendingPathComponent:@"cn1intents"];
+    // Before this invocation adds one, take away the ones nobody can still be reading.
+    cn1IntentsPruneStagedImages(root);
+    NSString *dir = [root stringByAppendingPathComponent:token];
     NSError *err = nil;
     [[NSFileManager defaultManager] createDirectoryAtPath:dir
                               withIntermediateDirectories:YES
