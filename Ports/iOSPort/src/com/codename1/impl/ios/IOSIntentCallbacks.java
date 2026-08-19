@@ -81,11 +81,28 @@ final class IOSIntentCallbacks {
         if (b != null) {
             return b;
         }
+        if (!Display.isInitialized()) {
+            // Asked before there is anything to ask. getInstance() hands back a Display whose
+            // implementation is still null, so reaching through it for the bridge throws --
+            // and this is a supported moment, not an error: the whole point of the queue below
+            // is that a headless intent can finish this early. Answered by returning null, so
+            // the caller holds the result rather than discovering the same thing by exception.
+            return bridge;
+        }
         try {
             // Assigns the static as a side effect, through getBridge below.
             Display.getInstance().getIntentBridge();
         } catch (Throwable t) {
-            Log.e(t);
+            // The logging is guarded too, and that is not belt-and-braces. Log.e routes
+            // through the same implementation that is missing here, so it can throw on its
+            // own -- and an exception escaping this method escapes completeOrQueue with it,
+            // which means the answer is never queued and the Swift continuation is never
+            // resumed. The assistant then waits forever on an intent that has already
+            // finished. A lost log line costs incomparably less than that.
+            try {
+                Log.e(t);
+            } catch (Throwable ignored) {
+            }
         }
         return bridge;
     }
