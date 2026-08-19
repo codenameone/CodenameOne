@@ -188,7 +188,8 @@ public final class InterpObject {
     /// to be logged -- and casting the sentinel would turn printing it into a
     /// ClassCastException.
     private static boolean isMiss(Object answer) {
-        //NOPMD CompareObjectsWithEquals - sentinels, not equal objects
-        return answer == InterpRuntime.NOT_OVERRIDDEN || answer == InterpRuntime.DETACHED;
+        // Sentinels, not equal objects: identity is the whole point of them.
+        return answer == InterpRuntime.NOT_OVERRIDDEN  //NOPMD CompareObjectsWithEquals - a sentinel
+                || answer == InterpRuntime.DETACHED;  //NOPMD CompareObjectsWithEquals - a sentinel
     }
 }

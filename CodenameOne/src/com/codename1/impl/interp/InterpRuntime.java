@@ -449,7 +449,8 @@ public final class InterpRuntime {
         // thread with Stop having no effect, since nothing would look at the
         // cancel flag. Charged against the same fuel counter, so the cost is a
         // decrement per call and a real check once every fuelPerCheck of them.
-        if (--st.fuel <= 0) {
+        st.fuel--;
+        if (st.fuel <= 0) {
             checkpoint(st);
         }
         st.depth++;
@@ -2108,13 +2109,13 @@ public final class InterpRuntime {
         // host method may reorder or replace elements in place and interpreted
         // code has to find its own objects there again.
         Vector arrays = null;
-        for (int i = 0; i < args.length; i++) {
-            if (args[i] instanceof Object[]) {
+        for (Object arg : args) {
+            if (arg instanceof Object[]) {
                 if (arrays == null) {
                     arrays = new Vector();
                 }
-                arrays.addElement(args[i]);
-                toHostElements(args[i], new Vector());
+                arrays.addElement(arg);
+                toHostElements(arg, new Vector());
             }
         }
         st.hostCallDepth++;
