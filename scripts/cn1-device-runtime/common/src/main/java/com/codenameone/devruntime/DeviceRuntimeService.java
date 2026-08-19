@@ -689,6 +689,25 @@ public class DeviceRuntimeService {
     }
 
     /**
+     * Asks the person to approve an authenticated push, without a clock on it.
+     *
+     * <p>Everything up to here was bounded because anything on the network can
+     * reach it. This is the other side of that line: the peer proved it holds
+     * the secret and the bundle matched, so what remains is a human deciding --
+     * and closing the connection under them would run the program while the
+     * desktop was told the push failed.</p>
+     */
+    private boolean approveWhileWaiting(String peerId, Progress progress) {
+        progress.allowLongWait();
+        try {
+            return DeviceRuntimePairing.approve(peerId);
+        } finally {
+            // The dialog is closed; what is left is the verdict going back.
+            progress.endLongWait();
+        }
+    }
+
+    /**
      * Reads a bundle body, treating arrival as progress.
      *
      * <p>Not {@code readFully}: this is the one long read that happens before
@@ -940,7 +959,7 @@ public class DeviceRuntimeService {
                                     // challenge, so this also rejects a program
                                     // altered in flight behind a valid answer.
                                     reject = "this connection did not authenticate";
-                                } else if (!DeviceRuntimePairing.approve(peerId)) {
+                                } else if (!approveWhileWaiting(peerId, progress)) {
                                     // Only now: prompting before authentication
                                     // would let anyone on the network raise
                                     // dialogs on this phone until somebody
@@ -1139,7 +1158,14 @@ public class DeviceRuntimeService {
         DeviceRuntimeMocks.reset();
         mocksUsed = "";
         runtime = rt;
-        requireNotStopped(generation);
+        if (stopGeneration != generation) {
+            // The stop landed between the guard above and this publication, so
+            // it tore down a runtime this one has just replaced. Undo the
+            // publication rather than leaving a stopped program reported as
+            // loaded with its callbacks live.
+            rollback(rt);
+            requireNotStopped(generation);
+        }
 
         final Throwable[] failure = new Throwable[1];
         final String[] outcome = new String[1];
@@ -1260,6 +1286,25 @@ public class DeviceRuntimeService {
     /// resources just published, and the field would then agree that the new
     /// runtime is the current one.
     private volatile int stopGeneration;  //NOPMD AvoidUsingVolatile - written from the UI, read on the install thread
+
+    /// Retires a runtime this install published and cannot go on to start.
+    ///
+    /// The same teardown a failed entry point does: detach it, forget the
+    /// program, and put the resources and theme back the way a stop leaves
+    /// them -- otherwise a stopped program stays reported as loaded and its
+    /// callbacks keep running.
+    private void rollback(InterpRuntime rt) {
+        stopLifecycleQuietly(rt);
+        rt.detach();
+        if (runtime == rt) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
+            runtime = null;
+        }
+        loadedName = "";
+        loadedSource = "";
+        CodenameOneImplementation.clearLocalResources();
+        applyPushedTheme(null);
+        DeviceRuntimeForm.showIt();
+    }
 
     /// Fails the install when a stop happened since it started.
     private void requireNotStopped(int generation) {

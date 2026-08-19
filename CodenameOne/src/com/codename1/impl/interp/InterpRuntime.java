@@ -249,12 +249,14 @@ public final class InterpRuntime {
         invokeInterpreted(ctor, app, new Object[0]);
 
         Object target = app.hostPeer != null ? app.hostPeer : app;
-        callLifecycle(c, app, "init", "(Ljava/lang/Object;)V", new Object[]{null});
-        // Held so stop() can be delivered later: a Lifecycle that opened a
-        // media player, a socket or a sensor releases it there, and detaching
-        // the runtime without calling it leaves those running against the
-        // runtime's own screen and the next pushed program.
+        // Held before init, not after start: a Lifecycle that opened a media
+        // player, a socket or a sensor releases it in stop(), and init is
+        // already far enough in to have opened one. Recording it only once the
+        // program was running left an init that threw with nothing to release
+        // it, and detaching the runtime without calling stop leaves those
+        // running against the runtime's own screen and the next pushed program.
         lifecycle = app;
+        callLifecycle(c, app, "init", "(Ljava/lang/Object;)V", new Object[]{null});
         callLifecycle(c, app, "start", "()V", new Object[0]);
         return target;
     }
