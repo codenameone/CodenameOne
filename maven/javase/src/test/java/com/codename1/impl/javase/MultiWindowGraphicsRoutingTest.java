@@ -415,4 +415,46 @@ class MultiWindowGraphicsRoutingTest {
         assertTrue(actual.contains(in.top + "," + in.left + "," + in.bottom + "," + in.right),
                 "the primary display's screen insets must appear in the fingerprint");
     }
+
+    @Test
+    void aSecondaryCanvasResizeLeavesTheMainCanvasAlone() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port);
+        JavaSEPort.C main = port.canvas;
+        assumeFalse(main == null, "needs a booted primary canvas");
+
+        java.lang.reflect.Field forced =
+                JavaSEPort.C.class.getDeclaredField("forcedSize");
+        forced.setAccessible(true);
+        Object before = forced.get(main);
+
+        // ancestorResized is primary-surface logic that a secondary canvas also runs,
+        // being the same class on the same listener. Its body reaches
+        // canvas.setForcedSize() -- the *port's* canvas, not the one the event arrived
+        // on -- so a secondary window's resize stamped the main canvas with the
+        // secondary window's dimensions and a later Swing layout could resize or clip
+        // the main surface. queueSizeChangeEvent's own guard is too late: by then the
+        // main canvas has already been mutated.
+        JavaSEPort.C secondary = port.createWindowCanvas(51);
+        // In a real frame, so the handler runs the same path it would in production
+        // rather than tripping over a null ancestor -- otherwise the test fails for the
+        // wrong reason and never reaches the assertion that matters.
+        javax.swing.JFrame frame = new javax.swing.JFrame("secondary");
+        frame.getContentPane().setLayout(new java.awt.BorderLayout());
+        frame.getContentPane().add(java.awt.BorderLayout.CENTER, secondary);
+        frame.setSize(137, 91);
+        frame.addNotify();
+        try {
+            secondary.ancestorResized(new java.awt.event.HierarchyEvent(
+                    secondary, java.awt.event.HierarchyEvent.ANCESTOR_RESIZED,
+                    secondary, secondary.getParent()));
+            assertSame(before, forced.get(main),
+                    "a secondary canvas's resize must not stamp the main canvas's "
+                            + "forced size");
+        } finally {
+            frame.dispose();
+            secondary.disposeGestureListeners();
+        }
+    }
 }

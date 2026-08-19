@@ -3751,7 +3751,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             boolean editorFocused = isPureEditorFocused();
             if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'c') {
-                Form f = CN.getCurrentForm();
+                // This canvas's top level, not the current form: the shortcut arrived
+                // on a particular window's canvas, and resolving the current form
+                // copied or selected from the unrelated main form -- or did nothing at
+                // all in a window-only application.
+                com.codename1.ui.TopLevelContainer f = canvasTopLevel();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
                     if (ts.isEnabled()) {
@@ -3777,7 +3781,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'a') {
-                Form f = CN.getCurrentForm();
+                // This canvas's top level, not the current form: the shortcut arrived
+                // on a particular window's canvas, and resolving the current form
+                // copied or selected from the unrelated main form -- or did nothing at
+                // all in a window-only application.
+                com.codename1.ui.TopLevelContainer f = canvasTopLevel();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
                     if (ts.isEnabled()) {
@@ -4313,7 +4321,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         
         public void ancestorResized(HierarchyEvent e) {
-            
+            if (windowId != 0) {
+                // Everything below is primary-surface logic that a secondary canvas
+                // also runs, being the same class and the same listener: it reads the
+                // skin, and mutates the *port's* canvas field rather than this one --
+                // canvas.setForcedSize() would stamp the main canvas with a secondary
+                // window's dimensions and let a later Swing layout resize or clip the
+                // main surface. A secondary window's own resize arrives through its
+                // componentResized, window-tagged.
+                //
+                // Rejected here rather than deeper down: queueSizeChangeEvent already
+                // guards itself, but by then the main canvas has been mutated.
+                return;
+            }
+
             /*
             if (e.getChanged() != getParent()) {
                 EventQueue.invokeLater(new Runnable() {
