@@ -586,17 +586,21 @@ public class Window extends Container implements TopLevelContainer {
 
     void repaintAnimations() {
         if (Display.getInstance().isEdt()) {
-            loopAnimations(animatableComponents);
-            loopAnimations(internalAnimatableComponents);
+            loopAnimations(animatableComponents, null);
+            // Excluding what the public list already animated, exactly as Form does.
+            // A component can sit in both -- an explicitly animated scrollable whose
+            // fading scrollbar is also running -- and animating it twice per frame
+            // advances its motion at double speed and repeats any side effect.
+            loopAnimations(internalAnimatableComponents, animatableComponents);
             animMananger.updateAnimations();
         }
     }
 
-    private void loopAnimations(ArrayList<Animation> v) {
+    private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
         // iterate by index and re-read the size: animate() may deregister itself
         for (int iter = 0; iter < v.size(); iter++) { // NOPMD ForLoopCanBeForeach
             Animation an = v.get(iter);
-            if (an != null && an.animate()) {
+            if (an != null && (notIn == null || !notIn.contains(an)) && an.animate()) {
                 if (an instanceof Component) {
                     Rectangle rect = ((Component) an).getDirtyRegion();
                     if (rect != null) {

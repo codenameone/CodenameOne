@@ -2366,6 +2366,72 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void anAnimationInBothRegistriesRunsOncePerFrame() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("anim", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+
+        final int[] ticks = new int[1];
+        com.codename1.ui.animations.Animation a =
+                new com.codename1.ui.animations.Animation() {
+                    @Override
+                    public boolean animate() {
+                        ticks[0]++;
+                        return false;
+                    }
+
+                    @Override
+                    public void paint(com.codename1.ui.Graphics g) {
+                    }
+                };
+
+        // A component can legitimately sit in both registries -- an explicitly animated
+        // scrollable whose fading scrollbar is also running. Form skips entries already
+        // handled by the public list; without the same exclusion the motion advances at
+        // double speed and any side effect happens twice per frame.
+        w.registerAnimated(a);
+        w.registerAnimatedInternal(a);
+
+        w.repaintAnimations();
+        assertEquals(1, ticks[0],
+                "an animation in both registries must run once per frame, not twice");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void emblemValidationInstallsItsGlassPaneInsideAWindow() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("validate", new BorderLayout());
+        w.setWindowSize(300, 200);
+        TextField field = new TextField("");
+        w.add(BorderLayout.CENTER, field);
+        w.show();
+        w.revalidate();
+        assertNull(w.getGlassPane(), "no glass pane before validation runs");
+
+        // setValid() is driven directly rather than through addConstraint: the full
+        // constraint path pulls in listener wiring that wedges the event dispatch
+        // thread in this harness, and the glass pane installation is what is under
+        // test. It is package private, hence the reflective call.
+        com.codename1.ui.validation.Validator v = new com.codename1.ui.validation.Validator();
+        v.setValidationFailureHighlightMode(
+                com.codename1.ui.validation.Validator.HighlightMode.EMBLEM);
+        java.lang.reflect.Method setValid = com.codename1.ui.validation.Validator.class
+                .getDeclaredMethod("setValid", Component.class, boolean.class);
+        setValid.setAccessible(true);
+        setValid.invoke(v, field, false);
+
+        // The emblem is drawn by a glass pane, and the guard that installed it resolved
+        // the form -- null inside a Window -- so EMBLEM validation showed nothing there.
+        assertNotNull(w.getGlassPane(),
+                "emblem validation must install its glass pane on the window");
+
+        w.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

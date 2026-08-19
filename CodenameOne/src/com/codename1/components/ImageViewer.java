@@ -1537,7 +1537,14 @@ public class ImageViewer extends Component {
             motion.start();
             this.replaceImage = replaceImage;
             this.updatePos = updatePos;
-            Display.getInstance().getCurrent().registerAnimated(this);
+            // This viewer's own top level, not whatever form happens to be current.
+            // Display.getCurrent() only ever names a Form: in a window-only application
+            // it is null and this threw, and with a main form present it registered the
+            // animation against the wrong surface and later deregistered from it.
+            TopLevelContainer panTop = getTopLevelContainer();
+            if (panTop != null) {
+                panTop.registerAnimated(this);
+            }
         }
 
         @Override
@@ -1579,7 +1586,10 @@ public class ImageViewer extends Component {
                         getImageRight().unlock();
                     }
                 }
-                Display.getInstance().getCurrent().deregisterAnimated(this);
+                TopLevelContainer panTop = getTopLevelContainer();
+                if (panTop != null) {
+                    panTop.deregisterAnimated(this);
+                }
             }
             repaint();
             return false;

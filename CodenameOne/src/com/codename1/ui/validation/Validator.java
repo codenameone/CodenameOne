@@ -724,12 +724,13 @@ public class Validator {
             }
         }
 
-        if (cmp.getComponentForm() != null) {
-            if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
-                com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
-                if (top != null && !(top.getGlassPane() instanceof ComponentListener)) {
-                    top.setGlassPane(new ComponentListener(null));
-                }
+        if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
+            // The outer guard used to resolve the form, which is null by design inside a
+            // Window -- so the emblem glass pane was never installed there and EMBLEM
+            // validation showed nothing at all.
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top != null && !(top.getGlassPane() instanceof ComponentListener)) {
+                top.setGlassPane(new ComponentListener(null));
             }
         }
         if (v) {
