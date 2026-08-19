@@ -78,7 +78,17 @@ final class CN1IntentNonce {
                     sb.append(Character.forDigit(bytes[i] & 0xf, 16));
                 }
                 existing = sb.toString();
-                prefs.edit().putString(KEY, existing).commit();
+                // commit() rather than apply() so the answer is known here, and the answer is
+                // acted on. A nonce that was not written is a secret that dies with the
+                // process, and the shortcuts stamped with it do not: a donated or indexed
+                // shortcut is durable, so after the next launch mints a different nonce the
+                // launcher is left holding entries the trampoline refuses as unauthenticated.
+                // Caching it anyway made that outcome certain instead of merely possible.
+                if (!prefs.edit().putString(KEY, existing).commit()) {
+                    Log.w(TAG, "Could not persist the intent nonce; not publishing shortcuts "
+                            + "that would be refused after a restart");
+                    return null;
+                }
             }
             cached = existing;
             return cached;

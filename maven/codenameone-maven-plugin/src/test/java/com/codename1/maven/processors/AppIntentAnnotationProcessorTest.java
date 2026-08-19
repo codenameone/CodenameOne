@@ -172,6 +172,51 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// A handler with an unannotated twin must not be the one that runs.
+    ///
+    /// The generated call names a method and lets the compiler choose the overload, and the
+    /// readers disagreed about boxing -- asInt returns int while required() is generic and so
+    /// returns Integer. A class carrying both log(int) and log(Integer) with only one annotated
+    /// could therefore bind to the other one: the build succeeded and the wrong method ran, and
+    /// which twin won depended on which reader the parameter happened to use.
+    @Test
+    public void anUnannotatedOverloadIsNotTheOneInvoked() throws Exception {
+        File classes = compile(source(
+                "public static String ran;\n"
+                        + "public static IntentResult log(int minutes) {\n"
+                        + "    ran = \"primitive\";\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"
+                        + "@AppIntent(value = \"log_it\", title = \"Log\", headless = true)\n"
+                        + "public static IntentResult log(\n"
+                        + "        @IntentParam(value = \"minutes\", required = false,\n"
+                        + "                defaultValue = \"5\") Integer minutes) {\n"
+                        + "    ran = \"boxed:\" + minutes;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            Map<String, Object> params = new LinkedHashMap<String, Object>();
+            params.put("minutes", Integer.valueOf(7));
+            registry.getClass()
+                    .getMethod("invoke", String.class, Map.class,
+                            loader.loadClass("com.codename1.intents.IntentContext"))
+                    .invoke(registry, "log_it", params, null);
+
+            Object ran = loader.loadClass("com.example.Handlers").getField("ran").get(null);
+            assertEquals("the annotated overload is the one that was declared, so it is the "
+                    + "one that must run", "boxed:7", ran);
+        } finally {
+            loader.close();
+        }
+    }
+
     /// Generating code that compiles is not the same as generating code that
     /// works. This loads the emitted registry and drives it, so a wrong argument
     /// order or a broken coercion is caught here rather than on a device.

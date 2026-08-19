@@ -599,6 +599,14 @@ public class AndroidIntentBridge implements IntentBridge {
             // same intent updates that shortcut in place and needs no free slot, which is the
             // common case and keeps working when the launcher is full.
             String donatedId = DONATED_PREFIX + intentId;
+            if (CN1IntentNonce.get(ctx) == null) {
+                // A donation is durable, so publishing it unauthenticated leaves the launcher
+                // holding an action this app's own trampoline will refuse. CN1IntentNonce has
+                // already logged why there is no nonce.
+                Log.i(TAG, "Not donating \"" + intentId + "\": no nonce, so the shortcut could "
+                        + "not be authenticated when the user taps it");
+                return;
+            }
             synchronized (PUBLISH) {
                 ShortcutCapacity room = capacity(ctx);
                 if (!room.admits(donatedId, 0)) {
@@ -676,9 +684,14 @@ public class AndroidIntentBridge implements IntentBridge {
                     String imageName = entry.length > 3 ? entry[3] : null;
                     String openUri = SCHEME + "://open?uid=" + Uri.encode(uid);
                     String nonce = CN1IntentNonce.get(ctx);
-                    if (nonce != null) {
-                        openUri += "&n=" + Uri.encode(nonce);
+                    if (nonce == null) {
+                        // Without it the entry is unauthenticated, and a durable shortcut the
+                        // trampoline will refuse is worse than no shortcut: it sits in the
+                        // launcher looking like a working action. CN1IntentNonce has already
+                        // said why it could not supply one.
+                        break;
                     }
+                    openUri += "&n=" + Uri.encode(nonce);
                     // Indexing publishes content the user has not necessarily touched.
                     String shortcutId = shortcutIdFor(uid);
                     if (!pushShortcut(ctx, shortcutId, title, subtitle, Uri.parse(openUri),

@@ -1190,6 +1190,61 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     }
 
     private String argumentExpression(ParamDef p) {
+        return castFor(p.descriptor) + rawArgumentExpression(p);
+    }
+
+    /// A cast pinning the argument to the type the handler actually declared.
+    ///
+    /// Overload resolution is done by the compiler on the generated call, and the readers do
+    /// not all agree about boxing: asInt returns int while required() is generic and therefore
+    /// returns Integer. So a class carrying both log(int) and log(Integer), only one of them
+    /// annotated, could have the call bind to the other one -- the build succeeds and the wrong
+    /// method runs. Which twin won depended on which reader the parameter happened to use,
+    /// so the two halves of the same feature failed in opposite directions.
+    ///
+    /// Casting to the declared descriptor makes the choice exact in both directions: an
+    /// argument of type int cannot bind to log(Integer) without boxing, and one of type Integer
+    /// cannot bind to log(int) without unboxing, and neither is allowed while an exact match
+    /// exists. A cast to a boxed type is legal on a primitive expression -- casting conversion
+    /// includes boxing -- so this needs nothing else emitted.
+    ///
+    /// Only the primitives and their boxes are cast: nothing else has a twin to be confused
+    /// with, and naming an entity class here would mean carrying its binary name too.
+    private static String castFor(String descriptor) {
+        if ("I".equals(descriptor)) {
+            return "(int) ";
+        }
+        if ("J".equals(descriptor)) {
+            return "(long) ";
+        }
+        if ("F".equals(descriptor)) {
+            return "(float) ";
+        }
+        if ("D".equals(descriptor)) {
+            return "(double) ";
+        }
+        if ("Z".equals(descriptor)) {
+            return "(boolean) ";
+        }
+        if ("Ljava/lang/Integer;".equals(descriptor)) {
+            return "(Integer) ";
+        }
+        if ("Ljava/lang/Long;".equals(descriptor)) {
+            return "(Long) ";
+        }
+        if ("Ljava/lang/Float;".equals(descriptor)) {
+            return "(Float) ";
+        }
+        if ("Ljava/lang/Double;".equals(descriptor)) {
+            return "(Double) ";
+        }
+        if ("Ljava/lang/Boolean;".equals(descriptor)) {
+            return "(Boolean) ";
+        }
+        return "";
+    }
+
+    private String rawArgumentExpression(ParamDef p) {
         String key = quote(p.name);
         if (p.required && p.defaultValue.length() == 0) {
             // A required value that never arrived must stop the invocation, not be silently

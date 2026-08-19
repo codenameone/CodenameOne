@@ -2025,12 +2025,23 @@ public final class Intents {
             // A parameterization runs its base intent. Bound values go in first so anything
             // supplied at invocation time overrides them -- a binding is a default, not a lock.
             targetId = dyn.getBaseIntentId();
-            reduceInto(safe, dyn.getBoundParameters());
+        }
+        // Read before the values are reduced, because the reduction needs it: an AppEntity
+        // loses its type on the way to the wire, and only the declaration says which type the
+        // parameter was supposed to be.
+        IntentDeclaration decl = getDeclaration(targetId);
+        if (dyn != null) {
+            String wrong = reduceInto(safe, dyn.getBoundParameters(), decl);
+            if (wrong != null) {
+                return new Outcome(IntentResult.failed(wrong), decl, safe);
+            }
         }
         if (params != null) {
-            reduceInto(safe, params);
+            String wrong = reduceInto(safe, params, decl);
+            if (wrong != null) {
+                return new Outcome(IntentResult.failed(wrong), decl, safe);
+            }
         }
-        IntentDeclaration decl = getDeclaration(targetId);
         try {
             IntentResult r = d.invoke(targetId, safe, ctx);
             if (r == null) {
@@ -2053,9 +2064,26 @@ public final class Intents {
     /// reader, which stringified it as "type:id" and asked BY_ID to resolve that. So a dynamic
     /// intent could fail through Intents.invoke and the simulator, and work once donated --
     /// the least debuggable shape a difference can take.
-    private static void reduceInto(Map<String, Object> target, Map<String, Object> source) {
+    /// Returns the reason this cannot run, or null when the values are usable.
+    private static String reduceInto(Map<String, Object> target, Map<String, Object> source,
+                                      IntentDeclaration decl) {
         for (Map.Entry<String, Object> e : source.entrySet()) {
             Object value = e.getValue();
+            // An entity of the wrong type must not be reduced. The reduction keeps only the id,
+            // and the generated reader then resolves that bare id through the *expected* type's
+            // BY_ID query -- so passing a customer where an order belongs does not fail, it
+            // finds whatever order happens to carry the customer's id and runs the handler
+            // against it. Ids are only unique within a type, so overlap is ordinary rather than
+            // unlucky. Checked here because this is the last point at which the type still
+            // exists.
+            if (value instanceof AppEntity) {
+                String declared = declaredEntityType(decl, e.getKey());
+                String actual = ((AppEntity) value).getType();
+                if (declared != null && actual != null && !declared.equals(actual)) {
+                    return "\"" + e.getKey() + "\" expects a " + declared + " and was given a "
+                            + actual;
+                }
+            }
             Object wire = IntentSerializer.toWire(value);
             // A value the wire format cannot carry -- NaN, an infinity, an object of no declared
             // type -- is still a value the caller supplied. Dropping it would turn "invalid"
@@ -2064,6 +2092,28 @@ public final class Intents {
             // means absent.
             target.put(e.getKey(), wire != null ? wire : value);
         }
+        return null;
+    }
+
+    /// The entity type a parameter was declared to take, or null when it takes something else.
+    ///
+    /// Indexed rather than a for-each: this runs on every in-process invocation, and the
+    /// declaration list is short enough that the iterator would be the more expensive half.
+    private static String declaredEntityType(IntentDeclaration decl, String name) {
+        if (decl == null || name == null) {
+            return null;
+        }
+        List<IntentParameterInfo> ps = decl.getParameters();
+        if (ps == null) {
+            return null;
+        }
+        for (int i = 0; i < ps.size(); i++) {
+            IntentParameterInfo p = ps.get(i);
+            if (p != null && name.equals(p.getName())) {
+                return p.getEntityType();
+            }
+        }
+        return null;
     }
 
     /// One handler's result together with what navigating from it would need.

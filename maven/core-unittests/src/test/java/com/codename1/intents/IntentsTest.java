@@ -2188,6 +2188,38 @@ class IntentsTest {
     ///
     /// Exercised through the decision itself. The path that matters recheck on the event
     /// dispatch thread, and this harness has none -- so what is pinned here is the rule the
+    /// An entity of the wrong type must not be quietly reinterpreted as the right one.
+    ///
+    /// Reduction keeps only the id, because that is all the wire carries, and the generated
+    /// reader then resolves that bare id through the *expected* type's BY_ID query. So handing
+    /// a customer to a parameter that takes an order did not fail: it found whatever order
+    /// happened to carry the customer's id and ran the handler against it. Ids are only unique
+    /// within a type, so the overlap is ordinary rather than unlucky, and the handler has no
+    /// way to notice.
+    @Test
+    void anEntityOfTheWrongTypeIsRefusedRatherThanReducedToItsId() {
+        IntentParameterInfo target = new IntentParameterInfo("order", "Which order?",
+                IntentParameterType.ENTITY, true, "order", null, null);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("track_order", "Track", "", true, true, false,
+                "", 5, Collections.<String>emptyList(), Arrays.asList(target),
+                Arrays.asList(Exposure.ASSISTANT)));
+        d.next = IntentResult.ok();
+        Intents.setDispatcher(d);
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("order", new AppEntity("customer", "42"));
+
+        IntentResult r = Intents.invoke("track_order", params);
+
+        assertTrue(r.isFailed(), "a customer is not an order");
+        assertTrue(d.invoked.isEmpty(),
+                "the handler must not run against whatever order shares that id");
+        assertTrue(r.getErrorMessage().contains("order")
+                        && r.getErrorMessage().contains("customer"),
+                "the message has to name both types: " + r.getErrorMessage());
+    }
+
     /// recheck applies, rather than the marshalling around it.
     @Test
     void aNavigationDoesNotRunOnceTheTimeoutHasAnswered() throws Exception {
