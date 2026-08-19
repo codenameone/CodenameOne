@@ -155,13 +155,28 @@ const setText = await page.evaluate(() => {
   // report a screen of TextAreas as having no way to set text.
   const inputs = actions ? Array.from(actions.querySelectorAll('input,textarea')) : [];
   const wired = inputs.filter(i => ids.includes(i.getAttribute('aria-controls')));
-  return { fields: boxes.length, inputs: inputs.length, wired: wired.length };
+  // Editing through the control is still editing that field, so it has to carry the same
+  // input metadata the ordinary editor applies -- the keyboard the constraint asks for, and
+  // the prediction and autofill it withholds.
+  const configured = wired.filter(i => i.getAttribute('autocomplete') !== null
+    && i.getAttribute('autocapitalize') !== null && i.getAttribute('spellcheck') !== null);
+  return {
+    fields: boxes.length, inputs: inputs.length, wired: wired.length,
+    configured: configured.length
+  };
 });
 if (!setText || setText.fields === 0) {
   console.log('SKIP  editable fields expose a control that can set text :: no field on screen');
 } else {
   check('editable fields expose a control that can set text', setText.wired > 0,
         `${setText.wired} control(s) for ${setText.fields} field(s)`);
+}
+if (!setText || !setText.wired) {
+  console.log('SKIP  a set-text control carries the field input constraints :: no wired control');
+} else {
+  check('a set-text control carries the field input constraints',
+        setText.configured === setText.wired,
+        `${setText.configured}/${setText.wired} control(s) configured`);
 }
 
 // A reload keeps the entry it happened on, and with it any id this port stamped there before

@@ -771,6 +771,7 @@ public final class JavaScriptSemanticOverlay {
         control.setAttribute("aria-controls", owner);
         control.setAttribute("aria-describedby", owner);
         applyMaxLength(control, node);
+        applyTextConstraints(control, node, !multiline, obscured);
         if (!obscured) {
             setControlValue(control, textEntryValue(node));
         }
@@ -828,6 +829,43 @@ public final class JavaScriptSemanticOverlay {
      * @param element the control
      * @param node the field's snapshot, whose component carries the limit
      */
+    /**
+     * Gives a SET_TEXT control the same input metadata the editor would have given the field.
+     *
+     * <p>Editing through this control is still editing that field: it has to offer the keyboard
+     * the constraint asks for, and it has to withhold prediction, capitalization and autofill
+     * from a field that forbids them. Sharing the editor's own routine rather than restating it
+     * here is the point -- a constraint added to one would otherwise never reach the other.</p>
+     *
+     * <p>Masking stays this class's decision. The constraint's {@code PASSWORD} bit is only the
+     * default for the snapshot's obscured flag, which an application can set either way, so a
+     * type resolved from the constraint alone would unmask a field the application asked to
+     * hide -- or keep masking one it has just revealed.</p>
+     *
+     * @param element the control
+     * @param node the field's snapshot, whose component carries the constraint
+     * @param singleLine true when the control is an input, so it carries a type
+     * @param obscured whether the field is to be masked
+     */
+    private void applyTextConstraints(HTMLElement element, AccessibilityNodeSnapshot node,
+            boolean singleLine, boolean obscured) {
+        Component owner = node.getComponent();
+        if (!(owner instanceof TextArea)) {
+            return;
+        }
+        String resolved = HTML5Implementation.applyTextInputConstraints(
+                element, (TextArea) owner, singleLine);
+        if (!singleLine) {
+            return;
+        }
+        if (obscured) {
+            element.setAttribute("type", "password");
+        } else if ("password".equals(resolved)) {
+            // The application revealed a field the constraint still marks as a password.
+            element.setAttribute("type", "text");
+        }
+    }
+
     private void applyMaxLength(HTMLElement element, AccessibilityNodeSnapshot node) {
         Component owner = node.getComponent();
         int max = owner instanceof TextArea ? ((TextArea) owner).getMaxSize() : 0;
@@ -913,12 +951,17 @@ public final class JavaScriptSemanticOverlay {
         // new limit raises it again on the way in.
         applyMaxLength(element, node);
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
+        // Also before the early returns, and for the same reason: an application can change a
+        // field's constraint while it is on screen, and a control left as it was would go on
+        // offering the keyboard, prediction and autofill the field no longer asks for. This
+        // writes the type, so what follows only has to track the masking marker.
+        applyTextConstraints(element, node, element.getAttribute(ATTRIBUTE_MULTILINE) == null,
+                obscured);
         if (obscured != (element.getAttribute(ATTRIBUTE_OBSCURED) != null)
                 && element.getAttribute(ATTRIBUTE_MULTILINE) == null) {
             // A field can be masked and revealed while it stays in the tree -- the eye button on
             // a password field. A control left as it was would either keep typing in the clear
             // into a field that is now a secret, or go on masking one that no longer is.
-            element.setAttribute("type", obscured ? "password" : "text");
             if (obscured) {
                 element.setAttribute(ATTRIBUTE_OBSCURED, "1");
                 // Cleared even mid-edit: what it holds became a secret, and a secret does not

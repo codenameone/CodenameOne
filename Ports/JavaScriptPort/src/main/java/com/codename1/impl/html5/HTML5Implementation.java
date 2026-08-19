@@ -5881,6 +5881,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * from a change-password field, say -- with the {@code cn1$autocomplete} client property.</p>
      */
     private String applyInputConstraints(HTMLInputElement inputEl, TextArea ta) {
+        return applyTextInputConstraints(inputEl, ta, ta.isSingleLineTextArea());
+    }
+
+    /**
+     * The same constraint metadata, for an element this class did not build.
+     *
+     * <p>The editor is not the only place a field is typed into: the accessibility overlay
+     * exposes an editable field to a screen reader through a control of its own, and a control
+     * that skipped this would offer the wrong keyboard and would let prediction and autofill
+     * reach a field whose constraint forbids them. The shape of that control is decided by the
+     * caller rather than read from the component -- an obscured field is given a single-line
+     * masking input whether or not the component is multiline -- so whether to write a
+     * {@code type} at all is passed in instead of asked of the {@code TextArea}.</p>
+     *
+     * @param inputEl the element to configure, an input or a textarea
+     * @param ta the field the element edits
+     * @param singleLine true when the element is an input and so carries a type
+     * @return the resolved input type, "text" for anything without one of its own
+     */
+    static String applyTextInputConstraints(HTMLElement inputEl, TextArea ta, boolean singleLine) {
         int constraint = ta.getConstraint();
         int base = constraint & 0xffff;
         boolean password = (constraint & TextArea.PASSWORD) != 0;
@@ -5900,7 +5920,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         } else if (base == TextArea.URL) {
             resolvedType = "url";
         }
-        if (ta.isSingleLineTextArea()) {
+        if (singleLine) {
             inputEl.setAttribute("type", resolvedType);
         } else {
             // A textarea has no type attribute, and callers treat "text" as the plain case.
