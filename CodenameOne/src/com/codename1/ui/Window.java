@@ -419,6 +419,13 @@ public class Window extends Container implements TopLevelContainer {
         titleArea.removeAll();
         titleArea.setLayout(new BorderLayout());
         titleArea.addComponent(BorderLayout.CENTER, toolbar);
+        if (toolbar != null) {
+            // A Form raises the toolbar's initialized flag from initMenuBar, which a
+            // Window never runs -- it has no MenuBar. Without this every guarded
+            // Toolbar method refused with "Need to call Form#setToolBar" for a toolbar
+            // that was in fact installed.
+            toolbar.markInstalledOnWindow(getTitle());
+        }
     }
 
     /// {@inheritDoc}

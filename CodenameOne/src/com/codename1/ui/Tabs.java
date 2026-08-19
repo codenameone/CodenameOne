@@ -2589,11 +2589,15 @@ public class Tabs extends Container {
         private boolean isEventBlockedByHigherComponent(ActionEvent evt) {
             final int x = evt.getX();
             final int y = evt.getY();
-            final Form currentForm = Display.INSTANCE.getCurrent();
-            if (currentForm == null) {
+            // These coordinates are local to the surface the tabs live on, so the hit
+            // test has to run against that surface. Resolving the current form meant a
+            // window's swipe was tested against an unrelated main-form component at the
+            // same coordinates, which set blockSwipe and made the swipe do nothing.
+            final TopLevelContainer top = getTopLevelContainer();
+            if (top == null) {
                 return false;
             }
-            final Component targetComponent = currentForm.getComponentAt(x, y);
+            final Component targetComponent = top.asContainer().getComponentAt(x, y);
             return !contentPane.equals(targetComponent) && !contentPane.contains(targetComponent);
         }
     }

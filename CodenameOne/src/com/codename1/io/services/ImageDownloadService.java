@@ -36,7 +36,6 @@ import com.codename1.io.Storage;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
@@ -671,9 +670,13 @@ public class ImageDownloadService extends ConnectionRequest {
                 @Override
                 public void run() {
                     l.setIcon(i);
-                    Form f = l.getComponentForm();
-                    if (f != null) {
-                        f.revalidate();
+                    // The top level, not the form. This is the cache-hit return, which
+                    // bypasses the download-completion path entirely, so it needs the
+                    // same resolution: in a Window the icon changed and the layout
+                    // stayed sized for the placeholder.
+                    com.codename1.ui.TopLevelContainer top = l.getTopLevelContainer();
+                    if (top != null) {
+                        top.asContainer().revalidate();
                     }
                 }
             });

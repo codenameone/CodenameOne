@@ -735,7 +735,13 @@ public class Toolbar extends Container {
         if (iconSize < 0) {
             iconSize = 3;
         }
-        getComponentForm().setBackCommand(cmd);
+        // Form only: the back command is Form navigation ("pop to the previous form"),
+        // which a Window has no notion of. The visible back button added below by the
+        // policy still works there -- it is an ordinary command in the left bar.
+        Form backHost = getComponentForm();
+        if (backHost != null) {
+            backHost.setBackCommand(cmd);
+        }
         switch (policy) {
             case ALWAYS:
                 if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
@@ -901,14 +907,36 @@ public class Toolbar extends Container {
     /// - `callback`: gets the search string callbacks
     public void showSearchBar(final ActionListener<ActionEvent> callback) {
         SearchBar s = new CallbackSearchBar(this, callback);
-        Form f = getComponentForm();
+        // Through the top level: getComponentForm() is null by design inside a Window,
+        // so activating the search command there threw on the very next line.
+        TopLevelContainer f = getTopLevelContainer();
+        if (f == null) {
+            return;
+        }
         setHidden(true);
-        f.removeComponentFromForm(this);
+        if (f instanceof Form) {
+            // A Form hangs the toolbar off its own children and swaps the menu bar
+            // with it, so the outgoing one has to be detached first.
+            ((Form) f).removeComponentFromForm(this);
+        }
+        // A Window's setToolbar clears its title area and installs the replacement, so
+        // there is nothing to detach separately.
         f.setToolbar(s);
         s.initSearchBar();
-        if (f == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals
-            f.animateLayout(100);
+        if (isOnDisplayedTopLevel(f)) {
+            f.asContainer().animateLayout(100);
         }
+    }
+
+    /// True when the given top level is the surface currently on screen.
+    ///
+    /// `Display#getCurrent()` only ever names a `Form`, so comparing a `Window`
+    /// against it is false however visible the window is.
+    private static boolean isOnDisplayedTopLevel(TopLevelContainer top) {
+        if (top instanceof Window) {
+            return ((Window) top).isWindowShowing();
+        }
+        return Display.INSTANCE.getCurrent() == top; //NOPMD CompareObjectsWithEquals
     }
 
     /// Removes a previously installed search command
@@ -2800,6 +2828,23 @@ public class Toolbar extends Container {
         allStyles.setMarginTop(topMargin + bottomMargin);
         allStyles.setPaddingBottom(0);
         allStyles.setMarginBottom(0);
+    }
+
+    /// Marks this toolbar as attached to a top level, so the guarded API stops
+    /// refusing.
+    ///
+    /// The flag was only ever raised from `initMenuBar`, which a `Window` never runs --
+    /// it has no `MenuBar` and installs the toolbar in its title area instead. Every
+    /// guarded method therefore threw "Need to call Form#setToolBar" for a toolbar in a
+    /// window, including the one the search bar needs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title to adopt from the owning top level
+    void markInstalledOnWindow(String title) {
+        initialized = true;
+        setTitle(title);
+        initTitleBarStatus();
     }
 
     private void checkIfInitialized() {

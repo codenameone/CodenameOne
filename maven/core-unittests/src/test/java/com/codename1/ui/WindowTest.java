@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -2532,6 +2533,35 @@ class WindowTest extends UITestBase {
 
         sel.setEnabled(false);
         assertFalse(sel.isEnabled());
+
+        w.dispose();
+    }
+
+    @FormTest
+    void showingTheToolbarSearchBarInsideAWindowSwapsTheToolbar() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("search", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Toolbar tb = new Toolbar();
+        w.setToolbar(tb);
+        w.show();
+        w.revalidate();
+        assertSame(tb, w.getToolbar());
+
+        // showSearchBar() assigned getComponentForm() and immediately called
+        // removeComponentFromForm on it, so activating the search command in a window
+        // threw. A Window installs its toolbar in the title area, so the outgoing one
+        // needs no separate detach -- only a Form does.
+        tb.showSearchBar(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+            }
+        });
+        flushSerialCalls();
+
+        assertNotSame(tb, w.getToolbar(),
+                "showing the search bar must swap the window's toolbar for it");
+        assertNotNull(w.getToolbar());
 
         w.dispose();
     }

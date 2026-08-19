@@ -271,9 +271,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
@@ -288,9 +292,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
@@ -305,9 +313,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
@@ -322,9 +334,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
