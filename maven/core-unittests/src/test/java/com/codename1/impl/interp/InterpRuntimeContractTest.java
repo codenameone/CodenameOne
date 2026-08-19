@@ -71,6 +71,31 @@ class InterpRuntimeContractTest {
     }
 
     /**
+     * The package a source declares is read as Java reads it, not by looking at
+     * what a line starts with. `/* license *""/ package com.example;` is one
+     * ordinary line, and taking it for the default package stored the source
+     * under a key the runtime never looks up -- so the push was refused for
+     * missing source that had been supplied.
+     */
+    @Test
+    @DisplayName("a package declaration is found past comments and on one line")
+    void thePackageIsParsedRatherThanPatternMatched() throws Exception {
+        assertEquals("com.example", packageOf(
+                "/* license */ package com.example;\npublic class A {}\n"));
+        assertEquals("com.example", packageOf(
+                "// a comment\n\npackage   com.example  ;\npublic class A {}\n"));
+        assertEquals("com.example", packageOf(
+                "/*\n * a block\n */\npackage com.example;\n"));
+        assertEquals("", packageOf("public class A {}\n"));
+        assertEquals("", packageOf("// package com.example;\npublic class A {}\n"));
+    }
+
+    private static String packageOf(String source) throws Exception {
+        Class<?> writer = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
+        return (String) writer.getMethod("packageOf", String.class).invoke(null, source);
+    }
+
+    /**
      * A package-private method is overridden only from inside its own package
      * (JVMS 5.4.5). A public method of the same signature in another package is
      * a different method that happens to share a name, and dispatch that

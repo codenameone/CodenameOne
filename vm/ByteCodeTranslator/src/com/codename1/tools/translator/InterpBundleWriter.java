@@ -209,20 +209,79 @@ public class InterpBundleWriter {
      * inferred from its path -- a source root is not always the package root.
      */
     public static String packageOf(String text) {
-        for (String raw : text.split("\n")) {
-            String line = raw.trim();
-            if (line.startsWith("package ")) {
-                int end = line.indexOf(';');
-                if (end > 0) {
-                    return line.substring("package ".length(), end).trim();
-                }
-            } else if (line.startsWith("import ") || line.startsWith("class ")
-                    || line.startsWith("public ")) {
-                // Past anything a package declaration may follow.
+        // Tokens, not line starts. `/* license */ package com.example;` is one
+        // line of perfectly ordinary Java, and reading it as the default
+        // package stored the source under a key the runtime never looks up --
+        // so the push was refused for missing source that had been supplied.
+        String code = stripComments(text);
+        int i = 0;
+        while (i < code.length()) {
+            char c = code.charAt(i);
+            if (c == '{') {
                 break;
             }
+            if (Character.isJavaIdentifierStart(c)) {
+                int start = i;
+                while (i < code.length() && Character.isJavaIdentifierPart(code.charAt(i))) {
+                    i++;
+                }
+                String token = code.substring(start, i);
+                if ("package".equals(token)) {
+                    int end = code.indexOf(';', i);
+                    return end < 0 ? "" : code.substring(i, end).replaceAll("\\s", "");
+                }
+                if ("import".equals(token) || "class".equals(token)
+                        || "interface".equals(token) || "enum".equals(token)) {
+                    // Past anything a package declaration may precede.
+                    break;
+                }
+                continue;
+            }
+            i++;
         }
         return "";
+    }
+
+    /**
+     * The source with comments and literals blanked out.
+     *
+     * <p>Blanked rather than removed, so nothing shifts: only the scan above
+     * uses this, and it cares about what a token is, not where it sits.</p>
+     */
+    private static String stripComments(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c == '/' && i + 1 < text.length() && text.charAt(i + 1) == '/') {
+                while (i < text.length() && text.charAt(i) != '\n') {
+                    i++;
+                }
+            } else if (c == '/' && i + 1 < text.length() && text.charAt(i + 1) == '*') {
+                i += 2;
+                while (i + 1 < text.length()
+                        && !(text.charAt(i) == '*' && text.charAt(i + 1) == '/')) {
+                    i++;
+                }
+                i = Math.min(i + 2, text.length());
+                out.append(' ');
+            } else if (c == '"' || c == '\'') {
+                char quote = c;
+                i++;
+                while (i < text.length() && text.charAt(i) != quote) {
+                    if (text.charAt(i) == '\\') {
+                        i++;
+                    }
+                    i++;
+                }
+                i++;
+                out.append(' ');
+            } else {
+                out.append(c);
+                i++;
+            }
+        }
+        return out.toString();
     }
 
     /** The class whose {@code main} the runtime should enter. */

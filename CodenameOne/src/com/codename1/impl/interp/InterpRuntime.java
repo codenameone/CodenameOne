@@ -421,6 +421,7 @@ public final class InterpRuntime {
         boolean freshEntry = st.depth == 0 || st.hostCallDepth > 0;
         int enclosingHostCalls = 0;
         long enclosingRunStart = st.runStartMs;
+        int enclosingFuel = st.fuel;
         if (freshEntry) {
             st.runStartMs = System.currentTimeMillis();
             st.fuel = fuelPerCheck;
@@ -460,6 +461,11 @@ public final class InterpRuntime {
                 // and the host-call exclusion would then be added to a
                 // timestamp that no longer belongs to anybody.
                 st.runStartMs = enclosingRunStart;
+                // The fuel counter with it. A loop whose body dispatches a
+                // listener would otherwise see a nearly full counter on every
+                // iteration and never reach a checkpoint -- so Stop would have
+                // nothing to act on, which is the thing the counter is for.
+                st.fuel = enclosingFuel;
             }
         }
     }
