@@ -79,6 +79,7 @@ public class IntentsApiTest extends BaseTest {
                 // below would be measuring nothing if they ran against it.
                 System.out.println("CN1SS:INFO:test=IntentsApiTest registry=absent "
                         + "(no generated dispatcher on this port; dispatch assertions skipped)");
+                done();
                 return true;
             }
             System.out.println("CN1SS:INFO:test=IntentsApiTest registry=present");
@@ -129,9 +130,12 @@ public class IntentsApiTest extends BaseTest {
             IntentResult gone = Intents.invoke("cn1_open_note", missing);
             assertBool(gone.isFailed(), "an unresolvable entity id must fail");
 
+            done();
             return true;
         } catch (Throwable t) {
-            System.out.println("CN1SS:INFO:test=IntentsApiTest threw " + t);
+            // fail() is what tells the runner the verdict; without it the suite waits out the
+            // whole timeout and reports the test as hung rather than as failed.
+            fail("App intents contract failed: " + t);
             t.printStackTrace();
             return false;
         }
