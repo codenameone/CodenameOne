@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.health;
+package com.codename1.impl.async;
 
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
@@ -28,8 +28,8 @@ import com.codename1.util.SuccessCallback;
 import com.codename1.util.EasyThread;
 import com.codename1.ui.Display;
 
-/// The resource every public health operation hands back: one outcome,
-/// delivered on the EDT.
+/// The resource a public health or smart-home operation hands back: one
+/// outcome, delivered on the EDT.
 ///
 /// This is what makes the threading contract a contract rather than a
 /// description of whatever each port happens to do. It used to depend on the
@@ -42,14 +42,17 @@ import com.codename1.ui.Display;
 /// the caller has to defend against every time, and most callers will not.
 ///
 /// Dispatching here rather than at each completion site is deliberate: the
-/// ports complete these resources directly from `doAggregate`, `doWrite`,
-/// `doDelete` and `doDrainChanges`, so a rule enforced at the call sites is
-/// one the next port has to be told about. Enforced by the type, a port cannot
-/// get it wrong.
+/// ports complete these resources directly from their platform callbacks, so a
+/// rule enforced at the call sites is one the next port has to be told about.
+/// Enforced by the type, a port cannot get it wrong.
 ///
 /// Already on the EDT means completed inline, so a callback chain that
 /// completes another resource does not queue a runnable per link.
-public final class EdtResult<T> extends OneShot<T> {
+///
+/// Not final, so a subsystem can name its own subtype; nothing here expects a
+/// subclass to add behaviour, and one that overrides the four settled entry
+/// points has to reproduce the reasoning below rather than inherit it.
+public class EdtResult<T> extends OneShot<T> {
 
     /// EVERY off-EDT registration is marshalled, not only one that finds the resource
     /// already settled.

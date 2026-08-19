@@ -449,12 +449,19 @@ public final class PlatformFeatureCatalog {
         //    it instead, gated on the scanner having seen health classes
         //    OUTSIDE the sensors subpackage.
         //
-        // The HealthKit framework linkage and the CN1_INCLUDE_HEALTH define
-        // flip likewise happen in IPhoneBuilder, gated the same way;
-        // iosFrameworks here is documentation-only, matching the bluetooth
-        // entry above.
+        //  - and NO iosFrameworks, for the same startsWith reason. The
+        //    frameworks named here are linked for real -- IPhoneBuilder
+        //    appends every matched entry's list to ios.add_libs -- so
+        //    naming HealthKit would link it into an app that only reads a
+        //    heart-rate strap, and Apple rejects a binary that links
+        //    HealthKit without the health purpose strings a sensor-only app
+        //    has no reason to declare. IPhoneBuilder links it under the
+        //    usesHealthStore gate instead, which is the one that knows the
+        //    difference.
+        //
+        // The CN1_INCLUDE_HEALTH define flip likewise happens in
+        // IPhoneBuilder, gated the same way.
         e.add(new Entry("com/codename1/health/")
-                .iosFrameworks("HealthKit")
                 .description("Cross-platform health data (samples, aggregates, background observers, workouts)"));
 
         // The health sensor layer talks to standard GATT devices over
@@ -475,6 +482,70 @@ public final class PlatformFeatureCatalog {
                 .iosPlist("NSBluetoothPeripheralUsageDescription",
                          "Communicates with nearby heart rate and fitness sensors.")
                 .description("Bluetooth health sensors (heart rate, power, cadence, scales, cuffs, glucose)"));
+
+        // Smart home (com.codename1.home.*): HomeKit on Apple platforms,
+        // Google Play services Matter commissioning on Android.
+        //
+        // NOTE three deliberate omissions.
+        //
+        //  - NO iosPlist default for NSHomeKitUsageDescription. Same reason
+        //    the health entry injects no purpose string: Apple reviews this
+        //    text against what the app actually does, so a generic
+        //    placeholder is precisely what gets an app rejected. iOS also
+        //    terminates an app that reaches HomeKit without one, so a
+        //    placeholder would not even achieve the "keeps the build working"
+        //    goal. IPhoneBuilder fails the build with an actionable message.
+        //
+        //  - NO androidPermissions. Play services runs the whole add-device
+        //    interaction in its OWN activity, so the app needs no Bluetooth,
+        //    location or local-network permission -- and the AAR's manifest
+        //    declares none, which is the authority here. Adding them "to be
+        //    safe" would put a Bluetooth permission prompt in front of users
+        //    of an app that never scans.
+        //
+        //  - The HomeKit framework linkage and the CN1_INCLUDE_HOMEKIT define
+        //    flip happen in IPhoneBuilder, because the entitlement decision is
+        //    tied to them and has to distinguish an app that touches
+        //    accessories from one that only asks whether HomeKit exists.
+        //    iosFrameworks here is documentation, matching the bluetooth and
+        //    health entries above.
+        // No iosFrameworks: IPhoneBuilder links HomeKit itself, under the
+        // same scan, and MatterSupport under a gate this table cannot
+        // express -- the ios.home.commissioning=false opt-out. A framework
+        // named here is linked for real, so a second copy of the decision
+        // here would link MatterSupport into a build that opted out.
+        //
+        // And no androidGradle or androidMinimumSdk either, for the startsWith
+        // reason the health entry above spells out: this prefix also covers
+        // com/codename1/home/commissioning/SetupPayload, which is a pure-Java
+        // parser for the string on an accessory's sticker. Naming
+        // play-services-home here would put a Play Services AAR -- and the
+        // API 21 floor that comes with it -- into an app that only checks
+        // whether a scanned code is well formed. AndroidGradleBuilder adds
+        // both inside the usesSmartHome gate, which is the one that knows the
+        // difference, and where the delegate that imports the AAR is injected.
+        e.add(new Entry("com/codename1/home/")
+                .description("Smart home accessories (HomeKit, Matter, "
+                        + "Google Home)"));
+
+        // Adding a Matter accessory. Its own entry, and its own package on the
+        // Java side, because on iOS it is far more expensive than the rest:
+        // the MatterSupport framework, a com.apple.developer.matter
+        // .allow-setup-payload entitlement, an app group and a whole generated
+        // app-extension target. An app that only reads its lights should carry
+        // none of that, and since entries match on a prefix with no way to
+        // express an exclusion, the package boundary has to BE the permission
+        // boundary.
+        //
+        // The deployment floor is real: MatterSupport arrived in iOS 16.1 and
+        // linking it below that fails at launch rather than at build time.
+        // And no iosMinimumDeploymentTarget either, for the same reason as
+        // the frameworks above: raising the app's floor to what MatterSupport
+        // needs is only right when MatterSupport is actually being linked,
+        // and ios.home.commissioning=false is invisible from here.
+        // IPhoneBuilder raises it inside that gate.
+        e.add(new Entry("com/codename1/home/commissioning/")
+                .description("Matter accessory commissioning"));
 
         // On-device Stable Diffusion: bundled Core ML model on iOS,
         // ONNX runtime on Android. Flag the >2 GB upload concern so

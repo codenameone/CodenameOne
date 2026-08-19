@@ -25,7 +25,7 @@ package com.codename1.health.workout;
 import com.codename1.health.HealthError;
 import com.codename1.health.HealthException;
 import com.codename1.util.AsyncResource;
-import com.codename1.impl.health.EdtResult;
+import com.codename1.impl.async.EdtResult;
 
 /// Starts and tracks workout recordings.
 ///

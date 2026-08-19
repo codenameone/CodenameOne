@@ -210,7 +210,7 @@ class HealthEdtDeliveryTest extends UITestBase {
      *
      * <p>Written as a source scan rather than as one test per operation
      * because the defect kept coming back in a new place: the store's nine
-     * resources moved to {@link com.codename1.impl.health.EdtResult} first,
+     * resources moved to {@link com.codename1.impl.async.EdtResult} first,
      * then the facade's two openers were found still inline, then the
      * workout and sensor operations. Each round fixed the sites that had been
      * pointed at. This asserts the property over the whole surface, so the

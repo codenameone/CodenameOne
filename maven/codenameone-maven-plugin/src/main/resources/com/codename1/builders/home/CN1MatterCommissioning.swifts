@@ -1,0 +1,231 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+//
+//  CN1MatterCommissioning.swift
+//  The MatterSupport half of com.codename1.home.commissioning.
+//
+//  This file exists because MatterSupport is Swift-only. MatterAddDeviceRequest
+//  is a Swift struct whose perform() is async throws, and Apple exposes no
+//  Objective-C interface to it -- so the rest of the smart-home bridge, which
+//  is Objective-C, cannot reach it directly.
+//
+//  It is NOT in the port's nativeSources, and that is deliberate. Every file
+//  there is unpacked into every iOS build; a .m can be compiled away with an
+//  #ifdef, but a .swift cannot, and its mere presence is what makes the
+//  builder turn Swift compilation on for the whole project. Shipping it that
+//  way put a Swift file -- and this framework -- into every Codename One app
+//  ever built, including the watchOS and tvOS slices where
+//  MatterAddDeviceRequest does not exist at all.
+//
+//  So the builder copies it in, alongside the MatterSupport framework, the
+//  com.apple.developer.matter.allow-setup-payload entitlement, an app group
+//  and the generated app-extension target, only for apps that reference
+//  com.codename1.home.commissioning. An app that only reads its lights carries
+//  none of it. The same arrangement the surfaces Swift glue uses.
+//
+
+import Foundation
+
+// os(iOS) as well as canImport, because canImport alone is not enough:
+// MatterSupport IS present in the watchOS and tvOS SDKs and imports cleanly
+// there, and only MatterAddDeviceRequest itself is marked unavailable. A
+// watch build therefore compiled this file and failed on the type rather than
+// skipping the file -- and it reaches those slices even when correctly
+// injected, because the watch target restages the app's own sources.
+//
+// Catalyst is excluded for a different reason: os(iOS) is true there, but the
+// extension this shim needs is filtered to the iOS slice when the target is
+// wired up -- Apple's add-device sheet is not a Mac feature. Left in, the Mac
+// app would offer commissioning and then fail for want of an extension that
+// was never embedded.
+#if canImport(MatterSupport) && os(iOS) && !targetEnvironment(macCatalyst)
+import Matter
+import MatterSupport
+
+/// Runs Apple's add-device sheet and reports the outcome back to
+/// `CN1SmartHome.m`.
+///
+/// #### Both directions are looked up by name
+///
+/// Swift reaches Objective-C in a mixed target through a bridging header, and
+/// Objective-C reaches Swift through a generated `<Module>-Swift.h`. Both file
+/// names contain the *application's* module name, which is whatever the
+/// developer called their project -- and this file ships inside the port, long
+/// before that name exists.
+///
+/// So neither header is used. Each side finds the other with
+/// `NSClassFromString` and passes one dictionary, which
+/// `performSelector:withObject:` can carry. The cost is a class lookup per
+/// commissioning flow, which happens once per accessory a user adds by hand.
+@objc(CN1MatterCommissioning)
+public final class CN1MatterCommissioning: NSObject {
+
+    /// The name Objective-C invokes, and the only entry point.
+    ///
+    /// - Parameter request: `requestId`, `setupPayload`, `structureId`,
+    ///   `roomId`, `suggestedName` and `timeoutMillis`, exactly as
+    ///   `homeCommission` packed them.
+    @objc(commission:)
+    public static func commission(_ request: [String: Any]) {
+        let requestId = (request["requestId"] as? NSNumber)?.int32Value ?? 0
+        let payloadText = request["setupPayload"] as? String ?? ""
+        // The requested home is deliberately not read back out. Nothing
+        // here can tell which home the accessory joined -- the sheet lets the
+        // user pick -- and the result's structure id means the home it JOINED.
+        guard #available(iOS 16.1, *) else {
+            deliver(requestId: requestId, structureId: "",
+                    error: "COMMISSIONING_UNAVAILABLE\tadding a Matter "
+                         + "accessory needs iOS 16.1 or newer")
+            return
+        }
+
+        // @MainActor, because delivering the answer re-enters the
+        // Objective-C bridge and the first thing that does is rebuild the
+        // snapshot -- which walks HMHomeManager, its homes and their
+        // accessories, all of which HomeKit requires be touched on the main
+        // queue. An unstructured Task runs on a generic executor, so without
+        // this the successful path races HomeKit's own delegates.
+        Task { @MainActor in
+            do {
+                let request = MatterAddDeviceRequest(
+                    topology: topology(),
+                    setupPayload: setupPayload(from: payloadText))
+                try await request.perform()
+                // Success, and deliberately with neither an accessory id
+                // nor a home id.
+                //
+                // MatterSupport reports that the flow finished and does not
+                // say what was added or where: the accessory joins the user's
+                // HomeKit home, and it turns up in the graph on the next
+                // refresh like any other. Inventing an accessory id would
+                // make wasCommissionedToThisApp() answer true for something
+                // the app cannot address, and echoing back the home the
+                // caller ASKED for would name the wrong one whenever the user
+                // picked a different one in the sheet -- which they are free
+                // to do, and which CommissioningResult says outright.
+                deliver(requestId: requestId, structureId: "", error: nil)
+            } catch {
+                deliver(requestId: requestId, structureId: "",
+                        error: describe(error))
+            }
+        }
+    }
+
+    /// The ecosystem and home names Apple's sheet shows.
+    ///
+    /// The app's display name, because that is what the user recognizes --
+    /// this is the "add to <ecosystem>" line in the sheet, and a bundle
+    /// identifier there reads like a bug.
+    /// The suggested name is deliberately NOT used here.
+    ///
+    /// `Home.displayName` names a HOME in the topology the sheet offers, and
+    /// `CommissioningRequest.setSuggestedName` is a name for the ACCESSORY.
+    /// Passing one as the other invented a destination home called "Kettle"
+    /// and applied the caller's preference nowhere. MatterSupport takes no
+    /// accessory-name hint, so the preference goes unused on iOS -- which the
+    /// setter's own javadoc says the platform is free to do.
+    @available(iOS 16.1, *)
+    private static func topology() -> MatterAddDeviceRequest.Topology {
+        let bundle = Bundle.main
+        let appName = (bundle.object(
+                forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+            ?? "Codename One"
+        return MatterAddDeviceRequest.Topology(
+            ecosystemName: appName,
+            homes: [MatterAddDeviceRequest.Home(displayName: appName)])
+    }
+
+    /// Parses a scanned code, or answers nil so Apple's sheet scans one
+    /// itself.
+    ///
+    /// Nil is a working outcome rather than a failure: with no payload the
+    /// sheet asks the user to scan, which is exactly what an app that has not
+    /// scanned one wants.
+    ///
+    /// #### Below iOS 17.6 a scanned code is not passed through
+    ///
+    /// `MTRSetupPayload(payload:)` arrived in 17.6. The spelling those
+    /// releases have -- `setupPayloadWithOnboardingPayload:error:` -- was
+    /// deprecated at the same time and is no longer surfaced in Swift by the
+    /// current SDK, so there is nothing left to call.
+    ///
+    /// The consequence is worth stating plainly: on iOS 16.1 to 17.5 a code
+    /// your app already scanned is dropped and Apple's sheet asks the user to
+    /// scan it again. Annoying, and it still commissions the accessory. The
+    /// alternative was reaching the removed selector dynamically, which trades
+    /// a visible re-scan for a silent failure the first time Apple drops the
+    /// symbol.
+    @available(iOS 16.1, *)
+    private static func setupPayload(from text: String) -> MTRSetupPayload? {
+        if text.isEmpty {
+            return nil
+        }
+        if #available(iOS 17.6, *) {
+            return MTRSetupPayload(payload: text)
+        }
+        return nil
+    }
+
+    /// The portable HomeError name for a MatterSupport failure.
+    ///
+    /// A user backing out of the sheet is by far the most common outcome and
+    /// is not an error worth reporting as one -- an app that showed a red
+    /// banner every time somebody changed their mind would be wrong far more
+    /// often than it was right.
+    private static func describe(_ error: Error) -> String {
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain
+                && nsError.code == NSUserCancelledError {
+            return "USER_CANCELED\tthe user closed the add-device sheet"
+        }
+        let message = nsError.localizedDescription
+            .replacingOccurrences(of: "\t", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+        return "COMMISSIONING_FAILED\t" + message
+    }
+
+    private static func deliver(requestId: Int32, structureId: String,
+                                error: String?) {
+        var result: [String: Any] = ["requestId": NSNumber(value: requestId)]
+        if !structureId.isEmpty {
+            result["structureId"] = structureId
+        }
+        if let error = error {
+            result["error"] = error
+        }
+        guard let bridge: AnyClass = NSClassFromString("CN1MatterBridge") else {
+            // The Objective-C half is missing, which means the build enabled
+            // Matter setup without the smart-home natives. Nothing can be
+            // reported, and there is nowhere to report it to -- so this is
+            // the one silent failure in the file, and it cannot happen in a
+            // build the builder produced.
+            return
+        }
+        _ = (bridge as AnyObject).perform(NSSelectorFromString("deliver:"),
+                                          with: result)
+    }
+}
+
+#endif
