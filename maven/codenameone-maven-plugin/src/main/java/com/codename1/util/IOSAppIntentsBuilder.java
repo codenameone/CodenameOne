@@ -359,7 +359,13 @@ public final class IOSAppIntentsBuilder {
             // Declared destructive, so the platform confirms before anything happens.
             sb.append("        try await requestConfirmation()\n");
         }
-        sb.append("        var params: [String: Any] = [:]\n");
+        // `let` when nothing will be put in it. Swift warns on a `var` that is never mutated,
+        // and an intent that takes no parameters produces exactly that -- a warning in a file
+        // the developer never wrote and cannot fix, in a project that may well build with
+        // warnings as errors.
+        sb.append(params.isEmpty()
+                ? "        let params: [String: Any] = [:]\n"
+                : "        var params: [String: Any] = [:]\n");
         for (Map<String, Object> p : params) {
             String name = str(p, "name");
             String type = str(p, "type");
