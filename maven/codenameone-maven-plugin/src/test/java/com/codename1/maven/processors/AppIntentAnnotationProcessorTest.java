@@ -33,6 +33,8 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.FileReader;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
@@ -105,6 +107,44 @@ public class AppIntentAnnotationProcessorTest {
         assertFalse(new File(classes, BOOTSTRAP_PATH).exists());
         assertTrue("nothing to declare means no manifest to write",
                 ctx.getEmittedResources().isEmpty());
+    }
+
+    /// An application's own intents.json is not this feature's to touch.
+    ///
+    /// The generated manifest used to sit at the jar root, which is where the resources phase
+    /// copies src/main/resources/intents.json. Building an app that has one and declares no
+    /// intent then ran deleteGenerated over the root path and removed the application's asset
+    /// -- silently, on a plugin upgrade, in a project that never used this feature. Reading it
+    /// as framework metadata would have been the milder version of the same mistake.
+    @Test
+    public void anApplicationsOwnRootManifestIsLeftAlone() throws Exception {
+        File classes = compile("package com.example;\n"
+                + "public class Plain { public void nothing() {} }\n");
+
+        // What the resources phase would have put there.
+        File theirs = new File(classes, "intents.json");
+        FileWriter w = new FileWriter(theirs);
+        try {
+            w.write("{\"mine\":true}");
+        } finally {
+            w.close();
+        }
+
+        run(classes, true);
+
+        assertTrue("the application's own intents.json was deleted", theirs.isFile());
+        StringBuilder sb = new StringBuilder();
+        FileReader r = new FileReader(theirs);
+        try {
+            int c;
+            while ((c = r.read()) != -1) {
+                sb.append((char) c);
+            }
+        } finally {
+            r.close();
+        }
+        assertEquals("the application's own intents.json was overwritten",
+                "{\"mine\":true}", sb.toString());
     }
 
     @Test
@@ -1838,7 +1878,7 @@ public class AppIntentAnnotationProcessorTest {
 
     private static String manifest(ProcessorContext ctx) {
         Map<String, byte[]> res = new LinkedHashMap<String, byte[]>(ctx.getEmittedResources());
-        byte[] bytes = res.get("intents.json");
+        byte[] bytes = res.get("META-INF/codenameone/intents.json");
         assertTrue("intents.json must be emitted", bytes != null);
         return new String(bytes, Charset.forName("UTF-8"));
     }

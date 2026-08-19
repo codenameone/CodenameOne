@@ -5304,7 +5304,11 @@ public class IPhoneBuilder extends Executor {
         if (!usesIntents) {
             return;
         }
-        File manifest = new File(resDir, "intents.json");
+        // Namespaced: the root belongs to the application, and an app with its own
+        // intents.json must not have it read as framework metadata. See MANIFEST_RESOURCE in
+        // AppIntentAnnotationProcessor. Only this path is read -- falling back to the root
+        // would reintroduce exactly the collision the namespace exists to prevent.
+        File manifest = new File(resDir, "META-INF/codenameone/intents.json");
         if (!manifest.exists()) {
             // Legitimate: the app indexes content or donates shortcuts without declaring any
             // @AppIntent, so the processor had nothing to emit.

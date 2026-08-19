@@ -52,7 +52,11 @@ class AndroidIntentShortcutsTest {
         assets.mkdirs();
         res.mkdirs();
         if (manifestJson != null) {
-            FileWriter w = new FileWriter(new File(assets, "intents.json"));
+            // The generated manifest is namespaced under META-INF so it cannot collide with an
+            // application's own intents.json; the builder reads only that path.
+            File manifestDir = new File(assets, "META-INF/codenameone");
+            manifestDir.mkdirs();
+            FileWriter w = new FileWriter(new File(manifestDir, "intents.json"));
             try {
                 w.write(manifestJson);
             } finally {

@@ -7421,7 +7421,10 @@ public class AndroidGradleBuilder extends Executor {
         entries.append("        <service android:name=\"com.codename1.impl.android.intents.CN1IntentService\"\n")
                 .append("                 android:exported=\"false\" />\n");
 
-        File manifest = new File(assetsDir, "intents.json");
+        // Namespaced, and only this path: the assets root is the application's, so reading
+        // intents.json from it would treat an app's own asset as framework metadata. See
+        // MANIFEST_RESOURCE in AppIntentAnnotationProcessor.
+        File manifest = new File(assetsDir, "META-INF/codenameone/intents.json");
         if (!manifest.exists()) {
             return entries.toString();
         }

@@ -87,7 +87,20 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     static final String REGISTRY_SIMPLE = "IntentRegistry";
     static final String BOOTSTRAP_PACKAGE = "cn1app";
     static final String BOOTSTRAP_SIMPLE = "IntentBootstrap";
-    static final String MANIFEST_RESOURCE = "intents.json";
+    /// Where the generated manifest is written inside the jar.
+    ///
+    /// Namespaced rather than sitting at the root, because the root is the application's. An
+    /// app with its own src/main/resources/intents.json has it copied to target/classes by the
+    /// resources phase, and this processor would then overwrite it -- or, worse, delete it in
+    /// deleteGenerated() when the app declares no intents at all. That is an application which
+    /// never used this feature silently losing one of its own assets on a plugin upgrade,
+    /// which no build-time convenience is worth.
+    ///
+    /// META-INF is the established place for exactly this: metadata a tool owns rather than
+    /// content the application authored. The path survives the trip to the builders unchanged,
+    /// because Executor.unzip routes every non-class, non-source, non-lib entry through
+    /// resolveArchiveEntry, which preserves the entry's relative path under the resource root.
+    static final String MANIFEST_RESOURCE = "META-INF/codenameone/intents.json";
 
     private static final String INTENT_RESULT_BINARY = "com.codename1.intents.IntentResult";
     private static final String INTENT_CONTEXT_DESC = "Lcom/codename1/intents/IntentContext;";

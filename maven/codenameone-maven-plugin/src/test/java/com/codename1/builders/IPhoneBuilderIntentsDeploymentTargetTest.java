@@ -84,7 +84,10 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
     }
 
     private static File manifest(Path dir, String json) throws IOException {
-        File f = new File(dir.toFile(), "intents.json");
+        // Namespaced under META-INF, which is the only path the builder reads.
+        File d = new File(dir.toFile(), "META-INF/codenameone");
+        d.mkdirs();
+        File f = new File(d, "intents.json");
         FileWriter w = new FileWriter(f);
         try {
             w.write(json);
