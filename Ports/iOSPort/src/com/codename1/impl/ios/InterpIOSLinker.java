@@ -113,15 +113,14 @@ public class InterpIOSLinker implements InterpLinker {
         if (id < 0) {
             return;
         }
-        initializeDefaultBearing(id, new java.util.Hashtable(), true);
+        initializeDefaultBearing(id, new java.util.Hashtable());
     }
 
     /// Superinterfaces first, then the interface itself when it declares a
     /// default method. Bounded by what has been seen: an interface hierarchy is
     /// a DAG whose diamonds would otherwise be walked twice, and a depth cap
     /// would answer wrongly on a hierarchy that is merely deep.
-    private void initializeDefaultBearing(int classId, java.util.Hashtable visited,
-                                          boolean root) {
+    private void initializeDefaultBearing(int classId, java.util.Hashtable visited) {
         Integer key = Integer.valueOf(classId);
         if (visited.get(key) != null) {
             return;
@@ -130,12 +129,15 @@ public class InterpIOSLinker implements InterpLinker {
         int[] ifaces = symbols.interfacesOf(classId);
         if (ifaces != null) {
             for (int i = 0; i < ifaces.length; i++) {
-                initializeDefaultBearing(ifaces[i], visited, false);
+                initializeDefaultBearing(ifaces[i], visited);
             }
         }
-        // The class this walk started from is initialized by initializeClass;
-        // only the interfaces above it are this method's business.
-        if (!root && symbols.declaresDefaultMethod(classId)) {
+        // Including the one this walk started from: the caller passes an
+        // interface the interpreted class implements directly, not the class
+        // itself, and that interface is as much a candidate as its ancestors.
+        // Only an interface is ever marked, so a class row cannot be caught by
+        // this -- and the class's own initializer is initializeClass's job.
+        if (symbols.declaresDefaultMethod(classId)) {
             InterpIOSNative.initializeClassById(classId);
         }
     }
