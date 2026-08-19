@@ -31,7 +31,9 @@ import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -158,6 +160,58 @@ class VisionApiTest extends UITestBase {
         assertEquals(3, backend.options.getMaximumResults());
         recognizer.close();
         assertEquals(1, backend.closeCount);
+    }
+
+    @Test
+    void textScriptDefaultsToNullAndSurvivesTheOptionSnapshot() {
+        RecordingVisionImpl backend = new RecordingVisionImpl();
+        implementation.setVisionImpl(backend);
+        assertNull(new VisionOptions().getTextScript(),
+                "No script means the platform default, not an assumed Latin");
+
+        VisionOptions options = new VisionOptions()
+                .textScript(TextScript.japanese());
+        TextRecognizer recognizer = new TextRecognizer(options);
+        // Mutating the caller's options after construction must not reach the
+        // port: the analyzer holds its own snapshot.
+        options.textScript(TextScript.korean());
+        await(recognizer.process(VisionImage.encoded(new byte[] {1})));
+
+        assertSame(TextScript.japanese(), backend.options.getTextScript());
+        assertEquals("japanese", backend.options.getTextScript().getId());
+        recognizer.close();
+    }
+
+    @Test
+    void everyTextScriptHasItsOwnStableIdentifier() {
+        // The ids are a port-boundary contract: the Android adapter class and
+        // the Apple recognition languages are both selected from them.
+        assertEquals("latin", TextScript.latin().getId());
+        assertEquals("chinese", TextScript.chinese().getId());
+        assertEquals("devanagari", TextScript.devanagari().getId());
+        assertEquals("japanese", TextScript.japanese().getId());
+        assertEquals("korean", TextScript.korean().getId());
+        assertEquals("korean", TextScript.korean().toString());
+
+        Set<String> ids = new HashSet<String>();
+        TextScript[] all = {TextScript.latin(), TextScript.chinese(),
+                TextScript.devanagari(), TextScript.japanese(),
+                TextScript.korean()};
+        for (TextScript script : all) {
+            assertTrue(ids.add(script.getId()), script.getId());
+        }
+    }
+
+    @Test
+    void nullTextScriptRestoresThePlatformDefault() {
+        RecordingVisionImpl backend = new RecordingVisionImpl();
+        implementation.setVisionImpl(backend);
+        TextRecognizer recognizer = new TextRecognizer(new VisionOptions()
+                .textScript(TextScript.chinese())
+                .textScript(null));
+        await(recognizer.process(VisionImage.encoded(new byte[] {1})));
+        assertNull(backend.options.getTextScript());
+        recognizer.close();
     }
 
     @Test

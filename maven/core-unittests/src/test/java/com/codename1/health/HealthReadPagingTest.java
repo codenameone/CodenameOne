@@ -22,7 +22,7 @@
  */
 package com.codename1.health;
 
-import com.codename1.impl.health.OneShot;
+import com.codename1.impl.async.OneShot;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;

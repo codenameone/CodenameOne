@@ -341,7 +341,7 @@ public class LocalHealthStore extends HealthStore {
     ///
     /// Named for what it does rather than where it runs, because it no longer
     /// decides that. The resource these operations complete is an
-    /// [EdtResult], so the delivery lands on the EDT whichever thread gets
+    /// [com.codename1.impl.async.EdtResult], so the delivery lands on the EDT whichever thread gets
     /// here -- matching the mobile ports instead of answering on whoever
     /// called, which is what made the same app code work on a phone and
     /// glitch on the desktop.

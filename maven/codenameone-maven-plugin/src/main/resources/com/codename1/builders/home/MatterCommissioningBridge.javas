@@ -1,0 +1,703 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android.home;
+
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.IntentSender;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.provider.Settings;
+
+import com.codename1.impl.android.AndroidNativeUtil;
+import com.codename1.impl.android.AndroidSmartHomeSupport;
+import com.codename1.impl.android.CodenameOneActivity;
+import com.codename1.impl.android.IntentResultListener;
+import com.codename1.impl.android.SmartHomeDelegate;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.home.matter.Matter;
+import com.google.android.gms.home.matter.commissioning.CommissioningRequest;
+import com.google.android.gms.home.matter.commissioning.CommissioningResult;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+
+/**
+ * The Google Play services half of {@code com.codename1.home} on Android.
+ *
+ * <p>The build server copies this file into the application's own source tree
+ * and weaves a {@code register()} call into the generated activity, but only
+ * for apps whose bytecode references {@code com.codename1.home}. Everything it
+ * touches -- Play services, the Matter commissioning API -- is on the app's
+ * Gradle classpath and not on the port's, which is why it lives here rather
+ * than in {@code Ports/Android}.</p>
+ *
+ * <h2>It reports COMMISSIONING_ONLY, and that is the honest answer</h2>
+ *
+ * <p>Play services can add a Matter accessory to the user's Google Home with
+ * no setup at all: no account linking, no Cloud project, no console
+ * registration. What it cannot do is let this app <em>see</em> or
+ * <em>control</em> that accessory afterwards -- the graph belongs to Google
+ * Home, and reading it needs the Google Home APIs, a Google Cloud project and
+ * a Home Developer Console registration carrying the SHA-1 of the developer's
+ * own signing key. None of that can be shipped on their behalf.</p>
+ *
+ * <p>So the graph here is empty and
+ * {@code HomeAvailability.COMMISSIONING_ONLY} is what
+ * {@code SmartHome.getAvailability()} reports. Reporting {@code AVAILABLE}
+ * would make the constant mean something entirely different on Android than
+ * on iOS, and an app written against the iOS meaning would render an empty
+ * house with no explanation.</p>
+ *
+ * <h2>The flow is an Activity result</h2>
+ *
+ * <p>{@code CommissioningClient.commissionDevice} answers with an
+ * {@code IntentSender} rather than doing anything, because the interaction
+ * belongs to Play services' own UI. This class starts it, parks the callback,
+ * and reads {@code CommissioningResult.fromIntentSenderResult} back out of
+ * {@code onActivityResult}.</p>
+ */
+public final class MatterCommissioningBridge implements SmartHomeDelegate {
+
+    /**
+     * The request code the commissioning activity comes back on.
+     *
+     * <p>Deliberately high and specific. {@code IntentResultListener} reserves
+     * the low numbers for the framework's own captures, and colliding with one
+     * would route a camera result into this class.</p>
+     */
+    private static final int REQUEST_COMMISSION = 0x51A7;
+
+    private static final String[] NOTHING = new String[0];
+
+    /** com.codename1.home.HomeAvailability ordinals. */
+    private static final int AVAIL_COMMISSIONING_ONLY = 1;
+    private static final int AVAIL_PROVIDER_NOT_INSTALLED = 6;
+    private static final int AVAIL_PROVIDER_UPDATE_REQUIRED = 7;
+
+    /** com.codename1.home.HomeAuthorizationStatus ordinals. */
+    private static final int AUTH_AUTHORIZED = 1;
+    private static final int AUTH_UNKNOWN = 4;
+
+    /** com.codename1.home.commissioning.CommissioningStyle ordinals. */
+    private static final int STYLE_OS_OWNED_UI = 0;
+    private static final int STYLE_APP_HANDOFF = 1;
+
+    private static final String GOOGLE_HOME_PACKAGE =
+            "com.google.android.apps.chromecast.app";
+
+    /// Guards every read and write of the commissioning state below.
+    ///
+    /// commission() and stop() arrive on the Codename One EDT while the Play
+    /// services listeners and the activity result arrive on Android's main
+    /// thread. Unsynchronized, a task completing as a new request starts
+    /// could read a stale generation and answer -- or clear -- the callback
+    /// that belongs to the new request, and the two threads had no ordering
+    /// between them at all: neither would reliably see the other's writes.
+    private final Object commissionLock = new Object();
+
+    private Callback pendingCommission;
+    /// Which request the parked callback belongs to.
+    ///
+    /// Play services prepares the IntentSender asynchronously, so a stop()
+    /// or a timeout can clear the callback while that task is still running.
+    /// Without an identity the task's listener would then find whatever
+    /// callback happened to be parked next and report ITS request's outcome
+    /// to a caller that asked for something else -- and on success open the
+    /// old request's sheet.
+    private int commissionGeneration;
+    /// When the parked request's own limit expires, or 0 when it has none.
+    ///
+    /// A CommissioningRequest timeout fails the waiting caller in the
+    /// framework, which knows nothing about this field -- so a request Play
+    /// services never answers at all left the callback parked here forever
+    /// and every later commission() refused with BUSY for the life of the
+    /// process, with no screen in front of the user to justify it.
+    private long commissionDeadline;
+    /// Whether the add-device screen actually went up for the parked request.
+    ///
+    /// Expiry only frees this bridge while nothing was launched. Once the
+    /// sheet is on the user's screen the flow is theirs to finish or cancel,
+    /// and it answers through the activity result -- reclaiming the slot then
+    /// would hand that answer to whoever asked next.
+    private boolean commissionLaunched;
+
+    private MatterCommissioningBridge() {
+    }
+
+    /**
+     * Publishes this bridge to the port. Called from the generated activity's
+     * {@code onCreate}.
+     */
+    public static void register() {
+        AndroidSmartHomeSupport.setDelegate(new MatterCommissioningBridge());
+    }
+
+    @Override
+    public void setEventSink(EventSink sink) {
+        // Nothing to push. There is no graph to change and no trait to watch,
+        // so this backend never produces an unsolicited event; holding the
+        // sink would only suggest otherwise.
+    }
+
+    @Override
+    public String backendId() {
+        // What this delegate IS, whatever Play services is doing right now.
+        // It commissions and nothing else: there is no Google Home graph
+        // behind it, so calling it "google_home" whenever the provider is
+        // missing or out of date named the one backend it is not, in exactly
+        // the situation an app is trying to explain to its user.
+        return "matter_only";
+    }
+
+    @Override
+    public int availability() {
+        int status = GoogleApiAvailability.getInstance()
+                .isGooglePlayServicesAvailable(AndroidNativeUtil.getContext());
+        if (status == ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED) {
+            return AVAIL_PROVIDER_UPDATE_REQUIRED;
+        }
+        if (status != ConnectionResult.SUCCESS) {
+            return AVAIL_PROVIDER_NOT_INSTALLED;
+        }
+        return AVAIL_COMMISSIONING_ONLY;
+    }
+
+    @Override
+    public int authorizationStatus() {
+        // Commissioning needs no grant from this app's point of view: Play
+        // services runs the whole interaction and asks the user itself. There
+        // is nothing to have been authorized, so AUTHORIZED is reported when
+        // the provider is usable and UNKNOWN otherwise -- rather than
+        // NOT_DETERMINED, which would send an app into a permission flow that
+        // has nothing to prompt for.
+        return availability() == AVAIL_COMMISSIONING_ONLY ? AUTH_AUTHORIZED
+                : AUTH_UNKNOWN;
+    }
+
+    @Override
+    public String[] configurationProblems() {
+        // Not a problem, and said here because this is the only channel that
+        // reaches a developer looking at why the house is empty. The text is
+        // for them, never for a user.
+        return new String[] {
+            "This build includes Matter commissioning but not the Google Home "
+            + "APIs, so accessories can be added and not read or controlled. "
+            + "The accessory graph needs a Google Cloud project and a Home "
+            + "Developer Console registration carrying your signing key's "
+            + "SHA-1, which Codename One cannot create on your behalf."
+        };
+    }
+
+    @Override
+    public void start(Callback callback) {
+        callback.onSuccess(NOTHING);
+    }
+
+    @Override
+    public void stop() {
+        synchronized (commissionLock) {
+            pendingCommission = null;
+            commissionDeadline = 0;
+            commissionLaunched = false;
+            // Anything still in flight now belongs to nobody.
+            commissionGeneration++;
+        }
+    }
+
+    @Override
+    public void requestAuthorization(Callback callback) {
+        callback.onSuccess(NOTHING);
+    }
+
+    @Override
+    public boolean openHomeSettings() {
+        Activity activity = AndroidNativeUtil.getActivity();
+        if (activity == null) {
+            return false;
+        }
+        try {
+            Intent intent = new Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + activity.getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(intent);
+            return true;
+        } catch (ActivityNotFoundException noSettings) {
+            // Some heavily customized builds have no app-details screen.
+            // Answering false lets the caller say so rather than promising a
+            // trip that never happened.
+            return false;
+        }
+    }
+
+    @Override
+    public boolean openEcosystemApp() {
+        Activity activity = AndroidNativeUtil.getActivity();
+        if (activity == null) {
+            return false;
+        }
+        PackageManager packages = activity.getPackageManager();
+        Intent launch = packages.getLaunchIntentForPackage(
+                GOOGLE_HOME_PACKAGE);
+        if (launch == null) {
+            return false;
+        }
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        activity.startActivity(launch);
+        return true;
+    }
+
+    @Override
+    public boolean openProviderSetup() {
+        Activity activity = AndroidNativeUtil.getActivity();
+        if (activity == null) {
+            return false;
+        }
+        GoogleApiAvailability availability =
+                GoogleApiAvailability.getInstance();
+        int status = availability.isGooglePlayServicesAvailable(activity);
+        if (status == ConnectionResult.SUCCESS) {
+            return false;
+        }
+        // Play services owns the wording and the destination -- install,
+        // update or enable, depending on which of those is wrong. Sending the
+        // user to a hard-coded Play listing would be right only sometimes.
+        return availability.isUserResolvableError(status)
+                && availability.showErrorDialogFragment(activity, status, 0);
+    }
+
+    // ------------------------------------------------------------------
+    // No graph
+    // ------------------------------------------------------------------
+
+    @Override
+    public String[] structures() {
+        return NOTHING;
+    }
+
+    @Override
+    public String[] rooms(String structureId) {
+        return NOTHING;
+    }
+
+    @Override
+    public String[] accessories(String structureId) {
+        return NOTHING;
+    }
+
+    @Override
+    public String[] services(String accessoryId) {
+        return NOTHING;
+    }
+
+    @Override
+    public String[] traits(String accessoryId, String serviceId) {
+        return NOTHING;
+    }
+
+    @Override
+    public void refresh(Callback callback) {
+        callback.onSuccess(NOTHING);
+    }
+
+    @Override
+    public void readTraits(String[] accessoryIds, String[] serviceIds,
+            String[] traitIds, boolean allowCached, Callback callback) {
+        callback.onError("NOT_SUPPORTED", graphUnavailable());
+    }
+
+    @Override
+    public void writeTraits(String[] accessoryIds, String[] serviceIds,
+            String[] traitIds, int[] kinds, double[] numericValues,
+            String[] stringValues, int[] unitWireIds,
+            String[] authorizationData, Callback callback) {
+        callback.onError("NOT_SUPPORTED", graphUnavailable());
+    }
+
+    @Override
+    public boolean isPushDelivery() {
+        return false;
+    }
+
+    @Override
+    public void subscribe(String subscriptionId, String[] accessoryIds,
+            String[] serviceIds, String[] traitIds, Callback callback) {
+        callback.onError("NOT_SUPPORTED", graphUnavailable());
+    }
+
+    @Override
+    public void unsubscribe(String subscriptionId) {
+    }
+
+    @Override
+    public void drainChanges(Callback callback) {
+        callback.onSuccess(new String[] {"0"});
+    }
+
+    @Override
+    public String[] scenes(String structureId) {
+        return NOTHING;
+    }
+
+    @Override
+    public String[] sceneActions(String structureId, String sceneId) {
+        return NOTHING;
+    }
+
+    @Override
+    public void executeScene(String structureId, String sceneId,
+            Callback callback) {
+        callback.onError("NOT_SUPPORTED", graphUnavailable());
+    }
+
+    @Override
+    public void createScene(String structureId, String name,
+            String[] accessoryIds, String[] serviceIds, String[] traitIds,
+            int[] kinds, double[] numericValues, String[] stringValues,
+            int[] unitWireIds, Callback callback) {
+        callback.onError("NOT_SUPPORTED", graphUnavailable());
+    }
+
+    @Override
+    public void deleteScene(String structureId, String sceneId,
+            Callback callback) {
+        callback.onError("NOT_SUPPORTED", graphUnavailable());
+    }
+
+    @Override
+    public void identify(String accessoryId, Callback callback) {
+        callback.onError("NOT_SUPPORTED", graphUnavailable());
+    }
+
+    private static String graphUnavailable() {
+        return "this build can commission Matter accessories but cannot read "
+                + "or control them; see SmartHome.getConfigurationProblems()";
+    }
+
+    // ------------------------------------------------------------------
+    // Commissioning
+    // ------------------------------------------------------------------
+
+    @Override
+    public int commissioningStyle() {
+        return availability() == AVAIL_COMMISSIONING_ONLY ? STYLE_OS_OWNED_UI
+                : STYLE_APP_HANDOFF;
+    }
+
+    @Override
+    public void commission(String setupPayload, String structureId,
+            String roomId, String suggestedName, int timeoutMillis,
+            final Callback callback) {
+        final Activity activity = AndroidNativeUtil.getActivity();
+        if (activity == null || !(activity instanceof CodenameOneActivity)) {
+            callback.onError("COMMISSIONING_UNAVAILABLE",
+                    "there is no activity to run the add-device flow in");
+            return;
+        }
+        if (((CodenameOneActivity) activity).isWaitingForResult()) {
+            // Some other flow -- a camera, a file picker -- owns the
+            // activity's result channel, and registering a listener while it
+            // does is silently ignored. Launching anyway sends the Matter
+            // sheet's result to that flow and leaves this one waiting for an
+            // answer that was handed to somebody else.
+            callback.onError("BUSY",
+                    "another screen is already waiting for a result; try"
+                            + " again once it has finished");
+            return;
+        }
+        int startedGeneration;
+        long startedDeadline;
+        // One critical section decides whether this request may start, and
+        // claims the slot if it may. Read and then written in two steps, the
+        // check and the claim raced each other: two callers could both find
+        // the slot free and the second would replace the first's parked
+        // callback, which is the caller that then never heard anything.
+        synchronized (commissionLock) {
+            if (pendingCommission != null && expiredWithNoScreen()) {
+                // The parked request asked for a limit, that limit has passed
+                // and no add-device screen ever went up: Play services
+                // answered neither its success nor its failure listener. The
+                // framework already failed that caller with TIMEOUT, so
+                // nothing is waiting on this callback and no screen is in
+                // front of the user -- and without this the slot stayed
+                // occupied for the life of the process and every later
+                // request was refused with BUSY.
+                pendingCommission = null;
+                commissionDeadline = 0;
+                // So the abandoned request's IntentSender, if it ever
+                // arrives, is dropped rather than opening a sheet for this
+                // one.
+                commissionGeneration++;
+            }
+            if (pendingCommission != null) {
+                // Play services shows one add-device UI at a time, and a
+                // second request would replace the parked callback so the
+                // first caller never heard anything. Refused, which is a
+                // failure they can see.
+                //
+                // This is cleared when the sheet returns, whatever it
+                // returns. A CommissioningRequest timeout fails the waiting
+                // caller in the framework rather than here, because nothing
+                // in this API can close a sheet Play services owns -- so a
+                // limit that expires frees the caller, and this stays refused
+                // while the user is actually looking at the screen in front
+                // of them.
+                startedGeneration = -1;
+                startedDeadline = 0;
+            } else {
+                pendingCommission = callback;
+                commissionLaunched = false;
+                startedGeneration = ++commissionGeneration;
+                // The caller's own limit, kept so a sender that arrives after
+                // it has expired is dropped rather than opening a sheet for a
+                // request the framework has already failed with TIMEOUT. Zero
+                // means no limit, which is the default and the usual case --
+                // somebody adding an accessory may be up a ladder.
+                startedDeadline = timeoutMillis > 0
+                        ? System.currentTimeMillis() + timeoutMillis : 0;
+                commissionDeadline = startedDeadline;
+            }
+        }
+        // Outside the lock: a callback runs application code, and holding a
+        // lock across it invites the app's own thread back in behind it.
+        if (startedGeneration < 0) {
+            callback.onError("BUSY",
+                    "an add-device flow is already running");
+            return;
+        }
+        CommissioningRequest.Builder request = CommissioningRequest.builder();
+        if (setupPayload != null && setupPayload.length() > 0) {
+            // Skips the scan step for a code the app already read. Play
+            // services validates it and falls back to asking the user when it
+            // does not like it, so a bad payload costs a step rather than the
+            // whole flow.
+            request.setOnboardingPayload(setupPayload);
+        }
+        if (suggestedName != null && suggestedName.length() > 0) {
+            request.setDeviceNameHint(suggestedName);
+        }
+        final int generation = startedGeneration;
+        final long deadline = startedDeadline;
+        final CommissioningRequest built = request.build();
+        Matter.getCommissioningClient(activity)
+                .commissionDevice(built)
+                .addOnSuccessListener(new OnSuccessListener<IntentSender>() {
+                    @Override
+                    public void onSuccess(IntentSender sender) {
+                        synchronized (commissionLock) {
+                            if (generation != commissionGeneration) {
+                                // Stopped, timed out or superseded while this
+                                // was being prepared. Dropped rather than
+                                // answered: the caller it belonged to is
+                                // gone, and whoever is parked now asked for
+                                // something else.
+                                return;
+                            }
+                        }
+                        if (deadline > 0
+                                && System.currentTimeMillis() > deadline) {
+                            Callback waiting = claimCommission(generation);
+                            if (waiting != null) {
+                                waiting.onError("TIMEOUT",
+                                        "the add-device screen took longer to"
+                                                + " prepare than the requested"
+                                                + " limit");
+                            }
+                            return;
+                        }
+                        launch(activity, sender, generation);
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(Exception failure) {
+                        // Nothing was launched, so no listener was registered
+                        // and there is nothing to restore here.
+                        Callback waiting = claimCommission(generation);
+                        if (waiting != null) {
+                            waiting.onError("COMMISSIONING_FAILED",
+                                    failure.getMessage());
+                        }
+                    }
+                });
+    }
+
+    /// Takes the parked callback if GENERATION still owns it, leaving the
+    /// slot free.
+    ///
+    /// The generation check and the hand-off are one step on purpose: read
+    /// apart, a task finishing as a new request starts could see the check
+    /// pass and then clear the callback the new request had just parked.
+    ///
+    /// @param generation the request the caller belongs to
+    /// @return the callback to answer, or null when it is somebody else's
+    private Callback claimCommission(int generation) {
+        synchronized (commissionLock) {
+            if (generation != commissionGeneration) {
+                return null;
+            }
+            Callback waiting = pendingCommission;
+            pendingCommission = null;
+            commissionDeadline = 0;
+            return waiting;
+        }
+    }
+
+    /// Whether the parked request has passed its own limit without ever
+    /// putting a screen in front of the user.
+    ///
+    /// A request with no limit never expires -- somebody adding an accessory
+    /// may be up a ladder, and the caller asked for exactly that. Called with
+    /// commissionLock held.
+    private boolean expiredWithNoScreen() {
+        return commissionDeadline > 0 && !commissionLaunched
+                && System.currentTimeMillis() > commissionDeadline;
+    }
+
+    private void launch(final Activity activity, IntentSender sender,
+            final int generation) {
+        final CodenameOneActivity cn1 = (CodenameOneActivity) activity;
+        Callback refused = null;
+        String refusedError = null;
+        String refusedMessage = null;
+        // The whole launch under the lock, decision and screen together.
+        // Decided and then acted on, a stop() landing in between still opened
+        // the sheet: the result channel was taken for a request that no
+        // longer existed, so whatever started next was answered BUSY by a
+        // screen nobody was waiting on, and the sheet's own answer was
+        // discarded when it finally came back. Nothing in here calls
+        // application code, and the other holders of this lock do a handful
+        // of field writes each.
+        synchronized (commissionLock) {
+            if (generation != commissionGeneration) {
+                // Stopped or superseded while Play services was preparing the
+                // sender. Nothing to answer and nothing to open.
+                return;
+            }
+            if (cn1.isWaitingForResult()) {
+                // Re-checked here, not only in commission(): the Play
+                // services call that produces this IntentSender is
+                // asynchronous, and another screen can take the result
+                // channel while it runs. Registering then is silently
+                // ignored, so launching anyway hands this flow's result to
+                // that screen.
+                refused = claimCommission(generation);
+                refusedError = "BUSY";
+                refusedMessage = "another screen took over while the"
+                        + " add-device screen was being prepared";
+            } else {
+                cn1.setIntentResultListener(
+                        commissionResultListener(cn1, generation));
+                try {
+                    // Through the activity's own override, which resets the
+                    // queued results the way startActivityForResult does.
+                    // Called on the raw Activity it would be the inherited
+                    // one, and a second run of this flow would be answered
+                    // with the first run's outcome.
+                    cn1.startIntentSenderForResult(sender, REQUEST_COMMISSION,
+                            null, 0, 0, 0);
+                    // Set once the screen is really up, and this is the point
+                    // after which an expiring limit no longer frees the slot:
+                    // the answer is the user's to give now, and it arrives
+                    // through the listener registered above.
+                    commissionLaunched = true;
+                } catch (IntentSender.SendIntentException cannotStart) {
+                    cn1.restoreIntentResultListener();
+                    refused = claimCommission(generation);
+                    refusedError = "COMMISSIONING_FAILED";
+                    refusedMessage = cannotStart.getMessage();
+                }
+            }
+        }
+        // Outside the lock: a callback runs application code, which can come
+        // straight back in here.
+        if (refused != null) {
+            refused.onError(refusedError, refusedMessage);
+        }
+    }
+
+    /// The activity result listener for one launched request.
+    ///
+    /// Its own method rather than an anonymous block inside the synchronized
+    /// launch, so the body it needs is not four levels deep.
+    ///
+    /// @param cn1 the activity the sheet was launched from
+    /// @param generation the request this sheet belongs to
+    /// @return the listener to register
+    private IntentResultListener commissionResultListener(
+            final CodenameOneActivity cn1, final int generation) {
+        return new IntentResultListener() {
+            @Override
+            public void onActivityResult(int requestCode, int resultCode,
+                    Intent data) {
+                if (requestCode != REQUEST_COMMISSION) {
+                    return;
+                }
+                // Before anything else, and on every path out of here. The
+                // activity latches waitingForResult when a listener is
+                // registered and ignores every later registration until this
+                // clears it -- so skipping it does not just leak this
+                // listener, it silently breaks the camera, the scanner and
+                // the file picker for the rest of the process.
+                cn1.restoreIntentResultListener();
+                // This flow's own callback, or nothing: a stop() between the
+                // launch and the answer means the parked callback belongs to
+                // whoever came next, and handing them this sheet's outcome
+                // would answer a request they never made.
+                Callback waiting = claimCommission(generation);
+                if (waiting == null) {
+                    return;
+                }
+                if (resultCode != Activity.RESULT_OK) {
+                    // By far the most common outcome, and not an error worth
+                    // dressing as one: people change their mind halfway up a
+                    // ladder.
+                    waiting.onError("USER_CANCELED",
+                            "the user closed the add-device screen");
+                    return;
+                }
+                try {
+                    CommissioningResult result =
+                            CommissioningResult.fromIntentSenderResult(
+                                    resultCode, data);
+                    // No accessory id, and that is the point. The device
+                    // joined the user's Google Home and this app is told its
+                    // name and nothing more -- which is what
+                    // CommissioningResult.wasCommissionedToThisApp() exists to
+                    // make un-missable on the Java side.
+                    String name = result.getDeviceName() == null ? ""
+                            : result.getDeviceName();
+                    waiting.onSuccess(new String[] {"\t" + name + "\t\t0"});
+                } catch (Exception badResult) {
+                    waiting.onError("COMMISSIONING_FAILED",
+                            badResult.getMessage());
+                }
+            }
+        };
+    }
+
+}

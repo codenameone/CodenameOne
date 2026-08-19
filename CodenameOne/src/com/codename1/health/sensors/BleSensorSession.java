@@ -36,7 +36,7 @@ import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 
 import java.util.List;
-import com.codename1.impl.health.EdtResult;
+import com.codename1.impl.async.EdtResult;
 
 /// The GATT transport behind [SensorSession]: connects, discovers the
 /// profile's service, subscribes to its measurement characteristic and
