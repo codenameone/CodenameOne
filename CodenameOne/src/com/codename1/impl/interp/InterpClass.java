@@ -133,6 +133,10 @@ public final class InterpClass {
 
     String sourceFile;
 
+    /// What javac's InnerClasses attribute called this class, or null when it
+    /// recorded none -- a top-level class, or an anonymous one.
+    String simpleName;
+
     InterpClass(String name) {
         this.name = name;
     }

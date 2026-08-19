@@ -48,7 +48,7 @@ public final class InterpBundle {
     /// Bundle format version. The runtime refuses anything it does not know,
     /// because a bundle is pushed from a machine whose SDK moves independently
     /// of the installed app.
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
 
     /// Extern kinds -- what a reference into the host app names.
     public static final int EXTERN_CLASS = 0;

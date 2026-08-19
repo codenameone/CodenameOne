@@ -62,7 +62,7 @@ import java.util.Map;
  */
 public class InterpBundleWriter {
     private static final int MAGIC = 0x434E3149;
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
 
     private static final int EXTERN_CLASS = 0;
     private static final int EXTERN_METHOD = 1;
@@ -318,10 +318,40 @@ public class InterpBundleWriter {
         return idx;
     }
 
+    /**
+     * The simple name javac recorded for a class, or "" when it has none.
+     *
+     * <p>An anonymous class answers "" here and the runtime reports "" for it,
+     * which is what {@code Class.getSimpleName()} does. A class with no
+     * InnerClasses entry naming itself is top-level, and its simple name is the
+     * last segment of its binary name -- which the runtime can work out, so
+     * this writes "" for that too rather than paying for a string.</p>
+     */
+    private static String simpleNameOf(ClassNode cn) {
+        if (cn.innerClasses == null) {
+            return "";
+        }
+        for (Object o : cn.innerClasses) {
+            org.objectweb.asm.tree.InnerClassNode icn = (org.objectweb.asm.tree.InnerClassNode) o;
+            if (cn.name.equals(icn.name)) {
+                return icn.innerName == null ? "" : icn.innerName;
+            }
+        }
+        return "";
+    }
+
     private void writeClass(DataOutputStream out, ClassNode cn) throws IOException {
         out.writeInt(intern(cn.name));
         out.writeInt(cn.access);
         out.writeUTF(cn.sourceFile == null ? "" : cn.sourceFile);
+        // The simple name, from the InnerClasses attribute rather than from the
+        // shape of the binary name. `Outer$1` is anonymous and has none,
+        // `Outer$1Local` is a local class called Local, and both a nested class
+        // and a top-level one may carry a `$` in their own identifier -- so
+        // splitting the name cannot tell them apart, and only the attribute
+        // knows. Empty means "no simple name of its own": an anonymous class,
+        // or a top-level class whose simple name is the last segment.
+        out.writeUTF(simpleNameOf(cn));
 
         // A supertype is either interpreted (named, resolved after load) or an
         // extern. java/lang/Object is always an extern -- it is the host's.

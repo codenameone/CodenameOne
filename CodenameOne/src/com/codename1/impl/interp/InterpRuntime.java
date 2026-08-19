@@ -391,6 +391,15 @@ public final class InterpRuntime {
             enclosingHostCalls = st.hostCallDepth;
             st.hostCallDepth = 0;
         }
+        // Entering a method is progress too. A back edge is the usual place to
+        // check, but code that recurses, catches the StackOverflowError this
+        // raises and recurses again never takes one -- and would hold the event
+        // thread with Stop having no effect, since nothing would look at the
+        // cancel flag. Charged against the same fuel counter, so the cost is a
+        // decrement per call and a real check once every fuelPerCheck of them.
+        if (--st.fuel <= 0) {
+            checkpoint(st);
+        }
         st.depth++;
         if (st.depth > maxDepth) {
             st.depth--;
@@ -1292,7 +1301,11 @@ public final class InterpRuntime {
     /// initializing an interface on behalf of an implementor.
     private boolean declaresDefaultMethod(InterpClass iface) {
         for (InterpMethod m : iface.methods) {
-            if (!m.isStatic() && !m.isAbstract() && !"<clinit>".equals(m.name)) {
+            // Private too: an interface may declare a private helper with a
+            // body (JDK 9 onwards) and that is not a default method, so it must
+            // not pull the interface's initializer forward.
+            if (!m.isStatic() && !m.isAbstract() && !m.isPrivate()
+                    && !"<clinit>".equals(m.name)) {
                 return true;
             }
         }
@@ -2048,34 +2061,22 @@ public final class InterpRuntime {
 
     /// The simple name of a class, as `Class.getSimpleName` reports it.
     ///
-    /// Splitting on the last `$` is not enough. javac names a local class
-    /// `Outer$1Local` and an anonymous one `Outer$1`, whose simple names are
-    /// `Local` and the empty string -- and a top-level class is allowed a `$`
-    /// in its own name, where nothing should be stripped at all. The
-    /// InnerClasses attribute that would say which is which is not in the
-    /// bundle, so the enclosing name is looked up instead: a prefix that is
-    /// itself a class here means this one is nested in it.
-    private String simpleNameOf(String internalName) {
-        int slash = internalName.lastIndexOf('/');
-        String simple = slash < 0 ? internalName : internalName.substring(slash + 1);
-        int dollar = internalName.lastIndexOf('$');
-        if (dollar < 0 || dollar < slash) {
-            return simple;
+    /// Read from the bundle rather than worked out from the binary name, which
+    /// cannot be done: `Outer$1` is anonymous and has no simple name at all,
+    /// `Outer$1Local` is a local class called Local, and a `$` may equally be
+    /// part of a class's own identifier -- nested or top-level. javac records
+    /// which in the InnerClasses attribute, and the bundle now carries it.
+    private static String simpleNameOf(InterpClass c) {
+        if (c.simpleName != null) {
+            return c.simpleName;
         }
-        if (bundle.findClass(internalName.substring(0, dollar)) == null) {
-            // Not a nested class of anything the bundle has: the `$` belongs to
-            // the class's own name.
-            return simple;
-        }
-        String suffix = internalName.substring(dollar + 1);
-        int digits = 0;
-        while (digits < suffix.length() && suffix.charAt(digits) >= '0'
-                && suffix.charAt(digits) <= '9') {
-            digits++;
-        }
-        // All digits is an anonymous class, whose simple name is empty; leading
-        // digits mark a local class, and the name is what follows them.
-        return suffix.substring(digits);
+        String name = c.getName();
+        // No recorded name: top-level, whose simple name is the last segment,
+        // or anonymous, which has none. A top-level class has no `$` from the
+        // compiler -- one in the name belongs to the class itself.
+        int slash = name.lastIndexOf('/');
+        String tail = slash < 0 ? name : name.substring(slash + 1);
+        return tail.indexOf('$') < 0 ? tail : "";
     }
 
     /// Selects the method an `invokevirtual` actually runs.
@@ -2332,7 +2333,7 @@ public final class InterpRuntime {
             return classCall(c.arrayComponent, "getSimpleName", args) + "[]";
         }
         if ("getSimpleName".equals(name) && args.length == 0) {
-            return simpleNameOf(c.getName());
+            return simpleNameOf(c);
         }
         if ("toString".equals(name) && args.length == 0) {
             return (c.isInterface() ? "interface " : "class ")

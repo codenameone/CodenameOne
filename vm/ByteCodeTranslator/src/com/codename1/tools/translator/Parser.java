@@ -539,7 +539,11 @@ public class Parser extends ClassVisitor {
         boolean declaresDefault = false;
         if (bc.isIsInterface()) {
             for (BytecodeMethod m : bc.getMethods()) {
-                if (!m.isStatic() && !m.isAbstract() && !m.isEliminated()
+                // Not private: an interface may declare a private helper with
+                // a body from JDK 9 onwards, and that is not a default method
+                // -- marking it as one initializes the interface earlier than
+                // Java does.
+                if (!m.isStatic() && !m.isAbstract() && !m.isPrivate() && !m.isEliminated()
                         && !"__CLINIT__".equals(m.getMethodName())
                         && !"<clinit>".equals(m.getMethodName())) {
                     declaresDefault = true;

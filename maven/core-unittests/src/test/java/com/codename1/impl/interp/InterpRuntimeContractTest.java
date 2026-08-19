@@ -261,6 +261,40 @@ class InterpRuntimeContractTest {
                 "the callback should run to completion");
     }
 
+    /**
+     * Recursion that catches its own StackOverflowError and recurses again
+     * takes no back edge, and back edges were the only place progress was
+     * counted -- so the Stop button had nothing to act on and the event thread
+     * was held for good.
+     */
+    @Test
+    @DisplayName("recursion that swallows its own overflow can still be stopped")
+    void recursionWithoutBackEdgesIsStillCancellable() throws Throwable {
+        final InterpRuntime rt = load("Swallow",
+                "public class Swallow {"
+                + " static int f(int n) {"
+                + "   try { return f(n + 1); }"
+                + "   catch (StackOverflowError e) { return f(n + 1); } }"
+                + " public static void main(String[] a) { f(0); } }");
+        final AtomicReference<Throwable> outcome = new AtomicReference<Throwable>();
+        Thread runner = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    rt.runMain(new String[0]);
+                } catch (Throwable t) {
+                    outcome.set(t);
+                }
+            }
+        });
+        runner.start();
+        Thread.sleep(300);
+        rt.requestCancel();
+        runner.join(15000);
+        assertTrue(!runner.isAlive(), "the interpreter did not stop when asked");
+        assertTrue(unwrap(outcome.get()) instanceof InterpCancelled,
+                "expected cancellation, got " + unwrap(outcome.get()));
+    }
+
     /** Runaway recursion must be diagnosable, not a native stack overflow. */
     @Test
     @DisplayName("unbounded recursion raises a StackOverflowError with an interpreted trace")
