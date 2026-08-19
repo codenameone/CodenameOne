@@ -264,6 +264,22 @@ public abstract class WindowHostTest extends BaseTest {
         Cn1ssDeviceRunnerHelper.emitImage(shot, name, new Runnable() {
             @Override
             public void run() {
+                // Stop any editor before tearing the window down. A native editor holds
+                // platform state tied to the window it is in -- on Mac Catalyst it pins
+                // the scene, so the *next* window came back at the system's default size
+                // instead of the one requested and never became renderable, which is why
+                // the editing case produced only its first size there. Stopping is
+                // asynchronous, hence the continuation.
+                if (window != null && window.isEditing()) {
+                    window.stopEditing(new Runnable() {
+                        @Override
+                        public void run() {
+                            closeWindow();
+                            captureNext(index + 1);
+                        }
+                    });
+                    return;
+                }
                 closeWindow();
                 captureNext(index + 1);
             }
