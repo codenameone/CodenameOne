@@ -97,6 +97,16 @@ extern UIView *editingComponent;
 
 #import "java_lang_NullPointerException.h"
 #import "java_lang_RuntimeException.h"
+#ifdef CN1_USE_INTENTS
+// The translated entry points the intents branches below call. Without this they are
+// implicit declarations: the iOS slice let that through as a warning and the Mac Catalyst
+// slice rejects it outright -- "call to undeclared function
+// 'com_codename1_impl_ios_IOSIntentCallbacks_nativeSpotlightItemSelected___java_lang_String'"
+// -- so the same source compiled on one platform and not the other. Inside the guard
+// because CodenameOne_GLViewController.h undefines CN1_USE_INTENTS for watchOS and tvOS,
+// where this class is not translated and the header does not exist.
+#import "com_codename1_impl_ios_IOSIntentCallbacks.h"
+#endif
 
 // A signal handler to handle bad accesses.  This will throw NPEs that we can catch
 // rather than crashing the app.
