@@ -1037,6 +1037,7 @@ public final class Intents {
         //
         // The test and the enqueue are one critical section, and it is the dispatcher's own
         // lock: anything less lets setDispatcher install and drain in the gap between them.
+        boolean staleRecord = false;
         synchronized (pending) {
             if (dispatcher != null) {
                 // The table exists and does not contain this type, so it belongs to somebody
@@ -1059,9 +1060,42 @@ public final class Intents {
             if (recorded == null || !recordNames(recorded, activityType)) {
                 return false;
             }
-            pendingActivities.add(new PendingActivity(activityType, params));
+            if (Display.isInitialized()) {
+                // The record names this type, and it is nevertheless not ours. The bootstrap
+                // installs the dispatcher from the stub's main, before Display.init -- so a
+                // Display that is already up with no dispatcher is proof that this build
+                // declares nothing at all, and the record was written by a version that did.
+                // An update can remove the last @AppIntent while still using the package to
+                // index content, and nothing rewrites the record then, because there is no
+                // bootstrap left to run.
+                //
+                // Claiming on that evidence is worse than useless: no dispatcher will ever
+                // arrive to drain the queue, so the suggestion opens the app and does nothing,
+                // and an application continuation that happens to reuse the id is swallowed
+                // for good. Refused, and the stale record is dropped so the next launch does
+                // not repeat it.
+                staleRecord = true;
+            } else {
+                pendingActivities.add(new PendingActivity(activityType, params));
+            }
+        }
+        if (staleRecord) {
+            // Outside the lock: this writes to storage, and nothing else here needs to wait
+            // for it.
+            forgetDeclaredIds();
+            return false;
         }
         return true;
+    }
+
+    /// Drops the remembered declaration ids, for a build that no longer declares any.
+    private static void forgetDeclaredIds() {
+        try {
+            Preferences.delete(DECLARED_IDS_KEY);
+        } catch (Throwable t) {
+            // The claim has already been refused, which is the part that mattered.
+            logError(t);
+        }
     }
 
 

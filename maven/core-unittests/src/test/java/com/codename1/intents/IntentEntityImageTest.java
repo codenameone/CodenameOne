@@ -22,8 +22,11 @@
  */
 package com.codename1.intents;
 
+import com.codename1.io.Preferences;
+import org.junit.jupiter.api.Test;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.util.Base64;
 
@@ -33,6 +36,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -276,5 +280,31 @@ class IntentEntityImageTest extends UITestBase {
         assertFalse(inlined.contains("imageData"));
         assertTrue(inlined.contains("\"image\""),
                 "the entity is still published; only the inline copy is dropped");
+    }
+
+    /// An activity type left over from a version that declared it must not be claimed.
+    ///
+    /// The generated bootstrap installs the dispatcher from the stub's main, before
+    /// Display.init, so a Display that is up with no dispatcher proves this build declares
+    /// nothing. An update can remove the last @AppIntent and keep using the package to index
+    /// content -- there is no bootstrap left to rewrite the record then, so the previous
+    /// version's ids survived and were still being claimed. Nothing would ever drain them:
+    /// the suggestion opened the app and did nothing, and an application continuation reusing
+    /// the id was swallowed for good.
+    @Test
+    void aRecordFromAVersionThatDeclaredIntentsIsNotClaimedOnceDisplayIsUp() throws Exception {
+        // What the previous version left behind.
+        Preferences.set("cn1$intents$declared", "log_workout,track_order");
+        Intents.setDispatcher(null);
+        try {
+            assertTrue(Display.isInitialized(), "this suite runs with a Display");
+
+            assertFalse(Intents.dispatchUserActivity("log_workout", null),
+                    "a build that declares nothing must not claim the old id");
+            assertNull(Preferences.get("cn1$intents$declared", null),
+                    "and the stale record must be dropped so the next launch does not repeat it");
+        } finally {
+            Preferences.delete("cn1$intents$declared");
+        }
     }
 }
