@@ -1,36 +1,36 @@
 {
-  "commit": "dc137859f2d66a7717b240d9921bede6710e3499",
-  "generated_at": "2026-08-18T05:01:55Z",
+  "commit": "3739a2876bf1d3e9fdfa1cd9a8b4c3e94cc20d3a",
+  "generated_at": "2026-08-19T06:51:15Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 382415000
+        "duration_ns": 375323000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 53336000
+        "duration_ns": 25483000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 148080000
+        "duration_ns": 152614000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 74594000
+        "duration_ns": 77060000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 445531000
+        "duration_ns": 376774000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 147421000
+        "duration_ns": 117633000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 222263000
+        "duration_ns": 149566000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32091446016",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32214814018",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 0,
+    "fail": 1,
     "not-run": 0,
-    "pass": 167,
+    "pass": 166,
     "skip": 4
   },
   "tests": {
@@ -490,7 +490,10 @@
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
-      "status": "pass"
+      "reasons": [
+        "screenshot-different:landscape"
+      ],
+      "status": "fail"
     },
     "PaletteOverrideThemeScreenshotTest": {
       "feature": "theme-palette-css",
