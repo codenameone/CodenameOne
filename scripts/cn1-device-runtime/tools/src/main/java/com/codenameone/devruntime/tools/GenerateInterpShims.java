@@ -1779,10 +1779,6 @@ public final class GenerateInterpShims {
                 checked.add(e);
             }
         }
-        if (checked.isEmpty()) {
-            w.println("        Object $r = " + call + ";");
-            return;
-        }
         w.println("        Object $r;");
         w.println("        try {");
         w.println("            $r = " + call + ";");
@@ -1796,6 +1792,17 @@ public final class GenerateInterpShims {
             w.println("                throw (" + typeName(e) + ") $thrown;");
             w.println("            }");
         }
+        // Unchecked ones need no throws clause to travel, and framework code
+        // around a callback catches them by their own type: a pushed
+        // `MyIllegalArgumentException extends IllegalArgumentException` has a
+        // peer that *is* an IllegalArgumentException, and letting the
+        // interpreter's carrier escape instead means that catch never runs.
+        w.println("            if ($thrown instanceof RuntimeException) {");
+        w.println("                throw (RuntimeException) $thrown;");
+        w.println("            }");
+        w.println("            if ($thrown instanceof Error) {");
+        w.println("                throw (Error) $thrown;");
+        w.println("            }");
         w.println("            throw $t;");
         w.println("        }");
     }

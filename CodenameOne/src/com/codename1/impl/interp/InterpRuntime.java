@@ -2039,6 +2039,21 @@ public final class InterpRuntime {
             return assignableFromInterp(target, (InterpClass) args[0])
                     ? Boolean.TRUE : Boolean.FALSE;
         }
+        if ("getResourceAsStream".equals(name) && args.length == 2
+                && args[0] instanceof InterpClass && args[1] instanceof String) {
+            // Java resolves a relative resource name against the *caller's*
+            // package -- `getResourceAsStream(MyApp.class, "data.json")` reads
+            // /com/example/data.json -- and the bundle stores it under exactly
+            // that path. The token is about to become a host class, taking the
+            // package with it, so the name is qualified here while it is still
+            // known.
+            String path = (String) args[1];
+            if (path.length() > 0 && path.charAt(0) != '/') {
+                String caller = ((InterpClass) args[0]).getName();
+                int slash = caller.lastIndexOf('/');
+                args[1] = slash < 0 ? "/" + path : "/" + caller.substring(0, slash + 1) + path;
+            }
+        }
         String[] params = paramDescriptors(desc);
         for (int i = 0; i < args.length && i < params.length; i++) {
             if (args[i] instanceof InterpClass && "Ljava/lang/Class;".equals(params[i])) {

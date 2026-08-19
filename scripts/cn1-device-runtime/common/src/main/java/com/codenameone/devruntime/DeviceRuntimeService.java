@@ -384,6 +384,15 @@ public class DeviceRuntimeService {
             openEnded = true;
         }
 
+        /// Restarts the bounded grace, without granting an unbounded wait.
+        ///
+        /// What a transfer needs: bytes arriving is progress, and a stalled
+        /// transfer should still be closed. Called as each chunk lands, so a
+        /// slow link is fine and a peer that stops sending is not.
+        void touch() {
+            identifiedAt = System.currentTimeMillis();
+        }
+
         /// Ends the open-ended phase and restarts the bounded grace.
         ///
         /// The human part of pairing is over the moment the dialog closes, and
@@ -680,6 +689,33 @@ public class DeviceRuntimeService {
     }
 
     /**
+     * Reads a bundle body, treating arrival as progress.
+     *
+     * <p>Not {@code readFully}: this is the one long read that happens before
+     * anything has authenticated -- the response covers the bundle, so it
+     * cannot be checked until the bundle is here -- and a peer that declares a
+     * plausible length and then stops sending would otherwise hold the dial and
+     * the sweep for good. Each chunk restarts the grace, so a slow link
+     * finishes and a stalled one is closed.</p>
+     */
+    private static void readBody(DataInputStream in, byte[] body, Progress progress)
+            throws IOException {
+        int off = 0;
+        while (off < body.length) {
+            int n = in.read(body, off, Math.min(BODY_CHUNK, body.length - off));
+            if (n < 0) {
+                throw new java.io.EOFException("the bundle ended after " + off + " of "
+                        + body.length + " bytes");
+            }
+            off += n;
+            progress.touch();
+        }
+    }
+
+    /// How much of a bundle is read between heartbeats.
+    private static final int BODY_CHUNK = 64 * 1024;
+
+    /**
      * Runs the pairing handshake on an open connection.
      *
      * <p>Two round trips, because the device cannot issue a challenge until a
@@ -813,10 +849,8 @@ public class DeviceRuntimeService {
                         if (length <= 0 || length > MAX_BUNDLE) {
                             reject = "implausible bundle length " + length;
                         } else {
-                            // A transfer takes as long as it takes.
-                            progress.allowLongWait();
                             payload = new byte[length];
-                            in.readFully(payload);
+                            readBody(in, payload, progress);
                         }
                     }
                 } else if (version == PROTOCOL_V3) {
@@ -892,13 +926,14 @@ public class DeviceRuntimeService {
                             if (length <= 0 || length > MAX_BUNDLE) {
                                 reject = "implausible bundle length " + length;
                             } else {
-                                // The peer answered the challenge and declared a
-                                // plausible length: the bytes now take as long
-                                // as they take. Everything before this point
-                                // stayed inside the bounded grace.
-                                progress.allowLongWait();
+                                // Read with a heartbeat rather than an
+                                // unbounded wait: nothing has authenticated yet
+                                // -- the answer is checked against the bundle
+                                // itself, so it cannot be until the bytes are
+                                // here -- and a peer that declares a length and
+                                // then stops sending must not hold the waiters.
                                 byte[] body = new byte[length];
-                                in.readFully(body);
+                                readBody(in, body, progress);
                                 if (!InterpPairingSecret.matches(response,
                                         InterpPairingSecret.respond(secret, challenge, body))) {
                                     // Covers the bundle as well as the
