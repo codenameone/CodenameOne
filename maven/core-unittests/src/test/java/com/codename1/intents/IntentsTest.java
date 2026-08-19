@@ -778,6 +778,38 @@ class IntentsTest {
         assertTrue(d.invoked.isEmpty());
     }
 
+    /// A donation is durable, so an entity id that names nothing is a shortcut that fails on
+    /// every tap -- and the only moment anyone could have acted on it is this one. The id used
+    /// to be accepted as "a String, therefore fine", leaving the BY_ID query to discover the
+    /// truth later, on a device, with nothing reported.
+    @Test
+    void anEntityIdThatResolvesToNothingIsNotDonated() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        IntentParameterInfo playlist = new IntentParameterInfo("playlist", "Which playlist?",
+                IntentParameterType.ENTITY, true, "playlist", null, null);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("play_it", "Play", "", true, true, false,
+                "", 5, Collections.<String>emptyList(), Arrays.asList(playlist),
+                Arrays.asList(Exposure.ASSISTANT)));
+        // The query answers with nothing, which is what an id naming a deleted playlist does.
+        d.queryResult = Collections.emptyList();
+        Intents.setDispatcher(d);
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("playlist", "gone");
+        Intents.donate("play_it", params);
+
+        assertNull(b.donatedId, "a shortcut whose entity no longer exists must not be donated");
+        assertEquals("byId", d.lastQueryKind, "the id has to be asked about, not assumed");
+        assertEquals("gone", d.lastQueryArgument);
+
+        // And the same donation goes through once the id names something.
+        d.queryResult = Arrays.asList(new AppEntity("playlist", "gone").setTitle("Found"));
+        Intents.donate("play_it", params);
+        assertEquals("play_it", b.donatedId, "a resolvable id is still donated");
+    }
+
     @Test
     void aModelOnlyIntentIsNotDonatedToThePlatform() {
         FakeBridge b = new FakeBridge();

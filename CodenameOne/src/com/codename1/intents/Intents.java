@@ -1541,8 +1541,29 @@ public final class Intents {
             String declared = p.getEntityType();
             return declared == null || declared.equals(((AppEntity) value).getType());
         }
-        // An id resolves through the BY_ID query, and whether it names anything is that query's
-        // answer to give rather than this method's.
+        if (type == IntentParameterType.ENTITY) {
+            // The id is asked about rather than assumed. Both callers are doors where being
+            // wrong is durable: donate() publishes a launcher shortcut that outlives the
+            // process, and a dynamic binding hides the parameter as already satisfied, so
+            // neither the simulator nor a model is given the chance to supply a working value.
+            // An id that resolves to nothing therefore became a shortcut that failed on every
+            // tap, with nothing said at the only moment anyone could have acted on it.
+            //
+            // BY_ID is mandatory for every entity-typed parameter -- the processor refuses the
+            // build without it -- so there is always something to ask. Neither caller is on a
+            // dispatch path: this runs when an application donates or registers, not when an
+            // intent is invoked. A query that throws is caught inside queryEntities and reads
+            // as unresolved, which is the safe direction here for the same reason the rest of
+            // this feature fails closed.
+            if (!(value instanceof String)) {
+                return false;
+            }
+            String declared = p.getEntityType();
+            if (declared == null || declared.length() == 0) {
+                return true;
+            }
+            return !queryEntities(declared, "byId", (String) value).isEmpty();
+        }
         return value instanceof String;
     }
 

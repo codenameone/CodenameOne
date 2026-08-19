@@ -15308,7 +15308,13 @@ static NSString *cn1IntentsWriteStagedImages(NSString *token) {
     }
     for (NSString *name in snapshot) {
         NSData *data = [snapshot objectForKey:name];
-        [data writeToFile:[dir stringByAppendingPathComponent:name] atomically:YES];
+        // The .png suffix is part of the contract, not decoration: CN1SurfaceRenderer's
+        // cn1LoadImage appends it to every name it is asked for, so a blob staged under the
+        // bare name is never found and the node renders as Color.clear -- an image silently
+        // missing from every App Intent snippet. IOSSurfaceBridge writes <name>.png for the
+        // widget and live-activity paths that share this renderer; this one had not.
+        NSString *file = [name stringByAppendingString:@".png"];
+        [data writeToFile:[dir stringByAppendingPathComponent:file] atomically:YES];
     }
     return dir;
 }
