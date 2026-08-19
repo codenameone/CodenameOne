@@ -32,19 +32,34 @@ public interface SigningService {
         public final boolean ok;
         public final T value;
         public final String message;
+        /** What kind of failure this was, so the UI can offer the right next step. Null when ok. */
+        public final SigningError error;
 
-        private Result(boolean ok, T value, String message) {
+        private Result(boolean ok, T value, String message, SigningError error) {
             this.ok = ok;
             this.value = value;
             this.message = message;
+            this.error = error;
         }
 
         public static <T> Result<T> ok(T value) {
-            return new Result<T>(true, value, null);
+            return new Result<T>(true, value, null, null);
         }
 
         public static <T> Result<T> fail(String message) {
-            return new Result<T>(false, null, message == null ? "Operation failed" : message);
+            return new Result<T>(false, null, message == null ? "Operation failed" : message, null);
+        }
+
+        public static <T> Result<T> fail(SigningError error) {
+            if (error == null) {
+                return fail((String) null);
+            }
+            return new Result<T>(false, null, error.message(), error);
+        }
+
+        /** The failure kind, or {@link SigningError.Kind#OTHER} when there is nothing more specific. */
+        public SigningError.Kind errorKind() {
+            return error == null ? SigningError.Kind.OTHER : error.kind();
         }
     }
 }
