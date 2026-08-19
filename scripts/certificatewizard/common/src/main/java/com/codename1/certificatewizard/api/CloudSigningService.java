@@ -140,15 +140,18 @@ public final class CloudSigningService implements SigningService {
                                 }
                                 apns[0] = r6.getResponseData();
                                 appGroupsApi.listAppGroups(bearerToken, r7 -> {
-                                    if (authFailure(r7)) {
-                                        callback.completed(Result.ok(SigningState.empty()));
-                                        return;
+                                    // App Groups are additive, and this is the last of
+                                    // the seven calls -- the six before it already
+                                    // proved both the login and the Apple key are good.
+                                    // Failing to list them is no reason to throw the
+                                    // whole account away and show an error instead:
+                                    // Apple answers 404 here for accounts it does not
+                                    // offer the resource to, which failed every refresh,
+                                    // and so every "Sync with Apple" that had just
+                                    // succeeded.
+                                    if (ok(r7)) {
+                                        appGroups[0] = r7.getResponseData();
                                     }
-                                    if (!ok(r7)) {
-                                        callback.completed(Result.fail(error(r7)));
-                                        return;
-                                    }
-                                    appGroups[0] = r7.getResponseData();
                                     callback.completed(Result.ok(toState(cred[0], certs[0], bundles[0],
                                             devices[0], profiles[0], apns[0], appGroups[0])));
                                 });
