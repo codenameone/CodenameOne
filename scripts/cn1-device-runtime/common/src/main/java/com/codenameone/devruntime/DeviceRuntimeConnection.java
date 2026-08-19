@@ -44,7 +44,7 @@ public class DeviceRuntimeConnection extends SocketConnection {
         // An accepted connection came in over the network, so it has to pair;
         // only a connection this device dialled to loopback is trusted on the
         // strength of the cable.
-        DeviceRuntimeService.getInstance().handle(is, os, false);
+        DeviceRuntimeService.getInstance().handleAccepted(is, os);
     }
 
     public void connectionError(int errorCode, String message) {

@@ -708,6 +708,96 @@ public class DeviceRuntimeService {
     }
 
     /**
+     * Serves a connection this device accepted, under a deadline.
+     *
+     * <p>An accepted connection has no poller behind it -- the dial and the
+     * sweep watch their own -- and the framework gives every accepted
+     * connection a thread. A peer that connects and sends nothing would park
+     * one of those forever, and enough of them would take the app's threads and
+     * sockets with no authentication anywhere in sight. A watchdog closes the
+     * silent ones, which is what unblocks the read they are parked in.</p>
+     */
+    void handleAccepted(InputStream is, OutputStream os) {
+        Watched w = new Watched(is);
+        synchronized (accepted) {
+            accepted.addElement(w);
+            if (!watchdogRunning) {
+                watchdogRunning = true;
+                new Thread(new Runnable() {
+                    public void run() {
+                        watchAccepted();
+                    }
+                }, "cn1-devruntime-accept-watchdog").start();
+            }
+        }
+        try {
+            handle(is, os, false, w.progress);
+        } finally {
+            synchronized (accepted) {
+                accepted.removeElement(w);
+            }
+        }
+    }
+
+    /// One accepted connection and how far it has got.
+    private static final class Watched {
+        private final InputStream stream;
+        private final Progress progress = new Progress();
+        private final long acceptedAt = System.currentTimeMillis();
+
+        Watched(InputStream stream) {
+            this.stream = stream;
+        }
+
+        /// Whether this connection has outstayed what it has earned.
+        boolean expired() {
+            if (progress.isOpenEnded()) {
+                return false;
+            }
+            if (progress.isIdentified()) {
+                return !progress.deservesWaiting();
+            }
+            return System.currentTimeMillis() - acceptedAt > SILENT_ACCEPT_TIMEOUT_MS;
+        }
+    }
+
+    /// How long an accepted connection may stay silent before it is closed.
+    ///
+    /// Four bytes of magic is not much to ask for, and a peer that cannot send
+    /// them is not a push tool -- it is a port scanner, or a crash.
+    private static final int SILENT_ACCEPT_TIMEOUT_MS = 5000;
+
+    private final Vector accepted = new Vector();
+
+    private boolean watchdogRunning;
+
+    /// Closes accepted connections that stopped making progress, and stops when
+    /// there are none left to watch.
+    private void watchAccepted() {
+        while (true) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                return;
+            }
+            synchronized (accepted) {
+                for (int i = accepted.size() - 1; i >= 0; i--) {
+                    Watched w = (Watched) accepted.elementAt(i);
+                    if (w.expired()) {
+                        // Closing is what ends the read its thread is parked in;
+                        // the handler's own finally then unregisters it.
+                        closeQuietly(w.stream);
+                    }
+                }
+                if (accepted.isEmpty()) {
+                    watchdogRunning = false;
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
      * Reads a bundle body, treating arrival as progress.
      *
      * <p>Not {@code readFully}: this is the one long read that happens before

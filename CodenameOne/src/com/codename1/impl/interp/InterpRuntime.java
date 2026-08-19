@@ -344,6 +344,14 @@ public final class InterpRuntime {
             InterpObject io = (InterpObject) result;
             return io.hostPeer != null ? io.hostPeer : io;
         }
+        if (result instanceof Object[]) {
+            // A returned array crosses like an argument does: its elements are
+            // exchanged for their peers, or host code casting one to the
+            // interface it implements gets a wrapper instead. Not converted
+            // back -- the array is the caller's now, and interpreted code
+            // reading an element converts on the way in.
+            toHostElements(result, new Vector());
+        }
         return result;
     }
 
