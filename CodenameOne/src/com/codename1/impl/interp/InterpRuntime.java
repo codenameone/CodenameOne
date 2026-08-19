@@ -2080,6 +2080,17 @@ public final class InterpRuntime {
         }
     }
 
+    /// Whether an array's component type is `java.lang.Object` -- the shape the
+    /// interpreter gives its own reference arrays, and the only one that can
+    /// hold an InterpObject.
+    private static boolean isPlainObjectArray(Object array) {
+        Class component = array.getClass().getComponentType();
+        // Unknown rather than absent: a platform that cannot answer is not a
+        // reason to leave peers where interpreted objects belong, and on that
+        // platform an array store is unchecked anyway.
+        return component == null || "java.lang.Object".equals(component.getName());
+    }
+
     /// Replaces peer-backed elements of a reference array with their peers.
     ///
     /// In place, and recursively for nested arrays, because the array itself is
@@ -2104,8 +2115,15 @@ public final class InterpRuntime {
     }
 
     /// The reverse: peers become the interpreted objects they stand for again.
+    ///
+    /// Only in an array the interpreter owns, which is always a plain
+    /// `Object[]`. An array declared with a host component type -- `Painter[]`,
+    /// holding the peers because that is what a `Painter[]` can hold -- must
+    /// keep them: storing an InterpObject there is an ArrayStoreException, and
+    /// nothing needs it anyway, since reading an element converts it.
     private static void fromHostElements(Object array, Vector seen) {
-        if (!(array instanceof Object[]) || seen.contains(array)) {
+        if (!(array instanceof Object[]) || seen.contains(array)
+                || !isPlainObjectArray(array)) {
             return;
         }
         seen.addElement(array);

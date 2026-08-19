@@ -431,6 +431,13 @@ class InterpConformanceTest {
                 + " Collections.sort(l);"
                 + " System.out.println(l.get(0) + \",\" + l.get(1));"
                 + " System.out.println(((Item)l.get(0)).v);"
+                // A host-typed array holds the peers, and must keep them: this
+                // is the shape a pushed class implementing a host interface
+                // gets when the array is declared with that interface.
+                + " Comparable[] host = new Comparable[]{ items[2], items[0] };"
+                + " Arrays.sort(host);"
+                + " System.out.println(host[0] + \",\" + host[1]);"
+                + " System.out.println(((Item)host[0]).v);"
                 + "}}"));
         // A private method is not virtual, and from JDK 11 javac emits
         // invokevirtual for one anyway -- so resolving from the receiver runs
