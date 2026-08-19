@@ -334,11 +334,41 @@ public final class JavaScriptSemanticOverlay {
                 it.remove();
             }
         }
-        int tabIndex = node.isFocusable() ? 0 : -1;
+        // A field edited through a SET_TEXT control gives up its own tab stop to it. The
+        // control is the half that can be typed into -- it carries the input handlers, and the
+        // semantic element carries none -- so leaving both tabbable would stop a keyboard user
+        // on a textbox that announces the field and then refuses every keystroke, before
+        // reaching the one that works.
+        int tabIndex = node.isFocusable() && !hasEditingControl(node) ? 0 : -1;
         if (entry.tabIndex != tabIndex) {
             entry.element.setTabIndex(tabIndex);
             entry.tabIndex = tabIndex;
         }
+    }
+
+    /**
+     * Whether this node is edited through a control of its own rather than through its element.
+     *
+     * <p>Read from the snapshot rather than from the entry's controls because the controls are
+     * built after the attributes are applied, so on the pass that first exposes a field the
+     * entry does not have one yet -- and that is exactly the pass that decides its tab stop.
+     * The test matches what {@link #applyCustomActions} will do with the same snapshot.</p>
+     *
+     * @param node the node being described
+     * @return true when a SET_TEXT control represents this node
+     */
+    private boolean hasEditingControl(AccessibilityNodeSnapshot node) {
+        if (node.getEnabled() != null && !node.getEnabled().booleanValue()) {
+            return false;
+        }
+        List<AccessibilityAction> actions = node.getActions();
+        for (int i = 0; i < actions.size(); i++) {
+            AccessibilityAction action = actions.get(i);
+            if (action.isEnabled() && AccessibilityAction.SET_TEXT.equals(action.getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void applyGeometry(Entry entry, AccessibilityNodeSnapshot node,

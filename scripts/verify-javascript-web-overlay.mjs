@@ -155,6 +155,12 @@ const setText = await page.evaluate(() => {
   // report a screen of TextAreas as having no way to set text.
   const inputs = actions ? Array.from(actions.querySelectorAll('input,textarea')) : [];
   const wired = inputs.filter(i => ids.includes(i.getAttribute('aria-controls')));
+  // A field is one tab stop, not two. The control carries the input handlers, so it is the
+  // half that must be tabbable; the semantic element it is wired to gives its own stop up
+  // rather than stopping a keyboard user on a textbox that refuses every keystroke.
+  const wiredIds = wired.map(i => i.getAttribute('aria-controls'));
+  const doubled = boxes.filter(b => wiredIds.includes(b.getAttribute('id'))
+    && b.getAttribute('tabindex') !== null && b.getAttribute('tabindex') !== '-1');
   // Editing through the control is still editing that field, so it has to carry the same
   // input metadata the ordinary editor applies -- the keyboard the constraint asks for, and
   // the prediction and autofill it withholds.
@@ -162,7 +168,7 @@ const setText = await page.evaluate(() => {
     && i.getAttribute('autocapitalize') !== null && i.getAttribute('spellcheck') !== null);
   return {
     fields: boxes.length, inputs: inputs.length, wired: wired.length,
-    configured: configured.length
+    doubled: doubled.length, configured: configured.length
   };
 });
 if (!setText || setText.fields === 0) {
@@ -172,8 +178,10 @@ if (!setText || setText.fields === 0) {
         `${setText.wired} control(s) for ${setText.fields} field(s)`);
 }
 if (!setText || !setText.wired) {
-  console.log('SKIP  a set-text control carries the field input constraints :: no wired control');
+  console.log('SKIP  an editable field is a single tab stop :: no wired control on screen');
 } else {
+  check('an editable field is a single tab stop', setText.doubled === 0,
+        `${setText.doubled} field(s) tabbable alongside their control`);
   check('a set-text control carries the field input constraints',
         setText.configured === setText.wired,
         `${setText.configured}/${setText.wired} control(s) configured`);
