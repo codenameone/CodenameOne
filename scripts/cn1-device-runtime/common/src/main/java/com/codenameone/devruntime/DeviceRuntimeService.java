@@ -293,7 +293,7 @@ public class DeviceRuntimeService {
         // element carries no visibility guarantee at all -- the poll is
         // entitled to never see the write, time out and close an exchange that
         // was working.
-        final Flag started = new Flag();
+        final Progress progress = new Progress();
         final Flag finished = new Flag();
         final Flag spoke = new Flag();
         // The stream, so a connection that accepts and then says nothing can
@@ -306,7 +306,7 @@ public class DeviceRuntimeService {
             public void connectionEstablished(InputStream is, OutputStream os) {
                 open.set(is);
                 try {
-                    if (handle(is, os, isLoopback(host), started)) {
+                    if (handle(is, os, isLoopback(host), progress)) {
                         spoke.set();
                     }
                 } finally {
@@ -337,7 +337,8 @@ public class DeviceRuntimeService {
         // then says nothing. Waiting on *that* forever wedges the dial loop and
         // the device never calls again.
         long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS + 500;
-        while (!finished.isSet() && (started.isSet() || System.currentTimeMillis() < deadline)) {
+        while (!finished.isSet()
+                && (progress.deservesWaiting() || System.currentTimeMillis() < deadline)) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
@@ -352,6 +353,59 @@ public class DeviceRuntimeService {
         }
         return spoke.isSet();
     }
+
+    /**
+     * How far an exchange has got, for the thread deciding whether to wait.
+     *
+     * <p>Three states, because they license different waits. Nothing yet: the
+     * connect timeout applies, and an address that accepts and says nothing is
+     * closed. Identified: the peer spoke the protocol and named itself, which
+     * is worth a bounded grace -- a round trip and an HMAC, not a human and
+     * not a transfer. Open-ended: the exchange reached a phase that genuinely
+     * takes as long as it takes, a person typing a pairing code or a bundle
+     * crossing, and only then is waiting forever right.</p>
+     *
+     * <p>The distinction is what stops an unauthenticated peer from wedging
+     * discovery: sending a header is cheap, so it may not buy an unbounded
+     * wait.</p>
+     */
+    private static final class Progress {
+        private volatile long identifiedAt;
+        private volatile boolean openEnded;
+
+        void identify() {
+            if (identifiedAt == 0) {
+                identifiedAt = System.currentTimeMillis();
+            }
+        }
+
+        void allowLongWait() {
+            identify();
+            openEnded = true;
+        }
+
+        boolean isIdentified() {
+            return identifiedAt != 0;
+        }
+
+        boolean isOpenEnded() {
+            return openEnded;
+        }
+
+        /// Whether this exchange still deserves to be waited on.
+        boolean deservesWaiting() {
+            return openEnded
+                    || (identifiedAt != 0
+                        && System.currentTimeMillis() - identifiedAt < PREAUTH_TIMEOUT_MS);
+        }
+    }
+
+    /// How long an identified but unauthenticated exchange may take.
+    ///
+    /// One round trip and one deliberately slow HMAC. Everything past that
+    /// point declares itself open-ended, so this only bounds the phase anything
+    /// on the network can reach.
+    private static final int PREAUTH_TIMEOUT_MS = 10000;
 
     /// A flag two threads share: set on the socket callback's thread, polled on
     /// the dial or sweep thread.
@@ -402,8 +456,8 @@ public class DeviceRuntimeService {
     private static final class SweepConnection {
         private final InputStream is;
 
-        /// Set once the exchange is identifiably ours; shared with handle.
-        private final Flag started = new Flag();
+        /// How far this exchange has got; shared with handle.
+        private final Progress progress = new Progress();
 
         SweepConnection(InputStream is) {
             this.is = is;
@@ -414,7 +468,7 @@ public class DeviceRuntimeService {
     private static boolean anyStarted(Vector connections) {
         synchronized (connections) {
             for (int i = 0; i < connections.size(); i++) {
-                if (((SweepConnection) connections.elementAt(i)).started.isSet()) {
+                if (((SweepConnection) connections.elementAt(i)).progress.deservesWaiting()) {
                     return true;
                 }
             }
@@ -428,7 +482,7 @@ public class DeviceRuntimeService {
         synchronized (connections) {
             for (int i = connections.size() - 1; i >= 0; i--) {
                 SweepConnection conn = (SweepConnection) connections.elementAt(i);
-                if (conn.started.isSet()) {
+                if (conn.progress.deservesWaiting()) {
                     continue;
                 }
                 closeQuietly(conn.is);
@@ -518,7 +572,7 @@ public class DeviceRuntimeService {
                         }
                         boolean spoke;
                         try {
-                            spoke = handle(is, os, false, conn.started);
+                            spoke = handle(is, os, false, conn.progress);
                         } finally {
                             synchronized (openStreams) {
                                 openStreams.removeElement(conn);
@@ -702,7 +756,7 @@ public class DeviceRuntimeService {
      * its life.</p>
      */
     boolean handle(InputStream is, OutputStream os, boolean loopback) {
-        return handle(is, os, loopback, new Flag());
+        return handle(is, os, loopback, new Progress());
     }
 
     /**
@@ -719,7 +773,7 @@ public class DeviceRuntimeService {
      * (an `adb reverse` with no listener behind it does exactly that) is closed
      * when the batch deadline passes.</p>
      */
-    boolean handle(InputStream is, OutputStream os, boolean loopback, Flag started) {
+    boolean handle(InputStream is, OutputStream os, boolean loopback, Progress progress) {
         firstContact();
         DataInputStream in = new DataInputStream(is);
         DataOutputStream out = new DataOutputStream(os);
@@ -731,7 +785,7 @@ public class DeviceRuntimeService {
             } else {
                 int version = in.readInt();
                 if (version == PROTOCOL_V1) {
-                    started.set();
+                    progress.identify();
                     if (!loopback) {
                         reject = "this app requires a paired computer; upgrade the push tool";
                     } else {
@@ -739,6 +793,8 @@ public class DeviceRuntimeService {
                         if (length <= 0 || length > MAX_BUNDLE) {
                             reject = "implausible bundle length " + length;
                         } else {
+                            // A transfer takes as long as it takes.
+                            progress.allowLongWait();
                             payload = new byte[length];
                             in.readFully(payload);
                         }
@@ -746,7 +802,7 @@ public class DeviceRuntimeService {
                 } else if (version == PROTOCOL_V3) {
                     int frame = in.readInt();
                     if (frame == FRAME_PING) {
-                        started.set();
+                        progress.identify();
                         out.writeByte(1);
                         out.writeUTF(DeviceRuntimePairing.deviceId());
                         out.flush();
@@ -759,7 +815,7 @@ public class DeviceRuntimeService {
                         // for the life of the app, refusing every real pairing.
                         String peerId = in.readUTF();
                         String peerName = in.readUTF();
-                        started.set();
+                        progress.identify();
                         // One prompt at a time, and a pause after a refusal.
                         // Nothing has authenticated yet at this point -- that is
                         // what pairing is for -- so anything on the network can
@@ -772,6 +828,12 @@ public class DeviceRuntimeService {
                             return true;
                         }
                         try {
+                            // A person is about to be asked to type six digits,
+                            // which is exactly the case an unbounded wait is
+                            // for -- and it is reached only after the prompt
+                            // slot was claimed, so it cannot be claimed by
+                            // everything at once.
+                            progress.allowLongWait();
                             handlePairing(peerId, peerName, in, out);
                         } finally {
                             releasePairingPrompt();
@@ -780,10 +842,11 @@ public class DeviceRuntimeService {
                     } else if (frame == FRAME_PUSH) {
                         String peerId = in.readUTF();
                         String desktopChallenge = in.readUTF();
-                        // Same rule: the exchange is identified once its bounded
-                        // header has arrived, and only then may it wait as long
-                        // as it likes.
-                        started.set();
+                        // Identified, which buys a bounded grace and no more:
+                        // this much is cheap for anything on the network to
+                        // send, and an unbounded wait here is a way to wedge
+                        // discovery for good.
+                        progress.identify();
                         byte[] secret = DeviceRuntimePairing.secretFor(peerId);
                         if (secret == null) {
                             // Said precisely, so the push tool can offer to pair
@@ -809,6 +872,11 @@ public class DeviceRuntimeService {
                             if (length <= 0 || length > MAX_BUNDLE) {
                                 reject = "implausible bundle length " + length;
                             } else {
+                                // The peer answered the challenge and declared a
+                                // plausible length: the bytes now take as long
+                                // as they take. Everything before this point
+                                // stayed inside the bounded grace.
+                                progress.allowLongWait();
                                 byte[] body = new byte[length];
                                 in.readFully(body);
                                 if (!InterpPairingSecret.matches(response,
@@ -967,6 +1035,18 @@ public class DeviceRuntimeService {
 
         InterpBundle bundle = InterpBundleReader.read(new ByteArrayInputStream(payload));
 
+        // Retire whatever is running before publishing anything of the new
+        // program's. Stop is on screen throughout an install -- a no-UI program
+        // leaves the runtime's own form up -- and stopping tears down exactly
+        // the resources and theme published here; doing it in this order means
+        // a stop that lands mid-install ends the old program, not the new one's
+        // assets, and the install then fails its own current-runtime check.
+        retirePrevious();
+        // Everything from here is this program's: a Stop arriving during it
+        // tears down what is being published, and the counter is how the
+        // installer notices rather than finishing on top of a teardown.
+        final int generation = stopGeneration;
+
         // The program's own theme, CSS and images, published where the
         // framework looks for them. Cleared first so a program that ships no
         // theme does not inherit the previous one's.
@@ -990,23 +1070,6 @@ public class DeviceRuntimeService {
         String main = bundle.getMainClass();
         loadedName = main == null ? "" : main.replace('/', '.');
 
-        // Detach whatever was running first. A replaced program's peers are
-        // still held by framework listeners and timers, and without this they
-        // go on dispatching into the old runtime alongside the new one -- and
-        // Stop, later, would only detach the newest.
-        final InterpRuntime previous = runtime;
-        if (previous != null) {
-            // The replaced program gets its stop() too, and on the event thread
-            // because that is where a Lifecycle's callbacks belong -- releasing
-            // a recorder or a sensor from a socket thread is not something the
-            // framework expects.
-            Display.getInstance().callSeriallyAndWait(new Runnable() {
-                public void run() {
-                    stopLifecycleQuietly(previous);
-                }
-            });
-            previous.detach();
-        }
         ShimObjectFactory factory = new ShimObjectFactory();
         final InterpRuntime rt = new InterpRuntime(bundle, InterpPlatform.getLinker(), factory);
         factory.attach(rt);
@@ -1017,6 +1080,7 @@ public class DeviceRuntimeService {
         DeviceRuntimeMocks.reset();
         mocksUsed = "";
         runtime = rt;
+        requireNotStopped(generation);
 
         final Throwable[] failure = new Throwable[1];
         final String[] outcome = new String[1];
@@ -1031,7 +1095,7 @@ public class DeviceRuntimeService {
                 // already ended: runMain clears the cancel flag, so the entry
                 // point runs and shows a form while the service reports
                 // nothing loaded.
-                if (runtime != rt || rt.isDetached()) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
+                if (runtime != rt || rt.isDetached() || stopGeneration != generation) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
                     stopped[0] = true;
                     return;
                 }
@@ -1048,6 +1112,11 @@ public class DeviceRuntimeService {
                     "the program was stopped before its entry point ran");
         }
         if (failure[0] != null) {
+            // Its stop() first: start() may have acquired a recorder or a
+            // sensor before it threw, and stop is where a program releases
+            // those -- after detaching, that callback would be a no-op like
+            // every other.
+            stopLifecycleQuietly(rt);
             // Detach before reporting. The entry point may have shown a form or
             // registered a listener before it threw, and those callbacks would
             // go on running a program the desktop was just told had failed --
@@ -1084,7 +1153,7 @@ public class DeviceRuntimeService {
         // on screen throughout. Reporting "running" then would overwrite the
         // status the stop just set, and tell the desktop a push succeeded into
         // a runtime that is no longer there.
-        if (runtime != rt || rt.isDetached()) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
+        if (runtime != rt || rt.isDetached() || stopGeneration != generation) {  //NOPMD CompareObjectsWithEquals - this runtime, not an equal one
             status = "stopped before it started";
             throw new IllegalStateException(
                     "the program was stopped while its entry point ran");
@@ -1120,6 +1189,45 @@ public class DeviceRuntimeService {
         return runtime != null;
     }
 
+    /// Counts stops, so an install can tell one happened while it was working.
+    ///
+    /// Comparing the running runtime is not enough on its own: a stop landing
+    /// between retiring the old program and publishing the new one clears the
+    /// resources just published, and the field would then agree that the new
+    /// runtime is the current one.
+    private volatile int stopGeneration;  //NOPMD AvoidUsingVolatile - written from the UI, read on the install thread
+
+    /// Fails the install when a stop happened since it started.
+    private void requireNotStopped(int generation) {
+        if (stopGeneration != generation) {
+            status = "stopped before it started";
+            throw new IllegalStateException("the program was stopped while it was being installed");
+        }
+    }
+
+    /**
+     * Ends the program that is running, if any, before another is installed.
+     *
+     * <p>A replaced program's peers are still held by framework listeners and
+     * timers, and without detaching they go on dispatching into the old runtime
+     * alongside the new one -- and a later Stop would only detach the newest.
+     * Its stop() is delivered first, on the event thread, because that is where
+     * a Lifecycle's callbacks belong: releasing a recorder or a sensor from a
+     * socket thread is not something the framework expects.</p>
+     */
+    private void retirePrevious() {
+        final InterpRuntime previous = runtime;
+        if (previous == null) {
+            return;
+        }
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                stopLifecycleQuietly(previous);
+            }
+        });
+        previous.detach();
+    }
+
     /**
      * Delivers stop() to a pushed Lifecycle, reporting rather than propagating.
      *
@@ -1138,6 +1246,9 @@ public class DeviceRuntimeService {
     }
 
     public void stopProgram() {
+        // Counted whether or not something is running: an install in flight has
+        // to notice a stop that arrives before it published its runtime.
+        stopGeneration++;
         InterpRuntime rt = runtime;
         if (rt == null) {
             return;
