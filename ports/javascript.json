@@ -1,48 +1,48 @@
 {
-  "commit": "18c89561a2da548cc7d889af8afda171571ca2e3",
-  "generated_at": "2026-08-19T03:25:56Z",
+  "commit": "3739a2876bf1d3e9fdfa1cd9a8b4c3e94cc20d3a",
+  "generated_at": "2026-08-19T04:49:09Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1463500000
+        "duration_ns": 1493400000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 926400000
+        "duration_ns": 924100000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 13847400000
+        "duration_ns": 13656300001
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 688700000
+        "duration_ns": 668900000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 3697099999
+        "duration_ns": 3674800000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 557100000
+        "duration_ns": 557399999
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 3025699999
+        "duration_ns": 3000699999
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 565100001
+        "duration_ns": 552200000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1044300000
+        "duration_ns": 1022900000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 1069100000
+        "duration_ns": 1035500000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,7 +52,7 @@
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32208730050",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32214814368",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
