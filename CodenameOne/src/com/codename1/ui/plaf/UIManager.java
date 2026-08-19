@@ -83,6 +83,15 @@ public class UIManager {
     /// restore entries that the theme has not overwritten in the meantime.
     private final Map<String, Font> scaledFontOriginals = new HashMap<String, Font>();
     private final Map<String, Font> scaledFontDerived = new HashMap<String, Font>();
+    /// Nesting depth of [#buildTheme]. A theme whose `@includeNativeBool` is
+    /// true makes buildTheme install the native theme, and that goes through
+    /// the full setThemeProps -> buildTheme path again with only the native
+    /// theme's entries in themeProps. The larger-text pass must run once, on
+    /// the outermost build that sees the merged native + app theme; running it
+    /// on the inner build made it clear the rollback bookkeeping for every app
+    /// font it could not see, after which the next refresh scaled the
+    /// already-scaled fonts again. See [#applyLargerTextScaleToThemeFonts].
+    private int buildThemeDepth;
     /// The resource bundle allows us to implicitly localize the UI on the fly, once its
     /// installed all internal application strings query the resource bundle and extract
     /// their values from this table if applicable.
@@ -1827,6 +1836,15 @@ public class UIManager {
     }
 
     private void buildTheme(Hashtable themeProps) {
+        buildThemeDepth++;
+        try {
+            buildThemeImpl(themeProps);
+        } finally {
+            buildThemeDepth--;
+        }
+    }
+
+    private void buildThemeImpl(Hashtable themeProps) {
         // A new theme may change constants that the platform consults while deriving
         // fonts (e.g. a native theme's text letter spacing). Flush the derived-font
         // cache so those fonts are rebuilt against the incoming constants rather than
@@ -1880,7 +1898,9 @@ public class UIManager {
             }
         }
 
-        applyLargerTextScaleToThemeFonts();
+        if (buildThemeDepth == 1) {
+            applyLargerTextScaleToThemeFonts();
+        }
 
         // necessary to clear up the style so we don't get resedue from the previous UI
         defaultStyle = new Style();
@@ -1889,7 +1909,9 @@ public class UIManager {
         defaultStyle = createStyle("", "", false);
         defaultSelectedStyle = new Style(defaultStyle);
         defaultSelectedStyle = createStyle("", "sel#", true);
-        applyLargerTextScaleToDefaultStyles();
+        if (buildThemeDepth == 1) {
+            applyLargerTextScaleToDefaultStyles();
+        }
 
         String overlayThemes = (String) themeProps.get("@OverlayThemes");
         if (overlayThemes != null) {
@@ -2069,6 +2091,9 @@ public class UIManager {
         }
     }
 
+    /// Only [#buildTheme] at depth 1 may call this: the bookkeeping below spans
+    /// the whole merged theme, and a nested `@includeNativeBool` install sees
+    /// only the native theme's half of it. See [#buildThemeDepth].
     private void applyLargerTextScaleToThemeFonts() {
         // Roll back any prior scaling we applied so this pass always derives
         // from the original installed font. Without the rollback, repeated
