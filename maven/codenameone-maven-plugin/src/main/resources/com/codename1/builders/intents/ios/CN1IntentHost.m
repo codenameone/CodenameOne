@@ -21,6 +21,12 @@
  * need additional information or have any questions.
  */
 #import "CN1IntentHost.h"
+// xmlvm.h first, because it is what defines NEW_CODENAME_ONE_VM, and the calls below choose
+// their mangled symbol on it. Without it the old-VM spelling compiles -- the one the
+// translator does not emit for a method with a return type -- and the Mac Catalyst slice
+// rejects it as an undeclared function while the iOS slice lets it through as an implicit
+// declaration. Every other native in this port includes it for the same reason.
+#include "xmlvm.h"
 #include "cn1_globals.h"
 #include "com_codename1_impl_ios_IOSIntentCallbacks.h"
 
