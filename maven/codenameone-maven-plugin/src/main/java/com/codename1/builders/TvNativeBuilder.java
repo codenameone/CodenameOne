@@ -95,6 +95,22 @@ class TvNativeBuilder {
             // references com.codename1.health, so weak-link it here or the tvOS slice fails
             // to link. CN1Health.m additionally compiles itself out via TARGET_OS_TV.
             + "HealthKit.framework";
+    // CoreSpotlight is deliberately NOT in this list, although the watch list carries it.
+    //
+    // The two platforms differ, and it was measured rather than reasoned about. On the
+    // Xcode 26.3 SDKs, CoreSpotlight.framework is absent from watchOS entirely -- which is why
+    // WatchNativeBuilder must weak-link it -- and present on tvOS, shipping a CoreSpotlight.tbd
+    // that links normally: an arm64-apple-tvos13.0 binary built with -framework CoreSpotlight
+    // links and carries the load command.
+    //
+    // What tvOS does not have is the API. Every CSSearchable* type is marked explicitly
+    // unavailable there, so using one is a compile error rather than a link error. That never
+    // arises: CodenameOne_GLViewController.h undoes CN1_USE_INTENTS for TARGET_OS_TV as well as
+    // TARGET_OS_WATCH, so the intent natives compile to their unsupported stubs on the tvOS
+    // slice and nothing references the framework at all.
+    //
+    // Weak-linking it here would therefore be a change with no effect, made against a failure
+    // that does not occur.
 
     TvNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;
