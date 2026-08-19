@@ -383,8 +383,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (!isIOSDeviceBuild()) {
             return;
         }
-        report(IOSProvisioningPreflight.check(mergedSettings,
-                IOSProvisioningPreflight.isReleaseTarget(buildTarget), new Date()));
+        boolean release = IOSProvisioningPreflight.isReleaseTarget(buildTarget);
+        report(IOSProvisioningPreflight.check(mergedSettings, release, new Date()));
+        // Every embedded app extension needs a profile of its own, and the app's profile says
+        // whether it can stand in for one. Run after check() so an unreadable or expired
+        // profile is reported as itself rather than as an extension problem.
+        report(IOSProvisioningPreflight.checkAppExtensions(mergedSettings, release,
+                project.getBasedir()));
     }
 
     private void report(List<IOSProvisioningPreflight.Problem> problems) throws MojoFailureException {
