@@ -217,6 +217,7 @@ def validate(manifest: dict) -> dict:
                     f"Stored report {report_path} is missing tests: "
                     + ", ".join(missing_tests)
                 )
+            unrun_tests = []
             for test, result in report_tests.items():
                 if not isinstance(result, dict) or result.get("status") not in {
                     "pass", "fail", "skip", "not-run"
@@ -224,6 +225,19 @@ def validate(manifest: dict) -> dict:
                     problems.append(f"Stored report {report_path} has an invalid result for {test}")
                 elif result.get("status") == "skip":
                     skipped_tests.add(test)
+                elif result.get("status") == "not-run":
+                    unrun_tests.append(test)
+            if unrun_tests:
+                # A registered test that never started is indistinguishable, on the page, from one
+                # that runs and passes -- nothing here objected to it, so a test could be
+                # published and quietly never executed on any port. A port that genuinely cannot
+                # do something reports "skip", from the suite itself, and is unaffected; "not-run"
+                # is the absence of evidence, and the answer to it is to run the suite and check
+                # the report in rather than to record the absence.
+                problems.append(
+                    f"Stored report {report_path} reports tests that never ran: "
+                    + ", ".join(sorted(unrun_tests))
+                )
             actual_summary = Counter(
                 result.get("status")
                 for result in report_tests.values()

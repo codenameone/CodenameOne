@@ -317,6 +317,82 @@ class PortStatusTest(unittest.TestCase):
             ):
                 port_status.validate(manifest)
 
+    def test_validate_rejects_a_test_that_never_ran(self):
+        # A registered test left at "not-run" reads on the page exactly like one that runs and
+        # passes. Seven database tests were published that way -- added to the manifest, never
+        # run in any stored report -- and nothing here objected.
+        original_directory = self.manifest["report_directory"]
+        with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
+            report_root = Path(tmp)
+            for port in self.manifest["ports"]:
+                source = port_status.REPO_ROOT / original_directory / (
+                    port["id"] + ".json"
+                )
+                (report_root / source.name).write_text(
+                    source.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+            android_path = report_root / "android.json"
+            android = port_status.read_json(android_path)
+            victim = next(
+                name
+                for name, result in android["tests"].items()
+                if result.get("status") == "pass"
+            )
+            android["tests"][victim]["status"] = "not-run"
+            android["summary"]["pass"] -= 1
+            android["summary"]["not-run"] += 1
+            android_path.write_text(
+                json.dumps(android, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest = dict(self.manifest)
+            manifest["report_directory"] = str(
+                report_root.relative_to(port_status.REPO_ROOT)
+            )
+            with self.assertRaisesRegex(
+                port_status.ContractError,
+                "reports tests that never ran: " + victim,
+            ):
+                port_status.validate(manifest)
+
+    def test_validate_accepts_a_test_the_port_skipped(self):
+        # The distinction the rule turns on: a port that genuinely cannot do something reports
+        # "skip" from the suite itself, which is evidence rather than the absence of it.
+        original_directory = self.manifest["report_directory"]
+        with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
+            report_root = Path(tmp)
+            for port in self.manifest["ports"]:
+                source = port_status.REPO_ROOT / original_directory / (
+                    port["id"] + ".json"
+                )
+                (report_root / source.name).write_text(
+                    source.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+            android_path = report_root / "android.json"
+            android = port_status.read_json(android_path)
+            victim = next(
+                name
+                for name, result in android["tests"].items()
+                if result.get("status") == "pass"
+            )
+            android["tests"][victim]["status"] = "skip"
+            android["summary"]["pass"] -= 1
+            android["summary"]["skip"] += 1
+            android_path.write_text(
+                json.dumps(android, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest = dict(self.manifest)
+            manifest["report_directory"] = str(
+                report_root.relative_to(port_status.REPO_ROOT)
+            )
+            # Asserted against this rule alone: a skip carries its own separate obligation --
+            # errata explaining it -- and that is what would be reported here instead.
+            try:
+                port_status.validate(manifest)
+            except port_status.ContractError as exc:
+                self.assertNotIn("never ran", str(exc))
+
     def publishable_report(self, port_id, **overrides):
         mapped = port_status.test_to_feature(self.manifest)
         tests = {
