@@ -24,6 +24,7 @@ package com.codename1.certificatewizard;
 
 import com.codename1.certificatewizard.api.CloudSigningService;
 import com.codename1.certificatewizard.api.MockSigningService;
+import com.codename1.certificatewizard.api.SigningError;
 import com.codename1.certificatewizard.api.SigningService;
 import com.codename1.certificatewizard.api.SigningState;
 import com.codename1.certificatewizard.api.WizardDecisions;
@@ -32,6 +33,7 @@ import com.codename1.certificatewizard.project.ProjectIO;
 import com.codename1.certificatewizard.project.AndroidKeystoreProvider;
 import com.codename1.certificatewizard.project.SigningAssetInstaller;
 import com.codename1.components.InteractionDialog;
+import com.codename1.components.SpanLabel;
 import com.codename1.components.ToastBar;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
@@ -57,6 +59,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.UIManager;
 
 import java.io.InputStream;
@@ -107,6 +110,8 @@ public class CertificateWizard extends Lifecycle {
     private Container messageHost;
     private String pageMessage = "";
     private boolean pageMessageWarn;
+    private String pageMessageActionText;
+    private Runnable pageMessageAction;
 
     public static void setServiceForTesting(SigningService s) {
         injectedService = s;
@@ -421,7 +426,7 @@ public class CertificateWizard extends Lifecycle {
         Button cert = outline("Generate certificate", "btn.generateCert");
         cert.addActionListener(e -> certificateDialog());
         Button sync = outline("Sync with Apple", "btn.reconcile");
-        sync.addActionListener(e -> service.reconcile(r -> afterMutation(r, "Synced with Apple")));
+        sync.addActionListener(e -> syncWithApple());
         page.add(actionRow(Component.LEFT, profile, cert, sync));
     }
 
@@ -762,7 +767,7 @@ public class CertificateWizard extends Lifecycle {
         Button add = primary("Generate", "btn.generateCert");
         add.addActionListener(e -> certificateDialog());
         Button sync = outline("Sync with Apple", "btn.reconcile");
-        sync.addActionListener(e -> service.reconcile(r -> afterMutation(r, "Synced with Apple")));
+        sync.addActionListener(e -> syncWithApple());
         page.add(actionRow(Component.LEFT, add, sync));
         Container table = card();
         Container body = tableBody(Section.CERTIFICATES);
@@ -1712,7 +1717,7 @@ public class CertificateWizard extends Lifecycle {
                     showPageMessage("The stored App Store Connect API key is no longer configured on the server. Store a new key to continue.", true);
                 }
             } else {
-                showPageMessage(r.message, true);
+                showPageError(r, this::reload);
             }
         });
     }
@@ -1745,9 +1750,22 @@ public class CertificateWizard extends Lifecycle {
         Preferences.set(PREF_CREDENTIAL_ISSUER_ID, state.credential.issuerId() == null ? "" : state.credential.issuerId());
     }
 
+    /**
+     * "Sync with Apple" -- the call that surfaced the old blanket 502. Retrying
+     * a reconcile is always safe, so a genuinely transient failure gets a
+     * button; a rejected API key gets pointed at the key page instead.
+     */
+    private void syncWithApple() {
+        service.reconcile(r -> afterMutation(r, "Synced with Apple", this::syncWithApple));
+    }
+
     private void afterMutation(SigningService.Result<Void> r, String okMessage) {
+        afterMutation(r, okMessage, null);
+    }
+
+    private void afterMutation(SigningService.Result<Void> r, String okMessage, Runnable retry) {
         if (!r.ok) {
-            showPageMessage(r.message, true);
+            showPageError(r, retry);
             return;
         }
         clearPageMessage();
@@ -1760,7 +1778,7 @@ public class CertificateWizard extends Lifecycle {
             clearPageMessage();
             ToastBar.showMessage("Saved " + r.value, FontImage.MATERIAL_FILE_DOWNLOAD);
         } else {
-            showPageMessage(r.message, true);
+            showPageError(r, null);
         }
     }
 
@@ -1924,13 +1942,40 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private void showPageMessage(String message, boolean warn) {
+        showPageMessage(message, warn, null, null);
+    }
+
+    private void showPageMessage(String message, boolean warn, String actionText, Runnable action) {
         pageMessage = message == null || message.trim().isEmpty() ? "The request failed. Try again later." : message;
         pageMessageWarn = warn;
+        pageMessageActionText = actionText;
+        pageMessageAction = action;
         renderPageMessage();
+    }
+
+    /**
+     * Reports a failed call with the next step attached. The service now
+     * distinguishes "your App Store Connect key needs fixing" from "Apple is
+     * down", so the banner can send the developer somewhere useful instead of
+     * telling them to try again later regardless.
+     */
+    private void showPageError(SigningService.Result<?> r, Runnable retry) {
+        SigningError.Kind kind = r.errorKind();
+        if (kind == SigningError.Kind.CREDENTIAL && section != Section.CREDENTIAL) {
+            showPageMessage(r.message, true, "Open ASC API Key", () -> go(Section.CREDENTIAL));
+            return;
+        }
+        if (retry != null && r.error != null && r.error.retryable()) {
+            showPageMessage(r.message, true, "Try again", retry);
+            return;
+        }
+        showPageMessage(r.message, true);
     }
 
     private void clearPageMessage() {
         pageMessage = "";
+        pageMessageActionText = null;
+        pageMessageAction = null;
         renderPageMessage();
     }
 
@@ -1940,10 +1985,28 @@ public class CertificateWizard extends Lifecycle {
         }
         messageHost.removeAll();
         if (pageMessage != null && pageMessage.length() > 0) {
-            Label l = new Label(pageMessage);
-            l.setUIID(uiid(pageMessageWarn ? "CWBannerWarn" : "CWBanner"));
+            String id = uiid(pageMessageWarn ? "CWBannerWarn" : "CWBanner");
+            // A SpanLabel rather than a Label: these messages are whole
+            // sentences telling the developer what to go and fix, and a Label
+            // would clip them to the width of the banner.
+            SpanLabel l = new SpanLabel(pageMessage);
+            l.setUIID(id);
+            l.setTextUIID(id);
+            l.setName("page.message");
             l.setTextSelectionEnabled(true);
+            TextArea text = l.getTextComponent();
+            text.setUIID(id);
+            text.getAllStyles().setPadding(0, 0, 0, 0);
+            text.getAllStyles().setMargin(0, 0, 0, 0);
+            text.getAllStyles().setBgTransparency(0);
+            text.getAllStyles().setBorder(Border.createEmpty());
             messageHost.add(l);
+            if (pageMessageActionText != null && pageMessageAction != null) {
+                Button act = outline(pageMessageActionText, "page.message.action");
+                final Runnable action = pageMessageAction;
+                act.addActionListener(e -> action.run());
+                messageHost.add(actionRow(Component.LEFT, act));
+            }
         }
         messageHost.revalidate();
     }

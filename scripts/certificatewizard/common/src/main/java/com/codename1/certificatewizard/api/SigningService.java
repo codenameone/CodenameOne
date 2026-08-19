@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.certificatewizard.api;
 
 import com.codename1.util.OnComplete;
@@ -32,19 +54,34 @@ public interface SigningService {
         public final boolean ok;
         public final T value;
         public final String message;
+        /** What kind of failure this was, so the UI can offer the right next step. Null when ok. */
+        public final SigningError error;
 
-        private Result(boolean ok, T value, String message) {
+        private Result(boolean ok, T value, String message, SigningError error) {
             this.ok = ok;
             this.value = value;
             this.message = message;
+            this.error = error;
         }
 
         public static <T> Result<T> ok(T value) {
-            return new Result<T>(true, value, null);
+            return new Result<T>(true, value, null, null);
         }
 
         public static <T> Result<T> fail(String message) {
-            return new Result<T>(false, null, message == null ? "Operation failed" : message);
+            return new Result<T>(false, null, message == null ? "Operation failed" : message, null);
+        }
+
+        public static <T> Result<T> fail(SigningError error) {
+            if (error == null) {
+                return fail((String) null);
+            }
+            return new Result<T>(false, null, error.message(), error);
+        }
+
+        /** The failure kind, or {@link SigningError.Kind#OTHER} when there is nothing more specific. */
+        public SigningError.Kind errorKind() {
+            return error == null ? SigningError.Kind.OTHER : error.kind();
         }
     }
 }

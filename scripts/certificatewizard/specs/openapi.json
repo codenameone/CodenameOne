@@ -210,7 +210,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -244,7 +250,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -333,6 +345,12 @@
           "404": {
             "description": "No such certificate"
           },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
           "502": {
             "$ref": "#/components/responses/AppleError"
           }
@@ -364,7 +382,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -405,7 +429,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -452,7 +482,16 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "404": {
+            "$ref": "#/components/responses/AppleGone"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -485,7 +524,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -526,7 +571,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -594,7 +645,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -637,7 +694,16 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "404": {
+            "$ref": "#/components/responses/AppleGone"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -673,6 +739,12 @@
           "404": {
             "description": "No such profile"
           },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
           "502": {
             "$ref": "#/components/responses/AppleError"
           }
@@ -704,7 +776,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -746,7 +824,13 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "409": {
-            "$ref": "#/components/responses/NotConfigured"
+            "$ref": "#/components/responses/AscKeyProblem"
+          },
+          "422": {
+            "$ref": "#/components/responses/AppleRejected"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           },
           "502": {
             "$ref": "#/components/responses/AppleError"
@@ -885,8 +969,38 @@
       "Forbidden": {
         "description": "Caller is anonymous / not authenticated."
       },
-      "NotConfigured": {
-        "description": "No App Store Connect API key configured for this account yet.",
+      "AscKeyProblem": {
+        "description": "The account's App Store Connect API key is missing, was rejected by Apple (revoked, or the Key ID / Issuer ID do not match the .p8), or lacks the access this call needs. The developer has to fix the stored key -- retrying will not clear it. The body is a plain-text explanation written for them.\n",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AppleRejected": {
+        "description": "The stored key is fine but Apple refused this particular request (for example \"You already have a current Distribution certificate\"). The body is a plain-text explanation, carrying Apple's own wording where Apple supplied it.\n",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Apple is rate-limiting App Store Connect requests for this team. Retrying after a pause is correct.",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AppleGone": {
+        "description": "Apple no longer has the object -- it was deleted in the Developer portal. A reconcile brings us back in step.",
         "content": {
           "text/plain": {
             "schema": {
@@ -899,7 +1013,7 @@
         "description": "Secrets vault is not configured on this deployment (no master key), so credentials cannot be stored."
       },
       "AppleError": {
-        "description": "The App Store Connect API rejected the call or was unreachable (upstream failure).",
+        "description": "App Store Connect is down or unreachable, so the call could not be completed. This is the only genuinely upstream failure and the only one worth retrying automatically; anything the developer must act on comes back as 409 or 422 instead.\n",
         "content": {
           "text/plain": {
             "schema": {
