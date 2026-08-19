@@ -4958,6 +4958,20 @@ public class IPhoneBuilder extends Executor {
                             // translation describing a different program.
                             + "    swift_paths = swift_paths.reject{|p| p.include?('/"
                             + WatchNativeBuilder.WATCH_SRC_DIR + "/')}\n"
+                            // The Objective-C host that Swift reaches CN1IntentHost through is
+                            // staged into the same directory, and this sweep only globs Swift --
+                            // so without naming it the file is present, imported by the bridging
+                            // header, and never compiled, which is an undefined symbol at link
+                            // rather than a missing type at compile. Named explicitly rather than
+                            // globbing '*.m', because that directory is full of translated
+                            // Objective-C the project already lists.
+                            + "    Dir.glob(File.join(project_root, main_class_name + '-src', 'CN1IntentHost.m')).each do |host_path|\n"
+                            + "      rel_path = Pathname.new(host_path).relative_path_from(Pathname.new(project_root)).to_s\n"
+                            + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
+                            + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
+                            + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
+                            + "      end\n"
+                            + "    end\n"
                             + "    swift_paths.each do |swift_path|\n"
                             + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
                             + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
@@ -6281,6 +6295,19 @@ public class IPhoneBuilder extends Executor {
             copyResourceTo("/com/codename1/builders/intents/ios/" + name,
                     new File(srcDir, name));
         }
+        // Staging the header is not the same as making it visible. Objective-C declarations in
+        // the same target are not automatically in scope for Swift -- they have to come through
+        // the bridging header -- and this one was written with nothing but a comment in it, so
+        // every reference to CN1IntentHost in the generated Swift failed to compile with
+        // "cannot find 'CN1IntentHost' in scope". A device build is the only thing that could
+        // have said so, which is why the sample now declares an intent.
+        //
+        // Appended rather than written, and only once: the header is shared with anything else
+        // that needs to reach Objective-C from Swift. The path is relative to the header's own
+        // directory, which is SRCROOT -- SWIFT_OBJC_BRIDGING_HEADER points at
+        // $(SRCROOT)/cn1-Bridging-Header.h.
+        importIntoBridgingHeader(distDir,
+                request.getMainClass() + "-src/CN1IntentHost.h");
         // A snippet is a small layout rendered while the app may be off screen, which is what a
         // widget is, so it reuses the surfaces node renderer rather than growing a second
         // layout vocabulary. Written under the same filenames the surfaces builder uses, so an
@@ -6324,6 +6351,31 @@ public class IPhoneBuilder extends Executor {
         }
         log("Generating App Intents declarations (" + intentsManifest.size() + " intent(s), "
                 + entitiesManifest.size() + " entity type(s))");
+    }
+
+    /// Adds an `#import` to the project's Swift bridging header, creating the header when the
+    /// Swift settings injection has not written it yet.
+    ///
+    /// Idempotent because both this and the Swift-settings pass can reach the file, and a
+    /// duplicate import is a redefinition once the header is preprocessed into the Swift
+    /// interface.
+    private void importIntoBridgingHeader(File distDir, String relativeHeaderPath)
+            throws IOException {
+        File bridging = new File(distDir, "cn1-Bridging-Header.h");
+        String line = "#import \"" + relativeHeaderPath + "\"\n";
+        String existing = "";
+        if (bridging.exists()) {
+            existing = new String(java.nio.file.Files.readAllBytes(bridging.toPath()),
+                    StandardCharsets.UTF_8);
+            if (existing.contains(line)) {
+                return;
+            }
+        } else {
+            existing = "// Codename One generated Swift bridging header\n";
+        }
+        try (FileOutputStream out = new FileOutputStream(bridging)) {
+            out.write((existing + line).getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     /// Copies a plugin resource to disk, failing loudly when it is missing: a silently absent
