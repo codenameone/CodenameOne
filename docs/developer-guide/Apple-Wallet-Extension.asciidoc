@@ -108,9 +108,9 @@ Provisioning profile "MyApp_Distribution" has app ID "com.mybank.app", which doe
 match the bundle ID "com.mybank.app.WalletNonUIExtension"
 ....
 
-Codename One refuses that build before it is sent, naming the extension and the bundle id its App ID has to match. To fix it, create an App ID for `<your package>.<folder name>` in the Apple Developer portal - for a Wallet extension with the `com.apple.developer.payment-pass-provisioning` entitlement Apple grants on request, and with the same App Group as the app - generate a provisioning profile for it against the same certificate as the app, and supply it in one of three ways:
+Codename One refuses that build before it's sent, naming the extension and the bundle id its App ID has to match. To fix it, create an App ID for `<your package>.<folder name>` in the Apple Developer portal - for a Wallet extension with the `com.apple.developer.payment-pass-provisioning` entitlement Apple grants on request, and with the same App Group as the app - generate a provisioning profile for it against the same certificate as the app, and supply it in one of three ways:
 
-. Place the `.mobileprovision` file inside `ios/app_extensions/MyWalletExtension/`. It is picked up automatically and kept out of the app bundle. Profiles carry no private keys, so committing one is safe.
+. Place the `.mobileprovision` file inside `ios/app_extensions/MyWalletExtension/`. It's picked up automatically and kept out of the app bundle. Profiles carry no private keys, so committing one is safe.
 . Point at it from `codenameone_settings.properties`, which suits a profile that lives outside the repository:
 +
 [source,properties]
@@ -121,9 +121,9 @@ include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extensio
 The unqualified `codename1.ios.appext.MyWalletExtension.provision` is the fallback for both build types.
 . Host it and name the URL in `ios.appext.MyWalletExtension.provisioningURL` (or the `ios.debug.appext...` / `ios.release.appext...` variants).
 
-The build validates the profile it is given: it must match the app's signing certificate, cover the extension's bundle id, be current, and grant the App Groups and the payment-pass-provisioning entitlement the extension's `.entitlements` asks for. Each of those fails with a message naming the extension, rather than as an Xcode codesigning error minutes into the build.
+The build validates the profile it's given: it must match the app's signing certificate, cover the extension's bundle id, be current, and grant the App Groups and the payment-pass-provisioning entitlement the extension's `.entitlements` asks for. Each of those fails with a message naming the extension, rather than as an Xcode code signing error minutes into the build.
 
-A wildcard App ID (`com.mybank.*`) is the one case that needs no extra profile - it covers the extension bundle ids already, and the build lets it through. Wallet extensions can't use one: the payment-pass-provisioning entitlement is granted per explicit App ID.
+A wildcard App ID (`com.mybank.*`) is the one case that needs no extra profile - it's already covering the extension bundle ids, and the build lets it through. Wallet extensions can't use one: the payment-pass-provisioning entitlement is granted per explicit App ID.
 
 Local "ios-source" builds need none of this - you sign the generated Xcode project in Xcode as usual.
 
