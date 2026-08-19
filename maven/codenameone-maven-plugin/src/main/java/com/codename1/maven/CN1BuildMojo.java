@@ -1501,8 +1501,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                             cn1SettingsProps.put(propName, propVal);
                         } else {
                             String existing = cn1SettingsProps.getProperty(propName);
-                            if (!existing.contains(propVal)) {
-                                cn1SettingsProps.setProperty(propName, existing + propVal);
+                            // Separator decided by the hint rather than by whatever the library
+                            // baked into its own value -- see LibraryHintMerger for why a bare
+                            // concatenation welds two Gradle statements into one.
+                            if (!LibraryHintMerger.alreadyContains(propName, existing, propVal)) {
+                                cn1SettingsProps.setProperty(propName,
+                                        LibraryHintMerger.append(propName, existing, propVal));
                             }
                         }
                     }
@@ -1523,6 +1527,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             }
 
+        }
+
+        // Fail here rather than in Gradle. A dependency hint that ran two statements together
+        // surfaces on the build server as a Groovy MissingMethodException against a generated
+        // build.gradle line, which says nothing about which hint or which library produced it --
+        // and on a cloud build that answer costs a queue slot and a round trip to discover.
+        for (String gradleHint : new String[] {"codename1.arg.android.gradleDep",
+                "codename1.arg.gradleDependencies"}) {
+            String problem = LibraryHintMerger.findUnseparatedStatement(
+                    gradleHint, cn1SettingsProps.getProperty(gradleHint));
+            if (problem != null) {
+                throw new MojoExecutionException(problem);
+            }
         }
 
         // Re-run the hardening pre-flight against the MERGED effective settings: a CN1Lib can supply
