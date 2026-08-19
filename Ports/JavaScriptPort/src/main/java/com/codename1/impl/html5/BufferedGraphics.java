@@ -912,7 +912,10 @@ public class BufferedGraphics extends HTML5Graphics {
         if (canvas == null || w <= 0 || h <= 0) {
             return;
         }
-        noteCanvasCover(x, y, w, h);
+        // Counted whatever the alpha is: the op is built with 255 and blits the surface
+        // opaquely, so a blit made with the graphics fully transparent still replaces what was
+        // underneath -- including text the layer had promoted over it.
+        noteAlphaIndependentRegion(x, y, w, h, null);
         upcoming.add(new com.codename1.impl.html5.graphics.DrawCanvas(canvas, x, y, w, h, 255));
     }
 
@@ -927,7 +930,10 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        noteStrokeCover(arcOutline(x, y, width, height, startAngle, arcAngle, false), 1);
+        // A sweep of nothing draws nothing -- the outline would be a single point repeated.
+        if (arcAngle != 0) {
+            noteStrokeCover(arcOutline(x, y, width, height, startAngle, arcAngle, false), 1);
+        }
         addOp(new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
@@ -1146,7 +1152,13 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        noteCanvasCover(x, y, width, height, arcCoverTest(x, y, width, height, startAngle, arcAngle));
+        // A sweep of nothing fills a path with no area, so nothing is covered. Reported, it
+        // would be the line from the centre out to the rim, and text across that line would be
+        // taken off the layer by a draw that painted no pixels at all.
+        if (arcAngle != 0) {
+            noteCanvasCover(x, y, width, height,
+                    arcCoverTest(x, y, width, height, startAngle, arcAngle));
+        }
         addOp(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
@@ -1447,8 +1459,11 @@ public class BufferedGraphics extends HTML5Graphics {
         // graphics fully transparent still replaces the pixels underneath. Coverage says what
         // the canvas does, not what it ought to do -- text left above this would be floating
         // over pixels that really were painted over.
-        noteAlphaIndependentRegion(x, y, width, height,
-                arcCoverTest(x, y, width, height, startAngle, arcAngle));
+        if (arcAngle != 0) {
+            // As with fillArc: a sweep of nothing paints nothing.
+            noteAlphaIndependentRegion(x, y, width, height,
+                    arcCoverTest(x, y, width, height, startAngle, arcAngle));
+        }
         shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, startAngle, arcAngle);
     }
     
