@@ -1441,13 +1441,20 @@ public class BufferedGraphics extends HTML5Graphics {
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         // A radial gradient fills the oval inscribed in these bounds, or a sector of it -- not
         // the bounds themselves, whose corners it never reaches.
-        noteCanvasCover(x, y, width, height, arcCoverTest(x, y, width, height, startAngle, arcAngle));
+        //
+        // Counted whatever the alpha is, because FillRadialGradient paints whatever the alpha
+        // is: its setGlobalAlpha call is commented out in the renderer, so a fill made with the
+        // graphics fully transparent still replaces the pixels underneath. Coverage says what
+        // the canvas does, not what it ought to do -- text left above this would be floating
+        // over pixels that really were painted over.
+        noteAlphaIndependentRegion(x, y, width, height,
+                arcCoverTest(x, y, width, height, startAngle, arcAngle));
         shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, startAngle, arcAngle);
     }
     
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
-        noteCanvasCover(x, y, width, height, arcCoverTest(x, y, width, height, 0, 360));
+        noteAlphaIndependentRegion(x, y, width, height, arcCoverTest(x, y, width, height, 0, 360));
         shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, 0, 360);
     }
 
