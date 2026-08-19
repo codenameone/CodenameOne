@@ -151,6 +151,11 @@ public final class GenerateInterpShims {
             "com/codename1/bluetooth/",
             "com/codename1/vr/",
             "com/codename1/surfaces/",
+            // Smart home: HomeKit on iOS, Matter and Google Home on Android.
+            // Debugging one of these on a device is the reason the runtime
+            // carries native capabilities at all -- a simulator cannot see an
+            // accessory.
+            "com/codename1/home/",
             // The vector map, which needs no key and no native provider: a
             // NativeMap with nothing wired in delegates to an embedded MapView,
             // so a pushed program gets a real map rather than a blank one.

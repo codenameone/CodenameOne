@@ -2304,9 +2304,13 @@ public final class InterpRuntime {
         Vector externs = new Vector();
         c.collectHostSupertypes(externs);
         for (int i = 0; i < externs.size(); i++) {
+            // The cast is outside the try on purpose: a catch of Throwable
+            // around it would be a handler for a failed cast, which ParparVM
+            // never raises -- see check-cast-semantics.
+            int ext = ((Integer) externs.elementAt(i)).intValue();
             Object supertype;
             try {
-                supertype = resolveExternClass(((Integer) externs.elementAt(i)).intValue());
+                supertype = resolveExternClass(ext);
             } catch (Throwable absent) {
                 // A supertype the installed app does not have cannot make
                 // anything assignable to the receiver, and asking a type
