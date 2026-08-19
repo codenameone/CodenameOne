@@ -699,12 +699,7 @@ public class DeviceRuntimeService {
      */
     private boolean approveWhileWaiting(String peerId, Progress progress) {
         progress.allowLongWait();
-        try {
-            return DeviceRuntimePairing.approve(peerId);
-        } finally {
-            // The dialog is closed; what is left is the verdict going back.
-            progress.endLongWait();
-        }
+        return DeviceRuntimePairing.approve(peerId);
     }
 
     /**
@@ -1077,6 +1072,11 @@ public class DeviceRuntimeService {
                 // push tool at all; every other one is our protocol saying no.
                 return !"bad magic".equals(reject);
             }
+            // Installing and starting a program takes as long as the program
+            // takes, and the desktop is waiting for the result on this same
+            // connection. Nothing unauthenticated reaches here: a v3 push
+            // answered the challenge and was approved, and v1 is loopback only.
+            progress.allowLongWait();
             try {
                 String result = loadAndRun(payload);
                 out.writeByte(1);
