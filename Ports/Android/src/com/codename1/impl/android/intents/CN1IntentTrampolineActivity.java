@@ -23,6 +23,7 @@
 package com.codename1.impl.android.intents;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -146,7 +147,7 @@ public class CN1IntentTrampolineActivity extends Activity {
                     // The runtime is up, so the policy can be applied now: held to what the
                     // launcher already offers, and stripped of parameters so a fabricated URI
                     // cannot choose the values a capability acts on.
-                    if (!isSafeForUntrustedCallers(id)) {
+                    if (!isSafeForUntrustedCallers(this, id)) {
                         Log.w(TAG, "Refusing an unauthenticated request for \"" + id + "\"");
                         return true;
                     }
@@ -203,7 +204,7 @@ public class CN1IntentTrampolineActivity extends Activity {
     /// An intent the application declared as not discoverable, or as destructive, or that needs
     /// a value nobody supplied, is never in that set -- so an arbitrary app cannot reach the
     /// capabilities most worth protecting.
-    static boolean isSafeForUntrustedCallers(String id) {
+    static boolean isSafeForUntrustedCallers(Context ctx, String id) {
         // A parameterization is a runtime publication, not one of the launcher actions this
         // policy exists to expose -- and it is the more dangerous of the two, because its whole
         // point is that it carries values the user already chose. Stripping params off an
@@ -240,7 +241,16 @@ public class CN1IntentTrampolineActivity extends Activity {
                 return false;
             }
         }
-        return true;
+        // Asked of the launcher rather than inferred, which is the difference between "would
+        // have qualified" and "was actually offered". The build publishes at most
+        // MAX_STATIC_SHORTCUTS of the intents that pass every test above, so an app declaring
+        // more than that had capabilities this predicate called launcher-equivalent while the
+        // launcher had never shown them -- and this Activity is exported, so any installed app
+        // could reach a fourth or later one with a fabricated cn1intent:// URI carrying no
+        // nonce. The manifest set is the authority on what a tap can legitimately mean here,
+        // and it is also the only set that arrives without a nonce: everything this framework
+        // publishes at runtime is stamped with one.
+        return AndroidIntentBridge.hasManifestShortcut(ctx, id);
     }
 
     private void launchMainActivity() {

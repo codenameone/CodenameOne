@@ -158,7 +158,7 @@ public class AndroidIntentBridge implements IntentBridge {
         if (parked == null) {
             return;
         }
-        if (!CN1IntentTrampolineActivity.isSafeForUntrustedCallers(parked)) {
+        if (!CN1IntentTrampolineActivity.isSafeForUntrustedCallers(context(), parked)) {
             Log.w(TAG, "Refusing the parked unauthenticated request for \"" + parked + "\"");
             return;
         }
@@ -989,7 +989,14 @@ public class AndroidIntentBridge implements IntentBridge {
     /// shortcut for more reasons than the declaration shows -- not discoverable, past the
     /// static quota, destructive -- and this only needs to know whether the launcher has one.
     @TargetApi(Build.VERSION_CODES.N_MR1)
-    private static boolean hasManifestShortcut(Context ctx, String intentId) {
+    static boolean hasManifestShortcut(Context ctx, String intentId) {
+        if (ctx == null || intentId == null) {
+            // No context is no answer, and this now gates an exported entry point: an
+            // unanswerable question has to read as "not published" rather than crash the
+            // trampoline or, worse, be treated as permission. registerIntents can reach here
+            // with a null context when the process has no Activity yet.
+            return false;
+        }
         // Cast outside the guard: inside a catch(Throwable) it reads as relying on
         // ClassCastException, which ParparVM does not throw.
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
