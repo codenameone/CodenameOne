@@ -173,6 +173,73 @@ final class IOSIntentCallbacks {
             return;
         }
         Map<String, Object> params = parse(paramsJson);
+        if (!headless && !hasWindow()) {
+            // The same rule nativeUserActivity applies, for the same reason and on the other
+            // door. openAppWhenRun asks the system to foreground the app; it does not wait for
+            // Codename One to have started, so a cold launch runs perform() while init/start
+            // are still only enqueued. The handler of a non-headless intent is documented to
+            // update the screen through callSerially -- against no Form at all, that either
+            // does nothing or builds into a Display that is not ready.
+            //
+            // Held on its own thread rather than parked in a list: unlike a continued activity,
+            // an invocation owns a token that has to be answered exactly once, so it cannot be
+            // dropped when the wait expires.
+            Thread t = new Thread(new InvocationWaiter(token, intentId, params, headless),
+                    "CN1 Intent window " + intentId);
+            t.start();
+            return;
+        }
+        runInvocation(token, intentId, params, headless);
+    }
+
+    /// Waits for the application to have a window, then runs the invocation.
+    ///
+    /// Named and static rather than anonymous: it outlives the callback that started it.
+    private static final class InvocationWaiter implements Runnable {
+        private final String token;
+        private final String intentId;
+        private final Map<String, Object> params;
+        private final boolean headless;
+
+        InvocationWaiter(String token, String intentId, Map<String, Object> params,
+                          boolean headless) {
+            this.token = token;
+            this.intentId = intentId;
+            this.params = params;
+            this.headless = headless;
+        }
+
+        @Override
+        public void run() {
+            long giveUpAt = System.currentTimeMillis() + WINDOW_WAIT_MILLIS;
+            while (System.currentTimeMillis() < giveUpAt) {
+                if (hasWindow()) {
+                    runInvocation(token, intentId, params, headless);
+                    return;
+                }
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            // A launch that never produced a window is a broken application, but the token is
+            // still owed an answer: a continuation that is never resumed leaves the assistant
+            // waiting forever, which is worse than a reported failure. A parked *activity* can
+            // simply be dropped here because nothing is waiting on it.
+            Log.p("[intents] the application never produced a window; not running \"" + intentId
+                    + "\"", Log.WARNING);
+            Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+            completeOrQueue(token, IntentSerializer.serializeResult(
+                    IntentResult.failed("The application did not finish starting"), images),
+                    images);
+        }
+    }
+
+    /// Hands one invocation to the framework and answers its token with whatever comes back.
+    private static void runInvocation(final String token, String intentId,
+                                       Map<String, Object> params, boolean headless) {
         // Not VOICE. Everything the system runs through an App Intent arrives here -- Siri, the
         // Shortcuts app, an App Shortcut on the home screen -- and perform() is not told which.
         // Claiming Siri for all of them was a statement the platform never made, and an
