@@ -226,7 +226,12 @@ public final class JavaScriptSemanticOverlay {
             // void call across the bridge is queued for the main thread, so it returns long
             // before the browser dispatches the event it causes.
             focusedNodeId = pendingFocus.id;
-            HTMLElement target = pendingFocus.element;
+            // A field edited through a SET_TEXT control no longer has a tab stop of its own, so
+            // its semantic element is not where focus is useful: the control is the half that
+            // takes keystrokes. Focusing the element instead would announce the field and then
+            // drop every key the user typed.
+            HTMLElement control = editingControl(pendingFocus);
+            HTMLElement target = control == null ? pendingFocus.element : control;
             pendingFocus = null;
             target.focus();
         }
@@ -607,6 +612,12 @@ public final class JavaScriptSemanticOverlay {
                 // have, and Enter, Space or an arrow key would still reach this element's
                 // listeners and act on a component the framework considers unfocused.
                 focusedNodeId = -1;
+                // Whichever of the two holds it: blur on an element that is not focused does
+                // nothing, and after the tab-stop change the control is the likelier holder.
+                HTMLElement control = editingControl(entry);
+                if (control != null) {
+                    control.blur();
+                }
                 entry.element.blur();
             }
             return;
@@ -618,6 +629,19 @@ public final class JavaScriptSemanticOverlay {
         // the first after a form change -- has not been attached yet, and a browser ignores
         // focus on an element that is not in the document. Applied once the tree is in place.
         pendingFocus = entry;
+    }
+
+    /**
+     * The control focus belongs on for a node, when one stands in for it.
+     *
+     * @param entry the node's entry
+     * @return its SET_TEXT control, or null when focus belongs on the element itself
+     */
+    private HTMLElement editingControl(Entry entry) {
+        if (entry.customActions == null) {
+            return null;
+        }
+        return entry.customActions.get(AccessibilityAction.SET_TEXT);
     }
 
     private void applyCustomActions(Entry entry, AccessibilityNodeSnapshot node) {
@@ -827,6 +851,19 @@ public final class JavaScriptSemanticOverlay {
             @Override
             public void handleEvent(Event event) {
                 control.setAttribute(ATTRIBUTE_EDITING, "1");
+                if (focusedNodeId == nodeId) {
+                    return;
+                }
+                // The field has no tab stop of its own any more, so this is the only way a
+                // keyboard or screen-reader user reaches it -- and without telling the
+                // framework, the browser would edit this field while Codename One still
+                // considered the previously focused component active, styling it, sending it
+                // focus events and navigating on from it. Recorded before the dispatch: the
+                // snapshot that comes back reporting this node focused then finds the overlay
+                // already agreeing, so it does not pull focus onto the semantic element and
+                // take it off this control mid-edit.
+                focusedNodeId = nodeId;
+                dispatcher.performAction(nodeId, AccessibilityAction.FOCUS, null);
             }
         });
         final boolean masked = obscured;
