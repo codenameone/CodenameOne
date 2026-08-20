@@ -333,6 +333,22 @@ class SimulatorIntents {
             return new ChoiceEditor(box, opts);
         }
         if (p.getType() == IntentParameterType.BOOLEAN) {
+            boolean noDefault = p.getDefaultValue() == null || p.getDefaultValue().length() == 0;
+            if (!p.isRequired() && noDefault) {
+                // A checkbox has two states and this parameter has three. Unchecked submits
+                // false, and a submitted false is not an omitted parameter: the platform can
+                // leave an optional value out entirely, and a handler taking a Boolean is then
+                // handed null and may well branch on it. With only a checkbox the window could
+                // not produce that invocation at all, so the one case the developer most wants
+                // to try is the one it silently replaced with its opposite.
+                //
+                // Same shape as a closed vocabulary with no default, a few lines up: a blank
+                // first entry is what absent looks like in this form, and collectParameters
+                // drops a blank rather than sending it. The values are the strings the wire
+                // carries, which is also what the generated coercion reads.
+                String[] states = {"", "true", "false"};
+                return new ChoiceEditor(new JComboBox(new DefaultComboBoxModel(states)), states);
+            }
             // Seeded from the declaration. An unchecked box always submits false, and because
             // the key is then present the generated coercion never applies the declared
             // default -- so pressing Run without touching the form exercised the opposite value
