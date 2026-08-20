@@ -6504,6 +6504,25 @@ public class AndroidGradleBuilder extends Executor {
         debug("Gradle File start\n-------\n");
         debug(gradleProps);
         debug("-------\nGradle File end \n");
+
+        // Two dependency statements run together are valid Groovy -- a method call on the
+        // dependency the first one returned -- so Gradle reports them as "Could not find method
+        // implementation()" against a generated build.gradle line the developer never wrote, and
+        // names neither the hint nor the library that produced it. Say it plainly instead. This
+        // is not only about hand written values: a cn1lib's codenameone_library_appended.properties
+        // used to be concatenated onto the project's own value with no separator, so a project
+        // built by an older Maven plugin still arrives here corrupted.
+        String unseparated = findUnseparatedGradleStatement(request.getArg("android.gradleDep", ""));
+        if (unseparated != null) {
+            log("The android.gradleDep build hint runs two Gradle statements together with no "
+                    + "separator between them, near: " + unseparated + " -- separate them with ';' "
+                    + "or a newline. If you did not write this value by hand, a cn1lib appended a "
+                    + "dependency to it: check your libraries for a "
+                    + "codenameone_library_appended.properties that sets android.gradleDep, and "
+                    + "make sure your own value ends with ';'.");
+            return false;
+        }
+
         File gradleFile = new File(projectDir, "build.gradle");
 
         try {
@@ -7931,6 +7950,36 @@ public class AndroidGradleBuilder extends Executor {
 
     protected String getReleaseCertificateFile() {
         return "android.ks";
+    }
+
+    /**
+     * A Gradle configuration keyword opening a dependency declaration directly after the closing
+     * quote of the previous one, with no ';' or newline between the two.
+     */
+    private static final java.util.regex.Pattern UNSEPARATED_GRADLE_STATEMENT =
+            java.util.regex.Pattern.compile(
+                "['\"][ \\t]*(implementation|api|compile|compileOnly|runtimeOnly"
+                + "|annotationProcessor|kapt|testImplementation|androidTestImplementation"
+                + "|debugImplementation|releaseImplementation)[ \\t]*['\"(]");
+
+    /**
+     * Finds two Gradle dependency statements run together with no separator between them.
+     *
+     * @param gradleDep the android.gradleDep hint value
+     * @return the offending excerpt, or null when the value is well formed
+     */
+    static String findUnseparatedGradleStatement(String gradleDep) {
+        if (gradleDep == null || gradleDep.length() == 0) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = UNSEPARATED_GRADLE_STATEMENT.matcher(gradleDep);
+        if (!matcher.find()) {
+            return null;
+        }
+        int from = Math.max(0, matcher.start() - 40);
+        int to = Math.min(gradleDep.length(), matcher.end() + 40);
+        return (from > 0 ? "..." : "") + gradleDep.substring(from, to)
+                + (to < gradleDep.length() ? "..." : "");
     }
 
     private String addNewlineIfMissing(String s) {

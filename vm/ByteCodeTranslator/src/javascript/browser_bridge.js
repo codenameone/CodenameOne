@@ -5027,15 +5027,82 @@
         return runAttempt(index + 1);
       });
     }
+    // The port promotes text into a DOM layer above the canvas, so a canvas readback is no
+    // longer the whole frame. When a test harness installs a composited capture hook, let it
+    // supply the image instead and return THAT as the screenshot: the bytes then travel the
+    // normal path to the cn1ss server, so there is exactly one writer of the PNG and no
+    // ordering to get wrong. Writing the composite to disk from the harness instead would be
+    // overwritten moments later by the canvas-only bytes this call is about to return.
+    //
+    // The hook is awaited inside this host call, and the worker is blocked on the call, so the
+    // suite cannot advance to the next test while the screenshot is being taken. Driving it
+    // from a console marker instead would race the next test's form onto the screen.
+    // A frame reaches the canvas as a batch of commands replayed on the main thread, and the
+    // page screenshot below reads whatever is on it at that instant -- including a frame that
+    // is only half replayed. That is how a tab lens came out as the plain rectangle of its
+    // backdrop, captured after the rectangle was drawn and before the rounded shape that masks
+    // it. Waiting for the canvas to go quiet puts the capture on a frame boundary. It is
+    // bounded: a screen that never stops drawing is still captured, as it was before.
+    function awaitQuietCanvas() {
+      return new Promise(function(resolve) {
+        if (typeof global.requestAnimationFrame !== 'function') {
+          resolve();
+          return;
+        }
+        var seen = -1;
+        var quiet = 0;
+        var frames = 0;
+        function tick() {
+          var seq = canvasOpSeq | 0;
+          if (seq === seen) {
+            quiet++;
+          } else {
+            quiet = 0;
+            seen = seq;
+          }
+          frames++;
+          // A good many quiet frames, not one or two: a screen is often painted over a series
+          // of frames with pauses between them -- a grid of gradients or images drawn cell by
+          // cell, an EDT tick apart -- and a capture taken in one of those pauses records a
+          // half-finished screen. The pauses seen in practice run to a tenth of a second, so
+          // the wait has to outlast them. Still bounded, so a screen that never stops drawing
+          // is captured as it was before.
+          if (quiet >= 12 || frames >= 120) {
+            resolve();
+            return;
+          }
+          global.requestAnimationFrame(tick);
+        }
+        global.requestAnimationFrame(tick);
+      });
+    }
+
+    function withCompositedCapture(makeResult) {
+      var hook = global.__cn1CompositeCapture;
+      if (typeof hook !== 'function') {
+        return makeResult(null);
+      }
+      return awaitQuietCanvas().then(hook).then(function(dataUrl) {
+        var composited = (typeof dataUrl === 'string'
+            && dataUrl.indexOf('data:image/') === 0) ? dataUrl : null;
+        return makeResult(composited);
+      }, function() {
+        return makeResult(null);
+      });
+    }
     return runAttempt(0).then(function(result) {
       if (!result || !result.dataUrl) {
         global.__cn1LastCaptureMeta = null;
-        return includeMeta ? {
-          dataUrl: '',
-          canvasScore: -1,
-          canvasLastPaintSeq: baselinePaintSeq | 0,
-          canvasPaintedSinceStart: 0
-        } : '';
+        return withCompositedCapture(function(composited) {
+          // A composited capture stands on its own: the canvas readback found nothing usable,
+          // but the page still has a frame worth recording.
+          return includeMeta ? {
+            dataUrl: composited || '',
+            canvasScore: composited ? 0 : -1,
+            canvasLastPaintSeq: baselinePaintSeq | 0,
+            canvasPaintedSinceStart: 0
+          } : (composited || '');
+        });
       }
       global.__cn1LastScreenshotSignature = result.canvasSignature || '';
       diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
@@ -5071,10 +5138,16 @@
         canvasPaintedSinceStart: result.paintedSinceStart ? 1 : 0,
         canvasSignature: result.canvasSignature || 'none'
       };
-      if (includeMeta) {
-        return global.__cn1LastCaptureMeta;
-      }
-      return String(result.dataUrl || '');
+      return withCompositedCapture(function(composited) {
+        if (composited) {
+          global.__cn1LastCaptureMeta.dataUrl = composited;
+          diag('SCREENSHOT_START', 'compositedLen', composited.length);
+        }
+        if (includeMeta) {
+          return global.__cn1LastCaptureMeta;
+        }
+        return String(global.__cn1LastCaptureMeta.dataUrl || '');
+      });
     });
   });
 

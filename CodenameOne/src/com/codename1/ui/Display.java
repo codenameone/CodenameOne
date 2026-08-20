@@ -1639,12 +1639,14 @@ public final class Display extends CN1Constants {
         if (edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
-
         if (!isEdt()) {
             // when not running callSerially executes synchronously and would recurse here forever (#4811)
             if (!codenameOneRunning) {
                 throw new IllegalStateException("Display.setCurrent must be invoked after Codename One has started running. Call it from start() or via callSerially.");
             }
+            // The direction is not recorded here: this call comes back round on the EDT and
+            // records it there. Doing it in both places would leave one entry behind for a
+            // later navigation to the same form to take.
             callSerially(new RunnableWrapper(newForm, null, reverse));
             return;
         }
@@ -1674,12 +1676,19 @@ public final class Display extends CN1Constants {
                 case SHOW_DURING_EDIT_IGNORE:
                     return;
                 case SHOW_DURING_EDIT_SET_AS_NEXT:
+                    newForm.setShownWithReverse(reverse);
                     impl.setCurrentForm(newForm);
                     return;
                 default:
                     break;
             }
         }
+
+        // Recorded once the call is known to be going through: on the EDT, with the form
+        // changing, and past the cases that decline to show anything while text is being
+        // edited. Recording it any earlier would queue a direction that no arrival takes, and a
+        // later navigation to the same form would take that stale one instead of its own.
+        newForm.setShownWithReverse(reverse);
 
         if (current != null) {
             if (current.isInitialized()) {
@@ -1730,6 +1739,18 @@ public final class Display extends CN1Constants {
                     }
                 }
                 current = current.getPreviousForm();
+                if (current != null) {
+                    // Coming out of a menu back to the form underneath it, which is a backward
+                    // move: without saying so, this arrival takes whatever direction that form
+                    // has left over and a port that keeps browser history in step reads it as a
+                    // step forward, pushing an entry for a form that was already behind.
+                    //
+                    // At the head of the queue, because this arrival comes first: when the form
+                    // being revealed is also the one being shown, its own direction is already
+                    // waiting, and appending would have this restoration take that one and leave
+                    // this one for the show.
+                    current.insertShownWithReverse(true);
+                }
                 impl.setCurrentForm(current);
             }
 

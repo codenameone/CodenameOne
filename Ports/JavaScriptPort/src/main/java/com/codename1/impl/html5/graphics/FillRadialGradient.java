@@ -68,7 +68,10 @@ public class FillRadialGradient implements ExecutableOp {
         context.scale(rx, ry);
         context.moveTo(1, 1);
         context.lineTo(1 + Math.cos(-startRad), 1 + Math.sin(-startRad));
-        context.arc(1, 1, 1, -startRad, -endRad, false);
+        // Anticlockwise exactly when the arcAngle is positive -- see FillArc, which had the
+        // same fixed direction and painted the complement of every partial sweep it was asked
+        // for. fillRadialGradient(.., 20, 200) drew the other 160 degrees.
+        context.arc(1, 1, 1, -startRad, -endRad, arcAngle >= 0);
         
         context.closePath();
         

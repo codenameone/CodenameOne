@@ -30,6 +30,7 @@ import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.ui.PeerComponent;
 
+import com.google.ads.mediation.admob.AdMobAdapter;
 import com.google.android.gms.ads.AdError;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdSize;
@@ -39,7 +40,6 @@ import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
 import com.google.android.gms.ads.OnUserEarnedRewardListener;
 import com.google.android.gms.ads.RequestConfiguration;
-import com.google.android.gms.ads.admanager.AdManagerAdRequest;
 import com.google.android.gms.ads.appopen.AppOpenAd;
 import com.google.android.gms.ads.interstitial.InterstitialAd;
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
@@ -50,6 +50,7 @@ import com.google.android.gms.ads.rewarded.ServerSideVerificationOptions;
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd;
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback;
 
+import com.google.android.ump.ConsentForm;
 import com.google.android.ump.ConsentInformation;
 import com.google.android.ump.ConsentRequestParameters;
 import com.google.android.ump.UserMessagingPlatform;
@@ -418,7 +419,11 @@ public class AdMobNativeImpl {
         if (nonPersonalized) {
             Bundle extras = new Bundle();
             extras.putString("npa", "1");
-            b.addNetworkExtrasBundle(AdManagerAdRequest.class, extras);
+            // The bundle is addressed to the mediation adapter that should read
+            // it, so the argument has to be a MediationExtrasReceiver.
+            // AdManagerAdRequest is a request, not a receiver -- passing it does
+            // not compile against play-services-ads 24.
+            b.addNetworkExtrasBundle(AdMobAdapter.class, extras);
         }
         return b.build();
     }
@@ -439,7 +444,7 @@ public class AdMobNativeImpl {
                         new ConsentInformation.OnConsentInfoUpdateSuccessListener() {
                             public void onConsentInfoUpdateSuccess() {
                                 UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity,
-                                        new ConsentInformation.OnConsentFormDismissedListener() {
+                                        new ConsentForm.OnConsentFormDismissedListener() {
                                             public void onConsentFormDismissed(com.google.android.ump.FormError error) {
                                                 AdMobCallback.fire(0, AdMobCallback.CONSENT_COMPLETE,
                                                         getConsentStatus(), null, null, 0);

@@ -27,6 +27,59 @@ const SUITE_FINISHED_MARKER = 'CN1SS:SUITE:FINISHED';
 
 let suiteFinished = false;
 
+// The app captures its own screenshot by reading back the canvas and ships the bytes over
+// the shared cn1ss WebSocket transport. That transport is fine, but a canvas readback is no
+// longer the whole picture: the port promotes text into a DOM layer above the canvas, so a
+// canvas-only capture is missing every label on screen.
+//
+// Rather than fork the transport that iOS, Android, watch and TV also use, supply the image
+// to the port and let it travel that transport: browser_bridge.js awaits this hook inside the
+// screenshot host call and returns what it produces as the screenshot, so the cn1ss server
+// remains the only writer of the PNG. Writing the file here instead would be overwritten
+// moments later by the canvas-only bytes the same call goes on to send.
+//
+// Being awaited inside the host call is also what makes the capture safe: the worker is
+// blocked on that call, so the suite cannot advance while the screenshot is being taken.
+// Driving it from a console marker would race the next test's form onto the screen.
+let capturedCount = 0;
+const CAPTURE_TIMEOUT_MS = Number(process.env.CN1_JS_CAPTURE_TIMEOUT_MS || '4000');
+
+async function installCompositeCapture(page) {
+  if (process.env.CN1_JS_DISABLE_COMPOSITE_CAPTURE === '1') {
+    return;
+  }
+  await page.exposeFunction('__cn1CompositeCapture', async () => {
+    try {
+      // `animations: 'disabled'` is what makes the capture reproducible: it settles animations
+      // and waits for fonts, and without it the screenshot races the canvas presentation --
+      // dropping it turned 59 of 181 goldens into mismatches, the static graphics and chart
+      // tests among them.
+      //
+      // It can also wait too long on a screen that never settles, and the suite is blocked on
+      // this very promise, so the timeout and the race are the backstop: always resolve
+      // promptly. Falling back to the canvas readback costs the promoted text in one golden;
+      // hanging costs the whole test.
+      const shot = page.screenshot({ animations: 'disabled', timeout: CAPTURE_TIMEOUT_MS });
+      const buffer = await Promise.race([
+        shot,
+        new Promise(resolve => setTimeout(() => resolve(null), CAPTURE_TIMEOUT_MS))
+      ]);
+      if (!buffer) {
+        shot.catch(() => {});
+        append('screenshot:timeout');
+        return null;
+      }
+      capturedCount++;
+      return `data:image/png;base64,${buffer.toString('base64')}`;
+    } catch (err) {
+      // Fall back to the canvas readback rather than losing the test entirely.
+      append(`screenshot:failed:${String(err)}`);
+      return null;
+    }
+  });
+  append('screenshot:composited:hook-installed');
+}
+
 function append(line) {
   const text = `[playwright] ${line}\n`;
   if (logFile) {
@@ -154,6 +207,8 @@ try {
     deviceScaleFactor: 2
   });
 
+  await installCompositeCapture(page);
+
   page.on('console', msg => {
     const text = msg.text();
     append(`console:${msg.type()}:${text}`);
@@ -261,5 +316,6 @@ try {
   }
   await finalizeProfile();
 } finally {
+  append(`screenshot:composited:total=${capturedCount}`);
   await browser.close();
 }

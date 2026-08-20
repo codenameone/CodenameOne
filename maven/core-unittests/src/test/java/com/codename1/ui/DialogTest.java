@@ -97,6 +97,58 @@ class DialogTest extends UITestBase {
     }
 
     @FormTest
+    void refreshThemeKeepsTheTitleInTheDialog() {
+        Dialog dialog = new Dialog("Kept", new BorderLayout());
+        dialog.setTitleCentered(true);
+        dialog.getContentPane().addComponent(BorderLayout.CENTER, new Label("Body"));
+
+        Label title = dialog.getTitleComponent();
+        Container centeredTitleArea = title.getParent();
+        assertNotNull(centeredTitleArea, "the centered title starts inside the dialog");
+
+        // Refreshing a form reinstalls its menu bar, which moves the form's title component
+        // into the title area. A dialog's title component is its own label and it keeps that
+        // area hidden, so without restoring the layout the title would vanish along with the
+        // space it held.
+        dialog.refreshTheme(false);
+
+        assertSame(centeredTitleArea, title.getParent(),
+                "refreshing the theme must leave the title where the dialog put it");
+        assertEquals("Kept", dialog.getTitle());
+        assertTrue(dialog.isTitleCentered());
+
+        dialog.setTitleCentered(false);
+        Container root = dialog.getDialogComponent();
+        dialog.refreshTheme(false);
+
+        assertSame(root, title.getParent());
+        assertEquals(BorderLayout.NORTH,
+                ((BorderLayout) root.getLayout()).getComponentConstraint(title));
+    }
+
+    @FormTest
+    void refreshThemeKeepsFocusInsideTheDialog() {
+        Dialog dialog = new Dialog("Focus", new BorderLayout());
+        dialog.setTitleCentered(true);
+        Button inside = new Button("Inside");
+        dialog.getContentPane().addComponent(BorderLayout.CENTER, inside);
+        dialog.showModeless();
+
+        Form form = Display.getInstance().getCurrent();
+        form.getAnimationManager().flush();
+        inside.requestFocus();
+        assertSame(inside, dialog.getFocused(), "the button starts focused");
+
+        // Nothing is displaced, so nothing is rebuilt: removing and re-adding the content pane
+        // would deinitialize it and take the form's focus with it.
+        dialog.refreshTheme(false);
+
+        assertSame(inside, dialog.getFocused(),
+                "refreshing the theme must not take focus out of the dialog");
+        dialog.dispose();
+    }
+
+    @FormTest
     void disposeWhenPointerOutOfBoundsClosesDialog() {
         implementation.setBuiltinSoundsEnabled(false);
         Form form = Display.getInstance().getCurrent();

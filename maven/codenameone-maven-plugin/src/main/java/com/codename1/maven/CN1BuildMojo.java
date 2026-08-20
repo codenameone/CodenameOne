@@ -383,8 +383,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (!isIOSDeviceBuild()) {
             return;
         }
-        report(IOSProvisioningPreflight.check(mergedSettings,
-                IOSProvisioningPreflight.isReleaseTarget(buildTarget), new Date()));
+        boolean release = IOSProvisioningPreflight.isReleaseTarget(buildTarget);
+        report(IOSProvisioningPreflight.check(mergedSettings, release, new Date()));
+        // Every embedded app extension needs a profile of its own, and the app's profile says
+        // whether it can stand in for one. Run after check() so an unreadable or expired
+        // profile is reported as itself rather than as an extension problem.
+        report(IOSProvisioningPreflight.checkAppExtensions(mergedSettings, release,
+                project.getBasedir()));
     }
 
     private void report(List<IOSProvisioningPreflight.Problem> problems) throws MojoFailureException {
@@ -1501,8 +1506,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                             cn1SettingsProps.put(propName, propVal);
                         } else {
                             String existing = cn1SettingsProps.getProperty(propName);
-                            if (!existing.contains(propVal)) {
-                                cn1SettingsProps.setProperty(propName, existing + propVal);
+                            // Separator decided by the hint rather than by whatever the library
+                            // baked into its own value -- see LibraryHintMerger for why a bare
+                            // concatenation welds two Gradle statements into one.
+                            if (!LibraryHintMerger.alreadyContains(propName, existing, propVal)) {
+                                cn1SettingsProps.setProperty(propName,
+                                        LibraryHintMerger.append(propName, existing, propVal));
                             }
                         }
                     }
@@ -1523,6 +1532,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             }
 
+        }
+
+        // Fail here rather than in Gradle. A dependency hint that ran two statements together
+        // surfaces on the build server as a Groovy MissingMethodException against a generated
+        // build.gradle line, which says nothing about which hint or which library produced it --
+        // and on a cloud build that answer costs a queue slot and a round trip to discover.
+        for (String gradleHint : new String[] {"codename1.arg.android.gradleDep",
+                "codename1.arg.gradleDependencies"}) {
+            String problem = LibraryHintMerger.findUnseparatedStatement(
+                    gradleHint, cn1SettingsProps.getProperty(gradleHint));
+            if (problem != null) {
+                throw new MojoExecutionException(problem);
+            }
         }
 
         // Re-run the hardening pre-flight against the MERGED effective settings: a CN1Lib can supply
