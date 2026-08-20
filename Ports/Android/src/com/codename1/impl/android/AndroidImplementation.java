@@ -6296,7 +6296,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private com.codename1.intents.spi.IntentBridge intentBridge;
 
     @Override
-    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+    // Synchronized for the same reason as the JavaSE bridge: two callers arriving together
+    // each see a null field and each construct one, and whichever loses the assignment keeps
+    // the donation or the indexed entities that were recorded through it. Nothing throws.
+    public synchronized com.codename1.intents.spi.IntentBridge getIntentBridge() {
         if (intentBridge == null) {
             intentBridge = new com.codename1.impl.android.intents.AndroidIntentBridge();
         }

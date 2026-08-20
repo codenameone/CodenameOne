@@ -459,8 +459,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// assistant and no system search index, so the bridge records what the application publishes
     /// and the simulator presents it -- which lets an intent be built and debugged with no device,
     /// against the same generated table a device would read.
+    ///
+    /// Synchronized because the lazy construction is a race otherwise, and losing it is silent:
+    /// two callers arriving together -- startup publishing the declaration table while a
+    /// background thread indexes -- each see a null field and each build a bridge, so one
+    /// records its declarations, donations or indexed entities into the instance that loses the
+    /// assignment, and the simulator then reads the winner and shows nothing of it. Nothing
+    /// throws and nothing is logged; the operation simply is not there.
     @Override
-    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+    public synchronized com.codename1.intents.spi.IntentBridge getIntentBridge() {
         if (intentBridge == null) {
             intentBridge = new JavaSEIntentBridge();
         }
