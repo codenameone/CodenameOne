@@ -120,14 +120,55 @@ public class JavaSESecureStorageNamespaceTest {
         assertTrue(ciphertext != null, "the fixture needs the stored form to move down a level");
         shared.put("v_cn1.db.key.shared", ciphertext);
         shared.node("com.example.first").remove("v_cn1.db.key.shared");
+        // A project that predates the split has no adoption mark either; set() above left one.
+        shared.node("com.example.first").remove("v_cn1.db.key.shared-adopted");
 
         JavaSESecureStorage reader = storageFor("com.example.first.Main");
         assertEquals(SecureStorage.ENTRY_PRESENT, reader.entryState("cn1.db.key.shared"),
                 "an entry in the shared node still counts as present");
         assertEquals("1111", reader.get("cn1.db.key.shared"),
                 "and still decrypts, because the salt behind the key did not move");
-        assertNull(shared.get("v_cn1.db.key.shared", null),
-                "and it has been moved into this project's own node");
+        assertEquals(ciphertext, shared.get("v_cn1.db.key.shared", null),
+                "and the shared entry stays, because another project may still need it");
+    }
+
+    @Test
+    public void aSecondProjectCanStillAdoptWhatTheFirstAdopted() {
+        // Before, adoption moved the entry: the first project to upgrade took the shared value and
+        // deleted it, so a project that upgraded later saw nothing, generated a replacement, and
+        // could no longer read the database it already had. A shared account name under one OS
+        // user is the very thing the per-application node separates, so the source has to survive
+        // until everyone has taken their copy.
+        JavaSESecureStorage writer = storageFor("com.example.first.Main");
+        writer.set("cn1.db.key.shared", "1111");
+        Preferences shared = Preferences.userRoot().node(SHARED_NODE);
+        String ciphertext = shared.node("com.example.first").get("v_cn1.db.key.shared", null);
+        assertTrue(ciphertext != null, "the fixture needs the stored form");
+        shared.put("v_cn1.db.key.shared", ciphertext);
+        shared.node("com.example.first").remove("v_cn1.db.key.shared");
+        shared.node("com.example.first").remove("v_cn1.db.key.shared-adopted");
+
+        assertEquals("1111", storageFor("com.example.first.Main").get("cn1.db.key.shared"),
+                "the first project adopts it");
+        assertEquals("1111", storageFor("com.example.second.Main").get("cn1.db.key.shared"),
+                "and the second project can still adopt the same key afterwards");
+    }
+
+    @Test
+    public void aForgottenKeyDoesNotComeBackFromTheSharedEntry() {
+        // The other half of leaving the source in place: this project must stop reading it once it
+        // has its own copy, or forgetting a key would hand back the value it was copied from.
+        JavaSESecureStorage storage = storageFor("com.example.first.Main");
+        storage.set("cn1.db.key.shared", "1111");
+        Preferences shared = Preferences.userRoot().node(SHARED_NODE);
+        shared.put("v_cn1.db.key.shared",
+                shared.node("com.example.first").get("v_cn1.db.key.shared", null));
+
+        assertTrue(storage.remove("cn1.db.key.shared"));
+        assertEquals(SecureStorage.ENTRY_ABSENT, storage.entryState("cn1.db.key.shared"),
+                "a forgotten key stays forgotten for this project");
+        assertNull(storage.get("cn1.db.key.shared"),
+                "and is not read back out of the entry it was copied from");
     }
     @Test
     public void creatingAKeyThatIsAlreadyThereTakesTheStoredOne() {

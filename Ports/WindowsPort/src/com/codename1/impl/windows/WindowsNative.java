@@ -450,6 +450,20 @@ public final class WindowsNative {
      */
     public static native int fileCreateExclusive(String path);
 
+    /**
+     * Takes an exclusive lock on a file, creating it if needed: the handle, or 0 if it could not
+     * be taken.
+     *
+     * <p>The operating system releases this when the process ends however it ends, which is what
+     * a file's existence cannot offer: a process that died holding a gate left it standing
+     * forever, and every later caller read it as a live writer.
+     */
+    public static native long fileLockExclusive(String path);
+
+    /** Releases a lock {@link #fileLockExclusive(String)} took. */
+    public static native void fileUnlock(long handle);
+
+
 
     /**
      * The operating system's own answer to "which file is this", as a string.

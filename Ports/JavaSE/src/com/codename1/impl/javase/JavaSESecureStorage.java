@@ -172,6 +172,23 @@ public final class JavaSESecureStorage extends SecureStorage {
         return new File(locks, gateName(account) + ".lock");
     }
 
+    /// Records that this application has taken its own copy of a shared entry.
+    private void markAdopted(java.util.prefs.Preferences shared, String key) {
+        java.util.prefs.Preferences mine = appNode(shared);
+        mine.putBoolean(key + "-adopted", true);
+        try {
+            mine.flush();
+        } catch (BackingStoreException cannotMark) {
+            // Worst case this project adopts again, which is the same value.
+            Log.e(cannotMark);
+        }
+    }
+
+    /// Whether this application has already taken its copy.
+    private boolean isAdopted(java.util.prefs.Preferences shared, String key) {
+        return appNode(shared).getBoolean(key + "-adopted", false);
+    }
+
     /**
      * The node this application's entries live in, under the shared one.
      *
@@ -218,6 +235,9 @@ public final class JavaSESecureStorage extends SecureStorage {
      * @return the value, or null when there was nothing to adopt
      */
     private String adoptSharedEntry(java.util.prefs.Preferences shared, String key) {
+        if (isAdopted(shared, key)) {
+            return null;
+        }
         String stored = shared.get(key, null);
         if (stored == null) {
             return null;
@@ -226,12 +246,15 @@ public final class JavaSESecureStorage extends SecureStorage {
         mine.put(key, stored);
         try {
             mine.flush();
-            shared.remove(key);
-            shared.flush();
-        } catch (BackingStoreException cannotMove) {
+        } catch (BackingStoreException cannotCopy) {
             // The value is still readable where it was, which is what the caller is given.
-            Log.e(cannotMove);
+            Log.e(cannotCopy);
         }
+        // The shared entry stays. Removing it would take it from every other project that had the
+        // same account under this OS user -- which is precisely the sharing the per-application
+        // node is separating -- so a project that upgrades later can still find its key. The mark
+        // below is what stops this one reading it again once it has its own copy.
+        markAdopted(shared, key);
         return stored;
     }
 
@@ -280,9 +303,8 @@ public final class JavaSESecureStorage extends SecureStorage {
     public AsyncResource<Boolean> remove(String reason, String account) {
         AsyncResource<Boolean> result = new AsyncResource<Boolean>();
         appNode(prefs).remove(account);
-        // The shared node too, so an entry written before the split cannot be read back after a
-        // caller was told it was removed.
-        prefs.remove(account);
+        // Marked rather than removed, so a project that has not upgraded keeps its own copy.
+        markAdopted(prefs, account);
         result.complete(Boolean.TRUE);
         return result;
     }
@@ -306,9 +328,9 @@ public final class JavaSESecureStorage extends SecureStorage {
             Base64.Encoder b64 = Base64.getEncoder();
             appNode(plainPrefs).put(VALUE_PREFIX + account,
                     b64.encodeToString(c.getIV()) + ":" + b64.encodeToString(enc));
-            // Anything an earlier run left in the shared node goes, now that this one holds the
-            // current value: leaving it would have a later read fall back to a stale secret.
-            plainPrefs.remove(VALUE_PREFIX + account);
+            // The shared entry stays for the projects that have not upgraded, and this one stops
+            // consulting it.
+            markAdopted(plainPrefs, VALUE_PREFIX + account);
             // flush(), and its outcome is this method's answer. Preferences writes back
             // on its own schedule, so returning true said the secret was stored while it
             // was still only in memory -- and the simulator is killed abruptly all the
@@ -336,7 +358,10 @@ public final class JavaSESecureStorage extends SecureStorage {
         }
         // Absent here is not absent: an earlier run wrote it in the shared node, and reporting
         // nothing is what would have ManagedKeys generate a second key over a database the first
-        // one encrypted.
+        // one encrypted. Once this project has its own copy the shared entry is somebody else's.
+        if (isAdopted(plainPrefs, VALUE_PREFIX + account)) {
+            return ENTRY_ABSENT;
+        }
         return plainPrefs.get(VALUE_PREFIX + account, null) != null ? ENTRY_PRESENT : ENTRY_ABSENT;
     }
 
@@ -375,7 +400,8 @@ public final class JavaSESecureStorage extends SecureStorage {
             return false;
         }
         appNode(plainPrefs).remove(VALUE_PREFIX + account);
-        plainPrefs.remove(VALUE_PREFIX + account);
+        // Marked rather than removed, for the same reason the adoption copies it.
+        markAdopted(plainPrefs, VALUE_PREFIX + account);
         try {
             appNode(plainPrefs).flush();
             // Same for the removal, and it matters more: this is the credential a logout

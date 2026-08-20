@@ -312,36 +312,39 @@ public final class AndroidSecureStorage extends SecureStorage {
         if (gate == null) {
             return super.setIfAbsent(account, value);
         }
-        boolean created;
+        java.io.RandomAccessFile handle = null;
+        java.nio.channels.FileLock lock = null;
         try {
-            created = gate.createNewFile();
-        } catch (java.io.IOException cannotCreate) {
-            Log.e(cannotCreate);
+            handle = new java.io.RandomAccessFile(gate, "rw");
+            // A lock rather than the file's existence: the system releases it when the process
+            // ends however it ends, so a process that dies here cannot leave the alias
+            // permanently uncreatable. Blocking, so a second caller waits for the first rather
+            // than proceeding as though the entry were absent.
+            lock = handle.getChannel().lock();
+            String stored = get(account);
+            if (stored != null) {
+                return stored;
+            }
+            return set(account, value) ? value : null;
+        } catch (java.io.IOException cannotLock) {
+            Log.e(cannotLock);
             return super.setIfAbsent(account, value);
-        }
-        if (created) {
-            if (set(account, value)) {
-                return value;
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
             }
-            // Nothing was stored, so the gate must not stay shut: the next caller has to be able
-            // to create the entry rather than be turned away from one that was never written.
-            if (!gate.delete()) {
-                // Worth saying out loud rather than dropping: while that file is there, every
-                // later attempt to create this key is refused, and the only thing that clears it
-                // is removing the file.
-                Log.p("Secure storage could not remove " + gate.getAbsolutePath()
-                        + " after a failed write, so creating '" + account
-                        + "' will be refused until that file is gone");
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
             }
-            return null;
         }
-        String stored = get(account);
-        if (stored != null) {
-            return stored;
-        }
-        // Another process holds the gate and this one cannot see its write. Reported rather than
-        // written over, which is the whole point of the gate.
-        return null;
     }
 
     /** The file whose creation decides which caller stores this account. */
@@ -466,19 +469,10 @@ public final class AndroidSecureStorage extends SecureStorage {
         synchronized (PLAIN_KEY_LOCK) {
             removed = prefs.edit().remove(account).commit();
         }
-        // The gate as well, or forgetting a key would make its alias unusable for good: the next
-        // create finds no value of its own and a gate it cannot take, so it reports nothing and
-        // ManagedKeys raises KEY_UNAVAILABLE forever, even once the database is deleted.
-        //
-        // After the entry, not before. A gate removed first would let a second caller create a
-        // key while this one still had the old value in place.
-        java.io.File gate = gateFile(account);
-        if (gate != null && gate.exists() && !gate.delete()) {
-            Log.p("Secure storage removed '" + account + "' but could not remove "
-                    + gate.getAbsolutePath() + ", so creating it again will be refused until "
-                    + "that file is gone");
-            return false;
-        }
+        // The lock file is deliberately left alone. It gates nothing by existing -- what excludes
+        // a second writer is the lock held on it, which the system drops when the process ends --
+        // and removing it while another process holds that lock would have the next caller create
+        // a different file and lock that instead, which is two writers again.
         return removed;
     }
 

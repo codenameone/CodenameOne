@@ -5802,11 +5802,12 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
           jvm.beginCaptureGate();
         }
         try {
+          const captureSettle = cn1SsSettleParams(normalizedTest);
           yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
             reason: "screenshot:" + normalizedTest,
-            maxFrames: 48,
-            stableFrames: 3,
-            quietFrames: 3
+            maxFrames: captureSettle.maxFrames,
+            stableFrames: captureSettle.stableFrames,
+            quietFrames: captureSettle.quietFrames
           }]);
           const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
           capturedDataUrl = hostResult == null ? "" : String(hostResult);
@@ -5889,11 +5890,12 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [
   if (!channel && jvm && typeof jvm.invokeHostNative === "function" && !cn1ssScreenshotEmitted[test]) {
     try {
       yield* forceDisplayPresentationForScreenshot("emitChannel:" + test);
+      const channelSettle = cn1SsSettleParams(test);
       yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
         reason: "screenshot:" + test,
-        maxFrames: 48,
-        stableFrames: 3,
-        quietFrames: 3
+        maxFrames: channelSettle.maxFrames,
+        stableFrames: channelSettle.stableFrames,
+        quietFrames: channelSettle.quietFrames
       }]);
       const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
       const capturedDataUrl = hostResult == null ? "" : String(hostResult);
@@ -5926,6 +5928,24 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
   return yield* cn1_ivAdapt(runMethod(completion));
 });
 
+// How hard to wait for the canvas to stop changing, per test.
+//
+// The heavy drawing tests were already given a longer wait before they are declared ready, but
+// the capture that follows used a fixed short one -- three still frames out of forty-eight. A
+// test that draws in stages can be still for three frames between two of them, and
+// graphics-draw-image-rect was captured exactly there: the top half of its grid drawn, the
+// bottom half not, on a run where the same test had passed all week. The two waits now come from
+// one place, so a test that needs a longer settle gets it at the moment that matters.
+function cn1SsSettleParams(testName) {
+  const normalized = normalizeCn1ssTestName(testName || "default");
+  const heavy = normalized === "DrawImage" || normalized === "graphics-draw-image-rect";
+  return {
+    maxFrames: heavy ? 120 : 48,
+    stableFrames: heavy ? 6 : 3,
+    quietFrames: heavy ? 6 : 3
+  };
+}
+
 bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
   baseTestRegisterReadyCallbackMethodId,
   baseTestRegisterReadyCallbackMethodId + "__impl"
@@ -5946,11 +5966,12 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
       // (A/B-confirmed: this is NOT the cause of the SlideHorizontal settle
       // message loss -- reverting to the host delay did not change it.)
       yield { op: "sleep", millis: delayMillis };
+      const readySettle = cn1SsSettleParams(activeTest);
       const settleResult = yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
         reason: "ready:" + activeTest,
-        maxFrames: delayMillis > 1500 ? 120 : 48,
-        stableFrames: delayMillis > 1500 ? 6 : 3,
-        quietFrames: delayMillis > 1500 ? 6 : 3
+        maxFrames: readySettle.maxFrames,
+        stableFrames: readySettle.stableFrames,
+        quietFrames: readySettle.quietFrames
       }]);
       if (settleResult && settleResult.changedFromPrevious != null) {
         settleChanged = String((settleResult.changedFromPrevious | 0) !== 0 ? 1 : 0);

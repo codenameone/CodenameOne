@@ -218,6 +218,50 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fileClose___long(CODENAME_ONE
  *
  * 1 created, 0 already there, -1 the attempt failed for another reason.
  */
+/*
+ * Takes an exclusive lock on a file, creating it if needed, and answers the handle holding it.
+ *
+ * A lock rather than the file's existence, because Windows closes the handle -- and so releases
+ * the lock -- when the process ends however it ends. A process that died between creating a gate
+ * file and storing its value left that file behind forever, and every later attempt read it as a
+ * live writer, so the key could never be created again. There is nothing to leave behind here.
+ *
+ * Opened without sharing, so a second caller waits in CreateFileW rather than proceeding as
+ * though the entry were absent. 0 when the lock could not be taken.
+ */
+JAVA_LONG com_codename1_impl_windows_WindowsNative_fileLockExclusive___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    HANDLE handle;
+    int attempt;
+    if (path == NULL) {
+        return 0;
+    }
+    /* Retried rather than failed: a holder releases within milliseconds, and CreateFileW answers
+     * ERROR_SHARING_VIOLATION immediately rather than waiting like flock does. */
+    for (attempt = 0; attempt < 600; attempt++) {
+        handle = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL, NULL);
+        if (handle != INVALID_HANDLE_VALUE) {
+            free(path);
+            return (JAVA_LONG) (intptr_t) handle;
+        }
+        if (GetLastError() != ERROR_SHARING_VIOLATION) {
+            break;
+        }
+        Sleep(50);
+    }
+    free(path);
+    return 0;
+}
+
+/* Releases what fileLockExclusive took; closing the handle drops the lock. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_fileUnlock___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    if (handle != 0) {
+        CloseHandle((HANDLE) (intptr_t) handle);
+    }
+}
+
 JAVA_INT com_codename1_impl_windows_WindowsNative_fileCreateExclusive___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);

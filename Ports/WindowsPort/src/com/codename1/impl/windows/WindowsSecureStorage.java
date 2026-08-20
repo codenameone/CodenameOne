@@ -71,6 +71,9 @@ public class WindowsSecureStorage extends SecureStorage {
     /// rather than a re-encryption. Copied before the old name is dropped: a delete that ran first
     /// and then failed to write would destroy a key that cannot be regenerated.
     private static Object adoptLegacyEntry(String account) {
+        if (isAdopted(account)) {
+            return null;
+        }
         Storage storage = Storage.getInstance();
         Object stored;
         try {
@@ -86,7 +89,7 @@ public class WindowsSecureStorage extends SecureStorage {
         }
         try {
             if (storage.writeObject(key(account), stored)) {
-                storage.deleteStorageFile(legacyKey(account));
+                markAdopted(account);
             }
         } catch (Throwable cannotMove) {
             // The value is still readable under its old name, which is what the caller is given.
@@ -124,47 +127,32 @@ public class WindowsSecureStorage extends SecureStorage {
         if (existing != null) {
             return existing;
         }
-        String gate = gatePath(account);
-        int created;
+        long lock;
         try {
-            created = WindowsNative.fileCreateExclusive(gate);
+            lock = WindowsNative.fileLockExclusive(gatePath(account));
         } catch (Throwable cannotAsk) {
             return super.setIfAbsent(account, value);
         }
-        if (created == 1) {
-            if (set(account, value)) {
-                return value;
-            }
-            // Nothing was stored, so the gate must not stay shut: the next caller has to be able
-            // to create the entry rather than wait forever for one that was never written.
-            try {
-                WindowsNative.fileDelete(gate);
-            } catch (Throwable ignored) {
-                // Reported by the null below either way.
-            }
-            return null;
-        }
-        if (created != 0) {
-            // The gate could not be attempted at all, which says nothing about the entry.
+        if (lock == 0) {
+            // The lock could not be taken, which says nothing about the entry -- so this falls
+            // back rather than reporting an absence it has not established.
             return super.setIfAbsent(account, value);
         }
-        // Another process created the gate and is writing the value. Its write is not instant, so
-        // this waits a moment for it rather than reporting an absence that is about to be wrong.
-        for (int iter = 0; iter < 50; iter++) {
+        try {
+            // Asked again inside the lock. Whoever held it before may have created the key, and
+            // the answer to that is theirs rather than a second one of ours.
             String stored = get(account);
             if (stored != null) {
                 return stored;
             }
+            return set(account, value) ? value : null;
+        } finally {
             try {
-                Thread.sleep(20);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                break;
+                WindowsNative.fileUnlock(lock);
+            } catch (Throwable cannotRelease) {
+                // The operating system drops it when this process ends, whatever happens here.
             }
         }
-        // It never arrived. Reported rather than written over: the other process may still be
-        // between its gate and its write, and overwriting it there is the failure this prevents.
-        return null;
     }
 
 
@@ -181,13 +169,42 @@ public class WindowsSecureStorage extends SecureStorage {
             if (!Storage.getInstance().writeObject(key(account), enc)) {
                 return false;
             }
-            // Only after the new one is stored. A stale entry left under the old name would be
-            // read back by adoptLegacyEntry the moment the namespaced one went missing.
-            Storage.getInstance().deleteStorageFile(legacyKey(account));
+            // The old entry stays where it is, and this application stops looking at it. Removing
+            // it would take it from every other application that shared it: one account name under
+            // one OS user is exactly what the namespace separates, so applications that have not
+            // upgraded yet still need to find their key there.
+            markAdopted(account);
             return true;
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /// Records that this application has taken its own copy of the shared entry.
+    ///
+    /// The shared entry is never removed -- other applications may still need it -- so something
+    /// has to stop this one reading it again after it has its own, or a key that was just
+    /// forgotten would come straight back from the copy it was taken from.
+    private static void markAdopted(String account) {
+        try {
+            Storage.getInstance().writeObject(adoptedKey(account), Boolean.TRUE);
+        } catch (Throwable cannotMark) {
+            // Worst case this application adopts again, which is the same value.
+        }
+    }
+
+    /// Whether this application has already taken its copy.
+    private static boolean isAdopted(String account) {
+        try {
+            return Storage.getInstance().exists(adoptedKey(account));
+        } catch (Throwable cannotAsk) {
+            return false;
+        }
+    }
+
+    /// The mark's own storage name, inside this application's namespace.
+    private static String adoptedKey(String account) {
+        return key(account) + "-adopted";
     }
 
     /// The file whose creation decides which caller stores this account.
@@ -210,7 +227,12 @@ public class WindowsSecureStorage extends SecureStorage {
             }
             // Absent under the namespaced name is not absent: an earlier build wrote it without
             // one, and reporting nothing here is what would have ManagedKeys generate a second
-            // key over a database the first one encrypted.
+            // key over a database the first one encrypted. Once this application has taken its own
+            // copy, though, the shared entry belongs to whoever else still needs it and is not
+            // consulted again.
+            if (isAdopted(account)) {
+                return ENTRY_ABSENT;
+            }
             return storage.exists(legacyKey(account)) ? ENTRY_PRESENT : ENTRY_ABSENT;
         } catch (Throwable cannotAsk) {
             return ENTRY_UNKNOWN;
@@ -256,19 +278,14 @@ public class WindowsSecureStorage extends SecureStorage {
         // The unnamespaced entry as well, or a caller that was told the key was forgotten would
         // still have it on disk under the name an earlier build used -- and get() would read it
         // back.
-        storage.deleteStorageFile(legacyKey(account));
-        // The gate too, or forgetting a key would make its alias unusable for good: the next
-        // create finds no value of its own and a gate it cannot take, so it reports nothing and
-        // ManagedKeys raises KEY_UNAVAILABLE forever, even once the database is deleted. After
-        // the entries, not before -- a gate removed first would let a second caller create a key
-        // while the old value was still in place.
-        try {
-            WindowsNative.fileDelete(gatePath(account));
-        } catch (Throwable cannotRemove) {
-            // Reported through the check below, which reads what is actually left.
-        }
-        return !storage.exists(key(account)) && !storage.exists(legacyKey(account))
-                && !WindowsNative.fileExists(gatePath(account));
+        // Marked, not deleted: another application may still be waiting to adopt it. The mark is
+        // what stops this one reading it back and resurrecting a key the caller just forgot.
+        markAdopted(account);
+        // The lock file is deliberately left alone. It gates nothing by existing -- what excludes
+        // a second writer is the lock held on it, which the system drops when the process ends --
+        // and removing it while another process holds that lock would have the next caller create
+        // a different file and lock that instead, which is two writers again.
+        return !storage.exists(key(account));
     }
 
     /* ----------------------------------------- prompting (AsyncResource) API
