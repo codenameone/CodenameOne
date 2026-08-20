@@ -160,7 +160,7 @@ jobs:
               '',
               `Last checked: ${new Date().toISOString()}`,
               '',
-              'The GitHub workflow publishes DEV/Foojay and creates queue tasks. The signed-in local runner publishes Medium, DZone, Hashnode, and LinkedIn. This issue stays open until both paths recover.',
+              'The GitHub workflow publishes DEV/Foojay and creates queue tasks. The signed-in local runner publishes Medium, Hashnode, and LinkedIn. This issue stays open until both paths recover.',
             ].join('\n');
 
             const assignees = process.env.ALERT_ASSIGNEE ? [process.env.ALERT_ASSIGNEE] : undefined;

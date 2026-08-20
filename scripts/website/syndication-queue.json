@@ -1,4 +1,4 @@
 {
-  "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
+  "_comment": "Queue of browser-only syndication tasks drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by the website queue scripts invoked by CI, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": []
 }

@@ -14,9 +14,8 @@ content with ``canonical_url`` pointing back at the original on
 
 Hashnode used to be driven from here too, but Hashnode shut down their
 free public GraphQL API on 2026-05-13 and moved it behind a paid /
-allow-listed offering. Hashnode is now syndicated via the Firefox
-extension queue alongside Medium and DZone — see
-``queue_browser_syndication.py``.
+allow-listed offering. Hashnode is now syndicated through the saved-browser
+flow in ``syndicate_browser_posts.py``.
 
 Designed to run from a daily GitHub Action with only the Python standard
 library available.
