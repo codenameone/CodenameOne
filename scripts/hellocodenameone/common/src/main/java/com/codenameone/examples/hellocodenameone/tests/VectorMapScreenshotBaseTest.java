@@ -36,6 +36,13 @@ import com.codename1.ui.util.UITimer;
 /// missing tiles, so it is deterministic even before the first paint -- and
 /// only capture once the engine has rendered the current tile set.
 ///
+/// The probe is also only meaningful per viewport: it derives the visible tile set from the
+/// component's current size, so consecutive "ready" answers count only while that size holds
+/// still. A layout pass that enlarges the map after the count reaches two leaves the new area
+/// unrendered at capture time -- seen on tvOS as a 4K frame with the basemap covering part of it
+/// and the background colour covering the rest, and with no cap warning, because the probe had
+/// been satisfied for the smaller viewport it was asked about.
+///
 /// isLoadingTiles() alone is NOT a sufficient readiness signal: tiles are
 /// requested lazily by paint, so the in-flight set can be EMPTY between
 /// request batches while most of the viewport is still unrendered (observed
@@ -80,6 +87,12 @@ public abstract class VectorMapScreenshotBaseTest extends BaseTest {
 
     private int consecutiveReady;
 
+    /// The map's size when the readiness probe last answered, so a probe taken against one
+    /// viewport is not credited to another.
+    private int lastWidth = -1;
+
+    private int lastHeight = -1;
+
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
         consecutiveReady = 0;
@@ -87,6 +100,20 @@ public abstract class VectorMapScreenshotBaseTest extends BaseTest {
     }
 
     private void awaitTilesThenRun(final Form parent, final Runnable run, final int waitedMs) {
+        // The size the probe is about to answer for. isMapReady() computes the visible tile set
+        // from the component's current width and height, so a run of "ready" polls only means
+        // anything if they were all asked about the same viewport: a layout pass that widens the
+        // map afterwards leaves tiles for the new area unrendered while the count already stands
+        // at two. That is what a tvOS capture showed -- the basemap drawn across part of a 4K
+        // viewport and the rest left at the background colour, with no cap warning, because the
+        // probe had genuinely been satisfied for the viewport it was asked about.
+        int width = mapWidth();
+        int height = mapHeight();
+        if (width != lastWidth || height != lastHeight) {
+            consecutiveReady = 0;
+            lastWidth = width;
+            lastHeight = height;
+        }
         if (isMapReady()) {
             consecutiveReady++;
         } else {
@@ -108,6 +135,16 @@ public abstract class VectorMapScreenshotBaseTest extends BaseTest {
                 awaitTilesThenRun(parent, run, waitedMs + POLL_MS);
             }
         });
+    }
+
+    private int mapWidth() {
+        return mapUnderTest instanceof com.codename1.ui.Component
+                ? ((com.codename1.ui.Component) mapUnderTest).getWidth() : -1;
+    }
+
+    private int mapHeight() {
+        return mapUnderTest instanceof com.codename1.ui.Component
+                ? ((com.codename1.ui.Component) mapUnderTest).getHeight() : -1;
     }
 
     private boolean isMapReady() {
