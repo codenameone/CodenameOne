@@ -17,7 +17,34 @@
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <!-- Must match the android.gradleDep line in
+             ../common/codenameone_library_required.properties. -->
+        <admob.ads.version>24.0.0</admob.ads.version>
+        <admob.ump.version>3.1.0</admob.ump.version>
+        <skipAdmobApiCheck>false</skipAdmobApiCheck>
     </properties>
+
+    <!--
+        These sources are shipped, never compiled by us: the jar below packages
+        src/main/java as resources and the customer's Android build is the first
+        compiler that ever sees them. That is how cn1-admob came to reference
+        AdManagerAdRequest where a MediationExtrasReceiver was required, and a
+        listener nested on ConsentInformation instead of ConsentForm  -  two
+        errors that reached users as a failed build rather than a failed CI job.
+
+        So the pinned SDK is fetched and the sources are compiled against it in
+        process-classes, purely as a check: the output goes to a throwaway
+        directory and the packaged artifact is unchanged. Pass
+        -DskipAdmobApiCheck to skip it (offline builds).
+    -->
+    <repositories>
+        <repository>
+            <id>google</id>
+            <url>https://dl.google.com/dl/android/maven2</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>
@@ -25,6 +52,99 @@
             <resource><directory>src/main/java</directory></resource>
         </resources>
         <plugins>
+            <!--
+                The versions here must match codenameone_library_required.properties;
+                AdMobPinnedSdkTest fails the build if they drift. Fetched by
+                explicit artifactItems so no transitive androidx aars are resolved
+                (they are Google-repo only and none of them is needed to compile).
+                An .aar is a zip, but plexus has no archiver registered for that
+                extension, so Ant unzips it rather than dependency:unpack.
+                play-services-ads is the umbrella artifact the gradleDep names and
+                carries none of these classes; they live in play-services-ads-lite,
+                which the umbrella pins to exactly the same version.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-pinned-ads-sdk</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>copy</goal></goals>
+                        <configuration>
+                            <skip>${skipAdmobApiCheck}</skip>
+                            <outputDirectory>${project.build.directory}/ads-sdk</outputDirectory>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.google.android.gms</groupId>
+                                    <artifactId>play-services-ads-lite</artifactId>
+                                    <version>${admob.ads.version}</version>
+                                    <type>aar</type>
+                                    <destFileName>ads-lite.aar</destFileName>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>com.google.android.ump</groupId>
+                                    <artifactId>user-messaging-platform</artifactId>
+                                    <version>${admob.ump.version}</version>
+                                    <type>aar</type>
+                                    <destFileName>ump.aar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>verify-against-pinned-ads-sdk</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <skip>${skipAdmobApiCheck}</skip>
+                            <target>
+                                <property file="${basedir}/../common/codenameone_library_required.properties"
+                                          prefix="lib"/>
+                                <fail message="The pinned Ads SDK in this pom has drifted from the android.gradleDep the library actually ships. Bump both together, so what we compile against stays what the app builds against.">
+                                    <condition>
+                                        <not>
+                                            <and>
+                                                <contains string="${lib.codename1.arg.android.gradleDep}"
+                                                          substring="play-services-ads:${admob.ads.version}"/>
+                                                <contains string="${lib.codename1.arg.android.gradleDep}"
+                                                          substring="user-messaging-platform:${admob.ump.version}"/>
+                                            </and>
+                                        </not>
+                                    </condition>
+                                </fail>
+                                <mkdir dir="${project.build.directory}/api-check-classes"/>
+                                <unzip src="${project.build.directory}/ads-sdk/ads-lite.aar"
+                                       dest="${project.build.directory}/ads-sdk/ads-lite">
+                                    <patternset><include name="classes.jar"/></patternset>
+                                </unzip>
+                                <unzip src="${project.build.directory}/ads-sdk/ump.aar"
+                                       dest="${project.build.directory}/ads-sdk/ump">
+                                    <patternset><include name="classes.jar"/></patternset>
+                                </unzip>
+                                <javac srcdir="${basedir}/src/main/java"
+                                       destdir="${project.build.directory}/api-check-classes"
+                                       source="1.8" target="1.8" includeantruntime="false"
+                                       debug="false" nowarn="true" failonerror="true">
+                                    <classpath>
+                                        <pathelement path="${project.build.directory}/ads-sdk/ads-lite/classes.jar"/>
+                                        <pathelement path="${project.build.directory}/ads-sdk/ump/classes.jar"/>
+                                        <pathelement path="${cn1.binaries}/android/android.jar"/>
+                                        <path refid="maven.compile.classpath"/>
+                                    </classpath>
+                                </javac>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
@@ -53,6 +173,15 @@
             <groupId>com.codenameone</groupId>
             <artifactId>cn1-admob-common</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <!-- Compile-time only, for the API check above: the sources reference
+             AndroidNativeUtil / AndroidImplementation. provided so it stays out
+             of the shipped artifact's dependency graph. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-android</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>
