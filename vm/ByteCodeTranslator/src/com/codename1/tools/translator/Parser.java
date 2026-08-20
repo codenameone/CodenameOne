@@ -1033,6 +1033,18 @@ public class Parser extends ClassVisitor {
 
                 generateClassAndMethodIndexHeader(outputDirectory);
 
+                // Interp-host builds emit and register a rank 1--3 array clazz
+                // for every host class, matching the class rows the symbol
+                // sidecar already advertises. Without this a pushed program's
+                // `new HostType[1]` or `HostType[].class` would resolve to an
+                // id whose registry entry is absent -- classObjectById returns
+                // null and newObjectArray falls back to Object[]. Seeded here,
+                // once, so every gate downstream (getArrayClazz, the array
+                // struct emission loop, the extern block, the vtable
+                // initializer, the id-to-clazz registration) sees a matching
+                // arrayTypes entry. No-op outside interp-host.
+                ByteCodeClass.seedInterpHostArrayTypes(classes);
+
                 boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
                 ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
 

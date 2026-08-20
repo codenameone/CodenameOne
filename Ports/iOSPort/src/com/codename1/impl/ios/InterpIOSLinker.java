@@ -95,11 +95,23 @@ public class InterpIOSLinker implements InterpLinker {
             chain.addElement(at);
             at = symbols.superName(at);
         }
+        // Default-bearing interfaces of each host class in the chain, before
+        // that class's own initializer, walked with one shared visited set so a
+        // diamond is not initialized twice. The runtime's separate interface
+        // walk covers interfaces declared by the interpreted subclass, not
+        // ones inherited through a host superclass -- so without this an
+        // interface `<clinit>` can run after its implementor's, reversing the
+        // order JLS 12.4.1 requires. `initializeDefaultBearing` skips a class
+        // node itself (it only marks interfaces), so the host class's own
+        // initializer stays this method's job.
+        java.util.Hashtable defaultsVisited = new java.util.Hashtable();
         for (int i = chain.size() - 1; i >= 0; i--) {
             int id = symbols.classId((String)chain.elementAt(i));
-            if (id >= 0) {
-                InterpIOSNative.initializeClassById(id);
+            if (id < 0) {
+                continue;
             }
+            initializeDefaultBearing(id, defaultsVisited);
+            InterpIOSNative.initializeClassById(id);
         }
     }
 

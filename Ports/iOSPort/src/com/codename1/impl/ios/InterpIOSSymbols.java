@@ -254,22 +254,39 @@ class InterpIOSSymbols {
      * only the superclass declares.</p>
      */
     int methodId(String owner, String name, String descriptor) {
+        // Two passes, in JLS 5.4.3.3 order: class methods first, the whole
+        // superclass chain, then interface defaults if none is found.
+        // Reversing this -- looking at each class's interfaces before moving
+        // up -- can pick a default over a concrete method the superclass
+        // inherited, which Java gives precedence to. A subinterface overriding
+        // an Object method with a default while the concrete class inherits
+        // Object's implementation is the shape that breaks.
+        //
+        // Bounded by what has been seen rather than by a count in both passes:
+        // a superclass chain is finite and a self-referential table is the
+        // only way the walk could not end. A number would instead stop partway
+        // up a merely deep hierarchy and answer "no such method" for a method
+        // the app has.
         String currentOwner = owner;
-        // Bounded by what has been seen, not by a count: a superclass chain is
-        // finite and a table that somehow named a class as its own ancestor is
-        // the only way this could not end. A number would instead stop looking
-        // partway up a hierarchy that is merely deep, and answer "no such
-        // method" for a method the app has.
-        Hashtable seen = new Hashtable();
-        while (currentOwner != null && seen.get(currentOwner) == null) {
-            seen.put(currentOwner, Boolean.TRUE);
+        Hashtable classSeen = new Hashtable();
+        while (currentOwner != null && classSeen.get(currentOwner) == null) {
+            classSeen.put(currentOwner, Boolean.TRUE);
             Integer id = (Integer)methodIds.get(currentOwner + "." + name + descriptor);
             if (id != null) {
                 return id.intValue();
             }
-            // Interfaces of this class before moving up, because that is where
-            // a default method lives and no superclass declares it.
-            int fromInterface = interfaceMethodId(currentOwner, name, descriptor, new Hashtable());
+            currentOwner = superName(currentOwner);
+        }
+        // No class method: consult interfaces. A shared visited set spans the
+        // whole hierarchy so a diamond is not walked twice, and every class in
+        // the chain contributes its interfaces -- one reached only through the
+        // superclass is as much a candidate as one on the receiver.
+        Hashtable interfaceVisited = new Hashtable();
+        currentOwner = owner;
+        Hashtable classSeenAgain = new Hashtable();
+        while (currentOwner != null && classSeenAgain.get(currentOwner) == null) {
+            classSeenAgain.put(currentOwner, Boolean.TRUE);
+            int fromInterface = interfaceMethodId(currentOwner, name, descriptor, interfaceVisited);
             if (fromInterface >= 0) {
                 return fromInterface;
             }

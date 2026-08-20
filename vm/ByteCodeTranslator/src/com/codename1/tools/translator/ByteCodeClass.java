@@ -630,6 +630,40 @@ public class ByteCodeClass {
         }
     }
 
+    /**
+     * Advertises rank 1--3 array classes for every host class in an interp-host
+     * build.
+     *
+     * <p>The symbol sidecar advertises a class row (and the class-id header
+     * carries a {@code cn1_array_N_id_} constant) for every rank of every host
+     * class, whether or not the closed world used it -- that is what lets a
+     * pushed program write {@code new HostType[1]} at all. Emission of the
+     * matching {@code class_arrayN__X} struct is otherwise gated by
+     * {@code arrayTypes}, so a host type the AOT build never happens to use as
+     * an array has an advertised id whose registry entry is absent:
+     * {@code classObjectById()} returns null and {@code newObjectArray()}
+     * silently falls back to {@code Object[]}, breaking class literals, casts
+     * and host calls expecting {@code HostType[]}.</p>
+     *
+     * <p>Called once after dependencies have been recomputed and before any
+     * class is emitted; the added entries are visible to every gate --
+     * {@link #getArrayClazz}, the array-struct emission loop, the header
+     * externs, the array vtable initializer and the id-to-clazz registration
+     * below -- so declared and defined array clazzes match and the registry
+     * has one entry per advertised id.</p>
+     */
+    static void seedInterpHostArrayTypes(List<ByteCodeClass> allClasses) {
+        if (!BytecodeMethod.isInterpHost()) {
+            return;
+        }
+        for (ByteCodeClass bc : allClasses) {
+            String name = bc.getClsName();
+            for (int rank = 1; rank <= 3; rank++) {
+                addArrayType(name, rank);
+            }
+        }
+    }
+
 
 
     public String generateCCode(List<ByteCodeClass> allClasses) {
@@ -1604,9 +1638,14 @@ public class ByteCodeClass {
         if (!BytecodeMethod.isInterpHost()) {
             return;
         }
-        // Only the ranks this build actually emitted. `class_arrayN__X` exists
-        // when something in the closed world used an array of that rank, which
-        // is the same condition the initializer above tests.
+        // Every rank the sidecar advertises. `seedInterpHostArrayTypes` puts
+        // ranks 1--3 into `arrayTypes` for every host class in an interp-host
+        // build, which is what the symbol sidecar advertises class rows for and
+        // what the id-to-clazz registry has to answer for. Gating this on prior
+        // AOT array use would leave `classObjectById()` returning null for a
+        // valid advertised id -- observed as `newObjectArray()` falling back to
+        // `Object[]` for `HostType[]` and breaking casts, class literals and
+        // host calls expecting the array type.
         for (int rank = 1; rank <= 3; rank++) {
             if (!arrayTypes.contains(rank + "_" + clsName)) {
                 continue;
