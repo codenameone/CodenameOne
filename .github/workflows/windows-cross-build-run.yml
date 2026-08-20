@@ -182,9 +182,19 @@ jobs:
           CN1_CLANG_CL: clang-cl
           CN1_LLVM_RC: llvm-rc
           CN1_CROSS_EXE_OUT: ${{ github.workspace }}/artifacts/WinHelloMain.exe
+          # Narrowed to resolution failures, because this step RUNS A TEST. The wrapper
+          # retries every nonzero exit unless it is told what to look for, so a cross-build or
+          # translation failure that came and went would have passed on attempt two and taken
+          # the gate green with it -- laundering exactly the kind of intermittent product bug
+          # this job exists to catch. The unit test workflow narrows it for the same reason.
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
         run: |
           cd vm
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl tests -am test \
+          # Through the retry wrapper: this resolves plugins from Maven Central and the runner
+          # edge intermittently resets the connection mid-download, which Maven treats as a
+          # permanent resolution failure -- this run died on a truncated plexus-utils with nothing
+          # compiled yet. A real failure fails the same way on every attempt.
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh mvn -B -pl tests -am test \
             '-Dtest=CleanTargetIntegrationTest#crossBuildsHelloSuiteExe' \
             '-Dsurefire.failIfNoSpecifiedTests=false'
           test -f "$CN1_CROSS_EXE_OUT"

@@ -526,6 +526,60 @@ public final class WindowsNative {
 
     public static native boolean fileExists(String path);
 
+    /**
+     * Creates a file only if it does not exist: 1 created, 0 already there, -1 the attempt failed.
+     *
+     * <p>Decided by the operating system, so two processes racing cannot both be told they created
+     * it. {@code fileExists} followed by a write is two operations and answers both of them yes.
+     */
+    public static native int fileCreateExclusive(String path);
+
+    /**
+     * Takes an exclusive lock on a file, creating it if needed: the handle, or 0 if it could not
+     * be taken.
+     *
+     * <p>The operating system releases this when the process ends however it ends, which is what
+     * a file's existence cannot offer: a process that died holding a gate left it standing
+     * forever, and every later caller read it as a live writer.
+     */
+    public static native long fileLockExclusive(String path);
+
+    /** Releases a lock {@link #fileLockExclusive(String)} took. */
+    public static native void fileUnlock(long handle);
+
+
+
+    /**
+     * The operating system's own answer to "which file is this", as a string.
+     *
+     * <p>Two names can reach one file: an 8.3 short name, a junction, a hard link. Comparing the
+     * names says they are different; the volume serial number and file index say they are not.
+     * Returns null when there is no file to ask about, which the caller reads as "no identity" and
+     * falls back to the name.
+     *
+     * <p>Not stable across a delete and recreate -- the index is reused for whatever is created
+     * next -- so it identifies an OPEN file, never a database by name. The persistent managed key
+     * alias stays name-based for exactly that reason.
+     *
+     * @param path the file to identify
+     * @return the identity, or null when the file cannot be opened
+     */
+    public static native String fileIdentity(String path);
+
+
+    /**
+     * The operating system's own upper-casing of a string, which is the rule the filesystem
+     * compares names by.
+     *
+     * <p>Unlike {@link #fileIdentity(String)} this needs no file: it is a property of the text, so
+     * it is stable before the file exists and after it has been deleted and made again. That is
+     * what a managed key alias needs.
+     *
+     * @param text the string to fold
+     * @return the folded string, or null if the platform would not fold it
+     */
+    public static native String caseFold(String text);
+
     public static native boolean fileIsDirectory(String path);
 
     public static native long fileLength(String path);
@@ -967,4 +1021,59 @@ public final class WindowsNative {
     public static native void gl3dDrawArrays(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap);
+
+    // ---- SQLite bindings. Implemented in cn1_windows_db.c from the shared cn1_db_sqlite_impl.h. ----
+
+    /** True when a database file exists at this absolute path. */
+    public static native boolean sqlDbExists(String path);
+    /** Removes the database file at this absolute path. */
+    public static native void sqlDbDelete(String path);
+    /** Opens or creates a database, returning the sqlite3 peer. */
+    public static native long sqlDbOpen(String path) throws java.io.IOException;
+    /**
+     * Applies an encryption key and checks that it decrypts, returning false when it does not.
+     * Reporting rather than throwing keeps a wrong key distinguishable from a failure to open.
+     */
+    public static native boolean sqlDbApplyKey(long dbPeer, String key) throws java.io.IOException;
+
+    /// Applies the key and probes it, reporting the SQLite result rather than a bare pass or fail.
+    ///
+    /// 0 is SQLITE_OK. 26 is SQLITE_NOTADB, which is what a key that did not decrypt the file
+    /// looks like, because the plaintext it produces has no valid header. Anything else is a
+    /// corrupt image or a read error, which no key repairs, so those must not be reported as a
+    /// wrong key.
+    public static native int sqlDbApplyKeyStatus(long dbPeer, String key) throws java.io.IOException;
+    /** Re-keys an open database, or removes the key when passed null. */
+    public static native void sqlDbRekey(long dbPeer, String key) throws java.io.IOException;
+    /** True when the linked engine supports encryption. */
+    public static native boolean sqlDbIsCipherAvailable();
+    public static native void sqlDbClose(long dbPeer) throws java.io.IOException;
+    /** Runs a whole script, which may contain several statements. */
+    /** Whether the engine reports a transaction in progress, which is sqlite3_get_autocommit. */
+    public static native boolean sqlDbInTransaction(long dbPeer) throws java.io.IOException;
+
+    public static native void sqlDbExecScript(long dbPeer, String sql) throws java.io.IOException;
+
+    public static native long sqlStmtPrepare(long dbPeer, String sql) throws java.io.IOException;
+    public static native int sqlStmtParameterCount(long stmtPeer) throws java.io.IOException;
+    public static native void sqlStmtBindNull(long stmtPeer, int index) throws java.io.IOException;
+    public static native void sqlStmtBindText(long stmtPeer, int index, byte[] utf8) throws java.io.IOException;
+    public static native void sqlStmtBindBlob(long stmtPeer, int index, byte[] value) throws java.io.IOException;
+    public static native void sqlStmtBindLong(long stmtPeer, int index, long value) throws java.io.IOException;
+    public static native void sqlStmtBindDouble(long stmtPeer, int index, double value) throws java.io.IOException;
+    /** Steps a statement, returning true when it landed on a row. */
+    public static native boolean sqlStmtStep(long stmtPeer) throws java.io.IOException;
+    /** Resets a statement to before its first row, keeping its bindings. */
+    public static native void sqlStmtReset(long stmtPeer) throws java.io.IOException;
+    public static native void sqlStmtFinalize(long stmtPeer) throws java.io.IOException;
+    /** Steps to completion and finalizes, for statements that return no rows. */
+    public static native void sqlStmtExecuteAndFinalize(long stmtPeer) throws java.io.IOException;
+
+    public static native int sqlColCount(long stmtPeer) throws java.io.IOException;
+    public static native byte[] sqlColName(long stmtPeer, int col) throws java.io.IOException;
+    public static native boolean sqlColIsNull(long stmtPeer, int col) throws java.io.IOException;
+    public static native byte[] sqlColText(long stmtPeer, int col) throws java.io.IOException;
+    public static native byte[] sqlColBlob(long stmtPeer, int col) throws java.io.IOException;
+    public static native double sqlColDouble(long stmtPeer, int col) throws java.io.IOException;
+    public static native long sqlColLong(long stmtPeer, int col) throws java.io.IOException;
 }

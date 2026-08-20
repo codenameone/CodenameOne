@@ -1,48 +1,48 @@
 {
-  "commit": "159c7e3cc8a0eb161ba96891b6912f1d06cd03c4",
-  "generated_at": "2026-08-07T14:33:04Z",
+  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
+  "generated_at": "2026-08-19T10:47:47Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 294814130
+        "duration_ns": 207587681
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 34775357
+        "duration_ns": 25544773
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 308450257
+        "duration_ns": 233590607
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 235772541
+        "duration_ns": 166166998
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 187630414
+        "duration_ns": 87938220
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 4976459635
+        "duration_ns": 2460716848
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 147261118
+        "duration_ns": 114265882
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 150555950
+        "duration_ns": 127842947
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 733838461
+        "duration_ns": 490740312
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 319822720
+        "duration_ns": 217409339
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,14 +52,14 @@
     "suite_checksum": 0
   },
   "port": "android",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31186472520",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868198",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 170,
     "fail": 0,
-    "skip": 1,
-    "not-run": 7
+    "not-run": 0,
+    "pass": 177,
+    "skip": 1
   },
   "tests": {
     "ARApiTest": {
@@ -259,6 +259,34 @@
     },
     "DarkLightShowcaseThemeScreenshotTest": {
       "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
       "status": "pass"
     },
     "DesktopModeScreenshotTest": {
@@ -476,10 +504,6 @@
     "MultiButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
       "status": "pass"
-    },
-    "MultiWindowApiTest": {
-      "feature": "multi-window",
-      "status": "not-run"
     },
     "MutableImageClipReadbackTest": {
       "feature": "mutable-images",
@@ -752,30 +776,6 @@
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
       "status": "pass"
-    },
-    "WindowEditingTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowGraphicsTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowLayoutTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowModalTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowOverlayTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowScrollTest": {
-      "feature": "multi-window",
-      "status": "not-run"
     }
   }
 }

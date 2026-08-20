@@ -31,6 +31,10 @@ import com.codename1.io.Log;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileLock;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.prefs.BackingStoreException;
@@ -75,10 +79,193 @@ public final class JavaSESecureStorage extends SecureStorage {
         this.plainPrefs = java.util.prefs.Preferences.userRoot().node(PLAIN_NODE);
     }
 
+    /**
+     * Creates an entry under a lock every process of this application takes, so two cannot both
+     * create one.
+     *
+     * <p>The inherited implementation checks and then writes, which is two operations: two
+     * simulator runs of the same project doing their first managed open can both find nothing
+     * stored, generate different keys and each overwrite the other, after which the database is
+     * encrypted with a key that no longer exists. Reading back afterwards does not close that --
+     * both callers read their own write.</p>
+     *
+     * <p>So the decision happens inside a file lock, which is the one mutual exclusion the JVM
+     * offers between processes rather than between threads. Preferences is read again inside it
+     * through {@code sync()}: this store caches per process, so without that the check would ask
+     * a copy taken before the other process wrote.</p>
+     *
+     * @param account the account to create
+     * @param value the value to store when there is none
+     * @return the value now stored, which may be another process's, or null if it could not be
+     *   stored
+     */
+    @Override
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        File lockFile = lockFileFor(account);
+        if (lockFile == null) {
+            // Nowhere to put the lock, which is not a reason to write blindly: the inherited
+            // behaviour is still the best available, and it says what it does and does not hold.
+            return super.setIfAbsent(account, value);
+        }
+        RandomAccessFile handle = null;
+        FileLock lock = null;
+        try {
+            handle = new RandomAccessFile(lockFile, "rw");
+            // Blocking, not tryLock: a caller that cannot take the lock has to wait for whoever
+            // holds it rather than proceed as though the entry were absent.
+            lock = handle.getChannel().lock();
+            try {
+                plainPrefs.sync();
+            } catch (BackingStoreException cannotRefresh) {
+                // Answered from this process's copy, which is what the inherited path does anyway.
+                Log.e(cannotRefresh);
+            }
+            String existing = get(account);
+            if (existing != null) {
+                return existing;
+            }
+            return set(account, value) ? value : null;
+        } catch (IOException cannotLock) {
+            Log.e(cannotLock);
+            return super.setIfAbsent(account, value);
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+        }
+    }
+
+    /**
+     * The file every process of this application locks to create this account.
+     *
+     * <p>Named from the application and the account, so one project's first open does not block
+     * another's, and kept in the temporary directory because it holds nothing: the lock is the
+     * file's existence being opened, not its contents.</p>
+     */
+    private File lockFileFor(String account) {
+        String dir = System.getProperty("java.io.tmpdir");
+        if (dir == null || dir.length() == 0) {
+            return null;
+        }
+        File locks = new File(dir, "cn1-securestorage-locks");
+        if (!locks.isDirectory() && !locks.mkdirs()) {
+            return null;
+        }
+        // The shared naming, so two accounts that differ cannot share a lock. It matters less
+        // here than it does for the ports whose file IS the gate -- a shared lock here only
+        // serialises two creates that need not have waited for each other, rather than refusing
+        // one of them -- but there is no reason for this to be the one place that hashes.
+        return new File(locks, gateName(account) + ".lock");
+    }
+
+    /// Records that this application has taken its own copy of a shared entry.
+    private void markAdopted(java.util.prefs.Preferences shared, String key) {
+        java.util.prefs.Preferences mine = appNode(shared);
+        mine.putBoolean(key + "-adopted", true);
+        try {
+            mine.flush();
+        } catch (BackingStoreException cannotMark) {
+            // Worst case this project adopts again, which is the same value.
+            Log.e(cannotMark);
+        }
+    }
+
+    /// Whether this application has already taken its copy.
+    private boolean isAdopted(java.util.prefs.Preferences shared, String key) {
+        return appNode(shared).getBoolean(key + "-adopted", false);
+    }
+
+    /**
+     * The node this application's entries live in, under the shared one.
+     *
+     * <p>The simulator runs every project on one machine under one OS user, and this class kept
+     * every account in one fixed Preferences node -- so two projects that both asked for a managed
+     * key under the same alias read each other's key, and forgetting it in either one removed the
+     * only copy either had. The device ports are separated by an OS sandbox; here the separation
+     * has to be written down.</p>
+     *
+     * <p>Resolved per call rather than in the constructor: this object is built while the port is
+     * coming up, before {@code Display} can answer what the application is, and an answer cached
+     * from that moment would name every project the same thing.</p>
+     */
+    private java.util.prefs.Preferences appNode(java.util.prefs.Preferences shared) {
+        return shared.node(applicationNamespace(launcherPackage()));
+    }
+
+    /**
+     * The package of the class the simulator was launched with, or null if there is none.
+     *
+     * <p>Preferred over asking {@code Display}, because this object is built while the port is
+     * still coming up: {@code Display} answers {@code package_name} from this very property once
+     * it is running, so this is the same identity a moment earlier.</p>
+     */
+    private static String launcherPackage() {
+        String mainClass = System.getProperty("MainClass", null);
+        if (mainClass == null) {
+            return null;
+        }
+        int lastDot = mainClass.lastIndexOf('.');
+        return lastDot > 0 ? mainClass.substring(0, lastDot) : mainClass;
+    }
+
+    /**
+     * Moves an entry an earlier run left in the shared node into this application's own.
+     *
+     * <p>The value moves as it is: the salt behind the key stays in the shared node, so ciphertext
+     * written before this split still decrypts with the same key afterwards. Written to the new
+     * place before it is dropped from the old one, because for a managed database key this entry
+     * is the only copy there is.</p>
+     *
+     * @param shared the node entries used to live in
+     * @param key the preference key
+     * @return the value, or null when there was nothing to adopt
+     */
+    private String adoptSharedEntry(java.util.prefs.Preferences shared, String key) {
+        if (isAdopted(shared, key)) {
+            return null;
+        }
+        String stored = shared.get(key, null);
+        if (stored == null) {
+            return null;
+        }
+        java.util.prefs.Preferences mine = appNode(shared);
+        mine.put(key, stored);
+        try {
+            mine.flush();
+        } catch (BackingStoreException cannotCopy) {
+            // The value is still readable where it was, which is what the caller is given.
+            Log.e(cannotCopy);
+        }
+        // The shared entry stays. Removing it would take it from every other project that had the
+        // same account under this OS user -- which is precisely the sharing the per-application
+        // node is separating -- so a project that upgrades later can still find its key. The mark
+        // below is what stops this one reading it again once it has its own copy.
+        markAdopted(shared, key);
+        return stored;
+    }
+
     @Override
     public AsyncResource<String> get(final String reason, final String account) {
         final AsyncResource<String> result = new AsyncResource<String>();
-        final String stored = prefs.get(account, null);
+        String mine = appNode(prefs).get(account, null);
+        if (mine == null) {
+            mine = adoptSharedEntry(prefs, account);
+        }
+        final String stored = mine;
         if (stored == null) {
             result.error(new BiometricException(BiometricError.UNKNOWN,
                     "No secure storage entry for account: " + account));
@@ -107,7 +294,7 @@ public final class JavaSESecureStorage extends SecureStorage {
                     "Simulator: biometrics not enabled for secure storage write"));
             return result;
         }
-        prefs.put(account, value);
+        appNode(prefs).put(account, value);
         result.complete(Boolean.TRUE);
         return result;
     }
@@ -115,7 +302,9 @@ public final class JavaSESecureStorage extends SecureStorage {
     @Override
     public AsyncResource<Boolean> remove(String reason, String account) {
         AsyncResource<Boolean> result = new AsyncResource<Boolean>();
-        prefs.remove(account);
+        appNode(prefs).remove(account);
+        // Marked rather than removed, so a project that has not upgraded keeps its own copy.
+        markAdopted(prefs, account);
         result.complete(Boolean.TRUE);
         return result;
     }
@@ -137,14 +326,18 @@ public final class JavaSESecureStorage extends SecureStorage {
             c.init(Cipher.ENCRYPT_MODE, plainKey());
             byte[] enc = c.doFinal(value.getBytes("UTF-8"));
             Base64.Encoder b64 = Base64.getEncoder();
-            plainPrefs.put(VALUE_PREFIX + account,
+            appNode(plainPrefs).put(VALUE_PREFIX + account,
                     b64.encodeToString(c.getIV()) + ":" + b64.encodeToString(enc));
+            // The shared entry stays for the projects that have not upgraded, and this one stops
+            // consulting it.
+            markAdopted(plainPrefs, VALUE_PREFIX + account);
             // flush(), and its outcome is this method's answer. Preferences writes back
             // on its own schedule, so returning true said the secret was stored while it
             // was still only in memory -- and the simulator is killed abruptly all the
             // time, by the run button and by the IDE. The same reasoning as the Android
             // tier committing rather than applying: a write that reports success has to
             // have happened.
+            appNode(plainPrefs).flush();
             plainPrefs.flush();
             return true;
         } catch (Exception e) {
@@ -154,11 +347,33 @@ public final class JavaSESecureStorage extends SecureStorage {
     }
 
     @Override
+    public int entryState(String account) {
+        if (account == null) {
+            return ENTRY_UNKNOWN;
+        }
+        // The stored string, not the decrypted value: an entry whose ciphertext will not decrypt
+        // still exists, and reporting it absent is what would let a caller overwrite it.
+        if (appNode(plainPrefs).get(VALUE_PREFIX + account, null) != null) {
+            return ENTRY_PRESENT;
+        }
+        // Absent here is not absent: an earlier run wrote it in the shared node, and reporting
+        // nothing is what would have ManagedKeys generate a second key over a database the first
+        // one encrypted. Once this project has its own copy the shared entry is somebody else's.
+        if (isAdopted(plainPrefs, VALUE_PREFIX + account)) {
+            return ENTRY_ABSENT;
+        }
+        return plainPrefs.get(VALUE_PREFIX + account, null) != null ? ENTRY_PRESENT : ENTRY_ABSENT;
+    }
+
+    @Override
     public String get(String account) {
         if (account == null) {
             return null;
         }
-        String stored = plainPrefs.get(VALUE_PREFIX + account, null);
+        String stored = appNode(plainPrefs).get(VALUE_PREFIX + account, null);
+        if (stored == null) {
+            stored = adoptSharedEntry(plainPrefs, VALUE_PREFIX + account);
+        }
         if (stored == null) {
             return null;
         }
@@ -184,8 +399,11 @@ public final class JavaSESecureStorage extends SecureStorage {
         if (account == null) {
             return false;
         }
-        plainPrefs.remove(VALUE_PREFIX + account);
+        appNode(plainPrefs).remove(VALUE_PREFIX + account);
+        // Marked rather than removed, for the same reason the adoption copies it.
+        markAdopted(plainPrefs, VALUE_PREFIX + account);
         try {
+            appNode(plainPrefs).flush();
             // Same for the removal, and it matters more: this is the credential a logout
             // clears, so an unflushed deletion is one that comes back on the next launch.
             plainPrefs.flush();

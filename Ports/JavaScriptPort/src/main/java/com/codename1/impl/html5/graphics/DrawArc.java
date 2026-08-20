@@ -70,7 +70,9 @@ public class DrawArc implements ExecutableOp {
             context.setStrokeStyle(HTML5Graphics.color(color));
             context.setGlobalAlpha(((double)alpha)/255.0);
             context.beginPath();
-            context.arc(cx, cy, rx, -startRad, -endRad, true);
+            // See FillArc: the sweep is counter-clockwise on the canvas exactly when the
+            // arcAngle is positive, so a negative arcAngle needs the other direction.
+            context.arc(cx, cy, rx, -startRad, -endRad, arcAngle >= 0);
             context.setLineWidth(1);
             context.stroke();
             context.restore();

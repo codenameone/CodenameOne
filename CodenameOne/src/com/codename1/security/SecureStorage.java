@@ -176,4 +176,192 @@ public class SecureStorage {
     public boolean remove(String account) {
         return false;
     }
+
+    /// The entry is there.
+    /// Stores a value only if this account has none, and reports what the store ended up holding.
+    ///
+    /// The operation a first-time key needs. Reading, generating and storing as three steps is
+    /// safe within one process and not between two: `synchronized` covers threads in one VM, while
+    /// an application can be opened from more than one -- Android components declared with their
+    /// own `android:process`, or simply two runs of a desktop build -- and both can see nothing
+    /// stored, generate different keys, and each overwrite the other. The database is then
+    /// encrypted with whichever key did not survive, and nothing can open it again.
+    ///
+    /// The return value is what makes racing callers agree: a caller that lost stores nothing and
+    /// is handed the value that won, so both go on to open the database with the same key.
+    ///
+    /// This default is the best a store with no create-if-absent of its own can do -- the check
+    /// and the write are still two operations, so a second process can land between them, and what
+    /// it prevents is the divergence rather than the race. A port whose store can do this in one
+    /// step overrides it; iOS does, because the keychain's own add fails when the item exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the account to create
+    ///
+    /// - `value`: the value to store if there is none
+    ///
+    /// #### Returns
+    ///
+    /// the value now stored, which may be another caller's, or null if the store cannot say
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        if (entryState(account) == ENTRY_ABSENT && set(account, value)) {
+            // Read back rather than assuming: another process may have written between the check
+            // and the write, and its value is the one to agree on.
+            String stored = get(account);
+            return stored != null ? stored : value;
+        }
+        return get(account);
+    }
+
+    /// A name unique to this application, for a store the platform shares between applications.
+    ///
+    /// The mobile ports do not need this: an OS sandbox already separates one application's
+    /// keychain or keystore from another's. A native desktop build has no sandbox -- its storage
+    /// is a plain directory under the user account -- so two applications that ask for the same
+    /// account name reach the same entry. For a managed database key that means one application
+    /// reading another's key, and forgetting it in either one removing the other's only copy.
+    ///
+    /// The package is what the installer, the store and the build all treat as the application's
+    /// identity. A display name is the fallback because a build without a package still has one,
+    /// though it is weaker: two vendors can both ship "Notes".
+    ///
+    /// #### Returns
+    ///
+    /// an identifier safe to embed in a storage name, never null and never empty
+    protected static String applicationNamespace() {
+        return applicationNamespace(null);
+    }
+
+    /// The same identifier, for a port that knows the application before `Display` can say.
+    ///
+    /// The simulator is that case: it builds its store while the port is still coming up, so
+    /// `Display` cannot answer yet -- and it has the launcher's main class in hand, which is where
+    /// its `package_name` comes from in the first place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `preferred`: an identity the port already knows, or null to ask `Display`
+    ///
+    /// #### Returns
+    ///
+    /// an identifier safe to embed in a storage name, never null and never empty
+    protected static String applicationNamespace(String preferred) {
+        String id = preferred;
+        if (id == null || id.length() == 0) {
+            try {
+                id = Display.getInstance().getProperty("package_name", null);
+                if (id == null || id.length() == 0) {
+                    id = Display.getInstance().getProperty("AppName", null);
+                }
+            } catch (RuntimeException tooEarly) {
+                // Asked before Display is ready, which is not a reason to fail an entry lookup.
+                id = null;
+            }
+        }
+        if (id == null || id.length() == 0) {
+            // A build that stamped neither. A constant rather than something that looks unique
+            // and is not: sharing one namespace is the thing this exists to fix, and a name that
+            // pretended otherwise would hide it.
+            return "cn1app";
+        }
+        return sanitizeNamespace(id);
+    }
+
+    /// The file name a port uses to gate the creation of one account, for the ports whose
+    /// create-if-absent is a file.
+    ///
+    /// Derived from the account itself rather than from its hash, because a hash is not a name:
+    /// `Aa` and `BB` hash alike, so two aliases would share one gate and whichever asked second
+    /// could never create its key -- it would find no value of its own and no gate to take. The
+    /// escape is the one `#applicationNamespace()` uses, so the result is reversible and two
+    /// accounts that differ keep different gates.
+    ///
+    /// A name too long to be a file gets its first part plus a hash of the whole, which is the
+    /// one place a hash is the right answer: the alternative is a name the filesystem refuses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the account being created
+    ///
+    /// #### Returns
+    ///
+    /// a file name, unique to this application and account
+    protected static String gateName(String account) {
+        String encoded = sanitizeNamespace(account == null ? "" : account);
+        if (encoded.length() > MAX_GATE_NAME) {
+            encoded = encoded.substring(0, MAX_GATE_NAME)
+                    + "-" + Integer.toHexString(account.hashCode());
+        }
+        return "cn1ss-gate-" + applicationNamespace() + "-" + encoded;
+    }
+
+    /// Leaves room for the application namespace and the prefix inside a 255 byte file name.
+    private static final int MAX_GATE_NAME = 120;
+
+    /// Reduces an identity to what a storage name, a preferences node or a keychain service holds.
+    ///
+    /// Reversibly, which is the whole point of it: folding every character it cannot carry onto
+    /// one replacement made `com.acme.foo$bar` and `com.acme.foo_bar` the same namespace, and
+    /// "My App" and "My_App" as well -- so two applications that collide there share a store this
+    /// exists to keep apart, and forgetting a key in one takes the other's. The escape is the one
+    /// `ManagedKeys#accountName(String)` already uses on the account half of the same name, so
+    /// the two halves are encoded the same way.
+    private static String sanitizeNamespace(String id) {
+        StringBuilder b = new StringBuilder(id.length());
+        for (int iter = 0; iter < id.length(); iter++) {
+            char c = id.charAt(iter);
+            boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.' || c == '-';
+            if (safe) {
+                b.append(c);
+            } else {
+                // Including the escape character itself, or "a%0020b" and "a b" would encode alike.
+                b.append('%');
+                b.append(HEX.charAt((c >> 12) & 0x0f));
+                b.append(HEX.charAt((c >> 8) & 0x0f));
+                b.append(HEX.charAt((c >> 4) & 0x0f));
+                b.append(HEX.charAt(c & 0x0f));
+            }
+        }
+        return b.toString();
+    }
+
+    /// The digits `#sanitizeNamespace(String)` escapes with.
+    private static final String HEX = "0123456789abcdef";
+
+    public static final int ENTRY_PRESENT = 1;
+
+    /// The store answered, and there is nothing under that account.
+    public static final int ENTRY_ABSENT = 0;
+
+    /// The store could not be asked, so nothing is known about the entry.
+    public static final int ENTRY_UNKNOWN = -1;
+
+    /// Whether an entry exists, as distinct from whether it can be read.
+    ///
+    /// `#get(String)` cannot answer this: it returns null for an entry that is not there and for
+    /// one it could not read, and a caller that treats those alike will eventually treat a store
+    /// that is briefly unavailable as a store that is empty. Where that caller then writes -- a
+    /// managed database key is the case this was added for -- it overwrites a key that was there
+    /// all along, and the database encrypted under the old one can never be opened again.
+    ///
+    /// A port answers `#ENTRY_PRESENT` for an entry it can see even if it cannot decrypt it: the
+    /// question is existence, not readability. The default is `#ENTRY_UNKNOWN`, which is the
+    /// honest answer for a platform with no non-prompting store, and callers must treat it as
+    /// "do not write".
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry to ask about
+    ///
+    /// #### Returns
+    ///
+    /// one of `#ENTRY_PRESENT`, `#ENTRY_ABSENT` or `#ENTRY_UNKNOWN`
+    public int entryState(String account) {
+        return ENTRY_UNKNOWN;
+    }
 }

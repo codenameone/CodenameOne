@@ -179,6 +179,11 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         result = result.replace("__APP_ADAPT_TO_RETINA__", sanitizeBoolean(adaptToRetina, true));
         result = result.replace("__APP_DESKTOP_TITLEBAR__", sanitizeTitleBarMode(titleBar));
         result = result.replace("__APP_DESKTOP_INTERACTIVE_SCROLLBARS__", sanitizeBoolean(interactiveScrollbars, true));
+        // A desktop wrapper is only ever generated from a Maven project, so the compatibility
+        // default for Ant projects does not apply here: the portable contract is the default and
+        // the hint is only carried through when it was set explicitly.
+        result = result.replace("__DB_LEGACY__", sanitizeBoolean(
+                properties.getProperty("codename1.arg.db.legacy"), false));
         return result;
     }
 

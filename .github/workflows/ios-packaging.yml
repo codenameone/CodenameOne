@@ -237,10 +237,20 @@ jobs:
           ./scripts/run-ios-native-tests.sh \
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        # 20 was enough while the sample built one app. It declares a watchMain now, so the app
-        # scheme carries an embedded watch app with a ParparVM translation of its own and
-        # xcodebuild builds that before running a single test. The same raise was already applied
-        # to this step in scripts-ios-native.yml; this workflow runs it too and was missed.
+        # Two things grew into this budget, and both still apply. The reuse above is partial:
+        # run-ios-native-tests.sh injects the test target into the pbxproj before building, and
+        # Xcode rebuilds the app target after a project change even though the objects are there,
+        # so this step still pays a near-full native build -- 6m55s of the 8m13s it takes on a
+        # fast runner. Measured on one commit, a slow runner spent 4m31s booting the simulator
+        # (a fast one: 1m15s) and 13 minutes on that build, and the cap fired before the tests
+        # started. On top of that the sample now declares a watchMain, so the app scheme carries
+        # an embedded watch app with a ParparVM translation of its own, which xcodebuild builds
+        # before running a single test -- the raise scripts-ios-native.yml already took.
+        #
+        # So the higher of the two, not either alone: the watch build is added work on top of the
+        # rebuild, not a re-description of it. The real fix is to inject before the UI-smoke step
+        # so this build is genuinely incremental; until then the budget has to cover the build it
+        # actually does.
         timeout-minutes: 45
 
       - name: Upload packaging artifacts

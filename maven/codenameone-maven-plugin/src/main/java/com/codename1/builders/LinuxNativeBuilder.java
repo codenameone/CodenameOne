@@ -76,6 +76,10 @@ import java.util.List;
  * invocation, CMake argument assembly) is platform independent and unit tested.</p>
  */
 public class LinuxNativeBuilder extends Executor {
+
+    /// Whether the application touches com.codename1.db. Held as a field because the class scan
+    /// and the stub generation happen in different methods.
+    private boolean usesDatabase;
     /** Supported target architectures for {@code linux.arch}. */
     public static final String ARCH_X64 = "x64";
     public static final String ARCH_ARM64 = "arm64";
@@ -241,6 +245,32 @@ public class LinuxNativeBuilder extends Executor {
                     + "(LinuxPort.jar + nativelinux.jar) on its classpath.", ex);
         }
 
+        // The bundled SQLite engine is emitted only for applications that use com.codename1.db,
+        // and its cipher only for those that configure encryption, so nobody else pays for either.
+        // Attributed to the class that makes the reference: the tree scanned below is the
+        // application merged with the framework, and Display alone carries
+        // openOrCreate(String, DatabaseConfig), so a callback that cannot say who referenced what
+        // answers yes for every application ever built.
+        //
+        // Ahead of the stub generation below, which needs the answer: the generated bootstrap
+        // decides there whether to switch the database into compatibility mode, and it can only
+        // do that for an application it knows uses a database. Scanning afterwards would also
+        // read the stub's own reference back and call every application a database user.
+        DatabaseUsage databaseUsage;
+        try {
+            // The libraries as well as the loose classes. unzip() routes a submitted .jar to the
+            // libs directory, which is btres here, and the translator reads it alongside the
+            // application -- so an application whose dependency is the only thing that calls
+            // DatabaseConfig scanned as using no database at all, and the build then compiled
+            // without the SQLite amalgamation the library needs.
+            databaseUsage = scanForDatabaseUsage(classesDir)
+                    .merge(scanForDatabaseUsage(buildinRes));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for database usage", ex);
+        }
+        usesDatabase = databaseUsage.usesDatabase();
+        final boolean usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
+
         // Native interface binding + app bootstrap (see WindowsNativeBuilder for the
         // full description of the three generated stub kinds). All generated stubs
         // are compiled into classesDir (a translator source root) so the executable
@@ -310,6 +340,8 @@ public class LinuxNativeBuilder extends Executor {
         if (!heapOverridden) {
             parparCmd.add("-Xmx" + heapMB + "m");
         }
+        parparCmd.add("-Dcn1.sqlite=" + usesDatabase);
+        parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
         NativeVerifyOption.addTo(parparCmd, request, "linux");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
@@ -544,7 +576,7 @@ public class LinuxNativeBuilder extends Executor {
             }
         }
 
-        writeBootstrapStub(request, classesDir, stubSource, registerNatives);
+        writeBootstrapStub(request, classesDir, stubSource, registerNatives, usesDatabase);
 
         String javacPath = System.getProperty("java.home") + "/../bin/javac";
         if (!new File(javacPath).exists()) {
@@ -620,7 +652,8 @@ public class LinuxNativeBuilder extends Executor {
      * app windowed. The clean target auto-selects this as the C {@code main}
      * because it is the only class carrying a {@code main(String[])} method.
      */
-    private void writeBootstrapStub(BuildRequest request, File classesDir, File stubSource, String registerNatives)
+    private void writeBootstrapStub(BuildRequest request, File classesDir, File stubSource, String registerNatives,
+            boolean usesDatabase)
             throws Exception {
         String pkg = request.getPackageName();
         String main = request.getMainClass();
@@ -643,9 +676,19 @@ public class LinuxNativeBuilder extends Executor {
         src.append(registerNatives);
         src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
         src.append("        Display.init(null);\n");
+        // The application's identity, which nothing else gives this platform. The stub passes
+        // null to Display.init, so the implementation never derives a package from an object, and
+        // without this the port has only the display name to key the per-application directory on
+        // -- which is not unique between applications, and was absent in these builds anyway, so
+        // every native desktop application shared one home directory and one set of databases.
+        src.append("        Display.getInstance().setProperty(\"package_name\", \"")
+                .append(request.getPackageName()).append("\");\n");
         // Stamp the hardening metadata so Hardening.isHardened() and crash reports carry the
         // mapping id / level on this port too (parity with iOS and Android).
         src.append(hardeningRuntimeProperties(request));
+        // And the database compatibility switch, before the lifecycle below starts, so it is in
+        // force by the time anything opens a database.
+        src.append(databaseLegacyStubProperty(request, usesDatabase));
         src.append(svgInstall);
         src.append("        Display.getInstance().callSerially(new Runnable() {\n");
         src.append("            public void run() {\n");

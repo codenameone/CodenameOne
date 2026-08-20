@@ -1,0 +1,8 @@
+# Vendored third-party sources. Marking them keeps them out of language
+# statistics and collapses them in diffs, so a routine engine update does not
+# read as a 400,000 line change and does not push review tooling past its
+# size limits.
+vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h linguist-vendored linguist-generated -diff
+vm/ByteCodeTranslator/src/cn1_sqlite3.h             linguist-vendored linguist-generated -diff
+Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js              linguist-vendored -diff
+Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js linguist-vendored -diff

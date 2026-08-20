@@ -55,7 +55,7 @@
             <configuration>
               <artifactItems>
                 <artifactItem>
-                  <groupId>org.xerial</groupId>
+                  <groupId>io.github.willena</groupId>
                   <artifactId>sqlite-jdbc</artifactId>
                   <version>${sqlite.jdbc.version}</version>
                   <classifier>javadoc</classifier>
@@ -94,7 +94,6 @@
     </plugins>
   </build>
   <properties>
-    <sqlite.jdbc.version>3.46.1.0</sqlite.jdbc.version>
-    <maven.deploy.skip>true</maven.deploy.skip>
+    <sqlite.jdbc.version>3.53.4.0</sqlite.jdbc.version>
   </properties>
 </project>

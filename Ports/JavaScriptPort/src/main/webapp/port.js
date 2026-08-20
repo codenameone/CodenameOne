@@ -1710,20 +1710,19 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName
 });
 
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function() {
-  // Default to 1: Codename One's JS port works end-to-end in CSS
-  // ("real") pixels and skips HiDPI auto-scaling of the canvas /
-  // pointer events. Use ``?pixelRatio=2`` to opt back in.
+  // Report the display's real scale factor. Codename One addresses DEVICE pixels --
+  // the iOS port detects the retina factor and scales the values it hands the native
+  // primitives, so the framework draws at native resolution rather than rendering at
+  // 1x. Pinning this to 1 made the browser upscale a 1x canvas on every HiDPI display,
+  // which is why canvas text looked soft next to DOM text.
+  //
+  // ``?pixelRatio=N`` still forces a specific factor, which the screenshot harness and
+  // the skin designer rely on.
   const ratioOverride = getQueryParameter("pixelRatio");
   const win = global.window || global;
   if (ratioOverride != null && ratioOverride !== "") {
     const parsed = Number(ratioOverride);
-    if (!isNaN(parsed) && parsed > 0) {
-      win.overridePixelRatio = parsed;
-    } else {
-      win.overridePixelRatio = 1;
-    }
-  } else if (typeof win.overridePixelRatio === "undefined") {
-    win.overridePixelRatio = 1;
+    win.overridePixelRatio = (!isNaN(parsed) && parsed > 0) ? parsed : 1;
   }
   if (typeof win.cn1ScaleCoord === "undefined") {
     win.cn1ScaleCoord = function(x) {
@@ -5802,11 +5801,12 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
           jvm.beginCaptureGate();
         }
         try {
+          const captureSettle = cn1SsSettleParams(normalizedTest);
           yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
             reason: "screenshot:" + normalizedTest,
-            maxFrames: 48,
-            stableFrames: 3,
-            quietFrames: 3
+            maxFrames: captureSettle.maxFrames,
+            stableFrames: captureSettle.stableFrames,
+            quietFrames: captureSettle.quietFrames
           }]);
           const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
           capturedDataUrl = hostResult == null ? "" : String(hostResult);
@@ -5889,11 +5889,12 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitChannelFastJs", [
   if (!channel && jvm && typeof jvm.invokeHostNative === "function" && !cn1ssScreenshotEmitted[test]) {
     try {
       yield* forceDisplayPresentationForScreenshot("emitChannel:" + test);
+      const channelSettle = cn1SsSettleParams(test);
       yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
         reason: "screenshot:" + test,
-        maxFrames: 48,
-        stableFrames: 3,
-        quietFrames: 3
+        maxFrames: channelSettle.maxFrames,
+        stableFrames: channelSettle.stableFrames,
+        quietFrames: channelSettle.quietFrames
       }]);
       const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
       const capturedDataUrl = hostResult == null ? "" : String(hostResult);
@@ -5926,6 +5927,24 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.completeNullRunnableGuard", [
   return yield* cn1_ivAdapt(runMethod(completion));
 });
 
+// How hard to wait for the canvas to stop changing, per test.
+//
+// The heavy drawing tests were already given a longer wait before they are declared ready, but
+// the capture that follows used a fixed short one -- three still frames out of forty-eight. A
+// test that draws in stages can be still for three frames between two of them, and
+// graphics-draw-image-rect was captured exactly there: the top half of its grid drawn, the
+// bottom half not, on a run where the same test had passed all week. The two waits now come from
+// one place, so a test that needs a longer settle gets it at the moment that matters.
+function cn1SsSettleParams(testName) {
+  const normalized = normalizeCn1ssTestName(testName || "default");
+  const heavy = normalized === "DrawImage" || normalized === "graphics-draw-image-rect";
+  return {
+    maxFrames: heavy ? 120 : 48,
+    stableFrames: heavy ? 6 : 3,
+    quietFrames: heavy ? 6 : 3
+  };
+}
+
 bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
   baseTestRegisterReadyCallbackMethodId,
   baseTestRegisterReadyCallbackMethodId + "__impl"
@@ -5946,11 +5965,12 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
       // (A/B-confirmed: this is NOT the cause of the SlideHorizontal settle
       // message loss -- reverting to the host delay did not change it.)
       yield { op: "sleep", millis: delayMillis };
+      const readySettle = cn1SsSettleParams(activeTest);
       const settleResult = yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
         reason: "ready:" + activeTest,
-        maxFrames: delayMillis > 1500 ? 120 : 48,
-        stableFrames: delayMillis > 1500 ? 6 : 3,
-        quietFrames: delayMillis > 1500 ? 6 : 3
+        maxFrames: readySettle.maxFrames,
+        stableFrames: readySettle.stableFrames,
+        quietFrames: readySettle.quietFrames
       }]);
       if (settleResult && settleResult.changedFromPrevious != null) {
         settleChanged = String((settleResult.changedFromPrevious | 0) !== 0 ? 1 : 0);
@@ -6449,3 +6469,927 @@ bindNative([
     id: jvm.toNativeString(deviceId), iid: iid | 0, enable: !!enable
   }]);
 });
+
+// ---------------------------------------------------------------------------
+// SQLite, compiled to WebAssembly.
+//
+// Replaces WebSQL, which Chrome removed in 119 and Firefox never implemented.
+// The engine is loaded into this worker on first use, so every call after the
+// initial load is an ordinary synchronous call with no host round trip.
+//
+// Storage uses the opfs-sahpool VFS. The default OPFS VFS needs
+// crossOriginIsolated, which needs COOP/COEP response headers, which we cannot
+// require: Codename One JavaScript apps are deployed to arbitrary static
+// hosting. opfs-sahpool needs only OPFS plus createSyncAccessHandle in a
+// worker, acquires its file handles once during install, and is fully
+// synchronous afterwards.
+// ---------------------------------------------------------------------------
+let cn1Sqlite = null;          // the sqlite3 namespace once initialised
+let cn1SqlitePoolVfs = null;   // encrypting VFS over the OPFS pool, or null if there is none
+let cn1SqliteMemoryVfs = "memdb"; // the VFS memory-backed databases open through
+let cn1SqlitePool = null;      // the opfs-sahpool utility, when persistent
+let cn1SqliteInitPromise = null;
+let cn1SqliteHandles = new Map();
+let cn1SqliteNextHandle = 1;
+
+function cn1SqliteRegister(obj) {
+  const id = cn1SqliteNextHandle++;
+  cn1SqliteHandles.set(id, obj);
+  return id;
+}
+
+function cn1SqliteLookup(id) {
+  const obj = cn1SqliteHandles.get(id);
+  if (!obj) {
+    throw new Error("this database handle has been closed");
+  }
+  return obj;
+}
+
+/**
+ * Distinguishes a browser that cannot do synchronous OPFS from one that merely would not.
+ *
+ * The first is permanent and memory is the best available answer. The second - another tab
+ * holding the handles, a quota, a timeout - is transient, and quietly substituting an empty
+ * in-memory database for a persistent one that exists is data loss, not degradation.
+ */
+function cn1SqliteOpfsIsUnsupported(err) {
+  if (typeof FileSystemFileHandle === "undefined"
+      || typeof FileSystemFileHandle.prototype === "undefined"
+      || typeof FileSystemFileHandle.prototype.createSyncAccessHandle !== "function") {
+    return true;
+  }
+  const message = String((err && err.message) || err || "").toLowerCase();
+  return message.indexOf("not supported") >= 0
+      || message.indexOf("unsupported") >= 0
+      || message.indexOf("is not a function") >= 0
+      || message.indexOf("undefined") >= 0;
+}
+
+/** How long either half of the engine bring-up may take before it is treated as unavailable. */
+const CN1_SQLITE_INIT_TIMEOUT_MS = 15000;
+
+/**
+ * Slots in the OPFS access-handle pool.
+ *
+ * The pool preallocates a fixed number of file handles and throws "SAH pool is full" once they
+ * are taken, so the default of six is a hard ceiling on databases -- and journal files take slots
+ * of their own, so the real ceiling is lower than it looks. Slots are cheap, an empty one is an
+ * unused zero length file, so this is set well above what an application is likely to need.
+ */
+const CN1_SQLITE_POOL_CAPACITY = 64;
+
+/**
+ * Rejects if the given promise has not settled in time.
+ *
+ * Neither step of the bring-up is guaranteed to settle at all. Acquiring a synchronous OPFS
+ * access handle blocks while another context holds the same file, and a browser that never
+ * releases it leaves the promise pending forever rather than rejecting. The translated code is
+ * waiting on this through the yield-on-promise bridge, which resumes only when the promise
+ * settles, so "pending forever" parks the event thread and every thread behind it -- a hang with
+ * nothing logged anywhere. A rejection, by contrast, is something the caller can report.
+ */
+function cn1SqliteWithin(promise, millis, what) {
+  return new Promise(function(resolve, reject) {
+    let settled = false;
+    const timer = setTimeout(function() {
+      if (!settled) {
+        settled = true;
+        reject(new Error(what + " did not complete within " + millis + "ms"));
+      }
+    }, millis);
+    Promise.resolve(promise).then(function(value) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      }
+    }, function(err) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  });
+}
+
+function cn1SqliteStartInit() {
+  if (cn1SqliteInitPromise) {
+    return cn1SqliteInitPromise;
+  }
+  cn1SqliteInitPromise = (async function() {
+    // This promise must never reject. The translated code awaits it through the runtime's
+    // yield-on-promise bridge, which resumes the calling thread only on resolution -- a rejection
+    // leaves the event thread parked on an await that never returns, and every other thread then
+    // blocks behind it. That is a hang with no error anywhere, not a failed database call. So
+    // every failure here resolves to false instead, and the caller reports the engine as
+    // unavailable in the ordinary way.
+    try {
+      // Classic worker, so importScripts is the load mechanism and is synchronous.
+      importScripts("js/sqlite3mc.js");
+      // locateFile is not optional here. importScripts does not change the worker's base URL, so
+      // the loader resolves its .wasm against the worker script's directory rather than its own
+      // and fetches /sqlite3.wasm from the site root - a 404, and then a fifteen second wait for
+      // the init timeout before the engine reports itself unavailable. The bundle keeps both
+      // files together under js/, so that is where the payload is.
+      cn1Sqlite = await cn1SqliteWithin(sqlite3InitModule({
+        locateFile: function(path) { return "js/" + path; }
+      }), CN1_SQLITE_INIT_TIMEOUT_MS, "loading the SQLite WebAssembly module");
+    } catch (err) {
+      console.warn("Codename One: the SQLite engine could not be loaded, so databases are "
+        + "unavailable in this build. Reported cause: " + err);
+      cn1Sqlite = null;
+      cn1SqlitePool = null;
+      return false;
+    }
+    try {
+      cn1SqlitePool = await cn1SqliteWithin(
+        cn1Sqlite.installOpfsSAHPoolVfs({ name: "cn1-db", initialCapacity: CN1_SQLITE_POOL_CAPACITY }),
+        CN1_SQLITE_INIT_TIMEOUT_MS,
+        "opening the OPFS storage pool");
+    } catch (err) {
+      if (!cn1SqliteOpfsIsUnsupported(err)) {
+        // Contention with another tab, a timeout, a quota or any other transient storage failure.
+        // Falling back here would open a fresh in-memory database, so an existing persistent one
+        // would look empty and everything written this session would vanish at page close -
+        // silent data loss dressed up as a working database. Reporting the database as
+        // unavailable is the only answer that does not lie.
+        console.warn("Codename One: the OPFS storage pool could not be opened, so databases are "
+          + "unavailable in this session. This is usually another tab holding the same storage. "
+          + "Reported cause: " + err);
+        cn1Sqlite = null;
+        cn1SqlitePool = null;
+        return false;
+      }
+      // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle at all. There is
+      // no persistent storage to lose on those, so memory is a genuine improvement over nothing -
+      // but say so, because losing every write on reload should not be discovered in production.
+      console.warn("Codename One: this browser has no synchronous OPFS access, so databases are "
+        + "kept in memory for the lifetime of this page and are lost when it closes. Reported "
+        + "cause: " + err);
+      cn1SqlitePool = null;
+    }
+    cn1SqliteInstallCipherVfs();
+    return true;
+  })();
+  return cn1SqliteInitPromise;
+}
+
+/**
+ * Wraps the storage VFS in the one that can encrypt.
+ *
+ * SQLite3MC does not encrypt through an arbitrary VFS: the cipher lives in a shim VFS that has to
+ * be created over the real one, and a database opened directly on the real one answers "Setting key
+ * failed. Encryption is not supported by the VFS." to every PRAGMA key. sqlite3mc_vfs_create
+ * registers "multipleciphers-<name>" over <name>; unencrypted databases work through either, so
+ * everything opens through the shim and the plain case simply never sets a key.
+ *
+ * A failure here is not fatal. It costs encryption, not storage, and the ports report encryption as
+ * unsupported in the ordinary way.
+ */
+function cn1SqliteInstallCipherVfs() {
+  if (!cn1Sqlite || !cn1Sqlite.capi || !cn1Sqlite.capi.sqlite3mc_vfs_create) {
+    return;
+  }
+  if (cn1SqlitePool) {
+    const real = cn1SqlitePool.vfsName || "opfs-sahpool";
+    if (cn1Sqlite.capi.sqlite3mc_vfs_create(real, 0) === 0) {
+      cn1SqlitePoolVfs = "multipleciphers-" + real;
+    } else {
+      console.warn("Codename One: this SQLite build cannot encrypt through the storage pool, so "
+        + "databases opened with a key will be refused.");
+    }
+    return;
+  }
+  if (cn1Sqlite.capi.sqlite3mc_vfs_create("memdb", 0) === 0) {
+    cn1SqliteMemoryVfs = "multipleciphers-memdb";
+  }
+}
+
+/**
+ * Anchor connections for the degraded in-memory path, by database name.
+ *
+ * The memdb VFS frees a named store as soon as its last connection closes, so without a connection
+ * held open here, closing a database would discard it instead of leaving it readable until the page
+ * closes. These are never handed out: every open gets its own connection, because handing the same
+ * one back would make a second open skip key validation entirely and report an encrypted database
+ * as plaintext.
+ */
+const cn1SqliteMemoryAnchors = new Map();
+
+/**
+ * Live application connections to each database, by name, whichever storage backs it.
+ *
+ * Neither backend refuses a delete on its own. The store behind a memdb URI is released only once
+ * every connection to it closes, and the pool's unlink drops the name-to-file mapping without
+ * touching the handles already open on it -- so in both cases deleting an open database removes
+ * the name while the data lives on behind the open connection: exists() says no, reopening the
+ * name creates a fresh database, and everything the old connection writes until it closes is
+ * discarded with the orphan. Counting is what lets delete refuse instead of doing half of it.
+ */
+const cn1SqliteOpenCounts = new Map();
+
+/** All three take the reduced name cn1SqliteDbPath produces, not the one the caller typed. */
+function cn1SqliteOpened(name) {
+  cn1SqliteOpenCounts.set(name, (cn1SqliteOpenCounts.get(name) || 0) + 1);
+}
+
+function cn1SqliteClosed(name) {
+  const count = cn1SqliteOpenCounts.get(name) || 0;
+  if (count <= 1) {
+    cn1SqliteOpenCounts.delete(name);
+  } else {
+    cn1SqliteOpenCounts.set(name, count - 1);
+  }
+}
+
+function cn1SqliteIsOpen(name) {
+  return (cn1SqliteOpenCounts.get(name) || 0) > 0;
+}
+
+/** Whether the last failed open failed because of the key, rather than storage or corruption. */
+let cn1SqliteLastOpenWrongKey = false;
+
+/** The message from the last failed call, for the exception the Java side raises. */
+let cn1SqliteLastError = "";
+
+/**
+ * Runs a database operation, turning any failure into a value the caller can test.
+ *
+ * Nothing in this file may throw across the bridge. An exception raised inside a native binding
+ * does not arrive in the translated code as a Java throwable: it unwinds the worker and leaves
+ * every thread blocked on a call that never returns, so an ordinary SQL error - a syntax mistake,
+ * a constraint violation - would hang the application instead of reporting itself. Each binding
+ * therefore records the message here and answers with a sentinel the Java side checks.
+ *
+ * The rule for anything added below: every binding that touches the engine goes through this.
+ * The only ones that do not are init and open, which catch for themselves because they have
+ * their own sentinels, and the four that just read a variable. "This one cannot throw" has been
+ * wrong four times in this file already -- reset looked inert and reports the previous step's
+ * error, close and finalize report the last error of what they are closing.
+ */
+function cn1SqliteGuard(fn, failureValue) {
+  // Cleared on entry so that what lastError() reports belongs to this call. The readers whose
+  // failure value is also a legal value -- a null blob, a null string -- cannot tell the two apart
+  // from the value alone, and an error left over from something earlier would make every one of
+  // them look like a failure.
+  cn1SqliteLastError = "";
+  try {
+    return fn();
+  } catch (err) {
+    cn1SqliteLastError = err && err.message ? String(err.message) : String(err);
+    return failureValue;
+  }
+}
+
+/**
+ * The page size every platform's databases use, set before the file has any pages.
+ *
+ * This build creates databases with 8192-byte pages, and SQLCipher 4 -- the on-disk format all the
+ * ports share -- is defined at 4096. The mismatch does not show up until the database is encrypted:
+ * a rekey has to change the page size, which SQLite refuses on a database that already has pages,
+ * so "Rekeying failed. Pagesize cannot be changed for an encrypted database." A page size set on a
+ * database that already has pages is silently ignored, which is exactly what makes this safe to
+ * issue on every open and useless to issue anywhere later.
+ */
+const CN1_SQLITE_PAGE_SIZE = 4096;
+
+/** Puts a newly opened connection on the shared page size, before anything writes to it. */
+function cn1SqlitePrepareConnection(db) {
+  db.exec("PRAGMA page_size = " + CN1_SQLITE_PAGE_SIZE);
+}
+
+/** Applies the key, if there is one, selecting the portable cipher scheme first. */
+function cn1SqliteApplyKey(db, key) {
+  if (key !== null && key !== undefined && key !== "") {
+    // Select the SQLCipher 4 scheme before applying the key, or the engine uses
+    // its own and the file cannot be read on any other platform.
+    db.exec("PRAGMA cipher = 'sqlcipher'");
+    db.exec("PRAGMA legacy = 4");
+    db.exec("PRAGMA key = \"" + key.replace(/"/g, '""') + "\"");
+  }
+}
+
+/**
+ * Recognises the engine's report for a file whose header did not decrypt.
+ *
+ * SQLite answers SQLITE_NOTADB for a wrong key, because the bytes it produces are not a database
+ * header. A corrupt image reports SQLITE_CORRUPT instead, which no key can fix.
+ */
+function cn1SqliteLooksLikeAKeyFailure(err) {
+  const message = String((err && err.message) || err || "").toLowerCase();
+  return message.indexOf("not a database") >= 0
+      || message.indexOf("notadb") >= 0
+      || message.indexOf("file is encrypted") >= 0;
+}
+
+/**
+ * Applies the key and proves it works, tagging a failure as a key failure.
+ *
+ * Only this step can fail because of the key. Opening the file, the pool and the VFS can all fail
+ * for reasons no key would fix -- storage full, a corrupt file, OPFS unavailable -- and reporting
+ * those as WRONG_KEY would have an application prompting for a passphrase that cannot help, even
+ * when it never supplied one.
+ */
+function cn1SqliteApplyKeyAndProbe(db, key) {
+  const keyed = key !== null && key !== undefined && key !== "";
+  try {
+    cn1SqliteApplyKey(db, key);
+    // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
+    // also succeeds: without this, opening one without a key would look like proof it is plaintext.
+    db.exec("SELECT count(*) FROM sqlite_master");
+  } catch (err) {
+    // A wrong key looks like a file that is not a database, because the plaintext it produces has
+    // no valid header. A malformed image or a read error is a different thing entirely and no key
+    // repairs it, so only the first is tagged - and only when a key was actually supplied, since
+    // reporting a key problem to a caller who supplied none is a diagnosis impossible on its face.
+    if (keyed && cn1SqliteLooksLikeAKeyFailure(err) && err && typeof err === "object") {
+      err.cn1WrongKey = true;
+    }
+    throw err;
+  }
+}
+
+/** Opens a database by name, through the pool when one is available. */
+function cn1SqliteOpen(name, key) {
+  if (cn1SqlitePool) {
+    // Not OpfsSAHPoolDb, which pins the connection to the pool's own VFS and so cannot be
+    // keyed. Same file, same pool underneath, reached through the shim that can encrypt.
+    const pooled = cn1SqlitePoolVfs
+        ? new cn1Sqlite.oo1.DB({ filename: cn1SqliteDbPath(name), flags: "c",
+            vfs: cn1SqlitePoolVfs })
+        : new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
+    try {
+      cn1SqlitePrepareConnection(pooled);
+      cn1SqliteApplyKeyAndProbe(pooled, key);
+    } catch (err) {
+      try {
+        pooled.close();
+      } catch (ignored) {
+        // Must not replace the tagged error: doing so would lose the wrong-key classification
+        // and surface a raw close failure instead.
+      }
+      throw err;
+    }
+    // Tagged and counted exactly as the memdb path below is: unlink() drops the pool's mapping
+    // for a name without rejecting handles already open on it, so delete has to be told.
+    pooled.cn1DbName = cn1SqliteDbPath(name);
+    cn1SqliteOpened(pooled.cn1DbName);
+    return pooled;
+  }
+  // The same reduction the pool path applies, so "foo" and "/foo" are one database here too --
+  // they are one file in the pool, and two stores in memory would make the fallback disagree with
+  // the storage it stands in for, down to exists() and delete() seeing only one spelling.
+  const memoryName = cn1SqliteDbPath(name);
+  // filename: gives the connection a name inside the VFS, so reopening finds it again.
+  const uri = "file:" + encodeURIComponent(memoryName) + "?vfs=" + cn1SqliteMemoryVfs;
+  const anchored = cn1SqliteMemoryAnchors.has(memoryName);
+  const db = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
+  try {
+    cn1SqlitePrepareConnection(db);
+    cn1SqliteApplyKeyAndProbe(db, key);
+  } catch (err) {
+    // Closing releases the store if this connection was the one that created it, so a rejected
+    // key leaves nothing behind.
+    db.close();
+    throw err;
+  }
+  if (!anchored) {
+    // Created after the real connection so the store already exists. The anchor takes the same
+    // key, but only so that opening it succeeds; it never reads or writes a page afterwards, so
+    // a later rekey through another connection leaves it holding a key it no longer needs.
+    let anchor = null;
+    try {
+      anchor = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
+      cn1SqliteApplyKey(anchor, key);
+    } catch (err) {
+      // The primary too, not just the anchor. It is open, prepared and keyed by this point, and
+      // nothing has recorded it yet -- the handle map and the open count are both written after
+      // this block -- so letting the throw past here left a live connection that nothing could
+      // close and that would keep the store alive against a later delete. Each failed open
+      // leaked another.
+      if (anchor !== null) {
+        try {
+          anchor.close();
+        } catch (alsoFailed) {
+          // The original failure is the one worth reporting.
+        }
+      }
+      db.close();
+      throw err;
+    }
+    cn1SqliteMemoryAnchors.set(memoryName, anchor);
+  }
+  // Tagged so closing this connection can decrement the count without another lookup, and so the
+  // close binding can tell a memdb connection from a pooled one.
+  db.cn1MemoryName = memoryName;
+  db.cn1DbName = memoryName;
+  cn1SqliteOpened(memoryName);
+  return db;
+}
+
+
+/**
+ * Java longs cross the bridge as a BigInt on the exact-longs runtime, as a {__l,l,h} record on the
+ * legacy one, or as a plain Number. Round-tripping through Number silently rounds anything past
+ * 2^53, which is exactly the range identifiers and epoch-microsecond values live in, so convert
+ * through BigInt instead and hand the engine a value it stores exactly.
+ */
+function cn1SqliteToBigInt(v) {
+  if (typeof v === "bigint") {
+    return v;
+  }
+  if (v && typeof v === "object" && v.__l === 1) {
+    return (BigInt(v.h | 0) << 32n) | BigInt(v.l >>> 0);
+  }
+  return BigInt(Math.trunc(Number(v)));
+}
+
+/**
+ * Converts an engine integer into the runtime's Java long.
+ *
+ * A long is a hi/lo pair here, not a BigInt and not a number: handing back a BigInt sends it
+ * through the runtime's _Lc(), whose BigInt branch goes via Number and drops everything past 53
+ * bits. SQLite stores 64-bit integers and the API promises a Java long, so 9007199254740993 came
+ * back as ...992 -- close enough to look right and wrong by one.
+ */
+function cn1SqliteFromBigInt(v) {
+  const big = typeof v === "bigint" ? v : BigInt(Math.trunc(Number(v)));
+  if (typeof _Llit === "function") {
+    // Two's complement both halves: asIntN keeps the sign of a negative value in the high word,
+    // and the low word is read back unsigned on the way in.
+    return _Llit(Number(BigInt.asIntN(32, big & 0xFFFFFFFFn)) | 0,
+      Number(BigInt.asIntN(32, big >> 32n)) | 0);
+  }
+  // A runtime without the hi/lo helpers represents longs as numbers, which is the precision it
+  // has everywhere else too.
+  return Number(big);
+}
+
+function cn1SqliteDbPath(name) {
+  return name.charAt(0) === "/" ? name : "/" + name;
+}
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_init_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_init___R_boolean"], function*() {
+  if (cn1Sqlite) {
+    return true;
+  }
+  yield { op: "await", promise: cn1SqliteStartInit() };
+  return !!cn1Sqlite;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isPersistent_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_isPersistent___R_boolean"],
+  function() { return !!cn1SqlitePool; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable___R_boolean"],
+  // A loaded engine is not enough: the cipher lives in a shim VFS, and a database opened on the
+  // storage VFS directly refuses every key. Answering yes here on an engine that cannot key the
+  // storage it actually uses turns a clear "encryption is unsupported" into an open that fails.
+  function() {
+    if (!cn1Sqlite) {
+      return false;
+    }
+    return cn1SqlitePool ? !!cn1SqlitePoolVfs : cn1SqliteMemoryVfs !== "memdb";
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_exists___java_lang_String_R_boolean"],
+  function(name) {
+    return cn1SqliteGuard(function() {
+      const n = jvm.toNativeString(name);
+      if (!cn1SqlitePool) {
+        return cn1SqliteMemoryAnchors.has(cn1SqliteDbPath(n));
+      }
+      return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(n)) >= 0;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String_R_boolean"],
+  function(name) {
+    return cn1SqliteGuard(function() {
+      const n = jvm.toNativeString(name);
+      if (cn1SqliteIsOpen(cn1SqliteDbPath(n))) {
+        // Refused rather than half done, and for both backends. The pool's unlink() removes the
+        // name-to-file mapping and clears the path on the access handle; it does not reject the
+        // SQLite handles already open on that file, and dropping the memdb anchor does not
+        // release a store another connection still holds. Either way the name would go while the
+        // data lived on behind the open connection: exists() would answer no, reopening would
+        // create a fresh database, and every write through the old handle would be discarded with
+        // the orphan when it closed. Saying so is the only honest answer.
+        cn1SqliteLastError = "the database " + n + " is still open; close it before deleting it";
+        return false;
+      }
+      if (cn1SqlitePool) {
+        // The rollback journal first, and the database itself last. The pool holds each as its own
+        // entry, so unlinking the database alone left a file holding the pages of an interrupted
+        // transaction, under a name reopening the database reads back. (This VFS has no shared
+        // memory and so no WAL, but the whole set is unlinked anyway: it costs nothing when the
+        // entry is absent, and it does not have to be revisited if that ever changes.)
+        //
+        // Order matters as much as the set does. Removing the database first and then failing on a
+        // companion reported a failure over a database that was already gone -- the caller is told
+        // to retry what cannot be retried, and reads the error as its data being intact. With the
+        // database last, anything that throws before it leaves a database that really can be
+        // deleted again.
+        //
+        // Unwrapped, all of them. The pool answers a name it never had by returning false, so the
+        // entries this database never created cost nothing and raise nothing; it throws only when
+        // it held the entry and could not release it, and that has to reach the guard. Swallowing
+        // it would report a deletion that did not happen while a file holding database pages
+        // stayed in the pool, which is the whole of what deleting the working files is for.
+        const cn1SqliteSidecars = ["-journal", "-wal", "-shm"];
+        for (let i = 0; i < cn1SqliteSidecars.length; i++) {
+          cn1SqlitePool.unlink(cn1SqliteDbPath(n) + cn1SqliteSidecars[i]);
+        }
+        cn1SqlitePool.unlink(cn1SqliteDbPath(n));
+      } else {
+        const anchor = cn1SqliteMemoryAnchors.get(cn1SqliteDbPath(n));
+        if (anchor) {
+          // Dropping the anchor releases the store once every other connection to it has closed.
+          anchor.close();
+          cn1SqliteMemoryAnchors.delete(cn1SqliteDbPath(n));
+        }
+      }
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_String_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_open___java_lang_String_java_lang_String_R_long"],
+  function(name, key) {
+    cn1SqliteLastOpenWrongKey = false;
+    cn1SqliteLastError = "";
+    try {
+      return cn1SqliteRegister(cn1SqliteOpen(jvm.toNativeString(name), key === null ? null : jvm.toNativeString(key)));
+    } catch (err) {
+      // Report through a sentinel and two accessors rather than by throwing. An exception raised
+      // inside a native binding does not cross back into the translated code as a Java throwable:
+      // it unwinds the worker and leaves every thread waiting on a call that never returns, which
+      // is a hang rather than an error.
+      cn1SqliteLastOpenWrongKey = !!(err && err.cn1WrongKey);
+      cn1SqliteLastError = err && err.message ? String(err.message) : String(err);
+      return 0;
+    }
+  });
+
+// The store the previous implementation used, which this engine cannot read.
+//
+// WebSQL went out of Chrome in 119 and Firefox never had it, so on nearly every browser this
+// answers false without doing anything. The overlap that matters is one old enough to still hold a
+// WebSQL store and new enough for the OPFS pool this engine needs, where an application that
+// upgrades would otherwise open a new empty database and show its user an empty application.
+//
+// There is no way to ask WebSQL whether a database exists: openDatabase creates one when it does
+// not. So this asks for the smallest store it can and reads the schema, and on a browser that has
+// the API but not the data it leaves an empty legacy database behind -- a few kilobytes, once, on
+// a browser that is already carrying the old store this is looking for.
+const CN1_SQLITE_LEGACY_TABLES =
+  "SELECT count(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+
+function cn1SqliteLegacyRowCount(resultSet) {
+  return resultSet && resultSet.rows && resultSet.rows.length > 0
+      ? resultSet.rows.item(0).c > 0 : false;
+}
+
+/// A worker gets the synchronous form, which answers without the await bridge.
+function cn1SqliteLegacyHasDataSync(name) {
+  const db = openDatabaseSync(name, "", name, 1);
+  let found = false;
+  db.readTransaction(function(tx) {
+    found = cn1SqliteLegacyRowCount(tx.executeSql(CN1_SQLITE_LEGACY_TABLES, []));
+  });
+  return found;
+}
+
+/// A window has only the callback form, which is why the binding below is a generator.
+function cn1SqliteLegacyHasDataAsync(name) {
+  return new Promise(function(resolve) {
+    let db;
+    try {
+      db = openDatabase(name, "", name, 1);
+    } catch (cannotOpen) {
+      resolve(false);
+      return;
+    }
+    if (!db) {
+      resolve(false);
+      return;
+    }
+    db.readTransaction(function(tx) {
+      tx.executeSql(CN1_SQLITE_LEGACY_TABLES, [], function(ignoredTx, resultSet) {
+        resolve(cn1SqliteLegacyRowCount(resultSet));
+      }, function() {
+        resolve(false);
+        return false;
+      });
+    }, function() {
+      resolve(false);
+    });
+  });
+}
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_legacyStoreHasData_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_legacyStoreHasData___java_lang_String_R_boolean"],
+  function*(name) {
+    const n = jvm.toNativeString(name);
+    try {
+      if (typeof openDatabaseSync === "function") {
+        return cn1SqliteLegacyHasDataSync(n);
+      }
+      if (typeof openDatabase === "function") {
+        return yield { op: "await", promise: cn1SqliteLegacyHasDataAsync(n) };
+      }
+    } catch (cannotAsk) {
+      // A browser that refuses the question is not one holding data this can lose: WebSQL threw
+      // for a disabled or full store, and answering true there would refuse every new database.
+      return false;
+    }
+    return false;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey___R_boolean"],
+  function() { return cn1SqliteLastOpenWrongKey; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastError_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastError___R_java_lang_String"],
+  function() { return jvm.createStringLiteral(String(cn1SqliteLastError)); });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_inTransaction_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_inTransaction___long_R_boolean"],
+  function(dbId) {
+    // The engine's own answer. A script that fails partway stops at the failing statement, and
+    // nothing outside can see which one that was, so reading the script cannot tell an unexecuted
+    // trailing COMMIT from an executed one.
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteHandles.get(Number(dbId));
+      return db ? !cn1Sqlite.capi.sqlite3_get_autocommit(db.pointer) : false;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_boolean"],
+  function(dbId) {
+    // Reports failure rather than swallowing it. A close that fails on an OPFS flush has not
+    // written the data, and the caller's peer is already cleared, so returning normally would be
+    // the last chance to say so passing silently. The handle is dropped before the close so a
+    // failure cannot leave it stranded in the map either.
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteHandles.get(Number(dbId));
+      if (db) {
+        // Always close: this is a connection of its own, never the anchor, and the anchor is what
+        // keeps a memdb-backed database readable after its last application connection goes away.
+        cn1SqliteHandles.delete(Number(dbId));
+        if (db.cn1DbName) {
+          cn1SqliteClosed(db.cn1DbName);
+        }
+        db.close();
+      }
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String_R_boolean"],
+  function(dbId, key) {
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteLookup(Number(dbId));
+      db.exec("PRAGMA cipher = 'sqlcipher'");
+      db.exec("PRAGMA legacy = 4");
+      const k = key === null ? "" : jvm.toNativeString(key);
+      db.exec("PRAGMA rekey = \"" + k.replace(/"/g, '""') + "\"");
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_execScript_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript___long_java_lang_String_R_boolean"],
+  function(dbId, sql) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(dbId)).exec(jvm.toNativeString(sql));
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_prepare_long_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_prepare___long_java_lang_String_R_long"],
+  function(dbId, sql) {
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteLookup(Number(dbId));
+      return cn1SqliteRegister(db.prepare(jvm.toNativeString(sql)));
+    }, 0);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount___long_R_int"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).parameterCount; }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_boolean"],
+  function(stmtId, index) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindString_long_int_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString___long_int_java_lang_String_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0,
+        value === null ? null : jvm.toNativeString(value));
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_int_byte_1ARRAY_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob___long_int_byte_1ARRAY_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      if (value === null) {
+        cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);
+        return true;
+      }
+      // Java bytes are signed; the engine wants raw octets.
+      const bytes = new Uint8Array(value.length);
+      for (let i = 0; i < value.length; i++) {
+        bytes[i] = value[i] & 0xff;
+      }
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, bytes);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, cn1SqliteToBigInt(value));
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_int_double_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble___long_int_double_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, value);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_step_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_step___long_R_int"],
+  function(stmtId) {
+    // 1 landed on a row, 0 reached the end, -1 failed. A boolean had no room to say "failed",
+    // which is why this one is an int.
+    return cn1SqliteGuard(function() {
+      return cn1SqliteLookup(Number(stmtId)).step() ? 1 : 0;
+    }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long_R_boolean"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() {
+      // Keep the bindings: re-stepping a parameterised query is how a backward seek works.
+      //
+      // Guarded because reset is not the inert call it looks like: the wrapper checks
+      // sqlite3_reset, which reports the error from the statement's last step, so resetting
+      // after a failed step raises that error here rather than at the step.
+      cn1SqliteLookup(Number(stmtId)).reset(false);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long_R_void"],
+  function(stmtId) {
+    // Same reasoning as close: finalize reports the statement's last error, and this is a
+    // cleanup path that cannot usefully raise. Handle dropped either way so it cannot be
+    // finalized twice.
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteHandles.get(Number(stmtId));
+      if (stmt) {
+        cn1SqliteHandles.delete(Number(stmtId));
+        stmt.finalize();
+      }
+      return null;
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long_R_boolean"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteHandles.get(Number(stmtId));
+      if (stmt) {
+        // Dropped before anything that can throw. finalize() reports the result of the statement
+        // it is finalizing, so a failed write -- a constraint violation, say -- throws from step()
+        // and then throws again from the cleanup, and a delete placed after it never runs. The
+        // entry would stay in the map forever with nothing left able to reach it, one per failed
+        // write. The same reasoning the close binding already follows.
+        cn1SqliteHandles.delete(Number(stmtId));
+        try {
+          while (stmt.step()) {
+            // A statement that returns rows still has to run to completion.
+          }
+        } finally {
+          stmt.finalize();
+        }
+      }
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount___long_R_int"],
+  function(stmtId) {
+    return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).columnCount; }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnName_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnName___long_int_R_java_lang_String"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      const name = cn1SqliteLookup(Number(stmtId)).getColumnName(col | 0);
+      return name === null || name === undefined ? null : jvm.createStringLiteral(String(name));
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_long_int_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull___long_int_R_int"],
+  function(stmtId, col) {
+    // -1 rather than a boolean, because "true" here is indistinguishable from a real SQL NULL:
+    // an out-of-range column index would be reported as a null value and the getter would hand
+    // back null or zero instead of raising. 1 is null, 0 is not, -1 is a failed lookup.
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      const index = col | 0;
+      if (index < 0 || index >= stmt.columnCount) {
+        throw new Error("Column " + index + " is out of range");
+      }
+      // The column's type, not its value. Asking for the value materialises it, and for a blob
+      // that means allocating and copying every byte out of the wasm heap into a Uint8Array which
+      // is then thrown away -- on the read path the cursor takes before every getBlob, so a large
+      // value was copied a second time for nothing and could fail on memory that would otherwise
+      // have held it. The type is what the question was about anyway.
+      return cn1Sqlite.capi.sqlite3_column_type(stmt.pointer, index)
+              === cn1Sqlite.capi.SQLITE_NULL ? 1 : 0;
+    }, -1);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnString___long_int_R_java_lang_String"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      const index = col | 0;
+      if (index < 0 || index >= stmt.columnCount) {
+        throw new Error("Column " + index + " is out of range");
+      }
+      // Asked as text, which is what every other port does: they read through
+      // sqlite3_column_text, and SQLite converts whatever is stored. Left to the stored type this
+      // handed back the value as it sits, so a blob arrived as a Uint8Array and String() rendered
+      // it "65,66" where the native ports return "AB" -- the same row read through the same API
+      // giving different answers on one platform.
+      //
+      // NULL is decided before the conversion rather than after it, so that a column holding SQL
+      // NULL stays null instead of becoming whatever text a forced conversion produces for it.
+      if (cn1Sqlite.capi.sqlite3_column_type(stmt.pointer, index)
+              === cn1Sqlite.capi.SQLITE_NULL) {
+        return null;
+      }
+      const v = stmt.get(index, cn1Sqlite.capi.SQLITE_TEXT);
+      return v === null || v === undefined ? null : jvm.createStringLiteral(String(v));
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_int_R_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob___long_int_R_byte_1ARRAY"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      // SQLITE_BLOB, not the Uint8Array constructor: this API takes a type code there, and a
+      // constructor makes it answer "Don't know how to translate type of result column" for every
+      // blob read rather than returning the bytes.
+      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0, cn1Sqlite.capi.SQLITE_BLOB);
+      if (v === null || v === undefined) {
+        return null;
+      }
+      const out = jvm.newArray(v.length, "JAVA_BYTE", 1);
+      for (let i = 0; i < v.length; i++) {
+        // Back to signed Java bytes.
+        out[i] = v[i] > 127 ? v[i] - 256 : v[i];
+      }
+      return out;
+    }, null);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble_long_int_R_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble___long_int_R_double"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      // Asked of the engine for the same reason columnLong is: a value stored as TEXT is read by
+      // SQLite as the number its leading characters spell, and Number() makes NaN of anything
+      // with a non-numeric tail. sqlite3_column_double answers 0.0 for a null column, which is
+      // what a double getter has to return anyway.
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      return cn1Sqlite.capi.sqlite3_column_double(stmt.pointer, col | 0);
+    }, 0);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_int_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong___long_int_R_long"],
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      // Asked of the engine as an integer, which is what the ports that call
+      // sqlite3_column_int64 get. Reading the column's own type and converting here does not
+      // agree with them on a value stored as TEXT: SQLite reads as many leading digits as it
+      // finds, so '123abc' is 123 and 'abc' is 0, while Number() makes NaN of both -- and BigInt
+      // then throws, which this guard would report as 0 for one and 0 for the other. A decimal
+      // too large for a long clamps to its limit there and wraps here.
+      // No null check either: sqlite3_column_int64 answers 0 for a NULL column, which is what a
+      // long getter returns for one anyway, and what the native ports return through the same
+      // call.
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      return cn1SqliteFromBigInt(
+        cn1Sqlite.capi.sqlite3_column_int64(stmt.pointer, col | 0));
+    }, 0);
+  });

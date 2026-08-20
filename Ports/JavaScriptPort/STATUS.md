@@ -17,6 +17,108 @@ routing.
 This document is the handoff for whoever picks up the branch next. Read it
 before you re-attempt switching initializr over.
 
+Web-native overlay layer
+------------------------
+
+The port renders to a canvas, but text, semantics and OS state no longer come
+from it. Two DOM layers sit above the canvas, which is itself marked
+`role=presentation` / `aria-hidden`:
+
+- `#cn1-text-layer` (`JavaScriptTextLayer`) carries the **visible text**.
+  `BufferedGraphics.drawString` -- the display graphics -- hands each run to the
+  layer instead of the canvas, so the text on screen is real DOM text that can be
+  selected, found with the browser's find-in-page, and rasterized by the browser
+  rather than by canvas. Codename One remains the sole layout authority: a run
+  arrives already broken and placed, so it is emitted as one `white-space:pre`
+  element at an absolute coordinate and the browser cannot wrap or reflow it.
+  Text measurement is unchanged and stays on the worker's `OffscreenCanvas`.
+- `#cn1-accessibility-tree` (`JavaScriptSemanticOverlay`) carries the ARIA
+  projection of `AccessibilityTreeSnapshot`. It is updated incrementally --
+  elements are keyed by semantic node id and reused -- because the previous
+  rebuild-per-invalidation discarded DOM focus and text selection on every
+  `CHANGE_BOUNDS`, which is raised by every `setX/setY/setWidth/setHeight`.
+
+The layer takes no pointer events: the canvas owns hit testing, so a drag across
+a label does not start a native selection. Find-in-page, the browser's own text
+handling and assistive technology all reach the text; pointer selection would
+mean teaching the port's input path to tell a selection drag from an application
+drag, which is a change to input rather than to this layer.
+
+Text that stays on the canvas, by design:
+
+- offscreen targets (transition buffers, `paintLock`, `ComponentImage`,
+  `Display.screenshot`) -- they use plain `HTML5Graphics`, so the gate is
+  structural rather than a check;
+- cell renderers, which are one component instance stamped at N positions and so
+  cannot key a pooled element per row;
+- anything outside the displayed form, because the layer sits above the canvas as
+  a whole and nothing painted afterwards can occlude it (a modal dialog paints
+  the form beneath it as its own backdrop);
+- decorated runs -- underline, strike-through, overline -- whose lines are drawn
+  after the glyphs and over them, which a promoted glyph would cover;
+- shape clips and non-identity transforms;
+- anything a later canvas draw covers. The layer is above the canvas as a whole,
+  so an image, fill or shape drawn over a promoted run cannot hide it the way it
+  would have hidden canvas text. Such a run is put back on the canvas and its
+  component stays there -- a sheet's scrim, a tab bar's composited lens, a
+  clipped rotation over a title. Who is drawing decides: a component painting its
+  own background, or a container painting behind children it is about to paint,
+  covers text it draws again a moment later and hides nothing. What the draw
+  reaches decides too: an empty clip or a fully transparent one reaches nothing,
+  the report is clipped to the graphics clip -- to the clip's own outline when it
+  is a shape, since text the clip protects is not covered by a draw it culls --
+  and a shape, polygon, arc, radial gradient or rounded rectangle is asked
+  whether its outline meets the glyphs rather than whether its bounding rectangle
+  does. Curves are walked rather than replaced by their control points.
+
+Bitmap fonts need no exclusion: `Graphics.drawString` renders a `CustomFont`
+itself and never reaches the implementation.
+
+**Consequence for the screenshot suite:** every test in the suite reads the screen
+back to capture it, and a pixel read returns text to the canvas for good -- the
+two representations cannot both be authoritative, and an application that reads
+pixels is saying which one it needs. The goldens are therefore canvas-text at the
+display's real pixel ratio, and have been rebaselined from a CI run. The DOM
+layer is covered by `scripts/verify-javascript-web-overlay.mjs`, which asserts it
+directly instead of through pixels.
+
+Known gaps in this area:
+
+- An editable field is reached through a SET_TEXT control in the actions region rather
+  than by typing into the semantic node itself, which is a div over a canvas. A native
+  input is still what appears once editing starts.
+- Drag-selection is not enabled. The layer takes no pointer events so the canvas
+  keeps hit testing; find-in-page and assistive technology do not need hit
+  testing, but selection does. Enabling it requires the pointer-routing rework.
+- Vertical placement uses `fontHeight()` as the line box, which matches Codename
+  One's own layout metric but is approximate against the browser's font metrics
+  to about a pixel. A text-parity harness comparing `getBoundingClientRect()`
+  against the Codename One width/position is the way to tighten this.
+- Occlusion within a form is not handled; only cross-form occlusion is, along with
+  the glass pane, a dragged component and transitions. A `Sheet`, an
+  `InteractionDialog`, or an opaque sibling in a `LayeredLayout` painting over a
+  text-bearing component will not cover its promoted text, because the layer is
+  above the canvas as a whole. Whether a later sibling covers an earlier one is
+  not known at the time the earlier one paints, so the only general answer is to
+  promote the covering content too -- which is the DOM renderer this deliberately
+  is not.
+
+Main-thread browser state
+-------------------------
+
+Several features were written when the port ran on the main thread and silently
+did nothing once it moved into a worker, because the objects they reach for do
+not exist there. `history.pushState` was a `@JSBody` and threw on every form
+change (the port logged that the back command would not work), and every
+`matchMedia` query -- dark mode, reduced motion, forced colors, contrast,
+reduced transparency -- answered `false` unconditionally. Both now go through
+the host bindings so they run on the main thread; media query results are cached
+and refreshed from a `change` listener.
+
+The rule this illustrates is worth keeping in mind for any future port work:
+**a `@JSBody` runs in the worker.** Anything touching `window`, `document`,
+`history`, `matchMedia` or `navigator` has to go through a host binding instead.
+
 Build
 -----
 

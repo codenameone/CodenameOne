@@ -317,6 +317,82 @@ class PortStatusTest(unittest.TestCase):
             ):
                 port_status.validate(manifest)
 
+    def test_validate_rejects_a_test_that_never_ran(self):
+        # A registered test left at "not-run" reads on the page exactly like one that runs and
+        # passes. Seven database tests were published that way -- added to the manifest, never
+        # run in any stored report -- and nothing here objected.
+        original_directory = self.manifest["report_directory"]
+        with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
+            report_root = Path(tmp)
+            for port in self.manifest["ports"]:
+                source = port_status.REPO_ROOT / original_directory / (
+                    port["id"] + ".json"
+                )
+                (report_root / source.name).write_text(
+                    source.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+            android_path = report_root / "android.json"
+            android = port_status.read_json(android_path)
+            victim = next(
+                name
+                for name, result in android["tests"].items()
+                if result.get("status") == "pass"
+            )
+            android["tests"][victim]["status"] = "not-run"
+            android["summary"]["pass"] -= 1
+            android["summary"]["not-run"] += 1
+            android_path.write_text(
+                json.dumps(android, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest = dict(self.manifest)
+            manifest["report_directory"] = str(
+                report_root.relative_to(port_status.REPO_ROOT)
+            )
+            with self.assertRaisesRegex(
+                port_status.ContractError,
+                "reports tests that never ran: " + victim,
+            ):
+                port_status.validate(manifest)
+
+    def test_validate_accepts_a_test_the_port_skipped(self):
+        # The distinction the rule turns on: a port that genuinely cannot do something reports
+        # "skip" from the suite itself, which is evidence rather than the absence of it.
+        original_directory = self.manifest["report_directory"]
+        with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
+            report_root = Path(tmp)
+            for port in self.manifest["ports"]:
+                source = port_status.REPO_ROOT / original_directory / (
+                    port["id"] + ".json"
+                )
+                (report_root / source.name).write_text(
+                    source.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+            android_path = report_root / "android.json"
+            android = port_status.read_json(android_path)
+            victim = next(
+                name
+                for name, result in android["tests"].items()
+                if result.get("status") == "pass"
+            )
+            android["tests"][victim]["status"] = "skip"
+            android["summary"]["pass"] -= 1
+            android["summary"]["skip"] += 1
+            android_path.write_text(
+                json.dumps(android, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest = dict(self.manifest)
+            manifest["report_directory"] = str(
+                report_root.relative_to(port_status.REPO_ROOT)
+            )
+            # Asserted against this rule alone: a skip carries its own separate obligation --
+            # errata explaining it -- and that is what would be reported here instead.
+            try:
+                port_status.validate(manifest)
+            except port_status.ContractError as exc:
+                self.assertNotIn("never ran", str(exc))
+
     def publishable_report(self, port_id, **overrides):
         mapped = port_status.test_to_feature(self.manifest)
         tests = {
@@ -603,6 +679,69 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual(([], []), port_status.publishable_report_problems(
             self.manifest, "linux-x64", report
         ))
+
+    def test_a_declared_skip_survives_a_missing_screenshot(self):
+        # A test that skips produces no screenshot, so the comparison reports the actual as
+        # missing. Counting that as a failure made "we could not test this here" and "this is
+        # broken" the same red, which is the distinction the gate exists to draw -- and it is why
+        # the map test stayed red after it started reporting the skip properly.
+        log_text = "\n".join(
+            [
+                "CN1SS:INFO:suite starting test=GoogleWebMapScreenshotTest",
+                "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=map-tiles-never-loaded",
+                "CN1SS:INFO:suite finished test=GoogleWebMapScreenshotTest",
+                "CN1SS:SUITE:FINISHED",
+            ]
+        )
+        comparison = {"results": [{"test": "GoogleWebMap", "status": "missing_actual"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            comparison_path = root / "comparison.json"
+            comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
+            report = port_status.normalize(
+                manifest=self.manifest,
+                port_id="ios-gl",
+                logs=[log_path],
+                comparisons=[comparison_path],
+                output=root / "report.json",
+                run_url="https://example.invalid/run/9",
+                commit="abc123",
+                generated_at="2026-07-15T00:00:00Z",
+            )
+        self.assertEqual("skip", report["tests"]["GoogleWebMapScreenshotTest"]["status"])
+
+    def test_a_screenshot_that_differs_still_fails_a_skipped_test(self):
+        # The other half, which is what keeps the forgiveness narrow: only a missing actual is
+        # excused. Anything that was captured and compared is a real result, and a difference in
+        # it fails whatever the log said.
+        log_text = "\n".join(
+            [
+                "CN1SS:INFO:suite starting test=GoogleWebMapScreenshotTest",
+                "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=map-tiles-never-loaded",
+                "CN1SS:INFO:suite finished test=GoogleWebMapScreenshotTest",
+                "CN1SS:SUITE:FINISHED",
+            ]
+        )
+        comparison = {"results": [{"test": "GoogleWebMap", "status": "different"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            comparison_path = root / "comparison.json"
+            comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
+            report = port_status.normalize(
+                manifest=self.manifest,
+                port_id="ios-gl",
+                logs=[log_path],
+                comparisons=[comparison_path],
+                output=root / "report.json",
+                run_url="https://example.invalid/run/10",
+                commit="abc123",
+                generated_at="2026-07-15T00:00:00Z",
+            )
+        self.assertEqual("fail", report["tests"]["GoogleWebMapScreenshotTest"]["status"])
 
     def test_publishable_requires_a_boolean_suite_completion_marker(self):
         # bool() accepted "false" and 1 as a finished suite, and Hugo reads the

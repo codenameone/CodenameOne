@@ -110,14 +110,14 @@
             <src path="../../CodenameOne/src" />
         </javac>        
         <delete file="build/tmp/com/codename1/impl/CodenameOneThread.class" />
-        <!-- Optional AR and AI implementations compile against dependencies
-             which are not in cn1-binaries. They are compiled inside user app
-             builds where the Android builder adds only the dependencies and
-             sources used by the app. Mirrors the excludes= entry in
-             nbproject/project.properties. -->
+        <!-- Optional AR, AI and encrypted-database implementations compile
+             against dependencies which are not in cn1-binaries. They are
+             compiled inside user app builds where the Android builder adds only
+             the dependencies and sources used by the app. Mirrors the excludes=
+             entry in nbproject/project.properties and in maven/android/pom.xml. -->
         <javac destdir="build/tmp"
             classpath="${javac.classpath}:build/tmp"
-            excludes="com/codename1/impl/android/ar/**,com/codename1/impl/android/ai/**">
+            excludes="com/codename1/impl/android/ar/**,com/codename1/impl/android/ai/**,com/codename1/impl/android/cipher/**">
             <src path="${src.dir}" />
         </javac>
         <jar jarfile="${dist.jar}" basedir="build/tmp">

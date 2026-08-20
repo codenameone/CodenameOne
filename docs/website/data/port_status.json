@@ -597,6 +597,29 @@
       ]
     },
     {
+      "id": "sqlite-database",
+      "category": "Storage and security",
+      "name": "SQLite database",
+      "description": "Opens a SQLite database and runs the portable statement, parameter binding and cursor contract.",
+      "tests": [
+        "DatabaseLifecycleTest",
+        "DatabaseStatementTest",
+        "DatabaseCursorTest"
+      ]
+    },
+    {
+      "id": "sqlite-transactions",
+      "category": "Storage and security",
+      "name": "SQLite transactions and encryption",
+      "description": "Transaction nesting and rollback, encrypted databases, re-keying and legacy compatibility mode.",
+      "tests": [
+        "DatabaseTransactionTest",
+        "DatabaseEncryptionTest",
+        "DatabaseStatementLegacyTest",
+        "DatabaseCursorLegacyTest"
+      ]
+    },
+    {
       "id": "notifications",
       "category": "Input and lifecycle",
       "name": "Local notifications",

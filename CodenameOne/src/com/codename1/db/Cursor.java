@@ -24,124 +24,117 @@ package com.codename1.db;
 
 import java.io.IOException;
 
-/// The Cursor interface is used to iterate over the results returned from a database query.
-/// **IMPORTANT:** Notice that some methods might not be supported on all platforms!
+/// Iterates over the results returned from a database query.
 ///
-/// There is more thorough coverage of the `Database API here`.
-///
-/// The sample code below presents a Database Explorer tool that allows executing arbitrary SQL and
-/// viewing the tabular results:
+/// Positions are counted from zero and a new cursor sits before the first row, so the usual loop
+/// is simply:
 ///
 /// ```java
-/// Toolbar.setGlobalToolbar(true);
-/// Style s = UIManager.getInstance().getComponentStyle("TitleCommand");
-/// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_QUERY_BUILDER, s);
-/// Form hi = new Form("SQL Explorer", new BorderLayout());
-/// hi.getToolbar().addCommandToRightBar("", icon, (e) -> {
-///     TextArea query = new TextArea(3, 80);
-///     Command ok = new Command("Execute");
-///     Command cancel = new Command("Cancel");
-///     if(Dialog.show("Query", query, ok, cancel) == ok) {
-///         Database db = null;
-///         Cursor cur = null;
-///         try {
-///             db = Display.getInstance().openOrCreate("MyDB.db");
-///             if(query.getText().startsWith("select")) {
-///                 cur = db.executeQuery(query.getText());
-///                 int columns = cur.getColumnCount();
-///                 hi.removeAll();
-///                 if(columns > 0) {
-///                     boolean next = cur.next();
-///                     if(next) {
-///                         ArrayList data = new ArrayList<>();
-///                         String[] columnNames = new String[columns];
-///                         for(int iter = 0 ; iter
+/// Cursor cur = db.executeQuery("SELECT id, body FROM notes ORDER BY id");
+/// try {
+///     while (cur.next()) {
+///         Row row = cur.getRow();
+///         System.out.println(row.getInteger(0) + ": " + row.getString(1));
+///     }
+/// } finally {
+///     cur.close();
+/// }
+/// ```
+///
+/// Every navigation method works on every platform. Only the cost varies: `#next()` is uniformly
+/// cheap, while `#last()`, `#prev()` and `#position(int)` may have to rewind and re-step the
+/// underlying statement, which costs time proportional to the distance from the start. For a large
+/// result set, prefer iterating forward with `#next()`.
+///
+/// Because a backward seek re-runs the statement, a cursor is a repeatable read only inside a
+/// transaction. See the `com.codename1.db` package documentation for the full contract.
 ///
 /// @author Chen
 public interface Cursor {
 
-    /// Move the cursor to the first row.
-    ///
-    /// If cursor provides forward-only navigation and is positioned after the
-    /// first row then calling first() method would throw a IOException.
+    /// Moves the cursor onto the first row.
     ///
     /// #### Returns
     ///
-    /// true if succeeded
+    /// true if there is a first row, false for an empty result set
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public; remove redundant modifiers.
     boolean first() throws IOException;
 
-    /// Move the cursor to the last row.
+    /// Moves the cursor onto the last row.
+    ///
+    /// Costs a full pass over the result set the first time it is called.
     ///
     /// #### Returns
     ///
-    /// true if succeeded
+    /// true if there is a last row, false for an empty result set
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     boolean last() throws IOException;
 
-    /// Moves the cursor to the next row.
-    /// Calling next() method the first time will position cursor on the first.
+    /// Advances the cursor one row.
+    ///
+    /// A new cursor sits before the first row, so the first call lands on it.
     ///
     /// #### Returns
     ///
-    /// true if succeeded
+    /// true if a row was reached, false at the end of the result set
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     boolean next() throws IOException;
 
-    /// Moves the cursor to the previous row.
-    /// If cursor is forward type then calling prev() would throw a IOException.
+    /// Moves the cursor back one row.
     ///
     /// #### Returns
     ///
-    /// true if succeeded
+    /// true if a row was reached, false when already at or before the first row
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     boolean prev() throws IOException;
 
-    /// Returns the zero-based index for a given column name.
-    /// Note that columns meta information is available only after navigation to
-    /// the first row
+    /// Returns the zero-based index of a column, or -1 if there is no such column.
+    ///
+    /// The comparison is case-insensitive and matches the result set label, so a column selected
+    /// as `SELECT a AS b` is found under `b`. Available as soon as the query returns, before the
+    /// first `#next()`.
     ///
     /// #### Parameters
     ///
-    /// - `columnName`: the name of the column.
+    /// - `columnName`: the name of the column
     ///
     /// #### Returns
     ///
-    /// the index of the column
+    /// the zero-based index, or -1 when the column is not in the result set
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     int getColumnIndex(String columnName) throws IOException;
 
-    /// Returns the column name at a given zero-based column index.
-    /// Note that columns meta information is available only after navigation to
-    /// the first row
+    /// Returns the label of the column at a zero-based index.
+    ///
+    /// Available as soon as the query returns, before the first `#next()`.
     ///
     /// #### Parameters
     ///
-    /// - `columnIndex`: the index of the column
+    /// - `columnIndex`: the zero-based index of the column
     ///
     /// #### Returns
     ///
-    /// the name of the column
+    /// the column label
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     String getColumnName(int columnIndex) throws IOException;
 
     /// Returns the column count
@@ -155,7 +148,9 @@ public interface Cursor {
     /// - `IOException`
     int getColumnCount() throws IOException;
 
-    /// Returns the current Cursor position.
+    /// Returns the zero-based position of the cursor.
+    ///
+    /// Reports -1 before any successful move, and the row count once the result set is exhausted.
     ///
     /// #### Returns
     ///
@@ -163,40 +158,47 @@ public interface Cursor {
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     int getPosition() throws IOException;
 
-    /// Move the cursor to an absolute row position
+    /// Moves the cursor to an absolute zero-based row.
+    ///
+    /// Passing -1 rewinds to before the first row and returns false.
     ///
     /// #### Parameters
     ///
-    /// - `row`: position to move to
+    /// - `row`: the zero-based row to move to
     ///
     /// #### Returns
     ///
-    /// true if succeeded
+    /// true if the row exists, false if it is out of range
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the cursor is closed
     boolean position(int row) throws IOException;
 
-    /// Close the cursor and release its resources
+    /// Closes the cursor and releases its resources.
+    ///
+    /// Calling this more than once is harmless.
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: if the underlying statement cannot be released
     void close() throws IOException;
 
-    /// Get the Row data Object.
+    /// Returns the current row.
+    ///
+    /// Valid only while the cursor is on a row.
     ///
     /// #### Returns
     ///
-    /// a Row Object
+    /// the current row
     ///
     /// #### Throws
     ///
-    /// - `IOException`
+    /// - `IOException`: @throws IOException if the cursor is closed, or is before the first row or
+    ///                   past the last one
     Row getRow() throws IOException;
 
 }

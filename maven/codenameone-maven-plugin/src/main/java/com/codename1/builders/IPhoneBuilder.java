@@ -135,6 +135,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
+    private boolean usesDatabase;
+    private boolean usesDatabaseCipher;
     private boolean usesBluetooth;
     private boolean usesBluetoothPeripheral;
 
@@ -1222,6 +1224,28 @@ public class IPhoneBuilder extends Executor {
         final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
         boolean excludeArm64Simulator = false;
 
+        // Attributed to the class that makes the reference, so the framework's own use of the
+        // database does not answer for the application's. Both payloads this gates are large --
+        // the cipher amalgamation replaces the system libsqlite3 -- so an application that never
+        // touches com.codename1.db must not carry either.
+        try {
+            // The libraries as well as the loose classes. unzip() routes a submitted .jar to the
+            // libs directory, which is btres here, and ParparVM translates it alongside the
+            // application -- so an application whose dependency is the only thing that calls
+            // DatabaseConfig scanned as using no database at all, and the build then linked the
+            // system SQLite and left the library's encrypted open failing as unsupported.
+            //
+            // Read before the port's own jars are unzipped into btres further down, which is what
+            // keeps the framework's use of the database from answering for the application's. The
+            // scan filters the framework's classes by name as well, in both trees.
+            DatabaseUsage databaseUsage = scanForDatabaseUsage(classesDir)
+                    .merge(scanForDatabaseUsage(buildinRes));
+            usesDatabase = databaseUsage.usesDatabase();
+            usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for database usage", ex);
+        }
+
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 // iOS has no OS-relaunch delivery, but it does have cold
@@ -1299,6 +1323,11 @@ public class IPhoneBuilder extends Executor {
                             usesCryptoAPI = true;
                         }
                     }
+                    // Deliberately not scanned here. This callback cannot say which class made
+                    // the reference, and the tree it walks is the application merged with the
+                    // framework, where Display alone carries openOrCreate(String, DatabaseConfig)
+                    // -- so both database gates would answer yes for every application ever built.
+                    // scanForDatabaseUsage below attributes the reference instead.
                     if (!usesNfc && cls.indexOf("com/codename1/nfc/") == 0) {
                         usesNfc = true;
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
@@ -2241,6 +2270,7 @@ public class IPhoneBuilder extends Executor {
         if (request.getArg("ios.disableScreenshots", "false").equalsIgnoreCase("true")) {
             disableScreenshots = "        Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
+        String dbLegacy = databaseLegacyStubProperty(request, usesDatabase);
 
         // If the build-time SVG transcoder produced a registry class, weave
         // its installGlobal() call into the Stub right before the first
@@ -2425,6 +2455,7 @@ public class IPhoneBuilder extends Executor {
                     + hardeningRuntimeProperties(request)
                     + newStorage
                     + disableScreenshots
+                    + dbLegacy
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect
@@ -4398,6 +4429,16 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DsaveUnitTests=" + isUnitTestMode());
                 parparCmd.add("-DfieldNullChecks=" + fieldNullChecks);
                 parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
+                // Both keyed on the cipher flag, not on usesDatabase, and that is deliberate on
+                // iOS: cn1.sqlite emits the bundled engine, and this platform already has one.
+                // ByteCodeTranslator links the system libsqlite3.dylib whenever the cipher is off,
+                // and the bindings in cn1_db_sqlite_impl.h resolve against it, so an application
+                // that uses com.codename1.db without encryption gets a working database and pays
+                // nothing for a second copy of SQLite. Emitting the bundle here would put two
+                // implementations in one process. Encryption is the only thing the system engine
+                // cannot do, which is why turning it on switches both flags at once.
+                parparCmd.add("-Dcn1.sqlite=" + usesDatabaseCipher);
+                parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
                 // The UNION of every enabled product's list, in ONE argument. These used to be
@@ -5560,7 +5601,7 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
-    private void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {
+    static void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {
 
         String basePath = baseDir.getAbsolutePath();
         if (!basePath.endsWith("/")) {
@@ -5568,7 +5609,14 @@ public class IPhoneBuilder extends Executor {
         }
         int basePathLen = basePath.length();
         for (File f : dir.listFiles()) {
-            if (f.isFile()) {
+            if (f.isDirectory() && f.getName().endsWith(".xcassets")) {
+                // Asset catalogs are directory packages. Adding their contents one file at a
+                // time flattens every Contents.json into the extension bundle and makes Xcode
+                // fail with "Multiple commands produce .../Contents.json". Add the catalog
+                // itself so Xcode compiles it with actool.
+                sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
+                sb.append(serviceTargetVarName).append(".add_resources([fileref])\n");
+            } else if (f.isFile()) {
                 sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
                 if (f.getName().endsWith(".m") || f.getName().endsWith(".swift")) {
                     sb.append(serviceTargetVarName).append(".add_file_references([fileref])\n");

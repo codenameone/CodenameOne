@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import http.server
 import json
+import mimetypes
 import socketserver
 import sys
 import threading
@@ -128,6 +129,11 @@ class HarnessState:
             out.write(text)
         if self.finished_marker and self.finished_marker in text:
             self.finished.set()
+
+
+# WebAssembly.instantiateStreaming rejects a response whose Content-Type is not
+# application/wasm, and older Python releases have no mapping for the extension.
+mimetypes.add_type("application/wasm", ".wasm")
 
 
 def create_handler(state: HarnessState):

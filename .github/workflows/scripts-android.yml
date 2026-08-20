@@ -12,6 +12,7 @@ name: Test Android build scripts
     paths:
       - '.github/workflows/scripts-android.yml'
       - 'scripts/setup-workspace.sh'
+      - 'scripts/ci/retry.sh'
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
@@ -41,6 +42,7 @@ name: Test Android build scripts
     paths:
       - '.github/workflows/scripts-android.yml'
       - 'scripts/setup-workspace.sh'
+      - 'scripts/ci/retry.sh'
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
@@ -180,9 +182,14 @@ jobs:
             ${{ runner.os }}-gradle-${{ matrix.id }}-
             ${{ runner.os }}-gradle-
       - name: Setup workspace
-        run: ./scripts/setup-workspace.sh -q -DskipTests
+        # Maven Central intermittently serves 403 from the runner CDN edge and Maven treats it as
+        # a permanent resolution failure, so this step died at plugin download with nothing built
+        # (central-publishing-maven-plugin and junit-bom, both 403 on the same attempt). See
+        # scripts/ci/retry.sh; this step only downloads and builds, so a blanket retry cannot turn
+        # a flaky test into a pass.
+        run: bash scripts/ci/retry.sh ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
-        run: ./scripts/build-android-port.sh -q -DskipTests
+        run: bash scripts/ci/retry.sh ./scripts/build-android-port.sh -q -DskipTests
       - name: Build Hello Codename One Android app
         id: build-android-app
         run: |

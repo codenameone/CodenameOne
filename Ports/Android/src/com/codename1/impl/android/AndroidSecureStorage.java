@@ -278,6 +278,108 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
+    /**
+     * Creates an entry behind a gate the filesystem decides, so two processes cannot both create
+     * one.
+     *
+     * <p>An application can declare components with their own {@code android:process}, and the
+     * inherited implementation checks and then writes: both processes can find nothing stored,
+     * generate different managed database keys and each overwrite the other, after which the
+     * database is encrypted with a key that no longer exists. {@code createNewFile()} is decided
+     * by the filesystem and cannot be won twice, so exactly one caller writes.</p>
+     *
+     * <p>The caller that loses reports nothing rather than writing. It cannot read the winner's
+     * value either: {@code SharedPreferences} caches per process and offers no way to reload, so
+     * a process that had already opened the file will not see a write made by another one. That
+     * turns a permanent, silent corruption into a transient failure -- {@code ManagedKeys} raises
+     * KEY_UNAVAILABLE and the next launch, whose process reads the file fresh, finds the key.</p>
+     *
+     * @param account the account to create
+     * @param value the value to store when there is none
+     * @return the value now stored, or null when this caller did not store it and cannot read what
+     *   did
+     */
+    @Override
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        String existing = get(account);
+        if (existing != null) {
+            return existing;
+        }
+        java.io.File gate = gateFile(account);
+        if (gate == null) {
+            return super.setIfAbsent(account, value);
+        }
+        java.io.RandomAccessFile handle = null;
+        java.nio.channels.FileLock lock = null;
+        try {
+            handle = new java.io.RandomAccessFile(gate, "rw");
+            // A lock rather than the file's existence: the system releases it when the process
+            // ends however it ends, so a process that dies here cannot leave the alias
+            // permanently uncreatable. Blocking, so a second caller waits for the first rather
+            // than proceeding as though the entry were absent.
+            lock = handle.getChannel().lock();
+            String stored = get(account);
+            if (stored != null) {
+                return stored;
+            }
+            return set(account, value) ? value : null;
+        } catch (java.io.IOException cannotLock) {
+            Log.e(cannotLock);
+            return super.setIfAbsent(account, value);
+        } finally {
+            if (lock != null) {
+                try {
+                    lock.release();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+            if (handle != null) {
+                try {
+                    handle.close();
+                } catch (java.io.IOException ignored) {
+                    Log.e(ignored);
+                }
+            }
+        }
+    }
+
+    /** The file whose creation decides which caller stores this account. */
+    private java.io.File gateFile(String account) {
+        try {
+            java.io.File dir = new java.io.File(AndroidNativeUtil.getActivity()
+                    .getApplicationContext().getFilesDir(), "cn1securestorage");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                return null;
+            }
+            return new java.io.File(dir, gateName(account));
+        } catch (Throwable noContext) {
+            return null;
+        }
+    }
+
+    @Override
+    public int entryState(String account) {
+        if (account == null) {
+            return ENTRY_UNKNOWN;
+        }
+        if (Build.VERSION.SDK_INT < 23) {
+            return legacyPlainGet(account) != null ? ENTRY_PRESENT : ENTRY_ABSENT;
+        }
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            // The store itself could not be opened, so nothing can be said about what is in it.
+            return ENTRY_UNKNOWN;
+        }
+        // contains(), not get(): the question is whether an entry exists, and an entry that is
+        // there but cannot be decrypted still exists. Answering absent for it is what would let a
+        // caller overwrite a key it could not read.
+        return prefs.contains(account) ? ENTRY_PRESENT : ENTRY_ABSENT;
+    }
+
     @Override
     public String get(String account) {
         if (account == null) {
@@ -363,9 +465,15 @@ public final class AndroidSecureStorage extends SecureStorage {
         //
         // Under the same lock as the write and the reset, so a removal cannot be
         // interleaved with a set that recreates the entry it was clearing.
+        boolean removed;
         synchronized (PLAIN_KEY_LOCK) {
-            return prefs.edit().remove(account).commit();
+            removed = prefs.edit().remove(account).commit();
         }
+        // The lock file is deliberately left alone. It gates nothing by existing -- what excludes
+        // a second writer is the lock held on it, which the system drops when the process ends --
+        // and removing it while another process holds that lock would have the next caller create
+        // a different file and lock that instead, which is two writers again.
+        return removed;
     }
 
     /**
@@ -392,6 +500,49 @@ public final class AndroidSecureStorage extends SecureStorage {
      * null when the key is absent and {@code create} is false, or when
      * generation fails.
      */
+    /**
+     * Whether the non-prompting tier's key is held in dedicated security hardware.
+     *
+     * An API level only says the AndroidKeyStore API exists; emulators and plenty of real devices
+     * back its keys in software. Callers use this to decide whether the platform is good enough
+     * for genuinely sensitive data, so it asks the key what it actually is.
+     *
+     * @return true when a TEE or StrongBox holds the key
+     */
+    static boolean isPlainKeyInsideSecureHardware() {
+        java.security.spec.KeySpec spec;
+        Object level = null;
+        try {
+            AndroidSecureStorage storage = new AndroidSecureStorage();
+            SecretKey key = storage.plainKey(true);
+            if (key == null) {
+                return false;
+            }
+            javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance(
+                    key.getAlgorithm(), ANDROID_KEY_STORE);
+            spec = factory.getKeySpec(key,
+                    Class.forName("android.security.keystore.KeyInfo")
+                            .asSubclass(java.security.spec.KeySpec.class));
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                // getSecurityLevel() replaced the deprecated isInsideSecureHardware() in API 31.
+                // Reflective because the port compiles against an older SDK than it runs on.
+                level = spec.getClass().getMethod("getSecurityLevel").invoke(spec);
+            }
+        } catch (Throwable cannotTell) {
+            // Unable to determine, so report the weaker answer rather than overstating it.
+            return false;
+        }
+        // Both results are typed here rather than inside the try, and by instanceof rather than by
+        // a bare cast: a failed cast is not an exception everywhere this framework runs, so a cast
+        // in a block that catches Throwable is one whose failure nothing would catch.
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            // Anything above SECURITY_LEVEL_SOFTWARE (0) is a TEE or StrongBox.
+            return level instanceof Integer && ((Integer) level).intValue() > 0;
+        }
+        return spec instanceof android.security.keystore.KeyInfo
+                && ((android.security.keystore.KeyInfo) spec).isInsideSecureHardware();
+    }
+
     private SecretKey plainKey(boolean create) throws Exception {
         // The whole load-check-generate sequence is serialized, not just the
         // generation. Two first writers that each saw the alias absent would each

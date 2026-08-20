@@ -1,36 +1,36 @@
 {
-  "commit": "159c7e3cc8a0eb161ba96891b6912f1d06cd03c4",
-  "generated_at": "2026-08-07T18:48:09Z",
+  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
+  "generated_at": "2026-08-19T14:15:59Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 380381000
+        "duration_ns": 294811000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 31862000
+        "duration_ns": 22420000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 160363000
+        "duration_ns": 127686000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 77676000
+        "duration_ns": 77184000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 449132000
+        "duration_ns": 302310000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 165361000
+        "duration_ns": 124076000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 223645000
+        "duration_ns": 151972000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,14 +44,14 @@
     "suite_checksum": 0
   },
   "port": "ios-metal",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31186473652",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868735",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 167,
     "fail": 0,
-    "skip": 4,
-    "not-run": 7
+    "not-run": 0,
+    "pass": 174,
+    "skip": 4
   },
   "tests": {
     "ARApiTest": {
@@ -251,6 +251,34 @@
     },
     "DarkLightShowcaseThemeScreenshotTest": {
       "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
       "status": "pass"
     },
     "DesktopModeScreenshotTest": {
@@ -469,10 +497,6 @@
       "feature": "native-theme-controls",
       "status": "pass"
     },
-    "MultiWindowApiTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
     "MutableImageClipReadbackTest": {
       "feature": "mutable-images",
       "status": "pass"
@@ -486,11 +510,11 @@
       "status": "pass"
     },
     "NativeMapFallbackScreenshotTest": {
-      "status": "skip",
       "feature": "vector-maps",
       "reasons": [
         "native-provider-active"
-      ]
+      ],
+      "status": "skip"
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
@@ -637,11 +661,11 @@
       "status": "pass"
     },
     "SurfacesRemoteViewsScreenshotTest": {
-      "status": "skip",
       "feature": "surfaces",
       "reasons": [
         "android-only-remoteviews-lowering"
-      ]
+      ],
+      "status": "skip"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -753,30 +777,6 @@
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
       "status": "pass"
-    },
-    "WindowEditingTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowGraphicsTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowLayoutTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowModalTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowOverlayTest": {
-      "feature": "multi-window",
-      "status": "not-run"
-    },
-    "WindowScrollTest": {
-      "feature": "multi-window",
-      "status": "not-run"
     }
   }
 }

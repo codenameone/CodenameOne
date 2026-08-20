@@ -651,6 +651,7 @@ unretraceable
 [Mm]inif(y|ies|ied|ier|ication)
 [Uu]nminif(y|ies|ied|ier|ication)
 [Rr]etrace(d|s|able)?
+[Pp]ragmas?
 
 # -----------------------------------------------------------------------------
 # Smart home (Smart-Home.asciidoc) terminology.

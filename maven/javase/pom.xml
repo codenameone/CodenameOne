@@ -162,11 +162,9 @@
             <artifactId>codenameone-core</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Version deliberately omitted so the pinned ${cn1.sqlite.jdbc.version} in the
-             parent's dependencyManagement applies. sqlite-jdbc is frozen and excluded from
-             publication; an explicit ${project.version} here would override the pin and
-             make every released codenameone-javase pom request a sqlite-jdbc that was
-             never uploaded. -->
+        <!-- Version comes from the parent's dependencyManagement, which tracks
+             ${project.version}. This is the shaded SQLite JDBC driver; it carries the
+             engine the simulator uses to read encrypted databases. -->
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>sqlite-jdbc</artifactId>
@@ -241,6 +239,26 @@
             </resource>
         </resources>
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <id>add-database-conformance-suite</id>
+                        <phase>generate-test-sources</phase>
+                        <goals><goal>add-test-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <!-- Shared with the on-device harness, which adds the same
+                                     directory as a main source. Test scope here, so it compiles
+                                     for SEDatabaseConformanceTest and never enters the port jar. -->
+                                <source>${project.basedir}/../../tests/conformance/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.javase.tests;
 
 import javax.imageio.ImageIO;
@@ -123,7 +145,8 @@ public class SimulatorWindowModeVerifier {
             // real failure).
             BufferedImage image = captureDesktop();
             Instant renderDeadline = Instant.now().plusSeconds(30);
-            while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image))
+            while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image)
+                        || isComponentInspectorDetailsUnsettled(parsed, image))
                     && Instant.now().isBefore(renderDeadline)) {
                 Thread.sleep(500);
                 image = captureDesktop();
@@ -191,6 +214,10 @@ public class SimulatorWindowModeVerifier {
             throw new AssertionError("Single-window simulator device content did not appear before capture; darkPixels="
                     + darkPixels);
         }
+        if (isComponentInspectorDetailsUnsettled(args, image)) {
+            throw new AssertionError("Component inspector details panel had not settled before capture; textPixels="
+                    + countComponentDetailsPixels(image));
+        }
     }
 
     private static boolean isBlankOrFlat(BufferedImage image) {
@@ -226,6 +253,54 @@ public class SimulatorWindowModeVerifier {
         }
         return darkPixels;
     }
+
+    /**
+     * Whether the docked Component Details panel is still showing a form that is on its way out.
+     *
+     * <p>The inspector is created and then moved into its own window by showInFrame(), and the
+     * docked panel it leaves behind settles empty -- which is what the stored reference holds and
+     * what every run captures once it has settled. A capture taken mid-move catches the form
+     * laid out with no values in it, and fails the comparison over a state neither the simulator
+     * nor the reference is supposed to be in.</p>
+     *
+     * <p>So the capture waits for the panel to settle rather than screenshotting on a fixed
+     * timer. Read from the pixels, like the device check above, because this verifier drives the
+     * simulator from another process and has no handle on its Swing tree.</p>
+     */
+    private static boolean isComponentInspectorDetailsUnsettled(Args args, BufferedImage image) {
+        if (!"component-inspector".equals(args.scenario)) {
+            return false;
+        }
+        return countComponentDetailsPixels(image) >= MIN_COMPONENT_DETAILS_PIXELS;
+    }
+
+    /** The label text of the form, which the settled panel does not draw at all. */
+    private static int countComponentDetailsPixels(BufferedImage image) {
+        int xMin = Math.min(image.getWidth(), 20);
+        int xMax = Math.min(image.getWidth(), 680);
+        int yMin = Math.min(image.getHeight(), 690);
+        int yMax = Math.min(image.getHeight(), 800);
+        if (xMax <= xMin || yMax <= yMin) {
+            return 0;
+        }
+        int textPixels = 0;
+        for (int y = yMin; y < yMax; y++) {
+            for (int x = xMin; x < xMax; x++) {
+                int rgb = image.getRGB(x, y);
+                if (((rgb >> 16) & 0xff) < 100 && ((rgb >> 8) & 0xff) < 100 && (rgb & 0xff) < 100) {
+                    textPixels++;
+                }
+            }
+        }
+        return textPixels;
+    }
+
+    /**
+     * Measured on both sides of the race this fixes: the form on its way out draws about 740 dark
+     * pixels in that band and the settled panel draws none, so anything above a small margin is
+     * the form still being there.
+     */
+    private static final int MIN_COMPONENT_DETAILS_PIXELS = 200;
 
     private static int minimumSingleWindowDevicePixels(Args args) {
         if ("test-recorder".equals(args.scenario)) {
