@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -1059,6 +1060,64 @@ class IntentsTest {
             }
         }, "the port to be asked to bring the app forward");
         assertEquals(1, b.foregroundRequests);
+    }
+
+    /// A route is built from the values the intent *ran with*, and the wire form is not always
+    /// that. The generated coercion takes "1" for a boolean and hands the handler true; it
+    /// takes "001" for an int and hands over 1. Copying the wire value in routed to /1 for an
+    /// invocation that ran with true -- a call that succeeded and then opened a different
+    /// resource than it acted on, or none at all, with nothing reporting it. A donated shortcut
+    /// replays its bound values on every tap, so it made that permanent.
+    @Test
+    void aRouteIsExpandedFromTheValueTheHandlerRanWith() throws Exception {
+        IntentDeclaration decl = new IntentDeclaration("known", "Known", "", false, true, false,
+                "/orders/{flag}/{count}/{ratio}/{name}", 5, Collections.<String>emptyList(),
+                Arrays.asList(
+                        new IntentParameterInfo("flag", "Flag?", IntentParameterType.BOOLEAN,
+                                true, null, "", Collections.<String>emptyList()),
+                        new IntentParameterInfo("count", "How many?",
+                                IntentParameterType.INTEGER, true, null, "",
+                                Collections.<String>emptyList(), 32),
+                        new IntentParameterInfo("ratio", "Ratio?", IntentParameterType.NUMBER,
+                                true, null, "", Collections.<String>emptyList(), 64),
+                        new IntentParameterInfo("name", "Name?", IntentParameterType.STRING,
+                                true, null, "", Collections.<String>emptyList())),
+                Arrays.asList(Exposure.ASSISTANT));
+
+        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        params.put("flag", "1");
+        params.put("count", "001");
+        params.put("ratio", "1.50");
+        params.put("name", "widget");
+
+        java.lang.reflect.Method expand = Intents.class.getDeclaredMethod(
+                "expandRoute", IntentDeclaration.class, Map.class);
+        expand.setAccessible(true);
+
+        assertEquals("/orders/true/1/1.5/widget", expand.invoke(null, decl, params),
+                "each placeholder carries what the handler received, not what the wire said");
+    }
+
+    /// Mirroring the coercion means mirroring where it stops. A value the coercion would refuse
+    /// is not this method's to reinterpret, so it goes into the URL as written and the ordinary
+    /// failure path reports it.
+    @Test
+    void aValueTheCoercionWouldRefuseIsLeftExactlyAsWritten() throws Exception {
+        IntentDeclaration decl = new IntentDeclaration("known", "Known", "", false, true, false,
+                "/orders/{count}", 5, Collections.<String>emptyList(),
+                Arrays.asList(new IntentParameterInfo("count", "How many?",
+                        IntentParameterType.INTEGER, true, null, "",
+                        Collections.<String>emptyList(), 32)),
+                Arrays.asList(Exposure.ASSISTANT));
+
+        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        params.put("count", "not-a-number");
+
+        java.lang.reflect.Method expand = Intents.class.getDeclaredMethod(
+                "expandRoute", IntentDeclaration.class, Map.class);
+        expand.setAccessible(true);
+
+        assertEquals("/orders/not-a-number", expand.invoke(null, decl, params));
     }
 
     /// headless = true says the handler *can* run with no UI, not that this invocation did.

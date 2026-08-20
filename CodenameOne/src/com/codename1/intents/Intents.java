@@ -33,6 +33,7 @@ import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1886,6 +1887,132 @@ public final class Intents {
         return null;
     }
 
+    /// How one bound value is spelled inside an expanded route.
+    ///
+    /// The wire form and the handler's form are not the same string, and this method's contract
+    /// is the handler's: a route is built from the values the intent ran with. The generated
+    /// coercion accepts "1" for a boolean and hands the handler `true`; it accepts "001" for an
+    /// int and hands over 1. Copying the wire value into the URL therefore routed to /1 for an
+    /// invocation that ran with true, and to /001 for one that ran with 1 -- so an invocation
+    /// that succeeded opened a different resource than it acted on, or none, and nothing
+    /// reported it. A donated shortcut makes that durable, since the value is replayed from the
+    /// donation on every tap.
+    ///
+    /// Mirrors the coercion for the same reason [#satisfies] does, and no further: a value the
+    /// coercion would not have accepted is left exactly as it was written, because this is not
+    /// the place that decides what runs. Only the four types whose accepted spellings differ
+    /// from their Java form are normalized; a String is already what the handler received, and
+    /// an entity crosses as its id and nothing else.
+    private static String routeValue(IntentParameterInfo p, Object value) {
+        if (p == null || value == null) {
+            return String.valueOf(value);
+        }
+        if (!p.getOptions().isEmpty()) {
+            // A closed vocabulary is matched as text and reaches the handler as the text it
+            // matched, which is what toWire produces -- the same read satisfies() does.
+            Object wire = IntentSerializer.toWire(value);
+            return String.valueOf(wire == null ? value : wire);
+        }
+        IntentParameterType type = p.getType();
+        if (type == IntentParameterType.BOOLEAN) {
+            String b = routeBoolean(value);
+            return b == null ? String.valueOf(value) : b;
+        }
+        if (type == IntentParameterType.INTEGER) {
+            Long l = routeLong(value);
+            return l == null ? String.valueOf(value) : Long.toString(l.longValue());
+        }
+        if (type == IntentParameterType.NUMBER) {
+            Double d = routeDouble(value);
+            if (d == null) {
+                return String.valueOf(value);
+            }
+            // At the declared width: a float parameter given 1.1 runs with 1.1f, and widening
+            // that to a double to print it spells it 1.100000023841858 -- a number the handler
+            // never saw. getNumericWidthBits is 0 only for a declaration built at runtime,
+            // where there is no width to honour and the wider form is the honest one.
+            return p.getNumericWidthBits() == 32
+                    ? Float.toString((float) d.doubleValue())
+                    : Double.toString(d.doubleValue());
+        }
+        if (type == IntentParameterType.DATE && value instanceof Date) {
+            // Only for an actual Date, which is the one spelling that has no business in a URL:
+            // it would be pasted in as "Thu Jan 01 ..." Epoch milliseconds are what the
+            // platforms send and what IntentDates reads back, so this is the form that survives
+            // the round trip. A value that was already text or a number is left as written --
+            // it is already a spelling of the same instant, and rewriting a working URL is not
+            // this method's business.
+            return Long.toString(((Date) value).getTime());
+        }
+        return String.valueOf(value);
+    }
+
+    /// How the handler's boolean is spelled, for each of the spellings the generated coercion
+    /// accepts, or null when this is not one of them.
+    ///
+    /// Returns the text rather than a Boolean deliberately: a Boolean-returning method that can
+    /// also be null gives its caller three answers for a two-valued type, which is the whole of
+    /// what NP_BOOLEAN_RETURN_NULL objects to, and the only caller wants the text anyway.
+    private static String routeBoolean(Object value) {
+        if (value instanceof Boolean) {
+            return ((Boolean) value).booleanValue() ? "true" : "false";
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            if (d == 0) {
+                return "false";
+            }
+            return d == 1 ? "true" : null;
+        }
+        String t = String.valueOf(value).trim();
+        if ("true".equalsIgnoreCase(t) || "1".equals(t)) {
+            return "true";
+        }
+        if ("false".equalsIgnoreCase(t) || "0".equals(t)) {
+            return "false";
+        }
+        return null;
+    }
+
+    private static Long routeLong(Object value) {
+        // Integral boxes are exact and stay exact, as requiredLong reads them; a fractional
+        // number is not something this can spell as an integer, so it is left alone.
+        if (value instanceof Long || value instanceof Integer || value instanceof Short
+                || value instanceof Byte) {
+            return Long.valueOf(((Number) value).longValue());
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            if (d == Math.floor(d) && !Double.isInfinite(d) && !Double.isNaN(d)
+                    && d >= -9223372036854775808.0 && d < 9223372036854775808.0) {
+                return Long.valueOf((long) d);
+            }
+            return null;
+        }
+        if (value instanceof String) {
+            try {
+                return Long.valueOf(Long.parseLong(((String) value).trim()));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Double routeDouble(Object value) {
+        if (value instanceof Number) {
+            return Double.valueOf(((Number) value).doubleValue());
+        }
+        if (value instanceof String) {
+            try {
+                return Double.valueOf(Double.parseDouble(((String) value).trim()));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     /// Fills a declared route template from the values the intent ran with, or returns null
     /// when there is no template or a placeholder has no value.
     private static String expandRoute(IntentDeclaration decl, Map<String, Object> params) {
@@ -1938,7 +2065,7 @@ public final class Intents {
             // Encoded, because a value is data and the template is structure. An id
             // containing "/" would otherwise add a path segment and stop matching the route it
             // was built for, and "?" or "#" would invent a query or a fragment.
-            out.append(percentEncode(String.valueOf(value)));
+            out.append(percentEncode(routeValue(decl.getParameter(name), value)));
             i = close + 1;
         }
         return out.toString();
