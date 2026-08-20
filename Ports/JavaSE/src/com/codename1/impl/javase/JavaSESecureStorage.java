@@ -165,8 +165,11 @@ public final class JavaSESecureStorage extends SecureStorage {
         if (!locks.isDirectory() && !locks.mkdirs()) {
             return null;
         }
-        return new File(locks, applicationNamespace(launcherPackage()) + "-"
-                + Integer.toHexString(account.hashCode()) + ".lock");
+        // The shared naming, so two accounts that differ cannot share a lock. It matters less
+        // here than it does for the ports whose file IS the gate -- a shared lock here only
+        // serialises two creates that need not have waited for each other, rather than refusing
+        // one of them -- but there is no reason for this to be the one place that hashes.
+        return new File(locks, gateName(account) + ".lock");
     }
 
     /**

@@ -125,8 +125,7 @@ public class LinuxSecureStorage extends SecureStorage {
         if (existing != null) {
             return existing;
         }
-        String gate = LinuxNative.storageDir() + "/" + "cn1ss-gate-"
-                + applicationNamespace() + "-" + Integer.toHexString(account.hashCode());
+        String gate = gatePath(account);
         int created;
         try {
             created = LinuxNative.fileCreateExclusive(gate);
@@ -190,6 +189,11 @@ public class LinuxSecureStorage extends SecureStorage {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /// The file whose creation decides which caller stores this account.
+    private static String gatePath(String account) {
+        return LinuxNative.storageDir() + "/" + gateName(account);
     }
 
     @Override
@@ -288,7 +292,18 @@ public class LinuxSecureStorage extends SecureStorage {
         // The unnamespaced token as well, or a caller that was told the key was forgotten would
         // still have it under the name an earlier build used.
         storage.deleteStorageFile(legacyKey(account));
-        return !storage.exists(key(account)) && !storage.exists(legacyKey(account));
+        // The gate too, or forgetting a key would make its alias unusable for good: the next
+        // create finds no value of its own and a gate it cannot take, so it reports nothing and
+        // ManagedKeys raises KEY_UNAVAILABLE forever, even once the database is deleted. After
+        // the entries, not before -- a gate removed first would let a second caller create a key
+        // while the old value was still in place.
+        try {
+            LinuxNative.fileDelete(gatePath(account));
+        } catch (Throwable cannotRemove) {
+            // Reported through the check below, which reads what is actually left.
+        }
+        return !storage.exists(key(account)) && !storage.exists(legacyKey(account))
+                && !LinuxNative.fileExists(gatePath(account));
     }
 
     /* ----------------------------------------- prompting (AsyncResource) API

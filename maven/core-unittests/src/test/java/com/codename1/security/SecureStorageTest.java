@@ -220,4 +220,40 @@ class SecureStorageTest extends UITestBase {
         assertNull(refuses.setIfAbsent("cn1.db.key.shared", "ours"));
     }
 
+    /** Reaches the protected gate name the file-gated ports gate creation with. */
+    private static final class GateProbe extends SecureStorage {
+        static String name(String account) {
+            return gateName(account);
+        }
+    }
+
+    @Test
+    void twoAccountsThatHashAlikeGetDifferentGates() {
+        // "Aa" and "BB" are the standard Java hash collision, and the gate used to be named from
+        // the hash: the two aliases shared one file, so once the first created its key the second
+        // could find no value of its own and no gate to take, and failed with KEY_UNAVAILABLE for
+        // good.
+        CN.setProperty("package_name", "com.example.app");
+        assertEquals("Aa".hashCode(), "BB".hashCode(), "the fixture depends on these colliding");
+
+        assertNotEquals(GateProbe.name("cn1.db.key.Aa"), GateProbe.name("cn1.db.key.BB"),
+                "two accounts that differ need gates that differ");
+    }
+
+    @Test
+    void aGateNameSurvivesBeingAFileName() {
+        CN.setProperty("package_name", "com.example.app");
+        String name = GateProbe.name("cn1.db.key.my alias/with slashes");
+        assertFalse(name.indexOf('/') >= 0, "a gate name is a file name: " + name);
+        assertFalse(name.indexOf(' ') >= 0, "and carries nothing a filesystem argues about: " + name);
+
+        // A name too long to be a file falls back to a bounded one rather than being refused.
+        StringBuilder huge = new StringBuilder("cn1.db.key.");
+        for (int iter = 0; iter < 400; iter++) {
+            huge.append('x');
+        }
+        assertTrue(GateProbe.name(huge.toString()).length() < 200,
+                "a very long alias still has to produce a file name");
+    }
+
 }

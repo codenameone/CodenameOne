@@ -155,4 +155,21 @@ public class JavaSESecureStorageNamespaceTest {
         assertEquals("aaaa", storageFor("com.example.first.Main").get("cn1.db.key.shared"));
     }
 
+    @Test
+    public void anAliasCanBeCreatedAgainAfterItIsForgotten() {
+        // forgetManagedKey removes the entry, and creation has to be possible afterwards. On the
+        // ports where a file gates creation, that file outlived the entry it gated: the next
+        // create found no value of its own and a gate it could not take, so the alias stayed
+        // unusable with KEY_UNAVAILABLE even once its database was gone.
+        JavaSESecureStorage storage = storageFor("com.example.first.Main");
+        assertEquals("aaaa", storage.setIfAbsent("cn1.db.key.shared", "aaaa"));
+
+        assertTrue(storage.remove("cn1.db.key.shared"), "the key is forgotten");
+        assertEquals(SecureStorage.ENTRY_ABSENT, storage.entryState("cn1.db.key.shared"));
+
+        assertEquals("bbbb", storage.setIfAbsent("cn1.db.key.shared", "bbbb"),
+                "and a fresh key can be created for the same alias");
+        assertEquals("bbbb", storage.get("cn1.db.key.shared"));
+    }
+
 }

@@ -271,6 +271,37 @@ public class SecureStorage {
         return sanitizeNamespace(id);
     }
 
+    /// The file name a port uses to gate the creation of one account, for the ports whose
+    /// create-if-absent is a file.
+    ///
+    /// Derived from the account itself rather than from its hash, because a hash is not a name:
+    /// `Aa` and `BB` hash alike, so two aliases would share one gate and whichever asked second
+    /// could never create its key -- it would find no value of its own and no gate to take. The
+    /// escape is the one `#applicationNamespace()` uses, so the result is reversible and two
+    /// accounts that differ keep different gates.
+    ///
+    /// A name too long to be a file gets its first part plus a hash of the whole, which is the
+    /// one place a hash is the right answer: the alternative is a name the filesystem refuses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the account being created
+    ///
+    /// #### Returns
+    ///
+    /// a file name, unique to this application and account
+    protected static String gateName(String account) {
+        String encoded = sanitizeNamespace(account == null ? "" : account);
+        if (encoded.length() > MAX_GATE_NAME) {
+            encoded = encoded.substring(0, MAX_GATE_NAME)
+                    + "-" + Integer.toHexString(account.hashCode());
+        }
+        return "cn1ss-gate-" + applicationNamespace() + "-" + encoded;
+    }
+
+    /// Leaves room for the application namespace and the prefix inside a 255 byte file name.
+    private static final int MAX_GATE_NAME = 120;
+
     /// Reduces an identity to what a storage name, a preferences node or a keychain service holds.
     ///
     /// Reversibly, which is the whole point of it: folding every character it cannot carry onto

@@ -124,8 +124,7 @@ public class WindowsSecureStorage extends SecureStorage {
         if (existing != null) {
             return existing;
         }
-        String gate = WindowsNative.storageDir() + "\\\\" + "cn1ss-gate-"
-                + applicationNamespace() + "-" + Integer.toHexString(account.hashCode());
+        String gate = gatePath(account);
         int created;
         try {
             created = WindowsNative.fileCreateExclusive(gate);
@@ -191,6 +190,11 @@ public class WindowsSecureStorage extends SecureStorage {
         }
     }
 
+    /// The file whose creation decides which caller stores this account.
+    private static String gatePath(String account) {
+        return WindowsNative.storageDir() + "\\\\" + gateName(account);
+    }
+
     @Override
     public int entryState(String account) {
         if (account == null) {
@@ -253,7 +257,18 @@ public class WindowsSecureStorage extends SecureStorage {
         // still have it on disk under the name an earlier build used -- and get() would read it
         // back.
         storage.deleteStorageFile(legacyKey(account));
-        return !storage.exists(key(account)) && !storage.exists(legacyKey(account));
+        // The gate too, or forgetting a key would make its alias unusable for good: the next
+        // create finds no value of its own and a gate it cannot take, so it reports nothing and
+        // ManagedKeys raises KEY_UNAVAILABLE forever, even once the database is deleted. After
+        // the entries, not before -- a gate removed first would let a second caller create a key
+        // while the old value was still in place.
+        try {
+            WindowsNative.fileDelete(gatePath(account));
+        } catch (Throwable cannotRemove) {
+            // Reported through the check below, which reads what is actually left.
+        }
+        return !storage.exists(key(account)) && !storage.exists(legacyKey(account))
+                && !WindowsNative.fileExists(gatePath(account));
     }
 
     /* ----------------------------------------- prompting (AsyncResource) API

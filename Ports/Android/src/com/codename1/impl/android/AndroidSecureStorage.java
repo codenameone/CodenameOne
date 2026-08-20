@@ -352,7 +352,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             if (!dir.isDirectory() && !dir.mkdirs()) {
                 return null;
             }
-            return new java.io.File(dir, "gate-" + Integer.toHexString(account.hashCode()));
+            return new java.io.File(dir, gateName(account));
         } catch (Throwable noContext) {
             return null;
         }
@@ -462,9 +462,24 @@ public final class AndroidSecureStorage extends SecureStorage {
         //
         // Under the same lock as the write and the reset, so a removal cannot be
         // interleaved with a set that recreates the entry it was clearing.
+        boolean removed;
         synchronized (PLAIN_KEY_LOCK) {
-            return prefs.edit().remove(account).commit();
+            removed = prefs.edit().remove(account).commit();
         }
+        // The gate as well, or forgetting a key would make its alias unusable for good: the next
+        // create finds no value of its own and a gate it cannot take, so it reports nothing and
+        // ManagedKeys raises KEY_UNAVAILABLE forever, even once the database is deleted.
+        //
+        // After the entry, not before. A gate removed first would let a second caller create a
+        // key while this one still had the old value in place.
+        java.io.File gate = gateFile(account);
+        if (gate != null && gate.exists() && !gate.delete()) {
+            Log.p("Secure storage removed '" + account + "' but could not remove "
+                    + gate.getAbsolutePath() + ", so creating it again will be refused until "
+                    + "that file is gone");
+            return false;
+        }
+        return removed;
     }
 
     /**
