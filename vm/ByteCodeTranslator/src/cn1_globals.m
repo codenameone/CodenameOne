@@ -554,6 +554,35 @@ static void cn1ReportPacingParks(void) {
             minHead < 0 ? -1L : minHead / 1024);
 }
 
+// Mark-worklist overflow accounting, reported by CN1_LOG_GC_OVERFLOW at exit and
+// asserted on by GcOverflowSpiralIntegrationTest. Overflow is a correctness backstop that is
+// meant to be rare: recovering from it costs a full O(heap) rescan, so a workload that
+// overflows EVERY cycle has a collector several times slower than the one it is supposed
+// to have -- the runaway of issue #5537. The cycle count is the direct signal for that,
+// and unlike a footprint reading it is a property of the code rather than of how much
+// RAM the machine running it happened to have free.
+static _Atomic long cn1GcOverflowCycles = 0;
+static _Atomic long cn1GcGraceDrains = 0;
+static _Atomic int cn1GcOverflowTrace = -1;
+static int cn1GcOverflowTraceOn(void) {
+    int on = atomic_load_explicit(&cn1GcOverflowTrace, memory_order_relaxed);
+    if(on < 0) {
+        on = getenv("CN1_LOG_GC_OVERFLOW") ? 1 : 0;
+        atomic_store_explicit(&cn1GcOverflowTrace, on, memory_order_relaxed);
+    }
+    return on;
+}
+
+static void cn1ReportGcOverflow(void) {
+    if(!cn1GcOverflowTraceOn()) {
+        return;
+    }
+    fprintf(stderr, "[GC-OVERFLOW] overflowCycles=%ld graceDrains=%ld cycles=%d\n",
+            atomic_load_explicit(&cn1GcOverflowCycles, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcGraceDrains, memory_order_relaxed),
+            currentGcMarkValue);
+}
+
 static void cn1ReportLowMemoryParks(void) {
     if(!cn1LowMemoryTraceOn()) {
         return;
@@ -1319,9 +1348,16 @@ long gcMarkNewObjectCount = 0;
 // without racing the others on this flag.
 static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
 #endif
-// Forward (tentative) declaration -- the real definition is below near the worklist;
-// the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
+// Forward (tentative) declarations -- the real definitions are below near the worklist.
+// The belt pass in codenameOneGCMark forces the overflow flag to trigger the full BiBOP
+// rescan, and the grace pass reads the cursor to drain before it can overflow (see the
+// interleaved drain there). The size macro is hoisted with them for the same reason;
+// its rationale stays at the worklist definition.
+#ifndef CN1_GC_MARK_WORKLIST_SIZE
+#define CN1_GC_MARK_WORKLIST_SIZE 65536
+#endif
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
+static int gcMarkWorklistTop;
 static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 #ifndef CN1_DISABLE_BIBOP
 // Forward declarations -- defined below; the grace-subtree pass in codenameOneGCMark
@@ -1412,6 +1448,15 @@ static JAVA_BOOLEAN cn1SweepRemoving;
 static __thread int cn1GcTrustedRoots = 0;
 #define CN1_GC_TRUSTED_BEGIN() int __cn1TrustSaved = cn1GcTrustedRoots; cn1GcTrustedRoots = 1
 #define CN1_GC_TRUSTED_END()   cn1GcTrustedRoots = __cn1TrustSaved
+// An untrusted HOLE inside a trusted walk, for a pass that has to drain the mark
+// worklist part-way through its registry walk (the grace passes). BEGIN/END cannot
+// express that: they save and restore a block-scoped local, so a pair inside the walk
+// would shadow the walk's own saved value and would restore whatever the ENCLOSING
+// window held rather than the "untrusted" a drain requires. Trust is a property of the
+// POINTERS being read -- authoritative in a registry walk, arbitrary in a drain that
+// follows child words out of mark functions -- so the two really are independent here.
+#define CN1_GC_TRUSTED_SUSPEND() cn1GcTrustedRoots = 0
+#define CN1_GC_TRUSTED_RESUME()  cn1GcTrustedRoots = 1
 #endif
 
 void codenameOneGCMark() {
@@ -1807,9 +1852,43 @@ void codenameOneGCMark() {
             }
             CN1_GC_TRUSTED_END();
             gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
+            // DRAIN AS WE GO (issue #5537). This pass pushes EVERY fresh object on
+            // every page, and "fresh" means "allocated since the last cycle" -- a
+            // number set by the mutator's allocation rate, not by the live set. A
+            // thread churning short-lived objects produces far more than the worklist
+            // holds (65536 entries against ~500K fresh objects per cycle on the
+            // reporter's game-tree search), so pushing the whole walk before draining
+            // once overflowed the worklist as a matter of course.
+            //
+            // Overflow is survivable but ruinously expensive: it arms the belt, whose
+            // recovery pass is a full O(heap) rescan. That makes the cycle several
+            // times longer, which lets the mutator produce several times more fresh
+            // objects before the next one, which overflows again -- the collector
+            // never returns to the fast path, RSS climbs without bound (measured 90MB
+            // to 6.2GB in 20 seconds with a live set of a few hundred bytes) and the
+            // app is killed by the iOS per-process ceiling, or, once the process-budget
+            // pacing of #5563 holds it under that ceiling, parks on every allocation
+            // and appears frozen. Both were reported on this issue.
+            //
+            // Draining between pages costs nothing that the end-of-pass drain would
+            // not have cost anyway -- the same objects are scanned, just sooner -- and
+            // it bounds the cursor, so the pass cannot overflow by volume. It must run
+            // OUTSIDE the trusted window: a drain follows child words out of arbitrary
+            // mark functions, which is exactly what the resolve guard is there for.
+            if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE / 2) {
+                atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
+                gcMarkDrain(d);
+            }
         }
         gcMarkDrain(d);
     }
+    // A single page's slot walk runs between two of those checks, so the worklist must
+    // have room for a whole page of pushes above the drain threshold. True by a wide
+    // margin at the defaults (2048 slots against 32768 of headroom); asserted so that
+    // raising CN1_BIBOP_PAGE_SIZE or shrinking the worklist fails the build instead of
+    // quietly restoring the overflow spiral above.
+    _Static_assert(CN1_BIBOP_PAGE_SIZE / 32 <= CN1_GC_MARK_WORKLIST_SIZE / 2,
+                   "a BiBOP page's slots must fit in the grace pass's worklist headroom");
 #endif
 
     // GRACE-SUBTREE MARKING, LEGACY HALF (same correctness argument as the page
@@ -1847,6 +1926,20 @@ void codenameOneGCMark() {
                && go->__codenameOneParentClsReference != 0
                && go->__codenameOneParentClsReference->markFunction != 0) {
                 gcMarkObject(d, go, JAVA_FALSE);
+                // Same interleaved drain as the page walk above, and for the same
+                // reason: the number of fresh entries here is set by the allocation
+                // rate (everything over CN1_BIBOP_MAX_OBJECT lands in this table, as
+                // does everything the survivor-heavy bypass diverts off the page
+                // heap), so a busy cycle can push more of them than the worklist
+                // holds and drop the collector into the overflow spiral described
+                // there. Checked only on a push, since nothing else moves the cursor,
+                // and outside the trusted window for the reason spelled out below.
+                if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE / 2) {
+                    atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
+                    CN1_GC_TRUSTED_SUSPEND();
+                    gcMarkDrain(d);
+                    CN1_GC_TRUSTED_RESUME();
+                }
             }
         }
         // Trust covers ONLY the registry walk above. Every fresh entry is already
@@ -6343,6 +6436,9 @@ static int cn1ForceVisitedTestAndSet(JAVA_OBJECT obj, int key) {
 // can have more). Smaller sizes still work via the heap-rescan slow path, but the
 // rescan adds non-trivial cost and the path is harder to test, so the default errs
 // on the side of avoiding overflow for any normal app.
+// (The #define itself is hoisted to the forward-declaration block far above, next to
+// gcMarkWorklistTop, because the grace pass needs it; this #ifndef is what keeps a
+// -D override authoritative in both places.)
 #ifndef CN1_GC_MARK_WORKLIST_SIZE
 #define CN1_GC_MARK_WORKLIST_SIZE 65536
 #endif
@@ -6458,7 +6554,13 @@ static void gcMarkFlushLocal(struct gcMarkLocalBuffer* lb) {
     for(int i = 0 ; i < lb->count ; i++) {
         if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
             gcMarkWorklistOverflow = JAVA_TRUE;
-            atomic_store_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release);
+            // EXCHANGE, so the counter below reads once per CYCLE rather than once per
+            // dropped push: what an overflow costs is the belt's O(heap) rescan, and
+            // that runs once however many pushes were dropped. Only ever executed on
+            // the overflow path, so the atomic RMW is off every normal mark.
+            if(!atomic_exchange_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release)) {
+                atomic_fetch_add_explicit(&cn1GcOverflowCycles, 1, memory_order_relaxed);
+            }
             break;
         }
         gcMarkWorklist[gcMarkWorklistTop] = lb->entries[i];
@@ -6487,7 +6589,10 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     // Serial path: identical to the original single-threaded push.
     if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
         gcMarkWorklistOverflow = JAVA_TRUE;
-        atomic_store_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release);
+        // See the matching exchange in gcMarkFlushLocal.
+        if(!atomic_exchange_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release)) {
+            atomic_fetch_add_explicit(&cn1GcOverflowCycles, 1, memory_order_relaxed);
+        }
         return;
     }
     gcMarkWorklist[gcMarkWorklistTop].obj = obj;
@@ -7860,6 +7965,7 @@ void initConstantPool() {
     // hook. Both are no-ops unless their environment variable is set.
     atexit(cn1ReportLowMemoryParks);
     atexit(cn1ReportPacingParks);
+    atexit(cn1ReportGcOverflow);
     cn1StartSimulatedMemoryWarnings();
 
     // it will wait two seconds unless an explicit GC occurs
