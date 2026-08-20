@@ -469,6 +469,37 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
     }
 
+    private com.codename1.home.spi.HomeBridge homeBridge;
+
+    /// Returns a local simulated home. There is no HomeKit or Google Home on
+    /// this port, so the bridge reports
+    /// {@code HomeAvailability.LOCAL_ONLY}: the accessories are furnished by
+    /// {@code SyntheticHome}, reads and writes work and are durable, and
+    /// nothing outside this app can see them.
+    ///
+    /// Worth having rather than answering unsupported, because almost all of a
+    /// smart-home feature -- laying out a room, wiring a control to a write,
+    /// rendering an unreachable accessory -- is code that has nothing to do
+    /// with hardware, and a port that reported nothing would make all of it
+    /// testable only on a phone.
+    @Override
+    public com.codename1.home.spi.HomeBridge getHomeBridge() {
+        // Guarded because the bridge holds the graph, the current trait
+        // values and the undelivered-change queues. Two threads racing this
+        // getter would each get their own home, and two homes coordinate on
+        // nothing -- a write through one would be invisible to a
+        // subscription registered against the other.
+        synchronized (WindowsImplementation.class) {
+            if (homeBridge == null) {
+                com.codename1.impl.home.LocalHomeBridge local =
+                        new com.codename1.impl.home.LocalHomeBridge();
+                com.codename1.impl.home.SyntheticHome.populate(local);
+                homeBridge = local;
+            }
+            return homeBridge;
+        }
+    }
+
     // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE
     // honestly when Windows location is disabled / denied.
     private com.codename1.location.LocationManager locationManager;

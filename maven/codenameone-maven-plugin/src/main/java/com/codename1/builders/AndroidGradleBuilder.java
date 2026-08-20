@@ -626,6 +626,19 @@ public class AndroidGradleBuilder extends Executor {
     private String healthQueriesFragment = "";
     private String healthApplicationFragment = "";
     private String healthGradleDependency = "";
+    // The artifact only. The configuration keyword -- implementation or the
+    // legacy compile -- is decided further down, after useAndroidX is known,
+    // and a generated project that predates implementation fails evaluating a
+    // build.gradle that uses it.
+    private String smartHomeGradleArtifact = "";
+
+    // Smart home (com.codename1.home.*). usesSmartHome gates the whole
+    // feature; usesHomeCommissioning is tracked separately because on iOS it
+    // costs an entire extra Xcode target, and both builders read the same
+    // package split so the two agree about what an app asked for.
+    private boolean usesSmartHome;
+    private boolean usesHomeCommissioning;
+    private String smartHomeQueriesFragment = "";
 
     private boolean integrateMoPub = false;
 
@@ -1463,6 +1476,12 @@ public class AndroidGradleBuilder extends Executor {
         // com.codename1.maps package and returns the onCreate snippet that
         // registers it. Keeps the core framework free of any map SDK.
         String mapsProviderSupport = MapsProviderInjector.injectAndroid(this, request, srcDir);
+        // The smart-home delegate is injected further down, after the class
+        // scan has run: usesSmartHome is still false here, and injecting on it
+        // now would never inject at all -- the API would report itself
+        // unsupported on a device that supports it, with nothing in the build
+        // log to say why.
+        String smartHomeSupport = "";
         File dummyClassesDir = new File(tmpFile, "Classes");
         dummyClassesDir.mkdirs();
         File libsDir = new File(projectDir, "libs");
@@ -1936,6 +1955,24 @@ public class AndroidGradleBuilder extends Executor {
                     // (Scan* handles vs the GATT/stream types); the
                     // usesClassMethod hook below catches facade-only
                     // callers.
+                    // Smart home (com.codename1.home.*). Gated on actual
+                    // usage so the Play services home dependency and the
+                    // injected bridge are only added for apps that reference
+                    // the API.
+                    if (cls.indexOf("com/codename1/home/") == 0
+                            && !isSmartHomeSetupPayload(cls)) {
+                        usesSmartHome = true;
+                        if (cls.indexOf("com/codename1/home/commissioning/")
+                                == 0
+                                && !SmartHomeManifestFragments
+                                    .isCommissioningCapabilityType(cls)) {
+                            // Commissioner and CommissioningStyle are left
+                            // out: an app asking whether it COULD add an
+                            // accessory names both and may never add one.
+                            // The Commissioner call decides it instead.
+                            usesHomeCommissioning = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/health/") == 0) {
                         usesHealth = true;
                         // The facade itself is not evidence of the store:
@@ -2041,6 +2078,11 @@ public class AndroidGradleBuilder extends Executor {
                     // dependencies and plist entries for every feature,
                     // health included, and is indifferent to what follows.
                     aiAcc.consumeMethod(cls, method);
+                    String scriptAdapter =
+                            androidTextScriptAdapterSource(cls, method);
+                    if (scriptAdapter != null) {
+                        includedAiAdapterSources.add(scriptAdapter);
+                    }
                     // A store method reached through a passed-in HealthStore
                     // never names Health at all, so the facade hook below
                     // cannot see it -- and without this the build skipped the
@@ -2436,6 +2478,49 @@ public class AndroidGradleBuilder extends Executor {
                     usesBluetoothScan, usesBluetoothConnect,
                     usesBluetoothPeripheral, usesBluetoothClassic,
                     neverForLocation, bleRequired, targetSDKVersionInt);
+        }
+
+        // Smart home (com.codename1.home.*).
+        //
+        // Deliberately no permissions. Play services runs the entire
+        // add-device interaction in its OWN activity, holding its own
+        // permissions, and the play-services-home AAR declares none -- so an
+        // app that never scans for anything does not get a Bluetooth prompt
+        // it cannot explain. See SmartHomeManifestFragments.
+        if (usesSmartHome) {
+            log("Smart home fragments version "
+                    + SmartHomeManifestFragments.FRAGMENT_VERSION
+                    + (usesHomeCommissioning ? " (with commissioning)" : ""));
+            // The delegate, and the onCreate snippet that registers it. Here
+            // rather than beside the maps injection above, because that runs
+            // before the scan that sets this flag.
+            //
+            // The play-services-home dependency the injected file imports.
+            // Added here rather than in PlatformFeatureCatalog because
+            // catalog entries match on a prefix with no way to express an
+            // exclusion, and com/codename1/home/ also covers the pure-Java
+            // setup-payload parser -- see isSmartHomeSetupPayload. An app
+            // that only validates a scanned code would otherwise ship a Play
+            // Services AAR it never calls. This gate is the one that knows
+            // the difference, and it keeps the dependency and the delegate
+            // that imports it inseparable.
+            smartHomeGradleArtifact =
+                    "com.google.android.gms:play-services-home:"
+                    + request.getArg("android.home.playServicesVersion",
+                            "16.0.0-beta1");
+            smartHomeSupport = SmartHomeInjector.injectAndroid(this, srcDir);
+            if (targetSDKVersionInt >= 30) {
+                // Package visibility. Without this
+                // getLaunchIntentForPackage answers null even when Google
+                // Home is installed, so SmartHome.openEcosystemApp() -- the
+                // recovery an app offers a user with no home set up --
+                // silently does nothing.
+                smartHomeQueriesFragment =
+                        SmartHomeManifestFragments.injectQueries("");
+            }
+            minSDK = maxInt(
+                    Integer.toString(SmartHomeManifestFragments.MINIMUM_SDK),
+                    minSDK);
         }
 
         // First-class health (com.codename1.health.*). Gated on
@@ -3467,7 +3552,8 @@ public class AndroidGradleBuilder extends Executor {
         if (targetSDKVersionInt >= 30) {
             xQueries = "<queries>\n"
                     + request.getArg("android.manifest.queries", "")
-                    + healthQueriesFragment + "</queries>\n";
+                    + healthQueriesFragment + smartHomeQueriesFragment
+                    + "</queries>\n";
         }
 
         //Delete the Facebook implemetation if this app does not use FB.
@@ -5132,6 +5218,7 @@ public class AndroidGradleBuilder extends Executor {
                     + facebookHashCode
                     + facebookSupport
                     + mapsProviderSupport
+                    + smartHomeSupport
                     + streamMode
                     + registerNativeImplementationsAndCreateStubs(
                             new URLClassLoader(
@@ -5926,6 +6013,14 @@ public class AndroidGradleBuilder extends Executor {
         request.putArgument("var.android.playServicesVersion", playServicesVersion);
         String additionalDependencies = request.getArg("gradleDependencies", "");
         additionalDependencies += healthGradleDependency;
+        if (smartHomeGradleArtifact.length() > 0) {
+            // Built here rather than where the artifact is chosen: `compile`
+            // is decided a few hundred lines below that, and a legacy project
+            // -- android.useGradle8=false without AndroidX -- fails
+            // evaluating a build.gradle that says implementation.
+            additionalDependencies += "    " + compile + " '"
+                    + smartHomeGradleArtifact + "'\n";
+        }
         if (facebookSupported) {
             minSDK = maxInt("15", minSDK);
 
@@ -6376,6 +6471,25 @@ public class AndroidGradleBuilder extends Executor {
         debug("Gradle File start\n-------\n");
         debug(gradleProps);
         debug("-------\nGradle File end \n");
+
+        // Two dependency statements run together are valid Groovy -- a method call on the
+        // dependency the first one returned -- so Gradle reports them as "Could not find method
+        // implementation()" against a generated build.gradle line the developer never wrote, and
+        // names neither the hint nor the library that produced it. Say it plainly instead. This
+        // is not only about hand written values: a cn1lib's codenameone_library_appended.properties
+        // used to be concatenated onto the project's own value with no separator, so a project
+        // built by an older Maven plugin still arrives here corrupted.
+        String unseparated = findUnseparatedGradleStatement(request.getArg("android.gradleDep", ""));
+        if (unseparated != null) {
+            log("The android.gradleDep build hint runs two Gradle statements together with no "
+                    + "separator between them, near: " + unseparated + " -- separate them with ';' "
+                    + "or a newline. If you did not write this value by hand, a cn1lib appended a "
+                    + "dependency to it: check your libraries for a "
+                    + "codenameone_library_appended.properties that sets android.gradleDep, and "
+                    + "make sure your own value ends with ';'.");
+            return false;
+        }
+
         File gradleFile = new File(projectDir, "build.gradle");
 
         try {
@@ -6504,6 +6618,10 @@ public class AndroidGradleBuilder extends Executor {
                 "com/codename1/impl/android/ai");
         String[] vision = {
             "AndroidTextRecognitionAdapter.java",
+            "AndroidTextRecognitionChineseAdapter.java",
+            "AndroidTextRecognitionDevanagariAdapter.java",
+            "AndroidTextRecognitionJapaneseAdapter.java",
+            "AndroidTextRecognitionKoreanAdapter.java",
             "AndroidBarcodeScanningAdapter.java",
             "AndroidFaceDetectionAdapter.java",
             "AndroidImageLabelingAdapter.java",
@@ -6572,6 +6690,37 @@ public class AndroidGradleBuilder extends Executor {
         // DocumentScanner is Apple-only. Returning null intentionally prunes
         // the Android vision backend for an app that references only it; the
         // public API then reports UNSUPPORTED without a native dependency.
+        return null;
+    }
+
+    /**
+     * Maps a {@code TextScript} selector call to the adapter source that owns
+     * that ML Kit script model. ML Kit ships one artifact per script, so unlike
+     * the feature adapters these are keyed on the selector method rather than a
+     * class: {@code TextRecognizer} alone says nothing about which scripts the
+     * application reads. Latin is the built-in default and has no separate
+     * source.
+     *
+     * @param cls internal-form owner of the referenced method
+     * @param method referenced method name
+     * @return the adapter source file to retain, or {@code null}
+     */
+    static String androidTextScriptAdapterSource(String cls, String method) {
+        if (!"com/codename1/ai/vision/TextScript".equals(cls)) {
+            return null;
+        }
+        if ("chinese".equals(method)) {
+            return "AndroidTextRecognitionChineseAdapter.java";
+        }
+        if ("devanagari".equals(method)) {
+            return "AndroidTextRecognitionDevanagariAdapter.java";
+        }
+        if ("japanese".equals(method)) {
+            return "AndroidTextRecognitionJapaneseAdapter.java";
+        }
+        if ("korean".equals(method)) {
+            return "AndroidTextRecognitionKoreanAdapter.java";
+        }
         return null;
     }
 
@@ -7367,6 +7516,25 @@ public class AndroidGradleBuilder extends Executor {
     /// HealthSample, and reading a number off it names QuantitySample and
     /// HealthQuantity. Counting those as store access made every
     /// documented sensor-only app fail the health-hint gate.
+    /**
+     * Whether {@code cls} is the Matter setup-payload parser, which needs
+     * nothing from the platform.
+     *
+     * <p>Pure Java: it parses an {@code MT:} QR string or a manual pairing
+     * code and checksums it, and it never reaches a bridge, a native or an
+     * ecosystem SDK. It lives in {@code com.codename1.home.commissioning}
+     * because that is where a reader looks for it, so the package prefix
+     * alone would give an app that merely validates a scanned code the
+     * play-services-home AAR, the Bluetooth and local-network permissions and
+     * the commissioning intent filter. Kept in step with the iOS scanner --
+     * see SmartHomeScannerParityTest.</p>
+     */
+    private static boolean isSmartHomeSetupPayload(String cls) {
+        return "com/codename1/home/commissioning/SetupPayload".equals(cls)
+                || cls.indexOf(
+                        "com/codename1/home/commissioning/SetupPayload$") == 0;
+    }
+
     private static boolean isSharedHealthModel(String cls) {
         return "com/codename1/health/HealthSample".equals(cls)
                 || "com/codename1/health/QuantitySample".equals(cls)
@@ -7423,6 +7591,36 @@ public class AndroidGradleBuilder extends Executor {
 
     protected String getReleaseCertificateFile() {
         return "android.ks";
+    }
+
+    /**
+     * A Gradle configuration keyword opening a dependency declaration directly after the closing
+     * quote of the previous one, with no ';' or newline between the two.
+     */
+    private static final java.util.regex.Pattern UNSEPARATED_GRADLE_STATEMENT =
+            java.util.regex.Pattern.compile(
+                "['\"][ \\t]*(implementation|api|compile|compileOnly|runtimeOnly"
+                + "|annotationProcessor|kapt|testImplementation|androidTestImplementation"
+                + "|debugImplementation|releaseImplementation)[ \\t]*['\"(]");
+
+    /**
+     * Finds two Gradle dependency statements run together with no separator between them.
+     *
+     * @param gradleDep the android.gradleDep hint value
+     * @return the offending excerpt, or null when the value is well formed
+     */
+    static String findUnseparatedGradleStatement(String gradleDep) {
+        if (gradleDep == null || gradleDep.length() == 0) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = UNSEPARATED_GRADLE_STATEMENT.matcher(gradleDep);
+        if (!matcher.find()) {
+            return null;
+        }
+        int from = Math.max(0, matcher.start() - 40);
+        int to = Math.min(gradleDep.length(), matcher.end() + 40);
+        return (from > 0 ? "..." : "") + gradleDep.substring(from, to)
+                + (to < gradleDep.length() ? "..." : "");
     }
 
     private String addNewlineIfMissing(String s) {

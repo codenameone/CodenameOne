@@ -15945,6 +15945,45 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private static com.codename1.impl.home.LocalHomeBridge homeBridge;
+
+    /// Returns the simulator's smart home. There is no desktop HomeKit or
+    /// Google Home, so this is a local simulated house reporting
+    /// {@code HomeAvailability.LOCAL_ONLY}: the accessories come from
+    /// {@code SyntheticHome}, and reads, writes, scenes and commissioning all
+    /// work against them.
+    ///
+    /// The house is deliberately awkward rather than tidy -- a two-gang
+    /// switch, a bridged pair of lights, an unreachable socket, a thermostat
+    /// in auto mode with no single setpoint, a sensor that has never reported
+    /// -- because those are the shapes that break naive code, and the
+    /// simulator is where finding that out is cheap.
+    @Override
+    public com.codename1.home.spi.HomeBridge getHomeBridge() {
+        return getSimulatedHome();
+    }
+
+    /// The simulated house, for the Simulate menu to script.
+    ///
+    /// Static and class-guarded because the simulator's own window reaches it
+    /// without holding a port instance, and because the bridge holds the graph,
+    /// the current trait values and the undelivered-change queues -- two of
+    /// them would coordinate on nothing, so a write through one would be
+    /// invisible to a subscription registered against the other.
+    ///
+    /// @return the simulated home, never null
+    public static com.codename1.impl.home.LocalHomeBridge getSimulatedHome() {
+        synchronized (JavaSEPort.class) {
+            if (homeBridge == null) {
+                com.codename1.impl.home.LocalHomeBridge local =
+                        new com.codename1.impl.home.LocalHomeBridge();
+                com.codename1.impl.home.SyntheticHome.populate(local);
+                homeBridge = local;
+            }
+            return homeBridge;
+        }
+    }
+
     /**
      * The first time the app reaches the NFC API in the simulator, write
      * placeholders for ios.NFCReaderUsageDescription if the developer has

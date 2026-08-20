@@ -6484,6 +6484,19 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the platform bridge that backs the `com.codename1.home` smart-home API with HomeKit,
+    /// the Google Home APIs, or a local simulated home. Ports supporting smart home override this;
+    /// the base implementation returns null, which makes `com.codename1.home.SmartHome` report
+    /// `HomeAvailability.NOT_SUPPORTED`, answer every graph query with an empty list and fail every
+    /// operation fast -- so application code needs no platform-specific branch.
+    ///
+    /// #### Returns
+    ///
+    /// the smart-home bridge, or null when unsupported
+    public com.codename1.home.spi.HomeBridge getHomeBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
     /// surfaces (home-screen widgets and live activities). Ports supporting surfaces override
     /// this; the base implementation returns null which renders the whole API an inert no-op.

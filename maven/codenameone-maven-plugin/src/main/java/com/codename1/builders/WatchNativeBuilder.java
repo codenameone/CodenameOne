@@ -146,7 +146,12 @@ class WatchNativeBuilder {
             //
             // This is the "device-only framework" the SDK probe was once written to protect. It
             // never needed protecting.
-            + "BackgroundTasks.framework";
+            + "BackgroundTasks.framework;"
+            // MatterSupport IS in the watchOS SDK -- verified with the ls above -- but the watch
+            // slice compiles the add-device flow out (CN1SmartHome.h #undefs
+            // CN1_INCLUDE_MATTER_SETUP for TARGET_OS_WATCH), because Apple's sheet is iOS and
+            // iPadOS only. Present but unreferenced is exactly what this list is for.
+            + "MatterSupport.framework";
 
     /**
      * Frameworks the watch target MAY link, so that every framework this builder can emit is
@@ -164,7 +169,10 @@ class WatchNativeBuilder {
             + "CoreLocation.framework;CoreMedia.framework;CoreML.framework;"
             + "CoreMotion.framework;CoreText.framework;CoreVideo.framework;"
             + "DeviceCheck.framework;EventKit.framework;GameKit.framework;"
-            + "HealthKit.framework;LocalAuthentication.framework;MobileCoreServices.framework;"
+            // HomeKit is present on watchOS and the watch slice genuinely uses it: CN1SmartHome.m
+            // compiles for the watch and a wrist app controlling a light is the obvious case.
+            + "HealthKit.framework;HomeKit.framework;"
+            + "LocalAuthentication.framework;MobileCoreServices.framework;"
             + "NaturalLanguage.framework;NetworkExtension.framework;PhotosUI.framework;"
             + "QuartzCore.framework;Security.framework;UserNotifications.framework;"
             + "WatchConnectivity.framework";
@@ -833,8 +841,16 @@ class WatchNativeBuilder {
     /// Deliberately literal, like {@link #injectedPlistString}: the hint is a fragment, not a
     /// document, so this scans for the tags rather than pretending to parse XML.
     static java.util.List<String> injectedPlistKeys(BuildRequest request) {
+        return injectedPlistKeys(request.getArg("ios.plistInject", null));
+    }
+
+    /// The keys a plist FRAGMENT declares, for a caller holding the text rather than the request.
+    ///
+    /// The Info.plist renderer is that caller: it appends its own fragments to the injected one as
+    /// it goes, so what it must not declare twice is decided by the string it has built, not by
+    /// the build hint it started from.
+    static java.util.List<String> injectedPlistKeys(String inject) {
         java.util.List<String> out = new java.util.ArrayList<String>();
-        String inject = request.getArg("ios.plistInject", null);
         if (inject == null) {
             return out;
         }
@@ -858,6 +874,126 @@ class WatchNativeBuilder {
         }
     }
 
+    /// The tag name of the value a {@code ios.plistInject} fragment gives {@code key} --
+    /// {@code "string"}, {@code "false"}, {@code "array"} -- or null when the fragment does not
+    /// carry the key at all.
+    ///
+    /// {@link #injectedPlistString} answers only for {@code <string>} values and answers null for
+    /// every other kind, which reads to a caller as "not supplied". A validator that then fills in
+    /// a default gets neither: the renderer suppresses the generated value because the key IS
+    /// there, and the injected non-string stays. Telling absent from present-and-not-a-string
+    /// needs the tag itself.
+    static String injectedPlistValueTag(BuildRequest request, String key) {
+        String inject = request.getArg("ios.plistInject", null);
+        if (inject == null) {
+            return null;
+        }
+        int value = injectedValueAt(inject, key);
+        if (value < 0) {
+            return null;
+        }
+        int element = nextElementAt(inject, value);
+        // Present, and with no element for a value: text, or nothing at all. Not the key's
+        // absence, which is what the caller has to tell it from.
+        return element < 0 ? "" : tagAt(inject, element);
+    }
+
+    /// The strings inside the array a {@code ios.plistInject} fragment gives {@code key}, trimmed
+    /// and in document order.
+    ///
+    /// Empty both for a key the fragment does not carry and for one whose value is not an array of
+    /// strings; a caller that has to tell those apart asks {@link #injectedPlistValueTag} first.
+    ///
+    /// The array belonging to the KEY. Found by searching for the key's name and reading the next
+    /// {@code <array>} after it, a fragment that mentions the name in a comment first took the
+    /// array of whatever key came next -- so a plist that declared the value perfectly well was
+    /// reported as not declaring it.
+    static java.util.List<String> injectedPlistStringArray(BuildRequest request, String key) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String inject = request.getArg("ios.plistInject", null);
+        if (inject == null) {
+            return out;
+        }
+        int value = injectedValueAt(inject, key);
+        int element = value < 0 ? -1 : nextElementAt(inject, value);
+        if (element < 0 || !"array".equals(tagAt(inject, element))) {
+            return out;
+        }
+        int body = contentAfterOpenTag(inject, "array", element);
+        int end = body < 0 ? -1 : closeOfElement(inject, body, "</array>");
+        if (end < 0) {
+            return out;
+        }
+        int at = body;
+        while (true) {
+            int start = contentAfterOpenTag(inject, "string", at);
+            if (start < 0 || start > end) {
+                return out;
+            }
+            int close = closeOfString(inject, start);
+            if (close < 0 || close > end) {
+                return out;
+            }
+            out.add(plistStringContent(inject.substring(start, close)).trim());
+            at = close + 1;
+        }
+    }
+
+    /// Where the value belonging to {@code key} begins -- just past its {@code </key>} -- or -1
+    /// when the fragment does not carry the key.
+    private static int injectedValueAt(String inject, String key) {
+        int at = 0;
+        while (true) {
+            int content = contentAfterOpenTag(inject, "key", at);
+            if (content < 0) {
+                return -1;
+            }
+            int close = closeOfElement(inject, content, "</key>");
+            if (close < 0) {
+                return -1;
+            }
+            at = close + 1;
+            if (!key.equals(plistStringContent(inject.substring(content, close)).trim())) {
+                continue;
+            }
+            int end = inject.indexOf('>', close);
+            return end < 0 ? -1 : end + 1;
+        }
+    }
+
+    /// The {@code <} of the next real element at or after {@code from}, or -1 when what follows is
+    /// text or nothing. Whitespace, comments and CDATA sit between a key and its value in real
+    /// fragments and none of them is the value.
+    private static int nextElementAt(String inject, int from) {
+        int i = from;
+        while (i < inject.length()) {
+            if (Character.isWhitespace(inject.charAt(i))) {
+                i++;
+                continue;
+            }
+            int skipped = skipMarkupBefore(inject, i, i);
+            if (skipped < 0) {
+                return -1;
+            }
+            if (skipped != i) {
+                i = skipped;
+                continue;
+            }
+            return inject.charAt(i) == '<' ? i : -1;
+        }
+        return -1;
+    }
+
+    /// The element name at an opening tag, lowercased. Empty for an end tag, which is not one.
+    private static String tagAt(String inject, int element) {
+        StringBuilder tag = new StringBuilder();
+        for (int j = element + 1; j < inject.length()
+                && Character.isLetterOrDigit(inject.charAt(j)); j++) {
+            tag.append(inject.charAt(j));
+        }
+        return tag.toString().toLowerCase(java.util.Locale.ENGLISH);
+    }
+
     static String injectedPlistString(BuildRequest request, String key) {
         String inject = request.getArg("ios.plistInject", null);
         if (inject == null) {
@@ -870,30 +1006,22 @@ class WatchNativeBuilder {
         // is what the phone's plist does. Matching the serialized form here meant the phone
         // suppressed its default for a key the watch then failed to find, and the pair shipped with
         // different marketing versions, which archive validation rejects.
-        int at = 0;
-        while (true) {
-            int content = contentAfterOpenTag(inject, "key", at);
-            if (content < 0) {
-                return null;
-            }
-            int close = closeOfElement(inject, content, "</key>");
-            if (close < 0) {
-                return null;
-            }
-            at = close + 1;
-            if (!key.equals(plistStringContent(inject.substring(content, close)).trim())) {
-                continue;
-            }
-            int valueContent = contentAfterOpenTag(inject, "string", at);
-            if (valueContent < 0) {
-                return null;
-            }
-            int valueClose = closeOfString(inject, valueContent);
-            if (valueClose < 0) {
-                return null;
-            }
-            return plistStringContent(inject.substring(valueContent, valueClose));
+        //
+        // And the key's OWN value. Scanning forward for the next <string> ANYWHERE after the key,
+        // a key given <false/> answered with an unrelated later key's string -- so a purpose-string
+        // check passed on a value the plist renderer keeps as the boolean false, and the app was
+        // terminated on the device for a disclosure the build had just approved.
+        int value = injectedValueAt(inject, key);
+        int element = value < 0 ? -1 : nextElementAt(inject, value);
+        if (element < 0 || !"string".equals(tagAt(inject, element))) {
+            return null;
         }
+        int content = contentAfterOpenTag(inject, "string", element);
+        int close = content < 0 ? -1 : closeOfString(inject, content);
+        if (close < 0) {
+            return null;
+        }
+        return plistStringContent(inject.substring(content, close));
     }
 
     /// The {@code </string>} that closes the element, skipping over CDATA sections.

@@ -2472,14 +2472,29 @@ static uint64_t cn1PhysFootprint(void) {
 // memory pressure, so a release shows up in RSS the moment it happens.
 #if defined(__linux__)
 static uint64_t cn1LinuxResidentBytes(void) {
+    // /proc/self/statm field 2 is resident pages. Parsed with fgets + strtoul rather
+    // than the scanf family: glibc 2.38 redirects fscanf to __isoc23_fscanf in
+    // <stdio.h>, and the cross-linked Linux target resolves against a sysroot that has
+    // no such symbol, so any retained scanf call fails the link outright
+    // (ld.lld: undefined symbol: __isoc23_fscanf).
     FILE* f = fopen("/proc/self/statm", "r");
     if(f == 0) {
         return 0;
     }
-    unsigned long total = 0, resident = 0;
-    int n = fscanf(f, "%lu %lu", &total, &resident);
+    char buf[128];
+    char* line = fgets(buf, sizeof(buf), f);
     fclose(f);
-    if(n != 2) {
+    if(line == 0) {
+        return 0;
+    }
+    char* end = 0;
+    strtoul(line, &end, 10);            // field 1: total program size, unused
+    if(end == line) {
+        return 0;
+    }
+    char* residentStart = end;
+    unsigned long resident = strtoul(residentStart, &end, 10);
+    if(end == residentStart) {
         return 0;
     }
     long ps = sysconf(_SC_PAGESIZE);

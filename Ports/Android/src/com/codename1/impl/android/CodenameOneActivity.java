@@ -26,6 +26,7 @@ package com.codename1.impl.android;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
@@ -444,6 +445,38 @@ public class CodenameOneActivity extends Activity {
             AndroidImplementation.stopEditing(true);
         }
         super.startActivityForResult(intent, requestCode);
+    }
+
+    /**
+     * Kept in step with {@link #startActivityForResult(Intent, int)}, which is
+     * the only place the queued results were reset.
+     *
+     * <p>A flow launched through an {@code IntentSender} -- Play services
+     * hands one back for its Matter add-device sheet, In-App Billing for its
+     * purchase sheet -- otherwise left the previous flow's result sitting at
+     * the head of the queue. {@code fireIntentResult} redispatches element
+     * zero without removing it, so the second run of the same flow was
+     * answered with the first run's outcome: cancel once, retry, and the
+     * retry reports cancelled before the user has touched it.</p>
+     */
+    @Override
+    public void startIntentSenderForResult(IntentSender intent, int requestCode,
+            Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags)
+            throws IntentSender.SendIntentException {
+        // The queue reset only, deliberately -- NOT waitingForResult.
+        // Callers of this method differ from callers of
+        // startActivityForResult: GoogleImpl launches its sign-in resolution
+        // here and registers its listener afterwards, and marking the channel
+        // busy first makes setIntentResultListener a no-op, so the resolution
+        // result would go nowhere and the client would never reconnect.
+        // Registering a listener is what marks the channel busy, whichever
+        // side of the launch it happens on.
+        intentResult = new Vector();
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
+        super.startIntentSenderForResult(intent, requestCode, fillInIntent,
+                flagsMask, flagsValues, extraFlags);
     }
 
     @Override

@@ -62,6 +62,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.AsyncResource;
 import java.io.Closeable;
 
@@ -1379,6 +1380,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mutableImagesFast = true;
         largerTextEnabled = false;
         largerTextScale = 1f;
+        nativeTheme = null;
         cameraImpl = null;
         arImpl = null;
         visionImplCreationHook = null;
@@ -2743,6 +2745,31 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setNativeFontSchemeSupported(boolean nativeFontSchemeSupported) {
         this.nativeFontSchemeSupported = nativeFontSchemeSupported;
+    }
+
+    /**
+     * Theme installed by {@link #installNativeTheme()}, or null when this
+     * implementation reports no native theme. Lets a test reproduce the
+     * layered {@code @includeNativeBool} install the device ports perform,
+     * where building the app theme re-enters the theme build with only the
+     * native theme's entries visible.
+     */
+    private Hashtable nativeTheme;
+
+    public void setNativeTheme(Hashtable nativeTheme) {
+        this.nativeTheme = nativeTheme;
+    }
+
+    @Override
+    public boolean hasNativeTheme() {
+        return nativeTheme != null;
+    }
+
+    @Override
+    public void installNativeTheme() {
+        if (nativeTheme != null) {
+            UIManager.getInstance().setThemeProps(nativeTheme);
+        }
     }
 
     public void setLargerTextEnabled(boolean largerTextEnabled) {
