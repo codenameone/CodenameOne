@@ -99,12 +99,41 @@ final class IOSIntentCallbacks {
             // which means the answer is never queued and the Swift continuation is never
             // resumed. The assistant then waits forever on an intent that has already
             // finished. A lost log line costs incomparably less than that.
-            try {
-                Log.e(t);
-            } catch (Throwable ignored) {
-            }
+            logQuietly(t);
         }
         return bridge;
+    }
+
+    /// Logs, and never throws while doing it.
+    ///
+    /// Logging is normally the safest thing a catch block can do, and on these paths it is not.
+    /// `Log` routes through the same implementation that is missing before `Display.init` --
+    /// its first call reaches `Display.getInstance().getResourceAsStream` to print the revision
+    /// banner, and pre-init that is a null implementation, an NPE, and only `IOException` is
+    /// caught there. A headless intent finishing that early is a supported moment, not an
+    /// error, so the log throwing is a thing that happens rather than a thing that cannot.
+    ///
+    /// What it costs is out of all proportion to a log line. Every caller below is holding
+    /// something native code is owed: a token whose Swift continuation nothing else will
+    /// resume, the rest of a drain loop full of such tokens, a synchronous reply the platform
+    /// is blocked on, or the `waiting` flag that decides whether anything ever drains again.
+    /// An exception from the *reporting* of a failure would take all of that with it and turn a
+    /// handled failure into an assistant that waits forever. So the report is what gets
+    /// dropped, and the obligation is what gets kept.
+    private static void logQuietly(Throwable t) {
+        try {
+            Log.e(t);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /// See [#logQuietly(Throwable)]. Warning level, because every current caller reports a
+    /// state the application should not have reached.
+    private static void logQuietly(String message) {
+        try {
+            Log.p(message, Log.WARNING);
+        } catch (Throwable ignored) {
+        }
     }
 
     /// Returns the singleton intent bridge, creating it on first use.
@@ -169,7 +198,7 @@ final class IOSIntentCallbacks {
             } catch (Throwable t) {
                 // One token failing must not strand the rest: every one of them is a Swift
                 // continuation that nothing else will ever resume.
-                Log.e(t);
+                logQuietly(t);
             }
         }
     }
@@ -245,8 +274,8 @@ final class IOSIntentCallbacks {
             // still owed an answer: a continuation that is never resumed leaves the assistant
             // waiting forever, which is worse than a reported failure. A parked *activity* can
             // simply be dropped here because nothing is waiting on it.
-            Log.p("[intents] the application never produced a window; not running \"" + intentId
-                    + "\"", Log.WARNING);
+            logQuietly("[intents] the application never produced a window; not running \""
+                    + intentId + "\"");
             Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
             completeOrQueue(token, IntentSerializer.serializeResult(
                     IntentResult.failed("The application did not finish starting"), images),
@@ -278,7 +307,7 @@ final class IOSIntentCallbacks {
                             // reaches the native side, the Swift continuation is never resumed
                             // and the assistant waits forever. A result too deep to serialize,
                             // for instance, would do that.
-                            Log.e(t);
+                            logQuietly(t);
                             images.clear();
                             json = IntentSerializer.serializeResult(
                                     IntentResult.failed("The result could not be delivered"),
@@ -386,8 +415,8 @@ final class IOSIntentCallbacks {
             }
             synchronized (PARKED) {
                 if (!PARKED.isEmpty()) {
-                    Log.p("[intents] the application never produced a window; dropping "
-                            + PARKED.size() + " continued activity(ies)", Log.WARNING);
+                    logQuietly("[intents] the application never produced a window; dropping "
+                            + PARKED.size() + " continued activity(ies)");
                     PARKED.clear();
                 }
                 waiting = false;
@@ -410,7 +439,7 @@ final class IOSIntentCallbacks {
             try {
                 Intents.dispatchUserActivity(held[0], parse(held[1]));
             } catch (Throwable t) {
-                Log.e(t);
+                logQuietly(t);
             }
         }
     }
@@ -432,7 +461,7 @@ final class IOSIntentCallbacks {
             // them is the whole transaction.
             return IntentSerializer.serializeEntities(found, null, true);
         } catch (Throwable t) {
-            Log.e(t);
+            logQuietly(t);
             return null;
         }
     }
@@ -444,7 +473,7 @@ final class IOSIntentCallbacks {
         try {
             return IntentSerializer.parsePayload(json);
         } catch (Throwable t) {
-            Log.e(t);
+            logQuietly(t);
             return null;
         }
     }
