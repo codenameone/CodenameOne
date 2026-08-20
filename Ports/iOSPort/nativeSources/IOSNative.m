@@ -15434,6 +15434,15 @@ void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang
     if (@available(iOS 12.0, *)) {
         activity.eligibleForPrediction = YES;
     }
+    // eligibleForSearch is iOS 9 and is deliberately not guarded: no build can reach this with
+    // a target older than that. IPhoneBuilder starts minDeploymentTargets at 12.0, adds
+    // DEFAULT_MIN_DEPLOYMENT_VERSION (13.0) unconditionally at the top of every build, and
+    // getDeploymentTarget returns maxVersionString over that list -- so ios.deployment_target
+    // can only ever raise the floor. A project pinning 8.0 still builds at 13.0.
+    //
+    // eligibleForPrediction above is guarded because 12.0 is exactly the floor, and a guard at
+    // the boundary costs nothing while documenting which iOS introduced the property. Guarding
+    // this one as well would suggest a configuration that cannot exist.
     activity.eligibleForSearch = YES;
     // The activity type has to be the machine id -- it is what the continuation path matches on
     // -- but the title is what Siri suggestions and Spotlight show a person. Using the id for
