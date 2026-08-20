@@ -5560,7 +5560,7 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
-    private void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {
+    static void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {
 
         String basePath = baseDir.getAbsolutePath();
         if (!basePath.endsWith("/")) {
@@ -5568,7 +5568,14 @@ public class IPhoneBuilder extends Executor {
         }
         int basePathLen = basePath.length();
         for (File f : dir.listFiles()) {
-            if (f.isFile()) {
+            if (f.isDirectory() && f.getName().endsWith(".xcassets")) {
+                // Asset catalogs are directory packages. Adding their contents one file at a
+                // time flattens every Contents.json into the extension bundle and makes Xcode
+                // fail with "Multiple commands produce .../Contents.json". Add the catalog
+                // itself so Xcode compiles it with actool.
+                sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
+                sb.append(serviceTargetVarName).append(".add_resources([fileref])\n");
+            } else if (f.isFile()) {
                 sb.append("fileref = ").append(serviceGroupVarName).append(".new_file(").append("'").append(f.getAbsolutePath().substring(basePathLen)).append("')\n");
                 if (f.getName().endsWith(".m") || f.getName().endsWith(".swift")) {
                     sb.append(serviceTargetVarName).append(".add_file_references([fileref])\n");
