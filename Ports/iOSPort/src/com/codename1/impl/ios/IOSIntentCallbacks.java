@@ -219,6 +219,29 @@ final class IOSIntentCallbacks {
             return;
         }
         Map<String, Object> params = parse(paramsJson);
+        // Why a *window* and not Display.isInitialized(): on iOS the runtime is always up by
+        // the time this is reached, and the launch order is what guarantees it rather than
+        // luck. Display.init sets codenameOneRunning, calls impl.initImpl -- which is what
+        // flips the flag isInitialized() reads (CodenameOneImplementation.initImpl, its last
+        // statement) -- then Util.setImplementation(impl) at Display.java:418, starts the EDT,
+        // and only at Display.java:430 calls impl.postInit(). IOSImplementation.postInit's
+        // first statement is nativeInstance.initVM(), which is UIApplicationMain
+        // (IOSNative.m:534) and never returns.
+        //
+        // So UIKit does not exist until the last statement of Display.init, and every callback
+        // in this file arrives from UIKit: an App Intent perform, a continued activity, an
+        // entity query. There is no window in which one of them observes a null
+        // implementation, which is why Storage, Preferences and Database work here exactly as
+        // the headless contract promises -- they resolve through Util.getImplementation(),
+        // installed twelve lines before UIApplicationMain was called. Gating headless
+        // invocations on Display.isInitialized() would be waiting for something that is
+        // already true, and on a background launch it would spend the intent's deadline doing
+        // it. (The watch takes a different path through initVM and has no intents at all:
+        // CN1_USE_INTENTS is undefined for TARGET_OS_WATCH.)
+        //
+        // What genuinely is not ready is the *application*: the lifecycle callback only
+        // enqueues init/start, so there may be no Form. That is a UI question, so it is asked
+        // as a UI question.
         if (!headless && !hasWindow()) {
             // The same rule nativeUserActivity applies, for the same reason and on the other
             // door. openAppWhenRun asks the system to foreground the app; it does not wait for
@@ -452,6 +475,19 @@ final class IOSIntentCallbacks {
             return null;
         }
         try {
+            // Answered on the calling thread, with no wait for the runtime, and that is safe
+            // for the reason set out at nativePerformIntent: this call can only originate from
+            // UIKit, and UIKit only exists once Display.init has reached its last statement --
+            // by which point Util.setImplementation has long run, so a query reading Storage or
+            // Database reads a live implementation. Waiting on Display.isInitialized() here
+            // would be worse than pointless: the platform is blocked on this reply while it
+            // builds a picker, so any delay is a picker that arrives late or not at all.
+            //
+            // A query that comes back empty during launch is therefore an application saying
+            // it has nothing, not a runtime that was not ready. The one thing genuinely not
+            // guaranteed at this moment is the developer's own init() having run, which is why
+            // an @EntityQuery is a static method over persisted data, in the same way and for
+            // the same reason a headless handler is.
             List<AppEntity> found = Intents.queryEntities(entityType, kind, argument);
             // Thumbnails travel inside the document here rather than through the staging area
             // the index and result paths use. This reply is synchronous -- the platform is

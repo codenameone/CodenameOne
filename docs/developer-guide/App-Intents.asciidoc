@@ -51,6 +51,8 @@ Your class stays your class: there is no interface to implement and no base clas
 
 A `BY_ID` query is mandatory. An entity crosses the platform boundary as its id and nothing else, so resolving that id back to an object is the one lookup the framework can't do without.
 
+Write a query the way you'd write a headless handler: static, reading persisted state, depending on nothing your `init()` set up. The system can ask for a picker while it's still launching your application, and it blocks on the answer, so a query is called at a moment when your own startup may not have run yet -- and a query that returns nothing then produces a picker with nothing in it. The framework and its storage are fully up by that point; your application's own singletons aren't.
+
 [WARNING]
 ====
 Entity ids outlive your process and often your release. The device search index and the system's donated shortcuts both persist your id and hand it back later, so an id derived from a list position or a content hash starts resolving to the wrong object after your data changes, with no error reported anywhere.
