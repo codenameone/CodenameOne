@@ -227,4 +227,36 @@ class PointerMetadataTest extends UITestBase {
                         + "stacks (" + maxLivePackets + " packets); a smaller ring wraps "
                         + "onto packets that are still queued");
     }
+
+    @Test
+    void dispatchingAnEventDoesNotDisturbWhatThePortHasStaged() {
+        // The restore that gives a dispatched packet its own metadata used to write
+        // back into the same fields a port fills in before queueing. Those are written
+        // on the port's thread and read when the packet is queued, so the restore could
+        // land between a port's setPointerEventMetadata and the capture that follows
+        // it, handing the *next* packet the previous event's button. It showed up as
+        // the reverse of the bug the snapshot was added to fix, and only under CI
+        // timing.
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_SECONDARY,
+                PointerEvent.MASK_SECONDARY, PointerEvent.TYPE_STYLUS, 0.5f, 0, 0, 0, 0, false);
+        int first = implementation.capturePointerEventMetadata();
+
+        // A port stages the next event's metadata...
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY,
+                PointerEvent.MASK_PRIMARY, PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+
+        // ...and the event dispatch thread restores the earlier packet's snapshot in
+        // between, which is the interleaving that used to corrupt the staging.
+        implementation.selectPointerEventMetadata(first);
+
+        // The staged metadata must be untouched, so the packet queued next still
+        // carries what the port asked for.
+        int second = implementation.capturePointerEventMetadata();
+        implementation.selectPointerEventMetadata(second);
+        assertEquals(PointerEvent.BUTTON_PRIMARY, display.getPointerButton(),
+                "a dispatch must not overwrite the metadata a port has staged");
+        assertEquals(PointerEvent.TYPE_MOUSE, display.getPointerType());
+
+        implementation.resetPointerEventMetadata();
+    }
 }

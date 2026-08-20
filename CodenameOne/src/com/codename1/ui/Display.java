@@ -1424,6 +1424,11 @@ public final class Display extends CN1Constants {
         while (offset < actualTmpPointer) {
             offset = handleEvent(offset, actualStack, actualMeta);
         }
+        // The restored metadata is only authoritative while this batch is being
+        // dispatched. Leaving it selected made every later read answer from the last
+        // packet dispatched, so a port that staged fresh metadata and then asked --
+        // without going through the queue -- got the previous event's button back.
+        impl.clearPointerEventMetadataSelection();
 
         actualStack[actualStack.length - 1] = 0;
 

@@ -398,7 +398,13 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                 }
                 return 0;
             }
-            if (wParam == SIZE_RESTORED && w->minimized) {
+            /* Any transition out of minimized, not just SIZE_RESTORED. Restoring a
+             * window that was maximized before it was minimized reports
+             * SIZE_MAXIMIZED, so keying on SIZE_RESTORED alone left `minimized` set
+             * and never sent WINDOW_SHOWN: the framework went on treating a visible
+             * window as iconified and excluded it from painting and animation for
+             * good. */
+            if (w->minimized) {
                 w->minimized = 0;
                 cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_SHOWN, 0, 0, 0);
             }

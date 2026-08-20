@@ -3210,16 +3210,49 @@ public abstract class CodenameOneImplementation {
             return;
         }
         int i = slot * 4;
-        currentPointerButton = pointerMetadataInts[i];
-        currentPointerButtonMask = pointerMetadataInts[i + 1];
-        currentPointerType = pointerMetadataInts[i + 2];
-        currentPointerModifiers = pointerMetadataInts[i + 3];
+        dispatchPointerButton = pointerMetadataInts[i];
+        dispatchPointerButtonMask = pointerMetadataInts[i + 1];
+        dispatchPointerType = pointerMetadataInts[i + 2];
+        dispatchPointerModifiers = pointerMetadataInts[i + 3];
         int f = slot * 4;
-        currentPointerPressure = pointerMetadataFloats[f];
-        currentPointerTiltX = pointerMetadataFloats[f + 1];
-        currentPointerTiltY = pointerMetadataFloats[f + 2];
-        currentPointerContactSize = pointerMetadataFloats[f + 3];
-        currentPointerHovering = pointerMetadataHovering[slot];
+        dispatchPointerPressure = pointerMetadataFloats[f];
+        dispatchPointerTiltX = pointerMetadataFloats[f + 1];
+        dispatchPointerTiltY = pointerMetadataFloats[f + 2];
+        dispatchPointerContactSize = pointerMetadataFloats[f + 3];
+        dispatchPointerHovering = pointerMetadataHovering[slot];
+        dispatchMetadataActive = true;
+    }
+
+    /// The metadata of the event being dispatched, restored from its snapshot.
+    ///
+    /// Deliberately a second set of fields rather than a write back into the
+    /// `currentPointer*` staging the ports fill in. Those are written on the port's
+    /// own thread and read when a packet is queued; writing them from the event
+    /// dispatch thread as well put the two in a race, and the restore could land
+    /// between a port's `#setPointerEventMetadata` and the capture that follows it --
+    /// handing the next packet the previous event's button. Separating the two means
+    /// the dispatch thread never writes what the port writes.
+    private int dispatchPointerButton = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+    private int dispatchPointerButtonMask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+    private int dispatchPointerType = com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN;
+    private float dispatchPointerPressure = 1f;
+    private float dispatchPointerTiltX;
+    private float dispatchPointerTiltY;
+    private float dispatchPointerContactSize;
+    private int dispatchPointerModifiers;
+    private boolean dispatchPointerHovering;
+    /// False until the first packet is dispatched, so the accessors keep answering
+    /// from the staging fields for a port that sets metadata and builds an event
+    /// directly, without going through the queue.
+    private boolean dispatchMetadataActive;
+
+    /// Stops the accessors answering from the last dispatched packet's snapshot.
+    ///
+    /// Called when a dispatch batch is finished. Without it the selection latched on
+    /// and a port that staged fresh metadata and then read it back -- rather than
+    /// queueing an event -- was answered with the previous event's values.
+    public void clearPointerEventMetadataSelection() {
+        dispatchMetadataActive = false;
     }
 
     /// Resets the rich pointer metadata back to its defaults. Ports may call this between
@@ -3234,6 +3267,9 @@ public abstract class CodenameOneImplementation {
         currentPointerContactSize = 0;
         currentPointerModifiers = 0;
         currentPointerHovering = false;
+        // The dispatch copy goes with it: a port resetting between gestures means the
+        // accessors should stop answering from the last dispatched packet.
+        dispatchMetadataActive = false;
     }
 
     /// Populates all of the rich pointer metadata in one call. Platform ports invoke this from
@@ -3290,55 +3326,58 @@ public abstract class CodenameOneImplementation {
 
     /// The button associated with the current pointer event, one of the `PointerEvent.BUTTON_*` constants.
     public int getPointerButton() {
-        return currentPointerButton;
+        return dispatchMetadataActive ? dispatchPointerButton : currentPointerButton;
     }
 
     /// A bitmask of the buttons currently held, built from the `PointerEvent.MASK_*` constants.
     public int getPointerButtonMask() {
-        return currentPointerButtonMask;
+        return dispatchMetadataActive ? dispatchPointerButtonMask : currentPointerButtonMask;
     }
 
     /// The current pointing device type, one of the `PointerEvent.TYPE_*` constants.
     public int getPointerType() {
-        return currentPointerType;
+        return dispatchMetadataActive ? dispatchPointerType : currentPointerType;
     }
 
     /// The normalized pressure of the current pointer event between `0.0` and `1.0`.
     public float getPointerPressure() {
-        return currentPointerPressure;
+        return dispatchMetadataActive ? dispatchPointerPressure : currentPointerPressure;
     }
 
     /// The stylus tilt across the x axis for the current pointer event, in degrees.
     public float getPointerTiltX() {
-        return currentPointerTiltX;
+        return dispatchMetadataActive ? dispatchPointerTiltX : currentPointerTiltX;
     }
 
     /// The stylus tilt across the y axis for the current pointer event, in degrees.
     public float getPointerTiltY() {
-        return currentPointerTiltY;
+        return dispatchMetadataActive ? dispatchPointerTiltY : currentPointerTiltY;
     }
 
     /// The normalized contact size of the current pointer event between `0.0` and `1.0`.
     public float getPointerContactSize() {
-        return currentPointerContactSize;
+        return dispatchMetadataActive ? dispatchPointerContactSize : currentPointerContactSize;
     }
 
     /// The keyboard modifier mask held during the current pointer event.
     public int getPointerModifiers() {
-        return currentPointerModifiers;
+        return dispatchMetadataActive ? dispatchPointerModifiers : currentPointerModifiers;
     }
 
     /// True if the current pointer event is a hover (no contact with the surface).
     public boolean isPointerHovering() {
-        return currentPointerHovering;
+        return dispatchMetadataActive ? dispatchPointerHovering : currentPointerHovering;
     }
 
     /// Builds an immutable `PointerEvent` snapshot from the current metadata for the given coordinates.
     /// Used by the framework when it dispatches a pointer event.
     public com.codename1.ui.events.PointerEvent buildPointerEvent(int x, int y, boolean hovering) {
-        return new com.codename1.ui.events.PointerEvent(x, y, currentPointerButton, currentPointerButtonMask,
-                currentPointerType, currentPointerPressure, currentPointerTiltX, currentPointerTiltY,
-                currentPointerContactSize, currentPointerModifiers, hovering || currentPointerHovering);
+        // Through the accessors, so this reads the dispatched event's own snapshot
+        // rather than whatever a port has staged since.
+        return new com.codename1.ui.events.PointerEvent(x, y, getPointerButton(),
+                getPointerButtonMask(), getPointerType(), getPointerPressure(),
+                getPointerTiltX(), getPointerTiltY(), getPointerContactSize(),
+                getPointerModifiers(), hovering || isPointerHovering());
     }
 
     /// Subclasses should invoke this method, it delegates the event to the display and into
