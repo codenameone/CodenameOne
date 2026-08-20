@@ -2320,8 +2320,21 @@ class IntentsTest {
                 "text that was never a date must not be schema-valid");
         assertFalse("".matches(pattern), "an empty string names no moment");
 
+        // A number written as text is deliberately not in the pattern. minimum and maximum
+        // constrain the numeric branch of the union and a pattern constrains the string one,
+        // so a digits alternative here would be unbounded -- and an epoch past what a long
+        // holds would be schema-valid and then refused before the handler ran. Epoch
+        // milliseconds have an exactly-bounded home already: the integer branch.
+        assertFalse("999999999999999999999999".matches(pattern),
+                "an out-of-range epoch must not be schema-valid as a string");
+        assertFalse("1770000000000".matches(pattern),
+                "epoch milliseconds belong to the integer branch, which is bounded");
+        // ...and the parser stays permissive about what a platform actually sends.
+        assertNotNull(IntentDates.parse("1770000000000"),
+                "the parser still reads a number written as text");
+
         // Everything the pattern admits, the parser reads.
-        String[] accepted = {"1770000000000", "-1", "2026-03-14", "2026-03-14T12:30",
+        String[] accepted = {"2026-03-14", "2026-03-14T12:30",
             "2026-03-14 12:30:15", "2026-03-14T12:30:15.250Z", "2026-03-14T12:30:15+02:00",
             "2026-03-14T12:30:15-0200"};
         for (String form : accepted) {

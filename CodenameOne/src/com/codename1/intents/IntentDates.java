@@ -47,6 +47,18 @@ public final class IntentDates {
     /// a pattern kept next to the consumer would drift from the parser the first time either
     /// changed, which is the whole reason the parsing was consolidated in the first place.
     ///
+    /// Deliberately ISO-8601 only, even though [#parse] also reads a number written as text.
+    /// A pattern constrains the string branch of a union and nothing else -- the minimum and
+    /// maximum beside it apply only to the numeric branch -- so a digits-only alternative here
+    /// would be unbounded, and "999999999999999999999999" would be schema-valid and then
+    /// rejected by Long.parseLong before the handler ran. Epoch milliseconds already have an
+    /// exactly-bounded home in that union: the integer branch. Advertising a second, looser way
+    /// to spell them bought nothing and cost the bound.
+    ///
+    /// The parser stays permissive -- a platform that sends "1770000000000" is still read
+    /// correctly -- because what a caller may send and what a schema recommends are different
+    /// questions.
+    ///
     /// It describes the *shape* and cannot describe the meaning: "2026-13-40" matches and is
     /// still refused, because no regex says a year has twelve months. That is the right split.
     /// The value of the pattern is that it rules out text which was never a date at all --
@@ -55,10 +67,9 @@ public final class IntentDates {
     /// entire class of well-formed-but-unparseable calls; the remaining rejections are values
     /// that look like dates and are not.
     static final String SCHEMA_PATTERN =
-            "^(-?[0-9]+"
-            + "|[0-9]{4}-[0-9]{2}-[0-9]{2}"
+            "^[0-9]{4}-[0-9]{2}-[0-9]{2}"
             + "([Tt ][0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]+)?)?"
-            + "([Zz]|[+-][0-9]{2}:?[0-9]{2})?)?)$";
+            + "([Zz]|[+-][0-9]{2}:?[0-9]{2})?)?$";
 
     /// The moment this value names, or null when it names none.
     ///
