@@ -1,36 +1,36 @@
 {
-  "commit": "b544e3527bed680fd96d39a1f0677f195760e77c",
-  "generated_at": "2026-08-20T10:37:18Z",
+  "commit": "b411fb7be7ce7e07f98594922748cd98dd95ab4c",
+  "generated_at": "2026-08-20T21:42:31Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 326561000
+        "duration_ns": 310779000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 41855000
+        "duration_ns": 27742000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 123436000
+        "duration_ns": 127532000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 82990000
+        "duration_ns": 73526000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 483905000
+        "duration_ns": 359697000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 123153000
+        "duration_ns": 159558000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 261011000
+        "duration_ns": 190028000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32341398171",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32394307488",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 167,
+    "pass": 174,
     "skip": 4
   },
   "tests": {
@@ -251,6 +251,34 @@
     },
     "DarkLightShowcaseThemeScreenshotTest": {
       "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
       "status": "pass"
     },
     "DesktopModeScreenshotTest": {
