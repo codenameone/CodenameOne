@@ -135,6 +135,11 @@ jobs:
         working-directory: vm
         run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B test -pl tests -am -Dgroups=benchmark -Djacoco.skip=true
         env:
+          # Narrowed because this step RUNS TESTS: retry.sh retries every nonzero exit
+          # without it, so a test that failed once and passed on a later attempt would take
+          # this gate green and hide the race that produced it. The wrapper's own docs
+          # require this filter for test-running commands.
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
           JDK_17_HOME: ${{ env.JDK_17_HOME }}
