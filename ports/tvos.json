@@ -1,36 +1,36 @@
 {
-  "commit": "3ba6819fe9709bc08bdca50d6341626218299c91",
-  "generated_at": "2026-08-19T18:19:05Z",
+  "commit": "f20546007e733cf0c6a9d0178cae96f795b8a85d",
+  "generated_at": "2026-08-20T06:21:18Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 437562000
+        "duration_ns": 370349000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 196511000
+        "duration_ns": 152009000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 213224000
+        "duration_ns": 226041000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 129710000
+        "duration_ns": 147905000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 583531000
+        "duration_ns": 517588000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 557141000
+        "duration_ns": 396215000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 932375000
+        "duration_ns": 826117000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32259627719",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32326056923",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 1,
+    "fail": 0,
     "not-run": 0,
-    "pass": 162,
+    "pass": 163,
     "skip": 8
   },
   "tests": {
@@ -742,10 +742,7 @@
     },
     "VectorMapShapesScreenshotTest": {
       "feature": "vector-maps",
-      "reasons": [
-        "screenshot-different:VectorMapShapes"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
       "feature": "video-decoding",
