@@ -58,7 +58,7 @@
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 173,
+    "pass": 180,
     "skip": 5
   },
   "tests": {
@@ -508,6 +508,10 @@
       "feature": "native-theme-controls",
       "status": "pass"
     },
+    "MultiWindowApiTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
     "MutableImageClipReadbackTest": {
       "feature": "mutable-images",
       "status": "pass"
@@ -787,6 +791,30 @@
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
+      "status": "pass"
+    },
+    "WindowEditingTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowGraphicsTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowLayoutTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowModalTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowOverlayTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowScrollTest": {
+      "feature": "multi-window",
       "status": "pass"
     }
   }

@@ -290,6 +290,120 @@
           ]
         }
       ]
+    },
+    {
+      "test": "WindowEditingTest",
+      "reason": "This baseline puts the keyboard focus in a text field hosted by a secondary window to prove native editing resolves to the owning window. Ports without a windowing system have one editing surface and nowhere else for an editor to go.",
+      "platform_support": "Every listed target remains a fully supported Codename One port. Multiple top-level windows are a desktop windowing-system capability rather than a framework feature, so a port with a single full-screen surface reports the capability as absent and the API throws instead of pretending. That contract is asserted on these targets by MultiWindowApiTest, which runs everywhere and passes.",
+      "verification": "The desktop ports open a native editor inside a real secondary window and compare the captured result against stored goldens, which is what proves the editor is parented to the right window.",
+      "reason_codes": [
+        {
+          "prefix": "no-windowing-system",
+          "ports": [
+            "android",
+            "ios-gl",
+            "ios-metal",
+            "javascript",
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "WindowGraphicsTest",
+      "reason": "This baseline draws shapes and charts on a secondary window's surface to prove the graphics pipeline works off the main framebuffer. A single-surface port has no second surface to draw on.",
+      "platform_support": "Every listed target remains a fully supported Codename One port. Multiple top-level windows are a desktop windowing-system capability rather than a framework feature, so a port with a single full-screen surface reports the capability as absent and the API throws instead of pretending. That contract is asserted on these targets by MultiWindowApiTest, which runs everywhere and passes.",
+      "verification": "The desktop ports render the same drawing into a real window and compare it against stored goldens, covering the non-primary surface path on each windowing backend.",
+      "reason_codes": [
+        {
+          "prefix": "no-windowing-system",
+          "ports": [
+            "android",
+            "ios-gl",
+            "ios-metal",
+            "javascript",
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "WindowLayoutTest",
+      "reason": "This baseline opens a real operating-system window at three sizes and checks that its content lays out to the window rather than to the main display. A port with no windowing system cannot open a second window, so there is nothing to capture.",
+      "platform_support": "Every listed target remains a fully supported Codename One port. Multiple top-level windows are a desktop windowing-system capability rather than a framework feature, so a port with a single full-screen surface reports the capability as absent and the API throws instead of pretending. That contract is asserted on these targets by MultiWindowApiTest, which runs everywhere and passes.",
+      "verification": "The desktop ports render this test at every size and compare the result against stored goldens, which is what proves layout follows the window's own dimensions.",
+      "reason_codes": [
+        {
+          "prefix": "no-windowing-system",
+          "ports": [
+            "android",
+            "ios-gl",
+            "ios-metal",
+            "javascript",
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "WindowModalTest",
+      "reason": "This baseline raises a modal window over another window and checks that the blocked window keeps repainting. Both halves of that property need two operating-system windows, which a single-surface port cannot provide.",
+      "platform_support": "Every listed target remains a fully supported Codename One port. Multiple top-level windows are a desktop windowing-system capability rather than a framework feature, so a port with a single full-screen surface reports the capability as absent and the API throws instead of pretending. That contract is asserted on these targets by MultiWindowApiTest, which runs everywhere and passes.",
+      "verification": "The desktop ports capture the modal window and its live background window together and compare both against stored goldens, which is the evidence that the event loop keeps servicing the blocked window.",
+      "reason_codes": [
+        {
+          "prefix": "no-windowing-system",
+          "ports": [
+            "android",
+            "ios-gl",
+            "ios-metal",
+            "javascript",
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "WindowOverlayTest",
+      "reason": "This baseline opens a sheet inside a secondary window to prove layered panes resolve to that window's top-level container. Without a second window the overlay has no separate top level to resolve to.",
+      "platform_support": "Every listed target remains a fully supported Codename One port. Multiple top-level windows are a desktop windowing-system capability rather than a framework feature, so a port with a single full-screen surface reports the capability as absent and the API throws instead of pretending. That contract is asserted on these targets by MultiWindowApiTest, which runs everywhere and passes.",
+      "verification": "The desktop ports capture the overlay inside a real window and compare it against stored goldens, so a top-level resolution regression is caught on the pixels.",
+      "reason_codes": [
+        {
+          "prefix": "no-windowing-system",
+          "ports": [
+            "android",
+            "ios-gl",
+            "ios-metal",
+            "javascript",
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "WindowScrollTest",
+      "reason": "This baseline scrolls a list inside a secondary window to prove that scroll bounds come from the window's height. Without a windowing system there is no secondary window to scroll.",
+      "platform_support": "Every listed target remains a fully supported Codename One port. Multiple top-level windows are a desktop windowing-system capability rather than a framework feature, so a port with a single full-screen surface reports the capability as absent and the API throws instead of pretending. That contract is asserted on these targets by MultiWindowApiTest, which runs everywhere and passes.",
+      "verification": "The desktop ports capture the scrolled list in a window and compare it against stored goldens, so a regression in window-scoped scroll math still fails on the pixels.",
+      "reason_codes": [
+        {
+          "prefix": "no-windowing-system",
+          "ports": [
+            "android",
+            "ios-gl",
+            "ios-metal",
+            "javascript",
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
     }
   ],
   "features": [
