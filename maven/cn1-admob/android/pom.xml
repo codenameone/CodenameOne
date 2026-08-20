@@ -25,17 +25,42 @@
     </properties>
 
     <!--
+        THE ADS SDK API CHECK.
+
         These sources are shipped, never compiled by us: the jar below packages
-        src/main/java as resources and the customer's Android build is the first
-        compiler that ever sees them. That is how cn1-admob came to reference
-        AdManagerAdRequest where a MediationExtrasReceiver was required, and a
-        listener nested on ConsentInformation instead of ConsentForm  -  two
-        errors that reached users as a failed build rather than a failed CI job.
+        src/main/java as resources, and the customer's Android build is the
+        first compiler that ever sees them. That is how cn1-admob came to
+        reference AdManagerAdRequest where a MediationExtrasReceiver was
+        required, and a consent listener nested on ConsentInformation instead of
+        ConsentForm. Both reached users as a failed app build rather than a
+        failed CI job.
 
         So the pinned SDK is fetched and the sources are compiled against it in
         process-classes, purely as a check: the output goes to a throwaway
         directory and the packaged artifact is unchanged. Pass
         -DskipAdmobApiCheck to skip it (offline builds).
+
+        WHERE THIS RUNS. Not in pr.yml: its changed-module mapping routes
+        cn1-admob to cn1-admob/common only, so this module is not built there.
+        It runs on every pull request anyway, because .github/workflows/ant.yml
+        triggers on all PRs to master (only CodenameOneDesigner/** is
+        path-ignored) and its build-linux-jdk8 job runs a full-reactor
+        `mvn install`, which includes this module. That is where the check
+        earned its keep on PR #5570, failing with the same two javac errors the
+        customer's build produced. Reviewers have read the pr.yml mapping alone
+        and concluded the check is dead code; it is not, so please do not wire
+        redundant coverage into pr.yml on that basis.
+
+        WHY IT DEPENDS ON ALMOST NOTHING IN THE REACTOR. codenameone-android is
+        built from an empty source directory unless compile-android is active,
+        and that profile activates on <file><exists>${cn1.binaries}</exists>,
+        which the download profile only creates during initialize, after
+        Maven has evaluated the model. So on a fresh checkout, including the
+        release reactor, the port resolves with no classes in it and depending
+        on it fails the build for reasons unrelated to AdMob. The two port
+        methods these sources touch are stubbed under src/api-check instead,
+        guarded below against the port's real signatures. codenameone-core is a
+        normal dependency: it compiles unconditionally.
     -->
     <repositories>
         <repository>
