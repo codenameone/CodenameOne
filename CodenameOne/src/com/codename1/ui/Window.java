@@ -434,6 +434,12 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void setToolbar(Toolbar toolbar) {
+        // Read before the assignment. getTitle() answers from the installed toolbar
+        // once there is one, so asking after this.toolbar has been replaced reads the
+        // *incoming* toolbar's empty title and hands that straight back to it --
+        // blanking the visible title while the native window title still showed the
+        // real one.
+        String currentTitle = getTitle();
         this.toolbar = toolbar;
         titleArea.removeAll();
         titleArea.setLayout(new BorderLayout());
@@ -443,7 +449,7 @@ public class Window extends Container implements TopLevelContainer {
             // Window never runs -- it has no MenuBar. Without this every guarded
             // Toolbar method refused with "Need to call Form#setToolBar" for a toolbar
             // that was in fact installed.
-            toolbar.markInstalledOnWindow(getTitle());
+            toolbar.markInstalledOnWindow(currentTitle);
         }
     }
 

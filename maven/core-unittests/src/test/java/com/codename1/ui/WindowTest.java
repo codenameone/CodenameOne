@@ -2659,6 +2659,44 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void installingAToolbarKeepsTheWindowsExistingTitle() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("original", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        // getTitle() answers from the installed toolbar once there is one, so reading
+        // it after this.toolbar has been replaced returns the incoming toolbar's empty
+        // title -- which was then handed straight back to it, blanking the visible
+        // title while the native window title still showed the real one.
+        Toolbar first = new Toolbar();
+        w.setToolbar(first);
+        assertEquals("original", titleTextOf(first),
+                "installing a toolbar must keep the window's existing title");
+        assertEquals("original", w.getTitle());
+        assertEquals("original", peer.getTitle(),
+                "and the native title is unchanged");
+
+        // Replacing one toolbar with another carries the title across too -- the same
+        // read-before-assign, one step further on.
+        w.setTitle("renamed");
+        Toolbar second = new Toolbar();
+        w.setToolbar(second);
+        assertEquals("renamed", titleTextOf(second),
+                "replacing a toolbar must carry the current title across");
+        assertEquals("renamed", w.getTitle());
+
+        w.dispose();
+    }
+
+    /// The text a toolbar is currently showing as its title, or null.
+    private static String titleTextOf(Toolbar tb) {
+        Component cmp = tb.getTitleComponent();
+        return cmp instanceof Label ? ((Label) cmp).getText() : null;
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {
