@@ -2566,6 +2566,32 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void aTitleSetAfterAToolbarIsInstalledReachesIt() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("first", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Toolbar tb = new Toolbar();
+        w.setToolbar(tb);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        // Once a toolbar is installed it draws the title, and the label setTitle used
+        // to update is no longer in the hierarchy -- so the change was invisible.
+        w.setTitle("second");
+
+        Component shown = tb.getTitleComponent();
+        assertTrue(shown instanceof Label, "the toolbar shows its title in a label");
+        assertEquals("second", ((Label) shown).getText(),
+                "an installed toolbar must show the window's new title");
+        assertEquals("second", w.getTitle(),
+                "and getTitle must read it back from the toolbar");
+        assertEquals("second", peer.getTitle(),
+                "while the native window title still follows too");
+
+        w.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

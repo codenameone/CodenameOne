@@ -324,6 +324,14 @@ typedef struct {
     int inUse;
     int pendingWidth;
     int pendingHeight;
+    /* The origin asked for, in pixels, and whether one was asked for at all. The
+     * creation bridge carries x and y but adoption used to hardcode (0,0), so a
+     * window positioned before its first show() -- a restored layout, or an explicit
+     * setWindowLocation -- opened somewhere else. Zero positionSet means "no opinion",
+     * which leaves the placement to the platform. */
+    int pendingX;
+    int pendingY;
+    int positionSet;
     /* The visibility the framework last asked for. A scene is requested
      * asynchronously, so a show()/hide() pair can both land before one exists;
      * without recording it the hide is dropped and adoption shows the window
@@ -524,15 +532,42 @@ static CGSize CN1MacWindowContentSize(UIWindow* window) {
     return rootView != nil ? rootView.bounds.size : window.bounds.size;
 }
 
-static void CN1MacWindowSettleGeometry(UIWindowScene* scene, UIWindow* window,
-        CGSize wantedContent, CGRect request, CGSize lastSample, int attemptsLeft);
+static void CN1MacWindowSettleGeometry(int slot, int generation, UIWindowScene* scene,
+        UIWindow* window, CGSize wantedContent, CGRect request, CGSize lastSample,
+        int attemptsLeft);
 
-static void CN1MacWindowSettleGeometryStep(UIWindowScene* scene, UIWindow* window,
-        CGSize wantedContent, CGRect request, CGSize lastSample, int attemptsLeft) {
+/*
+ * True while this settler still owns the window it was started for.
+ *
+ * A settler runs for up to a couple of seconds after the request, and a disposed
+ * window's scene goes back to the recycling pool inside that window. Without this a
+ * settler left over from the closed window would go on sampling -- and re-requesting
+ * geometry -- against the scene now hosting a *different* window, resizing the
+ * replacement out from under it.
+ */
+static BOOL CN1MacWindowSettlerStillOwns(int slot, int generation, UIWindowScene* scene) {
+    BOOL owns = NO;
+    if (slot < 0 || slot >= CN1_MAC_MAX_WINDOWS) {
+        return NO;
+    }
+    pthread_mutex_lock(&g_slotLock);
+    owns = g_macWindows[slot].inUse
+            && g_macWindows[slot].generation == generation
+            && g_macWindows[slot].scene == scene;
+    pthread_mutex_unlock(&g_slotLock);
+    return owns;
+}
+
+static void CN1MacWindowSettleGeometryStep(int slot, int generation,
+        UIWindowScene* scene, UIWindow* window, CGSize wantedContent, CGRect request,
+        CGSize lastSample, int attemptsLeft) {
+    if (!CN1MacWindowSettlerStillOwns(slot, generation, scene)) {
+        return;
+    }
     CGSize got = CN1MacWindowContentSize(window);
     if (got.width <= 0 || got.height <= 0) {
-        CN1MacWindowSettleGeometry(scene, window, wantedContent, request, got,
-                attemptsLeft - 1);
+        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent,
+                request, got, attemptsLeft - 1);
         return;
     }
     CGFloat dw = wantedContent.width - got.width;
@@ -545,8 +580,8 @@ static void CN1MacWindowSettleGeometryStep(UIWindowScene* scene, UIWindow* windo
     if (!settled) {
         /* Still laying out. Look again without touching the request -- acting on a
          * reading that is still moving is what caused the two earlier regressions. */
-        CN1MacWindowSettleGeometry(scene, window, wantedContent, request, got,
-                attemptsLeft - 1);
+        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent,
+                request, got, attemptsLeft - 1);
         return;
     }
     if (fabs(dw) > CN1_GEOMETRY_CHROME_SLACK || fabs(dh) > CN1_GEOMETRY_CHROME_SLACK) {
@@ -554,20 +589,21 @@ static void CN1MacWindowSettleGeometryStep(UIWindowScene* scene, UIWindow* windo
          * again for exactly the same frame -- never a computed one, which could not
          * be trusted at this distance. */
         CN1MacWindowRequestGeometry(scene, request);
-        CN1MacWindowSettleGeometry(scene, window, wantedContent, request, got,
-                attemptsLeft - 1);
+        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent,
+                request, got, attemptsLeft - 1);
         return;
     }
     /* Chrome-sized shortfall on a settled window: correct once, by that much. */
     CGRect next = CGRectMake(request.origin.x, request.origin.y,
             request.size.width + dw, request.size.height + dh);
     CN1MacWindowRequestGeometry(scene, next);
-    CN1MacWindowSettleGeometry(scene, window, wantedContent, next, got,
-            attemptsLeft - 1);
+    CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent, next,
+            got, attemptsLeft - 1);
 }
 
-static void CN1MacWindowSettleGeometry(UIWindowScene* scene, UIWindow* window,
-        CGSize wantedContent, CGRect request, CGSize lastSample, int attemptsLeft) {
+static void CN1MacWindowSettleGeometry(int slot, int generation, UIWindowScene* scene,
+        UIWindow* window, CGSize wantedContent, CGRect request, CGSize lastSample,
+        int attemptsLeft) {
     if (scene == nil || window == nil || attemptsLeft <= 0) {
         return;
     }
@@ -577,8 +613,8 @@ static void CN1MacWindowSettleGeometry(UIWindowScene* scene, UIWindow* window,
     UIWindow* heldWindow = [window retain];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (0.25 * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
-        CN1MacWindowSettleGeometryStep(heldScene, heldWindow, wantedContent, request,
-                lastSample, attemptsLeft);
+        CN1MacWindowSettleGeometryStep(slot, generation, heldScene, heldWindow,
+                wantedContent, request, lastSample, attemptsLeft);
         [heldWindow release];
         [heldScene release];
     });
@@ -637,6 +673,9 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     g_macWindows[slot].windowId = windowId;
     g_macWindows[slot].pendingWidth = width;
     g_macWindows[slot].pendingHeight = height;
+    g_macWindows[slot].pendingX = x;
+    g_macWindows[slot].pendingY = y;
+    g_macWindows[slot].positionSet = (x != 0 || y != 0) ? 1 : 0;
     g_macWindows[slot].pendingTitle = [title retain];
     g_macWindows[slot].resizable = resizable ? 1 : 0;
     g_macWindows[slot].decorated = decorated ? 1 : 0;
@@ -835,9 +874,13 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
                 scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
             }
         }
-        CGRect wantedFrame = CGRectMake(0, 0, pointWidth, pointHeight);
+        /* The requested origin, when one was asked for. Hardcoding (0,0) here threw
+         * away an explicitly positioned or restored window's placement. */
+        CGFloat pointX = w->positionSet ? w->pendingX / scale : 0;
+        CGFloat pointY = w->positionSet ? w->pendingY / scale : 0;
+        CGRect wantedFrame = CGRectMake(pointX, pointY, pointWidth, pointHeight);
         CN1MacWindowRequestGeometry(scene, wantedFrame);
-        CN1MacWindowSettleGeometry(scene, w->window,
+        CN1MacWindowSettleGeometry(slot, w->generation, scene, w->window,
                 CGSizeMake(pointWidth, pointHeight), wantedFrame,
                 CGSizeMake(-1, -1), CN1_GEOMETRY_ATTEMPTS);
     }

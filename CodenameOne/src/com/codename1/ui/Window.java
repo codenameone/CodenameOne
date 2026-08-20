@@ -391,6 +391,15 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public String getTitle() {
+        // The toolbar owns the visible title once one is installed, exactly as on a
+        // Form. Reading the detached label instead reported whatever it held before
+        // the toolbar took over.
+        if (toolbar != null) {
+            // Read the same way Form does: Toolbar has no getTitle, the title is
+            // whatever component it is currently showing.
+            Component cmp = toolbar.getTitleComponent();
+            return cmp instanceof Label ? ((Label) cmp).getText() : null;
+        }
         return title.getText();
     }
 
@@ -399,7 +408,17 @@ public class Window extends Container implements TopLevelContainer {
     /// Sets both the Codename One title component and the native window title.
     @Override
     public void setTitle(String title) {
-        this.title.setText(title);
+        // An installed toolbar draws the title, and the label this used to update is
+        // no longer in the hierarchy -- so a title set after the toolbar was installed
+        // changed nothing on screen. Form does the same forwarding.
+        if (toolbar != null) {
+            toolbar.setTitle(title);
+        } else {
+            this.title.setText(title);
+        }
+        // The native window title is set either way: it is the OS chrome's, not the
+        // toolbar's, and an undecorated window supplying its own chrome still wants
+        // the platform to know what the window is called.
         pendingTitle = title;
         if (nativePeer != null) {
             manager().setTitle(nativePeer, title);
