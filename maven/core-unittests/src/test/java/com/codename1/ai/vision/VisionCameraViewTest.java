@@ -165,6 +165,34 @@ class VisionCameraViewTest extends UITestBase {
     }
 
     @Test
+    void aCameraWithNoPreviewIsAFailureRatherThanABlankScreen() {
+        // iOS returns no peer when the native preview view cannot be made and
+        // Android returns none when CameraX cannot be resolved. Installing the
+        // empty view would report isRunning() true and leave CodeScanner
+        // sitting on a blank screen with no error ever delivered.
+        camera.previewPeerFails = true;
+        final List<Throwable> errors = new ArrayList<Throwable>();
+        view = new VisionCameraView<Barcode[]>(new BarcodeScanner());
+        view.setListener(new VisionPipelineListener<Barcode[]>() {
+            public void result(Barcode[] value, VisionImage source) {
+            }
+
+            public void error(Throwable error) {
+                errors.add(error);
+            }
+        });
+
+        view.start();
+        flushSerialCalls();
+
+        assertFalse(view.isRunning());
+        assertNull(view.getSession(), "the opened session must be released");
+        assertEquals(0, view.getComponentCount(),
+                "no empty preview is left behind");
+        assertEquals(1, errors.size());
+    }
+
+    @Test
     void leavingTheFormReleasesTheCameraButKeepsTheAnalyzerUsable() {
         CountingAnalyzer analyzer = new CountingAnalyzer();
         view = new VisionCameraView<Barcode[]>(analyzer);

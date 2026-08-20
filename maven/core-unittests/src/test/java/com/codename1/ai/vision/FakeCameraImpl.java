@@ -58,6 +58,7 @@ class FakeCameraImpl extends CameraImpl {
     FlashMode lastFlashMode;
     Boolean previewMirrored;
     ScaleType previewScaleType;
+    boolean previewPeerFails;
 
     void deliver(byte[] jpeg) {
         FrameListener listener = frameListener;
@@ -84,7 +85,16 @@ class FakeCameraImpl extends CameraImpl {
 
     @Override
     public PeerComponent createPreviewPeer() {
-        return null;
+        // Ports return null when native preview creation fails; the flag
+        // reproduces that without pretending the happy path also has no peer.
+        return previewPeerFails ? null : new FakePeer();
+    }
+
+    /** Stands in for a native preview view. */
+    static final class FakePeer extends PeerComponent {
+        FakePeer() {
+            super(new Object());
+        }
     }
 
     @Override

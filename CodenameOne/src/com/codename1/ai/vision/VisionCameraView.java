@@ -237,8 +237,20 @@ public class VisionCameraView<T> extends Container implements AutoCloseable {
             notifyError(error);
             return;
         }
+        CameraView preview = opened.createView();
+        if (preview.getPreviewPeer() == null) {
+            // A port returns no peer when native preview creation failed, or
+            // when it has no live preview at all. Carrying on would install an
+            // empty view, report isRunning() true, and leave a scanner sitting
+            // on a blank screen with no error ever delivered.
+            opened.close();
+            notifyError(new IllegalStateException(
+                    "The camera opened but this platform could not create a"
+                    + " live preview"));
+            return;
+        }
         session = opened;
-        cameraView = opened.createView();
+        cameraView = preview;
         cameraView.setScaleType(scaleType);
         // Mirror on the camera that opened, not the one asked for.
         // Camera.getDefault falls back to the first available camera when the
