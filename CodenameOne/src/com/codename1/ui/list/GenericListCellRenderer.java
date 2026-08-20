@@ -30,7 +30,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -38,6 +37,7 @@ import com.codename1.ui.List;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.Slider;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.URLImage;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
@@ -508,7 +508,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                 if (!label.isTickerRunning()) {
                     parentList = l;
                     if (parentList != null) {
-                        Form f = parentList.getComponentForm();
+                        // Resolve the top level rather than the Form: this renderer
+                        // works inside a Window, where getComponentForm() is null and
+                        // the ticker would silently never animate.
+                        TopLevelContainer f = parentList.getTopLevelContainer();
                         if (f != null) {
                             f.registerAnimated(mon);
                             label.startTicker(cmp.getUIManager().getLookAndFeel().getTickerSpeed(), true);
@@ -551,7 +554,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                             parentList = parent;
                         }
                         if (parentList != null) {
-                            Form f = parentList.getComponentForm();
+                            TopLevelContainer f = parentList.getTopLevelContainer();
                             if (f != null) {
                                 f.registerAnimated(mon);
                                 waitingForRegisterAnimation = false;
@@ -562,7 +565,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     } else {
                         if (waitingForRegisterAnimation) {
                             if (parentList != null) {
-                                Form f = parentList.getComponentForm();
+                                TopLevelContainer f = parentList.getTopLevelContainer();
                                 if (f != null) {
                                     f.registerAnimated(mon);
                                     waitingForRegisterAnimation = false;
@@ -744,7 +747,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         }
                     }
                 }
-                Form f = parentList.getComponentForm();
+                TopLevelContainer f = parentList.getTopLevelContainer();
                 if (f != null) {
                     if (parentList.hasFocus() && Display.getInstance().shouldRenderSelection(parentList)) {
                         int slen = selectedEntries.length;
@@ -805,7 +808,13 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     Map h = (Map) selection;
                     Command cmd = (Command) h.get("$navigation");
                     if (cmd != null) {
-                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd, ActionEvent.Type.Command));
+                        // Resolve the top level rather than the Form: this renderer
+                        // works in a Window too, where getComponentForm() is null and
+                        // this dereference would NPE on the EDT.
+                        TopLevelContainer top = parentList.getTopLevelContainer();
+                        if (top != null) {
+                            top.dispatchCommand(cmd, new ActionEvent(cmd, ActionEvent.Type.Command));
+                        }
                         return;
                     }
                     int slen = selectedEntries.length;

@@ -2471,6 +2471,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - `cmd`: The command to dispatch
     ///
     /// - `ev`: the event to dispatch
+    @Override
     public void dispatchCommand(Command cmd, ActionEvent ev) {
         cmd.actionPerformed(ev);
         if (!ev.isConsumed()) {

@@ -25,9 +25,13 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestWindowManager;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.UIManager;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -2698,6 +2702,49 @@ class WindowTest extends UITestBase {
     }
 
     /// The first day cell in a calendar's month view.
+    /// Runs the animation manager until nothing is in progress and its post-animation
+    /// queue has drained, which is where work handed to `AnimationManager#flushAnimation`
+    /// during a layout animation ends up.
+    private void pumpAnimations(Window w) {
+        AnimationManager mgr = w.getAnimationManager();
+        long deadline = System.currentTimeMillis() + 5000;
+        while (mgr.isAnimating() && System.currentTimeMillis() < deadline) {
+            mgr.updateAnimations();
+            flushSerialCalls();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        // updateAnimations() drains the post-animation queue only on a pass that finds
+        // the animation list already empty, and the pass that empties it is not that
+        // pass -- so a single trailing call is one short.
+        for (int iter = 0; iter < 5; iter++) {
+            mgr.updateAnimations();
+            flushSerialCalls();
+        }
+    }
+
+    /// Finds the first button carrying a `Command`, which is how the test reaches a
+    /// toolbar's back arrow without a public accessor for it.
+    private static Button findFirstCommandButton(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Button && ((Button) cmp).getCommand() != null) {
+                return (Button) cmp;
+            }
+            if (cmp instanceof Container) {
+                Button b = findFirstCommandButton((Container) cmp);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
+    }
+
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {
             Component cmp = c.getComponentAt(iter);
@@ -2739,5 +2786,90 @@ class WindowTest extends UITestBase {
                 return 8;
             }
         };
+    }
+
+    @FormTest
+    void legacyPullToRefreshRegistersItsAnimationOnTheWindow() {
+        implementation.setMultiWindowSupported(true);
+        final AtomicInteger registered = new AtomicInteger();
+        Window w = new Window("pull", new BorderLayout()) {
+            @Override
+            public void registerAnimated(Animation cmp) {
+                registered.incrementAndGet();
+                super.registerAnimated(cmp);
+            }
+        };
+        Container scrollable = new Container(new BorderLayout());
+        scrollable.setScrollableY(true);
+        w.add(BorderLayout.CENTER, scrollable);
+        w.show();
+
+        LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        assertTrue(laf instanceof DefaultLookAndFeel,
+                "This test drives the default look and feel's legacy pull-to-refresh path");
+        try {
+            // Also initializes the pull container the legacy path draws through.
+            int threshold = laf.getPullToRefreshHeight();
+            Graphics g = Image.createImage(60, 60).getGraphics();
+
+            // First pass swaps the "pull down to refresh" label into the container.
+            laf.drawPullToRefresh(g, scrollable, false);
+            // Crossing the threshold swaps in "release to refresh", and that swap is
+            // what registers the icon rotation animation on the top level. Before the
+            // migration this went through getComponentForm(), which is null in a
+            // Window, so the gesture threw on the EDT instead of animating.
+            scrollable.setScrollY(-(threshold + 1));
+            laf.drawPullToRefresh(g, scrollable, false);
+
+            assertTrue(registered.get() > 0,
+                    "Pull-to-refresh must register its animation on the Window that hosts it");
+        } finally {
+            // The look and feel keeps the pull container in a field shared by every
+            // test in this JVM, so a failure here must still tear the window down or
+            // it cascades into unrelated tests.
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void dismissingTheSearchBarInsideAWindowRestoresTheToolbar() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("search", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Toolbar tb = new Toolbar();
+        w.setToolbar(tb);
+        w.show();
+        w.revalidate();
+
+        tb.showSearchBar(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+            }
+        });
+        flushSerialCalls();
+        Toolbar search = w.getToolbar();
+        assertNotSame(tb, search, "the search bar should be installed at this point");
+
+        try {
+            // The search bar's back command resolved its host by casting getParent()
+            // to Form. Inside a Window the toolbar hangs off the title area, so that
+            // named the wrong type -- and because ParparVM does not check CHECKCAST,
+            // on Mac Catalyst it was a native crash rather than a catchable one.
+            Button back = findFirstCommandButton(search);
+            assertNotNull(back, "the search bar installs a back command");
+            back.getCommand().actionPerformed(
+                    new com.codename1.ui.events.ActionEvent(back.getCommand()));
+            flushSerialCalls();
+            // Showing the search bar animates the layout, so the restore is queued
+            // behind that animation rather than running inline.
+            pumpAnimations(w);
+
+            assertSame(tb, w.getToolbar(),
+                    "dismissing the search bar must put the original toolbar back");
+            assertFalse(tb.isHidden(),
+                    "the restored toolbar must be visible again");
+        } finally {
+            w.dispose();
+        }
     }
 }

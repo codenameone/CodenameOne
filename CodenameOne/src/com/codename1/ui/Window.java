@@ -540,6 +540,7 @@ public class Window extends Container implements TopLevelContainer {
         commandListeners.fireActionEvent(ev);
     }
 
+    @Override
     public void dispatchCommand(Command cmd, ActionEvent ev) {
         cmd.actionPerformed(ev);
         if (!ev.isConsumed()) {

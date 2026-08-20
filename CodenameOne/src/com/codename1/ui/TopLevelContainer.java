@@ -23,6 +23,7 @@
 package com.codename1.ui;
 
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.UIManager;
@@ -479,4 +480,15 @@ public interface TopLevelContainer {
     ///
     /// - `l`: the listener to remove
     void removeSizeChangedListener(ActionListener l);
+
+    /// Dispatches a command to this top level's command handling, which is how a
+    /// component that holds a `Command` triggers it without knowing whether it
+    /// lives in a `Form` or a `Window`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command to dispatch
+    ///
+    /// - `ev`: the event to dispatch
+    void dispatchCommand(Command cmd, ActionEvent ev);
 }
