@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.certificatewizard.api;
 
 import com.codename1.certificatewizard.cloud.APNsKeysApi;
@@ -81,7 +103,7 @@ public final class CloudSigningService implements SigningService {
                 return;
             }
             if (!ok(r1)) {
-                callback.completed(Result.fail(message(r1)));
+                callback.completed(Result.fail(error(r1)));
                 return;
             }
             cred[0] = r1.getResponseData();
@@ -95,7 +117,7 @@ public final class CloudSigningService implements SigningService {
                     return;
                 }
                 if (!ok(r2)) {
-                    callback.completed(Result.fail(message(r2)));
+                    callback.completed(Result.fail(error(r2)));
                     return;
                 }
                 certs[0] = r2.getResponseData();
@@ -105,7 +127,7 @@ public final class CloudSigningService implements SigningService {
                         return;
                     }
                     if (!ok(r3)) {
-                        callback.completed(Result.fail(message(r3)));
+                        callback.completed(Result.fail(error(r3)));
                         return;
                     }
                     bundles[0] = r3.getResponseData();
@@ -115,7 +137,7 @@ public final class CloudSigningService implements SigningService {
                             return;
                         }
                         if (!ok(r4)) {
-                            callback.completed(Result.fail(message(r4)));
+                            callback.completed(Result.fail(error(r4)));
                             return;
                         }
                         devices[0] = r4.getResponseData();
@@ -125,7 +147,7 @@ public final class CloudSigningService implements SigningService {
                                 return;
                             }
                             if (!ok(r5)) {
-                                callback.completed(Result.fail(message(r5)));
+                                callback.completed(Result.fail(error(r5)));
                                 return;
                             }
                             profiles[0] = r5.getResponseData();
@@ -135,20 +157,23 @@ public final class CloudSigningService implements SigningService {
                                     return;
                                 }
                                 if (!ok(r6)) {
-                                    callback.completed(Result.fail(message(r6)));
+                                    callback.completed(Result.fail(error(r6)));
                                     return;
                                 }
                                 apns[0] = r6.getResponseData();
                                 appGroupsApi.listAppGroups(bearerToken, r7 -> {
-                                    if (authFailure(r7)) {
-                                        callback.completed(Result.ok(SigningState.empty()));
-                                        return;
+                                    // App Groups are additive, and this is the last of
+                                    // the seven calls -- the six before it already
+                                    // proved both the login and the Apple key are good.
+                                    // Failing to list them is no reason to throw the
+                                    // whole account away and show an error instead:
+                                    // Apple answers 404 here for accounts it does not
+                                    // offer the resource to, which failed every refresh,
+                                    // and so every "Sync with Apple" that had just
+                                    // succeeded.
+                                    if (ok(r7)) {
+                                        appGroups[0] = r7.getResponseData();
                                     }
-                                    if (!ok(r7)) {
-                                        callback.completed(Result.fail(message(r7)));
-                                        return;
-                                    }
-                                    appGroups[0] = r7.getResponseData();
                                     callback.completed(Result.ok(toState(cred[0], certs[0], bundles[0],
                                             devices[0], profiles[0], apns[0], appGroups[0])));
                                 });
@@ -186,7 +211,7 @@ public final class CloudSigningService implements SigningService {
                                OnComplete<Result<Void>> callback) {
         bundleIdsApi.createBundleId(new CreateBundleIdRequest(identifier, name, platform), bearerToken, r -> {
             if (!ok(r)) {
-                callback.completed(Result.fail(message(r)));
+                callback.completed(Result.fail(error(r)));
                 return;
             }
             BundleIdDTO created = r.getResponseData();
@@ -202,7 +227,7 @@ public final class CloudSigningService implements SigningService {
     public void createAppGroup(String identifier, String name, OnComplete<Result<SigningState.AppGroup>> callback) {
         appGroupsApi.createAppGroup(new CreateAppGroupRequest(identifier, name), bearerToken, r -> {
             if (!ok(r)) {
-                callback.completed(Result.<SigningState.AppGroup>fail(message(r)));
+                callback.completed(Result.<SigningState.AppGroup>fail(error(r)));
                 return;
             }
             AppGroupDTO created = r.getResponseData();
@@ -255,7 +280,7 @@ public final class CloudSigningService implements SigningService {
                 .header("Authorization", bearerToken)
                 .onError(evt -> {
                     evt.consume();
-                    callback.completed(Result.fail(networkMessage(evt)));
+                    callback.completed(Result.<String>fail(networkError(evt)));
                 }, false)
                 .onErrorCodeBytes(r -> saveBytes(r, suggestedName, callback))
                 .fetchAsBytes(r -> saveBytes(r, suggestedName, callback));
@@ -266,7 +291,7 @@ public final class CloudSigningService implements SigningService {
         Rest.get(url).header("Authorization", bearerToken)
                 .onError(evt -> {
                     evt.consume();
-                    callback.completed(Result.fail(networkMessage(evt)));
+                    callback.completed(Result.<String>fail(networkError(evt)));
                 }, false)
                 .onErrorCodeBytes(r -> saveBytes(r, suggestedName, callback))
                 .fetchAsBytes(r -> saveBytes(r, suggestedName, callback));
@@ -292,66 +317,51 @@ public final class CloudSigningService implements SigningService {
         return r != null && (r.getResponseCode() == 401 || r.getResponseCode() == 403);
     }
 
-    private static String message(Response<?> r) {
+    /**
+     * The failure behind a non-2xx reply. On an error status the generated REST
+     * client hands us the raw body in {@code getResponseData()} (see the
+     * {@code onErrorCodeString} handler it emits), and the signing service puts
+     * a sentence written for this UI there -- so that body, not a status-derived
+     * guess, is the message wherever it is usable.
+     */
+    private static SigningError error(Response<?> r) {
         if (r == null) {
-            return "No response from server";
+            return SigningError.from(0, null, null);
         }
-        int code = r.getResponseCode();
-        if (authFailure(r)) {
-            return "Codename One login expired. Run the wizard again to refresh the sign-in token.";
+        return SigningError.from(r.getResponseCode(), bodyOf(r), r.getResponseErrorMessage());
+    }
+
+    private static String bodyOf(Response<?> r) {
+        Object data = r.getResponseData();
+        if (data instanceof String) {
+            return (String) data;
         }
-        if (code == 503) {
-            return "Codename One cloud signing service is unavailable (HTTP 503). Try again later.";
-        }
-        if (code >= 500) {
-            return "Codename One cloud signing service failed (HTTP " + code + "). Try again later.";
-        }
-        if (code <= 0) {
-            String transport = r.getResponseErrorMessage();
-            if (isTransportArtifact(transport)) {
-                return "Could not read the server response. Try again later.";
+        if (data instanceof byte[]) {
+            byte[] raw = (byte[]) data;
+            if (raw.length > 0) {
+                try {
+                    return new String(raw, "UTF-8");
+                } catch (java.io.UnsupportedEncodingException ex) {
+                    return null;
+                }
             }
-            return transport == null || transport.isEmpty() ? "Could not reach the Codename One cloud service."
-                    : "Connection failed: " + transport;
         }
-        String msg = r.getResponseErrorMessage();
-        if ((msg == null || msg.isEmpty()) && r.getResponseData() instanceof String) {
-            msg = (String) r.getResponseData();
-        }
-        if (isTransportArtifact(msg)) {
-            return "Request failed (HTTP " + code + "). Try again later.";
-        }
-        return msg == null || msg.isEmpty() ? "HTTP " + r.getResponseCode() : msg;
+        return null;
     }
 
-    private static boolean isTransportArtifact(String msg) {
-        if (msg == null) {
-            return false;
-        }
-        String m = msg.trim().toLowerCase();
-        return m.equals("stream closed") || m.equals("socket closed") || m.equals("unexpected end of stream")
-                || m.equals("premature eof") || m.equals("connection reset");
-    }
-
-    private static String networkMessage(NetworkEvent evt) {
+    private static SigningError networkError(NetworkEvent evt) {
         if (evt == null) {
-            return "Network request failed";
+            return SigningError.from(0, null, null);
         }
         String message = evt.getMessage();
         if ((message == null || message.trim().isEmpty()) && evt.getError() != null) {
             message = evt.getError().getMessage();
         }
-        if (message == null || message.trim().isEmpty()) {
-            message = "Network request failed";
-        }
-        if (evt.getResponseCode() > 0) {
-            return "Codename One cloud request failed (HTTP " + evt.getResponseCode() + "): " + message;
-        }
-        return message;
+        return SigningError.from(evt.getResponseCode(), null, message);
     }
 
     private static void done(Response<?> r, OnComplete<Result<Void>> callback) {
-        callback.completed(ok(r) ? Result.ok(null) : Result.<Void>fail(message(r)));
+        callback.completed(ok(r) ? Result.<Void>ok(null) : Result.<Void>fail(error(r)));
     }
 
     private SigningState toState(AscCredentialStatus cred, List<CertDTO> certs, List<BundleIdDTO> bundles,
@@ -403,7 +413,7 @@ public final class CloudSigningService implements SigningService {
 
     private void saveBytes(Response<byte[]> response, String suggestedName, OnComplete<Result<String>> callback) {
         if (!ok(response)) {
-            callback.completed(Result.fail(message(response)));
+            callback.completed(Result.<String>fail(error(response)));
             return;
         }
         byte[] data = response.getResponseData();

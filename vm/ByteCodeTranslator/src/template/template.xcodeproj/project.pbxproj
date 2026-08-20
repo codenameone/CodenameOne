@@ -11,8 +11,8 @@
 		0F634E7B18E9ABBC002F3D1D /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7A18E9ABBC002F3D1D /* CoreGraphics.framework */; };
 		0F634E7D18E9ABBC002F3D1D /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7C18E9ABBC002F3D1D /* UIKit.framework */; };
                 0F634EA318E9ABBC002F3D1D /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634EA218E9ABBC002F3D1D /* XCTest.framework */; };
-		0F634E7F18E9ABBC002F3D1D /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7E18E9ABBC002F3D1D /* GLKit.framework */; };
-		0F634E8118E9ABBC002F3D1D /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E8018E9ABBC002F3D1D /* OpenGLES.framework */; };
+		0F634E7F18E9ABBC002F3D1D /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7E18E9ABBC002F3D1D /* GLKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		0F634E8118E9ABBC002F3D1D /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E8018E9ABBC002F3D1D /* OpenGLES.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		0F634EA518E9ABBC002F3D1D /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0F634E7C18E9ABBC002F3D1D /* UIKit.framework */; };
 		0F634EA528E9ABBC002F3D1D /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0F634E7C18EAABBC002F3D1D /* Images.xcassets */; };
 

@@ -46,6 +46,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.Enumeration;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * Reads the {@code .mobileprovision} an iOS device build is about to sign with, and
@@ -81,6 +84,12 @@ final class IOSProvisioningPreflight {
         String name;
         String type;
         Date expirationDate;
+        /**
+         * The {@code application-identifier} entitlement, team prefix and all
+         * ({@code ABCD1234.com.example.app}, or {@code ABCD1234.com.example.*} for a
+         * wildcard). Null when the profile does not carry one.
+         */
+        String applicationIdentifier;
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
@@ -200,6 +209,262 @@ final class IOSProvisioningPreflight {
         }
         collectFileProblems(problems, settings, release, now, path, settingKey, true);
         return problems;
+    }
+
+    /**
+     * Whether every app extension this build embeds can actually be signed.
+     *
+     * <p>An {@code ios/app_extensions/<Name>/} folder becomes an embedded extension target
+     * whose bundle id is {@code <package>.<Name>}, and Apple signs an extension against its
+     * OWN App ID: the app's profile covers the app's bundle id and nothing under it. Supply
+     * no profile for the extension and the build server has nothing to sign that target with,
+     * so it inherits the app's -- and Xcode fails, minutes into a cloud build, with
+     * {@code Provisioning profile "X" has app ID "com.example.app", which does not match the
+     * bundle ID "com.example.app.MyExtension"}. That message names the target but not the
+     * setting that fixes it, and the guide called the profile "optional", so the natural
+     * reading was that Codename One had signed the extension wrongly.
+     *
+     * <p>Decided from files on disk: the app's profile carries the App ID it covers, and a
+     * wildcard App ID legitimately covers the extension, so that case passes. Fatal only when
+     * the app's profile demonstrably cannot sign the target -- anything this cannot read
+     * (an unparseable profile, an unset package name, an unresolved {@code ${...}} path) is
+     * left to the checks above and to the build server.
+     *
+     * @param iosProjectDir the iOS module directory, whose {@code app_extensions} folder holds
+     * one directory or zip per extension
+     * @return one problem per extension that cannot be signed as configured
+     */
+    static List<Problem> checkAppExtensions(Properties settings, boolean release, File iosProjectDir) {
+        List<Problem> problems = new ArrayList<Problem>();
+        if (iosProjectDir == null) {
+            return problems;
+        }
+        File appExtensions = new File(iosProjectDir, "app_extensions");
+        File[] extensions = appExtensions.isDirectory() ? appExtensions.listFiles() : null;
+        if (extensions == null || extensions.length == 0) {
+            return problems;
+        }
+        String packageName = settings == null ? null : settings.getProperty("codename1.packageName");
+        if (packageName == null || packageName.trim().isEmpty()) {
+            return problems;
+        }
+        packageName = packageName.trim();
+        Profile appProfile = appProfile(settings, release);
+        if (appProfile == null || appProfile.applicationIdentifier == null) {
+            // No readable profile, or one that names no App ID: check() reports the former and
+            // neither is something to refuse a build over here.
+            return problems;
+        }
+        for (File extension : extensions) {
+            String name = extensionName(extension);
+            if (name == null) {
+                continue;
+            }
+            if (hasOwnProfile(settings, extension, name)) {
+                continue;
+            }
+            String bundleId = extensionBundleId(extension, packageName + "." + name);
+            if (profileCoversBundleId(appProfile.applicationIdentifier, bundleId)) {
+                // A wildcard App ID signs the whole subtree, so this build is fine as it is.
+                continue;
+            }
+            problems.add(new Problem(appExtensionProfileMessage(name, bundleId, appProfile,
+                    release), true));
+        }
+        return problems;
+    }
+
+    /** The app's own profile for this build type, or null when it cannot be read. */
+    private static Profile appProfile(Properties settings, boolean release) {
+        String path = settings.getProperty(provisioningProfileSettingKey(release));
+        if (path == null || path.trim().isEmpty()) {
+            return null;
+        }
+        String resolved = resolvePlaceholders(path.trim(), settings);
+        if (resolved.indexOf("${") >= 0) {
+            return null;
+        }
+        File file = new File(resolved);
+        if (!file.isFile()) {
+            return null;
+        }
+        try {
+            return parse(readFile(file));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    /**
+     * The target name an {@code app_extensions} entry produces, mirroring what the build
+     * zips up: a directory keeps its name, a zip loses the extension. Anything else is not
+     * an app extension.
+     */
+    private static String extensionName(File extension) {
+        if (extension.isDirectory()) {
+            return extension.getName();
+        }
+        String name = extension.getName();
+        if (name.toLowerCase(Locale.US).endsWith(".zip")) {
+            return name.substring(0, name.length() - ".zip".length());
+        }
+        return null;
+    }
+
+    /**
+     * Whether a profile is supplied for this extension, by any of the three carriers the
+     * build server accepts: a {@code .mobileprovision} travelling inside the extension, the
+     * {@code codename1.ios.appext.<Name>.provision} project setting (which the build
+     * base64-encodes into {@code provisioningData}), or the hosted-URL build hint. The
+     * build-type qualified forms count too -- the mojo collapses those into the plain ones
+     * before submitting.
+     */
+    private static boolean hasOwnProfile(Properties settings, File extension, String name) {
+        if (containsProfileFile(extension)) {
+            return true;
+        }
+        String[] keys = {
+            "codename1.ios.appext." + name + ".provision",
+            "codename1.ios.debug.appext." + name + ".provision",
+            "codename1.ios.release.appext." + name + ".provision",
+            "codename1.arg.ios.appext." + name + ".provisioningData",
+            "codename1.arg.ios.appext." + name + ".provisioningURL",
+            "codename1.arg.ios.debug.appext." + name + ".provisioningURL",
+            "codename1.arg.ios.release.appext." + name + ".provisioningURL"
+        };
+        for (String key : keys) {
+            String value = settings.getProperty(key);
+            if (value != null && !value.trim().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A {@code .mobileprovision} anywhere in the extension, folder or zip alike. */
+    private static boolean containsProfileFile(File extension) {
+        if (extension.isDirectory()) {
+            File[] files = extension.listFiles();
+            if (files == null) {
+                return false;
+            }
+            for (File f : files) {
+                if (f.isFile() && f.getName().toLowerCase(Locale.US).endsWith(".mobileprovision")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // A zipped extension is unzipped into exactly that folder on the build server, so a
+        // profile packed inside it is found the same way.
+        try (ZipFile zip = new ZipFile(extension)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                String entry = entries.nextElement().getName();
+                if (entry.toLowerCase(Locale.US).endsWith(".mobileprovision")) {
+                    return true;
+                }
+            }
+        } catch (IOException ex) {
+            // Unreadable here means unreadable for the build too; not this check's business.
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * The bundle id the extension target actually carries. An extension may override it in
+     * its {@code buildSettings.properties}, and judging the default instead would refuse a
+     * build whose profile matches the overridden id -- the same trap the Matter extension
+     * hit on the build server.
+     */
+    private static String extensionBundleId(File extension, String defaultBundleId) {
+        Properties buildSettings = new Properties();
+        try {
+            if (extension.isDirectory()) {
+                File file = new File(extension, "buildSettings.properties");
+                if (!file.isFile()) {
+                    return defaultBundleId;
+                }
+                try (InputStream in = new FileInputStream(file)) {
+                    buildSettings.load(in);
+                }
+            } else {
+                try (ZipFile zip = new ZipFile(extension)) {
+                    ZipEntry entry = zip.getEntry("buildSettings.properties");
+                    if (entry == null) {
+                        return defaultBundleId;
+                    }
+                    try (InputStream in = zip.getInputStream(entry)) {
+                        buildSettings.load(in);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            return defaultBundleId;
+        }
+        String override = buildSettings.getProperty("PRODUCT_BUNDLE_IDENTIFIER");
+        if (override == null || override.trim().isEmpty()) {
+            return defaultBundleId;
+        }
+        return override.trim();
+    }
+
+    /**
+     * Whether a profile's {@code application-identifier} entitlement covers a bundle id.
+     *
+     * <p>Only the part after the team prefix is the pattern, and the one metacharacter Apple
+     * defines is a trailing {@code *} -- so this is prefix matching, not a glob. Unknown
+     * answers count as covered: this gates a hard refusal, and a profile that could not be
+     * read is not evidence that signing will fail.
+     *
+     * @param applicationIdentifier the entitlement, team prefix and all
+     * @param bundleId the bundle id that has to be signed
+     * @return false only when the profile demonstrably cannot sign it
+     */
+    static boolean profileCoversBundleId(String applicationIdentifier, String bundleId) {
+        if (applicationIdentifier == null || applicationIdentifier.isEmpty() || bundleId == null) {
+            return true;
+        }
+        String pattern = appIdPattern(applicationIdentifier);
+        if (pattern.endsWith("*")) {
+            return bundleId.startsWith(pattern.substring(0, pattern.length() - 1));
+        }
+        return pattern.equals(bundleId);
+    }
+
+    /** The App ID with the team prefix stripped, which is the part that has to match. */
+    private static String appIdPattern(String applicationIdentifier) {
+        int teamPrefix = applicationIdentifier.indexOf('.');
+        return teamPrefix < 0 ? applicationIdentifier
+                : applicationIdentifier.substring(teamPrefix + 1);
+    }
+
+    /**
+     * The message the developer reads instead of Xcode's. It quotes the failure they would
+     * otherwise get -- so searching for it lands here -- and names all three ways to supply
+     * the profile, since which one fits depends on whether the profile can live in the repo.
+     */
+    private static String appExtensionProfileMessage(String name, String bundleId, Profile appProfile,
+            boolean release) {
+        String buildType = release ? "release" : "debug";
+        return "The " + name + " app extension has no provisioning profile of its own, and the "
+                + "profile this build signs with (\"" + appProfile.name + "\", App ID "
+                + appIdPattern(appProfile.applicationIdentifier) + ") cannot sign it. Apple "
+                + "requires a separate App ID and provisioning profile for every app extension, "
+                + "so Xcode will fail with: Provisioning profile \"" + appProfile.name
+                + "\" has app ID \"" + appIdPattern(appProfile.applicationIdentifier)
+                + "\", which does not match the bundle ID \"" + bundleId + "\".\n"
+                + "Create an App ID for " + bundleId + " in the Apple Developer portal (Wallet "
+                + "extensions also need the payment-pass-provisioning entitlement on it), "
+                + "generate a provisioning profile for it against the same certificate as the "
+                + "app, and supply it in one of these ways:\n"
+                + "  1. Place the .mobileprovision file inside ios/app_extensions/" + name
+                + "/ -- it is picked up automatically and kept out of the app bundle.\n"
+                + "  2. Set codename1.ios." + buildType + ".appext." + name + ".provision="
+                + "{path to the .mobileprovision} in codenameone_settings.properties.\n"
+                + "  3. Host the profile and name its URL in codename1.arg.ios." + buildType
+                + ".appext." + name + ".provisioningURL.";
     }
 
     /**
@@ -423,6 +688,13 @@ final class IOSProvisioningPreflight {
         Element expires = valueForKey(doc, "ExpirationDate");
         if (expires != null && "date".equals(expires.getTagName())) {
             profile.expirationDate = parseDate(expires.getTextContent().trim());
+        }
+        // Nested inside the Entitlements dict, which valueForKey reaches because it walks
+        // every <key> in the document. This is what says which bundle ids the profile can
+        // sign -- see profileCoversBundleId.
+        Element applicationIdentifier = valueForKey(doc, "application-identifier");
+        if (applicationIdentifier != null && "string".equals(applicationIdentifier.getTagName())) {
+            profile.applicationIdentifier = applicationIdentifier.getTextContent().trim();
         }
         profile.type = deriveType(doc);
         return profile;
