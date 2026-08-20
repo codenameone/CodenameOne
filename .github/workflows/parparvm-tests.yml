@@ -113,11 +113,18 @@ jobs:
         # Maven Central intermittently serves 403/429 from the runner CDN edge
         # and Maven treats it as a permanent resolution failure (killed this job
         # at dependency download, before any test ran). See scripts/ci/retry.sh.
+        #
+        # Narrowed with RETRY_ONLY_MATCHING because the second command RUNS THE
+        # TESTS: without it the wrapper retries every nonzero exit, so a test that
+        # failed once and passed on the retry would take this gate green and hide
+        # the race that produced it. The Windows counterpart restricts it for the
+        # same reason.
         run: |
           retry() { bash ../scripts/ci/retry.sh "$@"; }
           retry mvn -B clean package -pl JavaAPI -am -DskipTests
           retry mvn -B test -pl tests -am -DexcludedGroups=benchmark
         env:
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
           JDK_17_HOME: ${{ env.JDK_17_HOME }}

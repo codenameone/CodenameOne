@@ -28,6 +28,9 @@
 #include "xmlvm.h"
 #include "java_lang_String.h"
 #include <pthread.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 #import "CN1ES2compat.h"
 #import "CN1JailbreakDetector.h"
 #if TARGET_OS_WATCH
@@ -841,6 +844,37 @@ static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
     if ([mimeType isEqualToString:@"text/html"]) return @"public.html";
     if ([mimeType isEqualToString:@"text/rtf"]) return @"public.rtf";
     return mimeType;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_realPath___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    POOL_BEGIN();
+    NSString* input = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    JAVA_OBJECT result = path;
+    char resolved[PATH_MAX];
+    const char* utf8 = [input fileSystemRepresentation];
+    if(utf8 != NULL && realpath(utf8, resolved) != NULL) {
+        result = fromNSString(CN1_THREAD_STATE_PASS_ARG
+                [[NSFileManager defaultManager] stringWithFileSystemRepresentation:resolved
+                                                                           length:strlen(resolved)]);
+    } else {
+        // Nothing there yet, which is the ordinary case for a database about to be created.
+        // The directory carries the links; the last component is the name the engine is about
+        // to make, so resolving the directory answers the same before and after creation.
+        NSString* directory = [input stringByDeletingLastPathComponent];
+        const char* directoryUtf8 = [directory fileSystemRepresentation];
+        if([directory length] > 0 && directoryUtf8 != NULL
+                && realpath(directoryUtf8, resolved) != NULL) {
+            NSString* real = [[NSFileManager defaultManager]
+                    stringWithFileSystemRepresentation:resolved length:strlen(resolved)];
+            result = fromNSString(CN1_THREAD_STATE_PASS_ARG
+                    [real stringByAppendingPathComponent:[input lastPathComponent]]);
+        }
+    }
+    POOL_END();
+    return result;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
@@ -8949,218 +8983,504 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofDoubleArrayI___j
 }
 #endif // NEW_CODENAME_ONE_VM
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
+/*
+ * SQLite bindings.
+ *
+ * Paths arrive here already absolute: the Java side resolves a bare database name against the
+ * documents directory and a file:// URL through FileSystemStorage, so this file does not have to
+ * duplicate URL handling in C.
+ *
+ * Errors are raised as java.io.IOException carrying sqlite3_errmsg, on every path.
+ */
+
+/** Throws java.io.IOException carrying the database's last error message. */
+static void cn1ThrowSqlError(CODENAME_ONE_THREAD_STATE, sqlite3* db, const char* context) {
+    const char* detail = db != NULL ? sqlite3_errmsg(db) : "unknown SQLite error";
+    NSString* message = [NSString stringWithFormat:@"%s: %s", context, detail];
+    JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex,
+            newStringFromCString(CN1_THREAD_STATE_PASS_ARG [message UTF8String]));
+    throwException(threadStateData, ex);
+}
+
+/** Throws with an explicit message rather than one taken from a connection. */
+static void cn1ThrowSqlMessage(CODENAME_ONE_THREAD_STATE, const char* message) {
+    JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex,
+            newStringFromCString(CN1_THREAD_STATE_PASS_ARG message));
+    throwException(threadStateData, ex);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlDbPath___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     POOL_BEGIN();
     NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [writablePaths lastObject];
-    
     NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    
-    NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
-    BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:foofile];
+    NSString* full = [documentsPath stringByAppendingPathComponent:nsSrc];
+    JAVA_OBJECT result = newStringFromCString(CN1_THREAD_STATE_PASS_ARG [full UTF8String]);
+    POOL_END();
+    return result;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    POOL_BEGIN();
+    NSString* nsPath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:nsPath];
     POOL_END();
     return fileExists;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
+void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
     POOL_BEGIN();
-    NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [writablePaths lastObject];
-    
-    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    
-    NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
-    
-    int retCode = sqlite3_config(SQLITE_CONFIG_SERIALIZED);
-    if (retCode != SQLITE_OK) {
-        sqlite3_shutdown();
-        sqlite3_config(SQLITE_CONFIG_SERIALIZED);
-        sqlite3_initialize();
+    NSString* nsPath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSFileManager* files = [NSFileManager defaultManager];
+    // Deleting what is not there is the documented no-op. Anything else -- file protection, a
+    // filesystem error -- has to be reported, or delete() returns and the database is still
+    // sitting there, which is neither the contract nor what this binding claims to do.
+    if ([files fileExistsAtPath:nsPath]) {
+        NSError* err = nil;
+        if (![files removeItemAtPath:nsPath error:&err]) {
+            NSString* failure = [NSString stringWithFormat:@"The database %@ could not be "
+                    "deleted: %@", nsPath, err != nil ? [err localizedDescription] : @"unknown error"];
+            cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [failure UTF8String]);
+            POOL_END();
+            return;
+        }
+    }
+    POOL_END();
+}
+
+/*
+ * SQLCipher-compatible keying, declared here rather than taken from a header so this file
+ * compiles unchanged whether or not the bundled engine was emitted.
+ *
+ * These are strong references and they stay strong on purpose: Apple's own libsqlite3 exports
+ * them, so a build without the bundled engine still links. Verified against Xcode 26.2 rather
+ * than assumed -- usr/lib/libsqlite3.tbd lists _sqlite3_key, _sqlite3_key_v2 and _sqlite3_rekey
+ * in both the iPhoneOS and iPhoneSimulator SDKs, and a binary calling sqlite3_key links against
+ * -lsqlite3 with no undefined symbol. What Apple's copy does NOT do is encrypt: it answers
+ * SQLITE_MISUSE and leaves the file plaintext, which is why availability is decided by
+ * cn1SqlCipherAvailable below and never by whether these symbols resolved.
+ */
+extern int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
+extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
+
+/*
+ * Whether this build can encrypt at all.
+ *
+ * Decided by the marker header the translator emits beside this file for an application that
+ * configures encryption -- the same marker the bundled engine compiles its ciphers against, so
+ * the two cannot disagree. Without it the process is linked against Apple's libsqlite3, which
+ * exports sqlite3_key and answers SQLITE_MISUSE from it.
+ *
+ * There is deliberately no runtime probe here. This was written as `PRAGMA cipher_version`,
+ * which is SQLCipher's pragma and not one SQLite3MC implements: an unknown pragma is not an
+ * error in SQLite, so it reported "no cipher" on the cipher build as well, and iOS answered that
+ * encryption was unsupported for every application. The conformance suite recorded it as a skip
+ * rather than a failure, which is how it went unnoticed.
+ */
+#if defined(__has_include)
+#  if __has_include("cn1_sqlite3_cipher.h")
+#    define CN1_DB_CIPHER_PRESENT 1
+#  endif
+#endif
+
+static JAVA_BOOLEAN cn1SqlCipherAvailable(sqlite3* db) {
+    (void)db;
+#ifdef CN1_DB_CIPHER_PRESENT
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+/**
+ * Selects the SQLCipher 4 on-disk format. Without this the bundled engine would use its own
+ * cipher scheme, producing files no other Codename One platform can read.
+ */
+static int cn1SqlApplyCipherProfile(sqlite3* db) {
+    int rc = sqlite3_exec(db, "PRAGMA cipher = 'sqlcipher'", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        return rc;
+    }
+    return sqlite3_exec(db, "PRAGMA legacy = 4", NULL, NULL, NULL);
+}
+
+/**
+ * Confirms the key actually decrypts the database. SQLCipher applies a key lazily, so without
+ * this a wrong passphrase surfaces much later as an unrelated "file is not a database".
+ */
+static int cn1SqlProbeKey(sqlite3* db) {
+    return sqlite3_exec(db, "SELECT count(*) FROM sqlite_master", NULL, NULL, NULL);
+}
+
+static JAVA_LONG cn1SqlOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT unusedKey) {
+    POOL_BEGIN();
+    NSString* nsPath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    sqlite3 *db = NULL;
+
+    // Per connection, rather than the process wide sqlite3_config(SQLITE_CONFIG_SERIALIZED) plus
+    // sqlite3_shutdown() this used to do. That had to run before sqlite3_initialize() to have any
+    // effect, and calling sqlite3_shutdown() with connections already open is undefined behaviour.
+    int rc = sqlite3_open_v2([nsPath UTF8String], &db,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, NULL);
+    if (rc != SQLITE_OK) {
+        // Copy the message out and close before raising. throwException longjmps, so nothing
+        // after it runs, and SQLite hands back a usable handle even from a failed open -- which
+        // then leaks a connection and its descriptor once per caught failure.
+        NSString* failure = [NSString stringWithFormat:@"Failed to open the database: %s",
+                db != NULL ? sqlite3_errmsg(db) : "unknown SQLite error"];
+        if (db != NULL) {
+            sqlite3_close_v2(db);
+        }
+        cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [failure UTF8String]);
+        POOL_END();
+        return 0;
     }
 
-    sqlite3 *db;
-    int rc = sqlite3_open([foofile UTF8String], &db);
-    
     POOL_END();
     return (JAVA_LONG)db;
 }
 
-void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
-    POOL_BEGIN();
-    NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-    NSString *documentsPath = [writablePaths lastObject];
-    
-    NSString* nsSrc = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    
-    NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
-    [[NSFileManager defaultManager] removeItemAtPath:foofile error:nil];
-    POOL_END();
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    return cn1SqlOpen(CN1_THREAD_STATE_PASS_ARG path, JAVA_NULL);
+}
+
+/**
+ * Applies a key to an already open connection and checks that it actually decrypts.
+ *
+ * Returns false for a wrong key rather than throwing, so the Java side can tell "this key is
+ * wrong" apart from "the file could not be opened" and raise the right exception. Keeping the
+ * distinction here would mean referencing a core exception class from C.
+ */
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbApplyKey___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    if (cn1SqlApplyCipherProfile(db) != SQLITE_OK) {
+        return JAVA_FALSE;
+    }
+    const char* keyChars = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
+    // sqlite3_key rather than PRAGMA key, so a passphrase containing a quote cannot break out of
+    // the statement.
+    if (sqlite3_key(db, keyChars, (int)strlen(keyChars)) != SQLITE_OK) {
+        return JAVA_FALSE;
+    }
+    // Reports the probe result rather than a bare pass/fail, so the Java side can tell a key that
+    // did not decrypt the file (SQLITE_NOTADB) from a corrupt image or a read error, which no key
+    // repairs. SQLITE_OK is 0, so a zero return means the key worked.
+    return cn1SqlProbeKey(db) == SQLITE_OK ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    if (cn1SqlApplyCipherProfile(db) != SQLITE_OK) {
+        return SQLITE_ERROR;
+    }
+    const char* keyChars = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
+    int rc = sqlite3_key(db, keyChars, (int)strlen(keyChars));
+    if (rc != SQLITE_OK) {
+        return rc;
+    }
+    return cn1SqlProbeKey(db);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbIsCipherAvailable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return cn1SqlCipherAvailable(NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlDbRekey___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    if (!cn1SqlCipherAvailable(db)) {
+        // Asked of the engine, not of the pragma that configures it: a build without the cipher
+        // accepts "PRAGMA cipher" silently and would have fallen through to sqlite3_rekey, where
+        // Apple's copy answers SQLITE_MISUSE and the caller would read a bare engine error
+        // instead of being told that this build cannot encrypt anything.
+        cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG
+                "This build does not support encrypted databases");
+        return;
+    }
+    if (cn1SqlApplyCipherProfile(db) != SQLITE_OK) {
+        cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG
+                "The SQLCipher 4 format could not be selected on this database");
+        return;
+    }
+    int rc;
+    if (key == JAVA_NULL) {
+        rc = sqlite3_rekey(db, NULL, 0);
+    } else {
+        const char* keyChars = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
+        rc = sqlite3_rekey(db, keyChars, (int)strlen(keyChars));
+    }
+    if (rc != SQLITE_OK) {
+        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to change the database key");
+    }
 }
 
 void com_codename1_impl_ios_IOSNative_sqlDbClose___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG db) {
-    sqlite3_free((sqlite3*)db);
+    // This used to call sqlite3_free on the connection handle, which never closed it, leaked the
+    // file descriptor, skipped the WAL checkpoint and handed the pointer to the wrong allocator.
+    if (db != 0) {
+        sqlite3_close_v2((sqlite3*)db);
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbInTransaction___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer) {
+    // The engine's own answer. After a script fails partway SQLite stops at the failing statement,
+    // and nothing outside can see which one that was, so reading the script cannot tell an
+    // unexecuted trailing COMMIT from an executed one.
+    return sqlite3_get_autocommit((sqlite3*)dbPeer) ? JAVA_FALSE : JAVA_TRUE;
+}
+
+void com_codename1_impl_ios_IOSNative_sqlDbExecScript___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
+    char* errInfo = NULL;
+    if (sqlite3_exec(db, chrs, NULL, NULL, &errInfo) != SQLITE_OK) {
+        NSString* message = errInfo != NULL
+                ? [NSString stringWithFormat:@"SQL error: %s", errInfo]
+                : @"SQL error";
+        if (errInfo != NULL) {
+            sqlite3_free(errInfo);
+        }
+        cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [message UTF8String]);
+    }
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlStmtPrepare___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
+    sqlite3_stmt* stmt = NULL;
+    if (sqlite3_prepare_v2(db, chrs, -1, &stmt, NULL) != SQLITE_OK) {
+        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to compile the statement");
+        return 0;
+    }
+    return (JAVA_LONG)stmt;
+}
+
+/** Raises when a bind fails. SQLite unbinds the old value before copying, so ignoring this leaves
+ * the parameter as SQL NULL and the statement runs with something the caller never supplied. */
+static void cn1CheckSqlBind(CODENAME_ONE_THREAD_STATE, int rc, int index) {
+    if (rc == SQLITE_OK) {
+        return;
+    }
+    NSString* message = [NSString stringWithFormat:@"Parameter %d could not be bound: %s", index,
+            sqlite3_errstr(rc)];
+    cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [message UTF8String]);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlStmtParameterCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
+    return sqlite3_bind_parameter_count((sqlite3_stmt*)statementPeer);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtBindNull___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtBindText___long_int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_OBJECT value) {
+    if (value == JAVA_NULL) {
+        cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+                sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
+        return;
+    }
+    // The caller encodes, and the length is the array's rather than "up to the first zero byte":
+    // a Java string may hold a zero character and SQLite stores it, so a C string would drop that
+    // character and everything after it.
+    JAVA_ARRAY arr = (JAVA_ARRAY)value;
+    // An empty array has no storage behind it -- allocArray leaves data at 0 when the length is
+    // zero -- and sqlite3_bind_text reads a null pointer as SQL NULL whatever length it is given.
+    // So "" would arrive as NULL: read back as null, and rejected outright by a NOT NULL column.
+    // Any non-null pointer with a length of zero is an empty string to SQLite.
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_text((sqlite3_stmt*)statementPeer, index,
+                    arr->length > 0 ? (const char*)arr->data : "",
+                    arr->length, SQLITE_TRANSIENT), index);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtBindBlob___long_int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_OBJECT value) {
+    if (value == JAVA_NULL) {
+        cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+                sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
+        return;
+    }
+    JAVA_ARRAY byteArray = (JAVA_ARRAY)value;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->data;
+    // Same as the text bind above: a zero length array carries a null pointer, and that is how
+    // SQL NULL is spelled to sqlite3_bind_blob. An empty blob is a pointer that is not null.
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_blob((sqlite3_stmt*)statementPeer, index,
+                    byteArray->length > 0 ? (const void*)data : (const void*)"",
+                    byteArray->length, SQLITE_TRANSIENT), index);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtBindLong___long_int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_LONG value) {
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_int64((sqlite3_stmt*)statementPeer, index, value), index);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtBindDouble___long_int_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_DOUBLE value) {
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_double((sqlite3_stmt*)statementPeer, index, value), index);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlStmtStep___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
+    sqlite3_stmt* stmt = (sqlite3_stmt*)statementPeer;
+    int rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) {
+        return JAVA_TRUE;
+    }
+    if (rc != SQLITE_DONE) {
+        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG sqlite3_db_handle(stmt), "Failed to step the statement");
+    }
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtReset___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
+    sqlite3_stmt* stmt = (sqlite3_stmt*)statementPeer;
+    // sqlite3_reset reports the error of the *previous* step, which has already been reported, so
+    // its return value is deliberately ignored here. Bindings survive a reset, which is what makes
+    // re-stepping a parameterized query for a backward seek work.
+    sqlite3_reset(stmt);
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtFinalize___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
+    if (statementPeer != 0) {
+        sqlite3_finalize((sqlite3_stmt*)statementPeer);
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_sqlStmtExecuteAndFinalize___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
+    sqlite3_stmt* stmt = (sqlite3_stmt*)statementPeer;
+    int rc;
+    // Step to completion: an UPDATE with a RETURNING clause, or any statement that yields rows,
+    // needs more than the single step this used to do.
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        // discard
+    }
+    if (rc != SQLITE_DONE) {
+        sqlite3* db = sqlite3_db_handle(stmt);
+        sqlite3_finalize(stmt);
+        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to execute the statement");
+        return;
+    }
+    sqlite3_finalize(stmt);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
-    
-    if(args != nil) {
-        sqlite3_stmt *addStmt = nil;
-        char* errInfo;
-        int result = sqlite3_prepare_v2(db, chrs, -1, &addStmt, 0);
-#ifdef NEW_CODENAME_ONE_VM
-        if (result != SQLITE_OK) {
-            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //CN1Log(@"Error : %@", errStr);
-            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
-            throwException(threadStateData, ex);
-            return;
+    if (args == JAVA_NULL) {
+        char* errInfo = NULL;
+        if (sqlite3_exec(db, chrs, NULL, NULL, &errInfo) != SQLITE_OK) {
+            NSString* message = errInfo != NULL
+                    ? [NSString stringWithFormat:@"SQL error: %s", errInfo]
+                    : @"SQL error";
+            if (errInfo != NULL) {
+                sqlite3_free(errInfo);
+            }
+            cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [message UTF8String]);
         }
-#endif
-#ifndef NEW_CODENAME_ONE_VM
-        org_xmlvm_runtime_XMLVMArray* stringArray = args;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-        int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-#else
-        JAVA_ARRAY_OBJECT* data = (JAVA_OBJECT*)((JAVA_ARRAY)args)->data;
-        int count = ((JAVA_ARRAY)args)->length;
-#endif
-        
-        for(int iter = 0 ; iter < count ; iter++) {
-            JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
-            const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG str);
-            sqlite3_bind_text(addStmt, iter + 1, chrs, -1, SQLITE_TRANSIENT);
-        }
-        result = sqlite3_step(addStmt);
-#ifdef NEW_CODENAME_ONE_VM
-        if (result != SQLITE_ROW && result != SQLITE_DONE && result != SQLITE_OK) {
-            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //CN1Log(@"Error : %@", errStr);
-            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %@", [NSString stringWithUTF8String:sqlite3_errmsg(db)]]));
-            throwException(threadStateData, ex);
-            return;
-        }
-#endif
-        result = sqlite3_finalize(addStmt);
-#ifdef NEW_CODENAME_ONE_VM
-        if (result != SQLITE_OK) {
-            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //CN1Log(@"Error : %@", errStr);
-            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %@", [NSString stringWithUTF8String:sqlite3_errmsg(db)]]));
-            throwException(threadStateData, ex);
-            return;
-        }
-#endif
-    } else {
-        char * errInfo;
-        int result = sqlite3_exec(db, chrs, 0, 0, &errInfo);
-        
-#ifdef NEW_CODENAME_ONE_VM
-        if (result != SQLITE_OK) {
-            //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //CN1Log(@"Error : %@", errStr);
-            JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG errInfo));
-            throwException(threadStateData, ex);
-            return;
-        }
-#endif
+        return;
     }
+
+    sqlite3_stmt *addStmt = NULL;
+    if (sqlite3_prepare_v2(db, chrs, -1, &addStmt, NULL) != SQLITE_OK) {
+        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to compile the statement");
+        return;
+    }
+    JAVA_ARRAY stringArray = (JAVA_ARRAY)args;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->data;
+    int count = stringArray->length;
+    for (int iter = 0; iter < count; iter++) {
+        JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
+        if (str == JAVA_NULL) {
+            sqlite3_bind_null(addStmt, iter + 1);
+        } else {
+            sqlite3_bind_text(addStmt, iter + 1,
+                    stringToUTF8(CN1_THREAD_STATE_PASS_ARG str), -1, SQLITE_TRANSIENT);
+        }
+    }
+    int rc;
+    while ((rc = sqlite3_step(addStmt)) == SQLITE_ROW) {
+        // discard
+    }
+    if (rc != SQLITE_DONE) {
+        sqlite3_finalize(addStmt);
+        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to execute the statement");
+        return;
+    }
+    sqlite3_finalize(addStmt);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_String_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql, JAVA_OBJECT args) {
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
-    sqlite3_stmt *addStmt = nil;
-    int result = sqlite3_prepare_v2(db, chrs, -1, &addStmt, 0);
-    
-#ifdef NEW_CODENAME_ONE_VM
-    if (result != SQLITE_OK) {
-        //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-        //CN1Log(@"Error : %@", errStr);
-        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
-        throwException(threadStateData, ex);
+    sqlite3_stmt *addStmt = NULL;
+    if (sqlite3_prepare_v2(db, chrs, -1, &addStmt, NULL) != SQLITE_OK) {
+        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to compile the query");
         return 0;
     }
-#endif
-    
-    if(args != nil) {
-#ifndef NEW_CODENAME_ONE_VM
-        org_xmlvm_runtime_XMLVMArray* stringArray = args;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
-        int count = stringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
-#else
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)args)->data;
-        int count = ((JAVA_ARRAY)args)->length;
-#endif
-        
-        for(int iter = 0 ; iter < count ; iter++) {
+    if (args != JAVA_NULL) {
+        JAVA_ARRAY stringArray = (JAVA_ARRAY)args;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->data;
+        int count = stringArray->length;
+        for (int iter = 0; iter < count; iter++) {
             JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
-            const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG str);
-            result = sqlite3_bind_text(addStmt, iter + 1, chrs, -1, SQLITE_TRANSIENT);
-#ifdef NEW_CODENAME_ONE_VM
-            if (result != SQLITE_OK) {
-                //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-                //CN1Log(@"Error : %@", errStr);
-                JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-                java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
-                throwException(threadStateData, ex);
-                return 0;
+            if (str == JAVA_NULL) {
+                sqlite3_bind_null(addStmt, iter + 1);
+            } else {
+                sqlite3_bind_text(addStmt, iter + 1,
+                        stringToUTF8(CN1_THREAD_STATE_PASS_ARG str), -1, SQLITE_TRANSIENT);
             }
-#endif
         }
     }
     return (JAVA_LONG)addStmt;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
-    int result = sqlite3_reset((sqlite3_stmt *)statementPeer);
-#ifdef NEW_CODENAME_ONE_VM
-    if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
-        //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-        //CN1Log(@"Error : %@", errStr);
-        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %d", result]));
-        throwException(threadStateData, ex);
-        return 0;
-    }
-#endif
-    return YES;
+    sqlite3_stmt* stmt = (sqlite3_stmt*)statementPeer;
+    sqlite3_reset(stmt);
+    return sqlite3_step(stmt) == SQLITE_ROW ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
-    int result = sqlite3_step((sqlite3_stmt *)statementPeer);
-    if (result == SQLITE_ROW) {
-        return YES;
-    }
-#ifdef NEW_CODENAME_ONE_VM
-    if (result != SQLITE_DONE && result != SQLITE_OK) {
-        //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-        //CN1Log(@"Error : %@", errStr);
-        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %d", result]));
-        throwException(threadStateData, ex);
-        return 0;
-    }
-#endif
-    return NO;
+    return com_codename1_impl_ios_IOSNative_sqlStmtStep___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
-    return xmlvm_create_java_string(CN1_THREAD_STATE_PASS_ARG sqlite3_column_name((sqlite3_stmt*)statementPeer, index));
+    // UTF-8 bytes for the caller to decode, for the reason given on sqlCursorValueAtColumnText:
+    // an identifier is as free to be non-ASCII as a value is.
+    const char* name = sqlite3_column_name((sqlite3_stmt*)statementPeer, index);
+    if (name == NULL) {
+        return JAVA_NULL;
+    }
+    POOL_BEGIN();
+    NSData* data = [NSData dataWithBytes:name length:strlen(name)];
+    JAVA_OBJECT result = nsDataToByteArr(data);
+    POOL_END();
+    return result;
 }
 
 void com_codename1_impl_ios_IOSNative_sqlCursorCloseStatement___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {
-    sqlite3_finalize((sqlite3_stmt*)statement);
+    if (statement != 0) {
+        sqlite3_finalize((sqlite3_stmt*)statement);
+    }
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnBlob___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return nil;
+    // This used to return nil unconditionally, so iOS could not read a blob at all.
+    sqlite3_stmt* stmt = (sqlite3_stmt*)statement;
+    const void* bytes = sqlite3_column_blob(stmt, col);
+    int length = sqlite3_column_bytes(stmt, col);
+    // A zero length blob is a blob, not SQL NULL: SQLite may return a null pointer for it, and
+    // reading that as null would disagree with the column type and with wasNull().
+    if (length < 0 || (bytes == NULL && length > 0)) {
+        return JAVA_NULL;
+    }
+    POOL_BEGIN();
+    NSData* data = [NSData dataWithBytes:bytes length:length];
+    JAVA_OBJECT result = nsDataToByteArr(data);
+    POOL_END();
+    return result;
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnDouble___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
@@ -9168,11 +9488,13 @@ JAVA_DOUBLE com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnDouble___long
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnFloat___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return sqlite3_column_double((sqlite3_stmt*)statement, col);
+    return (JAVA_FLOAT)sqlite3_column_double((sqlite3_stmt*)statement, col);
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnInteger___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return sqlite3_column_int((sqlite3_stmt*)statement, col);
+    // Read as 64 bit and narrow, so a value above 2^31 truncates predictably rather than being
+    // reinterpreted by sqlite3_column_int.
+    return (JAVA_INT)sqlite3_column_int64((sqlite3_stmt*)statement, col);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnLong___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
@@ -9180,72 +9502,37 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnLong___long_int
 }
 
 JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return sqlite3_column_int((sqlite3_stmt*)statement, col);
+    return (JAVA_SHORT)sqlite3_column_int64((sqlite3_stmt*)statement, col);
 }
 
-#ifdef NEW_CODENAME_ONE_VM
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-
-    enteringNativeAllocations();
-
-    const char* result = (const char*)sqlite3_column_text((sqlite3_stmt*)statement, col);
-    if(result == 0) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnText___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    // Handed back as the engine's own UTF-8 bytes, for the caller to decode. Converting here would
+    // mean a C string, which ends at an embedded zero byte -- a character SQLite stores and every
+    // other port round-trips.
+    sqlite3_stmt* stmt = (sqlite3_stmt*)statement;
+    if (sqlite3_column_type(stmt, col) == SQLITE_NULL) {
         return JAVA_NULL;
     }
-
-    NSString* ns = [NSString stringWithUTF8String:result];
-    if (!ns) {
-        return JAVA_NULL;
+    // sqlite3_column_bytes must follow the _text call: it reports the length of the value as that
+    // call converted it.
+    const void* text = sqlite3_column_text(stmt, col);
+    int length = sqlite3_column_bytes(stmt, col);
+    if (text == NULL || length < 0) {
+        length = 0;
     }
-    
-    [ns retain];
-
-    JAVA_OBJECT str = __NEW_INSTANCE_java_lang_String(threadStateData);
-    struct obj__java_lang_String* ss = (struct obj__java_lang_String*)str;
-    ss->java_lang_String_nsString = (JAVA_LONG)ns;
-    // String has no finalizer anymore: the peer is released by the VM reclaim
-    // path, which needs the page flagged (see cn1BibopNoteNativePeer).
-    cn1BibopNoteNativePeer(str);
-
-    NSUInteger len = [ns length];
-    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-    ss->java_lang_String_value = destArr;
-    ss->java_lang_String_count = len;
-
-    JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
-    [ns getCharacters:(unichar*)dest range:NSMakeRange(0, len)];
-
-    finishedNativeAllocations();
-    return str;
-}
-#else // NEW_CODENAME_ONE_VM
-JAVA_OBJECT xmlvm_create_UTF8_java_string(const char* s) {
-    if(s == 0) {
-        return 0;
-    }
-    java_lang_String* str = __NEW_java_lang_String();
-    int len = strlen(s);
-    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, len);
-    memcpy(byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_, s, len);
-    java_lang_String___INIT____byte_1ARRAY_java_lang_String(str, byteArray, utf8String);
-    return XMLVMUtil_getFromStringPool(str);
+    POOL_BEGIN();
+    NSData* data = [NSData dataWithBytes:(text == NULL ? "" : text) length:length];
+    JAVA_OBJECT result = nsDataToByteArr(data);
+    POOL_END();
+    return result;
 }
 
-
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return xmlvm_create_UTF8_java_string(sqlite3_column_text((sqlite3_stmt*)statement, col));
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    return sqlite3_column_type((sqlite3_stmt*)statement, col) == SQLITE_NULL ? JAVA_TRUE : JAVA_FALSE;
 }
-#endif // NEW_CODENAME_ONE_VM
-
-
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return (sqlite3_column_type((sqlite3_stmt*)statement, col) == SQLITE_NULL);
-}
-
 
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {
-    sqlite3_stmt *stmt = (sqlite3_stmt*)statement;
-    return sqlite3_column_count(stmt);
+    return sqlite3_column_count((sqlite3_stmt*)statement);
 }
 
 
@@ -12497,7 +12784,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long_R_boolean(CN1
     return com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
     return com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer, index);
 }
 
@@ -12523,6 +12810,46 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnLong___long_int
 
 JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_int_R_short(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statement, col);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlDbPath___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
+    return com_codename1_impl_ios_IOSNative_sqlDbPath___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, name);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbApplyKey___long_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
+    return com_codename1_impl_ios_IOSNative_sqlDbApplyKey___long_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, dbPeer, key);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
+    return com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, dbPeer, key);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbIsCipherAvailable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_sqlDbIsCipherAvailable__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_sqlStmtPrepare___long_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql) {
+    return com_codename1_impl_ios_IOSNative_sqlStmtPrepare___long_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, dbPeer, sql);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlStmtParameterCount___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
+    return com_codename1_impl_ios_IOSNative_sqlStmtParameterCount___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlStmtStep___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
+    return com_codename1_impl_ios_IOSNative_sqlStmtStep___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnText___long_int_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    return com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnText___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statement, col);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    return com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statement, col);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbInTransaction___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer) {
+    return com_codename1_impl_ios_IOSNative_sqlDbInTransaction___long(CN1_THREAD_STATE_PASS_ARG instanceObject, dbPeer);
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {
@@ -16033,6 +16360,38 @@ static NSString *cn1_secureStorageServiceName(NSString *appName) {
     return appName;
 }
 
+// The keychain service the non-prompting entries are written under.
+//
+// The bundle identifier, because it is the one name that does not change with the application.
+// cn1_getAppName reads the AppName property, which IPhoneBuilder sets from the build's display
+// name -- so renaming an application moved its keychain service, its managed database key became
+// unreachable, and ManagedKeys, seeing nothing under the new service, generated a replacement.
+// The database was then encrypted with a key nobody had. A display name is a label; the bundle
+// identifier is the identity, and the App Store enforces that it does not change.
+static NSString *cn1_secureStoragePlainService(CN1_THREAD_STATE_SINGLE_ARG) {
+    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    if (bundleId != nil && [bundleId length] > 0) {
+        return bundleId;
+    }
+    // No bundle identifier is not a state a real application is in, but the answer still has to be
+    // stable rather than absent, so this falls back to what was used before.
+    return cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
+}
+
+// The service the same entries were written under before, which is the display name.
+//
+// Read from, never written to. Entries stored by an earlier build are still sitting here, and for
+// a managed database key that entry is the only copy in existence: reading it is what keeps an
+// application that upgrades from finding its own database unreadable.
+static NSString *cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_SINGLE_ARG) {
+    return cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
+}
+
+// Whether the two are the same string, in which case there is no legacy anything to look at.
+static BOOL cn1_secureStorageHasLegacyService(NSString *current, NSString *legacy) {
+    return legacy != nil && current != nil && ![legacy isEqualToString:current];
+}
+
 void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
@@ -16199,6 +16558,54 @@ static NSMutableDictionary *cn1_secureStoragePlainQuery(NSString *account, NSStr
 // LocalAuthentication or block on a prompt, so they use a plain generic-password
 // keychain item while the async biometric methods below continue to use their
 // existing SecAccessControl path.
+// Whether a keychain item exists, which is not the same question as whether it can be read.
+// SecItemCopyMatching separates them: errSecItemNotFound means there is nothing under that
+// account, while any other failure means the keychain could not answer -- locked, an entitlement
+// problem, a daemon that is not talking. Reading alone cannot tell those apart, and a caller that
+// treats "could not read" as "not there" overwrites a key that exists, after which the database it
+// encrypted is unreadable for good.
+//
+// Asks for no data, only for the item's presence, so a locked item still answers.
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    if (account == JAVA_NULL) {
+        return -1;
+    }
+    JAVA_INT result;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
+    [q setObject:@NO forKey:(__bridge id)kSecReturnData];
+    [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, NULL);
+    if (status == errSecItemNotFound && cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Nothing under the stable service, so ask under the name an earlier build used. Absence
+        // there is the only thing that means absence: reporting it from the first query alone
+        // would have ManagedKeys generate a second key over a database the first one encrypted.
+        NSMutableDictionary *legacyQuery =
+                cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        [legacyQuery setObject:@NO forKey:(__bridge id)kSecReturnData];
+        [legacyQuery setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+        status = SecItemCopyMatching((__bridge CFDictionaryRef)legacyQuery, NULL);
+    }
+    if (status == errSecSuccess || status == errSecInteractionNotAllowed) {
+        // The second one is an item that is there but locked, which is presence, not absence.
+        result = 1;
+    } else if (status == errSecItemNotFound) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    return com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String_R_int(CN1_THREAD_STATE_PASS_ARG me, account);
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_secureStorageGetPlain___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
     if (account == JAVA_NULL) {
         return JAVA_NULL;
@@ -16206,18 +16613,48 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_secureStorageGetPlain___java_lang_S
     JAVA_OBJECT result = JAVA_NULL;
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
     [q setObject:@YES forKey:(__bridge id)kSecReturnData];
     [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
 
     CFTypeRef dataRef = NULL;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &dataRef);
+    BOOL fromLegacy = NO;
+    if (status == errSecItemNotFound && cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Written by a build that keyed these by display name. Read it rather than reporting
+        // nothing: for a managed database key this entry is the only copy there is.
+        NSMutableDictionary *legacyQuery =
+                cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        [legacyQuery setObject:@YES forKey:(__bridge id)kSecReturnData];
+        [legacyQuery setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+        status = SecItemCopyMatching((__bridge CFDictionaryRef)legacyQuery, &dataRef);
+        fromLegacy = (status == errSecSuccess);
+    }
     if (status == errSecSuccess && dataRef != NULL) {
         NSData *d = (__bridge NSData *)dataRef;
         NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
         if (value != nil) {
             result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+            if (fromLegacy) {
+                // Moved to the stable service as it is read, so the next rename does not have to
+                // find it again. Copy first and only then delete: a delete that ran before the
+                // copy landed would destroy the one copy of a key that cannot be regenerated.
+                NSMutableDictionary *moved =
+                        cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
+                [moved setObject:d forKey:(__bridge id)kSecValueData];
+                [moved setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock
+                          forKey:(__bridge id)kSecAttrAccessible];
+                OSStatus copied = SecItemAdd((__bridge CFDictionaryRef)moved, NULL);
+                if (copied == errSecSuccess || copied == errSecDuplicateItem) {
+                    NSMutableDictionary *old =
+                            cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+                    SecItemDelete((__bridge CFDictionaryRef)old);
+                }
+                // A failed copy is not an error to report: the value was read, and the entry it
+                // came from is still there to be read again next time.
+            }
         }
         CFRelease(dataRef);
     }
@@ -16233,22 +16670,66 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageSetPlain___java_lang_
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
     NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
     NSData *data = [nsValue dataUsingEncoding:NSUTF8StringEncoding];
 
-    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
     [item setObject:data forKey:(__bridge id)kSecValueData];
     [item setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock forKey:(__bridge id)kSecAttrAccessible];
 
     OSStatus status = SecItemAdd((__bridge CFDictionaryRef)item, nil);
     if (status == errSecDuplicateItem) {
-        NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+        NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
         NSDictionary *changes = [NSDictionary dictionaryWithObject:data forKey:(__bridge id)kSecValueData];
         status = SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)changes);
+    }
+    if (status == errSecSuccess && cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Only once the new value is stored. Leaving the old entry behind would have a later read
+        // find a stale value under the legacy name if the stable one were ever removed.
+        NSMutableDictionary *old = cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        SecItemDelete((__bridge CFDictionaryRef)old);
     }
     result = (status == errSecSuccess) ? JAVA_TRUE : JAVA_FALSE;
     POOL_END();
     return result;
+}
+
+// Create only, which is the operation a first-time managed key needs. SecItemAdd refuses an item
+// that already exists rather than replacing it, and it refuses it in the keychain daemon -- so two
+// processes reaching here at the same moment cannot both believe they created the key, which is
+// what leaves a database encrypted under a key that was immediately overwritten.
+//
+// 1 created, 0 already there, -1 the keychain could not be asked.
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageAddPlain___java_lang_String_java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account, JAVA_OBJECT value) {
+    if (account == JAVA_NULL || value == JAVA_NULL) {
+        return -1;
+    }
+    JAVA_INT result;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *nsValue = toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSData *data = [nsValue dataUsingEncoding:NSUTF8StringEncoding];
+
+    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
+    [item setObject:data forKey:(__bridge id)kSecValueData];
+    [item setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock forKey:(__bridge id)kSecAttrAccessible];
+
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)item, NULL);
+    if (status == errSecSuccess) {
+        result = 1;
+    } else if (status == errSecDuplicateItem) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageAddPlain___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account, JAVA_OBJECT value) {
+    return com_codename1_impl_ios_IOSNative_secureStorageAddPlain___java_lang_String_java_lang_String_R_int(CN1_THREAD_STATE_PASS_ARG me, account, value);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
@@ -16258,9 +16739,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_la
     JAVA_BOOLEAN result = JAVA_FALSE;
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
     OSStatus status = SecItemDelete((__bridge CFDictionaryRef)q);
+    if (cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Both, or a remove would leave the entry an earlier build wrote to be read back later --
+        // and for a managed key that is a key the caller believes it has destroyed.
+        NSMutableDictionary *old = cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        OSStatus legacyStatus = SecItemDelete((__bridge CFDictionaryRef)old);
+        if (status == errSecItemNotFound) {
+            status = legacyStatus;
+        }
+    }
     result = (status == errSecSuccess || status == errSecItemNotFound) ? JAVA_TRUE : JAVA_FALSE;
     POOL_END();
     return result;

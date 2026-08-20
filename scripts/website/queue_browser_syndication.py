@@ -3,14 +3,14 @@
 
 This script is the bridge between the daily CI cron (which knows which
 posts are eligible for syndication) and a local syndication tool that
-runs on the maintainer's machine and drives Medium / DZone / Hashnode
-editors from inside a signed-in browser session.
+runs on the maintainer's machine and drives browser-only editors from
+inside a signed-in browser session.
 
 Daily flow:
 
   1. CI runs the API syndicator (dev.to) and the Playwright syndicator
      (foojay) directly.
-  2. CI runs *this* script for `medium,dzone` (or whatever browser
+  2. CI runs *this* script for `medium` (or whatever browser
      platforms are configured) — it appends a task entry to
      syndication-queue.json for every eligible post that does not
      already have an entry in syndication-state.json for that platform.
@@ -50,7 +50,12 @@ from syndicate_blog_posts import (  # noqa: E402
 )
 
 QUEUE_FILE = Path(__file__).resolve().parent / "syndication-queue.json"
-DEFAULT_PLATFORMS = "medium,dzone"
+DEFAULT_PLATFORMS = "medium"
+
+# Keep the DZone scheduling implementation available in case the platform is
+# restored later, but do not create or retain DZone work while it is paused.
+# The CI workflow also passes its active platform list explicitly.
+PAUSED_PLATFORMS = {"dzone"}
 
 # Platforms that only receive the weekly Friday digest post, rather than every
 # eligible post. This mirrors FoojayAdapter.accepts in
@@ -75,6 +80,8 @@ def _task_is_allowed(task: dict, dates_by_slug: dict[str, dt.date]) -> bool:
     whose post date is unknown is kept — we never silently drop something we
     cannot evaluate."""
     platform = task.get("site")
+    if platform in PAUSED_PLATFORMS:
+        return False
     if platform not in WEEKLY_FRIDAY_PLATFORMS:
         return True
     post_date = dates_by_slug.get(task.get("slug"))
@@ -132,7 +139,11 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
     today = dt.date.fromisoformat(args.today) if args.today else dt.date.today()
     floor = dt.date.fromisoformat(args.floor)
-    platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
+    requested_platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
+    paused_requested = [p for p in requested_platforms if p in PAUSED_PLATFORMS]
+    if paused_requested:
+        print(f"Skipping paused platform(s): {', '.join(paused_requested)}")
+    platforms = [p for p in requested_platforms if p not in PAUSED_PLATFORMS]
     state = State.load(Path(args.state_file))
     blog_dir = Path(args.blog_dir)
     posts = _eligible_posts(today, floor, args.min_age_days, blog_dir)
@@ -149,8 +160,8 @@ def main(argv: list[str]) -> int:
         queue = {"tasks": []}
 
     # Prune any already-queued task that the per-platform rules no longer
-    # allow (e.g. a non-Friday DZone task queued before the Friday-only
-    # filter landed, or one added by hand). The drain tool submits whatever
+    # allow (e.g. a DZone task left over after the platform was paused, a
+    # non-Friday weekly task, or one added by hand). The drain tool submits whatever
     # sits in the queue, so this prune is what actually stops a stray task
     # from reaching moderation.
     original_tasks = queue.get("tasks", [])

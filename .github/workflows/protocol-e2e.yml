@@ -10,7 +10,6 @@ name: Protocol E2E (REST / GraphQL / gRPC)
 on:
   pull_request:
     paths:
-      - 'scripts/ci-mvn-retry.sh'
       - 'scripts/protocol-e2e/**'
       - 'CodenameOne/src/com/codename1/io/graphql/**'
       - 'CodenameOne/src/com/codename1/annotations/graphql/**'
@@ -21,7 +20,6 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'scripts/ci-mvn-retry.sh'
       - 'scripts/protocol-e2e/**'
       - 'CodenameOne/src/com/codename1/io/graphql/**'
       - 'CodenameOne/src/com/codename1/annotations/graphql/**'
@@ -37,20 +35,31 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Codename One artifacts (core / javase / css-compiler / plugin)
+        # This step builds rather than tests, and it still narrows what it will retry: a
+        # compilation failure has to fail on the first attempt. What it covers is the run that died
+        # here with "Unresolveable build extension: archetype-packaging ... could not be resolved"
+        # before anything was compiled, which is Maven Central rather than this repository.
+        env:
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+          # Five attempts a minute apart rather than three at thirty seconds: Central
+          # refused two different jobs on this branch today, and a window of about a
+          # minute is shorter than the incidents have been. It costs nothing on a real
+          # failure, which RETRY_ONLY_MATCHING returns on the first attempt.
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
         run: |
           export JAVA_HOME="${JAVA_HOME_8}"
           export PATH="${JAVA_HOME_8}/bin:$PATH"
           cd maven
-          # Retried: Maven treats a Central connection reset while resolving a build plugin as a
-          # permanent failure, which fails this job before any project code compiles. Same
-          # rationale as setup-workspace.sh's mvn_retry.
-          ../scripts/ci-mvn-retry.sh -B -pl core,javase,css-compiler,codenameone-maven-plugin -am install \
+          bash ../scripts/ci/retry.sh mvn -B -pl core,javase,css-compiler,codenameone-maven-plugin -am install \
               -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true
 
       - name: Ensure a virtual display (xvfb) for the simulator
         run: |
           if ! command -v xvfb-run >/dev/null 2>&1; then
-            (apt-get update && apt-get install -y xvfb) || true
+            # Bounded: the failure is already tolerated, but a mirror that stalls rather than
+            # refusing would hold the job instead of falling through.
+            (timeout 300 apt-get update && timeout 300 apt-get install -y xvfb) || true
           fi
 
       - name: Run REST / GraphQL / gRPC end-to-end

@@ -32,6 +32,8 @@ import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
@@ -9588,6 +9590,249 @@ public abstract class CodenameOneImplementation {
     /// - `IOException`: if database cannot be created
     public Database openOrCreateDB(String databaseName) throws IOException {
         return null;
+    }
+
+    /// Opens or creates an encrypted database.
+    ///
+    /// Ports that support encryption override this. The default implementation handles the
+    /// plaintext case by delegating, and refuses anything else -- returning an unencrypted
+    /// database to a caller who asked for encryption would be a silent security downgrade.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// - `config`: how the database should be keyed
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened or the platform cannot encrypt
+    public Database openOrCreateDB(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            return openOrCreateDB(databaseName);
+        }
+        throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                "Encrypted databases are not supported on this platform");
+    }
+
+    /// Indicates whether this platform can open encrypted databases.
+    ///
+    /// #### Returns
+    ///
+    /// false unless the port overrides this
+    public boolean isDatabaseEncryptionSupported() {
+        return false;
+    }
+
+    /// Opens a plaintext database through an engine that is able to encrypt it in place.
+    ///
+    /// Most ports use one engine for both, so the default simply opens normally. Android does not:
+    /// the system SQLite has no cipher, so a database opened through it can never be re-keyed, and
+    /// that port routes this through SQLCipher instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened
+    public Database openOrCreateDBForRekey(String databaseName) throws IOException {
+        return openOrCreateDB(databaseName);
+    }
+
+    /// Indicates whether managed database keys are protected by a hardware backed key store.
+    ///
+    /// Ports with a real key store override this. Returning false is the safe answer: it tells
+    /// security sensitive applications not to rely on hardware protection.
+    ///
+    /// #### Returns
+    ///
+    /// false unless the port overrides this
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        return false;
+    }
+
+    /// `#isDatabaseFileEncrypted(java.lang.String)` could not determine the answer.
+    public static final int DATABASE_ENCRYPTION_UNKNOWN = -1;
+
+    /// The database is a plaintext file.
+    public static final int DATABASE_NOT_ENCRYPTED = 0;
+
+    /// The database is encrypted.
+    public static final int DATABASE_ENCRYPTED = 1;
+
+    /// Reports whether a database is encrypted, when the platform can tell without reading the
+    /// file itself.
+    ///
+    /// The default reports `#DATABASE_ENCRYPTION_UNKNOWN`, which makes
+    /// `Database#isEncrypted(java.lang.String)` fall back to sniffing the file header. A port whose
+    /// databases do not live in a readable filesystem, such as the JavaScript one, overrides this
+    /// rather than letting the header read fail and be misread as ciphertext.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// one of `#DATABASE_ENCRYPTED`, `#DATABASE_NOT_ENCRYPTED` or `#DATABASE_ENCRYPTION_UNKNOWN`
+    /// The identity a managed key with no explicit alias is stored under.
+    ///
+    /// The ports key an implicit managed alias on the file a name resolves to rather than on the
+    /// name, so that two accepted spellings of one database derive one key. Anything that has to
+    /// find that key afterwards -- `com.codename1.db.Database#forgetManagedKey(String)` -- has to
+    /// ask the same question, and only the port can answer it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name the application opens the database under
+    ///
+    /// #### Returns
+    ///
+    /// the identity, which is the name itself unless the port resolves it
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return databaseName;
+    }
+
+    /// The registry identity for a file the engine reported, as `PRAGMA database_list` gives it.
+    ///
+    /// Not the same question as `#databaseManagedKeyIdentity(String)`, which takes a name an
+    /// application supplied. What comes back from the engine is whatever that engine calls the
+    /// file it opened: an absolute path on the ports backed by a filesystem, and a pool entry on
+    /// the browser, where dressing it up as a file URL produces a name the pool has never heard
+    /// of -- so the reconciliation released the right reservation and took one on nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `engineFile`: the filename the engine reported
+    ///
+    /// #### Returns
+    ///
+    /// the key connections on that file are registered under, or null if it cannot be worked out
+    /// The key open connections, attachments and claims on a database are registered under.
+    ///
+    /// Distinct from `#databaseManagedKeyIdentity(String)`, which answers a different question:
+    /// where a managed KEY for this database is filed. The two need different properties and one
+    /// hook cannot have both. An alias has to survive the file being deleted and made again, or
+    /// the key is lost with it -- so it is derived from the name. A registry key has to say
+    /// whether two handles are the same open FILE, which on a platform where several names reach
+    /// one file (a short name, a junction, a hard link) the name cannot answer.
+    ///
+    /// Answering with the alias, as the default does, is right for every port whose names and
+    /// files correspond one to one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the database, as an application named it
+    ///
+    /// #### Returns
+    ///
+    /// the key it is registered under, or null when this port cannot say
+    public String databaseRegistryIdentity(String databaseName) {
+        return databaseManagedKeyIdentity(databaseName);
+    }
+
+    /// Whether a relative name in an ATTACH means the same database to this port and its engine.
+    ///
+    /// It does not on a port backed by a filesystem. SQLite resolves a relative name against the
+    /// process working directory, which differs per platform and which no application controls
+    /// through this API, while a name here means a database in the port's own directory -- so a
+    /// reservation taken on one names a different file from the one the engine opens, and the
+    /// database that really was attached goes unprotected. A port whose engine has no filesystem
+    /// -- the browser, where a name is an entry in a storage pool -- resolves it exactly as this
+    /// does, and says so by answering true.
+    ///
+    /// #### Returns
+    ///
+    /// whether a relative attachment name resolves to the database this port would open
+    public boolean isRelativeAttachmentNameResolvable() {
+        return false;
+    }
+
+    public String databaseIdentityForEngineFile(String engineFile) {
+        if (engineFile == null || engineFile.length() == 0) {
+            return null;
+        }
+        return databaseManagedKeyIdentity("file://" + engineFile);
+    }
+
+    /// How many connections this port has open on a database.
+    ///
+    /// `Database#delete(String)` asks before unlinking, because deleting a file something still
+    /// holds succeeds on every platform here and leaves that connection writing to a file with no
+    /// name. The base class keeps its own registry, and ports that register there need not
+    /// override; a port that counts connections somewhere of its own says so here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name or path the caller asked to delete
+    ///
+    /// #### Returns
+    ///
+    /// the number of open connections this port knows about
+    public int openDatabaseConnections(String databaseName) {
+        return 0;
+    }
+
+    public int isDatabaseFileEncrypted(String databaseName) {
+        return DATABASE_ENCRYPTION_UNKNOWN;
+    }
+
+    /// Indicates whether `byte[]` values may be bound as query parameters.
+    ///
+    /// #### Returns
+    ///
+    /// false unless the port overrides this
+    public boolean isBlobQueryParameterSupported() {
+        return false;
+    }
+
+    /// The files SQLite keeps beside a database, given the database's own name or path.
+    ///
+    /// A database is not one file. Rows committed in WAL mode live in `-wal` until a checkpoint
+    /// moves them, `-shm` indexes that log, and in rollback mode `-journal` holds the pages a
+    /// transaction is undoing. A crash or a kill leaves whichever applies sitting there with data
+    /// in it.
+    ///
+    /// So deleting the database file alone reports a deletion that did not happen: the rows are
+    /// still on disk under a name nobody thinks to look at, and reopening the same name reads
+    /// them back through the leftovers. For an encrypted database they are as readable as the
+    /// pages they came from, which is the whole of what the encryption was for.
+    ///
+    /// Listed here rather than in each port so that every one of them deletes the same set. The
+    /// deletion itself stays with the port, because only it knows how to remove a file.
+    ///
+    /// **Delete these before the database, not after.** Removing the database first and then
+    /// failing on a companion reports a failure over a database that is already gone: the caller
+    /// is told to retry something that cannot be retried, and reasonably reads the error as its
+    /// data being intact. Taking the companions first makes the database file the last
+    /// destructive step, so any failure before it leaves a database the caller really can delete
+    /// again. It also keeps the invariant that matters on the next open, since a journal that
+    /// outlives its database is read as a hot one against whatever is created under that name
+    /// next.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databasePathOrName`: what the port would delete for the database itself
+    ///
+    /// #### Returns
+    ///
+    /// the companion names, in no particular order
+    protected static String[] databaseSidecarPaths(String databasePathOrName) {
+        return new String[] {
+            databasePathOrName + "-wal",
+            databasePathOrName + "-shm",
+            databasePathOrName + "-journal"
+        };
     }
 
     /// Deletes database

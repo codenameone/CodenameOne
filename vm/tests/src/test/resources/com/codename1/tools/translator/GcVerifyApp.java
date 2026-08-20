@@ -61,6 +61,13 @@ public class GcVerifyApp {
     static long scrubSink;
 
     public static void main(String[] args) throws Exception {
+        // The JVM reference run says so on the command line. It has no ParparVM collector to ask
+        // -- the native below resolves only in a translated build -- and nothing to synchronize
+        // with either, since it runs to establish what the program computes rather than to
+        // verify a heap. Catching a linkage error instead would have been neater, except that
+        // java.lang.UnsatisfiedLinkError is not part of the ParparVM class library, so naming it
+        // breaks the very build that does have the collector.
+        handshake = args == null || args.length == 0 || !"reference".equals(args[0]);
         for (int round = 0; round < ROUNDS; round++) {
             // HAZARD 1 -- page heap, allocated DURING a concurrent mark. This is
             // the shape that breaks a missing grace pass, and the timing is the
@@ -70,8 +77,35 @@ public class GcVerifyApp {
             // in between are what spread the allocation across the mark rather
             // than racing past it in a burst.
             refill(round);
+            long beforeMark = marksDone();
             System.gc();
+            // Allocate INSIDE the mark, established by asking the collector rather than by
+            // sleeping. The old loop spread 40 slices across 3ms sleeps and hoped they landed
+            // during the mark; when the machine was loaded they did not, and the fault-injected
+            // half of the gate then reported that the verifier could not detect a defect the
+            // workload had never created.
+            // Exactly the 40 slices of 8 this workload has always done -- the count is load
+            // bearing. It empties 320 of the 512 keep[] slots, and the 192 that survive are what
+            // a dropped fresh node can still be holding the only reference to. Allocating more
+            // than this empties the array outright, leaves no survivor, and the hazard stops
+            // existing: an earlier attempt at this fix looped for as long as the mark lasted and
+            // produced a run with three times the collections and nothing to find.
+            //
+            // What changed is only WHEN they run. Each slice is placed inside a live mark by
+            // asking the collector, instead of by sleeping 3ms and hoping; if a mark ends
+            // early, the next slice starts another one and waits for it.
             for (int slice = 0; slice < 40; slice++) {
+                if (handshake) {
+                    if (!marking()) {
+                        System.gc();
+                        if (!awaitMarkStart(20000)) {
+                            System.out.println("GC_VERIFY_NO_MARK round=" + round
+                                    + " slice=" + slice);
+                        }
+                    }
+                } else if (slice > 0) {
+                    Thread.sleep(3);
+                }
                 for (int i = 0; i < 8; i++) {
                     Node n = new Node();
                     int j = (slice * 8 + i) & (KEEP - 1);
@@ -80,7 +114,9 @@ public class GcVerifyApp {
                     sink[0] = n;
                     sink[0] = null;
                 }
-                Thread.sleep(3);
+            }
+            if (handshake) {
+                awaitMarkEnd(beforeMark, 20000);
             }
             // Quiet phase: no Node allocation at all across the next cycle, so
             // nothing re-traces that size class and the dropped nodes' children
@@ -91,8 +127,16 @@ public class GcVerifyApp {
                 f.b = i;
                 sink[i & 15] = f;
             }
+            // The quiet cycle this phase describes, waited out rather than slept through: the
+            // dropped nodes' children have to age past the sweep's threshold, and a sleep that
+            // ended early left them still young.
+            long beforeQuiet = marksDone();
             System.gc();
-            Thread.sleep(150);
+            if (handshake) {
+                awaitMarkEnd(beforeQuiet, 20000);
+            } else {
+                Thread.sleep(150);
+            }
 
             // HAZARD 2 -- legacy path, in a QUIET window. Outside a mark the SATB
             // barriers are disarmed, so nothing logs the reference as it moves
@@ -161,10 +205,77 @@ public class GcVerifyApp {
      * whatever it points at. Without overwriting that region the program pins
      * the hazard it just built and the verifier has nothing to check.</p>
      */
+
+    /**
+     * The collector's mark state: how many marks have finished, and whether one is running now.
+     *
+     * <p>Implemented in cn1_globals.m under CN1_GC_VERIFY, which is the only build this app is
+     * ever compiled into. The count is in the high bits and the in-progress flag in bit 0, packed
+     * into one value so a mark cannot begin and end between two separate reads.
+     */
+    static native long gcMarkState();
+
+    /**
+     * Whether the collector can be asked about its mark at all.
+     *
+     * <p>This app runs twice: once on a plain JVM, to establish what the program computes, and
+     * once as a translated native binary, which is where the heap is actually verified. Only the
+     * second has the collector this handshake talks to -- on the JVM the native does not resolve,
+     * and the reference run has nothing to synchronize with anyway, since it is HotSpot's
+     * collector deciding when to run. So the handshake is probed once and the timing-based
+     * behaviour is kept for the run that cannot use it.
+     */
+    private static boolean handshake = true;
+
+
+    /** Whether a mark is running right now. */
+    private static boolean marking() {
+        return (gcMarkState() & 1L) != 0L;
+    }
+
+    /** How many marks have finished. */
+    private static long marksDone() {
+        return handshake ? gcMarkState() >>> 1 : 0L;
+    }
+
+    /**
+     * Waits for a mark to start, and answers whether one did.
+     *
+     * <p>Bounded, and the bound is generous rather than tuned: a run that never collects should
+     * fail on the assertion that the hazard was not produced, not hang here. Returning false is
+     * how the caller learns to say so.
+     */
+    private static boolean awaitMarkStart(long deadlineMillis) throws Exception {
+        long limit = System.currentTimeMillis() + deadlineMillis;
+        while (System.currentTimeMillis() < limit) {
+            if (marking()) {
+                return true;
+            }
+            Thread.sleep(1);
+        }
+        return false;
+    }
+
+    /** Waits until the mark that is running -- or the next one -- has finished. */
+    private static void awaitMarkEnd(long from, long deadlineMillis) throws Exception {
+        long limit = System.currentTimeMillis() + deadlineMillis;
+        while (marksDone() <= from && System.currentTimeMillis() < limit) {
+            Thread.sleep(1);
+        }
+    }
+
     private static void settle() throws Exception {
         scrub(300);
+        // A whole cycle, waited for rather than slept through. The old 120ms was a guess at how
+        // long a collection takes, and on a loaded machine it expired mid-mark -- so the "quiet
+        // window" the hazards below rely on was not quiet, and the run proved nothing.
+        long before = marksDone();
         System.gc();
-        Thread.sleep(120);
+        if (handshake) {
+            awaitMarkEnd(before, 20000);
+        } else {
+            Thread.sleep(120);
+        }
     }
 
     private static long scrub(int depth) {

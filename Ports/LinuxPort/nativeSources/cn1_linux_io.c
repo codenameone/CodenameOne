@@ -36,6 +36,8 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/file.h>
 #include <dirent.h>
 #include <time.h>
 #include <libgen.h>
@@ -249,6 +251,68 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_fileExists___java_lang_String_
     const char* p = cn1JStr(threadStateData, path);
     struct stat st;
     return (p && stat(p, &st) == 0) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/*
+ * Creates a file only if it does not exist, and says which of the two happened.
+ *
+ * O_CREAT|O_EXCL is settled in the kernel, so two processes racing here cannot both be told they
+ * created it. That is what a first managed database key needs: without it both processes generate
+ * a key, each overwrites the other, and the database ends up encrypted under one that no longer
+ * exists anywhere.
+ *
+ * 1 created, 0 already there, -1 the attempt failed for another reason.
+ */
+/*
+ * Takes an exclusive lock on a file, creating it if needed, and answers the descriptor holding it.
+ *
+ * A lock rather than the file's existence, because the kernel releases it when the process ends
+ * however it ends. A process that died between creating a gate file and storing its value left
+ * that file behind forever, and every later attempt read it as a live writer -- so the key could
+ * never be created again. There is nothing to leave behind here: the lock is the open descriptor.
+ *
+ * Blocking, so a caller waits for whoever holds it rather than proceeding as though the entry
+ * were absent. 0 when the lock could not be taken.
+ */
+JAVA_LONG com_codename1_impl_linux_LinuxNative_fileLockExclusive___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
+    const char* p = cn1JStr(threadStateData, path);
+    int fd;
+    if (p == NULL) {
+        return 0;
+    }
+    fd = open(p, O_CREAT | O_RDWR, 0600);
+    if (fd < 0) {
+        return 0;
+    }
+    if (flock(fd, LOCK_EX) != 0) {
+        close(fd);
+        return 0;
+    }
+    /* +1 so a valid descriptor 0 is not reported as failure. */
+    return (JAVA_LONG) (fd + 1);
+}
+
+/* Releases what fileLockExclusive took; closing the descriptor drops the lock. */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_fileUnlock___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    if (handle > 0) {
+        int fd = (int) (handle - 1);
+        flock(fd, LOCK_UN);
+        close(fd);
+    }
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_fileCreateExclusive___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
+    const char* p = cn1JStr(threadStateData, path);
+    int fd;
+    if (p == NULL) {
+        return -1;
+    }
+    fd = open(p, O_CREAT | O_EXCL | O_WRONLY, 0600);
+    if (fd >= 0) {
+        close(fd);
+        return 1;
+    }
+    return errno == EEXIST ? 0 : -1;
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_fileIsDirectory___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {

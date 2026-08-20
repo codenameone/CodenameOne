@@ -6,27 +6,32 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl.ios;
 
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
-import com.codename1.db.Row;
-import com.codename1.db.RowExt;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
+import com.codename1.impl.AbstractDBCursor;
+import com.codename1.impl.SQLStatementSplitter;
+import com.codename1.impl.SQLText;
+
 import java.io.IOException;
+import java.util.Vector;
 
 /**
  * Implementation of the database SQL API
@@ -35,267 +40,609 @@ import java.io.IOException;
  */
 class DatabaseImpl extends Database {
     private long peer;
-    
-    public DatabaseImpl(String dbName) {
-        peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(dbName);
+
+    /**
+     * Cursors opened from this database. Closing the database finalizes its statements, so the
+     * cursors have to be marked dead rather than left holding freed pointers.
+     */
+    private final Vector openCursors = new Vector();
+
+    /** The file this connection is open on, for the shared registry a key change consults. */
+    private final String openKey;
+
+    /**
+     * The name a managed key for this database is filed under.
+     *
+     * <p>Not the same string as {@link #openKey}. That one identifies the file for the registry
+     * and is the absolute path, which on iOS moves: a restored application gets a fresh container,
+     * so the same database comes back under a different one. An alias that moved with it would
+     * leave the restored keychain holding the key under the old container while the open derived
+     * a new one under the new container -- a wrong key against intact data. So the alias is the
+     * path with the container taken off, and it is derived by the same method the open path uses.
+     */
+    private final String aliasKey;
+
+    public DatabaseImpl(String databaseName, String path) throws IOException {
+        // Normalized, so two spellings of one path are one registry entry: the claim a key
+        // change takes is worth nothing if the other connection is filed under "/a/./b".
+        this.aliasKey = IOSImplementation.managedKeyAliasForPath(path);
+        // The same string, and it has to be. Database.delete and the conversion claim ask the
+        // implementation for the identity and count registrations under what comes back, so a
+        // connection filed under the absolute path was invisible to a delete asking about the
+        // container-relative one -- the open-database guard stopped firing and a database was
+        // unlinked underneath a live connection. Two spellings of one database still meet here,
+        // because the path is resolved before the container is taken off it.
+        this.openKey = aliasKey;
+        // Registration first, because it is also the refusal: a key change in progress is rewriting
+        // this file, and opening it before asking would touch it mid-rewrite and leave the handle
+        // behind when the refusal arrived.
+        registerOpenDatabase(openKey);
+        boolean opened = false;
+        try {
+            peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
+            opened = true;
+        } finally {
+            if (!opened) {
+                // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
+            }
+        }
     }
-    
+
+    /// SQLite's success code.
+    private static final int SQLITE_OK = 0;
+
+    /// SQLite's "this is not a database file", which is what a wrong key looks like.
+    private static final int SQLITE_NOTADB = 26;
+
+    public DatabaseImpl(String databaseName, String path, String key) throws IOException {
+        // Normalized, so two spellings of one path are one registry entry: the claim a key
+        // change takes is worth nothing if the other connection is filed under "/a/./b".
+        this.aliasKey = IOSImplementation.managedKeyAliasForPath(path);
+        // The same string, and it has to be. Database.delete and the conversion claim ask the
+        // implementation for the identity and count registrations under what comes back, so a
+        // connection filed under the absolute path was invisible to a delete asking about the
+        // container-relative one -- the open-database guard stopped firing and a database was
+        // unlinked underneath a live connection. Two spellings of one database still meet here,
+        // because the path is resolved before the container is taken off it.
+        this.openKey = aliasKey;
+        // See the other constructor: the registration is what refuses an open during a key change,
+        // so it has to happen before the file is touched.
+        registerOpenDatabase(openKey);
+        boolean opened = false;
+        try {
+            peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
+            int status = IOSImplementation.nativeInstance.sqlDbApplyKeyStatus(peer, key);
+            if (status != SQLITE_OK) {
+                IOSImplementation.nativeInstance.sqlDbClose(peer);
+                peer = 0;
+                if (status == SQLITE_NOTADB) {
+                    throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                            "The supplied key does not decrypt this database");
+                }
+                // A corrupt image or a read error. Reporting it as a wrong key would send an
+                // application that follows the error codes into prompting for a passphrase forever.
+                throw new IOException("The database " + databaseName + " could not be read, SQLite "
+                        + "result " + status);
+            }
+            opened = true;
+        } finally {
+            if (!opened) {
+                // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
+            }
+        }
+    }
+
     public static long getPeer(Object db) {
         if (db instanceof DatabaseImpl) {
             return ((DatabaseImpl)db).peer;
         }
         return 0l;
     }
-    
+
+    private void checkOpen() throws IOException {
+        if (peer == 0) {
+            throw new IOException("This database has been closed");
+        }
+    }
+
+    private void requireSingleStatement(String sql) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
+        if (SQLStatementSplitter.isMultiStatement(sql)) {
+            throw new IOException("This method takes a single SQL statement, but the string "
+                    + "contains " + SQLStatementSplitter.countStatements(sql)
+                    + ". Use execute(String) to run a script.");
+        }
+    }
+
     @Override
     public void beginTransaction() throws IOException {
-        execute("BEGIN");
+        checkOpen();
+        checkBeginTransaction();
+        try {
+            executeScript("BEGIN");
+        } catch (IOException err) {
+            inTransaction = false;
+            throw err;
+        }
     }
 
     @Override
     public void commitTransaction() throws IOException {
-        execute("COMMIT");
+        checkOpen();
+        checkEndTransaction();
+        try {
+            executeScript("COMMIT");
+        } catch (IOException err) {
+            // SQLite leaves the transaction open when COMMIT fails, so discard it here.
+            rollbackQuietly();
+            throw abandonFailedCommit(err);
+        }
+        markTransactionEnded();
+    }
+
+    /// Rolls back without reporting a failure, for the path where a commit has already failed and
+    /// the engine may or may not have left the transaction open.
+    private void rollbackQuietly() {
+        try {
+            executeScript("ROLLBACK");
+        } catch (Throwable ignored) {
+            // Nothing to recover: the caller is already reporting the commit failure.
+        }
     }
 
     @Override
     public void rollbackTransaction() throws IOException {
-        execute("ROLLBACK");
+        checkOpen();
+        checkEndTransaction();
+        executeScript("ROLLBACK");
+        markTransactionEnded();
     }
 
-    public void finalize() {
-        try {
-            close();
-        } catch(Throwable t) {
-        }
-    }
-    
     @Override
     public void close() throws IOException {
-        if(peer != 0) {
-            IOSImplementation.nativeInstance.sqlDbClose(peer);
-            peer = 0;
+        if (peer == 0) {
+            return;
         }
+        if (inTransaction) {
+            inTransaction = false;
+            try {
+                executeScript("ROLLBACK");
+            } catch (IOException ignored) {
+                // Best effort; the close below is what matters.
+            }
+        }
+        // Invalidate before closing: the statements belong to the connection and go with it.
+        Object[] cursors = new Object[openCursors.size()];
+        openCursors.copyInto(cursors);
+        openCursors.removeAllElements();
+        for (int iter = 0; iter < cursors.length; iter++) {
+            ((CursorImpl)cursors[iter]).databaseClosed();
+        }
+        long closing = peer;
+        peer = 0;
+        try {
+            IOSImplementation.nativeInstance.sqlDbClose(closing);
+        } finally {
+            // Last, not first: until the native handle is gone this connection still holds and
+            // locks the file, and giving the claim back sooner lets another connection start
+            // rewriting it underneath a rollback that has not finished. In a finally so that a
+            // close which fails cannot strand the claim: the handle is already cleared, so
+            // nothing later would give it back, and every delete and key change of this database
+            // would be refused for the life of the process.
+            // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
+        }
+    }
+
+    @Override
+    public void changeKey(DatabaseConfig config) throws IOException {
+        checkOpen();
+        checkNoTransactionForKeyChange();
+        // Rotating a key rewrites the file under the new one for this connection only; another
+        // connection keeps the old key and fails at the first rewritten page it reads.
+        requireSoleConnectionForKeyChange(openKey);
+        try {
+            String key = null;
+            if (config != null && config.isEncrypted()) {
+                // The resolved file, as the open path does: an implicit managed key is stored
+                // under what is passed here, and re-keying under the raw name would write a second
+                // key that the next open, which resolves the file, would not find.
+                key = config.resolveKeyMaterial(aliasKey);
+            }
+            IOSImplementation.nativeInstance.sqlDbRekey(peer, key);
+        } finally {
+            releaseKeyChangeClaim(openKey);
+        }
+    }
+
+    private void executeScript(String sql) throws IOException {
+        IOSImplementation.nativeInstance.sqlDbExecScript(peer, sql);
     }
 
     @Override
     public void execute(String sql) throws IOException {
-        IOSImplementation.nativeInstance.sqlDbExec(peer, sql, null);
+        checkOpen();
+        // Before the engine runs it: an ATTACH of a database that is being deleted has to be
+        // refused rather than undone, because undoing it can fail while the delete proceeds.
+        reserveAttachments(sql);
+        // sqlite3_exec runs a whole script, which is the portable contract -- and which means a
+        // failure partway leaves everything before the failing statement done.
+        try {
+            executeScript(sql);
+        } finally {
+            // Read back from the engine rather than inferred from the script. sqlite3_exec stops
+            // at the statement that failed, so a trailing COMMIT in the text may never have run.
+            // The names first: an outermost SAVEPOINT opens a transaction that only its own
+            // RELEASE ends, and the engine reports a boolean without saying which savepoint owns
+            // it. A later RELEASE arriving through a parameterized overload -- which has no engine
+            // read of its own -- would otherwise go unrecognized and leave this believing a
+            // transaction was still open forever.
+            noteScriptTransactionControl(sql);
+            noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+        }
     }
 
     @Override
     public void execute(String sql, String[] params) throws IOException {
-        IOSImplementation.nativeInstance.sqlDbExec(peer, sql, params);
+        checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its
+        // file in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
+        requireSingleStatement(sql);
+        // Bind through the statement API rather than the older sqlDbExec, which binds only the
+        // values it is given and ignores the placeholder count: too few left placeholders bound to
+        // NULL and extra values were discarded, both silently.
+        try {
+            long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+            bindText(stmt, params);
+            IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction
+            // as it fails, so reading only on the success path would hold the flag over a
+            // transaction that is gone and refuse every begin and key change until close.
+            noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+        }
     }
 
     @Override
-    public void execute(String sql, Object... params) throws IOException{
-        // temporary workaround, this will probably fail with blobs
-        String[] val = new String[params.length];
-        for(int iter = 0 ; iter < val.length ; iter++) {
-            if(params[iter] == null) {
-                val[iter] = null;
-            } else {
-                val[iter] = "" + params[iter];
-            }
+    public void execute(String sql, Object... params) throws IOException {
+        if (params == null) {
+            // Only a null array means "no parameters at all". An explicitly empty one is still a
+            // parameterized call, so it goes down the path below and is held to both the
+            // single-statement rule and the parameter count -- otherwise
+            // execute("INSERT ... VALUES (?)", new Object[0]) would run with the slot unbound.
+            execute(sql);
+            return;
         }
-        execute(sql, val);
+        checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its file
+        // in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
+        requireSingleStatement(sql);
+        if (isLegacyBehavior()) {
+            // Everything used to be stringified here, which stored an Integer as TEXT.
+            execute(sql, coerceToText(params, "execute"));
+            return;
+        }
+        try {
+            long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+            bind(stmt, params);
+            IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction
+            // as it fails, so reading only on the success path would hold the flag over a
+            // transaction that is gone and refuse every begin and key change until close.
+            noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+        }
     }
 
     @Override
     public Cursor executeQuery(String sql, String[] params) throws IOException {
-        return new CursorImpl(IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, params));
+        checkOpen();
+        requireSingleStatement(sql);
+        requireQueryStatement(sql);
+        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        bindText(stmt, params);
+        return register(new CursorImpl(stmt), sql);
+    }
+
+    @Override
+    public Cursor executeQuery(String sql, Object... params) throws IOException {
+        if (params == null || params.length == 0) {
+            if (params != null) {
+                requireSingleStatement(sql);
+                requireQueryStatement(sql);
+            }
+            return executeQuery(sql);
+        }
+        checkOpen();
+        requireSingleStatement(sql);
+        requireQueryStatement(sql);
+        if (isLegacyBehavior()) {
+            return executeQuery(sql, coerceToText(params, "executeQuery"));
+        }
+        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        bind(stmt, params);
+        return register(new CursorImpl(stmt), sql);
     }
 
     @Override
     public Cursor executeQuery(String sql) throws IOException {
-        return new CursorImpl(IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null));
+        checkOpen();
+        requireSingleStatement(sql);
+        requireQueryStatement(sql);
+        if (isLegacyBehavior()) {
+            return register(new CursorImpl(
+                    IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null)), sql);
+        }
+        // Prepared rather than handed to sqlDbExecQuery, which binds nothing when given a null
+        // argument array: a statement with placeholders would run with every slot left as NULL
+        // instead of reporting the parameters the caller did not supply.
+        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        // Finalized here because this path does not go through the bind helpers, which are what
+        // own the statement everywhere else.
+        try {
+            checkParameterCount(stmt, 0);
+        } catch (IOException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        }
+        return register(new CursorImpl(stmt), sql);
     }
 
-    class CursorImpl implements Cursor, RowExt {
-        private long peer;
-        private int position = -1;
-        private boolean null_last_read_value = true;
-        
-        public CursorImpl(long peer) {
-            this.peer = peer;
-        }
-        
-        @Override
-        public boolean first() throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            position = -1;
-            return IOSImplementation.nativeInstance.sqlCursorFirst(peer);
-        }
+    private Cursor register(CursorImpl cursor, String sql) {
+        cursor.owner = this;
+        // A statement that writes must never be re-executed to move backwards: this cursor is
+        // stepped to run it, so a getCount() or last() would write again. The cursor refuses
+        // rather than doing it twice.
+        cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
+        openCursors.addElement(cursor);
+        return cursor;
+    }
 
-        @Override
-        public boolean last() throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            throw new IOException("Unsupported");
-        }
 
-        @Override
-        public boolean next() throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            if(IOSImplementation.nativeInstance.sqlCursorNext(peer)) {
-                position++;
-                return true;
-            }
-            return false;
+    /// Re-reads the transaction state from the engine.
+    ///
+    /// A cursor calls this when a step fails, because the failure may have ended the transaction
+    /// underneath the tracking. Separate from the read the execute paths do inline only because a
+    /// cursor is not this class and cannot reach the inherited hook itself.
+    void reconcileTransactionState() {
+        if (peer == 0) {
+            return;
         }
+        noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+    }
 
-        @Override
-        public boolean prev() throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            throw new IOException("Unsupported");
-        }
+    void unregister(CursorImpl cursor) {
+        openCursors.removeElement(cursor);
+    }
 
-        @Override
-        public int getColumnIndex(String columnName) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            for(int iter = 0 ; true ; iter++) {
-                String n = getColumnName(iter);
-                if(n == null) {
-                    return -1;
-                }
-                if(n.equalsIgnoreCase(columnName)) {
-                    return iter;
+    /** Binds every value as text, rejecting a count that does not match the statement. */
+    private void bindText(long stmt, String[] params) throws IOException {
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            int len = params == null ? 0 : params.length;
+            checkParameterCount(stmt, len);
+            for (int iter = 0; iter < len; iter++) {
+                if (params[iter] == null) {
+                    IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, iter + 1);
+                } else {
+                    IOSImplementation.nativeInstance.sqlStmtBindText(stmt, iter + 1,
+                            SQLText.toUTF8(params[iter]));
                 }
             }
+        } catch (IOException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        }
+    }
+
+    private void checkParameterCount(long stmt, int supplied) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
+        int declared = IOSImplementation.nativeInstance.sqlStmtParameterCount(stmt);
+        if (declared != supplied) {
+            // Deliberately does NOT finalize. The bind helpers that call this own the statement
+            // and finalize it when anything in them throws, so doing it here too would finalize
+            // the same pointer twice -- undefined behaviour, and a crash rather than the
+            // parameter-count error this is supposed to report.
+            throw new IOException("The statement has " + declared + " parameters but "
+                    + supplied + " were supplied");
+        }
+    }
+
+    /** Binds by runtime type, so an Integer is stored as INTEGER rather than as its text form. */
+    private void bind(long stmt, Object[] params) throws IOException {
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        // The binding loop itself is a separate method because a failed cast is not an exception
+        // on every runtime this framework targets, so a cast must not sit inside a block that
+        // catches RuntimeException -- there would be nothing for that handler to catch.
+        try {
+            checkParameterCount(stmt, params.length);
+            bindEach(stmt, params);
+        } catch (IOException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        }
+    }
+
+    /** The typed binds themselves, outside any catch region. See bind(long, Object[]). */
+    private void bindEach(long stmt, Object[] params) throws IOException {
+        for (int iter = 0; iter < params.length; iter++) {
+            Object p = params[iter];
+            int index = iter + 1;
+            if (p == null) {
+                IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, index);
+            } else if (p instanceof byte[]) {
+                IOSImplementation.nativeInstance.sqlStmtBindBlob(stmt, index, (byte[])p);
+            } else if (p instanceof String) {
+                IOSImplementation.nativeInstance.sqlStmtBindText(stmt, index,
+                        SQLText.toUTF8((String)p));
+            } else if (p instanceof Double || p instanceof Float) {
+                IOSImplementation.nativeInstance.sqlStmtBindDouble(stmt, index,
+                        ((Number)p).doubleValue());
+            } else if (p instanceof Long || p instanceof Integer || p instanceof Short
+                    || p instanceof Byte) {
+                IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
+                        ((Number)p).longValue());
+            } else if (p instanceof Boolean) {
+                IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
+                        ((Boolean)p).booleanValue() ? 1 : 0);
+            } else {
+                IOSImplementation.nativeInstance.sqlStmtBindText(stmt, index,
+                        SQLText.toUTF8(p.toString()));
+            }
+        }
+    }
+
+    /**
+     * Cursor over a compiled statement.
+     *
+     * A sqlite3_stmt only steps forward, so seeking backwards resets it and steps again. That is
+     * what AbstractDBCursor is built around, and it is the same strategy Android's own cursor uses
+     * when a requested row falls outside its window. Buffering rows instead would mean copying
+     * every column of every row stepped past, blobs included.
+     */
+    static class CursorImpl extends AbstractDBCursor {
+        private long stmt;
+        DatabaseImpl owner;
+
+        CursorImpl(long stmt) {
+            this.stmt = stmt;
+        }
+
+        /** Marks the cursor dead because the connection that owned its statement has gone. */
+        void databaseClosed() {
+            // Finalize first. sqlite3_close_v2 with an outstanding statement leaves a zombie
+            // connection alive until that statement is finalized, and dropping the only handle to
+            // it here would mean that could never happen.
+            if (stmt != 0) {
+                long closing = stmt;
+                stmt = 0;
+                try {
+                    IOSImplementation.nativeInstance.sqlStmtFinalize(closing);
+                } catch (Throwable alreadyGone) {
+                    // The connection is going away regardless; nothing useful to report.
+                }
+            }
+            invalidate();
+        }
+
+        /// Lets the database that created this cursor pass on what the SQL does. The hook it
+        /// forwards to is protected, so only a subclass can reach it.
+        void statementWrites(boolean writes) {
+            noteStatementWrites(writes);
         }
 
         @Override
-        public String getColumnName(int columnIndex) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            return IOSImplementation.nativeInstance.sqlGetColName(peer, columnIndex);
+        protected void rewind() throws IOException {
+            IOSImplementation.nativeInstance.sqlStmtReset(stmt);
         }
 
         @Override
-        public int getPosition() throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            return position;
-        }
-
-        @Override
-        public boolean position(int row) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            throw new IOException("Unsupported");
-        }
-
-        @Override
-        public void close() throws IOException {
-            // if the database was closed do not close the SQL cursor!
-            if(peer != 0 && DatabaseImpl.this.peer != 0) {
-                IOSImplementation.nativeInstance.sqlCursorCloseStatement(peer);
-                peer = 0;
-            }
-        }
-
-        public void finalize() {
+        protected boolean stepForward() throws IOException {
             try {
-                close();
-            } catch(Throwable t) {
+                return IOSImplementation.nativeInstance.sqlStmtStep(stmt);
+            } catch (IOException failed) {
+                if (owner != null) {
+                    // A statement runs its work here, not at prepare: an INSERT ... RETURNING
+                    // reached through executeQuery does its insert on this step. A constraint
+                    // with ON CONFLICT ROLLBACK therefore ends the transaction as this fails,
+                    // and without reading the engine back the flag would stay set over a
+                    // transaction that is gone -- refusing every later begin and key change,
+                    // and failing the rollback that would have cleared it.
+                    owner.reconcileTransactionState();
+                }
+                throw failed;
             }
-        }
-        
-        @Override
-        public Row getRow() throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            return this;
         }
 
         @Override
-        public byte[] getBlob(int index) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
+        protected void closeImpl() throws IOException {
+            if (owner != null) {
+                owner.unregister(this);
             }
-            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnBlob(peer, index);
+            if (stmt != 0) {
+                long closing = stmt;
+                stmt = 0;
+                IOSImplementation.nativeInstance.sqlStmtFinalize(closing);
+            }
         }
 
         @Override
-        public double getDouble(int index) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnDouble(peer, index);
+        protected int columnCount() throws IOException {
+            return IOSImplementation.nativeInstance.sqlCursorGetColumnCount(stmt);
         }
 
         @Override
-        public float getFloat(int index) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnFloat(peer, index);
+        protected String columnLabel(int columnIndex) throws IOException {
+            return SQLText.fromUTF8(IOSImplementation.nativeInstance.sqlGetColName(stmt, columnIndex));
         }
 
         @Override
-        public int getInteger(int index) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnInteger(peer, index);
+        protected boolean isNullAt(int index) throws IOException {
+            return IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(stmt, index);
         }
 
         @Override
-        public long getLong(int index) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnLong(peer, index);
+        protected boolean legacyWasNullBeforeAnyRead() {
+            // iOS answered wasNull() by asking the statement about the last column index it was
+            // given, which starts at zero, so before any read it reported on column zero of the
+            // current row rather than saying nothing had been read.
+            return true;
         }
 
         @Override
-        public short getShort(int index) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnShort(peer, index);
+        protected String readString(int index) throws IOException {
+            return SQLText.fromUTF8(
+                    IOSImplementation.nativeInstance.sqlCursorValueAtColumnText(stmt, index));
         }
 
         @Override
-        public String getString(int index) throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            null_last_read_value = IOSImplementation.nativeInstance.sqlCursorNullValueAtColumn(peer, index);
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnString(peer, index);
+        protected byte[] readBlob(int index) throws IOException {
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnBlob(stmt, index);
         }
-        
-        @Override
-        public boolean wasNull() throws IOException {
-            return null_last_read_value;
-        }
-        
 
         @Override
-        public int getColumnCount() throws IOException {
-            if(peer == 0) {
-                throw new IOException("Working with a closed cursor");
-            }
-            return IOSImplementation.nativeInstance.sqlCursorGetColumnCount(peer);
+        protected double readDouble(int index) throws IOException {
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnDouble(stmt, index);
+        }
+
+        @Override
+        protected long readLong(int index) throws IOException {
+            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnLong(stmt, index);
+        }
+
+        @Override
+        protected boolean isLegacyFirstRewind() {
+            // first() used to be a bare sqlite3_reset that reported success even for an empty
+            // result set, leaving the statement off a row.
+            return Database.isLegacyBehavior();
         }
     }
 }

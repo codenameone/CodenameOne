@@ -566,6 +566,15 @@ public final class PlatformFeatureCatalog {
         // drives the camera. The com.google.ar.core meta-data marks
         // ARCore optional so the app still installs on non-AR devices;
         // the android.ar.required=true build hint flips it to required.
+        // Encrypted databases. Keyed on DatabaseConfig rather than on the db package: every
+        // application that uses a database references com.codename1.db, but only the ones that
+        // encrypt reference DatabaseConfig, and SQLCipher's minimum SDK is above ours.
+        e.add(new Entry("com/codename1/db/DatabaseConfig")
+                .androidGradle("net.zetetic:sqlcipher-android:4.17.0@aar")
+                .androidGradle("androidx.sqlite:sqlite:2.4.0")
+                .androidMinimumSdk(23)
+                .description("Encrypted SQLite databases (SQLCipher)"));
+
         e.add(new Entry("com/codename1/ar/")
                 .iosFrameworks("ARKit", "SceneKit")
                 .iosPlist("NSCameraUsageDescription",

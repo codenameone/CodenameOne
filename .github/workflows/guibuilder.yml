@@ -105,7 +105,13 @@ jobs:
           export JAVA_HOME="${JAVA_HOME_8}"
           export PATH="${JAVA_HOME}/bin:${PATH}"
           cd scripts/guibuilder
-          xvfb-run -a mvn -B -pl javase -am -Pexecutable-jar package \
+          # Through the retry wrapper: this step resolves plugins from Maven Central, and the
+          # runner edge intermittently resets the connection mid-download, which Maven treats as a
+          # permanent resolution failure -- the packaging died on a truncated
+          # org.eclipse.sisu.plexus jar with every test already green. A real packaging failure
+          # fails the same way on each attempt, so retrying costs only time. See scripts/ci/retry.sh.
+          xvfb-run -a bash ../../scripts/ci/retry.sh \
+            mvn -B -pl javase -am -Pexecutable-jar package \
             -Dcodename1.platform=javase -Dmaven.test.skip=true
           ls javase/target/codenameone-guibuilder-*.jar
 

@@ -1,9 +1,35 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 #include "cn1_globals.h"
 #include "java_io_File.h"
 #include "java_lang_String.h"
 
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <Foundation/Foundation.h>
+// realpath and PATH_MAX, named rather than left to whatever Foundation happens to pull in.
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 
 JAVA_BOOLEAN java_io_File_existsImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
@@ -261,7 +287,24 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
         NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
         absPath = [cwd stringByAppendingPathComponent:p];
     }
-    NSString* canon = [absPath stringByStandardizingPath];
+    // realpath first, which is what getCanonicalPath is specified to do and what the platform
+    // itself resolves a path to. -stringByStandardizingPath is neither: it leaves a symbolic
+    // link in the middle of a path alone, and it rewrites /private/tmp and /private/var back to
+    // /tmp and /var -- the opposite direction from every other resolver on the system. SQLite
+    // reports the realpath form for an attached database, so a key built from the standardized
+    // form named a file the engine had never heard of.
+    //
+    // Falls back for a path that does not exist yet, where realpath cannot answer at all.
+    NSString* canon = nil;
+    char resolved[PATH_MAX];
+    const char* utf8 = [absPath fileSystemRepresentation];
+    if (utf8 != NULL && realpath(utf8, resolved) != NULL) {
+        canon = [[NSFileManager defaultManager] stringWithFileSystemRepresentation:resolved
+                                                                           length:strlen(resolved)];
+    }
+    if (canon == nil) {
+        canon = [absPath stringByStandardizingPath];
+    }
     JAVA_OBJECT res = fromNSString(CN1_THREAD_STATE_PASS_ARG canon);
     [pool release];
     finishedNativeAllocations();

@@ -742,6 +742,14 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+    /** The catalog entry that carries the SQLCipher dependencies and their minimum SDK. */
+    private static final String DATABASE_CIPHER_CATALOG_CLASS = "com/codename1/db/DatabaseConfig";
+
+    boolean dbCipherSupport;
+
+    /// Whether the application touches com.codename1.db at all, which is what the database
+    /// compatibility default is keyed on.
+    private boolean usesDatabase;
     private boolean visionSupport;
     private boolean inferenceSupport;
     private boolean languageSupport;
@@ -1763,6 +1771,23 @@ public class AndroidGradleBuilder extends Executor {
         // thread. The mutable feature flags and source set are intentionally
         // unsynchronized; parallelizing the scanner requires revisiting them.
         try {
+            DatabaseUsage databaseUsage = scanForDatabaseUsage(dummyClassesDir);
+            // libs as well as the classes: unzip writes submitted library jars there, and the
+            // generated gradle links them through a fileTree, so encryption used only inside a
+            // library is invisible to a scan of the loose class tree -- and the build would then
+            // delete the cipher implementation out from under the library that calls it.
+            DatabaseUsage libraryUsage = scanForDatabaseUsage(libsDir);
+            usesDatabase = databaseUsage.usesDatabase() || libraryUsage.usesDatabase();
+            // Keeps the SQLCipher-backed impl package, which is deleted below for apps that never
+            // encrypt, and pulls in the AAR through the catalog. The AAR carries minSdk 23, so a
+            // false positive here raises the floor of every application that never encrypts.
+            dbCipherSupport = databaseUsage.usesDatabaseCipher()
+                    || libraryUsage.usesDatabaseCipher();
+            if (dbCipherSupport) {
+                // Fed by name rather than by the scan, so the catalog applies its dependencies and
+                // its minimum SDK only when the application itself configures encryption.
+                aiAcc.consume(DATABASE_CIPHER_CATALOG_CLASS);
+            }
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
                 @Override
                 public void implementsInterface(String cls, String iface) {
@@ -1789,7 +1814,15 @@ public class AndroidGradleBuilder extends Executor {
 
                 @Override
                 public void usesClass(String cls) {
-                    aiAcc.consume(cls);
+                    // The catalog matches on a class reference and this callback cannot say which
+                    // class made one, so the SQLCipher entry is withheld here and fed from the
+                    // attributed scan below instead. Display references DatabaseConfig, so letting
+                    // it through adds both SQLCipher dependencies and takes minSdk to 23 for every
+                    // application -- which the later deletion of the cipher source package does
+                    // not undo, since the dependency and the floor are already in the gradle file.
+                    if (!DATABASE_CIPHER_CATALOG_CLASS.equals(cls)) {
+                        aiAcc.consume(cls);
+                    }
                     String aiAdapter = androidAiAdapterSource(cls);
                     if (aiAdapter != null) {
                         includedAiAdapterSources.add(aiAdapter);
@@ -1805,6 +1838,11 @@ public class AndroidGradleBuilder extends Executor {
                             && cls.indexOf("com/codename1/ai/language/") == 0) {
                         languageSupport = true;
                     }
+                    // Deliberately not scanned here. This callback cannot say which class made
+                    // the reference, and the tree it walks is the application merged with the
+                    // framework, where Display alone carries openOrCreate(String, DatabaseConfig)
+                    // -- so the cipher gate would answer yes for every application ever built and
+                    // raise its minimum SDK to 23 for nothing. Attributed below instead.
                     if (cls.indexOf("com/codename1/ar/") == 0) {
                         // Keeps the ARCore-backed impl sources (deleted for
                         // non-AR apps below) and bumps minSdk to the ARCore
@@ -3646,6 +3684,21 @@ public class AndroidGradleBuilder extends Executor {
             arPackage.delete();
         }
 
+        if (!dbCipherSupport) {
+            // The SQLCipher-backed database impl compiles against net.zetetic, which is only on
+            // the classpath when the catalog has added the dependency. AndroidImplementation
+            // reaches it through reflection only, so deleting it here costs nothing for apps that
+            // never open an encrypted database, and saves them the native library.
+            File cipherPackage = new File(srcDir, "com/codename1/impl/android/cipher");
+            File[] cipherFiles = cipherPackage.listFiles();
+            if (cipherFiles != null) {
+                for (File f : cipherFiles) {
+                    f.delete();
+                }
+            }
+            cipherPackage.delete();
+        }
+
         pruneOptionalAiSources(srcDir);
 
         final String moPubAdUnitId = request.getArg("android.mopubId", null);
@@ -4065,6 +4118,7 @@ public class AndroidGradleBuilder extends Executor {
         if (useHMS) {
             nativeThemeStubProps += "        Display.getInstance().setProperty(\"cn1.push.transport\", \"huawei\");\n";
         }
+        nativeThemeStubProps += databaseLegacyStubProperty(request, usesDatabase);
 
         String gcmSenderId = request.getArg("gcm.sender_id", null);
         if (gcmSenderId != null) {

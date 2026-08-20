@@ -8,17 +8,22 @@
     <packaging>jar</packaging>
     <name>sqlite-jdbc</name>
     <properties>
-        <sqlite.jdbc.version>3.46.1.0</sqlite.jdbc.version>
+        <sqlite.jdbc.version>3.53.4.0</sqlite.jdbc.version>
         <!--
-        Frozen: this module just shades org.xerial:sqlite-jdbc, so it only changes
-        when sqlite.jdbc.version or the shade config does, yet it was 13.5MB of every
-        release. Consumers resolve the last published build via
-        ${cn1.sqlite.jdbc.version} in the parent. To release a new one, bump that
-        property and drop sqlite-jdbc from <excludeArtifacts> in the parent pom for
-        that release (this property alone does not stop publication - the
-        central-publishing plugin takes over the deploy phase and ignores it).
+        This shades io.github.willena:sqlite-jdbc rather than org.xerial:sqlite-jdbc.
+        The willena build is the xerial driver with the SQLite3MC encryption extension
+        compiled into its native library: same org.sqlite package, same SQLiteConfig,
+        same behaviour on unencrypted databases, plus the SQLCipher-compatible cipher
+        the simulator needs in order to open databases created on a device. The two
+        cannot coexist on one classpath because they publish identical class names, and
+        relocating either one breaks the Java_org_sqlite_core_NativeDB_* JNI mangling.
         -->
-        <maven.deploy.skip>true</maven.deploy.skip>
+        <!--
+        This module is published again rather than frozen. Freezing assumed the shaded
+        contents never changed; now that the driver carries the SQLite engine used to
+        read encrypted databases, it has to be able to move with upstream security
+        releases, and consumers have to be able to resolve whatever the current one is.
+        -->
     </properties>
     <parent>
         <groupId>com.codenameone</groupId>
@@ -78,7 +83,7 @@
                         <configuration>
                             <artifactItems>
                                 <artifactItem>
-                                    <groupId>org.xerial</groupId>
+                                    <groupId>io.github.willena</groupId>
                                     <artifactId>sqlite-jdbc</artifactId>
                                     <version>${sqlite.jdbc.version}</version> <!-- Set the correct version -->
                                     <classifier>javadoc</classifier>
@@ -122,7 +127,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.xerial</groupId>
+            <groupId>io.github.willena</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>${sqlite.jdbc.version}</version>
         </dependency>

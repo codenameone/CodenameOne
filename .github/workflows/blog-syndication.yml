@@ -40,6 +40,7 @@ jobs:
       - name: Run syndication regression tests
         run: |
           python3 scripts/website/test_syndicate_blog_posts.py
+          python3 scripts/website/test_queue_browser_syndication.py
           python3 scripts/website/test_queue_social_posts.py
           python3 scripts/website/test_syndication_health.py
 
@@ -91,10 +92,10 @@ jobs:
             python3 scripts/website/syndicate_browser_posts.py
           fi
 
-      - name: Queue browser-extension syndication tasks (Medium, DZone)
+      - name: Queue browser-extension syndication tasks (Medium)
         run: |
           set -euo pipefail
-          python3 scripts/website/queue_browser_syndication.py
+          python3 scripts/website/queue_browser_syndication.py --platforms medium
 
       # LinkedIn's weekly blog-post syndication is paused. Keep validating
       # existing artifacts so malformed inputs still fail CI, but do not add
