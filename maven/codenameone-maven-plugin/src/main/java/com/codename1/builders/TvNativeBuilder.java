@@ -75,7 +75,22 @@ class TvNativeBuilder {
     private static final String EXCLUDED_TV_SOURCES =
             "CN1ES2compat.m CN1ES1compat.m EAGLView.m "
             + "CodenameOne_GLViewController.xib MainWindow.xib "
-            + "CodenameOne_METALViewController.xib MainWindowMETAL.xib";
+            + "CodenameOne_METALViewController.xib MainWindowMETAL.xib "
+            // App Intents and the snippet renderer are staged into <Main>-src for the iOS
+            // app target, and this builder copies that directory wholesale -- so declaring
+            // an intent made the tvOS slice compile App Intents types that need tvOS 16
+            // against a target whose floor is 13, 48 errors' worth. Excluded rather than
+            // availability-widened because the feature is already compiled out here:
+            // CodenameOne_GLViewController.h undefines CN1_USE_INTENTS for TARGET_OS_TV, so
+            // the natives behind these declarations are unsupported stubs on this slice and
+            // shipping the declarations anyway would advertise actions that cannot run.
+            //
+            // The surfaces renderer travels with them because a snippet reuses it; it is
+            // iOS/widget code (GraphicsContext needs tvOS 15) and the tvOS slice built fine
+            // without it before intents started staging it.
+            + "CN1AppIntents.swift CN1AppEntities.swift "
+            + "CN1IntentBridge.swift CN1IntentSnippetView.swift "
+            + "CN1SurfaceRenderer.swift CN1SurfaceModel.swift CN1SurfaceConfig.swift";
 
     // Frameworks the iOS port links that are unavailable on tvOS; ParparVM
     // weak-links these (see -Doptional.frameworks) so the iOS slice is unchanged
