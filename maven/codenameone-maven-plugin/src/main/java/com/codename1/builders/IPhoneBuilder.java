@@ -1364,7 +1364,9 @@ public class IPhoneBuilder extends Executor {
                     // so the old modal Capture API (which only sets
                     // INCLUDE_CAMERA_USAGE) does not pull in the new
                     // AVFoundation-based CN1Camera natives.
-                    if (!usesCn1Camera && cls.indexOf("com/codename1/camera/") == 0) {
+                    if (!usesCn1Camera
+                            && (cls.indexOf("com/codename1/camera/") == 0
+                                || isCameraBackedVisionClass(cls))) {
                         usesCn1Camera = true;
                     }
                     // Augmented reality (com.codename1.ar.*). Gated on actual
@@ -7535,11 +7537,24 @@ public class IPhoneBuilder extends Executor {
     private static boolean isVisionAnalyzerClass(String cls) {
         return "com/codename1/ai/vision/TextRecognizer".equals(cls)
                 || "com/codename1/ai/vision/BarcodeScanner".equals(cls)
+                || "com/codename1/ai/vision/CodeScanner".equals(cls)
                 || "com/codename1/ai/vision/FaceDetector".equals(cls)
                 || "com/codename1/ai/vision/ImageLabeler".equals(cls)
                 || "com/codename1/ai/vision/PoseDetector".equals(cls)
                 || "com/codename1/ai/vision/SelfieSegmenter".equals(cls)
                 || "com/codename1/ai/vision/DocumentScanner".equals(cls);
+    }
+
+    /// The vision classes that drive the camera themselves. An app using one
+    /// of these never names {@code com.codename1.camera} directly, so without
+    /// this the AVFoundation natives behind the preview would be left out of
+    /// the build.
+    ///
+    /// @param cls internal-form class name seen by the scan
+    /// @return whether referencing it means the app opens a camera
+    private static boolean isCameraBackedVisionClass(String cls) {
+        return "com/codename1/ai/vision/CodeScanner".equals(cls)
+                || "com/codename1/ai/vision/VisionCameraView".equals(cls);
     }
 
     private static boolean isLanguageFeatureClass(String cls) {

@@ -22,32 +22,44 @@
  */
 package com.codename1.ai.vision;
 
+import com.codename1.impl.VisionImpl;
 import com.codename1.util.AsyncResource;
 
-/// Reusable, closable on-device analyzer for still images or camera frames.
-///
-/// This is the type {@link VisionCameraView} is parameterized on, so the
-/// concrete analyzer and its result type travel together:
-///
-/// ```java
-/// VisionAnalyzer<Barcode[]> analyzer = new BarcodeScanner();
-/// VisionCameraView<Barcode[]> view = new VisionCameraView<Barcode[]>(analyzer);
-/// ```
-///
-/// Implementations may retain native detectors and models between calls, so
-/// create one analyzer per stream/workflow and close it when finished.
-/// Backend creation, request scheduling, capability checks, and close are
-/// serialized so a concurrent close cannot leave a newly created backend
-/// attached after the analyzer has closed.
-public interface VisionAnalyzer<T> extends AutoCloseable {
-    /// Tests the exact feature/backend pair configured for this analyzer.
-    /// @return {@code true} when the current target supports it
-    boolean isSupported();
-    /// Starts one asynchronous analysis without uploading the image.
-    /// @param image encoded or raw input
-    /// @return asynchronous typed result delivered on the EDT
-    AsyncResource<T> process(VisionImage image);
-    /// Releases native detector/model resources; further processing fails.
+/**
+ * Hand-written {@link VisionImpl} double. Completes each analysis immediately
+ * with whatever {@link #result} holds, so a test drives the scanner by setting
+ * that field and delivering a camera frame.
+ */
+class FakeVisionImpl extends VisionImpl {
+    boolean supported = true;
+    Object result;
+    Throwable failure;
+    int analyzeCount;
+    int closeCount;
+    VisionFeature lastFeature;
+
     @Override
-    void close();
+    public boolean isSupported(VisionFeature feature, String backendId) {
+        return supported;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> AsyncResource<T> analyze(VisionFeature feature, String backendId,
+                                        VisionImage image, VisionOptions options) {
+        analyzeCount++;
+        lastFeature = feature;
+        AsyncResource<T> out = new AsyncResource<T>();
+        if (failure != null) {
+            out.error(failure);
+        } else {
+            out.complete((T) result);
+        }
+        return out;
+    }
+
+    @Override
+    public void close() {
+        closeCount++;
+    }
 }

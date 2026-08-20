@@ -273,18 +273,209 @@ language.
 
 === On-device vision
 
-The vision API accepts JPEG, PNG, NV21, or RGBA8888 data through
-`VisionImage`. `VisionImage.fromCameraFrame(frame)` is normally the
-best way to connect a camera because it copies the frame's
-callback-owned buffers and preserves the frame rotation before analysis
-becomes asynchronous. For an encoded gallery or file image whose pixels
-need an EXIF display rotation, use
-`VisionImage.encoded(bytes, rotationDegrees)`; the one-argument overload
-assumes the stored pixels are already upright and doesn't inspect EXIF
-metadata. Each analyzer returns stable Codename One result types. Bounds
-and points use normalized coordinates in the range 0 through 1.
-`VisionOptions.minimumConfidence(...)` clamps finite and infinite values to
-that range and rejects NaN.
+The vision API is three layers deep, and most applications only need the
+first one. Start with the finished screen, drop to a component when the
+screen has to look like your own, and drop to a single analyzer when you
+are working on one image at a time.
+
+==== Scanning a barcode or QR code
+
+`CodeScanner` is an entire scanner screen in one call. It opens the
+camera, decodes, restores the form you came from, and hands back the
+code. This is the replacement for the `cn1-codescan` cn1lib:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-code-scanner,indent=0]
+----
+
+The result completes with `null` when the user backs out -- the cn1lib's
+`scanCanceled()` -- and fails through `except` when the camera cannot be
+opened, which is its `scanError()`. There is no third callback to
+implement.
+
+`CodeScannerOptions` rewords the screen and restricts which symbologies
+end the scan, so a stray product barcode in the frame doesn't complete a
+QR scan:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-code-scanner-options,indent=0]
+----
+
+The `BarcodeFormat` constants are the portable symbology names every
+backend maps onto, so no format literals are needed.
+
+IMPORTANT: Three classes share the name `CodeScanner`. Import
+`com.codename1.ai.vision.CodeScanner`. The other two are the
+`cn1-codescan` cn1lib's `com.codename1.ext.codescan.CodeScanner` and the
+long-deprecated `com.codename1.codescan.CodeScanner` in core, whose
+`getInstance()` returns `null` on current targets.
+
+==== Analyzing the live camera
+
+`VisionCameraView` is a component that owns the camera and runs an
+analyzer over its frames. It handles the session, the frame conversion,
+the keep-only-the-newest backpressure, and the hop back to the EDT; the
+application implements one listener. It works with every analyzer, not
+just barcodes:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-camera-view,indent=0]
+----
+
+The analyzer is constructed by the application rather than named by a
+feature constant. That is deliberate: the builders decide which native
+vision dependency to package from the analyzer classes an application
+references, so building the analyzer in your own code is what keeps a
+face-detection app from also carrying the barcode and pose models.
+
+The camera opens when the view is shown and is released when the user
+navigates away, so a form transition cannot leave the hardware held.
+`close()` additionally releases the analyzer, for a screen that is
+finished with for good.
+
+WARNING: The preview is a native view, and Codename One components cannot
+be painted over it on every platform -- iOS renders native peers behind
+the Codename One layer, Android renders them in front. Put a reticle,
+hints, and buttons around the preview rather than on top of it. Result
+geometry can still be drawn over a *still* image, as below.
+
+==== The analyzers
+
+Each analyzer takes a `VisionImage` and returns a typed result. Create
+one, reuse it across a sequence of images, and close it when finished.
+Check `isSupported()` before offering the feature: availability depends
+on the target, the linked backend, and the OS version.
+
+`VisionImage` accepts JPEG, PNG, NV21, or RGBA8888 data.
+`VisionImage.fromFile(path)` reads a gallery or captured photo,
+`VisionImage.fromImage(image)` takes one already in memory -- passing an
+`EncodedImage`'s original bytes straight through rather than re-encoding
+-- and `VisionImage.fromCameraFrame(frame)` copies a live frame's
+callback-owned buffers and preserves its rotation.
+
+`BarcodeScanner` decodes codes from a still image:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-still-barcode,indent=0]
+----
+
+`TextRecognizer` reads text. Over a file:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-text,indent=0]
+----
+
+Or from the live camera, stopping at the first block that looks like the
+value being hunted for:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-text-live,indent=0]
+----
+
+`FaceDetector` returns bounds, head angles, and named landmarks. Cropping
+a photo to the face it contains:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-face-still,indent=0]
+----
+
+Read individual landmarks with `face.getLandmark(...)` and the
+`FaceLandmarks` constants. Not every backend fills in every field:
+`getSmilingProbability()` and `getTrackingId()` are negative when
+unavailable, and Apple Vision reports neither.
+
+`ImageLabeler` classifies what an image contains:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-labels,indent=0]
+----
+
+The label text is the portable part. `ImageLabel.getIndex()` is a model
+class index that differs between backends and is `-1` on Apple Vision, so
+branch on `getText()`.
+
+`PoseDetector` locates body joints. Backends detect different subsets of
+the skeleton, so look joints up by name and handle a missing one:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-pose,indent=0]
+----
+
+`SelfieSegmenter` separates a person from the background.
+`SegmentationMask.cutOut(...)` applies the mask to the source image and
+rescales it, since the mask has the model's resolution rather than the
+frame's:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-segmentation,indent=0]
+----
+
+`SegmentationMask.toMaskImage(rgb)` renders the mask itself as a
+translucent tint, for highlighting the subject rather than cutting it out.
+
+`DocumentScanner` flattens a photographed page:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-document,indent=0]
+----
+
+==== Drawing the results
+
+Bounds and points are normalized to the range 0 through 1 rather than
+pixels, so one observation maps onto an image of any size.
+`VisionRect.toBounds(component)` and `VisionPoint.toPoint(component)`
+convert them into the absolute coordinates a `paint` method draws in:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-overlay,indent=0]
+----
+
+The mapping stretches the whole 0..1 range across the destination, which
+is right when the destination has the same aspect ratio as the analyzed
+image. A live preview scaled with `ScaleType.CROP` does not, which is the
+other half of why overlays belong on still images.
+
+==== Scripting results in the simulator
+
+The desktop has no on-device vision models. Rather than report every
+analyzer as unsupported -- which would leave a scanner screen impossible
+to build without a device -- the simulator returns whatever you script
+under *Simulate > Vision*:
+
+* *Vision Supported* turns the whole API off, so the `isSupported()`
+  branch can be exercised.
+* *Analysis outcome* switches between the scripted result, an empty
+  result, `VisionException.UNSUPPORTED`, and a backend error. Every
+  screen needs the "nothing found" and "it failed" paths, and this is how
+  to reach them.
+* The remaining items set the scripted values: the decoded code and its
+  format, the recognized text, the image labels, how many faces are found
+  and whether they are smiling, and whether a body pose is detected.
+
+The scripted results carry plausible geometry, so overlay and debounce
+code can be written and debugged before the app ever reaches a device.
+Nothing in this section applies to a device build.
+
+==== Backends and options
+
+An image whose stored pixels are not already upright needs its rotation
+declared: `VisionImage.encoded(bytes, rotationDegrees)`. The one-argument
+overload, and `fromFile(...)`, assume the pixels are upright and do not
+inspect EXIF metadata; `fromCameraFrame(...)` takes the rotation from the
+frame. `VisionOptions.minimumConfidence(...)` clamps finite and infinite
+values to the range 0 through 1 and rejects NaN.
 
 Android uses ML Kit. iOS and Mac native builds default to Apple Vision
 and Core Image. iOS can select ML Kit explicitly:
@@ -370,7 +561,7 @@ each class the application actually uses:
 | ML Kit bundle for that script
 | Vision recognition languages / `GoogleMLKit/TextRecognition<Script>`
 
-| `BarcodeScanner`
+| `BarcodeScanner`, `CodeScanner`
 | ML Kit barcode scanning
 | Vision / `GoogleMLKit/BarcodeScanning`
 
@@ -394,6 +585,12 @@ each class the application actually uses:
 | Unsupported for still images
 | Core Image perspective correction
 |===
+
+`CodeScanner` selects the same barcode dependency `BarcodeScanner` does,
+because it builds one internally; an application that references only the
+ready-made screen still gets the decoder. `CodeScanner` and
+`VisionCameraView` additionally select the camera natives, so neither has
+to be paired with a `com.codename1.camera` reference to work.
 
 The optional iOS ML Kit pod is added only when both the analyzer and its
 feature-specific selector are referenced. For example,

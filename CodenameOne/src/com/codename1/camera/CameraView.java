@@ -39,11 +39,12 @@ import com.codename1.ui.layouts.BorderLayout;
 /// f.add(BorderLayout.CENTER, view);
 /// f.show();
 ///
-/// session.setFrameListener(frame ->
-///     BarcodeScanner.scan(frame.getJpegBytes()).ready(codes -> {
-///         if (codes.length > 0) Log.p("scanned " + codes[0]);
-///     }));
+/// session.setFrameListener(frame -> analyze(frame.getJpegBytes()));
 /// ```
+///
+/// To run an on-device vision analyzer over the preview, prefer
+/// `com.codename1.ai.vision.VisionCameraView`, which creates and owns this
+/// view along with the frame plumbing.
 ///
 /// The view holds a back-reference to its `CameraSession`; closing the session
 /// while the view is still attached to a form leaves the view rendering its

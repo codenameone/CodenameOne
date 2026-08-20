@@ -30,7 +30,20 @@ package com.codename1.ai.vision;
 /// `leftEar`, `rightEar`, and the `left`/`right` forms of `Shoulder`, `Elbow`,
 /// `Wrist`, `Hip`, `Knee`, and `Ankle`. A backend can additionally report
 /// finer eye, mouth, finger, heel, foot, `neck`, or `root` landmarks using the
-/// same lower-camel-case convention.
+/// same lower-camel-case convention. {@link PoseLandmarks} holds those names
+/// as constants.
+///
+/// ```java
+/// PoseDetector detector = new PoseDetector();
+/// detector.process(VisionImage.fromCameraFrame(frame)).ready(pose -> {
+///     Pose.Landmark wrist = pose.getLandmark(PoseLandmarks.RIGHT_WRIST);
+///     Pose.Landmark shoulder = pose.getLandmark(PoseLandmarks.RIGHT_SHOULDER);
+///     boolean raised = wrist != null && shoulder != null
+///             && wrist.getConfidence() > 0.6f
+///             && wrist.getPosition().getY() < shoulder.getPosition().getY();
+///     repsLabel.setText(raised ? "up" : "down");
+/// });
+/// ```
 public final class Pose {
     private final Landmark[] landmarks;
     private final VisionMetadata metadata;
@@ -52,6 +65,27 @@ public final class Pose {
             System.arraycopy(landmarks, 0, this.landmarks, 0, landmarks.length);
         }
         this.metadata = metadata;
+    }
+
+    /// Looks up one named joint.
+    ///
+    /// Backends detect different subsets of the skeleton, so a {@code null}
+    /// return means "this backend did not report that joint for this frame",
+    /// not "unsupported". Check {@link Landmark#getConfidence()} before
+    /// trusting a position.
+    ///
+    /// @param name one of the {@link PoseLandmarks} constants
+    /// @return the detected joint, or {@code null} when it was not reported
+    public Landmark getLandmark(String name) {
+        if (name == null) {
+            return null;
+        }
+        for (Landmark landmark : landmarks) {
+            if (landmark != null && name.equals(landmark.getName())) {
+                return landmark;
+            }
+        }
+        return null;
     }
 
     /// @return defensive copy of detected body landmarks

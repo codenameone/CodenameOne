@@ -25,6 +25,18 @@ package com.codename1.ai.vision;
 /// Common analyzer configuration. An analyzer captures the supplied options
 /// when constructed; reuse it for frames needing the same backend, confidence
 /// threshold, and result limit.
+///
+/// ```java
+/// ImageLabeler labeler = new ImageLabeler(new VisionOptions()
+///         .minimumConfidence(0.6f)   // drop guesses below 60%
+///         .maximumResults(5));       // keep the top five labels
+/// ```
+///
+/// The analyzer snapshots these values, so mutating the options object
+/// afterwards changes nothing -- construct a second analyzer instead. Not
+/// every analyzer reads every setting: {@link #textScript(TextScript)} applies
+/// only to {@link TextRecognizer}, and a backend may ignore a limit it has no
+/// way to enforce.
 public final class VisionOptions {
     private VisionBackend backend = VisionBackends.auto();
     private float minimumConfidence;

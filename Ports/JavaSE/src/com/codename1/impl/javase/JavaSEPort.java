@@ -6836,6 +6836,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final JMenu foldableMenu = installFoldableSimulationMenu(simulateMenu, pref);
 
+        final JMenu visionMenu = installVisionSimulationMenu(simulateMenu, pref);
+
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
         // top of Toolbar created by Toolbar.initTitleBarStatus). The native
@@ -7352,6 +7354,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(shieldMenu);
         simulateMenu.add(nfcMenu);
         simulateMenu.add(foldableMenu);
+        simulateMenu.add(visionMenu);
         simulateMenu.add(statusBarTapDiag);
         simulateMenu.addSeparator();
         simulateMenu.add(darkLightModeMenu);
@@ -8864,6 +8867,182 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (value) {
             JavaSEShieldEngine.ensureRegistered();
         }
+    }
+
+    /// Builds *Simulate &gt; Vision*, which scripts what
+    /// {@link JavaSEVisionImpl} hands back to `com.codename1.ai.vision`
+    /// analyzers. The desktop cannot run the models, so this is what lets a
+    /// scanner screen, an overlay, or a "nothing found" branch be built
+    /// without a device.
+    private JMenu installVisionSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        JMenu visionMenu = new JMenu("Vision");
+        visionMenu.setToolTipText("Script the results the on-device vision "
+                + "analyzers return in the simulator");
+
+        final JCheckBoxMenuItem supported = new JCheckBoxMenuItem(
+                "Vision Supported", pref.getBoolean("VisionSim.supported", true));
+        JavaSEVisionImpl.simSupported = supported.isSelected();
+        supported.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.simSupported = supported.isSelected();
+                pref.putBoolean("VisionSim.supported", supported.isSelected());
+            }
+        });
+        visionMenu.add(supported);
+
+        visionMenu.addSeparator();
+
+        JMenu outcomeMenu = new JMenu("Analysis outcome");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        try {
+            JavaSEVisionImpl.outcome = JavaSEVisionImpl.SimOutcome.valueOf(
+                    pref.get("VisionSim.outcome",
+                            JavaSEVisionImpl.SimOutcome.RESULT.name()));
+        } catch (IllegalArgumentException ex) {
+            JavaSEVisionImpl.outcome = JavaSEVisionImpl.SimOutcome.RESULT;
+        }
+        for (final JavaSEVisionImpl.SimOutcome o
+                : JavaSEVisionImpl.SimOutcome.values()) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(o.name(),
+                    o == JavaSEVisionImpl.outcome);
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.outcome = o;
+                    pref.put("VisionSim.outcome", o.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        visionMenu.add(outcomeMenu);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.barcodeValue = pref.get("VisionSim.barcodeValue",
+                JavaSEVisionImpl.barcodeValue);
+        JMenuItem barcodeValue = new JMenuItem("Set scanned code value...");
+        barcodeValue.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Value the simulated barcode scanner decodes:",
+                        JavaSEVisionImpl.barcodeValue);
+                if (value != null) {
+                    JavaSEVisionImpl.barcodeValue = value;
+                    pref.put("VisionSim.barcodeValue", value);
+                }
+            }
+        });
+        visionMenu.add(barcodeValue);
+
+        JavaSEVisionImpl.barcodeFormat = pref.get("VisionSim.barcodeFormat",
+                JavaSEVisionImpl.barcodeFormat);
+        JMenu formatMenu = new JMenu("Scanned code format");
+        ButtonGroup formatGroup = new ButtonGroup();
+        String[] formats = {"QR_CODE", "EAN_13", "UPC_A", "CODE_128",
+            "DATA_MATRIX", "PDF417", "AZTEC"};
+        for (final String format : formats) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(format,
+                    format.equals(JavaSEVisionImpl.barcodeFormat));
+            formatGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.barcodeFormat = format;
+                    pref.put("VisionSim.barcodeFormat", format);
+                }
+            });
+            formatMenu.add(item);
+        }
+        visionMenu.add(formatMenu);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.recognizedText = pref.get("VisionSim.text",
+                JavaSEVisionImpl.recognizedText);
+        JMenuItem recognizedText = new JMenuItem("Set recognized text...");
+        recognizedText.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Text the simulated recognizer reads "
+                        + "(\\n separates blocks):",
+                        JavaSEVisionImpl.recognizedText.replace("\n", "\\n"));
+                if (value != null) {
+                    JavaSEVisionImpl.recognizedText = value.replace("\\n", "\n");
+                    pref.put("VisionSim.text", JavaSEVisionImpl.recognizedText);
+                }
+            }
+        });
+        visionMenu.add(recognizedText);
+
+        JavaSEVisionImpl.imageLabels = pref.get("VisionSim.labels",
+                JavaSEVisionImpl.imageLabels);
+        JMenuItem imageLabels = new JMenuItem("Set image labels...");
+        imageLabels.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Comma separated label:confidence pairs:",
+                        JavaSEVisionImpl.imageLabels);
+                if (value != null) {
+                    JavaSEVisionImpl.imageLabels = value;
+                    pref.put("VisionSim.labels", value);
+                }
+            }
+        });
+        visionMenu.add(imageLabels);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.faceCount = pref.getInt("VisionSim.faces",
+                JavaSEVisionImpl.faceCount);
+        JMenu faceMenu = new JMenu("Detected faces");
+        ButtonGroup faceGroup = new ButtonGroup();
+        for (int i = 0; i <= 3; i++) {
+            final int count = i;
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(
+                    String.valueOf(count), count == JavaSEVisionImpl.faceCount);
+            faceGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.faceCount = count;
+                    pref.putInt("VisionSim.faces", count);
+                }
+            });
+            faceMenu.add(item);
+        }
+        visionMenu.add(faceMenu);
+
+        final JCheckBoxMenuItem smiling = new JCheckBoxMenuItem(
+                "Faces are smiling", pref.getBoolean("VisionSim.smiling", true));
+        JavaSEVisionImpl.smilingProbability = smiling.isSelected() ? .8f : .1f;
+        smiling.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.smilingProbability =
+                        smiling.isSelected() ? .8f : .1f;
+                pref.putBoolean("VisionSim.smiling", smiling.isSelected());
+            }
+        });
+        visionMenu.add(smiling);
+
+        final JCheckBoxMenuItem pose = new JCheckBoxMenuItem(
+                "Body pose detected", pref.getBoolean("VisionSim.pose", true));
+        JavaSEVisionImpl.poseDetected = pose.isSelected();
+        pose.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.poseDetected = pose.isSelected();
+                pref.putBoolean("VisionSim.pose", pose.isSelected());
+            }
+        });
+        visionMenu.add(pose);
+
+        return visionMenu;
     }
 
     private JMenu installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
@@ -16255,6 +16434,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public com.codename1.impl.ARImpl createARImpl() {
         return new JavaSEARImpl();
+    }
+
+    /// The desktop has no on-device vision models, so the simulator serves the
+    /// results scripted in *Simulate &gt; Vision* instead of reporting every
+    /// analyzer as unsupported. That keeps scanner and overlay code buildable
+    /// without a device.
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        return new JavaSEVisionImpl();
     }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {

@@ -309,6 +309,42 @@ Base class returns `null` / `false` on platforms without an implementation, so y
 
 ## Built-in on-device ML
 
+Scanning a code is one call. `CodeScanner` is a whole scanner screen --
+camera, decode, return to the previous form -- and replaces the old
+`cn1-codescan` cn1lib. Import `com.codename1.ai.vision.CodeScanner`; two
+older classes share the simple name.
+
+```java
+CodeScanner.scan().ready(code -> {
+    if (code != null) {                 // null means the user backed out
+        urlField.setText(code.getValue());
+    }
+}).except(error -> Log.e(error));
+```
+
+`VisionCameraView` is the same wiring as a component, for a preview
+inside your own form, and works with any analyzer:
+
+```java
+VisionCameraView<Face[]> view = new VisionCameraView<>(new FaceDetector());
+view.setFacing(CameraFacing.FRONT);
+view.setListener(new VisionPipelineListener<Face[]>() {
+    public void result(Face[] faces, VisionImage source) {
+        status.setText(faces.length + " face(s)");
+    }
+    public void error(Throwable error) {
+        Log.e(error);
+    }
+});
+form.add(BorderLayout.CENTER, view);
+```
+
+It opens the camera when shown and releases it when the user navigates
+away. The preview is a native view, so put chrome around it rather than
+painting over it.
+
+For one image at a time, use the analyzer directly:
+
 ```java
 new TextRecognizer()
     .process(VisionImage.encoded(jpegBytes))
@@ -325,9 +361,17 @@ Translator.translate("Bonjour", "fr", "en", translationOptions)
     .ready(result -> Log.p(result));
 ```
 
-`VisionImage` accepts JPEG, PNG, NV21, and RGBA8888. Use
-`VisionPipeline` to connect a reusable analyzer to camera frames; it
-copies callback-owned data and drops stale pending frames under load.
+`VisionImage` accepts JPEG, PNG, NV21, and RGBA8888;
+`VisionImage.fromFile(path)` and `VisionImage.fromImage(image)` are the
+usual bridges from a picked photo. Bounds and points are normalized to
+0..1; `VisionRect.toBounds(component)` and
+`VisionPoint.toPoint(component)` convert them to pixels for drawing.
+`BarcodeFormat`, `FaceLandmarks` and `PoseLandmarks` hold the names that
+would otherwise be string literals. Use `VisionPipeline` when the app
+already owns a `CameraSession` and `VisionCameraView` when it does not;
+both copy callback-owned data and drop stale pending frames under load.
+In the simulator the results are whatever is scripted under
+*Simulate > Vision*, so a scanner screen can be built without a device.
 Use `ModelCache.fetch(httpsUrl, cacheKey, sha256)` for models too large
 to bundle. The initial model URL must remain HTTPS. Observable redirects
 are rejected if they downgrade to HTTP; iOS requires the digest because
@@ -343,7 +387,9 @@ Apple symbologies on a device, or select the ML Kit barcode backend.
 
 Dependency selection is per entry point. Referencing `TextRecognizer`
 retains only the Android text adapter/artifact; it does not pull
-barcode, face, labeling, pose, or segmentation. `LanguageIdentifier`,
+barcode, face, labeling, pose, or segmentation. `CodeScanner` selects the
+barcode dependency plus the camera natives, since it builds a
+`BarcodeScanner` and opens a camera itself. `LanguageIdentifier`,
 `Translator`, and `SmartReply` likewise select independent artifacts.
 On iOS, an ML Kit vision pod is selected only when both its analyzer
 and its matching feature-specific selector are referenced. For example,
