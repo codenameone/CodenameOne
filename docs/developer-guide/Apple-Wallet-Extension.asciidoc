@@ -95,9 +95,37 @@ If you already have Xcode extension targets - from an issuer SDK vendor or an ex
 * `Info.plist` with the `NSExtension` dictionary
 * `MyWalletExtension.entitlements`
 * Optional `buildSettings.properties` with Xcode build settings, one per line (set `IPHONEOS_DEPLOYMENT_TARGET=14.0` for Wallet extensions)
-* Optional `.mobileprovision` for cloud device builds (or supply `ios.appext.MyWalletExtension.provisioningURL`; qualify it as `ios.debug.appext.MyWalletExtension.provisioningURL` / `ios.release.appext.MyWalletExtension.provisioningURL` to use different development and distribution profiles per build type)
+* The extension's own `.mobileprovision` for cloud device builds - see below
 
 Each folder becomes an embedded extension target with bundle id `<your package>.<folder name>`. This mechanism isn't Wallet-specific - it embeds any iOS app extension type.
+
+==== Signing a brought-in extension
+
+Apple signs an app extension against its own App ID. The app's provisioning profile covers the app's bundle id and nothing beneath it, so every extension needs its own App ID and its own profile - two extra of each for a Wallet pair. Supply none and the extension target inherits the app's profile, and Xcode fails the build with:
+
+....
+Provisioning profile "MyApp_Distribution" has app ID "com.mybank.app", which does not
+match the bundle ID "com.mybank.app.WalletNonUIExtension"
+....
+
+Codename One refuses that build before it's sent, naming the extension and the bundle id its App ID has to match. To fix it, create an App ID for `<your package>.<folder name>` in the Apple Developer portal - for a Wallet extension with the `com.apple.developer.payment-pass-provisioning` entitlement Apple grants on request, and with the same App Group as the app - generate a provisioning profile for it against the same certificate as the app, and supply it in one of three ways:
+
+. Place the `.mobileprovision` file inside `ios/app_extensions/MyWalletExtension/`. It's picked up automatically and kept out of the app bundle. Profiles carry no private keys, so committing one is safe.
+. Point at it from `codenameone_settings.properties`, which suits a profile that lives outside the repository:
++
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.properties[tag=apple-wallet-extension-properties-004,indent=0]
+----
++
+The unqualified `codename1.ios.appext.MyWalletExtension.provision` is the fallback for both build types.
+. Host it and name the URL in `ios.appext.MyWalletExtension.provisioningURL` (or the `ios.debug.appext...` / `ios.release.appext...` variants).
+
+The build validates the profile it's given: it must match the app's signing certificate, cover the extension's bundle id, be current, and grant the App Groups and the payment-pass-provisioning entitlement the extension's `.entitlements` asks for. Each of those fails with a message naming the extension, rather than as an Xcode code signing error minutes into the build.
+
+A wildcard App ID (`com.mybank.*`) is the one case that needs no extra profile - it's already covering the extension bundle ids, and the build lets it through. Wallet extensions can't use one: the payment-pass-provisioning entitlement is granted per explicit App ID.
+
+Local "ios-source" builds need none of this - you sign the generated Xcode project in Xcode as usual.
 
 === Testing
 
