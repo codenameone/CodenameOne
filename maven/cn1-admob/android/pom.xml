@@ -108,6 +108,35 @@
                             <target>
                                 <property file="${basedir}/../common/codenameone_library_required.properties"
                                           prefix="lib"/>
+                                <property name="androidJar" value="${cn1.binaries}/android/android.jar"/>
+                                <property name="portSrc" value="${basedir}/../../../Ports/Android/src/com/codename1/impl/android"/>
+
+                                <!-- The stubs stand in for the Android port, so guard
+                                     them against the port's real declarations. Ports/
+                                     is in-tree, so this runs even when nothing has
+                                     compiled the port. -->
+                                <loadfile property="nativeUtilSrc" srcFile="${portSrc}/AndroidNativeUtil.java"
+                                          failonerror="false"/>
+                                <loadfile property="implSrc" srcFile="${portSrc}/AndroidImplementation.java"
+                                          failonerror="false"/>
+                                <fail message="src/api-check stubs no longer match the Android port. Update them to the port's current signatures, then re-run.">
+                                    <condition>
+                                        <not>
+                                            <and>
+                                                <or>
+                                                    <not><isset property="nativeUtilSrc"/></not>
+                                                    <contains string="${nativeUtilSrc}"
+                                                              substring="public static Activity getActivity()"/>
+                                                </or>
+                                                <or>
+                                                    <not><isset property="implSrc"/></not>
+                                                    <contains string="${implSrc}"
+                                                              substring="public static void runOnUiThreadAndBlock(final Runnable r)"/>
+                                                </or>
+                                            </and>
+                                        </not>
+                                    </condition>
+                                </fail>
                                 <fail message="The pinned Ads SDK in this pom has drifted from the android.gradleDep the library actually ships. Bump both together, so what we compile against stays what the app builds against.">
                                     <condition>
                                         <not>
@@ -120,6 +149,13 @@
                                         </not>
                                     </condition>
                                 </fail>
+                                <!-- Staged into cn1-binaries by the root build's initialize,
+                                     so this is present by process-classes in every normal
+                                     build. Say so plainly if it is not, rather than letting
+                                     javac report a wall of missing android.* packages. -->
+                                <fail message="The AdMob API check needs ${androidJar}, which is missing. Stage cn1-binaries, or pass -DskipAdmobApiCheck to skip the check.">
+                                    <condition><not><available file="${androidJar}"/></not></condition>
+                                </fail>
                                 <mkdir dir="${project.build.directory}/api-check-classes"/>
                                 <unzip src="${project.build.directory}/ads-sdk/ads-lite.aar"
                                        dest="${project.build.directory}/ads-sdk/ads-lite">
@@ -129,10 +165,11 @@
                                        dest="${project.build.directory}/ads-sdk/ump">
                                     <patternset><include name="classes.jar"/></patternset>
                                 </unzip>
-                                <javac srcdir="${basedir}/src/main/java"
-                                       destdir="${project.build.directory}/api-check-classes"
+                                <javac destdir="${project.build.directory}/api-check-classes"
                                        source="1.8" target="1.8" includeantruntime="false"
                                        debug="false" nowarn="true" failonerror="true">
+                                    <src path="${basedir}/src/main/java"/>
+                                    <src path="${basedir}/src/api-check/java"/>
                                     <classpath>
                                         <pathelement path="${project.build.directory}/ads-sdk/ads-lite/classes.jar"/>
                                         <pathelement path="${project.build.directory}/ads-sdk/ump/classes.jar"/>
@@ -174,12 +211,13 @@
             <artifactId>cn1-admob-common</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Compile-time only, for the API check above: the sources reference
-             AndroidNativeUtil / AndroidImplementation. provided so it stays out
-             of the shipped artifact's dependency graph. -->
+        <!-- For the API check only: the sources reference PeerComponent. core
+             compiles unconditionally, unlike the profile-gated Android port,
+             so depending on it does not tie this check to profile activation.
+             provided, so it stays out of the shipped artifact's graph. -->
         <dependency>
             <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-android</artifactId>
+            <artifactId>codenameone-core</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
