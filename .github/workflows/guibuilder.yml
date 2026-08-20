@@ -12,7 +12,7 @@ on:
     branches:
       - master
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/guibuilder.yml'
       - 'scripts/guibuilder/**'
       - '!scripts/guibuilder/**/*.md'
@@ -28,7 +28,7 @@ on:
     branches:
       - master
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/guibuilder.yml'
       - 'scripts/guibuilder/**'
       - '!scripts/guibuilder/**/*.md'
@@ -85,7 +85,7 @@ jobs:
           # Retried: Central has been answering 403 on this runner pool, and Maven treats a
           # failed build-extension resolution as permanent -- the job dies in setup having
           # proved nothing. Same rationale as setup-workspace.sh's mvn_retry.
-          ../scripts/ci-mvn-retry.sh -B install -Plocal-dev-javase -DskipTests \
+          bash ../scripts/ci/retry.sh mvn -B install -Plocal-dev-javase -DskipTests \
             -Darchetype.test.skip=true -Dmaven.javadoc.skip=true \
             -Dcn1.binaries="${GITHUB_WORKSPACE}/maven/target/cn1-binaries"
 

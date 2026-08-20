@@ -6,7 +6,7 @@ on:
       - master
     paths:
       - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - 'CodenameOneDesigner/**'
       - 'maven/css-compiler/**'
       - 'maven/css-cli/**'
@@ -17,7 +17,7 @@ on:
       - master
     paths:
       - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - 'CodenameOneDesigner/**'
       - 'maven/css-compiler/**'
       - 'maven/css-cli/**'
@@ -76,7 +76,7 @@ jobs:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
           cd maven
-          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -pl designer -am -DskipTests -Plocal-dev-javase \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl designer -am -DskipTests -Plocal-dev-javase \
               -Dmaven.javadoc.skip=true -Dcn1.binaries="${CN1_BINARIES}" install
 
       - name: Run designer XML parser unit tests (Maven)
@@ -84,7 +84,7 @@ jobs:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
           cd maven
-          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase \
               -Plocal-dev-javase -Dmaven.javadoc.skip=true -Dmaven.antrun.skip=true \
               -Dcn1.binaries="${CN1_BINARIES}" \
               -Dtest=SimpleXmlParserTest -Dsurefire.failIfNoSpecifiedTests=false test
@@ -96,7 +96,7 @@ jobs:
           # simulator's CSSWatcher), not as a shaded `java -jar`. Exercise it the
           # same way here.
           cd maven
-          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -q -pl css-cli -Plocal-dev-javase \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -q -pl css-cli -Plocal-dev-javase \
               -Dmdep.outputFile="$PWD/css-cli-cp.txt" dependency:build-classpath
           cd ..
           cp="maven/css-cli/target/classes:$(cat maven/css-cli-cp.txt)"
@@ -120,7 +120,7 @@ jobs:
       - name: Verify native-themes CEF-free build
         run: |
           cd maven
-          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
           cd ..
           ./scripts/build-native-themes.sh
           test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }

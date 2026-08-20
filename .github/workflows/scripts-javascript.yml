@@ -15,7 +15,7 @@ on:
     - cron: '35 1 * * *'
   pull_request:
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/scripts-javascript.yml'
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'
@@ -39,7 +39,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/scripts-javascript.yml'
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'
@@ -145,7 +145,7 @@ jobs:
           cp maven/UpdateCodenameOne.jar ~/.codenameone/
 
       - name: Build ParparVM compiler bundle
-        run: $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
+        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
 
       - name: Set up Java 17
         uses: actions/setup-java@v5

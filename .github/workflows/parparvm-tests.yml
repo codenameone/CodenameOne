@@ -3,7 +3,7 @@ name: ParparVM Java Tests
 on:
   pull_request:
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/parparvm-tests.yml'
       - 'scripts/ci/retry.sh'
       - 'vm/**'
@@ -14,7 +14,7 @@ on:
   push:
     branches: [ master, main ]
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/parparvm-tests.yml'
       - 'scripts/ci/retry.sh'
       - 'vm/**'
@@ -133,7 +133,7 @@ jobs:
 
       - name: Run ParparVM Benchmark
         working-directory: vm
-        run: $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B test -pl tests -am -Dgroups=benchmark -Djacoco.skip=true
+        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B test -pl tests -am -Dgroups=benchmark -Djacoco.skip=true
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}

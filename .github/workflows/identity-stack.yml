@@ -25,7 +25,7 @@ on:
   pull_request:
     branches: [ master ]
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
@@ -54,7 +54,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'scripts/ci-mvn-retry.sh'
+      - 'scripts/ci/retry.sh'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
@@ -127,7 +127,7 @@ jobs:
           # Targeted run: OidcCoreTest is the new suite; the *Connect / Login /
           # Oauth2 tests cover backward-compat for the changes in Login.java
           # and friends.
-          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -Dmaven.javadoc.skip=true \
               -DunitTests=true \
               -Plocal-dev-javase \
               -P unittests \
@@ -147,7 +147,7 @@ jobs:
           # Without it the build can't resolve those SNAPSHOT artifacts
           # because only core / factory / core-unittests landed in the
           # local repo from the previous step.
-          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -Dmaven.javadoc.skip=true \
               -pl codenameone-maven-plugin -am \
               -Plocal-dev-javase \
               -Dcn1.binaries="${CN1_BINARIES}" \

@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p ~/.codenameone
           cp maven/UpdateCodenameOne.jar ~/.codenameone/
-          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
