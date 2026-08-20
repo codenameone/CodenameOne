@@ -1,48 +1,48 @@
 {
-  "commit": "f691c7e4a6ced25f4d4e8191c6f69f86126420ed",
-  "generated_at": "2026-08-20T09:37:29Z",
+  "commit": "b411fb7be7ce7e07f98594922748cd98dd95ab4c",
+  "generated_at": "2026-08-20T17:32:03Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 206024000
+        "duration_ns": 263046000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 21350000
+        "duration_ns": 27543000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 49631000
+        "duration_ns": 65050000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 69619000
+        "duration_ns": 89822000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 53287000
+        "duration_ns": 68937000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 136419000
+        "duration_ns": 176614000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 2533103000
+        "duration_ns": 3625420000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 121079000
+        "duration_ns": 155954000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 164468000
+        "duration_ns": 212649000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 47970000
+        "duration_ns": 62024000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "windows-x64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32352865076",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32394307371",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 168,
+    "pass": 175,
     "skip": 3
   },
   "tests": {
@@ -259,6 +259,34 @@
     },
     "DarkLightShowcaseThemeScreenshotTest": {
       "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
       "status": "pass"
     },
     "DesktopModeScreenshotTest": {
