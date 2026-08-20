@@ -110,17 +110,17 @@ The platform will usually allow around twenty seconds. Don't use them. A spoken 
 | Returned value | piped to the next action | *caller only, not the launcher* | shown
 |===
 
-The last three rows are where Android differs most, so they are worth stating outright.
+The last three rows are where Android differs most, so they're worth stating outright.
 A launcher shortcut is a launch: it starts something, and nothing waits for an answer, so
 there is no channel to hand a result back through. A spoken line is shown as a toast, and
 only when the run was headless -- that being the one case with no UI of its own to say it
-in. A snippet is not rendered at all; no Android surface displays one for a shortcut, so a
-handler that returns one is not failing, its snippet simply has no consumer there. A
+in. A snippet isn't rendered at all; no Android surface displays one for a shortcut, so a
+handler that returns one isn't failing, its snippet simply has no consumer there. A
 returned value goes to whoever called `Intents.invoke`, which is how an app uses its own
-intents as a command layer and works on every port, but it does not travel back to the
+intents as a command layer and works on every port, but it doesn't travel back to the
 launcher, because nothing there asked a question.
 
-A handler whose entire result is a snippet therefore does nothing observable when it is
+A handler whose entire result is a snippet therefore does nothing observable when it's
 started from an Android launcher shortcut. Write handlers that also change state, or that
 name a route with `opensRoute`, and the outcome is visible everywhere.
 
@@ -152,7 +152,7 @@ Declaring an `@AppIntent` brings in Apple's App Intents framework, which needs a
 |===
 | Hint | Effect
 
-| `ios.intents.minDeploymentTarget` | A floor a declared intent contributes. Empty by default, so declaring an intent raises nothing: Xcode emits App Intents metadata below the deployment target, and the generated declarations are availability-fenced, so they are simply not offered on devices too old to run them. Set it to `16.0` if you would rather not ship a build whose intents are inert for part of your audience.
+| `ios.intents.minDeploymentTarget` | A floor a declared intent contributes. Empty by default, so declaring an intent raises nothing: Xcode emits App Intents metadata below the deployment target, and the generated declarations are availability-fenced, so they're simply not offered on devices too old to run them. Set it to `16.0` if you would rather not ship a build whose intents are inert for part of your audience.
 | `ios.intents.appIntents` | `false` keeps Spotlight indexing and shortcut donation while suppressing App Intents generation entirely.
 |===
 
