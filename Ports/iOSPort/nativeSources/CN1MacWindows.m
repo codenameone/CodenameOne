@@ -494,45 +494,62 @@ static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
 }
 
 /*
- * Asks for a frame and keeps asking until the scene's *content* is the size wanted.
+ * Asks for a frame and keeps asking until the window's *content* is the size wanted.
  *
  * Two things make a single request unreliable. A geometry preference is a request,
  * not an instruction: when the window manager ignores one the scene keeps the size
  * it already had -- Catalyst's 1024x768 default -- and nothing asked again, which
  * left the windowed screenshot suite intermittently short of captures. And the
  * preference is a *system* frame, which includes the title bar, while what has to
- * come out right is the content area Codename One lays out into. Asking for a system
- * frame of the wanted content size therefore delivers content that is short by the
- * height of the chrome.
+ * come out right is the content area Codename One lays out into.
  *
- * So this corrects rather than merely repeats: each round measures the delivered
- * content, folds the shortfall into the next request, and stops as soon as the
- * content matches. Chrome of any height converges in one correction; a manager that
- * refuses the size stops asking after the attempt budget rather than spinning.
+ * The measurement is the root view controller's view, because that is the same thing
+ * viewDidLayoutSubviews reports to the framework as the window's size. Measuring the
+ * scene's coordinate space instead reads the whole display, which made every delta
+ * hugely negative and shrank the window to its minimum -- a 400x300 window came out
+ * at 120x120.
  *
- * The tradeoff is that a user who drags the window during those rounds is argued with
- * for up to a couple of seconds. That is acceptable because this only ever follows an
- * explicit request -- window creation -- and never starts on its own.
+ * Hence the clamp: chrome can only make the system frame larger than the content it
+ * encloses, never smaller, so a correction that asks for less than the wanted content
+ * is by definition a bad measurement and is ignored. That bounds the damage from any
+ * future measurement mistake to "no correction" rather than "wrong size".
  */
-static void CN1MacWindowConvergeGeometry(UIWindowScene* scene, CGSize wantedContent,
-        CGSize request, int attemptsLeft) {
+static void CN1MacWindowConvergeGeometry(UIWindowScene* scene, UIWindow* window,
+        CGSize wantedContent, CGSize request, int attemptsLeft) {
     if (scene == nil || attemptsLeft <= 0) {
         return;
     }
     CN1MacWindowRequestGeometry(scene, CGRectMake(0, 0, request.width, request.height));
     /* Retained across the delay: this port builds without ARC, and a disconnect can
-     * release the scene while the check is queued. */
-    UIWindowScene* held = [scene retain];
+     * release either of these while the check is queued. */
+    UIWindowScene* heldScene = [scene retain];
+    UIWindow* heldWindow = [window retain];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (0.25 * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
-        CGSize got = held.coordinateSpace.bounds.size;
-        CGFloat dw = wantedContent.width - got.width;
-        CGFloat dh = wantedContent.height - got.height;
-        if (fabs(dw) > 1.0 || fabs(dh) > 1.0) {
-            CGSize next = CGSizeMake(request.width + dw, request.height + dh);
-            CN1MacWindowConvergeGeometry(held, wantedContent, next, attemptsLeft - 1);
+        UIView* rootView = heldWindow.rootViewController.view;
+        CGSize got = rootView != nil ? rootView.bounds.size : heldWindow.bounds.size;
+        CGSize next = request;
+        if (got.width > 0 && got.height > 0) {
+            CGFloat dw = wantedContent.width - got.width;
+            CGFloat dh = wantedContent.height - got.height;
+            if (fabs(dw) <= 1.0 && fabs(dh) <= 1.0) {
+                [heldWindow release];
+                [heldScene release];
+                return;
+            }
+            next = CGSizeMake(request.width + dw, request.height + dh);
         }
-        [held release];
+        /* Never below the content being asked for -- see the note above. */
+        if (next.width < wantedContent.width) {
+            next.width = wantedContent.width;
+        }
+        if (next.height < wantedContent.height) {
+            next.height = wantedContent.height;
+        }
+        CN1MacWindowConvergeGeometry(heldScene, heldWindow, wantedContent, next,
+                attemptsLeft - 1);
+        [heldWindow release];
+        [heldScene release];
     });
 }
 
@@ -791,7 +808,8 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
                 scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
             }
         }
-        CN1MacWindowConvergeGeometry(scene, CGSizeMake(pointWidth, pointHeight),
+        CN1MacWindowConvergeGeometry(scene, w->window,
+                CGSizeMake(pointWidth, pointHeight),
                 CGSizeMake(pointWidth, pointHeight), CN1_GEOMETRY_ATTEMPTS);
     }
     pthread_mutex_unlock(&g_slotLock);

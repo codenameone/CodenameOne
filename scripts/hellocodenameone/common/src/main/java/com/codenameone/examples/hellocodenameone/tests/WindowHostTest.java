@@ -52,6 +52,11 @@ import com.codename1.ui.layouts.BorderLayout;
  */
 public abstract class WindowHostTest extends BaseTest {
 
+    /// How far below the requested size a window may legitimately be.
+    /// Chrome costs tens of pixels; a window still carrying another
+    /// window's geometry is out by hundreds.
+    private static final int CHROME_ALLOWANCE = 64;
+
     /** Window sizes every windowed case is captured at. */
     protected static final int[][] SIZES = new int[][]{
         {400, 300},   // small
@@ -188,11 +193,20 @@ public abstract class WindowHostTest extends BaseTest {
                 && window.hasPaintedOnce()
                 && settled
                 && windowWidth > 0 && windowHeight > 0
-                // Exactly the size asked for. A tolerance here let a window that had
-                // kept a recycled scene's geometry be captured anyway, which put the
-                // wrong size in the golden; a window the platform will not size should
-                // fail visibly instead.
-                && windowWidth == width && windowHeight == height
+                // Within a chrome-sized allowance of the size asked for, and never
+                // larger. The original rule allowed anything down to three quarters,
+                // which was meant to reject a window still reporting a previous
+                // window's geometry and did not: a 700x500 background came back at a
+                // recycled scene's 600x450 and passed. Requiring an exact match instead
+                // was worse -- it rejected every window on ports whose reported size is
+                // the content inside the chrome, which is most of them.
+                //
+                // An absolute allowance separates the two. Chrome costs tens of pixels
+                // (Windows takes 16 wide and 39 high, Catalyst about 16 high), while a
+                // stale geometry is out by hundreds.
+                && windowWidth <= width && windowHeight <= height
+                && windowWidth >= width - CHROME_ALLOWANCE
+                && windowHeight >= height - CHROME_ALLOWANCE
                 && probe != null
                 && probe.getWidth() == windowWidth
                 && probe.getHeight() == windowHeight;

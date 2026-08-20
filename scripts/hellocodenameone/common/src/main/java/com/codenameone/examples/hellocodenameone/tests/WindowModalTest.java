@@ -48,6 +48,11 @@ import com.codename1.ui.layouts.BorderLayout;
  */
 public class WindowModalTest extends BaseTest {
 
+    /// How far below the requested size a window may legitimately be.
+    /// Chrome costs tens of pixels; a window still carrying another
+    /// window's geometry is out by hundreds.
+    private static final int CHROME_ALLOWANCE = 64;
+
     /** Size of the window the golden is captured from. */
     private static final int BACKGROUND_WIDTH = 700;
     private static final int BACKGROUND_HEIGHT = 500;
@@ -144,14 +149,20 @@ public class WindowModalTest extends BaseTest {
         return w.hasPaintedOnce()
                 && settled
                 && windowWidth > 0 && windowHeight > 0
-                // Exactly the size asked for. The old rule allowed anything down to
-                // three quarters, which was meant to catch a window still reporting a
-                // previous window's geometry -- and did not: a 700x500 background came
-                // back at a recycled scene's 600x450 and sailed through, so the golden
-                // recorded whichever size that run happened to get. A window that
-                // cannot be given its size should fail visibly rather than be captured
-                // at the wrong one.
-                && windowWidth == requestedWidth && windowHeight == requestedHeight
+                // Within a chrome-sized allowance of the size asked for, and never
+                // larger. The original rule allowed anything down to three quarters,
+                // which was meant to reject a window still reporting a previous
+                // window's geometry and did not: a 700x500 background came back at a
+                // recycled scene's 600x450 and passed. Requiring an exact match instead
+                // was worse -- it rejected every window on ports whose reported size is
+                // the content inside the chrome, which is most of them.
+                //
+                // An absolute allowance separates the two. Chrome costs tens of pixels
+                // (Windows takes 16 wide and 39 high, Catalyst about 16 high), while a
+                // stale geometry is out by hundreds.
+                && windowWidth <= requestedWidth && windowHeight <= requestedHeight
+                && windowWidth >= requestedWidth - CHROME_ALLOWANCE
+                && windowHeight >= requestedHeight - CHROME_ALLOWANCE
                 && probe != null
                 && probe.getWidth() == windowWidth
                 && probe.getHeight() == windowHeight;
