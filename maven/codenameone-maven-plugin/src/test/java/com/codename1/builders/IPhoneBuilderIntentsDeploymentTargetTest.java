@@ -33,6 +33,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -248,6 +249,81 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
         assertTrue(merged.contains("<string>play_list</string>"), merged);
         assertEquals(1, merged.split("NSUserActivityTypes", -1).length - 1,
                 "a second key would make the plist ambiguous: " + merged);
+    }
+
+    /// A helper that reads like the manifest the processor emits.
+    private static java.util.Map<String, Object> intent(String id, String exposure,
+            boolean destructive) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<String, Object>();
+        m.put("id", id);
+        if (exposure != null) {
+            java.util.List<Object> e = new java.util.ArrayList<Object>();
+            e.add(exposure);
+            m.put("exposure", e);
+        }
+        if (destructive) {
+            m.put("destructive", Boolean.TRUE);
+        }
+        return m;
+    }
+
+    /// NSUserActivityTypes is a list of what the app can *continue*, and the only producer of
+    /// these types is Intents.donate. An id donation refuses is not merely useless there: the
+    /// runtime claims any arriving type its registry declares, so an id that can never run
+    /// swallows an application activity that happens to share the string.
+    @Test
+    void activityTypesCarryOnlyWhatDonationCanPublish() throws Exception {
+        java.util.List<java.util.Map<String, Object>> intents =
+                new java.util.ArrayList<java.util.Map<String, Object>>();
+        intents.add(intent("log_workout", "ASSISTANT", false));
+        intents.add(intent("compute_total", "MODEL", false));
+        intents.add(intent("wipe_notes", "ASSISTANT", true));
+        intents.add(intent("continue_reading", null, false));
+
+        String key = IPhoneBuilder.userActivityTypesKey(intents);
+
+        assertTrue(key.contains("<string>log_workout</string>"), key);
+        assertFalse(key.contains("compute_total"),
+                "a MODEL-only id is never donated, so continuing it is not a thing that can "
+                        + "happen -- listing it only lets it swallow the app's own activity: " + key);
+        assertFalse(key.contains("wipe_notes"),
+                "donate() refuses a destructive declaration, so the same applies: " + key);
+        assertTrue(key.contains("<string>continue_reading</string>"),
+                "an omitted exposure means the default, which includes the assistant: " + key);
+    }
+
+    /// The key is a statement, and there is a difference between saying "these" and saying
+    /// "none". An app that continues its own activities must not be handed the latter.
+    @Test
+    void nothingToDeclareWritesNoKeyAtAll() throws Exception {
+        java.util.List<java.util.Map<String, Object>> intents =
+                new java.util.ArrayList<java.util.Map<String, Object>>();
+        intents.add(intent("wipe_notes", "ASSISTANT", true));
+        assertEquals("", IPhoneBuilder.userActivityTypesKey(intents),
+                "an app whose only assistant intent is destructive reaches the emission path "
+                        + "and has nothing to put in the array");
+        assertEquals("", IPhoneBuilder.userActivityTypesKey(
+                new java.util.ArrayList<java.util.Map<String, Object>>()));
+    }
+
+    /// Same filter on the merge path: an app that declared its own array gets the ids added to
+    /// it, and must not be given the ones the emission path would have withheld.
+    @Test
+    void theMergePathAppliesTheSameFilter() throws Exception {
+        java.util.List<java.util.Map<String, Object>> intents =
+                new java.util.ArrayList<java.util.Map<String, Object>>();
+        intents.add(intent("log_workout", "ASSISTANT", false));
+        intents.add(intent("compute_total", "MODEL", false));
+        intents.add(intent("wipe_notes", "ASSISTANT", true));
+
+        String existing = "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.handoff</string></array>";
+        String merged = IPhoneBuilder.mergeUserActivityTypes(existing, intents);
+
+        assertTrue(merged.contains("com.example.handoff"), "the app's own activity has to stay");
+        assertTrue(merged.contains("<string>log_workout</string>"), merged);
+        assertFalse(merged.contains("compute_total"), merged);
+        assertFalse(merged.contains("wipe_notes"), merged);
     }
 
     @Test

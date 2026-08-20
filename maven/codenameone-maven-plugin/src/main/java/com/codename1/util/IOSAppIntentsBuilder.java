@@ -804,6 +804,40 @@ public final class IOSAppIntentsBuilder {
         return false;
     }
 
+    /// True when this declaration can ever be handed to the app as an `NSUserActivity`, and so
+    /// belongs in `NSUserActivityTypes`.
+    ///
+    /// The key means one thing: iOS only continues an activity whose type the app declared
+    /// there. The only producer of these activity types is `Intents.donate`, so the honest
+    /// contents of the array are exactly the ids donation will publish -- not every id in the
+    /// manifest.
+    ///
+    /// Listing more is not harmlessly generous. `Intents.dispatchUserActivity` looks the
+    /// arriving type up in the registry, and a declaration it finds is claimed -- deliberately,
+    /// because a stale donation from before an update is still out there and telling the system
+    /// to look elsewhere for something that is ours to refuse would be wrong. So an id that was
+    /// advertised but can never be donated has only one effect available to it: if the
+    /// application also uses that string as its own Handoff or continuation activity type, the
+    /// app's activity is swallowed by a declaration that was never going to run anything. Intent
+    /// ids are `[a-z][a-z0-9_]{2,63}` and ordinary words like `continue_reading` are legal on
+    /// both sides, which is exactly the collision the cold-start path in `Intents` already
+    /// refuses to make on shape alone.
+    ///
+    /// Both restrictions mirror `Intents.donate`, which is the point -- this predicts what it
+    /// will do rather than restating a policy:
+    ///
+    /// - not exposed to the assistant: donation refuses it, because publishing a MODEL-only
+    ///   capability as a predictable activity exposes precisely what it opted out of.
+    /// - destructive: donation refuses it too, since a suggestion runs on one tap with nothing
+    ///   between the tap and the action, past the confirmation `destructive = true` promises.
+    ///   `AndroidGradleBuilder` declines to mint a static shortcut for the same reason.
+    ///
+    /// Neither loses the capability: both remain invocable, and an assistant-exposed one is
+    /// still offered by Siri and the Shortcuts app, which confirm first.
+    public static boolean publishesUserActivity(Map<String, Object> intent) {
+        return isExposedToAssistant(intent) && !bool(intent, "destructive");
+    }
+
     private static String str(Map<String, Object> m, String key) {
         Object o = m.get(key);
         return o instanceof String ? (String) o : "";

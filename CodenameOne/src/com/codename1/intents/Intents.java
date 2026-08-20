@@ -1021,6 +1021,16 @@ public final class Intents {
                 // Claimed rather than declined: the activity type is this application's, and
                 // saying otherwise would have the system look for another handler for something
                 // that is ours to refuse.
+                //
+                // Which is why the iOS builder writes only donatable ids into
+                // NSUserActivityTypes -- see IOSAppIntentsBuilder.publishesUserActivity. The
+                // claim above is unconditional by design: a suggestion minted before an update
+                // marked the intent destructive, or narrowed its exposure, is still out there,
+                // and it is ours. The cost is that an id we advertise and can never run will
+                // swallow an application activity that happens to share the string, so the
+                // answer is to advertise only what donation can publish. Declining here instead
+                // would trade that for a suggestion the system hands to nobody, which is the
+                // failure this branch exists to avoid.
                 logDiagnostic(suggestionRefusedMessage(activityType));
                 return true;
             }

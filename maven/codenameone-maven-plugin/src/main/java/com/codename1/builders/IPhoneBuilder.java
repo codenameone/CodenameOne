@@ -6189,6 +6189,30 @@ public class IPhoneBuilder extends Executor {
     /// Returns the injection unchanged when the key's array cannot be located, because writing
     /// a second NSUserActivityTypes key would produce a plist iOS reads unpredictably -- worse
     /// than the ids being absent, which at least fails in one direction.
+    /// The `NSUserActivityTypes` key for an app that has not declared one itself, or the empty
+    /// string when there is nothing to declare.
+    ///
+    /// Carries only the ids `Intents.donate` can publish -- see
+    /// `IOSAppIntentsBuilder.publishesUserActivity` for why advertising the rest is not
+    /// harmlessly generous.
+    static String userActivityTypesKey(List<Map<String, Object>> intents) {
+        StringBuilder types = new StringBuilder();
+        for (Map<String, Object> intent : intents) {
+            Object id = intent.get("id");
+            if (id instanceof String && IOSAppIntentsBuilder.publishesUserActivity(intent)) {
+                types.append("<string>").append((String) id).append("</string>");
+            }
+        }
+        if (types.length() == 0) {
+            // An app whose only assistant-exposed intent is destructive reaches here and
+            // contributes nothing. Writing the key with an empty array would state that the app
+            // continues no activity at all -- into the plist of an app that may well continue
+            // its own -- so nothing is written when there is nothing to say.
+            return "";
+        }
+        return "\n<key>NSUserActivityTypes</key><array>" + types + "</array>";
+    }
+
     static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
         int key = inject.indexOf("NSUserActivityTypes");
         int open = key < 0 ? -1 : inject.indexOf("<array>", key);
@@ -6200,7 +6224,10 @@ public class IPhoneBuilder extends Executor {
         StringBuilder add = new StringBuilder();
         for (Map<String, Object> intent : intents) {
             Object id = intent.get("id");
+            // Same filter as the emission path above: an id donation will never publish has no
+            // business in the app's own array either. See publishesUserActivity.
             if (id instanceof String
+                    && IOSAppIntentsBuilder.publishesUserActivity(intent)
                     && !existing.contains("<string>" + (String) id + "</string>")) {
                 add.append("<string>").append((String) id).append("</string>");
             }
@@ -7150,15 +7177,7 @@ public class IPhoneBuilder extends Executor {
             // CoreSpotlightContinuation too, which is a different key entirely, so a Spotlight
             // result could not continue into the app either.
             if (!inject.contains("NSUserActivityTypes")) {
-                StringBuilder types = new StringBuilder("\n<key>NSUserActivityTypes</key><array>");
-                for (Map<String, Object> intent : intentsManifest) {
-                    Object id = intent.get("id");
-                    if (id instanceof String) {
-                        types.append("<string>").append((String) id).append("</string>");
-                    }
-                }
-                types.append("</array>");
-                inject += types.toString();
+                inject += userActivityTypesKey(intentsManifest);
             } else {
                 // Merge into the array the application supplied rather than replacing it: its
                 // own activity types have to keep working. Appended just before the closing
