@@ -218,7 +218,7 @@ public final class IOSNative {
     // is a no-op on iOS proper, where the implementation is compiled out.
 
     native int macWindowCreate(int windowId, String title, int x, int y, int width, int height,
-            boolean decorated, boolean resizable);
+            boolean decorated, boolean resizable, boolean positionSet);
 
     native void macWindowDestroy(int slot);
 

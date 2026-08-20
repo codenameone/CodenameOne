@@ -2362,15 +2362,15 @@ void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THRE
 #import "CN1MacWindows.h"
 #endif
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_R_int(
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
-        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable) {
+        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_BOOLEAN positionSet) {
 #if TARGET_OS_MACCATALYST
     POOL_BEGIN();
     NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
     int slot = CN1MacWindowCreate(windowId, t == nil ? @"" : t, x, y, width, height,
-            decorated ? YES : NO, resizable ? YES : NO);
+            decorated ? YES : NO, resizable ? YES : NO, positionSet ? YES : NO);
     POOL_END();
     return slot;
 #else

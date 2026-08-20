@@ -115,10 +115,13 @@ public class MacWindowManager extends WindowManager {
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
             boolean decorated, boolean resizable, Object parentPeer, boolean positionSet,
             boolean ownedByMainWindow) {
-        // Catalyst scenes have no owner relation and the window server places them,
-        // so both of the new hints are deliberately unused here.
+        // Catalyst scenes have no owner relation, so ownedByMainWindow is deliberately
+        // unused. positionSet is not: inferring it from the coordinates makes a window
+        // explicitly placed at 0,0 look unplaced, and the window server then puts it
+        // wherever it likes.
         int s = IOSImplementation.nativeInstance.macWindowCreate(windowId,
-                title == null ? "" : title, x, y, width, height, decorated, resizable);
+                title == null ? "" : title, x, y, width, height, decorated, resizable,
+                positionSet);
         if (s < 0) {
             return null;
         }

@@ -424,6 +424,12 @@ static void CN1MacWindowReportLayout(int windowId, int width, int height) {
             w->awaitingHeight = 0;
             w->staleLayoutDropped = 0;
         }
+        /* Whatever the window actually ended up as, including a size the user dragged
+         * it to. Without this pendingWidth/Height only ever held the last size the
+         * application asked for, so setResizable(false) pinned the restrictions to
+         * that and snapped a user-resized window back to it. */
+        w->pendingWidth = width;
+        w->pendingHeight = height;
         break;
     }
     pthread_mutex_unlock(&g_slotLock);
@@ -652,7 +658,7 @@ static UIWindowScene* takeFreeScene(void) {
 }
 
 int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, int height,
-        BOOL decorated, BOOL resizable) {
+        BOOL decorated, BOOL resizable, BOOL positionSet) {
     int slot = -1;
     int iter;
     for (iter = 0; iter < CN1_MAC_MAX_WINDOWS; iter++) {
@@ -675,7 +681,10 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     g_macWindows[slot].pendingHeight = height;
     g_macWindows[slot].pendingX = x;
     g_macWindows[slot].pendingY = y;
-    g_macWindows[slot].positionSet = (x != 0 || y != 0) ? 1 : 0;
+    /* Carried through rather than inferred from the coordinates: a window explicitly
+     * placed at 0,0 is placed, and guessing from the numbers made it look unplaced so
+     * the window server put it wherever it liked. */
+    g_macWindows[slot].positionSet = positionSet ? 1 : 0;
     g_macWindows[slot].pendingTitle = [title retain];
     g_macWindows[slot].resizable = resizable ? 1 : 0;
     g_macWindows[slot].decorated = decorated ? 1 : 0;
@@ -1075,6 +1084,14 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
     pthread_mutex_lock(&g_slotLock);
     w->pendingWidth = width;
     w->pendingHeight = height;
+    /* The origin too, and the fact that one was given. Scene activation is
+     * asynchronous, so a move made straight after show() usually finds no scene at
+     * all: only the size was recorded, the request went to a nil scene and was
+     * dropped, and adoption then placed the window at the origin it was created with.
+     * Recording it here means adoption applies the move when the scene arrives. */
+    w->pendingX = x;
+    w->pendingY = y;
+    w->positionSet = 1;
     w->awaitingWidth = width;
     w->awaitingHeight = height;
     w->staleLayoutDropped = 0;

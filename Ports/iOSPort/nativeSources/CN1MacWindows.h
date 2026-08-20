@@ -57,7 +57,7 @@
 /* Creates a window scene and returns its slot, or -1 on failure. windowId is the
  * framework's own id, stored so every callback can echo it back. */
 int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, int height,
-        BOOL decorated, BOOL resizable);
+        BOOL decorated, BOOL resizable, BOOL positionSet);
 void CN1MacWindowDestroy(int slot);
 void CN1MacWindowShow(int slot, BOOL visible);
 void CN1MacWindowSetTitle(int slot, NSString* title);
