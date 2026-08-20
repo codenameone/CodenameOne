@@ -1,36 +1,36 @@
 {
-  "commit": "f20546007e733cf0c6a9d0178cae96f795b8a85d",
-  "generated_at": "2026-08-20T05:55:06Z",
+  "commit": "b544e3527bed680fd96d39a1f0677f195760e77c",
+  "generated_at": "2026-08-20T11:56:27Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 292747000
+        "duration_ns": 263366000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 20419000
+        "duration_ns": 21465000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 117246000
+        "duration_ns": 108618000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 67957000
+        "duration_ns": 65824000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 288513000
+        "duration_ns": 293659000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 122736000
+        "duration_ns": 115799000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 147103000
+        "duration_ns": 148135000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-metal",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32326056923",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32341398171",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 0,
+    "fail": 1,
     "not-run": 0,
-    "pass": 167,
+    "pass": 166,
     "skip": 4
   },
   "tests": {
@@ -490,7 +490,10 @@
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
-      "status": "pass"
+      "reasons": [
+        "screenshot-different:landscape"
+      ],
+      "status": "fail"
     },
     "PaletteOverrideThemeScreenshotTest": {
       "feature": "theme-palette-css",
