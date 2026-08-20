@@ -295,23 +295,77 @@ class InterpIOSSymbols {
         return -1;
     }
 
-    /** Searches a class's interfaces, and theirs, for a method. */
+    /**
+     * The maximally specific interface method that matches, or -1.
+     *
+     * <p>Every interface reachable from {@code owner} that declares a method
+     * with this name and descriptor is a candidate. The set is filtered to
+     * "maximally specific" per JLS 5.4.3.3: keep only those no other
+     * candidate's declaring interface subtypes. Returning the first
+     * depth-first hit instead picks a superinterface's default over a
+     * subinterface that overrides it (a class declaring
+     * {@code implements I, J} where {@code J extends I} and both define the
+     * method), which is the wrong host implementation.</p>
+     *
+     * <p>The visited set the caller passes is shared across the candidate
+     * collection (a diamond is walked once) and across the outer class-chain
+     * pass in {@link #methodId} (an interface reached through both the
+     * receiver and its superclass is still considered once).</p>
+     */
     private int interfaceMethodId(String owner, String name, String descriptor,
                                   Hashtable visited) {
-        // A visited set rather than a depth limit: interfaces form a directed
-        // acyclic graph, so this terminates on its own, and a cap would answer
-        // "no such method" for a hierarchy that merely happens to be deep.
-        if (visited.get(owner) != null) {
+        java.util.Vector candidateOwners = new java.util.Vector();
+        java.util.Vector candidateIds = new java.util.Vector();
+        collectInterfaceCandidates(owner, name, descriptor, visited,
+                candidateOwners, candidateIds);
+        int count = candidateOwners.size();
+        if (count == 0) {
             return -1;
+        }
+        if (count == 1) {
+            return ((Integer)candidateIds.elementAt(0)).intValue();
+        }
+        for (int i = 0; i < count; i++) {
+            String candidate = (String)candidateOwners.elementAt(i);
+            boolean maximal = true;
+            for (int j = 0; j < count; j++) {
+                if (i == j) {
+                    continue;
+                }
+                // If some other candidate's declaring interface is a proper
+                // subinterface of this one, this one is not maximally specific
+                // -- Java would take the subinterface's method.
+                if (isSubinterfaceOf(
+                        (String)candidateOwners.elementAt(j), candidate)) {
+                    maximal = false;
+                    break;
+                }
+            }
+            if (maximal) {
+                return ((Integer)candidateIds.elementAt(i)).intValue();
+            }
+        }
+        // Multiple maximally specific and none dominates -- JLS leaves the
+        // choice arbitrary. Take the first candidate found so the answer is
+        // deterministic within a build.
+        return ((Integer)candidateIds.elementAt(0)).intValue();
+    }
+
+    private void collectInterfaceCandidates(String owner, String name, String descriptor,
+                                            Hashtable visited,
+                                            java.util.Vector candidateOwners,
+                                            java.util.Vector candidateIds) {
+        if (visited.get(owner) != null) {
+            return;
         }
         visited.put(owner, Boolean.TRUE);
         Integer ownerId = (Integer)classIds.get(owner);
         if (ownerId == null) {
-            return -1;
+            return;
         }
         int[] ifaces = (int[])interfaceIds.get(ownerId);
         if (ifaces == null) {
-            return -1;
+            return;
         }
         for (int i = 0; i < ifaces.length; i++) {
             String ifaceName = (String)classNames.get(Integer.valueOf(ifaces[i]));
@@ -320,14 +374,69 @@ class InterpIOSSymbols {
             }
             Integer id = (Integer)methodIds.get(ifaceName + "." + name + descriptor);
             if (id != null) {
-                return id.intValue();
+                candidateOwners.addElement(ifaceName);
+                candidateIds.addElement(id);
             }
-            int deeper = interfaceMethodId(ifaceName, name, descriptor, visited);
-            if (deeper >= 0) {
-                return deeper;
+            // Keep walking even when this interface declares the method: a
+            // subinterface below may override it, and that override is the
+            // one JLS would pick.
+            collectInterfaceCandidates(ifaceName, name, descriptor, visited,
+                    candidateOwners, candidateIds);
+        }
+    }
+
+    /// Whether {@code candidate} is a proper subinterface of {@code parent}.
+    /// A fresh visited set per call -- reusing the candidate-collection one
+    /// would cut this walk short at an already-considered interface.
+    private boolean isSubinterfaceOf(String candidate, String parent) {
+        if (candidate.equals(parent)) {
+            return false;
+        }
+        Hashtable seen = new Hashtable();
+        return walkSuperinterfacesFor(candidate, parent, seen);
+    }
+
+    private boolean walkSuperinterfacesFor(String owner, String target, Hashtable seen) {
+        if (seen.get(owner) != null) {
+            return false;
+        }
+        seen.put(owner, Boolean.TRUE);
+        Integer ownerId = (Integer)classIds.get(owner);
+        if (ownerId == null) {
+            return false;
+        }
+        int[] ifaces = (int[])interfaceIds.get(ownerId);
+        if (ifaces == null) {
+            return false;
+        }
+        for (int i = 0; i < ifaces.length; i++) {
+            String ifaceName = (String)classNames.get(Integer.valueOf(ifaces[i]));
+            if (ifaceName == null) {
+                continue;
+            }
+            if (target.equals(ifaceName)) {
+                return true;
+            }
+            if (walkSuperinterfacesFor(ifaceName, target, seen)) {
+                return true;
             }
         }
-        return -1;
+        return false;
+    }
+
+    /**
+     * The method id declared exactly on this class, or -1.
+     *
+     * <p>No superclass walk. Constructor resolution has to use this: a
+     * subclass whose exact {@code <init>} descriptor is missing (an SDK newer
+     * than the installed runtime, a class that declares only some
+     * constructors) has to fail loudly rather than silently pick up the
+     * parent's {@code <init>} and hand back a base-class instance for
+     * {@code new Sub(args)}.</p>
+     */
+    int declaredMethodId(String owner, String name, String descriptor) {
+        Integer id = (Integer)methodIds.get(owner + "." + name + descriptor);
+        return id == null ? -1 : id.intValue();
     }
 
     /**

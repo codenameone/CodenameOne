@@ -194,9 +194,20 @@ public class InterpIOSLinker implements InterpLinker {
         if (owner == null) {
             throw new NoClassDefFoundError("unknown host class");
         }
-        // A constructor thunk allocates its own receiver and returns it, which
-        // is why this passes no target and expects an object back.
-        return invoke(owner, "<init>", descriptor, null, args, K_OBJECT);
+        // Exact-owner lookup, no superclass walk. A subclass whose requested
+        // <init> descriptor is missing (SDK newer than the installed runtime,
+        // a subclass that declares only some parent constructors) has to fail
+        // loudly here -- the generic resolver would find a same-descriptor
+        // constructor on the superclass and its thunk would allocate a Base
+        // instance for `new Sub(args)`, hiding the missing device API.
+        int id = symbols.declaredMethodId(owner, "<init>", descriptor);
+        if (id < 0) {
+            throw new NoSuchMethodError(owner + ".<init>" + descriptor
+                    + " is not present in the installed app");
+        }
+        // A constructor thunk allocates its own receiver and returns it,
+        // which is why this passes no target and expects an object back.
+        return invokeWithId(id, descriptor, null, args, K_OBJECT);
     }
 
     public Object invokeVirtual(Object target, String owner, String name, String descriptor,
@@ -244,6 +255,14 @@ public class InterpIOSLinker implements InterpLinker {
             throw new NoSuchMethodError(owner + "." + name + descriptor
                     + " is not present in the installed app");
         }
+        return invokeWithId(id, descriptor, target, args, returnKind);
+    }
+
+    /// The marshalling half of {@link #invoke}, split out so a caller that
+    /// resolved the id another way (constructor: exact-owner lookup) can
+    /// dispatch without going back through the generic resolver.
+    private Object invokeWithId(int id, String descriptor, Object target,
+                                Object[] args, int returnKind) throws Throwable {
         String[] argTypes = InterpValuesAccess.argumentTypes(descriptor);
         int count = argTypes.length;
         long[] prims = new long[count == 0 ? 1 : count];
