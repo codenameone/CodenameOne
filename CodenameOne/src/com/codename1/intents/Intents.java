@@ -1715,7 +1715,7 @@ public final class Intents {
     /// screen it happened to be showing, which is the failure an `opens` result exists to avoid.
     private static void navigateIfRequested(IntentResult r, IntentDeclaration decl,
                                              Map<String, Object> params,
-                                             CompletionGuard guard) {
+                                             CompletionGuard guard, boolean ranHeadless) {
         if (r == null || r.isFailed()) {
             return;
         }
@@ -1734,6 +1734,16 @@ public final class Intents {
         // A declared opensRoute has already brought the app forward -- that is what the flag is
         // for. A route the handler decided on at runtime has not, and if it ran headless the
         // destination would otherwise be built somewhere nobody can see.
+        //
+        // "Ran headless" is a property of the invocation, not of the declaration. headless =
+        // true says the handler *can* run without UI, and the same intent is routinely invoked
+        // by the application itself through Intents.invoke while a form is on screen -- an
+        // invocation whose context says headless = false, because it is. Reading the flag
+        // instead asked a port to foreground an app that was already in front, and a port with
+        // no bridge -- the base getIntentBridge returns null, which is every port that has no
+        // intent support -- can only answer no, so the route was dropped in exactly the place
+        // the documentation promises in-process invocation works everywhere. The ports that do
+        // have a bridge hid it: iOS answers this case specially and JavaSE simply says yes.
         // Checked before the app is asked forward, not only before the navigation. Bringing an
         // app to the front is not something that can be taken back: requestForeground posts the
         // launch and then waits for the Activity to arrive, and if the deadline expires during
@@ -1743,7 +1753,7 @@ public final class Intents {
         if (fromResult && guard != null && guard.answered()) {
             return;
         }
-        if (fromResult && decl != null && decl.runsHeadless() && !requestForeground(decl)) {
+        if (fromResult && ranHeadless && decl != null && !requestForeground(decl)) {
             // The app is staying where it is, so building the destination would change what
             // this application shows next without anyone having seen it happen -- a screen the
             // user finds already open the next time they launch, for an action they were told
@@ -2060,7 +2070,7 @@ public final class Intents {
         Outcome o = dispatchOnce(intentId, params, ctx);
         // The in-app path navigates unconditionally: the caller is blocked in this method and
         // there is no competing timeout to lose to.
-        navigateIfRequested(o.result, o.declaration, o.params, null);
+        navigateIfRequested(o.result, o.declaration, o.params, null, ctx != null && ctx.isHeadless());
         return o.result;
     }
 
@@ -2226,7 +2236,8 @@ public final class Intents {
                 // waiting forever for an answer that is already decided.
                 if (guard.claim()) {
                     try {
-                        navigateIfRequested(o.result, o.declaration, o.params, guard);
+                        navigateIfRequested(o.result, o.declaration, o.params, guard,
+                                ctx != null && ctx.isHeadless());
                     } finally {
                         guard.deliver(o.result);
                     }

@@ -1036,7 +1036,7 @@ class IntentsTest {
     /// the app forward builds the destination Form where nobody can see it.
     @Test
     void aHeadlessResultThatOpensARouteAsksThePortToForeground() {
-        FakeBridge b = new FakeBridge();
+        final FakeBridge b = new FakeBridge();
         Intents.setBridge(b);
         FakeDispatcher d = new FakeDispatcher();
         d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
@@ -1046,9 +1046,87 @@ class IntentsTest {
         d.next = IntentResult.opens("/orders/42");
         Intents.setDispatcher(d);
 
-        Intents.invoke("known", null);
+        // Dispatched headless, which is the situation being described. This used to drive it
+        // through Intents.invoke -- the in-app entry point, whose context says headless =
+        // false -- and passed only because the code under test read the declaration's flag
+        // instead of the invocation's state. Asserting the real path is what keeps the two
+        // apart.
+        Intents.dispatchInvocation("known", null, IntentSource.SHORTCUT, true, null);
 
+        awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+            public Boolean call() {
+                return Boolean.valueOf(b.foregroundRequests > 0);
+            }
+        }, "the port to be asked to bring the app forward");
         assertEquals(1, b.foregroundRequests);
+    }
+
+    /// headless = true says the handler *can* run with no UI, not that this invocation did.
+    /// The application invoking its own capability while a form is on screen is the in-app
+    /// path, and it navigates: there is nothing to bring forward.
+    @Test
+    void anInAppInvocationOfAHeadlessIntentNavigatesWithoutForegrounding() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                    "", 5, Collections.<String>emptyList(),
+                    Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.opens("/orders/42");
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertEquals(Arrays.asList("/orders/42"), navigated);
+            assertEquals(0, b.foregroundRequests,
+                    "the app is already in front; asking a port to foreground it is asking for "
+                            + "something that has already happened");
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+            Intents.setBridge(null);
+        }
+    }
+
+    /// The port that has no bridge at all is the one this went wrong on. Every port answers
+    /// Intents.invoke, because the dispatch table is generated code rather than a platform
+    /// service -- so a route the handler returns has to open there too. Consulting the
+    /// declaration meant asking a null bridge to foreground the app, taking its "no" for an
+    /// answer, and dropping the route on exactly the ports the documentation promises this
+    /// works on.
+    @Test
+    void anInAppRouteOpensOnAPortWithNoIntentBridge() {
+        Intents.setBridge(null);
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                    "", 5, Collections.<String>emptyList(),
+                    Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.opens("/orders/42");
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertEquals(Arrays.asList("/orders/42"), navigated);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
     }
 
     /// The platform omits an optional parameter it was not given, and the generated dispatcher
@@ -2168,7 +2246,7 @@ class IntentsTest {
             }
         });
         try {
-            FakeBridge b = new FakeBridge();
+            final FakeBridge b = new FakeBridge();
             b.canForeground = false;
             Intents.setBridge(b);
 
@@ -2177,15 +2255,29 @@ class IntentsTest {
             d.next = IntentResult.opens("/orders/42");
             Intents.setDispatcher(d);
 
-            Intents.invoke("known", null);
+            // Dispatched headless: this rule is about an invocation that ran with nothing on
+            // screen, and driving it through Intents.invoke asserted it of an app that is in
+            // front -- which is the in-app path, where there is nothing to bring forward and
+            // the route simply opens.
+            Intents.dispatchInvocation("known", null, IntentSource.SHORTCUT, true, null);
 
+            awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+                public Boolean call() {
+                    return Boolean.valueOf(b.foregroundRequests > 0);
+                }
+            }, "the port to be asked to bring the app forward");
             assertTrue(navigated.isEmpty(),
                     "the destination must not be built where nobody can see it");
             assertEquals(1, b.foregroundRequests, "and it did ask first");
 
             // When the app can come forward, the same result navigates as before.
             b.canForeground = true;
-            Intents.invoke("known", null);
+            Intents.dispatchInvocation("known", null, IntentSource.SHORTCUT, true, null);
+            awaitCondition(new java.util.concurrent.Callable<Boolean>() {
+                public Boolean call() {
+                    return Boolean.valueOf(!navigated.isEmpty());
+                }
+            }, "the route to open once the app can come forward");
             assertEquals(Arrays.asList("/orders/42"), navigated);
         } finally {
             com.codename1.router.Navigation.setDispatcher(null);
@@ -2376,9 +2468,10 @@ class IntentsTest {
 
             java.lang.reflect.Method navigate = Intents.class.getDeclaredMethod(
                     "navigateIfRequested", IntentResult.class, IntentDeclaration.class,
-                    Map.class, guardClass);
+                    Map.class, guardClass, boolean.class);
             navigate.setAccessible(true);
-            navigate.invoke(null, IntentResult.opens("/orders/42"), headless, null, guard);
+            navigate.invoke(null, IntentResult.opens("/orders/42"), headless, null, guard,
+                    Boolean.TRUE);
 
             assertEquals(0, b.foregroundRequests,
                     "the platform was told the action stopped, so the app must not be launched");

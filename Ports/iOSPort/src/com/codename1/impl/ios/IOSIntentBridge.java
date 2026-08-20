@@ -79,13 +79,18 @@ final class IOSIntentBridge implements IntentBridge {
     }
 
     public boolean requestForeground() {
-        // Already forward is already foregrounded. Intents.invoke can be called from the app
-        // itself while it is on screen -- for a declaration marked headless, which describes
-        // how the *platform* may run it and says nothing about an in-app caller -- and a
-        // handler returning opens() then asked for a transition that had already happened.
-        // Answering false made the framework suppress the route, so an in-app invocation
-        // succeeded and silently never opened its destination. The Android bridge has always
-        // answered this way; this door had not.
+        // Already forward is already foregrounded. A headless invocation does not imply a
+        // backgrounded app -- a widget button or a Shortcuts run can arrive while the app is on
+        // screen -- and a handler returning opens() then asked for a transition that had
+        // already happened. Answering false made the framework suppress the route, so the
+        // invocation succeeded and silently never opened its destination. The Android bridge
+        // has always answered this way; this door had not.
+        //
+        // The in-app case that first exposed this no longer reaches here at all: Intents.invoke
+        // runs with a context that says headless = false, and the framework now reads the
+        // invocation rather than the declaration's flag, so it never asks a port to foreground
+        // an app on that path. That fix had to be in the framework, because a port with no
+        // bridge cannot answer this question at all and its route was being dropped.
         //
         // isMinimized rather than "a Form exists": a backgrounded app still has a current Form,
         // and treating that as foreground is what the paragraph below exists to prevent.
