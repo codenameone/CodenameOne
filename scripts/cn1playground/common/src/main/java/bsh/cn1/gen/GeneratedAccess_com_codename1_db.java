@@ -55,8 +55,17 @@ public final class GeneratedAccess_com_codename1_db {
         if ("Cursor".equals(simpleName)) {
             return com.codename1.db.Cursor.class;
         }
+        if ("CursorExt".equals(simpleName)) {
+            return com.codename1.db.CursorExt.class;
+        }
         if ("Database".equals(simpleName)) {
             return com.codename1.db.Database.class;
+        }
+        if ("DatabaseConfig".equals(simpleName)) {
+            return com.codename1.db.DatabaseConfig.class;
+        }
+        if ("DatabaseEncryptionException".equals(simpleName)) {
+            return com.codename1.db.DatabaseEncryptionException.class;
         }
         if ("Row".equals(simpleName)) {
             return com.codename1.db.Row.class;
@@ -71,6 +80,16 @@ public final class GeneratedAccess_com_codename1_db {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.db.DatabaseEncryptionException.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
+                return new com.codename1.db.DatabaseEncryptionException(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.Throwable.class}, false);
+                return new com.codename1.db.DatabaseEncryptionException(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.Throwable) adaptedArgs[2]);
+            }
+        }
         if (type == com.codename1.db.ThreadSafeDatabase.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.db.Database.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.db.Database.class}, false);
@@ -83,14 +102,39 @@ public final class GeneratedAccess_com_codename1_db {
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.db.Database.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.db.DatabaseConfig.class) return invokeStatic1(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("beforeFirst".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.db.Cursor.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.db.Cursor.class}, false);
+                com.codename1.db.Database.beforeFirst((com.codename1.db.Cursor) adaptedArgs[0]); return null;
+            }
+        }
+        if ("count".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.db.Cursor.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.db.Cursor.class}, false);
+                return com.codename1.db.Database.count((com.codename1.db.Cursor) adaptedArgs[0]);
+            }
+        }
+        if ("decrypt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false);
+                com.codename1.db.Database.decrypt((java.lang.String) adaptedArgs[0], (com.codename1.db.DatabaseConfig) adaptedArgs[1]); return null;
+            }
+        }
         if ("delete".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.db.Database.delete((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("encrypt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false);
+                com.codename1.db.Database.encrypt((java.lang.String) adaptedArgs[0], (com.codename1.db.DatabaseConfig) adaptedArgs[1]); return null;
             }
         }
         if ("exists".equals(name)) {
@@ -99,10 +143,21 @@ public final class GeneratedAccess_com_codename1_db {
                 return com.codename1.db.Database.exists((java.lang.String) adaptedArgs[0]);
             }
         }
+        if ("forgetManagedKey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.db.Database.forgetManagedKey((java.lang.String) adaptedArgs[0]);
+            }
+        }
         if ("getDatabasePath".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return com.codename1.db.Database.getDatabasePath((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("isBlobQueryParameterSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.db.Database.isBlobQueryParameterSupported();
             }
         }
         if ("isCustomPathSupported".equals(name)) {
@@ -110,10 +165,36 @@ public final class GeneratedAccess_com_codename1_db {
                 return com.codename1.db.Database.isCustomPathSupported();
             }
         }
+        if ("isEncrypted".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.db.Database.isEncrypted((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("isEncryptionSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.db.Database.isEncryptionSupported();
+            }
+        }
+        if ("isLegacyBehavior".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.db.Database.isLegacyBehavior();
+            }
+        }
         if ("openOrCreate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return com.codename1.db.Database.openOrCreate((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false);
+                return com.codename1.db.Database.openOrCreate((java.lang.String) adaptedArgs[0], (com.codename1.db.DatabaseConfig) adaptedArgs[1]);
+            }
+        }
+        if ("setLegacyBehavior".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.db.Database.setLegacyBehavior(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("supportsWasNull".equals(name)) {
@@ -129,6 +210,36 @@ public final class GeneratedAccess_com_codename1_db {
             }
         }
         throw unsupportedStatic(com.codename1.db.Database.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("managed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.db.DatabaseConfig.managed();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.db.DatabaseConfig.managed((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("passphrase".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.db.DatabaseConfig.passphrase((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("plain".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.db.DatabaseConfig.plain();
+            }
+        }
+        if ("rawKey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return com.codename1.db.DatabaseConfig.rawKey((byte[]) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.db.DatabaseConfig.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
@@ -148,23 +259,44 @@ public final class GeneratedAccess_com_codename1_db {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.db.DatabaseConfig) {
+            try {
+                return invoke2((com.codename1.db.DatabaseConfig) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.db.DatabaseEncryptionException) {
+            try {
+                return invoke3((com.codename1.db.DatabaseEncryptionException) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.db.Cursor) {
             try {
-                return invoke2((com.codename1.db.Cursor) target, name, safeArgs);
+                return invoke4((com.codename1.db.Cursor) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.db.CursorExt) {
+            try {
+                return invoke5((com.codename1.db.CursorExt) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.db.Row) {
             try {
-                return invoke3((com.codename1.db.Row) target, name, safeArgs);
+                return invoke6((com.codename1.db.Row) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.db.RowExt) {
             try {
-                return invoke4((com.codename1.db.RowExt) target, name, safeArgs);
+                return invoke7((com.codename1.db.RowExt) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -179,6 +311,12 @@ public final class GeneratedAccess_com_codename1_db {
         if ("beginTransaction".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.beginTransaction(); return null;
+            }
+        }
+        if ("changeKey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.db.DatabaseConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.db.DatabaseConfig.class}, false);
+                typedTarget.changeKey((com.codename1.db.DatabaseConfig) adaptedArgs[0]); return null;
             }
         }
         if ("close".equals(name)) {
@@ -232,6 +370,11 @@ public final class GeneratedAccess_com_codename1_db {
                 return typedTarget.getThread();
             }
         }
+        if ("isInTransaction".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isInTransaction();
+            }
+        }
         if ("rollbackTransaction".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.rollbackTransaction(); return null;
@@ -244,6 +387,12 @@ public final class GeneratedAccess_com_codename1_db {
         if ("beginTransaction".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.beginTransaction(); return null;
+            }
+        }
+        if ("changeKey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.db.DatabaseConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.db.DatabaseConfig.class}, false);
+                typedTarget.changeKey((com.codename1.db.DatabaseConfig) adaptedArgs[0]); return null;
             }
         }
         if ("close".equals(name)) {
@@ -292,6 +441,11 @@ public final class GeneratedAccess_com_codename1_db {
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], varArgs);
             }
         }
+        if ("isInTransaction".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isInTransaction();
+            }
+        }
         if ("rollbackTransaction".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.rollbackTransaction(); return null;
@@ -300,7 +454,109 @@ public final class GeneratedAccess_com_codename1_db {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.db.Cursor typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.db.DatabaseConfig typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getCipherProfile".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCipherProfile();
+            }
+        }
+        if ("getKeyAlias".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKeyAlias();
+            }
+        }
+        if ("getKeyMode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKeyMode();
+            }
+        }
+        if ("isEncrypted".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEncrypted();
+            }
+        }
+        if ("isKeyHardwareBacked".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isKeyHardwareBacked();
+            }
+        }
+        if ("resolveKeyMaterial".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.resolveKeyMaterial((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("wipe".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.wipe(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.db.DatabaseEncryptionException typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addSuppressed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.addSuppressed((java.lang.Throwable) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getCause".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCause();
+            }
+        }
+        if ("getErrorCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getErrorCode();
+            }
+        }
+        if ("getLocalizedMessage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLocalizedMessage();
+            }
+        }
+        if ("getMessage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMessage();
+            }
+        }
+        if ("getStackTrace".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStackTrace();
+            }
+        }
+        if ("getSuppressed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSuppressed();
+            }
+        }
+        if ("initCause".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return typedTarget.initCause((java.lang.Throwable) adaptedArgs[0]);
+            }
+        }
+        if ("printStackTrace".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.printStackTrace(); return null;
+            }
+        }
+        if ("setStackTrace".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false);
+                typedTarget.setStackTrace((java.lang.StackTraceElement[]) adaptedArgs[0]); return null;
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codename1.db.Cursor typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.close(); return null;
@@ -362,7 +618,79 @@ public final class GeneratedAccess_com_codename1_db {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.db.Row typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.db.CursorExt typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("beforeFirst".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.beforeFirst(); return null;
+            }
+        }
+        if ("close".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("first".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.first();
+            }
+        }
+        if ("getColumnCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getColumnCount();
+            }
+        }
+        if ("getColumnIndex".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getColumnIndex((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getColumnName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getColumnName(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("getCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCount();
+            }
+        }
+        if ("getPosition".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPosition();
+            }
+        }
+        if ("getRow".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRow();
+            }
+        }
+        if ("last".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.last();
+            }
+        }
+        if ("next".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.next();
+            }
+        }
+        if ("position".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.position(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("prev".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.prev();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.db.Row typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getBlob".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -408,7 +736,7 @@ public final class GeneratedAccess_com_codename1_db {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.db.RowExt typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.db.RowExt typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getBlob".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -460,7 +788,25 @@ public final class GeneratedAccess_com_codename1_db {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.db.DatabaseConfig.class) return getStaticField0(name);
+        if (type == com.codename1.db.DatabaseEncryptionException.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("KEY_MANAGED".equals(name)) return com.codename1.db.DatabaseConfig.KEY_MANAGED;
+        if ("KEY_NONE".equals(name)) return com.codename1.db.DatabaseConfig.KEY_NONE;
+        if ("KEY_PASSPHRASE".equals(name)) return com.codename1.db.DatabaseConfig.KEY_PASSPHRASE;
+        if ("KEY_RAW".equals(name)) return com.codename1.db.DatabaseConfig.KEY_RAW;
+        throw unsupportedStaticField(com.codename1.db.DatabaseConfig.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("KEY_UNAVAILABLE".equals(name)) return com.codename1.db.DatabaseEncryptionException.KEY_UNAVAILABLE;
+        if ("MIGRATION_FAILED".equals(name)) return com.codename1.db.DatabaseEncryptionException.MIGRATION_FAILED;
+        if ("NOT_SUPPORTED".equals(name)) return com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED;
+        if ("WRONG_KEY".equals(name)) return com.codename1.db.DatabaseEncryptionException.WRONG_KEY;
+        throw unsupportedStaticField(com.codename1.db.DatabaseEncryptionException.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

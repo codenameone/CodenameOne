@@ -98,9 +98,22 @@ jobs:
 
       - name: Run Purchase / ReceiptStore unit tests
         working-directory: maven
+        # Narrowed to resolution failures, because this step RUNS TESTS: retrying every nonzero
+        # exit would let an intermittent product failure pass on a later attempt and take the gate
+        # green with it. What this covers is the run that died here before a single test compiled,
+        # with "authorization failed for https://repo.maven.apache.org/maven2" against the JUnit
+        # BOM and the publishing plugin -- Maven Central, not this repository.
+        env:
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+          # Five attempts a minute apart rather than three at thirty seconds: Central
+          # refused two different jobs on this branch today, and a window of about a
+          # minute is shorter than the incidents have been. It costs nothing on a real
+          # failure, which RETRY_ONLY_MATCHING returns on the first attempt.
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
         run: |
           set -euo pipefail
-          mvn -B -Dmaven.javadoc.skip=true \
+          bash ../scripts/ci/retry.sh mvn -B -Dmaven.javadoc.skip=true \
               -DunitTests=true \
               -Plocal-dev-javase \
               -P unittests \

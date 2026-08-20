@@ -136,6 +136,12 @@ public class JavaScriptBuilder extends Executor {
             stageSourceJar(sourceZip, stageClasses);
             stageJavaApi(stageClasses);
 
+            // Before the port is staged, and that is the whole point. The port's own
+            // DatabaseImpl extends Database, so once it is merged into this tree every
+            // application looks like a database user and nothing is ever pruned. The iOS,
+            // Windows and Linux builders scan at the same point for the same reason.
+            recordDatabaseUsage(stageClasses);
+
             File portSources = locateJavaScriptPortSources(request);
             File portClassesStaged = stageJavaScriptPort(request, portSources, stageClasses, portClasses);
 
@@ -235,6 +241,26 @@ public class JavaScriptBuilder extends Executor {
      * {@code Samplerate} global ("use libsamplerate if it is available"), and
      * no script tag, ScriptTool call or bridge ever defines one.
      */
+    /**
+     * True when the application references com.codename1.db, so the SQLite engine has to ship.
+     * Set by {@link #recordDatabaseUsage(File)} before the port is staged, and read when the
+     * port assets are pruned and when the launcher is written.
+     */
+    private boolean usesDatabase;
+
+    /**
+     * Records whether the application, as opposed to the framework, touches the database.
+     *
+     * The attribution lives in {@link Executor}: the staging tree is the application merged with
+     * the framework, and Display alone references both Database and DatabaseConfig, so a scan that
+     * cannot say which class made the reference reports every application as a database user and
+     * ships the ~1.5MB engine to all of them.
+     */
+    private void recordDatabaseUsage(File stageClasses) throws IOException {
+        usesDatabase = scanForDatabaseUsage(stageClasses).usesDatabase();
+    }
+
+
     private void pruneOptionalPortAssets(File webApp, BuildRequest request) {
         File js = new File(webApp, "js");
         if (!js.isDirectory()) {
@@ -258,6 +284,18 @@ public class JavaScriptBuilder extends Executor {
             // Not fatal -- the bundle just carries a dead 485KB file -- but say
             // so rather than silently shipping what we claim to have pruned.
             log("WARNING: could not delete " + samplerate + "; it will ship in the bundle");
+        }
+        if (!usesDatabase) {
+            // About 1.5MB of engine that an application which never opens a database
+            // has no use for.
+            String[] sqliteAssets = {"sqlite3mc.js", "sqlite3.wasm", "sqlite3-opfs-async-proxy.js"};
+            for (String asset : sqliteAssets) {
+                File f = new File(js, asset);
+                if (f.isFile() && !f.delete()) {
+                    log("WARNING: could not delete " + f + "; it will ship in the bundle");
+                }
+            }
+            debug("Omitting the SQLite engine; this application does not use com.codename1.db");
         }
     }
 
@@ -369,11 +407,21 @@ public class JavaScriptBuilder extends Executor {
             throw new BuildException("Failed to compile JavaScript port sources");
         }
         copyTree(portClasses, stageClasses);
-        // Source-checkout build: the webapp sits next to the sources at
-        // src/main/webapp (portSources is src/main/java).
+        // Source-checkout build: the webapp sits next to the sources at src/main/webapp
+        // (portSources is src/main/java). Copied into this build's work directory before it is
+        // used, rather than pointed at in place: pruning is a delete, and the directory here
+        // belongs to somebody's checkout of this repository -- a build that never opens a
+        // database would otherwise remove sqlite3.wasm from their working tree. The bundled path
+        // moves its webapp out of the jar for the same reason and prunes the copy.
         File srcWebApp = new File(portSources.getParentFile(), "webapp");
         if (srcWebApp.isDirectory()) {
-            jsPortWebApp = srcWebApp;
+            File dest = new File(tmpDir, "port-webapp");
+            if (dest.exists()) {
+                delTree(dest, true);
+            }
+            copyTree(srcWebApp, dest);
+            jsPortWebApp = dest;
+            pruneOptionalPortAssets(dest, request);
         }
         return stageClasses;
     }
@@ -433,6 +481,10 @@ public class JavaScriptBuilder extends Executor {
                             + ifaceName + ".class, " + ifaceName + "Impl.class);");
                 }
             }
+            // Before the bootstrap, so the switch is in force by the time anything opens a
+            // database. Display does not exist yet here, hence the static call.
+            pw.print(databaseLegacyStubCall(request, usesDatabase,
+                    coreHasLegacySwitch(stageClasses)));
             // Stamp the hardening metadata after Display.init but BEFORE the lifecycle's init/start,
             // so Hardening.isHardened() and any crash raised during startup already carry the mapping
             // id / level (parity with iOS and Android). bootstrap(lifecycle, afterInit) invokes the

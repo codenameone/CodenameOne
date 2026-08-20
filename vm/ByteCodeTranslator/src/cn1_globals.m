@@ -1414,8 +1414,41 @@ static __thread int cn1GcTrustedRoots = 0;
 #define CN1_GC_TRUSTED_END()   cn1GcTrustedRoots = __cn1TrustSaved
 #endif
 
+#ifdef CN1_GC_VERIFY
+/*
+ * The handshake GcVerifyApp waits on, in place of sleeping.
+ *
+ * Its hazard is an object allocated WHILE a mark is running and dropped before the mark ends:
+ * that is the shape a missing grace pass loses. The app used to arrange it by calling
+ * System.gc() and sleeping, which is a guess about how long a cycle takes -- and on a loaded
+ * runner the guess is wrong in both directions. When it is, the fault-injected half of the gate
+ * allocates outside the mark, produces no dangling reference, and the run fails saying the
+ * verifier cannot detect a defect that was never actually created.
+ *
+ * The flag says whether a mark is in progress; the counter says how many have finished. Both
+ * are written by the collector thread only, and only in a verification build -- there is no
+ * such symbol in a shipping app.
+ */
+_Atomic int cn1GcVerifyMarkActive = 0;
+_Atomic int cn1GcVerifyMarksDone = 0;
+
+/*
+ * Packed so one call answers both without tearing: the count in the high bits, the in-progress
+ * flag in bit 0. Reading them separately let a mark begin and end between the two reads, which
+ * is exactly the window the app is trying to observe.
+ */
+JAVA_LONG GcVerifyApp_gcMarkState___R_long(CODENAME_ONE_THREAD_STATE) {
+    int done = atomic_load_explicit(&cn1GcVerifyMarksDone, memory_order_acquire);
+    int active = atomic_load_explicit(&cn1GcVerifyMarkActive, memory_order_acquire);
+    return (((JAVA_LONG)done) << 1) | (active ? 1 : 0);
+}
+#endif
+
 void codenameOneGCMark() {
     currentGcMarkValue++;
+#ifdef CN1_GC_VERIFY
+    atomic_store_explicit(&cn1GcVerifyMarkActive, 1, memory_order_release);
+#endif
     atomic_store_explicit(&gcMarkOverflowSeen, JAVA_FALSE, memory_order_relaxed);
     // Env-gated cycle tracer (same pattern as CN1_LEGACY_DEBUG): one stderr line
     // per collection cycle. Costs one cached getenv when disabled. Used by
@@ -1932,6 +1965,12 @@ void codenameOneGCMark() {
     // Marking (incl. grace, belt and SATB) is fully done. Register the objects matured
     // this cycle into allObjectsInHeap now -- single-threaded, locked, before the sweep.
     cn1DrainAdoptBuffer();
+#endif
+#ifdef CN1_GC_VERIFY
+    // Marking is over -- including the grace pass, the belt and the SATB drain. The count moves
+    // after the flag clears, so an app that sees the count advance knows the whole mark is done.
+    atomic_store_explicit(&cn1GcVerifyMarkActive, 0, memory_order_release);
+    atomic_fetch_add_explicit(&cn1GcVerifyMarksDone, 1, memory_order_release);
 #endif
 }
 

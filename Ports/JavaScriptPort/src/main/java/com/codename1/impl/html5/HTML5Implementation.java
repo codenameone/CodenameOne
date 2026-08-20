@@ -67,7 +67,6 @@ import com.codename1.push.PushCallback;
 import com.codename1.teavm.ext.localforage.LocalForage;
 import com.codename1.teavm.ext.localforage.LocalForage.ItemSavedListener;
 import com.codename1.teavm.ext.usermedia.PhotoCapture;
-import com.codename1.teavm.ext.websql.WebSQL;
 import com.codename1.teavm.geom.JSAffineTransform;
 import com.codename1.teavm.geom.JSMatrix4;
 import com.codename1.teavm.io.BlobUtil;
@@ -12495,8 +12494,150 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
-        WebSQL.Database db = WebSQL.openDatabase(databaseName, "1.0", databaseName, defaultFileSystemSize);
-        return new DatabaseImpl(db);
+        return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, com.codename1.db.DatabaseConfig config)
+            throws IOException {
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            throw new IOException("The SQLite engine could not be loaded");
+        }
+        String key = null;
+        if (config != null && config.isEncrypted()) {
+            // The resolved file, not the name it was asked for: a managed key with no explicit
+            // alias is stored under what is passed here, so two accepted spellings of one database
+            // would derive two different keys and the second open would report a wrong key against
+            // intact data.
+            key = config.resolveKeyMaterial(DatabaseImpl.poolKeyFor(databaseName));
+        }
+        return new DatabaseImpl(databaseName, key);
+    }
+
+    /// The file an implicit managed key is stored under; see the open path, which resolves the
+    /// same way so two spellings of one database derive one key.
+    @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return com.codename1.impl.html5.database.DatabaseImpl.poolKeyFor(databaseName);
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        return com.codename1.impl.html5.database.SQLiteNative.init()
+                && com.codename1.impl.html5.database.SQLiteNative.isCipherAvailable();
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        // Storage is a virtual pool keyed by name, not a filesystem, so there are no paths.
+        return false;
+    }
+
+    /// Whether a database of this name is in the storage pool.
+    ///
+    /// An engine that will not start is not an empty pool. The load can fail for reasons that have
+    /// nothing to do with what is stored -- another tab holding the OPFS pool is the likely one --
+    /// and answering "no such database" there says the user's data is gone. It is worse than
+    /// unhelpful: `Database#isEncrypted(String)` gives up on a database that does not exist and
+    /// reports false, so an unreachable engine would have described an encrypted database as
+    /// plaintext.
+    ///
+    /// So an unreachable engine is not reported as absence. The caller goes on to open, which
+    /// fails with what actually happened, rather than concluding the database was never there.
+    @Override
+    public boolean existsDB(String databaseName) {
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            return true;
+        }
+        return com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
+    }
+
+    /// The browser's non-prompting secure store.
+    ///
+    /// Without one the base class answers "unknown" to every question, and ManagedKeys refuses to
+    /// generate a key it cannot prove is absent -- so DatabaseConfig.managed() failed at every
+    /// open on a port that reports encryption as supported. See HTML5SecureStorage for what this
+    /// does and does not protect: it is persistence in origin storage, not a key store.
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new HTML5SecureStorage();
+        }
+        return secureStorage;
+    }
+
+    private com.codename1.security.SecureStorage secureStorage;
+
+    @Override
+    public boolean isRelativeAttachmentNameResolvable() {
+        // No filesystem and no working directory: the engine is SQLite compiled to wasm over a
+        // storage pool, so a bare name in an ATTACH is a pool entry -- the same entry this port
+        // would open under that name. There is nothing here for a relative name to resolve
+        // against differently, so the reservation names the database that really gets attached.
+        return true;
+    }
+
+    @Override
+    public String databaseIdentityForEngineFile(String engineFile) {
+        // The engine here is SQLite compiled to wasm over a storage pool, so what it reports is a
+        // pool entry rather than a path. Dressing it as a file URL, which is right on every port
+        // backed by a filesystem, produced a name the pool has never held -- so the reservation
+        // for the database that really was attached got released and one was taken on nothing.
+        if (engineFile == null || engineFile.length() == 0) {
+            return null;
+        }
+        return com.codename1.impl.html5.database.DatabaseImpl.poolKeyFor(engineFile);
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws IOException {
+        // A failed init is not "nothing to delete". The engine is unavailable - another tab
+        // holding the storage, most likely - and the database is still there, so returning
+        // normally would report a deletion that did not happen.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            throw new IOException("The database " + databaseName + " could not be deleted "
+                    + "because the SQLite engine is unavailable");
+        }
+        if (!com.codename1.impl.html5.database.SQLiteNative.delete(databaseName)) {
+            throw new IOException("The database " + databaseName + " could not be deleted: "
+                    + com.codename1.impl.html5.database.SQLiteNative.lastError());
+        }
+    }
+
+    @Override
+    public int isDatabaseFileEncrypted(String databaseName) {
+        // Databases live in a browser storage pool, not a filesystem, so there is no header to
+        // read. Ask the engine: opening without a key succeeds only for a plaintext database.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            // Unreachable, so unanswered. Reporting "not encrypted" from here would be this port
+            // asserting the one thing it must never get wrong about a database it could not open.
+            return DATABASE_ENCRYPTION_UNKNOWN;
+        }
+        if (!com.codename1.impl.html5.database.SQLiteNative.exists(databaseName)) {
+            return DATABASE_NOT_ENCRYPTED;
+        }
+        try {
+            long peer = com.codename1.impl.html5.database.SQLiteNative.open(databaseName, null);
+            if (peer == 0) {
+                return DATABASE_ENCRYPTED;
+            }
+            com.codename1.impl.html5.database.SQLiteNative.close(peer);
+            return DATABASE_NOT_ENCRYPTED;
+        } catch (IOException cannotOpenUnkeyed) {
+            return DATABASE_ENCRYPTED;
+        }
+    }
+
+    @Override
+    public String getDatabasePath(String databaseName) {
+        // The name inside the storage pool. Not a real filesystem path, and deliberately not
+        // presented as one: FileSystemStorage cannot open it.
+        return databaseName;
     }
 
     @Override

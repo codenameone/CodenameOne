@@ -583,6 +583,613 @@ public abstract class Executor {
         }
     }
 
+    /// Reports whether this build came from a Maven project.
+    ///
+    /// The Maven plugin stamps its own version into the settings it hands over, and the legacy
+    /// Ant build client never has, so the presence of that argument is the discriminator. It has
+    /// been written since 2021, well before the Maven transition finished, so an ordinary Maven
+    /// build is not going to be missing it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    ///
+    /// #### Returns
+    ///
+    /// true if the request was produced by the Maven plugin
+    protected boolean isMavenBuild(BuildRequest request) {
+        return request.getArg("maven.codenameone-maven-plugin", null) != null
+                || request.getArg("maven.codenameone-core.version", null) != null;
+    }
+
+    /// Decides whether the database compatibility switch should be on for this build.
+    ///
+    /// An explicit `db.legacy` always wins, in either direction. Failing that, an Ant project is
+    /// defaulted to the old behaviour, because it predates the portable contract and its author
+    /// has no reason to expect a rebuild to change how their queries behave. A Maven project
+    /// gets the portable contract, which is the documented default.
+    ///
+    /// The default only applies when the application actually uses the database. Turning it on
+    /// for an app with no database is harmless but misleading, and it would show up in the build
+    /// log of every Ant project ever built.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// true if the generated stub should switch the database into legacy mode
+    protected boolean isDatabaseLegacyMode(BuildRequest request, boolean usesDatabase) {
+        String explicit = request.getArg("db.legacy", null);
+        if (explicit != null) {
+            return "true".equalsIgnoreCase(explicit);
+        }
+        if (!usesDatabase || isMavenBuild(request)) {
+            return false;
+        }
+        debug("This is an Ant project that uses com.codename1.db, so the database is being built "
+                + "in compatibility mode: it keeps the behaviour this project was written "
+                + "against rather than the portable contract. Set the db.legacy build hint to "
+                + "false to opt in to the portable contract, or to true to pin compatibility "
+                + "mode explicitly.");
+        return true;
+    }
+
+    /// The line a generated application stub needs in order to apply the decision above.
+    ///
+    /// Empty when the switch is off, so the stub is unchanged for the common case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// the source line to insert, or an empty string
+    protected String databaseLegacyStubProperty(BuildRequest request, boolean usesDatabase) {
+        if (!isDatabaseLegacyMode(request, usesDatabase)) {
+            return "";
+        }
+        return "        Display.getInstance().setProperty(\"db.legacy\", \"true\");\n";
+    }
+
+    /// The same decision, for a stub that runs before `Display` exists.
+    ///
+    /// A **direct** call, not reflection: ParparVM's dead-code elimination does not keep a member
+    /// reached only reflectively, so a reflective form would be culled and the lookup would fail
+    /// at runtime, silently leaving the application on the new behaviour. The launcher calls
+    /// `SVGRegistry.installGlobal` and `NativeLookup.register` directly for the same reason.
+    ///
+    /// It compiles everywhere because it is emitted only when the staged core actually has the
+    /// switch. A core that predates it has none to set, and its behaviour is already the old
+    /// behaviour, so emitting nothing there reaches the same result.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// the source line to insert, or an empty string
+    protected String databaseLegacyStubCall(BuildRequest request, boolean usesDatabase,
+            boolean coreHasLegacySwitch) {
+        if (!coreHasLegacySwitch || !isDatabaseLegacyMode(request, usesDatabase)) {
+            return "";
+        }
+        return "        com.codename1.db.Database.setLegacyBehavior(true);\n";
+    }
+
+    /// Whether the staged framework carries the database compatibility switch.
+    ///
+    /// `DatabaseConfig` arrived with the portable database contract, so its presence is what
+    /// distinguishes a core that has `setLegacyBehavior` from one that predates the feature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stageClasses`: the staged class tree, or null
+    ///
+    /// #### Returns
+    ///
+    /// true if the switch is available to call directly
+    protected boolean coreHasLegacySwitch(File stageClasses) {
+        return stageClasses != null
+                && new File(stageClasses, "com/codename1/db/DatabaseConfig.class").exists();
+    }
+
+    /// What an application's own classes say about its use of the database API.
+    ///
+    /// Two independent answers, because two different payloads hang off them: any reference to
+    /// `com.codename1.db` means the SQLite engine has to ship, and a reference to `DatabaseConfig`
+    /// additionally means the cipher does.
+    public static final class DatabaseUsage {
+
+        private final boolean database;
+
+        private final boolean cipher;
+
+        DatabaseUsage(boolean database, boolean cipher) {
+            this.database = database;
+            this.cipher = cipher;
+        }
+
+        /// The answer from two roots, since a build can stage classes and libraries separately.
+        ///
+        /// #### Parameters
+        ///
+        /// - `other`: the usage found under another root
+        ///
+        /// #### Returns
+        ///
+        /// a usage that is true wherever either is
+        public DatabaseUsage merge(DatabaseUsage other) {
+            if (other == null) {
+                return this;
+            }
+            return new DatabaseUsage(database || other.database, cipher || other.cipher);
+        }
+
+        /// Whether anything outside the framework references `com.codename1.db`.
+        public boolean usesDatabase() {
+            return database;
+        }
+
+        /// Whether anything outside the framework references `com.codename1.db.DatabaseConfig`.
+        public boolean usesDatabaseCipher() {
+            return cipher;
+        }
+    }
+
+    /// The database API itself. Every class in it names the package, so none of them says
+    /// anything about whether the application does.
+    private static final String DATABASE_PACKAGE = "com/codename1/db";
+
+    /// Framework classes whose reference to the database package is their own.
+    ///
+    /// Named one by one rather than by package, because a package is not a reliable statement
+    /// about who wrote a class: skipping `com/codename1/ui` wholesale would also skip an
+    /// application class under it, and a direct `DatabaseConfig` reference there would then go
+    /// unseen and the engine would be left out of a build that needs it. There are sixteen of
+    /// these in the framework and they are enumerated.
+    private static final String[] FRAMEWORK_DATABASE_CLASSES = {
+        "com/codename1/impl/AbstractDBCursor",
+        "com/codename1/impl/CodenameOneImplementation",
+        "com/codename1/orm/Dao",
+        "com/codename1/orm/EntityManager",
+        "com/codename1/properties/SQLMap",
+        // Not framework code any more -- it lives under tests/ and is compiled only into the
+        // conformance harness -- but the harness does carry it, and it is our check on the ports
+        // rather than that application's own use of the database. Named here so it keeps counting
+        // for nothing, and so an application that shipped against an older core, which did carry
+        // it, is unaffected.
+        "com/codename1/testing/DatabaseConformanceSuite",
+        "com/codename1/ui/Display",
+        // The database package itself. Listed by name rather than skipped as a directory: the
+        // package is the framework's by convention, not by ownership, and an application or a
+        // library is free to put a class in it -- which used to make that class invisible to this
+        // scan, so a helper there could configure encryption and the build would drop the cipher.
+        "com/codename1/db/Cursor",
+        "com/codename1/db/CursorExt",
+        "com/codename1/db/Database",
+        "com/codename1/db/DatabaseConfig",
+        "com/codename1/db/DatabaseEncryptionException",
+        "com/codename1/db/ManagedKeys",
+        "com/codename1/db/Row",
+        "com/codename1/db/RowExt",
+        "com/codename1/db/ThreadSafeDatabase",
+        "com/codename1/db/package-info"
+    };
+
+    /// The class that turns encryption on.
+    private static final String DATABASE_CONFIG_CLASS = "com/codename1/db/DatabaseConfig";
+
+    /// Framework classes that are a database by another name.
+    ///
+    /// An application can use one of these and never mention `com.codename1.db` itself --
+    /// `EntityManager` and `SQLMap` exist so that it does not have to -- so a reference to one is
+    /// a reference to the database. Without this the engine would be left out of exactly the
+    /// applications that took the framework's advice, and they would fail at runtime rather than
+    /// at build time.
+    private static final String[] DATABASE_FACADE_PREFIXES = {
+        "com/codename1/orm/",
+        "com/codename1/properties/SQLMap"
+    };
+
+    /// Reports whether the application, as opposed to the framework, uses the database.
+    ///
+    /// Reads each class file directly rather than going through
+    /// `#scanClassesForPermissions(File,ClassScanner)`, which reports the class being scanned only
+    /// from `visitEnd` -- after its references have already been delivered -- so a reference cannot
+    /// be attributed to the class that made it. Walking one file at a time, and skipping the
+    /// framework by path, is what makes the distinction possible.
+    ///
+    /// The test is a constant-pool search for the package name, which is how every reference to a
+    /// class in it is stored, including the descriptor of a framework method that merely returns
+    /// one. A class mentioning the string for some other reason counts too, which errs towards
+    /// treating the application as a database user -- the safe direction, since the cost is bytes
+    /// rather than a missing engine.
+    ///
+    /// #### Parameters
+    ///
+    /// - `classesDir`: the staged class tree, application and framework together
+    ///
+    /// #### Returns
+    ///
+    /// what the application's own classes reference, never null
+    protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
+        boolean[] found = {false, false};
+        if (classesDir != null && classesDir.isDirectory()) {
+            scanForDatabaseUsage(classesDir, "", found);
+        }
+        return new DatabaseUsage(found[0], found[1]);
+    }
+
+    private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found)
+            throws IOException {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (int iter = 0; iter < children.length; iter++) {
+            if (found[0] && found[1]) {
+                return;
+            }
+            File child = children[iter];
+            String childPath = relativePath.length() == 0
+                    ? child.getName() : relativePath + "/" + child.getName();
+            if (child.isDirectory()) {
+                scanForDatabaseUsage(child, childPath, found);
+            } else if (child.getName().endsWith(".aar")) {
+                // An Android archive carries its bytecode in a nested classes.jar, and the
+                // generated gradle links it like any other dependency, so encryption configured
+                // inside one has to count exactly as a plain jar's does.
+                scanArchiveForDatabaseUsage(child, found);
+            } else if (child.getName().endsWith(".jar")) {
+                // A library can be the only thing that touches the database: the application calls
+                // the library, and Android stages the jar into libs and links it through the
+                // generated fileTree. Reading loose class files alone reported no database use and
+                // dropped the engine out from under code that runs it.
+                scanArchiveForDatabaseUsage(child, found);
+            } else if (child.getName().endsWith(".class")
+                    && !isFrameworkDatabaseClass(childPath)) {
+                inspectClassForDatabaseUsage(readAllBytes(child), found);
+            }
+        }
+    }
+
+    /// Reads the class entries of a library archive, which carry the same weight as loose ones.
+    private void scanArchiveForDatabaseUsage(File archive, boolean[] found) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(archive);
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements() && !(found[0] && found[1])) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                if (name.endsWith(".jar")) {
+                    // An Android archive keeps its bytecode in a nested classes.jar, so the
+                    // entries that matter are one level further in.
+                    //
+                    // Caught per entry, because an entry that cannot be read says nothing about
+                    // the entries after it. A name ending in .jar need not be an archive at all --
+                    // a truncated or opaque resource carries that name perfectly well -- and
+                    // letting it out of here abandoned the rest of a library that was otherwise
+                    // fine. The classes it dropped are the ones this scan exists to find, and the
+                    // consequence is silent: the cipher implementation is pruned from an
+                    // application that turns out to need it, and encryption fails on the device.
+                    try {
+                        java.io.InputStream nested = zip.getInputStream(entry);
+                        try {
+                            scanNestedArchiveForDatabaseUsage(nested, found);
+                        } finally {
+                            nested.close();
+                        }
+                    } catch (IOException cannotReadEntry) {
+                        log("WARNING: could not read " + name + " inside " + archive
+                                + " while looking for database use; the rest of the archive was "
+                                + "still read");
+                    }
+                    continue;
+                }
+                if (!name.endsWith(".class") || isFrameworkDatabaseClass(name)) {
+                    continue;
+                }
+                // Per entry for the same reason: one unreadable class is not a reason to stop
+                // reading the ones after it.
+                try {
+                    java.io.InputStream in = zip.getInputStream(entry);
+                    try {
+                        inspectClassForDatabaseUsage(readAllBytes(in), found);
+                    } finally {
+                        in.close();
+                    }
+                } catch (IOException cannotReadEntry) {
+                    log("WARNING: could not read " + name + " inside " + archive
+                            + " while looking for database use; the rest of the archive was still "
+                            + "read");
+                }
+            }
+        } catch (IOException cannotRead) {
+            // An archive that cannot be opened says nothing either way, and refusing to build over
+            // it would fail every application carrying a jar this cannot parse.
+            log("WARNING: could not read " + archive + " while looking for database use");
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // Nothing left to do with it.
+                }
+            }
+        }
+    }
+
+    /// Reads the class entries of an archive inside an archive, which is where an AAR keeps them.
+    private void scanNestedArchiveForDatabaseUsage(java.io.InputStream nested, boolean[] found)
+            throws IOException {
+        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(nested);
+        java.util.zip.ZipEntry entry = in.getNextEntry();
+        while (entry != null && !(found[0] && found[1])) {
+            String name = entry.getName();
+            if (!entry.isDirectory() && name.endsWith(".class")
+                    && !isFrameworkDatabaseClass(name)) {
+                inspectClassForDatabaseUsage(readAllBytes(in), found);
+            }
+            entry = in.getNextEntry();
+        }
+    }
+
+    /// Applies both questions to one class file, through ASM.
+    ///
+    /// Read as bytecode rather than searched as bytes. Every name a class refers to sits in its
+    /// constant pool, so a substring search cannot tell a *reference* to com.codename1.db from a
+    /// string literal that happens to contain those characters -- and it cannot tell
+    /// DatabaseConfig.plain(), which says a database is not encrypted, from
+    /// DatabaseConfig.passphrase(), because the class name is identical in both. Asking the
+    /// bytecode asks the question that was meant.
+    ///
+    /// The same reader and visitor style scanClassesForPermissions already uses, on the same
+    /// files, in the same builds -- which is where this should have started rather than in a
+    /// hand written constant pool walk.
+    ///
+    /// A class this cannot read counts as using both: the alternative is an application that
+    /// encrypts shipping without a cipher.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bytes`: one class file
+    /// - `found`: the two answers so far, updated in place
+    private void inspectClassForDatabaseUsage(byte[] bytes, boolean[] found) {
+        if (found[0] && found[1]) {
+            return;
+        }
+        boolean[] hit = {false, false};
+        try {
+            new ClassReader(bytes).accept(new DatabaseUsageVisitor(hit),
+                    ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        } catch (RuntimeException cannotRead) {
+            // Truncated or obfuscated past recognition, and not a reason to decide the application
+            // does not encrypt. This stays a rare case only while the ASM here keeps up with the
+            // bytecode the toolchain emits: read no class file at all and every application would
+            // be charged the cipher, and on Android an API 23 floor. The daemon, pinned to an ASM
+            // that stops at Java 8, reads the constant pool directly instead for that reason.
+            hit[0] = true;
+            hit[1] = true;
+        }
+        found[0] = found[0] || hit[0];
+        found[1] = found[1] || hit[1];
+    }
+
+    /// Answers "does this class use the database" and "does it configure encryption".
+    private static final class DatabaseUsageVisitor extends ClassVisitor {
+
+        private final boolean[] hit;
+
+        DatabaseUsageVisitor(boolean[] hit) {
+            super(Opcodes.ASM9);
+            this.hit = hit;
+        }
+
+        /// Any mention of a database type, in a name, a descriptor or a signature.
+        private void note(String name) {
+            if (name == null) {
+                return;
+            }
+            if (name.indexOf(DATABASE_PACKAGE + "/") >= 0) {
+                hit[0] = true;
+                return;
+            }
+            for (int iter = 0; iter < DATABASE_FACADE_PREFIXES.length; iter++) {
+                // An application can use SQLMap or the ORM and never mention com.codename1.db
+                // itself; those exist so that it does not have to.
+                if (name.indexOf(DATABASE_FACADE_PREFIXES[iter]) >= 0) {
+                    hit[0] = true;
+                    return;
+                }
+            }
+        }
+
+        /// A constant that can name a type or a method: a class literal, a method handle, or --
+        /// on a class file new enough to have them -- a dynamic constant whose own bootstrap
+        /// arguments carry more of the same.
+        private void noteConstant(Object value) {
+            if (value instanceof Type) {
+                // The descriptor rather than the internal name, because a Type here can describe a
+                // method, and an internal name is not a question that can be asked of one.
+                note(((Type) value).getDescriptor());
+                return;
+            }
+            if (value instanceof Handle) {
+                Handle handle = (Handle) value;
+                note(handle.getOwner());
+                note(handle.getDesc());
+                if (DATABASE_CONFIG_CLASS.equals(handle.getOwner())
+                        && isEncryptingFactory(handle.getName())) {
+                    hit[1] = true;
+                }
+                return;
+            }
+            if (value instanceof ConstantDynamic) {
+                ConstantDynamic constant = (ConstantDynamic) value;
+                note(constant.getDescriptor());
+                noteConstant(constant.getBootstrapMethod());
+                for (int iter = 0; iter < constant.getBootstrapMethodArgumentCount(); iter++) {
+                    noteConstant(constant.getBootstrapMethodArgument(iter));
+                }
+            }
+        }
+
+        private void noteAll(String[] names) {
+            if (names != null) {
+                for (int iter = 0; iter < names.length; iter++) {
+                    note(names[iter]);
+                }
+            }
+        }
+
+        @Override
+        public void visit(int version, int access, String name, String signature,
+                String superName, String[] interfaces) {
+            note(superName);
+            note(signature);
+            noteAll(interfaces);
+        }
+
+        @Override
+        public FieldVisitor visitField(int access, String name, String descriptor,
+                String signature, Object value) {
+            note(descriptor);
+            note(signature);
+            return null;
+        }
+
+        @Override
+        public MethodVisitor visitMethod(int access, String name, String descriptor,
+                String signature, String[] exceptions) {
+            note(descriptor);
+            note(signature);
+            noteAll(exceptions);
+            return new MethodVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitMethodInsn(int opcode, String owner, String methodName,
+                        String methodDescriptor, boolean isInterface) {
+                    note(owner);
+                    note(methodDescriptor);
+                    if (DATABASE_CONFIG_CLASS.equals(owner) && isEncryptingFactory(methodName)) {
+                        // The call, not the class. plain() is the documented way to say a
+                        // database is not encrypted, and reading it as encryption costs that
+                        // application the cipher library and, on Android, every device below 23.
+                        hit[1] = true;
+                    }
+                }
+
+                @Override
+                public void visitFieldInsn(int opcode, String owner, String fieldName,
+                        String fieldDescriptor) {
+                    note(owner);
+                    note(fieldDescriptor);
+                }
+
+                @Override
+                public void visitTypeInsn(int opcode, String type) {
+                    note(type);
+                }
+
+                @Override
+                public void visitLdcInsn(Object value) {
+                    noteConstant(value);
+                }
+
+                /// A lambda or a method reference, which is not a call instruction.
+                ///
+                /// `DatabaseConfig::passphrase` compiles to an invokedynamic whose bootstrap
+                /// arguments carry the factory as a method handle, so nothing reaches
+                /// visitMethodInsn above. Missing it left an application that encrypts being
+                /// built without a cipher -- the one direction this scan must never get wrong.
+                @Override
+                public void visitInvokeDynamicInsn(String name, String descriptor,
+                        Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+                    note(descriptor);
+                    noteConstant(bootstrapMethodHandle);
+                    if (bootstrapMethodArguments != null) {
+                        for (int iter = 0; iter < bootstrapMethodArguments.length; iter++) {
+                            noteConstant(bootstrapMethodArguments[iter]);
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    /// Whether a DatabaseConfig factory is one that configures a key.
+    private static boolean isEncryptingFactory(String name) {
+        for (int iter = 0; iter < ENCRYPTING_CONFIG_FACTORIES.length; iter++) {
+            if (ENCRYPTING_CONFIG_FACTORIES[iter].equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The DatabaseConfig factories that mean a database is encrypted.
+    ///
+    /// `plain()` is deliberately absent: it is the documented way to say a database is *not*
+    /// encrypted, and treating a reference to it as encryption costs that application the cipher
+    /// library and, on Android, every device below API 23.
+    private static final String[] ENCRYPTING_CONFIG_FACTORIES = {
+        "passphrase", "rawKey", "managed"
+    };
+
+    /// Whether this class file is one of the framework's own, by exact name.
+    ///
+    /// The `$` test catches a nested class, which belongs to the class that declares it --
+    /// `SQLMap$SqlType$8` is `SQLMap`.
+    private static boolean isFrameworkDatabaseClass(String path) {
+        String name = path.substring(0, path.length() - ".class".length());
+        for (int iter = 0; iter < FRAMEWORK_DATABASE_CLASSES.length; iter++) {
+            String framework = FRAMEWORK_DATABASE_CLASSES[iter];
+            if (name.equals(framework) || name.startsWith(framework + "$")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static byte[] readAllBytes(File f) throws IOException {
+        byte[] bytes = new byte[(int) f.length()];
+        InputStream in = new FileInputStream(f);
+        try {
+            int read = 0;
+            while (read < bytes.length) {
+                int step = in.read(bytes, read, bytes.length - read);
+                if (step < 0) {
+                    break;
+                }
+                read += step;
+            }
+        } finally {
+            in.close();
+        }
+        return bytes;
+    }
+
+    /// Reads a stream whose length is not known in advance, which is every archive entry.
+    private static byte[] readAllBytes(InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int step = in.read(buffer);
+        while (step > 0) {
+            out.write(buffer, 0, step);
+            step = in.read(buffer);
+        }
+        return out.toByteArray();
+    }
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {

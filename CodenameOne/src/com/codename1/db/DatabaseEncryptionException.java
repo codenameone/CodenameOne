@@ -1,0 +1,107 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.db;
+
+import java.io.IOException;
+
+/// Thrown when an encrypted database cannot be opened, keyed or converted.
+///
+/// This extends `java.io.IOException` deliberately: every database method already
+/// declares `IOException`, so existing `catch` blocks keep compiling and keep
+/// working. Code that wants to tell the failure modes apart can catch this type
+/// and switch on `#getErrorCode()`.
+///
+/// #### Example
+///
+/// ```java
+/// try {
+///     db = Database.openOrCreate("secure.db", DatabaseConfig.passphrase(entered));
+/// } catch (DatabaseEncryptionException err) {
+///     if (err.getErrorCode() == DatabaseEncryptionException.WRONG_KEY) {
+///         showRetryPrompt();
+///     } else {
+///         throw err;
+///     }
+/// }
+/// ```
+public class DatabaseEncryptionException extends IOException {
+
+    /// The platform cannot open encrypted databases at all. Check
+    /// `Database#isEncryptionSupported()` before offering encryption in the UI.
+    ///
+    /// A request for encryption on such a platform always fails with this code.
+    /// It never silently falls back to an unencrypted database.
+    public static final int NOT_SUPPORTED = 1;
+
+    /// The supplied passphrase or key does not decrypt this database, or the
+    /// file is not a database at all. These two cases are indistinguishable by
+    /// design: a correct cipher reveals nothing about a wrong key.
+    public static final int WRONG_KEY = 2;
+
+    /// A managed key was requested but the platform key store could not produce
+    /// or persist one. The database is not opened, because opening it
+    /// unencrypted would silently downgrade the protection the caller asked for.
+    public static final int KEY_UNAVAILABLE = 3;
+
+    /// Converting a database between encrypted and plaintext form failed part
+    /// way through. The original file is left untouched.
+    public static final int MIGRATION_FAILED = 4;
+
+    private final int errorCode;
+
+    /// Creates an exception with the given code and message.
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorCode`: one of the constants declared by this class
+    ///
+    /// - `message`: a human readable description of the failure
+    public DatabaseEncryptionException(int errorCode, String message) {
+        super(message);
+        this.errorCode = errorCode;
+    }
+
+    /// Creates an exception with the given code, message and underlying cause.
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorCode`: one of the constants declared by this class
+    ///
+    /// - `message`: a human readable description of the failure
+    ///
+    /// - `cause`: the underlying failure, retained for diagnostics
+    public DatabaseEncryptionException(int errorCode, String message, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+    }
+
+    /// Returns the code identifying why the operation failed.
+    ///
+    /// #### Returns
+    ///
+    /// one of `#NOT_SUPPORTED`, `#WRONG_KEY`, `#KEY_UNAVAILABLE` or
+    /// `#MIGRATION_FAILED`
+    public int getErrorCode() {
+        return errorCode;
+    }
+}
