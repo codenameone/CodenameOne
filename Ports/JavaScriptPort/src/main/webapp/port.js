@@ -1710,20 +1710,19 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName
 });
 
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function() {
-  // Default to 1: Codename One's JS port works end-to-end in CSS
-  // ("real") pixels and skips HiDPI auto-scaling of the canvas /
-  // pointer events. Use ``?pixelRatio=2`` to opt back in.
+  // Report the display's real scale factor. Codename One addresses DEVICE pixels --
+  // the iOS port detects the retina factor and scales the values it hands the native
+  // primitives, so the framework draws at native resolution rather than rendering at
+  // 1x. Pinning this to 1 made the browser upscale a 1x canvas on every HiDPI display,
+  // which is why canvas text looked soft next to DOM text.
+  //
+  // ``?pixelRatio=N`` still forces a specific factor, which the screenshot harness and
+  // the skin designer rely on.
   const ratioOverride = getQueryParameter("pixelRatio");
   const win = global.window || global;
   if (ratioOverride != null && ratioOverride !== "") {
     const parsed = Number(ratioOverride);
-    if (!isNaN(parsed) && parsed > 0) {
-      win.overridePixelRatio = parsed;
-    } else {
-      win.overridePixelRatio = 1;
-    }
-  } else if (typeof win.overridePixelRatio === "undefined") {
-    win.overridePixelRatio = 1;
+    win.overridePixelRatio = (!isNaN(parsed) && parsed > 0) ? parsed : 1;
   }
   if (typeof win.cn1ScaleCoord === "undefined") {
     win.cn1ScaleCoord = function(x) {

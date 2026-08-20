@@ -73,7 +73,12 @@ public class FillArc implements ExecutableOp {
         context.scale(rx, ry);
         context.moveTo(1, 1);
         context.lineTo(1 + Math.cos(-startRad), 1 + Math.sin(-startRad));
-        context.arc(1, 1, 1, -startRad, -endRad, false);
+        // A positive arcAngle sweeps counter-clockwise, and negating the angles for the
+        // y-down canvas turns that into a counter-clockwise canvas sweep -- which the canvas
+        // calls "anticlockwise". Passing false here made fillArc(.., 0, 90) traverse the long
+        // way round and paint the 270-degree complement of the wedge it was asked for, which
+        // is also why it disagreed with drawArc over the same angles.
+        context.arc(1, 1, 1, -startRad, -endRad, arcAngle >= 0);
         
         context.closePath();
         

@@ -973,6 +973,54 @@ public class Dialog extends Form implements AbstractDialog {
         dialogContentPane.removeComponent(cmp);
     }
 
+    /// Refreshing the theme reinstalls the menu bar, and installing it moves the form's title
+    /// component into the title area. A dialog's title component is its own title label, and a
+    /// dialog keeps the form title area hidden -- so without putting the label back where it
+    /// belongs, refreshing the theme loses the dialog's title altogether, along with the space
+    /// it occupied in the centered-title layout.
+    ///
+    /// {@inheritDoc}
+    @Override
+    public void refreshTheme(boolean merge) {
+        super.refreshTheme(merge);
+        restoreDisplacedTitle();
+    }
+
+    /// Puts the title label back where this dialog's layout wants it, and touches nothing else.
+    ///
+    /// Rebuilding the whole layout would remove and re-add the content pane, which deinitializes
+    /// that subtree -- taking the form's focus with it when the focused component is in there,
+    /// and closing an editor the user is typing in. Only the label moved, so only the label is
+    /// moved back.
+    private void restoreDisplacedTitle() {
+        Container root = super.getContentPane();
+        Container target = titleCentered ? centeredTitleArea : root;
+        if (target == null) {
+            updateTitleLayout();
+            revalidate();
+            return;
+        }
+        if (titleCentered && centeredTitleArea != null) {
+            // The area's UIID comes from a theme constant, and a refresh is exactly when that
+            // constant can have changed. Restoring the label without it would leave a centered
+            // dialog wearing the previous theme's title styling.
+            centeredTitleArea.setUIID(getUIManager().getThemeConstant(
+                    "dlgCenteredTitleUIID", "Container"));
+        }
+        if (dialogTitle.getParent() == target) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        if (dialogTitle.getParent() != null) {
+            dialogTitle.remove();
+        }
+        if (titleCentered) {
+            target.addComponent(BorderLayout.CENTER, dialogTitle);
+        } else {
+            target.addComponent(BorderLayout.NORTH, dialogTitle);
+        }
+        revalidate();
+    }
+
     /// {@inheritDoc}
     @Override
     public Label getTitleComponent() {

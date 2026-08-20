@@ -1402,6 +1402,52 @@ public class Form extends Container {
         return previousForm;
     }
 
+    /// Directions of the displays asked for on this form that have not arrived yet, oldest
+    /// first. A transition defers a form change, so two navigations to the same form can be in
+    /// flight at once -- showBack() to it, then show() while the first is still animating -- and
+    /// a single field would give both arrivals the direction of the later one.
+    private ArrayList<Boolean> pendingReverse;
+
+    /// The direction of the last arrival, for a form change with nothing queued behind it.
+    private boolean lastShownWithReverse;
+
+    void setShownWithReverse(boolean value) {
+        if (pendingReverse == null) {
+            pendingReverse = new ArrayList<Boolean>();
+        }
+        // Every entry is a display that is going to arrive, so none of them is dropped: a
+        // handful of shows and showBacks can be in flight at once when each is waiting on a
+        // transition, and clearing the queue to make room would hand the first arrival the last
+        // caller's direction. A display that changes nothing -- showing the form already up --
+        // returns before it records anything, so nothing accumulates here unspent.
+        //
+        // The bound is a leak guard rather than a policy: a hundred displays of one form waiting
+        // at once is not navigation, it is something stuck.
+        if (pendingReverse.size() >= 100) {
+            pendingReverse.remove(0);
+        }
+        pendingReverse.add(Boolean.valueOf(value));
+    }
+
+    /// Puts a direction at the head of the queue, for a form change that happens before
+    /// anything already waiting -- a menu folding away to reveal this form, which arrives before
+    /// the show that asked for it.
+    void insertShownWithReverse(boolean value) {
+        if (pendingReverse == null) {
+            pendingReverse = new ArrayList<Boolean>();
+        }
+        pendingReverse.add(0, Boolean.valueOf(value));
+    }
+
+    /// Takes the direction belonging to the form change that is arriving now.
+    boolean consumeShownWithReverse() {
+        if (pendingReverse == null || pendingReverse.isEmpty()) {
+            return lastShownWithReverse;
+        }
+        lastShownWithReverse = pendingReverse.remove(0).booleanValue();
+        return lastShownWithReverse;
+    }
+
     void setPreviousForm(Form previousForm) {
         this.previousForm = previousForm;
     }
