@@ -25,6 +25,7 @@ package com.codename1.ai.vision;
 import com.codename1.camera.CameraFacing;
 import com.codename1.camera.CameraInfo;
 import com.codename1.camera.CameraView;
+import com.codename1.camera.ScaleType;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
@@ -236,6 +237,9 @@ class VisionCameraViewTest extends UITestBase {
 
         assertEquals("back", camera.openedCameraId);
         assertFalse(previewView().isMirrored());
+        // Recording the flag is not enough: it has to reach the port, or the
+        // preview renders unmirrored while isMirrored() claims otherwise.
+        assertEquals(Boolean.FALSE, camera.previewMirrored);
     }
 
     @Test
@@ -246,6 +250,19 @@ class VisionCameraViewTest extends UITestBase {
 
         assertEquals("front", camera.openedCameraId);
         assertTrue(previewView().isMirrored());
+        assertEquals(Boolean.TRUE, camera.previewMirrored);
+    }
+
+    @Test
+    void theScaleTypeReachesThePort() {
+        view = new VisionCameraView<Barcode[]>(new BarcodeScanner());
+        view.setScaleType(ScaleType.FIT);
+        view.start();
+        assertEquals(ScaleType.FIT, camera.previewScaleType);
+
+        // Changing it while running has to reach the port too.
+        view.setScaleType(ScaleType.FILL);
+        assertEquals(ScaleType.FILL, camera.previewScaleType);
     }
 
     private CameraView previewView() {

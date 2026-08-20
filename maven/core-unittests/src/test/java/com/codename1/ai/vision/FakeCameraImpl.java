@@ -31,6 +31,7 @@ import com.codename1.camera.FlashMode;
 import com.codename1.camera.FrameFormat;
 import com.codename1.camera.FrameListener;
 import com.codename1.camera.PhotoCaptureOptions;
+import com.codename1.camera.ScaleType;
 import com.codename1.impl.CameraImpl;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.AsyncResource;
@@ -55,6 +56,8 @@ class FakeCameraImpl extends CameraImpl {
     boolean captureAudio;
     FrameListener frameListener;
     FlashMode lastFlashMode;
+    Boolean previewMirrored;
+    ScaleType previewScaleType;
 
     void deliver(byte[] jpeg) {
         FrameListener listener = frameListener;
@@ -103,6 +106,16 @@ class FakeCameraImpl extends CameraImpl {
     @Override
     public void setFrameListener(FrameListener listener, FrameFormat format, int maxFps) {
         frameListener = listener;
+    }
+
+    @Override
+    public void setPreviewMirrored(boolean mirrored) {
+        previewMirrored = Boolean.valueOf(mirrored);
+    }
+
+    @Override
+    public void setPreviewScaleType(ScaleType scaleType) {
+        previewScaleType = scaleType;
     }
 
     @Override

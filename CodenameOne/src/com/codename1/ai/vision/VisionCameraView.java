@@ -125,6 +125,12 @@ public class VisionCameraView<T> extends Container implements AutoCloseable {
     /// Selects which camera to open. Takes effect the next time the view is
     /// shown; the default is {@link CameraFacing#BACK}.
     ///
+    /// A front camera's preview is requested mirrored, the way a selfie view
+    /// behaves. The simulator honors that; the iOS and Android previews do not
+    /// mirror yet. Note also that a device without the requested camera falls
+    /// back to whatever it has, and the mirroring follows the camera that
+    /// actually opened rather than the one asked for.
+    ///
     /// @param value the camera to prefer, or {@code null} for the back camera
     public void setFacing(CameraFacing value) {
         facing = value == null ? CameraFacing.BACK : value;
@@ -152,6 +158,11 @@ public class VisionCameraView<T> extends Container implements AutoCloseable {
 
     /// How the preview is fitted into this component's bounds. The default is
     /// {@link ScaleType#CROP}, which fills the view the way a camera app does.
+    ///
+    /// The simulator honors every mode. The iOS and Android previews render
+    /// fixed at fill-and-crop today, because neither port implements the
+    /// scaling hook yet, so a non-default mode is a request those targets
+    /// currently ignore rather than a promise.
     ///
     /// @param value the scaling to apply, or {@code null} for the default
     public void setScaleType(ScaleType value) {

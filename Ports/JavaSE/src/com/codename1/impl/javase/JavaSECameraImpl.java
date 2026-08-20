@@ -30,6 +30,7 @@ import com.codename1.camera.CapturedPhoto;
 import com.codename1.camera.FlashMode;
 import com.codename1.camera.FrameFormat;
 import com.codename1.camera.FrameListener;
+import com.codename1.camera.ScaleType;
 import com.codename1.camera.PhotoCaptureOptions;
 import com.codename1.impl.CameraImpl;
 import com.codename1.io.FileSystemStorage;
@@ -94,6 +95,8 @@ public class JavaSECameraImpl extends CameraImpl {
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> frameTask;
     private JPanel previewPanel;
+    private volatile boolean previewMirrored;
+    private volatile ScaleType previewScaleType = ScaleType.CROP;
     private CameraSessionOptions options;
     private CameraInfo info;
     private volatile BufferedImage currentFrame;
@@ -149,6 +152,27 @@ public class JavaSECameraImpl extends CameraImpl {
     }
 
     @Override
+    public void setPreviewMirrored(boolean mirrored) {
+        previewMirrored = mirrored;
+        repaintPreview();
+    }
+
+    @Override
+    public void setPreviewScaleType(ScaleType scaleType) {
+        previewScaleType = scaleType == null ? ScaleType.CROP : scaleType;
+        repaintPreview();
+    }
+
+    private void repaintPreview() {
+        final JPanel panel = previewPanel;
+        if (panel != null) {
+            javax.swing.SwingUtilities.invokeLater(new Runnable() {
+                @Override public void run() { panel.repaint(); }
+            });
+        }
+    }
+
+    @Override
     public PeerComponent createPreviewPeer() {
         if (previewPanel == null) {
             previewPanel = new JPanel() {
@@ -156,12 +180,32 @@ public class JavaSECameraImpl extends CameraImpl {
                 protected void paintComponent(java.awt.Graphics g) {
                     super.paintComponent(g);
                     BufferedImage f = currentFrame;
-                    if (f != null) {
-                        g.drawImage(f, 0, 0, getWidth(), getHeight(), null);
-                    } else {
+                    if (f == null) {
                         g.setColor(Color.DARK_GRAY);
                         g.fillRect(0, 0, getWidth(), getHeight());
+                        return;
                     }
+                    java.awt.Rectangle target = fitPreview(
+                            f.getWidth(), f.getHeight(),
+                            getWidth(), getHeight(), previewScaleType);
+                    if (previewScaleType == ScaleType.FIT) {
+                        // Letterboxing leaves bars; the panel's own background
+                        // does not repaint under an opaque child bounds.
+                        g.setColor(Color.BLACK);
+                        g.fillRect(0, 0, getWidth(), getHeight());
+                    }
+                    int left = target.x;
+                    int right = target.x + target.width;
+                    if (previewMirrored) {
+                        // Swapping the destination x coordinates flips the
+                        // image, which is what a selfie preview does.
+                        int swap = left;
+                        left = right;
+                        right = swap;
+                    }
+                    g.drawImage(f, left, target.y, right,
+                            target.y + target.height,
+                            0, 0, f.getWidth(), f.getHeight(), null);
                 }
             };
             previewPanel.setBackground(Color.BLACK);
@@ -231,6 +275,26 @@ public class JavaSECameraImpl extends CameraImpl {
             this.fpsCap = Math.max(1, Math.min(30, maxFps));
             restartScheduler();
         }
+    }
+
+    /// The destination rectangle a frame of {@code srcW}x{@code srcH} occupies
+    /// inside a {@code dstW}x{@code dstH} preview under {@code scaleType}. FIT
+    /// letterboxes, CROP fills and overflows, FILL stretches.
+    static java.awt.Rectangle fitPreview(int srcW, int srcH,
+                                         int dstW, int dstH,
+                                         ScaleType scaleType) {
+        if (srcW <= 0 || srcH <= 0 || scaleType == ScaleType.FILL) {
+            return new java.awt.Rectangle(0, 0, dstW, dstH);
+        }
+        double byWidth = (double) dstW / srcW;
+        double byHeight = (double) dstH / srcH;
+        double scale = scaleType == ScaleType.FIT
+                ? Math.min(byWidth, byHeight)
+                : Math.max(byWidth, byHeight);
+        int width = (int) Math.round(srcW * scale);
+        int height = (int) Math.round(srcH * scale);
+        return new java.awt.Rectangle((dstW - width) / 2, (dstH - height) / 2,
+                width, height);
     }
 
     @Override public void setFlashMode(FlashMode mode) { /* no-op in simulator */ }

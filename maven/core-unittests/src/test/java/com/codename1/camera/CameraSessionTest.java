@@ -199,4 +199,27 @@ class CameraSessionTest extends UITestBase {
         flushSerialCalls();
         return value.get();
     }
+    @org.junit.jupiter.api.Test
+    void previewSettingsReachThePortRatherThanOnlyTheGetter() {
+        // Both settings used to be stored on CameraView and read by nobody, so
+        // a front-facing preview rendered unmirrored while isMirrored()
+        // returned true. A port that cannot honor them overrides nothing and
+        // the default no-op keeps that behavior.
+        CameraView view = session.createView();
+
+        view.setMirrored(true);
+        org.junit.jupiter.api.Assertions.assertEquals(
+                Boolean.TRUE, impl.previewMirrored);
+        org.junit.jupiter.api.Assertions.assertTrue(view.isMirrored());
+
+        view.setScaleType(ScaleType.FIT);
+        org.junit.jupiter.api.Assertions.assertEquals(
+                ScaleType.FIT, impl.previewScaleType);
+
+        // null means "the default", and the port is told the resolved value.
+        view.setScaleType(null);
+        org.junit.jupiter.api.Assertions.assertEquals(
+                ScaleType.CROP, impl.previewScaleType);
+    }
+
 }

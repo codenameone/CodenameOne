@@ -29,6 +29,7 @@ import com.codename1.camera.FlashMode;
 import com.codename1.camera.FrameFormat;
 import com.codename1.camera.FrameListener;
 import com.codename1.camera.PhotoCaptureOptions;
+import com.codename1.camera.ScaleType;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.AsyncResource;
 
@@ -97,4 +98,25 @@ public abstract class CameraImpl {
     /// Release all native resources for this session. Subsequent calls become
     /// no-ops.
     public abstract void close();
+
+    /// Mirror the live preview horizontally, or stop mirroring it. Called by
+    /// `com.codename1.camera.CameraView#setMirrored(boolean)`.
+    ///
+    /// The default does nothing, which is what a port whose preview cannot be
+    /// mirrored should do: the setting is then recorded and readable but has
+    /// no visual effect. Override to make it visible.
+    ///
+    /// @param mirrored whether the preview should be flipped horizontally
+    public void setPreviewMirrored(boolean mirrored) {
+    }
+
+    /// Fit the live preview into the view's bounds. Called by
+    /// `com.codename1.camera.CameraView#setScaleType(ScaleType)`.
+    ///
+    /// The default does nothing, which is what a port that renders the
+    /// preview one fixed way should do. Override to honor the request.
+    ///
+    /// @param scaleType how the preview should be fitted, never `null`
+    public void setPreviewScaleType(ScaleType scaleType) {
+    }
 }

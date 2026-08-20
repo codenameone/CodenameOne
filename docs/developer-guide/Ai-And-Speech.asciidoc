@@ -337,6 +337,12 @@ navigates away, so a form transition can't leave the hardware held.
 `close()` additionally releases the analyzer, for a screen that's
 finished with for good.
 
+NOTE: `setScaleType(...)`, and the mirroring a front camera asks for, are
+honored in the simulator. The iOS and Android previews render fixed at
+fill-and-crop and unmirrored, because neither port implements the
+preview-scaling hook on `CameraImpl` yet. Treat both as requests rather
+than guarantees on a device.
+
 WARNING: The preview is a native view, and Codename One components can't
 be painted over it on every platform -- iOS renders native peers behind
 the Codename One layer, Android renders them in front. Put a reticle,
