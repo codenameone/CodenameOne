@@ -115,7 +115,11 @@ public class VisionCameraView<T> extends Container implements AutoCloseable {
     ///
     /// @return {@code true} when both the camera and the analyzer are available
     public boolean isSupported() {
-        return Camera.isSupported() && analyzer.isSupported();
+        // Camera.isSupported() only says the port has a backend. A device with
+        // no capture hardware still enumerates nothing, and start() would fail
+        // on a screen this method said was fine to show.
+        return Camera.isSupported() && Camera.getCameras().length > 0
+                && analyzer.isSupported();
     }
 
     /// Selects which camera to open. Takes effect the next time the view is
@@ -207,8 +211,9 @@ public class VisionCameraView<T> extends Container implements AutoCloseable {
             return;
         }
         CameraSession opened;
+        CameraInfo info;
         try {
-            CameraInfo info = Camera.getDefault(facing);
+            info = Camera.getDefault(facing);
             if (info == null) {
                 throw new IllegalStateException(
                         "No camera is available on this device");
@@ -224,7 +229,11 @@ public class VisionCameraView<T> extends Container implements AutoCloseable {
         session = opened;
         cameraView = opened.createView();
         cameraView.setScaleType(scaleType);
-        cameraView.setMirrored(facing == CameraFacing.FRONT);
+        // Mirror on the camera that opened, not the one asked for.
+        // Camera.getDefault falls back to the first available camera when the
+        // requested facing does not exist, and mirroring a rear preview shows
+        // the world reversed.
+        cameraView.setMirrored(info.getFacing() == CameraFacing.FRONT);
         addComponent(BorderLayout.CENTER, cameraView);
         pipeline = new VisionPipeline<T>(opened, shared,
                 new VisionPipelineListener<T>() {

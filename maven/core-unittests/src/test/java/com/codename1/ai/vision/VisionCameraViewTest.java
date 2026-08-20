@@ -23,6 +23,8 @@
 package com.codename1.ai.vision;
 
 import com.codename1.camera.CameraFacing;
+import com.codename1.camera.CameraInfo;
+import com.codename1.camera.CameraView;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
@@ -208,6 +210,48 @@ class VisionCameraViewTest extends UITestBase {
         assertTrue(view.isSupported());
         vision.supported = false;
         assertFalse(view.isSupported());
+    }
+
+    @Test
+    void aBackendWithNoCamerasIsNotSupported() {
+        // Camera.isSupported() is true whenever the port has a backend, which
+        // a camera-less device still does. Reporting support there would have
+        // start() fail on a screen this method said was fine to show.
+        camera.cameras = new CameraInfo[0];
+        view = new VisionCameraView<Barcode[]>(new BarcodeScanner());
+        assertFalse(view.isSupported());
+    }
+
+    @Test
+    void theMirrorFollowsTheCameraThatOpenedNotTheOneRequested() {
+        // Camera.getDefault falls back to the first available camera when the
+        // requested facing does not exist. Mirroring on the request would show
+        // that rear preview reversed.
+        camera.cameras = new CameraInfo[] {
+            new CameraInfo("back", CameraFacing.BACK, null, null, true, true)
+        };
+        view = new VisionCameraView<Barcode[]>(new BarcodeScanner());
+        view.setFacing(CameraFacing.FRONT);
+        view.start();
+
+        assertEquals("back", camera.openedCameraId);
+        assertFalse(previewView().isMirrored());
+    }
+
+    @Test
+    void aFrontCameraPreviewIsMirrored() {
+        view = new VisionCameraView<Barcode[]>(new BarcodeScanner());
+        view.setFacing(CameraFacing.FRONT);
+        view.start();
+
+        assertEquals("front", camera.openedCameraId);
+        assertTrue(previewView().isMirrored());
+    }
+
+    private CameraView previewView() {
+        assertEquals(1, view.getComponentCount(),
+                "the preview is the view's only child while running");
+        return (CameraView) view.getComponentAt(0);
     }
 
     /** Counts what the view does to a caller-supplied analyzer. */

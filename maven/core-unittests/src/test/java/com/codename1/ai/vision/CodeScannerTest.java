@@ -22,6 +22,7 @@
  */
 package com.codename1.ai.vision;
 
+import com.codename1.camera.CameraInfo;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Command;
 import com.codename1.ui.Display;
@@ -72,6 +73,13 @@ class CodeScannerTest extends UITestBase {
         implementation.setCameraImpl(null);
         assertFalse(CodeScanner.isSupported(),
                 "a target without a camera cannot scan");
+
+        // A backend that enumerates nothing is the camera-less device: the
+        // port has an implementation, the hardware does not exist, and the
+        // scan would fail immediately after this said it would not.
+        implementation.setCameraImpl(camera);
+        camera.cameras = new CameraInfo[0];
+        assertFalse(CodeScanner.isSupported());
     }
 
     @Test

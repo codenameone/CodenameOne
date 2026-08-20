@@ -290,7 +290,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/V
 ----
 
 The result completes with `null` when the user backs out -- the cn1lib's
-`scanCanceled()` -- and fails through `except` when the camera cannot be
+`scanCanceled()` -- and fails through `except` when the camera can't be
 opened, which is its `scanError()`. There is no third callback to
 implement.
 
@@ -316,7 +316,8 @@ long-deprecated `com.codename1.codescan.CodeScanner` in core, whose
 
 `VisionCameraView` is a component that owns the camera and runs an
 analyzer over its frames. It handles the session, the frame conversion,
-the keep-only-the-newest backpressure, and the hop back to the EDT; the
+the dropping of frames that inference has fallen behind, and the hop
+back to the EDT; the
 application implements one listener. It works with every analyzer, not
 just barcodes:
 
@@ -326,17 +327,17 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/V
 ----
 
 The analyzer is constructed by the application rather than named by a
-feature constant. That is deliberate: the builders decide which native
+feature constant. That's deliberate: the builders decide which native
 vision dependency to package from the analyzer classes an application
 references, so building the analyzer in your own code is what keeps a
 face-detection app from also carrying the barcode and pose models.
 
 The camera opens when the view is shown and is released when the user
-navigates away, so a form transition cannot leave the hardware held.
-`close()` additionally releases the analyzer, for a screen that is
+navigates away, so a form transition can't leave the hardware held.
+`close()` additionally releases the analyzer, for a screen that's
 finished with for good.
 
-WARNING: The preview is a native view, and Codename One components cannot
+WARNING: The preview is a native view, and Codename One components can't
 be painted over it on every platform -- iOS renders native peers behind
 the Codename One layer, Android renders them in front. Put a reticle,
 hints, and buttons around the preview rather than on top of it. Result
@@ -442,9 +443,9 @@ convert them into the absolute coordinates a `paint` method draws in:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-overlay,indent=0]
 ----
 
-The mapping stretches the whole 0..1 range across the destination, which
-is right when the destination has the same aspect ratio as the analyzed
-image. A live preview scaled with `ScaleType.CROP` does not, which is the
+The mapping stretches the whole normalized range across the destination,
+which is right when the destination has the same aspect ratio as the analyzed
+image. A live preview scaled with `ScaleType.CROP` doesn't, which is the
 other half of why overlays belong on still images.
 
 ==== Scripting results in the simulator
@@ -462,7 +463,7 @@ under *Simulate > Vision*:
   to reach them.
 * The remaining items set the scripted values: the decoded code and its
   format, the recognized text, the image labels, how many faces are found
-  and whether they are smiling, and whether a body pose is detected.
+  and whether they're smiling, and whether a body pose is detected.
 
 The scripted results carry plausible geometry, so overlay and debounce
 code can be written and debugged before the app ever reaches a device.
@@ -470,9 +471,9 @@ Nothing in this section applies to a device build.
 
 ==== Backends and options
 
-An image whose stored pixels are not already upright needs its rotation
+An image whose stored pixels aren't already upright needs its rotation
 declared: `VisionImage.encoded(bytes, rotationDegrees)`. The one-argument
-overload, and `fromFile(...)`, assume the pixels are upright and do not
+overload, and `fromFile(...)`, assume the pixels are upright and don't
 inspect EXIF metadata; `fromCameraFrame(...)` takes the rotation from the
 frame. `VisionOptions.minimumConfidence(...)` clamps finite and infinite
 values to the range 0 through 1 and rejects NaN.

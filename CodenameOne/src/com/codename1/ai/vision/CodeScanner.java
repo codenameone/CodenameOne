@@ -111,7 +111,10 @@ public final class CodeScanner {
     ///
     /// @return {@code true} when {@link #scan()} can open a working scanner
     public static boolean isSupported() {
-        if (!Camera.isSupported()) {
+        // Camera.isSupported() only says the port has a backend; a device with
+        // no capture hardware enumerates nothing and the scan would fail
+        // immediately after this method promised it would not.
+        if (!Camera.isSupported() || Camera.getCameras().length == 0) {
             return false;
         }
         BarcodeScanner scanner = new BarcodeScanner();
