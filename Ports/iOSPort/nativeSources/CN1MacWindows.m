@@ -494,68 +494,95 @@ static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
 }
 
 /*
- * Asks for a frame and keeps asking until the window's *content* is the size wanted.
+ * Gets a window to the content size Codename One asked for, and keeps it there.
  *
- * Two things make a single request unreliable. A geometry preference is a request,
- * not an instruction: when the window manager ignores one the scene keeps the size
- * it already had -- Catalyst's 1024x768 default -- and nothing asked again, which
- * left the windowed screenshot suite intermittently short of captures. And the
- * preference is a *system* frame, which includes the title bar, while what has to
- * come out right is the content area Codename One lays out into.
+ * Two separate problems, and an earlier attempt at each made things worse.
  *
- * The measurement is the root view controller's view, because that is the same thing
- * viewDidLayoutSubviews reports to the framework as the window's size. Measuring the
- * scene's coordinate space instead reads the whole display, which made every delta
- * hugely negative and shrank the window to its minimum -- a 400x300 window came out
- * at 120x120.
+ * A geometry preference is a request, not an instruction. When the window manager
+ * ignores one the scene keeps the size it already had -- Catalyst's 1024x768 default
+ * -- and nothing asked again, so the window stayed wrong for good and the windowed
+ * screenshot suite came up short of captures.
  *
- * Hence the clamp: chrome can only make the system frame larger than the content it
- * encloses, never smaller, so a correction that asks for less than the wanted content
- * is by definition a bad measurement and is ignored. That bounds the damage from any
- * future measurement mistake to "no correction" rather than "wrong size".
+ * And the preference is a *system* frame, which encloses the title bar, while what
+ * has to come out right is the content area. Whether the chrome is charged against a
+ * request depends on when it arrives, so the same window came back 900x700 on one run
+ * and 900x684 on the next -- fine for a live application, fatal for a golden.
+ *
+ * So: sample twice and only act on a settled reading, then apply **one** correction,
+ * capped. The cap is what makes this safe. Correcting from an unsettled reading is
+ * how a 400x300 window was once driven to its 120x120 minimum and a 1000x400 window
+ * overshot to 1700x400; a correction that can only ever move the frame by the width
+ * of some chrome cannot do either, whatever it measures.
  */
-static void CN1MacWindowConvergeGeometry(UIWindowScene* scene, UIWindow* window,
-        CGSize wantedContent, CGSize request, int attemptsLeft) {
-    if (scene == nil || attemptsLeft <= 0) {
+#define CN1_GEOMETRY_CHROME_SLACK 64.0
+#define CN1_GEOMETRY_ATTEMPTS 10
+
+static CGSize CN1MacWindowContentSize(UIWindow* window) {
+    /* The root view controller's view, because that is the same thing
+     * viewDidLayoutSubviews reports to the framework as the window's size. */
+    UIView* rootView = window.rootViewController.view;
+    return rootView != nil ? rootView.bounds.size : window.bounds.size;
+}
+
+static void CN1MacWindowSettleGeometry(UIWindowScene* scene, UIWindow* window,
+        CGSize wantedContent, CGRect request, CGSize lastSample, int attemptsLeft);
+
+static void CN1MacWindowSettleGeometryStep(UIWindowScene* scene, UIWindow* window,
+        CGSize wantedContent, CGRect request, CGSize lastSample, int attemptsLeft) {
+    CGSize got = CN1MacWindowContentSize(window);
+    if (got.width <= 0 || got.height <= 0) {
+        CN1MacWindowSettleGeometry(scene, window, wantedContent, request, got,
+                attemptsLeft - 1);
         return;
     }
-    CN1MacWindowRequestGeometry(scene, CGRectMake(0, 0, request.width, request.height));
+    CGFloat dw = wantedContent.width - got.width;
+    CGFloat dh = wantedContent.height - got.height;
+    if (fabs(dw) <= 1.0 && fabs(dh) <= 1.0) {
+        return;                      /* content is what was asked for */
+    }
+    BOOL settled = fabs(got.width - lastSample.width) <= 1.0
+            && fabs(got.height - lastSample.height) <= 1.0;
+    if (!settled) {
+        /* Still laying out. Look again without touching the request -- acting on a
+         * reading that is still moving is what caused the two earlier regressions. */
+        CN1MacWindowSettleGeometry(scene, window, wantedContent, request, got,
+                attemptsLeft - 1);
+        return;
+    }
+    if (fabs(dw) > CN1_GEOMETRY_CHROME_SLACK || fabs(dh) > CN1_GEOMETRY_CHROME_SLACK) {
+        /* Nowhere near: the request was ignored rather than adjusted for chrome. Ask
+         * again for exactly the same frame -- never a computed one, which could not
+         * be trusted at this distance. */
+        CN1MacWindowRequestGeometry(scene, request);
+        CN1MacWindowSettleGeometry(scene, window, wantedContent, request, got,
+                attemptsLeft - 1);
+        return;
+    }
+    /* Chrome-sized shortfall on a settled window: correct once, by that much. */
+    CGRect next = CGRectMake(request.origin.x, request.origin.y,
+            request.size.width + dw, request.size.height + dh);
+    CN1MacWindowRequestGeometry(scene, next);
+    CN1MacWindowSettleGeometry(scene, window, wantedContent, next, got,
+            attemptsLeft - 1);
+}
+
+static void CN1MacWindowSettleGeometry(UIWindowScene* scene, UIWindow* window,
+        CGSize wantedContent, CGRect request, CGSize lastSample, int attemptsLeft) {
+    if (scene == nil || window == nil || attemptsLeft <= 0) {
+        return;
+    }
     /* Retained across the delay: this port builds without ARC, and a disconnect can
      * release either of these while the check is queued. */
     UIWindowScene* heldScene = [scene retain];
     UIWindow* heldWindow = [window retain];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (0.25 * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
-        UIView* rootView = heldWindow.rootViewController.view;
-        CGSize got = rootView != nil ? rootView.bounds.size : heldWindow.bounds.size;
-        CGSize next = request;
-        if (got.width > 0 && got.height > 0) {
-            CGFloat dw = wantedContent.width - got.width;
-            CGFloat dh = wantedContent.height - got.height;
-            if (fabs(dw) <= 1.0 && fabs(dh) <= 1.0) {
-                [heldWindow release];
-                [heldScene release];
-                return;
-            }
-            next = CGSizeMake(request.width + dw, request.height + dh);
-        }
-        /* Never below the content being asked for -- see the note above. */
-        if (next.width < wantedContent.width) {
-            next.width = wantedContent.width;
-        }
-        if (next.height < wantedContent.height) {
-            next.height = wantedContent.height;
-        }
-        CN1MacWindowConvergeGeometry(heldScene, heldWindow, wantedContent, next,
-                attemptsLeft - 1);
+        CN1MacWindowSettleGeometryStep(heldScene, heldWindow, wantedContent, request,
+                lastSample, attemptsLeft);
         [heldWindow release];
         [heldScene release];
     });
 }
-
-/* Enough rounds to absorb a correction and a few ignored requests, and short enough
- * to stay well inside the screenshot harness's ten second readiness deadline. */
-#define CN1_GEOMETRY_ATTEMPTS 8
 
 static void dropPendingSlotLocked(int slot) {
     int read;
@@ -808,9 +835,11 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
                 scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
             }
         }
-        CN1MacWindowConvergeGeometry(scene, w->window,
-                CGSizeMake(pointWidth, pointHeight),
-                CGSizeMake(pointWidth, pointHeight), CN1_GEOMETRY_ATTEMPTS);
+        CGRect wantedFrame = CGRectMake(0, 0, pointWidth, pointHeight);
+        CN1MacWindowRequestGeometry(scene, wantedFrame);
+        CN1MacWindowSettleGeometry(scene, w->window,
+                CGSizeMake(pointWidth, pointHeight), wantedFrame,
+                CGSizeMake(-1, -1), CN1_GEOMETRY_ATTEMPTS);
     }
     pthread_mutex_unlock(&g_slotLock);
 }
