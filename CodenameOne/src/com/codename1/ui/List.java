@@ -1681,9 +1681,16 @@ public class List<T> extends Component implements ActionSource {
                 if (i != null && i instanceof Command && ((Command) i).isEnabled()) {
                     ((Command) i).actionPerformed(a);
                     if (!a.isConsumed()) {
-                        Form f = getComponentForm();
-                        if (f != null) {
-                            f.actionCommandImpl((Command) i);
+                        // The top level rather than the form: getComponentForm() is null
+                        // by design inside a Window, so a command list there invoked the
+                        // command and then told nobody -- the window's command listeners
+                        // never saw the activation. Neither branch re-invokes the
+                        // command, which has just run above.
+                        TopLevelContainer top = getTopLevelContainer();
+                        if (top instanceof Form) {
+                            ((Form) top).actionCommandImpl((Command) i);
+                        } else if (top instanceof Window) {
+                            ((Window) top).dispatchCommandNoRecurse((Command) i, a);
                         }
                     }
                 }

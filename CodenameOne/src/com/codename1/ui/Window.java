@@ -1262,14 +1262,38 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// - `other`: the top level to centre over
     public void centerOn(TopLevelContainer other) {
+        Rectangle o = null;
         if (other instanceof Window) {
-            Rectangle o = ((Window) other).getWindowBounds();
-            Rectangle b = getWindowBounds();
-            setWindowLocation(o.getX() + (o.getWidth() - b.getWidth()) / 2,
-                    o.getY() + (o.getHeight() - b.getHeight()) / 2);
+            o = ((Window) other).getWindowBounds();
+        } else if (other != null) {
+            // A Form lives in the application's main native window, so centre over
+            // that. Falling through to centerOnDesktop() centred on the monitor's work
+            // area instead, which is a different place whenever the main window has
+            // been moved, maximized or simply does not fill the screen -- and this
+            // method's contract is to centre over the top level it was given.
+            o = mainWindowBounds();
+        }
+        if (o == null) {
+            centerOnDesktop();
             return;
         }
-        centerOnDesktop();
+        Rectangle b = getWindowBounds();
+        setWindowLocation(o.getX() + (o.getWidth() - b.getWidth()) / 2,
+                o.getY() + (o.getHeight() - b.getHeight()) / 2);
+    }
+
+    /// The application's main native window in desktop coordinates, or null when the
+    /// port cannot report it.
+    private Rectangle mainWindowBounds() {
+        WindowManager wm = Display.impl == null ? null : Display.impl.getWindowManager();
+        if (wm == null) {
+            return null;
+        }
+        int[] b = wm.getMainWindowBounds(new int[4]);
+        if (b == null || b[2] <= 0 || b[3] <= 0) {
+            return null;
+        }
+        return new Rectangle(b[0], b[1], b[2], b[3]);
     }
 
     /// Minimizes this window.
@@ -1381,6 +1405,24 @@ public class Window extends Container implements TopLevelContainer {
     /// hierarchy out again, since preferred sizes computed at the old scale are stale.
     void monitorChanged() {
         currentMonitor = Desktop.getInstance().getMonitorFor(this);
+        // Re-read the drawable size rather than laying out at the one we already had.
+        // A move between monitors of different backing scale changes how many device
+        // pixels the same window is worth without any logical resize accompanying it,
+        // so the port reports a new size while this window still believes the old one:
+        // the hierarchy went on laying out and painting at the previous scale into a
+        // buffer sized for the new one, which clips the content or leaves part of it
+        // blank.
+        if (nativePeer != null) {
+            WindowManager wm = manager();
+            int nativeWidth = wm.getWidth(nativePeer);
+            int nativeHeight = wm.getHeight(nativePeer);
+            if (nativeWidth > 0 && nativeHeight > 0
+                    && (nativeWidth != getWidth() || nativeHeight != getHeight())) {
+                sizeChangedInternal(nativeWidth, nativeHeight);
+                repaint();
+                return;
+            }
+        }
         setShouldCalcPreferredSize(true);
         revalidateWithAnimationSafety();
         repaint();

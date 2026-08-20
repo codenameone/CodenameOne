@@ -2592,6 +2592,73 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void centeringOnAFormUsesTheMainWindowNotTheWorkArea() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        // The main window deliberately does not fill the work area, which is the case
+        // that separates the two behaviours.
+        wm.setMainWindowBounds(200, 100, 600, 400);
+
+        Window w = new Window("centred", new BorderLayout());
+        w.setWindowSize(200, 100);
+        w.show();
+
+        // A Form lives in the application's main native window, so centring over a Form
+        // has to centre over that window. Falling through to centerOnDesktop() centred
+        // on the monitor work area instead -- a different place whenever the main
+        // window has been moved or does not fill the screen.
+        w.centerOn(Display.getInstance().getCurrent());
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(200 + (600 - 200) / 2, peer.getX(),
+                "centred horizontally over the main window");
+        assertEquals(100 + (400 - 100) / 2, peer.getY(),
+                "centred vertically over the main window");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void aCommandListInsideAWindowNotifiesItsCommandListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("cmd list", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        final int[] commandRuns = new int[1];
+        Command cmd = new Command("Pick") {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                commandRuns[0]++;
+            }
+        };
+        final int[] listenerSaw = new int[1];
+        w.addCommandListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                listenerSaw[0]++;
+            }
+        });
+
+        List<Command> list = new List<Command>(new Command[]{cmd});
+        list.setCommandList(true);
+        w.add(BorderLayout.CENTER, list);
+        w.show();
+        w.revalidate();
+
+        // List.fireActionEvent invoked the command and then dispatched the follow-up
+        // through the form, null in a window, so the window's command listeners never
+        // saw the activation.
+        list.setSelectedIndex(0);
+        list.fireActionEvent();
+        flushSerialCalls();
+
+        assertEquals(1, commandRuns[0], "the command runs exactly once");
+        assertEquals(1, listenerSaw[0],
+                "and the window's command listeners must be notified once");
+
+        w.dispose();
+    }
+
     /// The first day cell in a calendar's month view.
     private static Button findFirstDayButton(Container c) {
         for (int iter = 0; iter < c.getComponentCount(); iter++) {

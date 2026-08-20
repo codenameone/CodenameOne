@@ -332,6 +332,7 @@ public class TestWindowManager extends WindowManager {
     }
 
     public void reset() {
+        mainWindowBounds = null;
         publishedCommands.clear();
         captureResult = null;
         captureCalls = 0;
@@ -553,6 +554,23 @@ public class TestWindowManager extends WindowManager {
     @Override
     public int getMonitorCount() {
         return monitors.size();
+    }
+
+    /// Scriptable main-window bounds, so a test can place the application's main
+    /// native window somewhere other than the monitor's work area.
+    private int[] mainWindowBounds;
+
+    public void setMainWindowBounds(int x, int y, int w, int h) {
+        mainWindowBounds = new int[]{x, y, w, h};
+    }
+
+    @Override
+    public int[] getMainWindowBounds(int[] out) {
+        if (mainWindowBounds == null || out == null || out.length < 4) {
+            return null;
+        }
+        System.arraycopy(mainWindowBounds, 0, out, 0, 4);
+        return out;
     }
 
     @Override

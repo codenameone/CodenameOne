@@ -57,6 +57,15 @@ public abstract class WindowHostTest extends BaseTest {
     /// window's geometry is out by hundreds.
     private static final int CHROME_ALLOWANCE = 64;
 
+    /// How many readiness polls between re-asserting the requested size. The polls run
+    /// as fast as the event dispatch thread will re-queue them, so this is a rough
+    /// throttle rather than a duration -- often enough to rescue a refused request,
+    /// rare enough not to fight a platform that is mid-resize.
+    private static final int RESIZE_RETRY_POLLS = 25;
+
+    /// Counts readiness polls for the size re-assert above.
+    private int resizeAttempts;
+
     /** Window sizes every windowed case is captured at. */
     protected static final int[][] SIZES = new int[][]{
         {400, 300},   // small
@@ -138,6 +147,7 @@ public abstract class WindowHostTest extends BaseTest {
         closeWindow();
         lastWidth = -1;
         lastHeight = -1;
+        resizeAttempts = 0;
         window = new Window(baseImageName(), new BorderLayout());
         window.setResizable(true);
         window.add(BorderLayout.CENTER, createWindowContent(width, height));
@@ -213,6 +223,19 @@ public abstract class WindowHostTest extends BaseTest {
         if (ready || System.currentTimeMillis() >= deadline) {
             captureAndAdvance(index, width, height, ready);
             return;
+        }
+        // Ask again, periodically, for the size this test wants.
+        //
+        // A window size is a request the platform may refuse -- Mac Catalyst hands
+        // back its 1024x768 default when it ignores one -- and a window that lost the
+        // request otherwise stays wrong until the deadline, producing no capture at
+        // all. The port retries too, but only for a couple of seconds after creation;
+        // this covers a refusal that outlasts that, and costs nothing on a platform
+        // that granted the size, because the window is ready and never gets here.
+        resizeAttempts++;
+        if (window != null && resizeAttempts % RESIZE_RETRY_POLLS == 0
+                && (windowWidth != width || windowHeight != height)) {
+            window.setWindowSize(width, height);
         }
         CN.callSerially(new Runnable() {
             @Override

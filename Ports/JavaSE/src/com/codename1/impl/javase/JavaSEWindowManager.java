@@ -779,6 +779,27 @@ public class JavaSEWindowManager extends WindowManager {
         });
     }
 
+    /**
+     * The application's main frame in desktop coordinates.
+     *
+     * findTopFrame() is deliberately the primary window only -- every other caller of
+     * it is a main-window operation -- and that is exactly what is wanted here: a Form
+     * lives in that frame, so centring a Window over a Form centres over it.
+     */
+    @Override
+    public int[] getMainWindowBounds(int[] out) {
+        java.awt.Window main = port.findTopFrame();
+        if (main == null || out == null || out.length < 4) {
+            return null;
+        }
+        Rectangle b = main.getBounds();
+        out[0] = b.x;
+        out[1] = b.y;
+        out[2] = b.width;
+        out[3] = b.height;
+        return out;
+    }
+
     // ---- monitors ---------------------------------------------------------------------
 
     private static GraphicsDevice[] devices() {

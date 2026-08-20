@@ -551,6 +551,25 @@ public abstract class WindowManager {
     ///
     /// #### Returns
     ///
+    /// The application's main native window in desktop coordinates, or null when the
+    /// port cannot report it.
+    ///
+    /// A `Form` lives in that window, so centring a `Window` over a `Form` has to
+    /// centre over it. Without this the only thing available was the monitor work
+    /// area, which is a different place whenever the main window has been moved,
+    /// maximized or simply does not fill the screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: a four element array to fill with x, y, width and height
+    ///
+    /// #### Returns
+    ///
+    /// `out` when the bounds were reported, or null when this port cannot
+    public int[] getMainWindowBounds(int[] out) {
+        return null;
+    }
+
     /// the monitor offset
     public int getMonitorForMainWindow() {
         return getPrimaryMonitor();
