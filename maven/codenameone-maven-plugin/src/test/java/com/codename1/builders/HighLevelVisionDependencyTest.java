@@ -22,6 +22,7 @@
  */
 package com.codename1.builders;
 
+import com.codename1.build.shared.PlatformFeatureCatalog;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -165,14 +166,72 @@ class HighLevelVisionDependencyTest {
         }
     }
 
+    /** The Android artifacts the catalog adds for one class. */
+    private static List<String> androidDeps(String simpleName) {
+        List<String> out = new ArrayList<String>();
+        for (PlatformFeatureCatalog.Entry entry : PlatformFeatureCatalog
+                .matchesFor("com/codename1/ai/vision/" + simpleName)) {
+            out.addAll(entry.androidGradleDeps());
+        }
+        return out;
+    }
+
     @Test
-    void aVisionClassThatOpensTheCameraSelectsTheCameraNatives()
+    void aConvenienceClassCarriesItsAnalyzersOwnDependencies()
             throws Exception {
-        String builder = read(new File(
-                "src/main/java/com/codename1/builders/IPhoneBuilder.java"));
+        // Retaining the adapter source is only half of it. The adapter is
+        // compiled inside the generated app against an artifact the catalog
+        // adds, so a convenience class that selects the adapter without
+        // selecting the artifact produces a project that does not compile.
+        for (String[] pair : analyzerBuildingClasses()) {
+            List<String> analyzer = androidDeps(pair[1]);
+            assertTrue(!analyzer.isEmpty(),
+                    pair[1] + " has no catalog Android dependency");
+            List<String> convenience = androidDeps(pair[0]);
+            for (String dep : analyzer) {
+                assertTrue(convenience.contains(dep),
+                        pair[0] + " builds a " + pair[1] + " but the catalog"
+                                + " does not add " + dep + " for it, so the"
+                                + " retained adapter has nothing to compile"
+                                + " against");
+            }
+        }
+    }
+
+    @Test
+    void aVisionClassThatOpensTheCameraCarriesTheCameraDependencies()
+            throws Exception {
+        // Same trap one level over: an app that references only CodeScanner or
+        // VisionCameraView never names com.codename1.camera, so the camera
+        // entry never fires and the preview opens on hardware the build did
+        // not provision.
+        for (String simple : cameraOpeningClasses()) {
+            List<String> deps = androidDeps(simple);
+            assertTrue(deps.contains("androidx.camera:camera-core:1.3.4"),
+                    simple + " opens a camera but the catalog adds no CameraX"
+                            + " artifact for it");
+            boolean permission = false;
+            boolean avFoundation = false;
+            for (PlatformFeatureCatalog.Entry entry : PlatformFeatureCatalog
+                    .matchesFor("com/codename1/ai/vision/" + simple)) {
+                permission |= entry.androidPermissions()
+                        .contains("android.permission.CAMERA");
+                avFoundation |= entry.iosFrameworks().contains("AVFoundation");
+            }
+            assertTrue(permission,
+                    simple + " opens a camera but the catalog requests no"
+                            + " CAMERA permission for it");
+            assertTrue(avFoundation,
+                    simple + " opens a camera but the catalog links no"
+                            + " AVFoundation for it");
+        }
+    }
+
+    /** Vision classes that call Camera.open, directly or through the view. */
+    private static List<String> cameraOpeningClasses() throws Exception {
+        List<String> out = new ArrayList<String>();
         File[] sources = VISION_DIR.listFiles();
         assertNotNull(sources);
-        int checked = 0;
         for (File source : sources) {
             String name = source.getName();
             if (!name.endsWith(".java")) {
@@ -180,22 +239,30 @@ class HighLevelVisionDependencyTest {
             }
             String body = code(source);
             // VisionPipeline consumes a session the application opened; the
-            // classes this guards are the ones that call Camera.open
+            // classes this finds are the ones that call Camera.open
             // themselves, directly or through VisionCameraView.
-            if (!body.contains("Camera.open(")
-                    && !body.contains("new VisionCameraView")) {
-                continue;
+            if (body.contains("Camera.open(")
+                    || body.contains("new VisionCameraView")) {
+                out.add(name.substring(0, name.length() - ".java".length()));
             }
-            String simple = name.substring(0, name.length() - ".java".length());
-            checked++;
+        }
+        assertTrue(!out.isEmpty(),
+                "VisionCameraView opens the camera, so this scan must not come"
+                        + " back empty");
+        return out;
+    }
+
+    @Test
+    void aVisionClassThatOpensTheCameraSelectsTheCameraNatives()
+            throws Exception {
+        String builder = read(new File(
+                "src/main/java/com/codename1/builders/IPhoneBuilder.java"));
+        for (String simple : cameraOpeningClasses()) {
             assertTrue(builder.contains(
                     "\"com/codename1/ai/vision/" + simple + "\""),
                     simple + " opens a camera but IPhoneBuilder never names"
                             + " it, so usesCn1Camera stays false and the"
                             + " AVFoundation preview natives are left out");
         }
-        assertTrue(checked > 0,
-                "VisionCameraView opens the camera, so this scan must not come"
-                        + " back empty");
     }
 }

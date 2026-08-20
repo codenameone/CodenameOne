@@ -25,6 +25,7 @@ package com.codename1.build.shared;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -348,9 +349,64 @@ class PlatformFeatureCatalogTest {
                 }
             }
         }
-        assertEquals(26, checked,
+        // 27 since CodeScanner carries its own barcode-scanning entry: the
+        // ready-made screen builds a BarcodeScanner internally, and an app
+        // that never names BarcodeScanner still needs the artifact.
+        assertEquals(27, checked,
                 "If an AI dependency is intentionally added or removed, "
                 + "update this lock count after verifying its Android floor");
+    }
+
+    @Test
+    void theReadyMadeScannerCarriesBarcodeScanningAndACamera() {
+        // CodeScanner is a BarcodeScanner plus a camera, and an application
+        // using it references neither. Without its own entries the generated
+        // project keeps the barcode adapter with no artifact to compile it
+        // against, and opens a preview on hardware the build never
+        // provisioned.
+        PlatformFeatureCatalog.Accumulator acc =
+                new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/vision/CodeScanner");
+
+        Set<String> android = new LinkedHashSet<String>();
+        Set<String> permissions = new LinkedHashSet<String>();
+        for (PlatformFeatureCatalog.Entry entry : acc.hits()) {
+            android.addAll(entry.androidGradleDeps());
+            permissions.addAll(entry.androidPermissions());
+        }
+
+        assertTrue(android.contains("com.google.mlkit:barcode-scanning:17.2.0"));
+        assertTrue(android.contains("androidx.camera:camera-core:1.3.4"));
+        assertTrue(permissions.contains("android.permission.CAMERA"));
+        assertTrue(acc.iosFrameworks().contains("AVFoundation"));
+        assertTrue(acc.iosFrameworks().contains("Vision"));
+        assertEquals(21, acc.minimumAndroidSdk());
+
+        // A scanner does not record audio, so it must not drag the microphone
+        // permission in the way the general-purpose camera entry does.
+        assertFalse(permissions.contains("android.permission.RECORD_AUDIO"));
+    }
+
+    @Test
+    void theLiveAnalyzerViewCarriesACameraButNoAnalyzer() {
+        // VisionCameraView is analyzer-agnostic: the application constructs
+        // the analyzer, which is what selects that model. The view itself must
+        // add the camera and nothing else.
+        PlatformFeatureCatalog.Accumulator acc =
+                new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/vision/VisionCameraView");
+
+        Set<String> android = new LinkedHashSet<String>();
+        for (PlatformFeatureCatalog.Entry entry : acc.hits()) {
+            android.addAll(entry.androidGradleDeps());
+        }
+
+        assertTrue(android.contains("androidx.camera:camera-core:1.3.4"));
+        for (String dependency : android) {
+            assertFalse(dependency.startsWith("com.google.mlkit:"),
+                    "the view must not pull a model the app never asked for: "
+                            + dependency);
+        }
     }
 
     @Test
