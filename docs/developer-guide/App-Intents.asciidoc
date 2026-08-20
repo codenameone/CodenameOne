@@ -105,13 +105,28 @@ The platform will usually allow around twenty seconds. Don't use them. A spoken 
 | System disambiguation | yes | *no* -- the app foregrounds its own picker | in-app picker
 | Content indexing | Core Spotlight | long-lived launcher shortcuts | searchable list
 | Donation | learned suggestions | dynamic shortcuts | logged
-| Spoken result | spoken aloud | *dropped* | shown as text
-| Returned value | piped to the next action | result extras | shown
+| Spoken result | spoken aloud | toast, headless runs only | shown as text
+| Snippet | rendered natively | *not shown* | rasterized preview
+| Returned value | piped to the next action | *caller only, not the launcher* | shown
 |===
+
+The last three rows are where Android differs most, so they are worth stating outright.
+A launcher shortcut is a launch: it starts something, and nothing waits for an answer, so
+there is no channel to hand a result back through. A spoken line is shown as a toast, and
+only when the run was headless -- that being the one case with no UI of its own to say it
+in. A snippet is not rendered at all; no Android surface displays one for a shortcut, so a
+handler that returns one is not failing, its snippet simply has no consumer there. A
+returned value goes to whoever called `Intents.invoke`, which is how an app uses its own
+intents as a command layer and works on every port, but it does not travel back to the
+launcher, because nothing there asked a question.
+
+A handler whose entire result is a snippet therefore does nothing observable when it is
+started from an Android launcher shortcut. Write handlers that also change state, or that
+name a route with `opensRoute`, and the outcome is visible everywhere.
 
 An intent marked `destructive` is absent from parts of that table by design: it's not published as a launcher shortcut and not donated, because both run on a single tap with nothing between the tap and the action, and confirmation is the whole point of the flag. It stays available through the assistant and the Shortcuts app, which confirm first.
 
-*Android isn't Siri parity, and this framework doesn't pretend otherwise.* Android has no contract by which an assistant invokes an application capability and receives a typed result back, so phrases, system disambiguation and spoken results are iOS-only. Branch on `Intents.isVoiceInvocationSupported()`, not on `areIntentsSupported()`, when deciding whether to tell a user they can talk to your app.
+*Android isn't Siri parity, and this framework doesn't pretend otherwise.* Android has no contract by which an assistant invokes an application capability and receives a typed result back, so phrases and system disambiguation are iOS-only. Branch on `Intents.isVoiceInvocationSupported()`, not on `areIntentsSupported()`, when deciding whether to tell a user they can talk to your app.
 
 What Android does deliver is real: launcher shortcuts, dynamic shortcuts the system learns to suggest from donation, and genuinely headless execution -- the last of which is actually easier there than on iOS, because the Android port already boots without an Activity for background fetch.
 
@@ -137,7 +152,7 @@ Declaring an `@AppIntent` brings in Apple's App Intents framework, which needs a
 |===
 | Hint | Effect
 
-| `ios.intents.minDeploymentTarget` | The floor a declared intent contributes. Defaults to the App Intents minimum; set it empty to contribute none.
+| `ios.intents.minDeploymentTarget` | A floor a declared intent contributes. Empty by default, so declaring an intent raises nothing: Xcode emits App Intents metadata below the deployment target, and the generated declarations are availability-fenced, so they are simply not offered on devices too old to run them. Set it to `16.0` if you would rather not ship a build whose intents are inert for part of your audience.
 | `ios.intents.appIntents` | `false` keeps Spotlight indexing and shortcut donation while suppressing App Intents generation entirely.
 |===
 
