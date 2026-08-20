@@ -229,6 +229,26 @@ class GcOverflowSpiralIntegrationTest {
                         + " proves nothing. Check that the app still allocates small"
                         + " reference-carrying objects at volume.\n--- run ---\n" + output);
 
+        // AND THAT THE PERIODIC DRAIN STAYED CHEAP. gcMarkDrain is not "drain the
+        // worklist": every call also rescans allObjectsInHeap from index 0 and re-runs the
+        // mark function of everything already marked. That is affordable for the ONE call
+        // that ends each grace pass and quadratic for a caller that drains periodically --
+        // the first cut at this fix pointed the interleaved drain at it, passed every test
+        // here, and hung the Mac Catalyst screenshot suite outright, whose retained graph
+        // is a live UI rather than a micro-benchmark's handful of objects. So the count of
+        // full drains taken INSIDE a grace pass must track the number of passes (two per
+        // cycle) and not the number of periodic drains, which is far larger.
+        long graceFullDrains = parseTrace(output, "graceFullDrains=");
+        long fullDrains = parseTrace(output, "fullDrains=");
+        assertTrue(graceFullDrains <= 2 * cycles + 4,
+                "The grace passes made " + graceFullDrains + " full heap-rescanning drains"
+                        + " across " + cycles + " cycles, where two per cycle -- one to end"
+                        + " each pass -- is all they may make. The extra ones are periodic"
+                        + " drains calling gcMarkDrain instead of gcMarkDrainWorklist, which"
+                        + " makes a pass quadratic in the heap; that is what hung the Mac"
+                        + " Catalyst suite. (graceDrains=" + graceDrains + " fullDrains="
+                        + fullDrains + ")\n--- run ---\n" + output);
+
         // AND THE USER-VISIBLE PROPERTY the collector is there to provide: a live set of
         // one path through a game tree stays inside a ceiling this workload never needs
         // to approach. Under a real ceiling, crossing it is the process being killed.

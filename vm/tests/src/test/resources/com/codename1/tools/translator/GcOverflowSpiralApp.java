@@ -52,6 +52,11 @@
  * ones. Move carries references because only a non-leaf object is pushed; a board of
  * ints is a leaf and never reaches the worklist.</p>
  *
+ * <p>It also holds a retained legacy population for the whole run (see
+ * {@code LEGACY_BLOCKS}), so the collector's table walks cost something. Without that,
+ * this app cannot distinguish a periodic drain that is cheap from one that rescans the
+ * whole heap every time -- and the second is what hung a real app.</p>
+ *
  * <p>Deterministic by construction: a fixed number of rounds rather than a wall-clock
  * budget, so RESULT can be compared against the same program on a stock JVM.</p>
  */
@@ -77,6 +82,29 @@ public class GcOverflowSpiralApp {
     /** Footprint sample cadence, in nodes visited. Cheap next to the allocation it follows. */
     private static final int SAMPLE_EVERY_NODES = 100000;
 
+    /**
+     * A RETAINED legacy population, held for the whole run. Not decoration: every one of
+     * these is above CN1_BIBOP_MAX_OBJECT, so it lives in allObjectsInHeap, and the
+     * collector's full drain walks that table from index 0 on EVERY call, re-running the
+     * mark function of everything already marked. A workload whose table holds only what
+     * a translated hello-world allocates cannot tell a cheap periodic drain from an
+     * O(heap) one -- which is precisely how a first cut at this fix passed here and then
+     * hung the Mac Catalyst screenshot suite, whose table is a live UI.
+     *
+     * <p>REFERENCE-CARRYING on purpose. The rescan only re-pushes objects that have a
+     * mark function, so a population of primitive arrays is skipped and costs nothing:
+     * an earlier version of this app used byte[] and measured the two drains as equally
+     * fast. Object[] has a mark function that walks every slot, which is what a real
+     * app's retained graph looks like to the collector.</p>
+     */
+    private static final int LEGACY_BLOCKS = 256;
+
+    /** References per retained block: 128 * 8 bytes + header is over the 512 threshold. */
+    private static final int LEGACY_BLOCK_REFS = 128;
+
+    /** Held in a static so nothing here is collectable. */
+    static Object[][] legacyLiveSet;
+
     /** One node of the search: small, short-lived, and carrying references. */
     static final class Move {
         int from;
@@ -94,6 +122,20 @@ public class GcOverflowSpiralApp {
     public static void main(String[] args) {
         System.out.println("CONFIG branch=" + BRANCH + " depth=" + DEPTH
                 + " movesPerNode=" + MOVES_PER_NODE + " rounds=" + ROUNDS);
+        legacyLiveSet = new Object[LEGACY_BLOCKS][];
+        for (int i = 0; i < LEGACY_BLOCKS; i++) {
+            Object[] block = new Object[LEGACY_BLOCK_REFS];
+            // Every slot filled, so the mark function has real references to follow
+            // rather than nulls it can skip.
+            for (int j = 0; j < LEGACY_BLOCK_REFS; j++) {
+                Move held = new Move();
+                held.from = i;
+                held.to = j;
+                block[j] = held;
+            }
+            legacyLiveSet[i] = block;
+        }
+
         long baselineKb = footprintKb();
         peakKb = baselineKb;
         System.out.println("BASELINE_FOOTPRINT_KB=" + baselineKb);
@@ -125,7 +167,10 @@ public class GcOverflowSpiralApp {
         System.out.println("BASELINE_KB=" + baselineKb);
         System.out.println("NODES=" + nodes);
         System.out.println("ELAPSED_MS=" + elapsedMs);
-        System.out.println("RESULT=" + checksum);
+        // Keeps the population reachable to the end, and folds it into RESULT so the
+        // JavaSE comparison covers it too.
+        Move lastHeld = (Move) legacyLiveSet[LEGACY_BLOCKS - 1][LEGACY_BLOCK_REFS - 1];
+        System.out.println("RESULT=" + (checksum + lastHeld.from + lastHeld.to));
         System.out.println("GC_OVERFLOW_SPIRAL_DONE");
     }
 
