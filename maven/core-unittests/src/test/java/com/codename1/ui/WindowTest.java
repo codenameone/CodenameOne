@@ -28,6 +28,8 @@ import com.codename1.testing.TestWindowManager;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.WindowEvent;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -2982,5 +2984,91 @@ class WindowTest extends UITestBase {
         assertEquals(2.0, w.getScale(), 0.0001,
                 "and the scale that is answered from it");
         w.dispose();
+    }
+
+    @FormTest
+    void aWindowMoveBetweenMonitorsIsNotADesktopTopologyEvent() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        java.util.List<TestWindowManager.FakeMonitor> two =
+                new ArrayList<TestWindowManager.FakeMonitor>();
+        two.add(new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+        two.add(new TestWindowManager.FakeMonitor(1440, 0, 2560, 1440, 2.0, 192, "second"));
+        wm.setMonitors(two);
+
+        final int[] fired = new int[1];
+        Desktop.getInstance().addMonitorListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+
+        Window w = new Window("dragged", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+        assertEquals(0, w.getMonitor().getIndex());
+
+        // Dragging one window onto another display is not a change of topology.
+        // addMonitorListener is documented for a monitor being attached, removed or
+        // reconfigured, so firing it here made every move across a mixed-DPI desktop
+        // re-run whatever display reconfiguration work the application does.
+        try {
+            peer.setMonitor(1);
+            Display.getInstance().windowMonitorChanged(w.getWindowId());
+            DisplayTest.flushEdt();
+
+            assertEquals(0, fired[0],
+                    "moving a window between monitors must not notify monitor listeners");
+            assertEquals(1, w.getMonitor().getIndex(),
+                    "but the window itself must follow the display it is now on");
+            assertEquals(2.0, w.getScale(), 0.0001);
+
+            // A real topology change still notifies.
+            Display.getInstance().monitorsChanged();
+            DisplayTest.flushEdt();
+            assertEquals(1, fired[0], "an attach, removal or reconfiguration still notifies");
+        } finally {
+            // A window left undisposed by a failing assertion keeps the event dispatch
+            // thread busy and times out whatever runs next, which buries the real
+            // failure under an unrelated one.
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void terminalEventsReportTheGeometryTheWindowActuallyHad() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("mover", new BorderLayout());
+        w.setWindowBounds(new Rectangle(10, 20, 400, 300));
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        final java.util.List<Rectangle> disposedBounds = new ArrayList<Rectangle>();
+        w.addWindowListener(new ActionListener<WindowEvent>() {
+            @Override
+            public void actionPerformed(WindowEvent evt) {
+                if (evt.getType() == WindowEvent.Type.Disposed) {
+                    disposedBounds.add(evt.getBounds());
+                }
+            }
+        });
+
+        // The user drags and resizes it natively. Nothing in the application asked for
+        // this geometry, so it lives only in the peer.
+        wm.setBounds(peer, 640, 480, 900, 700);
+        w.dispose();
+
+        assertEquals(1, disposedBounds.size(), "disposal must report exactly once");
+        Rectangle r = disposedBounds.get(0);
+        // Before the snapshot, disposal nulled the peer first and getWindowBounds()
+        // fell back to the originally requested rectangle -- so a listener persisting
+        // geometry across runs restored the window to where it was never left.
+        assertEquals(640, r.getX(), "the final native position, not the requested one");
+        assertEquals(480, r.getY());
+        assertEquals(900, r.getWidth());
+        assertEquals(700, r.getHeight());
     }
 }

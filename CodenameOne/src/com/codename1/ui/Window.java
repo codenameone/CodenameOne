@@ -1434,7 +1434,29 @@ public class Window extends Container implements TopLevelContainer {
     /// window. Nothing needs re-laying out -- only the position changed -- so this
     /// just reports it.
     void moved() {
+        rememberNativeBounds();
         fireWindowEvent(WindowEvent.Type.Moved);
+    }
+
+    /// Copies the peer's current geometry into the fields `#getWindowBounds()` falls
+    /// back on once the peer is gone.
+    ///
+    /// Without this the fallback answered with whatever the application last
+    /// *requested*, so a window the user had dragged or resized reported its original
+    /// position and size in the terminal `Hidden` and `Disposed` events -- and a
+    /// listener persisting geometry across runs restored the wrong rectangle.
+    private void rememberNativeBounds() {
+        if (nativePeer == null) {
+            return;
+        }
+        int[] out = manager().getBounds(nativePeer, new int[4]);
+        if (out[2] > 0 && out[3] > 0) {
+            pendingX = out[0];
+            pendingY = out[1];
+            pendingPositionSet = true;
+            pendingWidth = out[2];
+            pendingHeight = out[3];
+        }
     }
 
     /// Invoked by the framework when the platform reports that this window has moved
@@ -1801,6 +1823,9 @@ public class Window extends Container implements TopLevelContainer {
         // window cannot pin its component tree
         Display.impl.disposePaintSurface(paintSurface);
         paintSurface = null;
+        // Before the peer goes: the terminal Hidden and Disposed events below report
+        // bounds, and once nativePeer is null there is nothing left to ask.
+        rememberNativeBounds();
         nativePeer = null;
         windowGraphics = null;
         // showModal parks on Display.lock and wakes on this flag, so publish it under
@@ -2129,6 +2154,9 @@ public class Window extends Container implements TopLevelContainer {
             // waiting on hasPaintedOnce() has to wait again rather than capture a
             // surface that is half old content and half unpainted.
             paintedOnce = false;
+            // As in moved(): keep the fallback geometry current so a window resized by
+            // the user still reports its real size once the peer is gone.
+            rememberNativeBounds();
             sizeChangedListeners.fireActionEvent(new ActionEvent(this, w, h));
             fireWindowEvent(WindowEvent.Type.Resized);
         }

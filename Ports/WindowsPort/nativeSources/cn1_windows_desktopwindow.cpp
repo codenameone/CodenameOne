@@ -380,13 +380,24 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             return DefWindowProcW(hwnd, msg, wParam, lParam);
 #endif
         case WM_KEYDOWN:
-        case WM_SYSKEYDOWN:
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
             return 0;
         case WM_KEYUP:
-        case WM_SYSKEYUP:
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
             return 0;
+        /* The system-key variants are forwarded and then handed on, never swallowed.
+         * Alt+F4, Alt+Space and F10 arrive as WM_SYSKEYDOWN, and it is DefWindowProcW
+         * that turns them into WM_CLOSE and the window menu; returning 0 here left the
+         * window unclosable by the keyboard and killed the native menu shortcuts.
+         * The main window proc in cn1_windows_window.cpp does not claim these messages
+         * at all, so a secondary window ends up with strictly more: the application
+         * sees the key, and the operating system still behaves normally. */
+        case WM_SYSKEYDOWN:
+            cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
+        case WM_SYSKEYUP:
+            cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_SIZE:
             /* A minimize arrives as a resize to zero. Reporting only that leaves the
              * framework thinking the window is still on screen: it keeps painting it

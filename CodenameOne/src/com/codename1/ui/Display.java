@@ -3490,10 +3490,19 @@ public final class Display extends CN1Constants {
                     }
                     break;
                 case MONITOR_CHANGED:
+                    // One window moved to another display. Deliberately not
+                    // desktop.fireMonitorChanged(): Desktop.addMonitorListener is
+                    // documented for a monitor being attached, removed or
+                    // reconfigured, and firing it for every drag across a mixed-DPI
+                    // desktop turned an ordinary window move into a topology event --
+                    // repeatedly re-running whatever display reconfiguration work the
+                    // application does there. The window itself re-reads its scale and
+                    // lays out below, and an application that wants to follow one
+                    // window across displays sees it through that window's Moved
+                    // event plus getMonitor().
                     if (w != null) {
                         w.monitorChanged();
                     }
-                    desktop.fireMonitorChanged();
                     break;
                 case MONITORS_CHANGED:
                     // Cleared before the work, not after: a display change that
