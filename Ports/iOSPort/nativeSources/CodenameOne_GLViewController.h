@@ -189,6 +189,15 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // delegate because the delegate is #if !TARGET_OS_WATCH and the watch reaches the same link
 // through its SwiftUI scene. Returns YES when the URL was ours and has been consumed.
 BOOL cn1HandleSurfaceURL(NSURL *url);
+
+#if TARGET_OS_WATCH
+// Applies a timeline the phone mirrored across into the watch's own App Group container and
+// re-renders. Called from CN1WatchConnectivity's didReceiveUserInfo, which may run with no CN1
+// runtime at all -- the whole point of the background wake is to refresh a complication, not to
+// start an application -- so this touches no Java.
+void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
+        NSArray<NSString *> *imageNames, NSArray<NSData *> *imageBlobs);
+#endif
 #endif
 
 // CN1_USE_INTENTS gates the app intents native bridge: the IOSNative intents* implementations

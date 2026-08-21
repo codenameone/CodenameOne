@@ -106,6 +106,46 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             return;
         }
         nativeInstance.surfacesReloadTimelines(kindId);
+        mirrorToWatch(kindId, timelineJson, images);
+    }
+
+    /// Forwards a published timeline to the paired watch, when this build has a watch app and
+    /// the kind declares a complication family.
+    ///
+    /// An App Group container is device-local: the watch resolves the same identifier to a
+    /// directory of its own, which nothing on the phone can write. So a phone-side publish is
+    /// invisible to a complication unless the descriptor travels, and this is where it does.
+    ///
+    /// Which kinds are worth sending is decided at build time and read from the app's plist by
+    /// the native, so a publish of a phone-only kind costs one dictionary lookup. The native is
+    /// also a no-op in a build with no watch app, and on the watch itself -- where the app's own
+    /// publish is authoritative and mirroring back would loop.
+    ///
+    /// Best-effort by contract, and deliberately after the local write: this call cannot fail in
+    /// a way that leaves the phone's own widget wrong.
+    private void mirrorToWatch(String kindId, String timelineJson, Map<String, byte[]> images) {
+        String[] names;
+        byte[][] blobs;
+        if (images == null || images.isEmpty()) {
+            names = new String[0];
+            blobs = new byte[0][];
+        } else {
+            names = new String[images.size()];
+            blobs = new byte[images.size()][];
+            int i = 0;
+            for (Map.Entry<String, byte[]> e : images.entrySet()) {
+                names[i] = e.getKey();
+                blobs[i] = e.getValue();
+                i++;
+            }
+        }
+        try {
+            nativeInstance.surfacesMirrorToWatch(kindId, timelineJson, names, blobs);
+        } catch (Throwable t) {
+            // The timeline is already persisted and the phone's widget already reloaded. A watch
+            // that does not hear about it is a degraded surface, not a failed publish.
+            Log.e(t);
+        }
     }
 
     public void reloadWidgets(String kindId) {

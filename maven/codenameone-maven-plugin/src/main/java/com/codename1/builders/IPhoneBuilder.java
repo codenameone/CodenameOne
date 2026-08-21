@@ -7312,14 +7312,34 @@ public class IPhoneBuilder extends Executor {
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
         // shared App Group container through this key; the CN1Widgets extension carries its own
         // copy in its generated Info.plist. See surfaces.json / the ios.surfaces.* build hints.
-        if (surfacesExtensionEnabled) {
+        if (surfacesExtensionEnabled || surfacesWatchEnabled) {
             if (!inject.contains("CN1SurfacesAppGroup")) {
                 inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";
+            }
+            // Which kinds are worth mirroring to the watch, decided here rather than at runtime.
+            // The phone cannot write into the watch's App Group container -- the same identifier
+            // resolves to a directory of its own there -- so a phone-side publish only reaches a
+            // complication if the descriptor travels over WCSession, and that is budgeted. Naming
+            // the kinds means a publish of a phone-only kind costs one dictionary lookup instead.
+            if (surfacesWatchEnabled && !inject.contains("CN1SurfacesWatchKinds")) {
+                StringBuilder watchKinds = new StringBuilder();
+                for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+                    if (IOSWidgetExtensionBuilder.hasWatchFamily(kind)) {
+                        if (watchKinds.length() > 0) {
+                            watchKinds.append(",");
+                        }
+                        watchKinds.append(kind.getId());
+                    }
+                }
+                inject += "\n<key>CN1SurfacesWatchKinds</key><string>" + watchKinds + "</string>";
             }
             // The extension's deployment target: the runtime gates areWidgetsSupported() on it
             // (the extension cannot run or appear in the widget gallery below this version, so
             // WidgetKit's own iOS 14 floor is not the right check).
-            if (!inject.contains("CN1SurfacesMinOS")) {
+            // The PHONE's floor, always -- the watch bundle carries its own, lower one, written
+            // by WatchNativeBuilder. Both are compared against the OS actually running, so one
+            // shared value would be wrong on one of the two.
+            if (surfacesExtensionEnabled && !inject.contains("CN1SurfacesMinOS")) {
                 inject += "\n<key>CN1SurfacesMinOS</key><string>"
                         + request.getArg("ios.surfaces.deploymentTarget", "16.1") + "</string>";
             }
