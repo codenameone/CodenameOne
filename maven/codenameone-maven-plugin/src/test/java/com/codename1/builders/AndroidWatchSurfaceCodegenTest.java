@@ -129,6 +129,41 @@ class AndroidWatchSurfaceCodegenTest {
         assertEquals("", AndroidGradleBuilder.complicationTypes("small,medium,large,lockscreen"));
     }
 
+    // --- version codes -----------------------------------------------------------
+
+    /// A watch APK must outrank the phone's. On a watch, Play picks among the APKs the device
+    /// supports by version code; on a phone the required watch feature filters the wear one out
+    /// entirely, so the phone APK still wins there.
+    @Test
+    void theWearArtifactOutranksThePhoneOne() {
+        assertEquals(101, AndroidGradleBuilder.wearVersionCode(request(), 100));
+    }
+
+    @Test
+    void theWearVersionCodeCanBeSetOutright() {
+        BuildRequest req = request();
+        req.putArgument("android.watchVersionCode", "5000");
+
+        assertEquals(5000, AndroidGradleBuilder.wearVersionCode(req, 100));
+    }
+
+    @Test
+    void theOffsetCanBeWidenedForAProjectThatNumbersItsBuildsTightly() {
+        BuildRequest req = request();
+        req.putArgument("android.watchVersionCodeOffset", "50");
+
+        assertEquals(150, AndroidGradleBuilder.wearVersionCode(req, 100));
+    }
+
+    /// A malformed hint must not produce a version code that silently reorders the two artifacts.
+    @Test
+    void aMalformedVersionHintFallsBackToTheDefault() {
+        BuildRequest req = request();
+        req.putArgument("android.watchVersionCodeOffset", "not a number");
+
+        assertEquals(101, AndroidGradleBuilder.wearVersionCode(req, 100));
+    }
+
     // --- tiles ------------------------------------------------------------------
 
     /// Only the rectangular family is roomy enough for a layout rather than a readout, so it is

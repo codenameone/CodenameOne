@@ -1,0 +1,10 @@
+package androidx.wear.watchface.complications.data;
+import android.app.PendingIntent;
+public class ShortTextComplicationData extends ComplicationData {
+    public static class Builder {
+        public Builder(ComplicationText text, ComplicationText contentDescription) { }
+        public Builder setTitle(ComplicationText t) { return this; }
+        public Builder setTapAction(PendingIntent p) { return this; }
+        public ShortTextComplicationData build() { return null; }
+    }
+}

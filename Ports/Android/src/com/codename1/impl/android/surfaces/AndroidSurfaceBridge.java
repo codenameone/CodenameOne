@@ -111,6 +111,10 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
             CN1SurfaceStore.rememberBackgroundFetchClass(ctx,
                     AndroidImplementation.getBackgroundFetchListenerClassName());
             broadcastUpdate(ctx, kindId);
+            // After the local write, so neither can leave the phone's own widget wrong. Both are
+            // no-ops unless this build declared watch families.
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            CN1SurfaceMirror.onPublished(ctx, kindId, timelineJson, images);
         } catch (Throwable t) {
             Log.w(TAG, "Failed to publish the timeline of widget kind " + kindId, t);
         }

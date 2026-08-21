@@ -1,0 +1,9 @@
+package androidx.wear.watchface.complications.data;
+import android.app.PendingIntent;
+public class MonochromaticImageComplicationData extends ComplicationData {
+    public static class Builder {
+        public Builder(MonochromaticImage image, ComplicationText contentDescription) { }
+        public Builder setTapAction(PendingIntent p) { return this; }
+        public MonochromaticImageComplicationData build() { return null; }
+    }
+}

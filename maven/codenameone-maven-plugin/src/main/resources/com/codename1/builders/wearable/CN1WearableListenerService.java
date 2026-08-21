@@ -303,6 +303,22 @@ public class CN1WearableListenerService extends WearableListenerService {
         });
     }
 
+    /**
+     * The payload of a mirrored surface item.
+     *
+     * <p>Read straight from the DataMap rather than through the bridge's ordering machinery: a
+     * mirror is a replacement, not a replicated value with a logical clock, and the newest write
+     * always wins.</p>
+     */
+    private static byte[] readMirrorPayload(DataEvent event) {
+        try {
+            return DataMapItem.fromDataItem(event.getDataItem()).getDataMap()
+                    .getByteArray(CN1WearableBridge.payloadKey());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     private void handleDataChanged(java.lang.Iterable<DataEvent> events, long removalGeneration,
             java.util.Set<String> openRemovals) {
         // Before anything is read: in a cold service process this is the only context there is, and
@@ -374,6 +390,18 @@ public class CN1WearableListenerService extends WearableListenerService {
                     ? null
                     : CN1WearableBridge.decode(
                             path.substring(CN1WearableBridge.pathPrefix().length()));
+            // Framework bookkeeping, routed BEFORE anything app-visible and before
+            // ensureAppRunning -- the same position and the same reasoning the acknowledgement
+            // traffic above uses. A mirrored complication is applied by writing a file and asking
+            // the watch face to re-read; there is nothing for the application to do, and starting
+            // it would bring a UI forward that the user did not ask for. Delivering it to the
+            // app's own listeners would also show it a message it never sent itself.
+            if (appPath != null && !deleted
+                    && com.codename1.impl.android.surfaces.CN1SurfaceMirror.isMirrorPath(appPath)) {
+                com.codename1.impl.android.surfaces.CN1SurfaceMirror.receive(this, appPath,
+                        readMirrorPayload(event));
+                continue;
+            }
             // Read before anything is cleared, so the reset below can tell this device's own
             // removal from a republish that landed while it was being processed.
             String beforeTombstone = !transferItem && deleted
@@ -442,6 +470,15 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // Confirmed from inside the delivery: dispatched is not delivered, and a
                     // claim persisted for a file the app never received suppresses the redelivery
                     // that would have replaced it.
+                    if (com.codename1.impl.android.surfaces.CN1SurfaceMirror
+                            .isMirrorPath(transfer.logicalPath)) {
+                        // Mirrored complication artwork. Stored beside the descriptor that names
+                        // it, without waking the app: see the data-item branch above.
+                        com.codename1.impl.android.surfaces.CN1SurfaceMirror.receiveFile(this,
+                                transfer.logicalPath, transfer.payload);
+                        CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq, true);
+                        continue;
+                    }
                     if (!started) {
                         ensureAppRunning();
                         started = true;

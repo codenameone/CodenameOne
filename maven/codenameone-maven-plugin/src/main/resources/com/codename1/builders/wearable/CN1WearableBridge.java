@@ -85,6 +85,20 @@ public class CN1WearableBridge implements WearableBridge {
     static final String CAPABILITY_NAME = "cn1_wearable";
     /** The key the payload bytes live under inside a DataItem. */
     private static final String PAYLOAD_KEY = "cn1.payload";
+
+    /**
+     * The DataMap key a replicated value's payload lives under.
+     *
+     * <p>Exposed for the listener service's surface-mirror branch, which reads a mirrored
+     * complication descriptor straight from the map: a mirror is a replacement rather than a
+     * replicated value with a logical clock, so it does not go through the ordering machinery
+     * that owns this constant everywhere else.</p>
+     *
+     * @return the payload key
+     */
+    static String payloadKey() {
+        return PAYLOAD_KEY;
+    }
     /** The publication order of a value or transfer, so the newer of two items wins. */
     private static final String SEQUENCE_KEY = "cn1.seq";
     /**

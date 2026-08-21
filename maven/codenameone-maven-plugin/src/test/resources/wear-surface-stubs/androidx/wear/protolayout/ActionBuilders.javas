@@ -1,0 +1,17 @@
+package androidx.wear.protolayout;
+public final class ActionBuilders {
+    public interface Action { }
+    public static class AndroidActivity {
+        public static class Builder {
+            public Builder setPackageName(String p) { return this; }
+            public Builder setClassName(String c) { return this; }
+            public AndroidActivity build() { return null; }
+        }
+    }
+    public static class LaunchAction implements Action {
+        public static class Builder {
+            public Builder setAndroidActivity(AndroidActivity a) { return this; }
+            public LaunchAction build() { return null; }
+        }
+    }
+}

@@ -1,0 +1,9 @@
+package androidx.wear.protolayout;
+public final class DimensionBuilders {
+    public static class DpProp { }
+    public static class SpProp { }
+    public static class DegreesProp { }
+    public static DpProp dp(float v) { return null; }
+    public static SpProp sp(float v) { return null; }
+    public static DegreesProp degrees(float v) { return null; }
+}

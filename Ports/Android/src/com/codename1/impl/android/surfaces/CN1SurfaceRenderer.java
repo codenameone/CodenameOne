@@ -738,6 +738,67 @@ public final class CN1SurfaceRenderer {
         }
     }
 
+    /**
+     * Rasterizes one {@code img} or {@code vec} node for a Wear complication or Tile.
+     *
+     * <p>Neither of those renders through RemoteViews -- a complication hands the watch face a
+     * typed value and a Tile serves a ProtoLayout -- so they need the bitmap rather than a view
+     * tree. Reusing the decoding and vector rasterization here is what makes a vector degrade to
+     * a bitmap on a watch face exactly as it does on a home screen, instead of degrading twice
+     * in two slightly different ways.</p>
+     *
+     * @param ctx any context
+     * @param kindId the widget kind, which locates the published imagery
+     * @param node an {@code img} or {@code vec} node
+     * @param state the entry state, for interpolated values
+     * @return the bitmap, or null when the node names nothing renderable
+     */
+    static Bitmap renderWatchBitmap(Context ctx, String kindId, JSONObject node,
+            JSONObject state) {
+        RenderContext rc = new RenderContext(ctx, state == null ? new JSONObject() : state,
+                kindId, CN1SurfaceStore.kindDir(ctx, kindId));
+        String type = node.optString("t", "");
+        if ("vec".equals(type)) {
+            return renderVectorBitmap(node, rc);
+        }
+        if ("img".equals(type)) {
+            return loadBitmap(node.optString("name", ""), node, rc);
+        }
+        return null;
+    }
+
+    /**
+     * The intent a complication or Tile tap should fire, matching what a widget tap sends.
+     *
+     * <p>Built here rather than at the call site so all three surfaces agree on the extras and
+     * on the canonical {@code cn1surface://} form -- which doubles as the uniqueness key that
+     * keeps PendingIntents with different extras from colliding.</p>
+     *
+     * @param ctx any context
+     * @param source the widget kind, reported to the action handler
+     * @param actionId the declared action id
+     * @param params the declared parameters, or null
+     * @return the trampoline intent
+     */
+    static Intent watchActionIntent(Context ctx, String source, String actionId,
+            JSONObject params) {
+        String paramsJson = params == null ? null : params.toString();
+        Intent intent = new Intent(ctx, CN1SurfaceActionActivity.class);
+        intent.putExtra(CN1SurfaceActionActivity.EXTRA_SOURCE, source);
+        intent.putExtra(CN1SurfaceActionActivity.EXTRA_ACTION_ID, actionId);
+        if (paramsJson != null) {
+            intent.putExtra(CN1SurfaceActionActivity.EXTRA_ACTION_PARAMS, paramsJson);
+        }
+        StringBuilder uri = new StringBuilder("cn1surface://a?src=");
+        uri.append(Uri.encode(source == null ? "" : source));
+        uri.append("&id=").append(Uri.encode(actionId));
+        if (paramsJson != null) {
+            uri.append("&p=").append(Uri.encode(paramsJson));
+        }
+        intent.setData(Uri.parse(uri.toString()));
+        return intent;
+    }
+
     private static void applyAction(RemoteViews rv, JSONObject action, RenderContext rc) {
         String actionId = action.optString("id", "");
         JSONObject params = action.optJSONObject("p");

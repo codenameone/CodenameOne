@@ -1,0 +1,15 @@
+package org.json;
+public class JSONObject {
+    public JSONObject() { }
+    public JSONObject(String s) { }
+    public boolean has(String k) { return false; }
+    public String optString(String k, String d) { return d; }
+    public String optString(String k) { return ""; }
+    public int optInt(String k, int d) { return d; }
+    public int optInt(String k) { return 0; }
+    public long optLong(String k) { return 0L; }
+    public double optDouble(String k, double d) { return d; }
+    public JSONObject optJSONObject(String k) { return null; }
+    public JSONArray optJSONArray(String k) { return null; }
+    public String toString() { return ""; }
+}
