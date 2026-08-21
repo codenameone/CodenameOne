@@ -128,26 +128,27 @@ class MultiWindowGraphicsRoutingTest {
         assertNotNull(port);
 
         java.awt.Toolkit toolkit = java.awt.Toolkit.getDefaultToolkit();
-        java.util.List<java.awt.event.AWTEventListener> before = wheelListeners(toolkit);
-
         JavaSEPort.C canvas = port.createWindowCanvas(11);
-        java.util.List<java.awt.event.AWTEventListener> registered = wheelListeners(toolkit);
-        registered.removeAll(before);
+
+        // The canvas's own listener, read off the field that holds it, rather than
+        // whatever appeared in the Toolkit's list while this test ran. That list is
+        // global to the VM and the simulator's event dispatch thread is live alongside
+        // this test, so both a count and a before/after diff can attribute an unrelated
+        // registration to this canvas and then demand that it be removed.
+        java.lang.reflect.Field field =
+                JavaSEPort.C.class.getDeclaredField("magnificationWheelFallbackListener");
+        field.setAccessible(true);
+        java.awt.event.AWTEventListener own = (java.awt.event.AWTEventListener) field.get(canvas);
+        assertNotNull(own, "the canvas registers a global wheel listener");
+        assertTrue(wheelListeners(toolkit).contains(own), "and hands it to the Toolkit");
+
         canvas.disposeGestureListeners();
-        java.util.List<java.awt.event.AWTEventListener> after = wheelListeners(toolkit);
 
         // The Toolkit holds its listeners for the life of the VM, so a window that
         // never releases one leaks the canvas and its whole hierarchy, and keeps
         // inspecting every wheel event in the application.
-        //
-        // Asserted against the identity of the listener this canvas registered rather
-        // than against the size of the Toolkit's list: the list is global to the VM and
-        // the simulator's event dispatch thread is live alongside this test, so a count
-        // taken here also sees registrations that have nothing to do with this canvas.
-        assertFalse(registered.isEmpty(), "the canvas registers a global wheel listener");
-        for (java.awt.event.AWTEventListener l : registered) {
-            assertFalse(after.contains(l), "disposing must hand that listener back");
-        }
+        assertFalse(wheelListeners(toolkit).contains(own),
+                "disposing must hand that listener back");
     }
 
     @Test

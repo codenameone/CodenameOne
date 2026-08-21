@@ -367,11 +367,24 @@ public class JavaSEWindowManager extends WindowManager {
         }
     }
 
+    /**
+     * Applied on the AWT thread <em>before returning</em>, not queued.
+     *
+     * <p>Geometry is read back synchronously: {@code setWindowSize()} followed by
+     * {@code centerOnDesktop()} or {@code centerOn()} in one Codename One event
+     * dispatch turn has the centring read {@link #getBounds}, work out an origin from
+     * it and write the whole rectangle back. Queued, the read saw the frame's old
+     * dimensions, so the second write carried the old size and the later AWT task
+     * undid the resize -- the resize silently did nothing.
+     *
+     * <p>Waiting here follows what {@code createWindow} and {@code show} already do
+     * in this class for the same reason.
+     */
     @Override
     public void setBounds(Object peerObj, final int x, final int y, final int width, final int height) {
         final Peer p = peer(peerObj);
         if (p != null) {
-            runOnAwt(new Runnable() {
+            runOnAwtAndWait(new Runnable() {
                 @Override
                 public void run() {
                     p.frame.setBounds(x, y, width, height);
