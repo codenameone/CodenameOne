@@ -277,47 +277,36 @@ class InterpIOSSymbols {
             }
             currentOwner = superName(currentOwner);
         }
-        // No class method: consult interfaces. A shared visited set spans the
-        // whole hierarchy so a diamond is not walked twice, and every class in
-        // the chain contributes its interfaces -- one reached only through the
-        // superclass is as much a candidate as one on the receiver.
+        // No class method: consult interfaces. Candidates from every class in
+        // the chain are pooled first, then the maximally specific one is
+        // selected across the whole set -- selecting per class would return
+        // `I.m` from a receiver's direct `implements I` and never see the
+        // superclass's `J extends I` override. A shared visited set across
+        // the walk means a diamond (a class and its superclass both reaching
+        // the same interface) is walked once.
+        java.util.Vector candidateOwners = new java.util.Vector();
+        java.util.Vector candidateIds = new java.util.Vector();
         Hashtable interfaceVisited = new Hashtable();
         currentOwner = owner;
         Hashtable classSeenAgain = new Hashtable();
         while (currentOwner != null && classSeenAgain.get(currentOwner) == null) {
             classSeenAgain.put(currentOwner, Boolean.TRUE);
-            int fromInterface = interfaceMethodId(currentOwner, name, descriptor, interfaceVisited);
-            if (fromInterface >= 0) {
-                return fromInterface;
-            }
+            collectInterfaceCandidates(currentOwner, name, descriptor, interfaceVisited,
+                    candidateOwners, candidateIds);
             currentOwner = superName(currentOwner);
         }
-        return -1;
+        return selectMaximallySpecific(candidateOwners, candidateIds);
     }
 
     /**
-     * The maximally specific interface method that matches, or -1.
+     * The maximally specific candidate from a pooled set, or -1 when empty.
      *
-     * <p>Every interface reachable from {@code owner} that declares a method
-     * with this name and descriptor is a candidate. The set is filtered to
-     * "maximally specific" per JLS 5.4.3.3: keep only those no other
-     * candidate's declaring interface subtypes. Returning the first
-     * depth-first hit instead picks a superinterface's default over a
-     * subinterface that overrides it (a class declaring
-     * {@code implements I, J} where {@code J extends I} and both define the
-     * method), which is the wrong host implementation.</p>
-     *
-     * <p>The visited set the caller passes is shared across the candidate
-     * collection (a diamond is walked once) and across the outer class-chain
-     * pass in {@link #methodId} (an interface reached through both the
-     * receiver and its superclass is still considered once).</p>
+     * <p>JLS 5.4.3.3: keep only candidates no other candidate's declaring
+     * interface subtypes. Ties are arbitrary per JLS -- taking the first
+     * pooled candidate makes the answer deterministic within a build.</p>
      */
-    private int interfaceMethodId(String owner, String name, String descriptor,
-                                  Hashtable visited) {
-        java.util.Vector candidateOwners = new java.util.Vector();
-        java.util.Vector candidateIds = new java.util.Vector();
-        collectInterfaceCandidates(owner, name, descriptor, visited,
-                candidateOwners, candidateIds);
+    private int selectMaximallySpecific(java.util.Vector candidateOwners,
+                                        java.util.Vector candidateIds) {
         int count = candidateOwners.size();
         if (count == 0) {
             return -1;
@@ -345,9 +334,6 @@ class InterpIOSSymbols {
                 return ((Integer)candidateIds.elementAt(i)).intValue();
             }
         }
-        // Multiple maximally specific and none dominates -- JLS leaves the
-        // choice arbitrary. Take the first candidate found so the answer is
-        // deterministic within a build.
         return ((Integer)candidateIds.elementAt(0)).intValue();
     }
 

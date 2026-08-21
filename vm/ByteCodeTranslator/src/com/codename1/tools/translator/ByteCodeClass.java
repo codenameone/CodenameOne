@@ -1657,7 +1657,8 @@ public class ByteCodeClass {
     }
 
     /**
-     * Publishes this class's static initializer under its class id.
+     * Publishes this class's or interface's static initializer under its
+     * class id.
      *
      * <p>Reading a static field runs it, which covers most classes -- but a
      * class can have an observable static block and declare no static field at
@@ -1665,12 +1666,22 @@ public class ByteCodeClass {
      * initialize a host superclass before an interpreted subclass's own
      * initializer runs, so it needs to name one directly.</p>
      *
+     * <p>Interfaces need the same handle, for the same reason: JLS 12.4.1
+     * requires a default-bearing superinterface to initialize before its
+     * implementor's initializer runs, and the linker's traversal calls
+     * {@code initializeClassById} on each such interface. Without a registered
+     * initializer that call is a no-op, and a host interface with a
+     * nonconstant {@code <clinit>} stays uninitialized until its methods are
+     * first entered -- which may be never, and is always after the
+     * implementor's constructor. {@code __STATIC_INITIALIZER_} is emitted for
+     * interfaces too, so registering it costs one row per interface.</p>
+     *
      * <p>{@code __STATIC_INITIALIZER_} is idempotent (it returns immediately
      * once the class is loaded), so calling it when the class is already
      * initialized costs a comparison.</p>
      */
     private void appendInterpClassInitializerRegistration(StringBuilder b) {
-        if (!BytecodeMethod.isInterpHost() || isInterface) {
+        if (!BytecodeMethod.isInterpHost()) {
             return;
         }
         b.append("    cn1_register_class_initializer(cn1_class_id_").append(clsName)
