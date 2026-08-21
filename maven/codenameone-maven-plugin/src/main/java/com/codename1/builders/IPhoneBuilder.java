@@ -298,6 +298,13 @@ public class IPhoneBuilder extends Executor {
     // ios.surfaces.extension=false the whole iOS lowering is skipped (no define flip, no
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
     private boolean surfacesExtensionEnabled;
+    /// True when a watch target exists and at least one kind declares a complication family, so
+    /// the watch app gets a CN1WatchWidgets extension of its own.
+    ///
+    /// Deliberately INDEPENDENT of surfacesExtensionEnabled. A manifest whose every kind is a
+    /// complication produces no iOS extension and no phone app-group entitlement, and must still
+    /// produce a watch one -- that is the whole case the surfaces watch families exist for.
+    private boolean surfacesWatchEnabled;
     // Resolved app group: surfaces.json appGroup > ios.surfaces.appGroup hint > group.<package>.
     private String surfacesAppGroup;
     private boolean surfacesLiveActivities;
@@ -3001,7 +3008,11 @@ public class IPhoneBuilder extends Executor {
             // lives in the shared CodenameOne_GLViewController.h so it reaches every wearable
             // translation unit, and unlike the widgets define it deliberately survives on the watch
             // slice: both halves of a pair run the same symmetric code.
-            if (usesWearable) {
+            // surfacesWatchEnabled counts too. Mirroring a phone-side publish to the watch
+            // rides WCSession, and the app that publishes need never have written a line of
+            // com.codename1.wearable -- so the scan alone would leave the mirror with no
+            // transport in exactly the apps that want one.
+            if (usesWearable || surfacesWatchEnabled) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WATCHCONNECTIVITY", "#define CN1_USE_WATCHCONNECTIVITY");
             }
 
@@ -4111,7 +4122,7 @@ public class IPhoneBuilder extends Executor {
             // link WatchConnectivity.framework in lockstep with the scan. It exists on both iOS and
             // watchOS, which is why it is a plain link rather than one of the watch slice's
             // weak-linked frameworks.
-            if (usesWearable) {
+            if (usesWearable || surfacesWatchEnabled) {
                 String wearableLib = "WatchConnectivity.framework";
                 if (addLibs == null || addLibs.length() == 0) {
                     addLibs = wearableLib;
@@ -5036,6 +5047,7 @@ public class IPhoneBuilder extends Executor {
                             + "      file_name = f.path || f.name || f.display_name\n"
                             + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
                             + SURFACES_EXTENSION_NAME + "/') && !file_name.start_with?('"
+                            + SURFACES_WATCH_EXTENSION_NAME + "/') && !file_name.start_with?('"
                             + MatterExtensionBuilder.EXTENSION_NAME + "/') && !file_name.include?('/"
                             + WatchNativeBuilder.WATCH_SRC_DIR + "/')\n"
                             + "    end\n"
@@ -5364,6 +5376,11 @@ public class IPhoneBuilder extends Executor {
 
                 if (watchNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    // Before the plist and the Xcode script, both of which describe it. Generated
+                    // here rather than alongside the iOS extension because the watch APP target
+                    // does not exist yet when the schemes ruby runs -- and the complication
+                    // extension is embedded in that target, not the phone's.
+                    writeWatchWidgetExtension(request, new File(tmpFile, "dist"), appSrcDir);
                     watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
                     watchNativeBuilder.writeStubHeaders(appSrcDir);
@@ -6154,6 +6171,9 @@ public class IPhoneBuilder extends Executor {
         sb.append("end\n");
     }
 
+    /** Xcode target / folder name of the generated watchOS complication extension. */
+    static final String SURFACES_WATCH_EXTENSION_NAME = "CN1WatchWidgets";
+
     /** Xcode target / folder name of the generated WidgetKit extension. */
     static final String SURFACES_EXTENSION_NAME = "CN1Widgets";
 
@@ -6574,6 +6594,17 @@ public class IPhoneBuilder extends Executor {
                 break;
             }
         }
+        // Whether a complication reaches a device is a separate question from whether an iOS
+        // widget does, and it is answered separately: a watch-only manifest produces no iOS
+        // extension and must still produce a watch one.
+        boolean anyWatchSurface = false;
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            if (IOSWidgetExtensionBuilder.hasWatchFamily(kind)) {
+                anyWatchSurface = true;
+                break;
+            }
+        }
+        surfacesWatchEnabled = anyWatchSurface && watchTargetEnabled(request);
         if (!anyIosSurface) {
             // Said HERE, and in full. Turning the flag off is what stops widgetExtensionBuilder
             // from ever being created, and the watch-only notice at the extension-generation site
@@ -6587,20 +6618,41 @@ public class IPhoneBuilder extends Executor {
                 }
                 names.append(kind.getId());
             }
-            log("[surfaces] NOTE: these kinds declare only watch complication families and will "
-                    + "NOT appear on any device in this build: " + names + ". The watchOS widget "
-                    + "extension target and the Wear OS complication data source are not generated "
-                    + "yet, so nothing emits them. Declare a phone family alongside them if you "
-                    + "need a surface today.");
-            log("[surfaces] No iOS extension is generated and the iOS surface lowering is skipped "
-                    + "entirely -- no app group, no widget support compiled into the app.");
+            if (surfacesWatchEnabled) {
+                log("[surfaces] These kinds declare only watch complication families and are "
+                        + "hosted by the watch app's " + SURFACES_WATCH_EXTENSION_NAME
+                        + " extension: " + names + ". No iOS extension is generated, because "
+                        + "there is no iPhone surface to put them on.");
+            } else if (anyWatchSurface) {
+                log("[surfaces] NOTE: these kinds declare only watch complication families and "
+                        + "will NOT appear on any device in this build: " + names + ". They are "
+                        + "hosted by the watch app, and this project declares no "
+                        + "codename1.watchMain -- add one, or declare a phone family alongside "
+                        + "them.");
+            } else {
+                log("[surfaces] NOTE: these kinds declare no family this build can host and will "
+                        + "NOT appear on any device: " + names + ".");
+            }
             surfacesExtensionEnabled = false;
-            // Nothing further to prepare, and in particular no xcodeproj gem to require: that
-            // check exists for wiring an extension into the project, and there is no extension.
-            return;
+            if (!surfacesWatchEnabled) {
+                log("[surfaces] No iOS extension is generated and the iOS surface lowering is "
+                        + "skipped entirely -- no app group, no widget support compiled into the "
+                        + "app.");
+                // Nothing further to prepare, and in particular no xcodeproj gem to require: that
+                // check exists for wiring an extension into the project, and there is no
+                // extension.
+                return;
+            }
+            // Deliberately falling through with surfacesExtensionEnabled false. The watch
+            // extension still has to be wired into the project, which needs the xcodeproj gem
+            // checked below and an app group validated -- and the group is now something this
+            // build genuinely uses, even though the PHONE gets neither an entitlement for it nor
+            // an extension to use it.
+            log("[surfaces] The watch app publishes surfaces; the phone app does not.");
         }
-        // Only now, with an iOS surface confirmed, is the app group something this build actually
-        // uses -- and only now is rejecting a malformed one the right answer.
+        // Only now, with a surface confirmed on one platform or the other, is the app group
+        // something this build actually uses -- and only now is rejecting a malformed one the
+        // right answer.
         if (!surfacesAppGroup.startsWith("group.")) {
             throw new BuildException("The surfaces app group must start with 'group.' (Apple "
                     + "requirement); found '" + surfacesAppGroup + "' (from surfaces.json "
@@ -6612,6 +6664,64 @@ public class IPhoneBuilder extends Executor {
         log("External surfaces enabled: app group " + surfacesAppGroup + ", "
                 + surfacesKinds.size() + " widget kind(s)"
                 + (surfacesLiveActivities ? ", live activities" : ""));
+    }
+
+    /**
+     * Generates the watchOS complication extension under dist/ and hands it to
+     * {@link WatchNativeBuilder}, which embeds it in the watch app target.
+     *
+     * <p>Deliberately NOT part of {@link #appendWidgetExtensionTargets}. That path runs inside
+     * the schemes ruby, at a point where the watch app target does not exist yet -- and this
+     * extension is embedded in the watch app, not the phone app. So it is generated here,
+     * immediately before the watch builder runs its own xcodeproj script, and wired by that
+     * script instead.</p>
+     *
+     * <p>The app-side Swift glue goes into the same {@code <MainClass>-src} folder the phone's
+     * does. The two are the same files, and the watch script adds them to the watch target by
+     * name; the schemes script's sweep of that folder into the PHONE target is what already
+     * handles the case where the watch shares the phone's translation.</p>
+     *
+     * @param request the build
+     * @param distDir the generated project's dist folder
+     * @param appSrcDir the {@code <MainClass>-src} folder
+     */
+    private void writeWatchWidgetExtension(BuildRequest request, File distDir, File appSrcDir)
+            throws IOException {
+        if (!surfacesWatchEnabled) {
+            return;
+        }
+        IOSWidgetExtensionBuilder watchBuilder = new IOSWidgetExtensionBuilder()
+                .setWatchTarget(true)
+                .setExtensionName(SURFACES_WATCH_EXTENSION_NAME)
+                // The extension is nested in the watch app, so its bundle id extends the WATCH
+                // bundle id rather than the phone's.
+                .setHostBundleId(request.getPackageName() + ".watchkitapp")
+                .setAppGroupId(surfacesAppGroup)
+                .setDeploymentTarget(request.getArg("watchNative.surfaces.deploymentTarget",
+                        IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET));
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            watchBuilder.addKind(kind);
+        }
+        if (!watchBuilder.hasWatchSurface()) {
+            // Cannot happen -- surfacesWatchEnabled was decided from the same predicate -- but
+            // generating an empty WidgetBundle would break the watch build rather than degrade,
+            // so the check is worth its two lines.
+            return;
+        }
+        File extensionDir = new File(distDir, SURFACES_WATCH_EXTENSION_NAME);
+        IOSWalletExtensionBuilder.writeFileMap(watchBuilder.buildFileMap(), extensionDir);
+        IOSWalletExtensionBuilder.writeFileMap(watchBuilder.buildAppTargetFileMap(), appSrcDir);
+        watchNativeBuilder.setWidgetExtension(extensionDir, surfacesAppGroup,
+                watchBuilder.getDeploymentTarget());
+        int complications = 0;
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            if (IOSWidgetExtensionBuilder.hasWatchFamily(kind)) {
+                complications++;
+            }
+        }
+        log("Adding watchOS complication extension target " + SURFACES_WATCH_EXTENSION_NAME
+                + " (" + complications + " complication kind(s), watchOS "
+                + watchBuilder.getDeploymentTarget() + ")");
     }
 
     /**
@@ -6630,11 +6740,10 @@ public class IPhoneBuilder extends Executor {
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             widgetBuilder.addKind(kind);
         }
-        // Named out loud, every time, whether or not the extension is generated. A watch-only kind
-        // is silently dropped from the iOS bundle and NOTHING else emits it -- there is no watchOS
-        // widget extension target and no Wear complication data source yet -- so a developer who
-        // declares one and says nothing about it gets no surface on any platform and no clue why.
-        // The limitation is documented in the Wearables guide; this is the build-time half of it.
+        // Named out loud, every time, whether or not the extension is generated. A watch-only
+        // kind is silently dropped from the iOS bundle, so a developer who declares one and hears
+        // nothing has to work out for themselves where it went -- and, when there is no watch
+        // target, that it went nowhere at all.
         StringBuilder watchOnly = new StringBuilder();
         for (IOSWidgetExtensionBuilder.Kind watchKind : surfacesKinds) {
             if (IOSWidgetExtensionBuilder.isWatchOnly(watchKind)) {
@@ -6645,17 +6754,23 @@ public class IPhoneBuilder extends Executor {
             }
         }
         if (watchOnly.length() > 0) {
-            log("[surfaces] NOTE: these kinds declare only watch complication families and will "
-                    + "NOT appear on any device in this build: " + watchOnly + ". The watchOS "
-                    + "widget extension target and the Wear OS complication data source are not "
-                    + "generated yet. Declare a phone family alongside them if you need a surface "
-                    + "today.");
+            if (surfacesWatchEnabled) {
+                log("[surfaces] These kinds declare only watch complication families and are "
+                        + "hosted by " + SURFACES_WATCH_EXTENSION_NAME + " rather than by the iOS "
+                        + "extension: " + watchOnly + ".");
+            } else {
+                log("[surfaces] NOTE: these kinds declare only watch complication families and "
+                        + "will NOT appear on any device in this build: " + watchOnly + ". They "
+                        + "are hosted by the watch app, and this project declares no "
+                        + "codename1.watchMain -- add one, or declare a phone family alongside "
+                        + "them.");
+            }
         }
         if (!widgetBuilder.hasIosSurface()) {
-            // Every declared kind is a watch complication and there is no live activity, so the iOS
-            // extension would host nothing -- and a WidgetBundle with an empty body does not compile.
-            // Declaring only complications is legitimate; it simply produces no iOS surface until the
-            // watchOS extension target exists, so skip the extension instead of failing the build.
+            // Every declared kind is a watch complication and there is no live activity, so the
+            // iOS extension would host nothing -- and a WidgetBundle with an empty body does not
+            // compile. Declaring only complications is legitimate: those kinds are hosted by the
+            // watch extension instead, so skip this one rather than failing the build.
             log("Skipping the WidgetKit extension target: surfaces.json declares only watch "
                     + "complication families, which the iOS extension cannot host");
             return;
