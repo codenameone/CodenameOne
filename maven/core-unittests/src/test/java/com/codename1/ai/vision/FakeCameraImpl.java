@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -20,8 +20,18 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.camera;
+package com.codename1.ai.vision;
 
+import com.codename1.camera.CameraFacing;
+import com.codename1.camera.CameraFrame;
+import com.codename1.camera.CameraInfo;
+import com.codename1.camera.CameraSessionOptions;
+import com.codename1.camera.CapturedPhoto;
+import com.codename1.camera.FlashMode;
+import com.codename1.camera.FrameFormat;
+import com.codename1.camera.FrameListener;
+import com.codename1.camera.PhotoCaptureOptions;
+import com.codename1.camera.ScaleType;
 import com.codename1.impl.CameraImpl;
 import com.codename1.ui.PeerComponent;
 import com.codename1.util.AsyncResource;
@@ -29,38 +39,38 @@ import com.codename1.util.AsyncResource;
 import java.io.IOException;
 
 /**
- * Hand-written {@link CameraImpl} test double (no Mockito). Records the calls
- * the {@code Camera} / {@code CameraSession} layer makes against it and lets a
- * test pre-configure the cameras to enumerate, the photo to deliver, and
- * whether {@link #open} should fail.
+ * Hand-written {@link CameraImpl} double for the high-level vision tests. One
+ * instance backs both the enumeration probe and the opened session, which is
+ * how {@code TestCodenameOneImplementation.setCameraImpl} hands the same
+ * backend to every {@code Camera} call.
  */
-class RecordingCameraImpl extends CameraImpl {
-    CameraInfo[] cameras = new CameraInfo[0];
-    boolean enumerateReturnsNull;
+class FakeCameraImpl extends CameraImpl {
+    CameraInfo[] cameras = {
+        new CameraInfo("back", CameraFacing.BACK, null, null, true, true),
+        new CameraInfo("front", CameraFacing.FRONT, null, null, false, true)
+    };
     IOException openFailure;
-
     String openedCameraId;
     int openCount;
     int closeCount;
-    int pauseCount;
-    int resumeCount;
+    boolean captureAudio;
+    FrameListener frameListener;
     FlashMode lastFlashMode;
-    float lastZoom = Float.NaN;
-    float lastFocusX = Float.NaN;
-    float lastFocusY = Float.NaN;
-    FrameListener lastFrameListener;
     Boolean previewMirrored;
     ScaleType previewScaleType;
-    boolean frameListenerCleared;
-    String videoPath;
-    boolean videoAudio;
+    boolean previewPeerFails;
 
-    PhotoCaptureOptions lastPhotoOptions;
-    CapturedPhoto photoToDeliver = new CapturedPhoto(new byte[]{1, 2, 3}, "file://photo.jpg", 4, 3);
+    void deliver(byte[] jpeg) {
+        FrameListener listener = frameListener;
+        if (listener != null) {
+            listener.onFrame(new CameraFrame(jpeg, null, 4, 3, 0, 1L,
+                    FrameFormat.JPEG));
+        }
+    }
 
     @Override
     public CameraInfo[] enumerateCameras() {
-        return enumerateReturnsNull ? null : cameras;
+        return cameras;
     }
 
     @Override
@@ -69,75 +79,74 @@ class RecordingCameraImpl extends CameraImpl {
             throw openFailure;
         }
         openedCameraId = cameraId;
+        captureAudio = opts != null && opts.isCaptureAudio();
         openCount++;
     }
 
     @Override
     public PeerComponent createPreviewPeer() {
-        return null;
+        // Ports return null when native preview creation fails; the flag
+        // reproduces that without pretending the happy path also has no peer.
+        return previewPeerFails ? null : new FakePeer();
+    }
+
+    /** Stands in for a native preview view. */
+    static final class FakePeer extends PeerComponent {
+        FakePeer() {
+            super(new Object());
+        }
     }
 
     @Override
     public void takePhoto(PhotoCaptureOptions opts, AsyncResource<CapturedPhoto> result) {
-        lastPhotoOptions = opts;
-        result.complete(photoToDeliver);
+        result.complete(new CapturedPhoto(new byte[] {1}, "file://photo.jpg", 4, 3));
     }
 
     @Override
-    public void startVideoRecording(String filePath, boolean audio) throws IOException {
-        this.videoPath = filePath;
-        this.videoAudio = audio;
+    public void startVideoRecording(String filePath, boolean audio) {
     }
 
     @Override
     public void stopVideoRecording(AsyncResource<String> result) {
         if (result != null) {
-            result.complete(videoPath);
+            result.complete("file://video.mp4");
         }
     }
 
     @Override
     public void setFrameListener(FrameListener listener, FrameFormat format, int maxFps) {
-        this.lastFrameListener = listener;
-        if (listener == null) {
-            frameListenerCleared = true;
-        }
+        frameListener = listener;
     }
 
     @Override
     public void setPreviewMirrored(boolean mirrored) {
-        this.previewMirrored = Boolean.valueOf(mirrored);
+        previewMirrored = Boolean.valueOf(mirrored);
     }
 
     @Override
     public void setPreviewScaleType(ScaleType scaleType) {
-        this.previewScaleType = scaleType;
+        previewScaleType = scaleType;
     }
 
     @Override
     public void setFlashMode(FlashMode mode) {
-        this.lastFlashMode = mode;
+        lastFlashMode = mode;
     }
 
     @Override
     public void setZoom(float ratio) {
-        this.lastZoom = ratio;
     }
 
     @Override
     public void focus(float xNorm, float yNorm) {
-        this.lastFocusX = xNorm;
-        this.lastFocusY = yNorm;
     }
 
     @Override
     public void pause() {
-        pauseCount++;
     }
 
     @Override
     public void resume() {
-        resumeCount++;
     }
 
     @Override

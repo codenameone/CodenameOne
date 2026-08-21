@@ -6750,7 +6750,12 @@ public class AndroidGradleBuilder extends Executor {
         if ("com/codename1/ai/vision/TextRecognizer".equals(cls)) {
             return "AndroidTextRecognitionAdapter.java";
         }
-        if ("com/codename1/ai/vision/BarcodeScanner".equals(cls)) {
+        if ("com/codename1/ai/vision/BarcodeScanner".equals(cls)
+                || "com/codename1/ai/vision/CodeScanner".equals(cls)) {
+            // CodeScanner is the ready-made scanner screen built on top of
+            // BarcodeScanner. An app that only references the high-level class
+            // never names BarcodeScanner itself, so it has to select the same
+            // adapter or the feature ships inert.
             return "AndroidBarcodeScanningAdapter.java";
         }
         if ("com/codename1/ai/vision/FaceDetector".equals(cls)) {
