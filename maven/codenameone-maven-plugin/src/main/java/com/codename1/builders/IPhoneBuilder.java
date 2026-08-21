@@ -6102,8 +6102,12 @@ public class IPhoneBuilder extends Executor {
         // project the extension was exported from, and those overrides are written onto this
         // target. A reference is only as good as what it lands on.
         String resolved = resolveSettingsInValue(current, archiveSettings);
-        if (resolved.length() == 0 || resolved.contains("$(") || resolved.contains("${")) {
-            return true;
+        if (resolved.length() == 0) {
+            // $(EXTENSION_BUNDLE_ID) with nothing defining it does not fall back to the target's
+            // identifier -- Xcode expands it to the empty string and the .appex ships with no
+            // identifier at all. The one reference that IS safe, $(PRODUCT_BUNDLE_IDENTIFIER),
+            // resolves through the settings because the caller puts the target's own there.
+            return false;
         }
         return resolved.startsWith(hostBundleId + ".");
     }
@@ -6521,6 +6525,34 @@ public class IPhoneBuilder extends Executor {
         return resolved != null && resolved.isFile() ? resolved : byName;
     }
 
+    /// Whether an entitlements plist grants a boolean entitlement at its top level.
+    ///
+    /// Read as a property list, not searched as text: entitlements may be UTF-16, in which case a
+    /// byte search for the key finds nothing and a Wallet extension keeps the 12.0 floor it will
+    /// be rejected for; and the same string sitting in a comment, or in some unrelated value, is
+    /// not a granted entitlement -- taking it for one pushes an extension to iOS 14 and drops it
+    /// off the 12 and 13 devices it would have run on.
+    static boolean entitlementIsTrue(File entitlements, String key) {
+        if (entitlements == null || !entitlements.isFile()) {
+            return false;
+        }
+        String text;
+        try {
+            text = readPlistText(entitlements).text;
+        } catch (IOException cannotRead) {
+            return false;
+        }
+        if (rootDictAt(text) < 0) {
+            return false;
+        }
+        int afterKey = topLevelKeyEnd(text, key);
+        if (afterKey < 0) {
+            return false;
+        }
+        int element = nextMarkupAt(text, afterKey);
+        return element >= 0 && "true".equals(WatchNativeBuilder.tagAt(text, element));
+    }
+
     /// The minimum iOS version a brought-in app extension declares.
     ///
     /// Xcode writes the target's IPHONEOS_DEPLOYMENT_TARGET into the built .appex as
@@ -6543,7 +6575,7 @@ public class IPhoneBuilder extends Executor {
         // IPHONEOS_DEPLOYMENT_TARGET = 10.0 of its own, and honouring that unconditionally would
         // reproduce the very rejection this exists to prevent -- 10.0 does not even build against
         // the current SDK, and an issuer-provisioning Wallet extension is refused below 14.
-        String floor = fileContains(entitlements, PAYMENT_PASS_PROVISIONING) ? "14.0" : "12.0";
+        String floor = entitlementIsTrue(entitlements, PAYMENT_PASS_PROVISIONING) ? "14.0" : "12.0";
         String chosen = declared != null && declared.trim().length() > 0
                 ? declared.trim()
                 : appTarget;
