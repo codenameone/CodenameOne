@@ -6296,6 +6296,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return surfaceBridge;
     }
 
+    private com.codename1.intents.spi.IntentBridge intentBridge;
+
+    @Override
+    // Synchronized for the same reason as the JavaSE bridge: two callers arriving together
+    // each see a null field and each construct one, and whichever loses the assignment keeps
+    // the donation or the indexed entities that were recorded through it. Nothing throws.
+    public synchronized com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        if (intentBridge == null) {
+            intentBridge = new com.codename1.impl.android.intents.AndroidIntentBridge();
+        }
+        return intentBridge;
+    }
+
     private AndroidHomeBridge homeBridge;
 
     /// Returns the smart-home bridge. Always returned rather than
@@ -6323,6 +6336,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// `CN1SurfaceActionActivity` trampoline before the app instance existed.
     public static void deliverPendingSurfaceActions() {
         com.codename1.impl.android.surfaces.AndroidSurfaceBridge.deliverPendingActions();
+    }
+
+    /// Invoked once the app has started (from the generated stub, beside
+    /// `deliverPendingSurfaceActions`) to run intent requests the trampoline parked rather than
+    /// dispatched.
+    ///
+    /// A non-headless handler is allowed to touch a `Form`, so the launcher tap can only ask for
+    /// the app to be brought forward; running the handler has to wait until it is.
+    public static void deliverPendingIntentRequests() {
+        // Order matters. The generated bootstrap installs the dispatcher before startContext
+        // has produced a bridge, so publication is deferred -- and until it happens the bridge
+        // never sees registerIntents, which is what judges a request the trampoline parked at a
+        // cold start. Draining the foreground queue alone left such a shortcut opening the app
+        // and running nothing.
+        com.codename1.intents.Intents.publishPendingDeclarations();
+        com.codename1.impl.android.intents.AndroidIntentBridge.deliverPendingForegroundRequests();
     }
 
     /**

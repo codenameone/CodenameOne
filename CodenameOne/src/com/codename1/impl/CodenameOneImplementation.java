@@ -6040,6 +6040,19 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the platform bridge used by the `com.codename1.intents` API to expose the
+    /// application's capabilities to the system -- assistant intents, app shortcuts and device
+    /// search. Ports supporting intents override this; the base implementation returns null, which
+    /// renders every outward projection an inert no-op while leaving in-process invocation working,
+    /// since that runs through generated code rather than through this bridge.
+    ///
+    /// #### Returns
+    ///
+    /// the intent bridge, or null when unsupported
+    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        return null;
+    }
+
     /// True if the device is a foldable or dual screen device. False on the base implementation.
     public boolean isFoldable() {
         return false;

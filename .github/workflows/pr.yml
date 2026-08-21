@@ -21,6 +21,12 @@ on:
       - 'scripts/ci/db-cipher-interop.sh'
       - 'scripts/ci/check-android-cipher-package-compiles.sh'
       - 'scripts/ci/check-js-sqlite-wasm.sh'
+      # Every Maven step in this matrix runs through retry.sh, and the apt helpers gate the
+      # Linux legs, so a change to one of them that nothing exercises can merge and then break
+      # the matrix it was meant to protect.
+      - 'scripts/ci/retry.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/apt-get-install.sh'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
@@ -47,6 +53,12 @@ on:
       - 'scripts/ci/db-cipher-interop.sh'
       - 'scripts/ci/check-android-cipher-package-compiles.sh'
       - 'scripts/ci/check-js-sqlite-wasm.sh'
+      # Every Maven step in this matrix runs through retry.sh, and the apt helpers gate the
+      # Linux legs, so a change to one of them that nothing exercises can merge and then break
+      # the matrix it was meant to protect.
+      - 'scripts/ci/retry.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/apt-get-install.sh'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'

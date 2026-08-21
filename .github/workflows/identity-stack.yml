@@ -25,6 +25,7 @@ on:
   pull_request:
     branches: [ master ]
     paths:
+      - 'scripts/ci/retry.sh'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
@@ -53,6 +54,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci/retry.sh'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
@@ -120,12 +122,18 @@ jobs:
 
       - name: Run identity-stack unit tests
         working-directory: maven
+        env:
+          # Narrowed because this step RUNS TESTS: retry.sh retries every nonzero exit
+          # without it, so a test that failed once and passed on a later attempt would take
+          # this gate green and hide the race that produced it. The wrapper's own docs
+          # require this filter for test-running commands.
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
         run: |
           set -euo pipefail
           # Targeted run: OidcCoreTest is the new suite; the *Connect / Login /
           # Oauth2 tests cover backward-compat for the changes in Login.java
           # and friends.
-          mvn -B -Dmaven.javadoc.skip=true \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -Dmaven.javadoc.skip=true \
               -DunitTests=true \
               -Plocal-dev-javase \
               -P unittests \
@@ -145,7 +153,7 @@ jobs:
           # Without it the build can't resolve those SNAPSHOT artifacts
           # because only core / factory / core-unittests landed in the
           # local repo from the previous step.
-          mvn -B -Dmaven.javadoc.skip=true \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -Dmaven.javadoc.skip=true \
               -pl codenameone-maven-plugin -am \
               -Plocal-dev-javase \
               -Dcn1.binaries="${CN1_BINARIES}" \

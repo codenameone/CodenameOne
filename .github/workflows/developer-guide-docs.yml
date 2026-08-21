@@ -3,6 +3,7 @@ name: Build Developer Guide Docs
 on:
   pull_request:
     paths:
+      - 'scripts/ci/retry.sh'
       - 'docs/developer-guide/**'
       - 'docs/demos/**'
       - 'scripts/developer-guide/**'
@@ -75,7 +76,7 @@ jobs:
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
-          mvn -B -ntp \
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -ntp \
             -Dgenerate-gui-sources-done=true \
             -Dcodename1.platform=javase \
             -f docs/demos/pom.xml \

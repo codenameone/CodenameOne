@@ -1208,6 +1208,52 @@ public final class IOSNative {
     /** True when ActivityKit live activities are available and enabled (iOS 16.1+). */
     native boolean surfacesActivitiesSupported();
 
+    // --- App intents (Core Spotlight + App Intents) -------------------------
+    // Backs com.codename1.intents. Two frameworks with different floors sit behind these:
+    // Core Spotlight is Objective-C and available well below this port's minimum, while App
+    // Intents is Swift-only and needs a newer iOS, so the two capability queries are answered
+    // separately rather than from one flag. Payloads cross as JSON strings; the App Intents
+    // half trampolines through the generated Swift declarations via an Objective-C shim,
+    // because Swift cannot name a translated Java symbol.
+
+    /** True when this build linked the intent natives at all. */
+    native boolean intentsSupported();
+
+    /** True when App Intents is available, which is what Siri and headless execution need. */
+    native boolean intentsAppIntentsSupported();
+
+    /** True when Core Spotlight can accept indexed content on this device. */
+    native boolean intentsIndexingSupported();
+
+    /** Hands the native side the application's full intent catalogue at startup. */
+    native void intentsRegister(String declarationsJson);
+
+    /** Records that the user performed a capability, so the system can suggest it later. */
+    native void intentsDonate(String intentId, String title, String paramsJson);
+
+    /**
+     * Stages a PNG blob under {@code name} for the next indexing or completion call, which
+     * reference it by that name from inside their JSON. Keeping the bytes out of the JSON is
+     * what lets the payload stay a plain string across the boundary.
+     */
+    native void intentsStageImage(String name, byte[] data, int length);
+
+    /** Publishes serialized entities to the Core Spotlight index. */
+    native void intentsIndex(String entitiesJson);
+
+    /** Removes the serialized {@code type, id} references from the index. */
+    native void intentsRemoveFromIndex(String idsJson);
+
+    /** Removes every indexed entry of one type, or all of this app's entries when null. */
+    native void intentsClearIndex(String entityType);
+
+    /**
+     * Answers the invocation the native side is holding open under {@code token}. Called at
+     * most once per token: the Swift continuation waiting on the other side crashes the
+     * process if it is resumed twice.
+     */
+    native void intentsCompleteInvocation(String token, String resultJson);
+
     // --- Phone-to-watch link (WatchConnectivity) ----------------------------
     // Backs com.codename1.wearable. The same natives serve both halves of a pair: WCSession is
     // symmetric, so the phone app and the watch app run identical code. Payloads cross as opaque

@@ -650,6 +650,10 @@ unretraceable
 [Mm]inif(y|ies|ied|ier|ication)
 [Uu]nminif(y|ies|ied|ier|ication)
 [Rr]etrace(d|s|able)?
+[Ii]nvokable
+[Dd]eindex(ed|es|ing)?
+[Ss]potlight
+[Ss]tringly
 [Pp]ragmas?
 
 # -----------------------------------------------------------------------------

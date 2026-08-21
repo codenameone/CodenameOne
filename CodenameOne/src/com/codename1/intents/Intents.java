@@ -1,0 +1,2563 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+import com.codename1.ai.Tool;
+import com.codename1.ai.ToolHandler;
+import com.codename1.intents.spi.IntentBridge;
+import com.codename1.io.JSONWriter;
+import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import com.codename1.util.StringUtil;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The entry point for app intents: the capabilities your application offers to
+/// the outside world.
+///
+/// You do not register intents here. You declare them with
+/// `com.codename1.annotations.AppIntent` on a `public static` method and the
+/// build generates the table, because the platforms compile their intent
+/// catalogues into the native binary and a runtime-only registration could never
+/// reach them. What this class gives you is everything around that declaration:
+/// running an intent yourself, telling the system one just happened, publishing
+/// content to device search, and asking what the current platform can actually
+/// do.
+///
+/// ```java
+/// // In your application code, once:
+/// @AppIntent(value = "log_workout", title = "Log a workout",
+///         phrases = {"Log a workout in ${applicationName}"}, headless = true)
+/// public static IntentResult logWorkout(
+///         @IntentParam("minutes") int minutes) {
+///     WorkoutStore.append(minutes);
+///     return IntentResult.spoken("Logged " + minutes + " minutes.");
+/// }
+///
+/// // Later, after the user does it by hand, so the system learns to suggest it:
+/// Intents.donate("log_workout", params);
+/// ```
+///
+/// #### What is honestly supported where
+///
+/// Ask, do not assume. [#areIntentsSupported()] is true wherever intents can be
+/// exposed to the platform at all, but the interesting question is usually
+/// [#isVoiceInvocationSupported()], which is true on iOS and false on Android --
+/// Android has no assistant contract that hands a typed result back to an app.
+/// Android gets launcher shortcuts and headless execution; it does not get Siri.
+/// The package documentation has the full table.
+///
+/// #### Zero cost when unused
+///
+/// Referencing this package is what makes the build inject the native plumbing.
+/// An application that never touches `com.codename1.intents` gets none of it and
+/// builds exactly as it did before.
+public final class Intents {
+
+    private static IntentBridge bridge;
+    private static boolean bridgeOverridden;
+    private static IntentDispatcher dispatcher;
+    private static int defaultTimeoutSeconds = 20;
+
+    /// Intents declared at runtime rather than by the build. Kept separate from
+    /// the generated table so [#getDeclarations()] can present one list without
+    /// either source being able to corrupt the other.
+    private static final Map<String, DynamicIntent> dynamic =
+            new LinkedHashMap<String, DynamicIntent>();
+
+    /// Invocations that arrived before the generated dispatcher installed
+    /// itself -- the cold start where a tap on a shortcut is what launched the
+    /// process. Drained in arrival order once the dispatcher appears.
+    private static final List<PendingInvocation> pending =
+            new ArrayList<PendingInvocation>();
+
+    private static EntitySelectionHandler selectionHandler;
+
+    /// Search-result taps that arrived before a handler was registered -- the
+    /// common case, since a tap is often what launched the process.
+    private static final List<AppEntity> pendingSelections = new ArrayList<AppEntity>();
+
+    /// Platform activities that arrived before the declarations did. Drained once the generated
+    /// dispatcher installs itself, and dropped if it turns out nothing declares them.
+    ///
+    /// Guarded by `pending`, the dispatcher's own lock, rather than by itself. "Is the
+    /// dispatcher installed, and if not, queue this" has to be one decision: with two locks the
+    /// dispatcher can install and drain an empty queue in the window between the answer and the
+    /// enqueue, and the activity then sits here forever with nothing left to drain it -- a
+    /// donated shortcut tap on a cold start that launches the app and does nothing, which is
+    /// the exact failure this queue exists to prevent.
+    private static final List<PendingActivity> pendingActivities =
+            new ArrayList<PendingActivity>();
+
+    private Intents() {
+    }
+
+    // ------------------------------------------------------------------
+    // Capability queries
+    // ------------------------------------------------------------------
+
+    /// True when this platform can expose intents to the system.
+    ///
+    /// False does not make the API useless: [#invoke] still runs your handlers
+    /// in-process on every platform, because the dispatch table is generated
+    /// code rather than a platform service. Only the projections outward --
+    /// voice, search indexing, shortcuts -- go quiet.
+    public static boolean areIntentsSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.areIntentsSupported();
+    }
+
+    /// True when this platform can run an intent without bringing the app to the
+    /// foreground.
+    public static boolean isHeadlessExecutionSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.isHeadlessExecutionSupported();
+    }
+
+    /// True when a voice assistant can invoke intents here.
+    ///
+    /// This is the honest discriminator between the platforms. Branch on it
+    /// rather than on [#areIntentsSupported()] when deciding whether to tell a
+    /// user they can talk to your app.
+    public static boolean isVoiceInvocationSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.isVoiceInvocationSupported();
+    }
+
+    /// True when [#index] can publish content to a system-wide search index.
+    public static boolean isIndexingSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.isIndexingSupported();
+    }
+
+    // ------------------------------------------------------------------
+    // Declarations
+    // ------------------------------------------------------------------
+
+    /// Every intent this application declares, from the build-time table and
+    /// from [#registerDynamicIntent].
+    ///
+    /// The simulator's Intents window is built from exactly this list, which is
+    /// what makes it trustworthy: it can only show what actually shipped.
+    public static List<IntentDeclaration> getDeclarations() {
+        List<IntentDeclaration> out = new ArrayList<IntentDeclaration>();
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d != null) {
+            try {
+                List<IntentDeclaration> declared = d.describe();
+                if (declared != null) {
+                    out.addAll(declared);
+                }
+            } catch (Throwable t) {
+                logError(t);
+            }
+        }
+        synchronized (dynamic) {
+            for (DynamicIntent dyn : dynamic.values()) {
+                IntentDeclaration base = findById(out, dyn.getBaseIntentId());
+                if (base != null) {
+                    out.add(describeDynamic(dyn, base));
+                }
+            }
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    /// The declaration with this id, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the intent id
+    public static IntentDeclaration getDeclaration(String intentId) {
+        if (intentId == null) {
+            return null;
+        }
+        for (IntentDeclaration d : getDeclarations()) {
+            if (intentId.equals(d.getId())) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    /// Declares a parameterization of an intent the application already declares -- a specific
+    /// shortcut such as "reorder my usual", built from data only known once the app is running.
+    ///
+    /// It runs by running the intent it names, with the bound values filled in, which is what
+    /// makes it invokable at all. It cannot introduce a new capability: the native catalogue is
+    /// compiled into the app, so a genuinely new verb could never reach the platform.
+    ///
+    /// Ignored when the base intent is not declared, or when the id would shadow a declared one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intent`: the parameterization
+    public static void registerDynamicIntent(DynamicIntent intent) {
+        if (intent == null) {
+            return;
+        }
+        if (declaredById(intent.getId()) != null) {
+            logError(new IllegalArgumentException("A dynamic intent cannot take the id of a "
+                    + "declared one: \"" + intent.getId() + "\""));
+            return;
+        }
+        if (declaredById(intent.getBaseIntentId()) == null) {
+            logError(new IllegalArgumentException("Dynamic intent \"" + intent.getId()
+                    + "\" names base intent \"" + intent.getBaseIntentId()
+                    + "\", which this application does not declare"));
+            return;
+        }
+        synchronized (dynamic) {
+            dynamic.put(intent.getId(), intent);
+        }
+    }
+
+    /// The parameterization registered under this id, or null when the id is a build-time
+    /// declaration or nothing at all.
+    ///
+    /// Ports need this to resolve a donation: a shortcut outlives the process while a
+    /// parameterization does not, so the shortcut has to record the base intent and the bound
+    /// values rather than a runtime id nothing will recognise later.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the id to look up
+    public static DynamicIntent getDynamicIntent(String intentId) {
+        if (intentId == null) {
+            return null;
+        }
+        synchronized (dynamic) {
+            return dynamic.get(intentId);
+        }
+    }
+
+    /// The declaration for a build-time intent id, or null. Deliberately does not consult the
+    /// dynamic table, so registration can check for collisions against the real catalogue.
+    private static IntentDeclaration declaredById(String intentId) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d == null || intentId == null) {
+            return null;
+        }
+        List<IntentDeclaration> declared;
+        try {
+            declared = d.describe();
+        } catch (Throwable t) {
+            logError(t);
+            return null;
+        }
+        // The walk stays outside the catch. A for-each over a typed list compiles to a
+        // CHECKCAST, and ParparVM expands that to nothing -- so a catch around it would be
+        // guarding against something that can never fire on the platform that matters most.
+        if (declared == null) {
+            return null;
+        }
+        for (IntentDeclaration decl : declared) {
+            if (intentId.equals(decl.getId())) {
+                return decl;
+            }
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------
+    // Invocation
+    // ------------------------------------------------------------------
+
+    /// Runs an intent on the calling thread and returns its result.
+    ///
+    /// This is the in-app path -- your own code deciding to perform one of its
+    /// declared capabilities -- and it works on every platform, including those
+    /// with no intent support at all, because the dispatch table is generated
+    /// code rather than a platform service.
+    ///
+    /// Platform-initiated invocations do not come through here; they arrive at
+    /// [#dispatchInvocation], which adds thread marshalling and an enforced
+    /// deadline.
+    ///
+    /// The deadline on this path is a **budget the handler may consult**, not a
+    /// cutoff: your own thread is blocked in this call, nothing else is waiting
+    /// to report an outcome, and a handler that overruns has still done the work
+    /// and produced the answer you asked for. So a late result is returned
+    /// rather than discarded. Discarding is the right behaviour under
+    /// [#dispatchInvocation], where the framework has already told the platform
+    /// the invocation failed and a second answer would be a protocol violation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the declared intent id
+    /// - `params`: parameter values keyed by name; may be null
+    ///
+    /// #### Returns
+    ///
+    /// the handler's result, or a failed result when no such intent exists
+    public static IntentResult invoke(String intentId, Map<String, Object> params) {
+        IntentDeclaration decl = getDeclaration(intentId);
+        int timeout = budgetFor(decl);
+        // The deadline is carried so a handler can size its work the same way it would under a
+        // platform invocation, and deliberately not enforced afterwards: the caller is blocked
+        // in this method waiting for exactly this result, so turning a late success into a
+        // failure would discard completed work with nobody left to report it to. Enforcement
+        // belongs to dispatchInvocation, which has already answered the platform by then.
+        IntentContext ctx = new IntentContext(IntentSource.IN_APP, false,
+                System.currentTimeMillis() + timeout * 1000L);
+        return invokeInternal(intentId, params, ctx);
+    }
+
+    /// Framework/port entry point: runs an intent the platform asked for and
+    /// reports the outcome exactly once.
+    ///
+    /// Ports call this after decoding their platform payload. It owns everything
+    /// the ports should not each reinvent: queuing across a cold start, running
+    /// the handler off the event dispatch thread, enforcing the deadline, and
+    /// guaranteeing the completion fires once and only once.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the intent to run
+    /// - `params`: parameter values keyed by name; may be null
+    /// - `source`: where the invocation came from
+    /// - `headless`: true when the app has no UI on screen
+    /// - `completion`: notified with the outcome; may be null
+    public static void dispatchInvocation(final String intentId,
+                                          final Map<String, Object> params,
+                                          final IntentSource source,
+                                          final boolean headless,
+                                          final IntentCompletion completion) {
+        PendingInvocation inv = new PendingInvocation(intentId, params, source,
+                headless, completion);
+        IntentDispatcher d;
+        // Read the dispatcher and decide queue-vs-run atomically under the same
+        // lock setDispatcher installs it and drains under, so an invocation
+        // cannot slip in between the drain and the install and be stranded.
+        synchronized (pending) {
+            d = dispatcher;
+            if (d == null) {
+                pending.add(inv);
+                return;
+            }
+        }
+        run(inv);
+    }
+
+    /// Overrides how long a handler may run before the framework gives up, for
+    /// intents that did not state their own budget.
+    ///
+    /// Raising this is rarely the right fix. The platform's patience is not the
+    /// constraint that matters -- a spoken interaction that takes ten seconds
+    /// has already failed as an interaction. An intent that genuinely needs
+    /// longer should return [IntentResult#opens] and do the work in the app.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the default budget; values below 1 are ignored
+    public static void setDefaultTimeout(int seconds) {
+        if (seconds >= 1) {
+            defaultTimeoutSeconds = seconds;
+        }
+    }
+
+    /// The default handler time budget in seconds.
+    public static int getDefaultTimeout() {
+        return defaultTimeoutSeconds;
+    }
+
+    // ------------------------------------------------------------------
+    // Donation and indexing
+    // ------------------------------------------------------------------
+
+    /// Tells the system the user just performed this capability, so it can
+    /// suggest or predict it later.
+    ///
+    /// Donate when the user does the thing *in your app by hand*. That is the
+    /// signal the system learns from; donating on every intent invocation
+    /// teaches it only that the user uses shortcuts.
+    ///
+    /// Callable from any thread. A no-op where unsupported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the capability that was performed
+    /// - `params`: the values it was performed with; may be null
+    public static void donate(String intentId, Map<String, Object> params) {
+        if (intentId == null) {
+            return;
+        }
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.areIntentsSupported()) {
+            return;
+        }
+        // exposure is a restriction, and donation is a platform surface: publishing a
+        // MODEL-only capability as a launcher shortcut or a predictable activity would expose
+        // exactly what it opted out of. The static builders filter this; so must the runtime.
+        IntentDeclaration decl = getDeclaration(intentId);
+        if (decl == null) {
+            // A donation is a durable publication: Android persists a shortcut and iOS records
+            // an activity the system may suggest for weeks. Publishing one for an id nothing
+            // declares produces a launcher entry or a Siri suggestion that opens the app and
+            // does nothing, and there is no later moment at which that gets cleaned up. A typo
+            // in an id is the ordinary way to get here.
+            logDiagnostic("Ignoring a donation for \"" + intentId
+                    + "\", which no @AppIntent declares and no dynamic intent registers");
+            return;
+        }
+        if (!decl.isExposedTo(Exposure.ASSISTANT)) {
+            return;
+        }
+        if (decl.isDestructive()) {
+            // A donation becomes a launcher shortcut on Android and a suggested activity on
+            // iOS, and a tap on either dispatches the handler directly -- past the confirmation
+            // the generated App Intent performs, which is the entire promise of destructive=true.
+            // The Android static-shortcut generator and the trampoline's unauthenticated policy
+            // already refuse destructive intents for this reason; a donation is the same
+            // one-tap path and gets the same answer.
+            //
+            // The capability itself is unaffected: Siri and the Shortcuts app still offer it,
+            // and confirm before it runs, which is where a destructive action belongs.
+            logDiagnostic("Not donating \"" + intentId + "\": it is destructive, and a donated "
+                    + "shortcut runs on one tap with no confirmation. It remains available "
+                    + "through the assistant, which confirms first.");
+            return;
+        }
+        String unusable = donationProblem(baseOf(decl, intentId), effectiveParams(intentId, params));
+        if (unusable != null) {
+            // Same reasoning as the unrepresentable case below, one step earlier: a donation the
+            // handler could not run is a durable, permanently broken suggestion.
+            logDiagnostic("Not donating \"" + intentId + "\": " + unusable);
+            return;
+        }
+        String lost = IntentSerializer.unrepresentable(params);
+        if (lost != null) {
+            // A donation is durable: the platform keeps these values and replays them when the
+            // user taps the shortcut, possibly weeks later. A value the wire cannot carry --
+            // a NaN, an infinity, an object of no declared type -- would be dropped on the way
+            // out, and the tap would then run the handler on the parameter's *default* rather
+            // than on what was donated. That is a shortcut which does something other than the
+            // thing it was learned from, and there is no later moment at which it gets
+            // corrected. Refusing loses only a suggestion.
+            logDiagnostic("Not donating \"" + intentId + "\": the value bound to \"" + lost
+                    + "\" cannot be carried to the platform, and a shortcut recorded without it "
+                    + "would run on that parameter's default instead.");
+            return;
+        }
+        try {
+            b.donate(intentId, IntentSerializer.serializeParams(params));
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    /// Publishes app content to the device's search index, replacing any entry
+    /// carrying the same type and id.
+    ///
+    /// #### Threading
+    ///
+    /// A background thread is the right thread, not merely a permitted one. This
+    /// writes through to the platform index and encodes any thumbnails on the
+    /// way, so calling it on the event dispatch thread looks instantaneous in
+    /// the simulator and stalls the UI on a device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entities`: the content to publish; null and empty are no-ops
+    public static void index(List<AppEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return;
+        }
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.isIndexingSupported()) {
+            return;
+        }
+        // A title is what a search result shows, and the platforms disagree about a missing one
+        // rather than degrading alike: Android hands an empty long label to ShortcutInfo.Builder
+        // and can reject the shortcut outright, while iOS publishes a searchable item with
+        // nothing written on it. The build enforces this for a declared @IntentEntity through
+        // @EntityTitle; direct construction is the path that skips the build, so it is checked
+        // here instead of failing differently on each device.
+        List<AppEntity> publishable = new ArrayList<AppEntity>();
+        for (AppEntity e : entities) {
+            if (e == null) {
+                continue;
+            }
+            if (e.getTitle() == null || e.getTitle().trim().length() == 0) {
+                logDiagnostic("Not indexing " + e.getType() + ":" + e.getId()
+                        + " because it has no title. A search result with nothing written on it "
+                        + "is not something a user can act on; call setTitle before indexing.");
+                continue;
+            }
+            publishable.add(e);
+        }
+        if (publishable.isEmpty()) {
+            return;
+        }
+        Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+        String json = IntentSerializer.serializeEntities(publishable, images);
+        try {
+            b.index(json, images);
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    /// Publishes a single entity. Shorthand for the list form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entity`: the content to publish
+    public static void index(AppEntity entity) {
+        if (entity != null) {
+            index(Collections.singletonList(entity));
+        }
+    }
+
+    /// Removes one entry from the search index.
+    ///
+    /// Removal matters more than it looks. An index entry outlives the data
+    /// behind it, so content the user deleted keeps appearing in device search
+    /// and taps resolve to nothing until the app removes it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entityType`: the entity type id
+    /// - `id`: the entity id
+    public static void removeFromIndex(String entityType, String id) {
+        if (entityType == null || id == null) {
+            return;
+        }
+        // Same rule the constructor enforces, and this path never builds an entity so it never
+        // reached it. removeFromIndex("shop:order", "42") composes the uid "shop:order:42",
+        // which is exactly what new AppEntity("shop", "order:42") publishes -- so the call did
+        // not merely fail, it deleted somebody else's content.
+        AppEntity.checkType(entityType);
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.isIndexingSupported()) {
+            return;
+        }
+        try {
+            b.removeFromIndex(IntentSerializer.serializeEntityRef(entityType, id));
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    /// Removes every indexed entry of one type, or everything this app indexed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entityType`: the type to clear, or null for all of this app's entries
+    public static void clearIndex(String entityType) {
+        if (entityType != null) {
+            // Ports match a type by uid prefix, so clearIndex("shop:order") would sweep every
+            // entity of type "shop" whose id begins with "order:" -- the same collision.
+            AppEntity.checkType(entityType);
+        }
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.isIndexingSupported()) {
+            return;
+        }
+        try {
+            b.clearIndex(entityType);
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // AppEntity queries
+    // ------------------------------------------------------------------
+
+    /// Runs one of an entity type's declared queries.
+    ///
+    /// The platform calls this on its own when it has to disambiguate a
+    /// parameter -- "which playlist?" -- and the simulator calls it to populate
+    /// its picker, which is why the simulator exercises the real query rather
+    /// than a stand-in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entityType`: the entity type id
+    /// - `kind`: `byId`, `suggested` or `search`
+    /// - `argument`: the id, the search text, or null
+    ///
+    /// #### Returns
+    ///
+    /// the matching entities, never null
+    public static List<AppEntity> queryEntities(String entityType, String kind, String argument) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d == null || entityType == null) {
+            return Collections.emptyList();
+        }
+        try {
+            List<AppEntity> out = d.queryEntities(entityType, kind, argument);
+            return out == null ? Collections.<AppEntity>emptyList() : out;
+        } catch (Throwable t) {
+            logError(t);
+            return Collections.emptyList();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Language-model projection
+    // ------------------------------------------------------------------
+
+    /// The intents that opted into [Exposure#MODEL], projected down to
+    /// `com.codename1.ai.Tool` so they can be handed to a language model or an MCP host.
+    ///
+    /// Nothing is exposed by calling this. It returns descriptions; the application decides
+    /// whether to give them to a model, which is deliberately a separate act from declaring the
+    /// intent, because a model calls a capability because it inferred it should rather than
+    /// because a person asked by name.
+    ///
+    /// The projection is one-way and lossy on purpose. A `Tool` is stringly typed -- a JSON
+    /// schema in, a JSON string out -- which is right for a model and wrong for the platform,
+    /// where entity types let the system run its own picker before the handler is reached. So
+    /// the richer declaration projects down to the weaker one, never the reverse.
+    ///
+    /// #### Returns
+    ///
+    /// one tool per model-exposed intent, never null
+    public static List<Tool> asTools() {
+        List<Tool> out = new ArrayList<Tool>();
+        for (IntentDeclaration d : getDeclarations()) {
+            if (!d.isExposedTo(Exposure.MODEL)) {
+                continue;
+            }
+            if (d.isDestructive()) {
+                // A Tool is a name, a schema and a handler: there is nowhere in it to say "ask
+                // first", and IntentTool.invoke dispatches immediately. So projecting a
+                // destructive capability here would let a model delete, send or spend because
+                // it inferred a call -- while every other surface refuses or confirms. The
+                // static shortcut builder refuses one, the trampoline's unauthenticated policy
+                // refuses one, donate() refuses one, and the generated App Intent confirms
+                // before it runs. This is the same door.
+                //
+                // MODEL exposure says the capability is eligible for a model, not that any
+                // particular call was consented to. An application that really wants this can
+                // still build its own Tool around the handler, where it decides what
+                // confirmation means; what it cannot do is get one by accident from here.
+                logDiagnostic("Not offering \"" + d.getId() + "\" as a model tool: it is "
+                        + "destructive, and a Tool has no way to confirm before it runs. It "
+                        + "remains available through the assistant, which confirms first.");
+                continue;
+            }
+            out.add(new Tool(d.getId(), toolDescription(d), toolSchema(d), new IntentTool(d)));
+        }
+        return out;
+    }
+
+    private static String toolDescription(IntentDeclaration d) {
+        String description = d.getDescription();
+        if (description != null && description.length() > 0) {
+            return description;
+        }
+        return d.getTitle();
+    }
+
+    /// Builds the JSON schema a model needs. Entity parameters are described as strings,
+    /// because that is what crosses the boundary: the id, which the handler resolves.
+    private static String toolSchema(IntentDeclaration d) {
+        Map<String, Object> properties = new LinkedHashMap<String, Object>();
+        List<Object> required = new ArrayList<Object>();
+        for (IntentParameterInfo p : d.getParameters()) {
+            Map<String, Object> prop = new LinkedHashMap<String, Object>();
+            prop.put("type", schemaType(p.getType()));
+            prop.put("description", p.getTitle());
+            addNumericBounds(prop, p);
+            if (!p.getOptions().isEmpty()) {
+                prop.put("enum", new ArrayList<Object>(p.getOptions()));
+            }
+            if (p.getType() == IntentParameterType.ENTITY) {
+                prop.put("description", p.getTitle() + " (the id of a "
+                        + p.getEntityType() + ")");
+            }
+            if (p.getType() == IntentParameterType.DATE) {
+                // A bare "string" would let a model send anything and call it schema-valid,
+                // which is how a well-formed request turns into a null argument. Name both
+                // forms the dispatcher actually parses.
+                prop.put("description", p.getTitle()
+                        + " (an ISO-8601 date such as 2026-03-14, or epoch milliseconds)");
+                // And accept both in the type, not only in the prose. IntentDates takes an
+                // integral number as epoch milliseconds, so declaring string alone had a
+                // schema-enforcing caller reject a value the description had just recommended
+                // and the dispatcher would have parsed. A schema that disagrees with the
+                // coercion is a call the model could not have got right.
+                List<Object> both = new ArrayList<Object>();
+                both.add("string");
+                both.add("integer");
+                prop.put("type", both);
+                // And bounded, for the same reason every other numeric property is: IntentDates
+                // refuses a number outside the range a long holds, so without these a model
+                // could write a schema-valid epoch that is rejected before the handler runs.
+                prop.put("minimum", Long.valueOf(Long.MIN_VALUE));
+                prop.put("maximum", Long.valueOf(Long.MAX_VALUE));
+                // The same argument applied to the other branch, which said nothing at all: an
+                // unconstrained string accepted "not-a-date", so a model obeying the schema
+                // could make a request certain to fail, and the schema is the only thing it has
+                // to go on. The pattern is the parser's own, kept beside the grammar it
+                // describes. In a union type a pattern constrains the string branch only, just
+                // as minimum and maximum constrain the numeric one.
+                prop.put("pattern", IntentDates.SCHEMA_PATTERN);
+            }
+            properties.put(p.getName(), prop);
+            if (p.isRequired()) {
+                required.add(p.getName());
+            }
+        }
+        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        if (!required.isEmpty()) {
+            schema.put("required", required);
+        }
+        return JSONWriter.toJson(schema);
+    }
+
+    /// Bounds a numeric property to what the handler declared, so a schema-valid call is also
+    /// a runnable one.
+    ///
+    /// Without them a model reading the schema sees "integer" and may produce 5000000000 for a
+    /// handler that declared an int -- valid against the schema and rejected by the coercion
+    /// before it reaches the handler, which is a failure the model had no way to avoid. The
+    /// width is recorded on the declaration, so the schema can say it.
+    ///
+    /// A double is unbounded and says nothing, which is the honest description of a double.
+    private static void addNumericBounds(Map<String, Object> prop, IntentParameterInfo p) {
+        if (p.getNumericWidthBits() != 32) {
+            if (p.getType() == IntentParameterType.INTEGER
+                    && p.getNumericWidthBits() == 64) {
+                prop.put("minimum", Long.valueOf(Long.MIN_VALUE));
+                prop.put("maximum", Long.valueOf(Long.MAX_VALUE));
+            }
+            return;
+        }
+        if (p.getType() == IntentParameterType.INTEGER) {
+            prop.put("minimum", Integer.valueOf(Integer.MIN_VALUE));
+            prop.put("maximum", Integer.valueOf(Integer.MAX_VALUE));
+        } else if (p.getType() == IntentParameterType.NUMBER) {
+            // Magnitude bounds alone were not the accepted set. requiredFloat refuses a
+            // non-zero double that casts to 0.0f, so 1e-100 was schema-valid and rejected
+            // before the handler ran -- a call the model could not have got right. The three
+            // branches are the shape of what a float actually holds: zero, and each sign's
+            // representable range. Written with anyOf because that interval has a hole in it
+            // and minimum/maximum cannot describe a hole.
+            List<Object> options = new ArrayList<Object>();
+            options.add(constantZero());
+            options.add(range(Float.MIN_VALUE, Float.MAX_VALUE));
+            options.add(range(-Float.MAX_VALUE, -Float.MIN_VALUE));
+            prop.put("anyOf", options);
+        }
+    }
+
+    /// A schema branch matching only zero.
+    private static Map<String, Object> constantZero() {
+        Map<String, Object> zero = new LinkedHashMap<String, Object>();
+        List<Object> only = new ArrayList<Object>();
+        only.add(Double.valueOf(0));
+        zero.put("enum", only);
+        return zero;
+    }
+
+    /// A schema branch matching one inclusive numeric range.
+    ///
+    /// The narrow end is Float.MIN_VALUE rather than half of it. A double between the two may
+    /// round up to the smallest subnormal and so be accepted at dispatch, and describing that
+    /// exactly would put a rounding rule into a schema; erring one representable step narrow
+    /// keeps the schema a subset of what runs, which is the safe direction -- a model simply
+    /// does not offer a value there.
+    private static Map<String, Object> range(double min, double max) {
+        Map<String, Object> r = new LinkedHashMap<String, Object>();
+        r.put("minimum", Double.valueOf(min));
+        r.put("maximum", Double.valueOf(max));
+        return r;
+    }
+
+    private static String schemaType(IntentParameterType type) {
+        if (type == IntentParameterType.INTEGER) {
+            return "integer";
+        }
+        if (type == IntentParameterType.NUMBER) {
+            return "number";
+        }
+        if (type == IntentParameterType.BOOLEAN) {
+            return "boolean";
+        }
+        // A date stays a string, which is the form a model writes dates in without being
+        // coerced into arithmetic on epoch millis. The generated dispatcher accepts both that
+        // and a numeric string, and the property description says so -- the two have to agree
+        // or a schema-valid request becomes a null argument.
+        return "string";
+    }
+
+    /// Runs one intent on behalf of a model.
+    ///
+    /// Named rather than anonymous because it holds the declaration it belongs to, and because
+    /// the iOS translator's dead-code elimination is easier to reason about with a real type.
+    private static final class IntentTool implements ToolHandler {
+        private final IntentDeclaration declaration;
+
+        IntentTool(IntentDeclaration declaration) {
+            this.declaration = declaration;
+        }
+
+        /// Runs the intent through the same deadline-enforcing path a platform invocation
+        /// uses, and blocks until it answers.
+        ///
+        /// Calling the dispatcher directly would have made a model the one caller whose
+        /// handlers had no enforced budget: the deadline would pass, the context would report
+        /// cancelled, and the late result would still be serialized and still navigate. A model
+        /// is the caller least able to notice that, since it just receives a string.
+        ///
+        /// Blocking is correct here and is not the same as blocking under
+        /// [Intents#invoke]: the tool contract is synchronous, and what arrives is whichever
+        /// outcome won the race -- the handler's, or the timeout's.
+        @Override
+        public String invoke(String argumentsJson) throws Exception {
+            Map<String, Object> args = null;
+            if (argumentsJson != null && argumentsJson.length() > 0) {
+                // Through the shared parser: a model writing a large id must not have it
+                // rounded into a different, still-plausible number.
+                args = IntentSerializer.parsePayload(argumentsJson);
+            }
+            final ToolCompletion done = new ToolCompletion();
+            dispatchInvocation(declaration.getId(), args, IntentSource.MODEL, false, done);
+            IntentResult r = awaitToolResult(done, budgetFor(declaration));
+            Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+            return IntentSerializer.serializeResult(r, images);
+        }
+    }
+
+    /// Waits for a tool's outcome without taking the event thread down with it.
+    ///
+    /// The tool contract is synchronous, so an application is free to call it from an event
+    /// callback -- and a plain wait there is a deadlock in slow motion: the handler's route
+    /// navigation asks for the same event thread this wait is holding, so nothing moves until
+    /// the deadline fires and the model is told the action failed, having done nothing wrong.
+    ///
+    /// invokeAndBlock is the framework's answer to exactly this. It keeps the event loop
+    /// running while the caller waits, so the navigation gets its turn and the tool returns
+    /// what actually happened.
+    private static IntentResult awaitToolResult(final ToolCompletion done, final int budget) {
+        if (!Display.isInitialized() || !Display.getInstance().isEdt()) {
+            return done.awaitResult(budget);
+        }
+        final IntentResult[] holder = new IntentResult[1];
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                holder[0] = done.awaitResult(budget);
+            }
+        });
+        return holder[0] == null ? IntentResult.ok() : holder[0];
+    }
+
+    /// Blocks a model's synchronous tool call until the framework reports an outcome.
+    ///
+    /// Named and static rather than anonymous so it holds nothing but its own result.
+    private static final class ToolCompletion implements IntentCompletion {
+        private IntentResult result;
+        private boolean done;
+
+        @Override
+        public void onIntentResult(IntentResult r) {
+            synchronized (this) {
+                result = r;
+                done = true;
+                notifyAll();
+            }
+        }
+
+        /// Waits for the outcome. The framework's own timeout is what ends the wait in the
+        /// normal case; the margin here exists only so a completion lost to a bug cannot block
+        /// the caller forever.
+        IntentResult awaitResult(int timeoutSeconds) {
+            // Widened before the addition, not after. The multiplication was already a long,
+            // which is not enough: a budget within five seconds of Integer.MAX_VALUE overflowed
+            // while the two ints were still being added, so a model's synchronous call returned
+            // a timeout at once while its handler carried on.
+            long giveUpAt = System.currentTimeMillis()
+                    + ((long) timeoutSeconds + COMPLETION_BACKSTOP_SECONDS) * 1000L;
+            synchronized (this) {
+                while (!done) {
+                    long left = giveUpAt - System.currentTimeMillis();
+                    if (left <= 0) {
+                        return IntentResult.failed("The action took too long and was stopped");
+                    }
+                    try {
+                        wait(left);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return IntentResult.failed("The action was interrupted");
+                    }
+                }
+                return result == null ? IntentResult.ok() : result;
+            }
+        }
+    }
+
+    /// How far past its own deadline the framework is given to report, before a blocked caller
+    /// gives up on it.
+    private static final int COMPLETION_BACKSTOP_SECONDS = 5;
+
+    // ------------------------------------------------------------------
+    // Search-result selection
+    // ------------------------------------------------------------------
+
+    /// Registers the single handler that receives taps on content published with
+    /// [#index].
+    ///
+    /// Registration drains anything that arrived before it, which is the normal
+    /// case: a tap in device search is frequently what started the process, so
+    /// the selection is already waiting by the time your `init()` runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handler`: the handler, or null to clear
+    public static void setSelectionHandler(EntitySelectionHandler handler) {
+        // Install and drain under the same lock dispatchSpotlightSelection reads
+        // it under, so a selection cannot slip between the drain and the install
+        // and be stranded forever.
+        List<AppEntity> queued = null;
+        synchronized (pendingSelections) {
+            selectionHandler = handler;
+            if (handler != null && !pendingSelections.isEmpty()) {
+                queued = new ArrayList<AppEntity>(pendingSelections);
+                pendingSelections.clear();
+            }
+        }
+        if (queued != null) {
+            for (AppEntity e : queued) {
+                deliverSelection(handler, e);
+            }
+        }
+    }
+
+    /// Framework/port entry point: the user opened an indexed item. The id is the
+    /// composite the framework indexed under, `type:id`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uniqueId`: the identifier the platform handed back
+    public static void dispatchSpotlightSelection(String uniqueId) {
+        if (uniqueId == null || uniqueId.length() == 0) {
+            return;
+        }
+        int sep = uniqueId.indexOf(':');
+        if (sep <= 0 || sep == uniqueId.length() - 1) {
+            return;
+        }
+        AppEntity e = new AppEntity(uniqueId.substring(0, sep), uniqueId.substring(sep + 1));
+        EntitySelectionHandler h;
+        synchronized (pendingSelections) {
+            h = selectionHandler;
+            if (h == null) {
+                pendingSelections.add(e);
+                return;
+            }
+        }
+        deliverSelection(h, e);
+    }
+
+    /// Framework/port entry point: a platform activity arrived that is not a web
+    /// link. Returns true when this application claimed it.
+    ///
+    /// Answering honestly matters. Claiming everything would swallow handoff and
+    /// third-party activities the app never declared, so an activity is claimed
+    /// only when its type names an intent this application actually declares --
+    /// which is the shape the platform uses to continue a donated action.
+    ///
+    /// #### Parameters
+    ///
+    /// - `activityType`: the platform activity type
+    /// - `params`: the activity payload, may be null
+    public static boolean dispatchUserActivity(String activityType, Map<String, Object> params) {
+        if (activityType == null) {
+            return false;
+        }
+        IntentDeclaration declared = getDeclaration(activityType);
+        if (declared != null) {
+            // A continued activity is a persisted suggestion: the system kept it, and a tap on
+            // it reaches the handler with the donated values and nothing in between. Which is
+            // fine for what the app donated -- and a donation made before an update that marked
+            // the intent destructive is still out there being suggested. Running it would
+            // delete, send or spend on one tap, past the confirmation the generated App Intent
+            // performs and past the check donate() applies to every new donation. The
+            // declaration in front of us is the authority, not the one that minted the
+            // suggestion.
+            if (!allowsSuggestedInvocation(declared)) {
+                // Claimed rather than declined: the activity type is this application's, and
+                // saying otherwise would have the system look for another handler for something
+                // that is ours to refuse.
+                //
+                // Which is why the iOS builder writes only donatable ids into
+                // NSUserActivityTypes -- see IOSAppIntentsBuilder.publishesUserActivity. The
+                // claim above is unconditional by design: a suggestion minted before an update
+                // marked the intent destructive, or narrowed its exposure, is still out there,
+                // and it is ours. The cost is that an id we advertise and can never run will
+                // swallow an application activity that happens to share the string, so the
+                // answer is to advertise only what donation can publish. Declining here instead
+                // would trade that for a suggestion the system hands to nobody, which is the
+                // failure this branch exists to avoid.
+                logDiagnostic(suggestionRefusedMessage(activityType));
+                return true;
+            }
+            dispatchInvocation(activityType, params, IntentSource.SHORTCUT, false, null);
+            return true;
+        }
+        // Cold start: the platform can deliver a donated activity before the generated
+        // dispatcher installs itself, so an unrecognised type is not yet evidence of anything.
+        // Dropping it here is what made a shortcut tap on a dead process launch the app and
+        // then do nothing.
+        //
+        // Only ids shaped like ours are held. A third-party or handoff activity type is
+        // reverse-DNS and cannot match, so claiming this one does not swallow theirs.
+        //
+        // The test and the enqueue are one critical section, and it is the dispatcher's own
+        // lock: anything less lets setDispatcher install and drain in the gap between them.
+        boolean staleRecord = false;
+        synchronized (pending) {
+            if (dispatcher != null) {
+                // The table exists and does not contain this type, so it belongs to somebody
+                // else.
+                return false;
+            }
+            // Shape is not ownership, and there is no first-launch exception to that. An
+            // application may declare its own activity type that happens to look like an intent
+            // id -- "continue_reading" is entirely ordinary -- and claiming it tells iOS the
+            // activity was handled, so the app's own continuation never runs and
+            // drainPendingActivities drops it later without a word.
+            //
+            // Nothing is lost by refusing when there is no record, because reaching here at all
+            // already means this application declared no intents. The generated bootstrap is
+            // spliced into the stub's main *before* Display.init, and UIKit only starts
+            // delivering activities after that -- so an app with any @AppIntent has its real
+            // table installed before the first one can arrive, and takes the branch above. An
+            // app without one has no bootstrap, no dispatcher, and nothing here to own.
+            String recorded = recordedDeclarationIds();
+            if (recorded == null || !recordNames(recorded, activityType)) {
+                return false;
+            }
+            if (Display.isInitialized()) {
+                // The record names this type, and it is nevertheless not ours. The bootstrap
+                // installs the dispatcher from the stub's main, before Display.init -- so a
+                // Display that is already up with no dispatcher is proof that this build
+                // declares nothing at all, and the record was written by a version that did.
+                // An update can remove the last @AppIntent while still using the package to
+                // index content, and nothing rewrites the record then, because there is no
+                // bootstrap left to run.
+                //
+                // Claiming on that evidence is worse than useless: no dispatcher will ever
+                // arrive to drain the queue, so the suggestion opens the app and does nothing,
+                // and an application continuation that happens to reuse the id is swallowed
+                // for good. Refused, and the stale record is dropped so the next launch does
+                // not repeat it.
+                staleRecord = true;
+            } else {
+                pendingActivities.add(new PendingActivity(activityType, params));
+            }
+        }
+        if (staleRecord) {
+            // Outside the lock: this writes to storage, and nothing else here needs to wait
+            // for it.
+            forgetDeclaredIds();
+            return false;
+        }
+        return true;
+    }
+
+    /// Drops the remembered declaration ids, for a build that no longer declares any.
+    private static void forgetDeclaredIds() {
+        try {
+            Preferences.delete(DECLARED_IDS_KEY);
+        } catch (Throwable t) {
+            // The claim has already been refused, which is the part that mattered.
+            logError(t);
+        }
+    }
+
+
+    private static void deliverSelection(final EntitySelectionHandler h, final AppEntity e) {
+        if (h == null) {
+            return;
+        }
+        if (!Display.isInitialized()) {
+            // EntitySelectionHandler says it is invoked on the event dispatch thread, and a
+            // handler written to that promise opens or updates a screen. Calling it inline here
+            // -- on whoever registered the handler, or on the native callback that delivered
+            // the tap -- gave it that thread's stack instead, before the application had even
+            // started. Held until there is an event thread to keep the promise on.
+            synchronized (pendingSelections) {
+                pendingSelections.add(e);
+                if (!awaitingDisplay) {
+                    awaitingDisplay = true;
+                    new Thread(new SelectionWaiter(), "CN1 Intent selection").start();
+                }
+            }
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                h.onEntitySelected(e);
+            }
+        });
+    }
+
+    /// True while a thread is waiting for Display so held selections can be delivered on the
+    /// event thread. Guarded by pendingSelections.
+    private static boolean awaitingDisplay;
+
+    /// Waits for an event dispatch thread to exist, then releases what was held for it.
+    ///
+    /// Named and static rather than anonymous: it outlives the call that started it.
+    private static final class SelectionWaiter implements Runnable {
+        @Override
+        public void run() {
+            long giveUpAt = System.currentTimeMillis() + SELECTION_WAIT_MILLIS;
+            while (System.currentTimeMillis() < giveUpAt) {
+                if (Display.isInitialized()) {
+                    releaseHeldSelections();
+                    return;
+                }
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            synchronized (pendingSelections) {
+                // An application that never starts is not one to deliver a tap into minutes
+                // later, into whatever it is showing by then.
+                if (!pendingSelections.isEmpty()) {
+                    logDiagnostic("No event dispatch thread appeared; dropping "
+                            + pendingSelections.size() + " Spotlight selection(s)");
+                    pendingSelections.clear();
+                }
+                awaitingDisplay = false;
+            }
+        }
+    }
+
+    /// How long a held selection waits for an event thread before it is dropped.
+    private static final long SELECTION_WAIT_MILLIS = 15000L;
+
+    /// Hands everything held to the handler registered now, on the event thread.
+    private static void releaseHeldSelections() {
+        List<AppEntity> held;
+        EntitySelectionHandler h;
+        synchronized (pendingSelections) {
+            awaitingDisplay = false;
+            h = selectionHandler;
+            if (h == null || pendingSelections.isEmpty()) {
+                // Still nobody to hand them to; setSelectionHandler drains when one arrives.
+                return;
+            }
+            held = new ArrayList<AppEntity>(pendingSelections);
+            pendingSelections.clear();
+        }
+        for (AppEntity e : held) {
+            deliverSelection(h, e);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Framework / port entry points
+    // ------------------------------------------------------------------
+
+    /// Internal: installs the build-time-generated dispatcher and drains any
+    /// invocation that arrived before it. Invoked once during startup by the
+    /// generated bootstrap; application code should not call this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the generated dispatcher
+    public static void setDispatcher(IntentDispatcher d) {
+        List<PendingInvocation> queued = null;
+        List<PendingActivity> activities = null;
+        synchronized (pending) {
+            dispatcher = d;
+            if (d != null) {
+                if (!pending.isEmpty()) {
+                    queued = new ArrayList<PendingInvocation>(pending);
+                    pending.clear();
+                }
+                // Taken under the same lock that just installed the dispatcher, so nothing can
+                // be queued after this snapshot and before the queue stops being consulted.
+                if (!pendingActivities.isEmpty()) {
+                    activities = new ArrayList<PendingActivity>(pendingActivities);
+                    pendingActivities.clear();
+                }
+            }
+        }
+        if (d != null) {
+            publishDeclarations(d);
+            drainPendingActivities(activities);
+        }
+        if (queued != null) {
+            for (PendingInvocation q : queued) {
+                // Started in the order they arrived, each on its own thread: one that blocks
+                // must not hold up the next, whose platform token is waiting on nothing else.
+                run(q);
+            }
+        }
+    }
+
+    /// Framework/port entry point: resolves the platform bridge, which publishes any
+    /// declarations that were installed before one existed.
+    ///
+    /// The generated bootstrap installs the dispatcher before the port has booted -- from
+    /// `main()` on iOS, and before `startContext` on Android -- so the first publication finds
+    /// no bridge and is deferred. Something has to ask for the bridge afterwards or the
+    /// platform never learns the catalogue, and on Android a request parked at a cold start is
+    /// never judged, so the shortcut opens the app and runs nothing.
+    ///
+    /// Ports call this once the runtime is up. It is safe to call at any time and does nothing
+    /// when there is nothing owed.
+    public static void publishPendingDeclarations() {
+        bridgeInternal();
+    }
+
+    /// Framework/port/test entry point: overrides the bridge resolved from the
+    /// platform port. Passing null restores platform resolution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bridge, or null
+    public static void setBridge(IntentBridge b) {
+        bridge = b;
+        bridgeOverridden = b != null;
+    }
+
+    static IntentBridge bridgeInternal() {
+        IntentBridge b = resolveBridge();
+        if (b != null) {
+            // First moment a bridge exists is the first moment declarations can be published,
+            // and on iOS that is later than the moment they are installed.
+            flushDeclarations(b);
+        }
+        return b;
+    }
+
+    private static IntentBridge resolveBridge() {
+        if (bridgeOverridden) {
+            return bridge;
+        }
+        if (!Display.isInitialized()) {
+            return null;
+        }
+        try {
+            return Display.getInstance().getIntentBridge();
+        } catch (Throwable t) {
+            logError(t);
+            return null;
+        }
+    }
+
+    /// True when declarations exist but could not be published because no bridge did yet.
+    /// Guarded by `pending`.
+    private static boolean declarationsOwed;
+
+    /// Publishes declarations that were installed before the platform bridge existed.
+    ///
+    /// The generated bootstrap installs the dispatcher from the app's `main`, which on iOS runs
+    /// **before** `Display.init` -- so the first publication attempt finds no bridge and, until
+    /// this existed, gave up permanently. The native side then never learned the catalogue, and
+    /// the first App Intent ran its handler and dropped the result because the port's bridge
+    /// reference was still null.
+    private static void flushDeclarations(IntentBridge b) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            if (!declarationsOwed) {
+                return;
+            }
+            d = dispatcher;
+            // Cleared before publishing rather than after: registerIntents can re-enter this
+            // through the framework, and a second publication is not what that would mean.
+            declarationsOwed = false;
+        }
+        if (d == null) {
+            return;
+        }
+        publishTo(b, d);
+    }
+
+    /// Test seam: clears the bridge override, the dispatcher, queued invocations
+    /// and runtime declarations.
+    static void reset() {
+        bridge = null;
+        bridgeOverridden = false;
+        defaultTimeoutSeconds = 20;
+        synchronized (pending) {
+            dispatcher = null;
+            pending.clear();
+            pendingActivities.clear();
+            declarationsOwed = false;
+        }
+        synchronized (dynamic) {
+            dynamic.clear();
+        }
+        synchronized (pendingSelections) {
+            selectionHandler = null;
+            pendingSelections.clear();
+            awaitingDisplay = false;
+        }
+        try {
+            // Remembered across launches on a device, so a reset that left it behind would let
+            // one test's declaration list decide what the next one claims.
+            Preferences.delete(DECLARED_IDS_KEY);
+        } catch (Throwable ignored) {
+            // A reset must not fail because storage is unavailable.
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Internals
+    // ------------------------------------------------------------------
+
+    /// The budget an invocation of this declaration gets, in seconds.
+    ///
+    /// One definition on purpose. The build rejects a non-positive timeoutSeconds, but a
+    /// DynamicIntent or a declaration built at runtime can still carry one, and three callers
+    /// each reading it their own way is how the same handler ended up with contradictory
+    /// deadlines: platform dispatch substituting the default, Intents.invoke building an
+    /// already-expired context, and a model waiting on the raw number.
+    /// Where the declared intent ids are remembered between launches.
+    ///
+    /// Prefixed like every other framework preference so an application's own key cannot
+    /// collide with it.
+    private static final String DECLARED_IDS_KEY = "cn1$intents$declared";
+
+    private static int budgetFor(IntentDeclaration decl) {
+        int declared = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
+        return declared < 1 ? defaultTimeoutSeconds : declared;
+    }
+
+    private static IntentDeclaration findById(List<IntentDeclaration> all, String id) {
+        for (IntentDeclaration d : all) {
+            if (d.getId().equals(id)) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    /// Presents a parameterization as a declaration in its own right, inheriting the base
+    /// intent's behaviour and dropping the parameters it has already bound -- those are no
+    /// longer anything a caller has to supply.
+    private static IntentDeclaration describeDynamic(DynamicIntent dyn, IntentDeclaration base) {
+        List<IntentParameterInfo> remaining = new ArrayList<IntentParameterInfo>();
+        Map<String, Object> bound = dyn.getBoundParameters();
+        for (IntentParameterInfo p : base.getParameters()) {
+            // Bound is not the same as satisfied. A binding the declared type cannot accept --
+            // "abc" for an int, a value outside a closed vocabulary -- would otherwise hide the
+            // parameter from this declaration, so neither the simulator nor a model schema
+            // offers any way to correct it, while dispatch rejects it later in the coercion.
+            // The parameterization and every donation made from it are then unusable with
+            // nothing on either side saying why. A binding that cannot be honoured leaves the
+            // parameter visible, where it can be supplied -- and a supplied value wins over a
+            // bound one, so surfacing it is also the repair.
+            if (!bound.containsKey(p.getName())
+                    || !satisfies(p, bound.get(p.getName()), true)) {
+                remaining.add(p);
+            }
+        }
+        return new IntentDeclaration(dyn.getId(), dyn.getTitle(), base.getDescription(),
+                base.isHeadless(), base.isDiscoverable(), base.isDestructive(),
+                base.getOpensRoute(), base.getTimeoutSeconds(),
+                Collections.<String>emptyList(), remaining, base.getExposure());
+    }
+
+    /// The declaration a donation actually has to satisfy.
+    ///
+    /// For a parameterization that is the *base* intent, not the synthesized declaration. The
+    /// synthesized one hides every parameter the binding satisfied, so a supplied value
+    /// overriding one of those was never examined -- and both bridges merge supplied values on
+    /// top of the bindings, so an override of "abc" for a bound integer replaced a valid value
+    /// with one the coercion rejects on every tap. What runs is the base intent, so what is
+    /// checked is the base intent.
+    private static IntentDeclaration baseOf(IntentDeclaration decl, String intentId) {
+        DynamicIntent dyn = getDynamicIntent(intentId);
+        if (dyn == null) {
+            return decl;
+        }
+        IntentDeclaration base = getDeclaration(dyn.getBaseIntentId());
+        return base == null ? decl : base;
+    }
+
+    /// The values a donated parameterization will actually run with.
+    ///
+    /// Mirrors IntentSerializer#mergeParams, which is what the ports apply: the bindings first,
+    /// then anything supplied at donation time on top, because a binding is a default rather
+    /// than a lock. A null supplied value is skipped rather than overriding -- the serializer
+    /// drops nulls on the way out, so on the platforms the binding survives one.
+    private static Map<String, Object> effectiveParams(String intentId,
+                                                       Map<String, Object> params) {
+        DynamicIntent dyn = getDynamicIntent(intentId);
+        if (dyn == null) {
+            return params;
+        }
+        Map<String, Object> merged =
+                new LinkedHashMap<String, Object>(dyn.getBoundParameters());
+        if (params != null) {
+            for (Map.Entry<String, Object> e : params.entrySet()) {
+                if (e.getValue() != null) {
+                    merged.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return merged;
+    }
+
+    /// Why this donation could never run, or null when it could.
+    ///
+    /// A donation is not an invocation, so nothing rejects it at the time it is made -- but the
+    /// platforms replay the saved arguments verbatim when the user taps the shortcut, with no
+    /// picker in between. A donation missing a required value, or carrying one its parameter
+    /// cannot accept, therefore publishes a launcher entry or a Siri suggestion that fails on
+    /// every tap, for as long as it survives. Refusing costs only a suggestion.
+    ///
+    /// The declaration is the authority on what is missing, and for a parameterization it is
+    /// the synthesized one -- whose parameters are exactly those the binding has not already
+    /// satisfied, which is what the platform will merge in.
+    private static String donationProblem(IntentDeclaration decl, Map<String, Object> params) {
+        for (IntentParameterInfo p : decl.getParameters()) {
+            Object supplied = params == null ? null : params.get(p.getName());
+            if (supplied == null) {
+                // A default stands in for an absent value, which is what makes an optional
+                // parameter optional. The build refuses required-with-a-default, so in practice
+                // only a runtime-built declaration reaches the second half of this.
+                if (p.isRequired() && (p.getDefaultValue() == null
+                        || p.getDefaultValue().length() == 0)) {
+                    return "it has no value for the required parameter \"" + p.getName()
+                            + "\", so every tap on the shortcut would fail.";
+                }
+                continue;
+            }
+            if (!satisfies(p, supplied, false)) {
+                return "the value given for \"" + p.getName() + "\" is not one that parameter "
+                        + "accepts, so every tap on the shortcut would fail.";
+            }
+        }
+        return null;
+    }
+
+    /// Whether a bound value is one the generated coercion could accept for this parameter.
+    ///
+    /// Mirrors that coercion rather than restating it loosely: a whole number may arrive as a
+    /// number or as text, a boolean accepts only the four spellings the coercion accepts, and a
+    /// closed vocabulary is matched as text because that is how the coercion matches it.
+    ///
+    /// #### Why the numeric width is the caller's choice
+    ///
+    /// A declaration records `INTEGER` for both `int` and `long`, and `NUMBER` for both `float`
+    /// and `double`, so this cannot know which width the handler declared -- while the generated
+    /// coercion checks the real one. Neither guess is safe for both callers, because their
+    /// failure modes are opposites.
+    ///
+    /// Deciding whether a parameterization may *hide* a parameter, too loose is unrecoverable:
+    /// a binding that can never run sits behind a parameter nobody can see, and neither the
+    /// simulator nor a model schema offers any way to override it. Too strict merely surfaces a
+    /// parameter that was already satisfied -- visible, and still correct at dispatch, since the
+    /// bound value is merged in regardless. That caller asks for `narrow`.
+    ///
+    /// Deciding whether a donation *could run*, the asymmetry reverses: too strict refuses to
+    /// publish a shortcut that would have dispatched perfectly well, and 5000000000 is an
+    /// ordinary value for a `long`. So that caller asks for the widest the type could mean, and
+    /// refuses only what no width could hold.
+    private static boolean satisfies(IntentParameterInfo p, Object value, boolean narrow) {
+        if (value == null) {
+            return false;
+        }
+        IntentParameterType type = p.getType();
+        if (!p.getOptions().isEmpty()) {
+            // Against what actually crosses, stringified, because that is what the generated
+            // oneOf compares: it reads through asString first. Requiring a String here refused
+            // a donation of 123 for a vocabulary containing "123", which would have run.
+            Object wire = IntentSerializer.toWire(value);
+            return p.getOptions().contains(String.valueOf(wire == null ? value : wire));
+        }
+        if (type == IntentParameterType.STRING) {
+            // Anything non-null, because the generated asString stringifies anything non-null.
+            // A caller donating Integer.valueOf(123) for a String parameter was refused for a
+            // call that would have reached the handler as "123".
+            return true;
+        }
+        if (type == IntentParameterType.BOOLEAN) {
+            if (value instanceof Boolean) {
+                return true;
+            }
+            if (value instanceof Number) {
+                double d = ((Number) value).doubleValue();
+                return d == 0 || d == 1;
+            }
+            // equalsIgnoreCase, because that is what the coercion uses. Being stricter here is
+            // not the safe direction for every caller: hiding a parameter that would have run
+            // is recoverable, but refusing to donate a shortcut that would have dispatched
+            // just loses it.
+            String t = value.toString().trim();
+            return "true".equalsIgnoreCase(t) || "false".equalsIgnoreCase(t)
+                    || "1".equals(t) || "0".equals(t);
+        }
+        if (type == IntentParameterType.INTEGER || type == IntentParameterType.NUMBER) {
+            // The declared width when the declaration records one, which every generated
+            // declaration does. `narrow` is only the fallback for a declaration built at
+            // runtime, and it is a guess either way -- which is why the width is carried now.
+            int bits = p.getNumericWidthBits();
+            boolean small = bits == 0 ? narrow : bits == 32;
+            if (type == IntentParameterType.INTEGER) {
+                // An integral box is exact and stays exact, which is what the generated
+                // requiredLong does before it considers anything else. Routing Long.MAX_VALUE
+                // through a double rounds it up to 2^63 and the range check then rejects a
+                // value the declared type holds perfectly -- so a donation was refused for a
+                // number the invocation itself accepts.
+                if (value instanceof Long || value instanceof Integer
+                        || value instanceof Short || value instanceof Byte) {
+                    return fitsIntegerWidth(((Number) value).longValue(), small);
+                }
+                if (value instanceof String) {
+                    try {
+                        return fitsIntegerWidth(Long.parseLong(((String) value).trim()), small);
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+                }
+                if (value instanceof Number) {
+                    return isWhole(((Number) value).doubleValue(), small);
+                }
+                return false;
+            }
+            if (value instanceof Number) {
+                return isFinite(((Number) value).doubleValue(), small);
+            }
+            if (value instanceof String) {
+                try {
+                    return isFinite(Double.parseDouble(((String) value).trim()), small);
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+        if (type == IntentParameterType.DATE) {
+            return IntentDates.parse(value) != null;
+        }
+        if (value instanceof AppEntity) {
+            // An entity of the wrong type is not a near miss. The wire keeps only the id, so a
+            // customer bound to an order parameter arrives as a bare id that the *order* BY_ID
+            // query resolves -- either finding nothing, or finding an unrelated order that
+            // happens to share the id and running the handler on it. Neither is recoverable
+            // afterwards, and neither is visible: a parameterization would also have hidden the
+            // parameter as satisfied.
+            String declared = p.getEntityType();
+            return declared == null || declared.equals(((AppEntity) value).getType());
+        }
+        if (type == IntentParameterType.ENTITY) {
+            // The id is asked about rather than assumed. Both callers are doors where being
+            // wrong is durable: donate() publishes a launcher shortcut that outlives the
+            // process, and a dynamic binding hides the parameter as already satisfied, so
+            // neither the simulator nor a model is given the chance to supply a working value.
+            // An id that resolves to nothing therefore became a shortcut that failed on every
+            // tap, with nothing said at the only moment anyone could have acted on it.
+            //
+            // BY_ID is mandatory for every entity-typed parameter -- the processor refuses the
+            // build without it -- so there is always something to ask. Neither caller is on a
+            // dispatch path: this runs when an application donates or registers, not when an
+            // intent is invoked. A query that throws is caught inside queryEntities and reads
+            // as unresolved, which is the safe direction here for the same reason the rest of
+            // this feature fails closed.
+            if (!(value instanceof String)) {
+                return false;
+            }
+            String declared = p.getEntityType();
+            if (declared == null || declared.length() == 0) {
+                return true;
+            }
+            return !queryEntities(declared, "byId", (String) value).isEmpty();
+        }
+        return value instanceof String;
+    }
+
+    /// Whether an exactly known whole number fits the declared width.
+    ///
+    /// Separate from the double-based check because a long is not a double: the two disagree at
+    /// the boundary, and only this one is right about a value that arrived as a long.
+    private static boolean fitsIntegerWidth(long v, boolean narrow) {
+        return !narrow || (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE);
+    }
+
+    /// A whole number an `INTEGER` parameter could hold, at `int` width or at `long` width.
+    ///
+    /// The generated coercion rejects a fraction rather than rounding it, and rejects a value
+    /// past the declared width rather than letting longValue() saturate it into a number the
+    /// caller never sent. Both rejections are mirrored here; only the width varies.
+    private static boolean isWhole(double d, boolean narrow) {
+        if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {
+            return false;
+        }
+        if (narrow) {
+            return d >= Integer.MIN_VALUE && d <= Integer.MAX_VALUE;
+        }
+        // The upper bound is exclusive because (double) Long.MAX_VALUE rounds up to 2^63
+        // exactly, which is the same reason the generated coercion writes it that way.
+        return d >= -9223372036854775808.0 && d < 9223372036854775808.0;
+    }
+
+    /// A number a `NUMBER` parameter could hold, at `float` width or at `double` width.
+    ///
+    /// At float width both ends matter, as they do in the coercion: past Float.MAX_VALUE
+    /// becomes Infinity, and a non-zero value too small to represent becomes exactly zero -- a
+    /// value nobody supplied. A double holds any finite value, so there being finite is all.
+    private static boolean isFinite(double d, boolean narrow) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return false;
+        }
+        if (!narrow) {
+            return true;
+        }
+        if (d < -Float.MAX_VALUE || d > Float.MAX_VALUE) {
+            return false;
+        }
+        return d == 0.0d || (float) d != 0.0f;
+    }
+
+    /// Runs the activities that arrived before the declarations did, dropping any the
+    /// application turns out not to declare.
+    ///
+    /// Takes the snapshot as a parameter rather than reading the queue itself: the caller
+    /// drained it under the lock that installed the dispatcher, which is what closes the window
+    /// an activity could otherwise be queued into and never taken out of.
+    private static void drainPendingActivities(List<PendingActivity> queued) {
+        if (queued == null) {
+            return;
+        }
+        for (PendingActivity a : queued) {
+            IntentDeclaration decl = getDeclaration(a.activityType);
+            if (decl == null) {
+                continue;
+            }
+            // Judged against the declarations that exist now, not the ones that were recorded
+            // when this was queued. That gap is the whole reason this queue exists -- the
+            // activity arrived before the dispatcher did -- so an update that made the intent
+            // destructive, or took the assistant out of its exposure, lands exactly here. The
+            // warm path has checked this since the persisted-donation fix; this one had not,
+            // so a stale suggestion still ran on one tap after a cold start.
+            if (!allowsSuggestedInvocation(decl)) {
+                logDiagnostic(suggestionRefusedMessage(a.activityType));
+                continue;
+            }
+            // Run rather than dispatch: this is the drain, so the dispatcher is installed and
+            // the queue check would only be repeated. Started in arrival order, each on its own
+            // thread.
+            run(new PendingInvocation(a.activityType, a.params, IntentSource.SHORTCUT,
+                    false, null));
+        }
+    }
+
+    /// Whether the current declaration still allows this intent to run from a suggestion.
+    ///
+    /// A suggestion is a one-tap surface: the system kept it, and a tap reaches the handler
+    /// with the donated values and nothing in between. That is fine for what the app donated,
+    /// and not fine once the app has changed its mind -- a donation made before an update that
+    /// marked the intent destructive is still out there being offered.
+    ///
+    /// One definition because there are two doors: the activity that arrives while the
+    /// declarations exist, and the one queued before they did.
+    private static boolean allowsSuggestedInvocation(IntentDeclaration decl) {
+        return !decl.isDestructive() && decl.isExposedTo(Exposure.ASSISTANT);
+    }
+
+    /// What to say when a suggestion outlived the policy that allowed it.
+    private static String suggestionRefusedMessage(String activityType) {
+        return "Not running \"" + activityType + "\" from a suggested activity: the declaration "
+                + "no longer allows it to run without confirmation. A suggestion donated by an "
+                + "earlier version can outlive the policy that allowed it.";
+    }
+
+    /// Navigates when a result names a route.
+    ///
+    /// The framework does this rather than each port, because the route table is Java and the
+    /// platforms only know how to bring the app forward -- iOS through `openAppWhenRun`, Android
+    /// through the trampoline. Without this the app would foreground and then sit on whatever
+    /// screen it happened to be showing, which is the failure an `opens` result exists to avoid.
+    private static void navigateIfRequested(IntentResult r, IntentDeclaration decl,
+                                             Map<String, Object> params,
+                                             CompletionGuard guard, boolean ranHeadless) {
+        if (r == null || r.isFailed()) {
+            return;
+        }
+        String url = r.getOpenUrl();
+        boolean fromResult = url != null && url.length() > 0;
+        if (!fromResult) {
+            // The handler named no route, but the declaration may have. That is the whole point
+            // of opensRoute: a handler can return ok() and still be an "open the app here"
+            // intent, and without expanding the template the app foregrounds onto whatever
+            // screen it happened to be showing.
+            url = expandRoute(decl, params);
+        }
+        if (url == null || url.length() == 0) {
+            return;
+        }
+        // A declared opensRoute has already brought the app forward -- that is what the flag is
+        // for. A route the handler decided on at runtime has not, and if it ran headless the
+        // destination would otherwise be built somewhere nobody can see.
+        //
+        // "Ran headless" is a property of the invocation, not of the declaration. headless =
+        // true says the handler *can* run without UI, and the same intent is routinely invoked
+        // by the application itself through Intents.invoke while a form is on screen -- an
+        // invocation whose context says headless = false, because it is. Reading the flag
+        // instead asked a port to foreground an app that was already in front, and a port with
+        // no bridge -- the base getIntentBridge returns null, which is every port that has no
+        // intent support -- can only answer no, so the route was dropped in exactly the place
+        // the documentation promises in-process invocation works everywhere. The ports that do
+        // have a bridge hid it: iOS answers this case specially and JavaSE simply says yes.
+        // Checked before the app is asked forward, not only before the navigation. Bringing an
+        // app to the front is not something that can be taken back: requestForeground posts the
+        // launch and then waits for the Activity to arrive, and if the deadline expires during
+        // that wait the recheck below correctly suppresses the route -- but the app has already
+        // appeared, for an action the platform was told had been stopped. The user sees the app
+        // open itself and land nowhere.
+        if (fromResult && guard != null && guard.answered()) {
+            return;
+        }
+        if (fromResult && ranHeadless && decl != null && !requestForeground(decl)) {
+            // The app is staying where it is, so building the destination would change what
+            // this application shows next without anyone having seen it happen -- a screen the
+            // user finds already open the next time they launch, for an action they were told
+            // could not be shown. The diagnostic requestForeground just logged says the
+            // destination will not be shown; this is what makes that true.
+            return;
+        }
+        try {
+            navigateUnlessAlreadyAnswered(url, guard);
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    /// Opens the route, unless the deadline answered the platform while this was waiting.
+    ///
+    /// The wait is the point. Navigation.dispatchExternalUrl hands the work to the event
+    /// dispatch thread and blocks, and a busy EDT can hold it past the budget -- at which point
+    /// the watchdog tells the platform the action was stopped. Without this check the screen
+    /// then changed anyway once the EDT freed up, so the assistant said one thing and the app
+    /// did the other.
+    ///
+    /// Rechecked on the event thread rather than before the hand-off, because the whole gap
+    /// being guarded against is the one between them. dispatchExternalUrl navigates directly
+    /// when it is already on that thread, so calling it from inside costs nothing.
+    private static void navigateUnlessAlreadyAnswered(final String url,
+                                                       final CompletionGuard guard) {
+        if (guard == null || !Display.isInitialized()
+                || Display.getInstance().isEdt()) {
+            if (guard == null || !guard.answered()) {
+                com.codename1.router.Navigation.dispatchExternalUrl(url);
+            }
+            return;
+        }
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                if (guard.answered()) {
+                    logDiagnostic("Not opening \"" + url + "\": the action was already reported "
+                            + "as timed out, and moving the user's screen afterwards would "
+                            + "contradict what the platform was told.");
+                    return;
+                }
+                com.codename1.router.Navigation.dispatchExternalUrl(url);
+            }
+        });
+    }
+
+    /// Asks the port to bring the app forward for a route the handler chose at runtime, and
+    /// says so plainly when the platform will not.
+    ///
+    /// #### Returns
+    ///
+    /// true when the application is forward and the route may be built
+    private static boolean requestForeground(IntentDeclaration decl) {
+        IntentBridge b = bridgeInternal();
+        if (b == null) {
+            return false;
+        }
+        try {
+            if (b.requestForeground()) {
+                return true;
+            }
+        } catch (Throwable t) {
+            logError(t);
+            return false;
+        }
+        // iOS is the case that reaches here: an app cannot bring itself forward, so whether it
+        // does is fixed before the handler runs. Naming the fix is the useful part -- declaring
+        // opensRoute is what sets openAppWhenRun, and it works on every platform.
+        logDiagnostic("\"" + decl.getId() + "\" ran headless and returned a route, but this "
+                + "platform does not let an app foreground itself, so the destination will not "
+                + "be shown. Declare opensRoute on the @AppIntent to have the platform open the "
+                + "app for it.");
+        return false;
+    }
+
+    /// Percent-encodes a route value, one UTF-8 byte at a time.
+    ///
+    /// Util.encodeUrl walks UTF-16 code units and encodes each as up to three bytes, which is
+    /// correct for everything in the basic plane and wrong above it: a supplementary character
+    /// -- an emoji in an entity id, say -- is a surrogate pair, and encoding each half
+    /// separately emits two three-byte sequences that are not valid UTF-8 at all. The router
+    /// decodes them as UTF-8 and gets replacement characters, so the handler ran on the right
+    /// id and the screen it opened was built from a corrupted one.
+    ///
+    /// Encoding the UTF-8 bytes of the whole string cannot make that mistake, because the
+    /// pairing is resolved before any byte is written. Only the unreserved set is left as-is;
+    /// over-encoding is harmless to a decoder and safe in every part of a URL.
+    private static String percentEncode(String value) {
+        byte[] utf8;
+        try {
+            utf8 = value.getBytes("UTF-8");
+        } catch (Throwable t) {
+            // No UTF-8 is not a situation this can improve on; the old behaviour is still
+            // right for everything in the basic plane.
+            return com.codename1.io.Util.encodeUrl(value);
+        }
+        StringBuilder out = new StringBuilder(utf8.length * 3);
+        for (byte raw : utf8) {
+            int b = raw & 0xff;
+            if ((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')
+                    || b == '-' || b == '.' || b == '_' || b == '~') {
+                out.append((char) b);
+            } else {
+                out.append('%');
+                String hex = Integer.toHexString(b).toUpperCase();
+                if (hex.length() == 1) {
+                    out.append('0');
+                }
+                out.append(hex);
+            }
+        }
+        return out.toString();
+    }
+
+    /// What the generated coercion substitutes for an omitted value of this type, or null when
+    /// absence really does mean null.
+    ///
+    /// Only the primitives have one: a String, Date or entity parameter left out arrives as
+    /// null, and a URL containing "null" would route somewhere nobody asked for -- worse than
+    /// not navigating.
+    private static String implicitDefault(IntentParameterType type) {
+        if (type == IntentParameterType.INTEGER || type == IntentParameterType.NUMBER) {
+            return "0";
+        }
+        if (type == IntentParameterType.BOOLEAN) {
+            return "false";
+        }
+        return null;
+    }
+
+    /// How one bound value is spelled inside an expanded route.
+    ///
+    /// The wire form and the handler's form are not the same string, and this method's contract
+    /// is the handler's: a route is built from the values the intent ran with. The generated
+    /// coercion accepts "1" for a boolean and hands the handler `true`; it accepts "001" for an
+    /// int and hands over 1. Copying the wire value into the URL therefore routed to /1 for an
+    /// invocation that ran with true, and to /001 for one that ran with 1 -- so an invocation
+    /// that succeeded opened a different resource than it acted on, or none, and nothing
+    /// reported it. A donated shortcut makes that durable, since the value is replayed from the
+    /// donation on every tap.
+    ///
+    /// Mirrors the coercion for the same reason [#satisfies] does, and no further: a value the
+    /// coercion would not have accepted is left exactly as it was written, because this is not
+    /// the place that decides what runs. Only the four types whose accepted spellings differ
+    /// from their Java form are normalized; a String is already what the handler received, and
+    /// an entity crosses as its id and nothing else.
+    private static String routeValue(IntentParameterInfo p, Object value) {
+        if (p == null || value == null) {
+            return String.valueOf(value);
+        }
+        if (!p.getOptions().isEmpty()) {
+            // A closed vocabulary is matched as text and reaches the handler as the text it
+            // matched, which is what toWire produces -- the same read satisfies() does.
+            Object wire = IntentSerializer.toWire(value);
+            return String.valueOf(wire == null ? value : wire);
+        }
+        IntentParameterType type = p.getType();
+        if (type == IntentParameterType.BOOLEAN) {
+            String b = routeBoolean(value);
+            return b == null ? String.valueOf(value) : b;
+        }
+        if (type == IntentParameterType.INTEGER) {
+            Long l = routeLong(value);
+            return l == null ? String.valueOf(value) : Long.toString(l.longValue());
+        }
+        if (type == IntentParameterType.NUMBER) {
+            Double d = routeDouble(value);
+            if (d == null) {
+                return String.valueOf(value);
+            }
+            // At the declared width: a float parameter given 1.1 runs with 1.1f, and widening
+            // that to a double to print it spells it 1.100000023841858 -- a number the handler
+            // never saw. getNumericWidthBits is 0 only for a declaration built at runtime,
+            // where there is no width to honour and the wider form is the honest one.
+            return p.getNumericWidthBits() == 32
+                    ? Float.toString((float) d.doubleValue())
+                    : Double.toString(d.doubleValue());
+        }
+        if (type == IntentParameterType.DATE && value instanceof Date) {
+            // Only for an actual Date, which is the one spelling that has no business in a URL:
+            // it would be pasted in as "Thu Jan 01 ..." Epoch milliseconds are what the
+            // platforms send and what IntentDates reads back, so this is the form that survives
+            // the round trip. A value that was already text or a number is left as written --
+            // it is already a spelling of the same instant, and rewriting a working URL is not
+            // this method's business.
+            return Long.toString(((Date) value).getTime());
+        }
+        return String.valueOf(value);
+    }
+
+    /// How the handler's boolean is spelled, for each of the spellings the generated coercion
+    /// accepts, or null when this is not one of them.
+    ///
+    /// Returns the text rather than a Boolean deliberately: a Boolean-returning method that can
+    /// also be null gives its caller three answers for a two-valued type, which is the whole of
+    /// what NP_BOOLEAN_RETURN_NULL objects to, and the only caller wants the text anyway.
+    private static String routeBoolean(Object value) {
+        if (value instanceof Boolean) {
+            return ((Boolean) value).booleanValue() ? "true" : "false";
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            if (d == 0) {
+                return "false";
+            }
+            return d == 1 ? "true" : null;
+        }
+        String t = String.valueOf(value).trim();
+        if ("true".equalsIgnoreCase(t) || "1".equals(t)) {
+            return "true";
+        }
+        if ("false".equalsIgnoreCase(t) || "0".equals(t)) {
+            return "false";
+        }
+        return null;
+    }
+
+    private static Long routeLong(Object value) {
+        // Integral boxes are exact and stay exact, as requiredLong reads them; a fractional
+        // number is not something this can spell as an integer, so it is left alone.
+        if (value instanceof Long || value instanceof Integer || value instanceof Short
+                || value instanceof Byte) {
+            return Long.valueOf(((Number) value).longValue());
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            if (d == Math.floor(d) && !Double.isInfinite(d) && !Double.isNaN(d)
+                    && d >= -9223372036854775808.0 && d < 9223372036854775808.0) {
+                return Long.valueOf((long) d);
+            }
+            return null;
+        }
+        if (value instanceof String) {
+            try {
+                return Long.valueOf(Long.parseLong(((String) value).trim()));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Double routeDouble(Object value) {
+        if (value instanceof Number) {
+            return Double.valueOf(((Number) value).doubleValue());
+        }
+        if (value instanceof String) {
+            try {
+                return Double.valueOf(Double.parseDouble(((String) value).trim()));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// Fills a declared route template from the values the intent ran with, or returns null
+    /// when there is no template or a placeholder has no value.
+    private static String expandRoute(IntentDeclaration decl, Map<String, Object> params) {
+        if (decl == null) {
+            return null;
+        }
+        String template = decl.getOpensRoute();
+        if (template == null || template.length() == 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < template.length()) {
+            int open = template.indexOf('{', i);
+            if (open < 0) {
+                out.append(template.substring(i));
+                break;
+            }
+            int close = template.indexOf('}', open);
+            if (close < 0) {
+                out.append(template.substring(i));
+                break;
+            }
+            out.append(template, i, open);
+            String name = template.substring(open + 1, close);
+            Object value = params == null ? null : params.get(name);
+            if (value == null) {
+                // The platform omits an optional parameter it was not given, and the generated
+                // dispatcher fills in the declared default before calling the handler. Reading
+                // only the supplied map made the route unexpandable for exactly those intents,
+                // so a valid invocation left the app sitting on whatever screen it was showing.
+                IntentParameterInfo p = decl.getParameter(name);
+                if (p != null && p.getDefaultValue() != null
+                        && p.getDefaultValue().length() > 0) {
+                    value = p.getDefaultValue();
+                } else if (p != null) {
+                    // A primitive cannot be absent: the generated dispatcher hands the handler
+                    // the type's zero, so the route has to be built from that too. Reading only
+                    // explicit defaults meant "/items/{page}" with an optional int ran the
+                    // handler with page 0 and then left the foregrounded app on whatever screen
+                    // it was already showing -- the invocation half-happening.
+                    value = implicitDefault(p.getType());
+                }
+            }
+            if (value == null) {
+                // A half-expanded URL would route somewhere unintended, which is worse than not
+                // navigating at all.
+                return null;
+            }
+            // Encoded, because a value is data and the template is structure. An id
+            // containing "/" would otherwise add a path segment and stop matching the route it
+            // was built for, and "?" or "#" would invent a query or a fragment.
+            out.append(percentEncode(routeValue(decl.getParameter(name), value)));
+            i = close + 1;
+        }
+        return out.toString();
+    }
+
+    /// Logs a swallowed failure without ever being able to become one.
+    ///
+    /// Every `catch` in this class exists to guarantee that a broken handler
+    /// still produces a result rather than an exception. `Log.e` can itself
+    /// throw when the logging stack is not fully up -- which is precisely the
+    /// state a headless invocation runs in, since the process may have been
+    /// started for no other reason than to answer it. Letting that escape would
+    /// turn a handled failure into an unhandled one at exactly the wrong moment.
+    private static void logError(Throwable t) {
+        try {
+            Log.e(t);
+        } catch (Throwable ignored) {
+            // Nothing useful is left to do: the reporting path is the thing that
+            // is broken. Losing the log entry is strictly better than losing the
+            // result the caller is waiting for.
+        }
+    }
+
+    /// Reports a request the framework declined to act on.
+    ///
+    /// Guarded the same way as [#logError]: `Log.p` reaches for the Display, which a headless
+    /// invocation may not have started yet.
+    private static void logDiagnostic(String message) {
+        try {
+            Log.p("[intents] " + message, Log.WARNING);
+        } catch (Throwable ignored) {
+            // See logError: the reporting path failing must not fail the caller.
+        }
+    }
+
+    private static void publishDeclarations(IntentDispatcher d) {
+        IntentBridge b = bridgeInternal();
+        if (b == null) {
+            // No platform bridge yet. On iOS the generated bootstrap runs from main() before
+            // Display.init, so this is the ordinary path rather than an error -- but it has to
+            // be remembered, or the platform never learns what this app can do.
+            synchronized (pending) {
+                declarationsOwed = true;
+            }
+            return;
+        }
+        if (!b.areIntentsSupported()) {
+            return;
+        }
+        publishTo(b, d);
+    }
+
+    private static void publishTo(IntentBridge b, IntentDispatcher d) {
+        if (!b.areIntentsSupported()) {
+            return;
+        }
+        try {
+            b.registerIntents(IntentSerializer.serializeDeclarations(d.describe()));
+        } catch (Throwable t) {
+            logError(t);
+        }
+        rememberDeclaredIds(d);
+    }
+
+    /// Records which activity types belong to this application's intents, for the next cold
+    /// start to consult before its dispatcher exists.
+    ///
+    /// Written every publication rather than once: the set changes when the app is updated, and
+    /// a stale entry would have the framework claim an activity type the app has since given
+    /// back to its own continuation handling.
+    private static void rememberDeclaredIds(IntentDispatcher d) {
+        try {
+            Preferences.set(DECLARED_IDS_KEY, joinDeclaredIds(d));
+        } catch (Throwable t) {
+            // Persisting is an optimisation for one launch, never a requirement.
+            logError(t);
+        }
+    }
+
+    /// The declared ids as one comma-separated string.
+    ///
+    /// Separate from the method above so the loop is not inside a catch(Throwable). Iterating a
+    /// List<IntentDeclaration> compiles to a CHECKCAST, and ParparVM does not throw for a
+    /// failed cast -- so a handler wrapped around one reads as relying on an exception that
+    /// never arrives, and the repo's gate rejects the shape wherever it appears. The caller
+    /// still catches, so behaviour is unchanged.
+    private static String joinDeclaredIds(IntentDispatcher d) {
+        List<IntentDeclaration> all = d.describe();
+        if (all == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (IntentDeclaration decl : all) {
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(decl.getId());
+        }
+        return sb.toString();
+    }
+
+    /// The declaration ids a previous launch recorded, or null when there has never been one.
+    ///
+    /// Null and empty are different answers and the caller depends on the difference: an empty
+    /// record means the app published a list and it was empty, so nothing is ours; no record at
+    /// all means a genuinely first launch, which is the only case left to guess about. Returned
+    /// as the raw text rather than a tri-state Boolean, because a Boolean that can be null is
+    /// one auto-unboxing away from a NullPointerException.
+    private static String recordedDeclarationIds() {
+        try {
+            return Preferences.get(DECLARED_IDS_KEY, null);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /// Whether a recorded declaration list names this activity type.
+    private static boolean recordNames(String recorded, String activityType) {
+        for (String id : StringUtil.tokenize(recorded, ",")) {
+            if (activityType.equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static IntentResult invokeInternal(String intentId, Map<String, Object> params,
+                                               IntentContext ctx) {
+        Outcome o = dispatchOnce(intentId, params, ctx);
+        // The in-app path navigates unconditionally: the caller is blocked in this method and
+        // there is no competing timeout to lose to.
+        navigateIfRequested(o.result, o.declaration, o.params, null, ctx != null && ctx.isHeadless());
+        return o.result;
+    }
+
+    /// Runs the handler and reports what came back, **without navigating**.
+    ///
+    /// Navigation is separated because it is a side effect on the user's screen, and whether it
+    /// is allowed depends on something this cannot know: whether the invocation won its race
+    /// against the deadline. A platform invocation that timed out has already been reported as
+    /// failed, so bringing the app forward afterwards contradicts what the platform was told.
+    private static Outcome dispatchOnce(String intentId, Map<String, Object> params,
+                                        IntentContext ctx) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d == null) {
+            return new Outcome(IntentResult.failed(
+                    "No intents are declared in this application"), null, null);
+        }
+        String targetId = intentId;
+        Map<String, Object> safe = new HashMap<String, Object>();
+        DynamicIntent dyn;
+        synchronized (dynamic) {
+            dyn = dynamic.get(intentId);
+        }
+        if (dyn != null) {
+            // A parameterization runs its base intent. Bound values go in first so anything
+            // supplied at invocation time overrides them -- a binding is a default, not a lock.
+            targetId = dyn.getBaseIntentId();
+        }
+        // Read before the values are reduced, because the reduction needs it: an AppEntity
+        // loses its type on the way to the wire, and only the declaration says which type the
+        // parameter was supposed to be.
+        IntentDeclaration decl = getDeclaration(targetId);
+        if (dyn != null) {
+            String wrong = reduceInto(safe, dyn.getBoundParameters(), decl);
+            if (wrong != null) {
+                return new Outcome(IntentResult.failed(wrong), decl, safe);
+            }
+        }
+        if (params != null) {
+            String wrong = reduceInto(safe, params, decl);
+            if (wrong != null) {
+                return new Outcome(IntentResult.failed(wrong), decl, safe);
+            }
+        }
+        try {
+            IntentResult r = d.invoke(targetId, safe, ctx);
+            if (r == null) {
+                return new Outcome(IntentResult.failed(
+                        "Unknown intent \"" + intentId + "\""), decl, safe);
+            }
+            return new Outcome(r, decl, safe);
+        } catch (Throwable t) {
+            logError(t);
+            return new Outcome(IntentResult.failed(
+                    "The action could not be completed"), decl, safe);
+        }
+    }
+
+    /// Copies values in, reduced exactly as they would be if they had crossed a platform
+    /// boundary.
+    ///
+    /// Without this the two routes disagreed about the same object: donation reduces an
+    /// AppEntity to its id, while in-process dispatch handed the entity itself to the generated
+    /// reader, which stringified it as "type:id" and asked BY_ID to resolve that. So a dynamic
+    /// intent could fail through Intents.invoke and the simulator, and work once donated --
+    /// the least debuggable shape a difference can take.
+    /// Returns the reason this cannot run, or null when the values are usable.
+    private static String reduceInto(Map<String, Object> target, Map<String, Object> source,
+                                      IntentDeclaration decl) {
+        for (Map.Entry<String, Object> e : source.entrySet()) {
+            Object value = e.getValue();
+            // An entity of the wrong type must not be reduced. The reduction keeps only the id,
+            // and the generated reader then resolves that bare id through the *expected* type's
+            // BY_ID query -- so passing a customer where an order belongs does not fail, it
+            // finds whatever order happens to carry the customer's id and runs the handler
+            // against it. Ids are only unique within a type, so overlap is ordinary rather than
+            // unlucky. Checked here because this is the last point at which the type still
+            // exists.
+            if (value instanceof AppEntity) {
+                String declared = declaredEntityType(decl, e.getKey());
+                String actual = ((AppEntity) value).getType();
+                if (declared != null && actual != null && !declared.equals(actual)) {
+                    return "\"" + e.getKey() + "\" expects a " + declared + " and was given a "
+                            + actual;
+                }
+            }
+            Object wire = IntentSerializer.toWire(value);
+            // A value the wire format cannot carry -- NaN, an infinity, an object of no declared
+            // type -- is still a value the caller supplied. Dropping it would turn "invalid"
+            // into "absent", and an optional parameter would then quietly run on its default
+            // instead of the coercion rejecting what was actually passed. Only a genuine null
+            // means absent.
+            target.put(e.getKey(), wire != null ? wire : value);
+        }
+        return null;
+    }
+
+    /// The entity type a parameter was declared to take, or null when it takes something else.
+    private static String declaredEntityType(IntentDeclaration decl, String name) {
+        if (decl == null || name == null) {
+            return null;
+        }
+        List<IntentParameterInfo> ps = decl.getParameters();
+        if (ps == null) {
+            return null;
+        }
+        for (IntentParameterInfo p : ps) {
+            if (p != null && name.equals(p.getName())) {
+                return p.getEntityType();
+            }
+        }
+        return null;
+    }
+
+    /// One handler's result together with what navigating from it would need.
+    private static final class Outcome {
+        private final IntentResult result;
+        private final IntentDeclaration declaration;
+        private final Map<String, Object> params;
+
+        Outcome(IntentResult result, IntentDeclaration declaration, Map<String, Object> params) {
+            this.result = result;
+            this.declaration = declaration;
+            this.params = params;
+        }
+    }
+
+    /// Runs one invocation off the event dispatch thread and reports it once.
+    ///
+    /// The handler never runs on the EDT. An invocation can arrive while the app
+    /// is foregrounded and visible -- a widget button, a search hit on a running
+    /// app -- and a handler that blocks the EDT for even a second there is a
+    /// visible freeze. Handlers are forbidden from touching UI precisely so they
+    /// do not need it.
+    /// Runs one invocation.
+    private static void run(final PendingInvocation inv) {
+        final IntentDeclaration decl = getDeclaration(inv.intentId);
+        final int timeout = budgetFor(decl);
+        final IntentContext ctx = new IntentContext(inv.source, inv.headless,
+                System.currentTimeMillis() + timeout * 1000L);
+        final CompletionGuard guard = new CompletionGuard(inv.completion);
+        // A long, like the deadline two lines above. As an int this overflowed for any budget
+        // past 2147483 seconds -- which the build accepts and setDefaultTimeout accepts -- and
+        // a negative wait made awaitCompletion report a timeout immediately: the platform was
+        // told the action was stopped while the handler was still running its side effects, and
+        // the context it held said it had weeks left.
+        final long timeoutMillis = timeout * 1000L;
+
+        Runnable body = new Runnable() {
+            @Override
+            public void run() {
+                Outcome o = dispatchOnce(inv.intentId, inv.params, ctx);
+                // Only the winner navigates. A handler that overran its deadline has already
+                // had the platform told it failed, and moving the user's screen afterwards
+                // contradicts that -- the app foregrounding itself onto a new form for an
+                // action the assistant just said did not happen.
+                //
+                // Claimed, then navigated, then reported: the report releases the Android
+                // service's latch and that service tears down the runtime this navigation is
+                // using. try/finally because a failure to navigate must not leave the platform
+                // waiting forever for an answer that is already decided.
+                if (guard.claim()) {
+                    try {
+                        navigateIfRequested(o.result, o.declaration, o.params, guard,
+                                ctx != null && ctx.isHeadless());
+                    } finally {
+                        guard.deliver(o.result);
+                    }
+                }
+            }
+        };
+
+        final Runnable watchdog = new Runnable() {
+            @Override
+            public void run() {
+                // Wait on the guard rather than sleeping the whole budget, so a
+                // handler that answers in 50ms does not leave a thread parked
+                // for the remaining 20 seconds.
+                if (guard.awaitCompletion(timeoutMillis)) {
+                    return;
+                }
+                ctx.cancel();
+                guard.deliverTimeout(IntentResult.failed(
+                        "The action took too long and was stopped"));
+            }
+        };
+
+        if (!Display.isInitialized()) {
+            // No Display: unit tests and the very earliest startup. The handler still runs
+            // inline, because that is what keeps this deterministic rather than depending on a
+            // thread pool that does not exist yet.
+            //
+            // The deadline does not get to be inline with it. This used to run the body and
+            // return, so a handler that overran its budget in the cold-start window was never
+            // cancelled and the platform waited for it -- forever, if it blocked -- while
+            // dispatchInvocation promises an enforced deadline. A plain daemon thread needs
+            // nothing from Display and is the one timer available this early; it exits as soon
+            // as the guard completes, so an instant handler does not leave it parked.
+            // Not marked daemon: this runtime's Thread has no setDaemon, and it does not need
+            // one. The watchdog waits on the guard for at most the declared budget and then
+            // returns, so the longest it can hold a process open is that budget -- and it
+            // usually returns the moment the handler completes.
+            new Thread(watchdog, "CN1 Intent timeout").start();
+            // Always a worker, never inline. Two callers depend on that and for different
+            // reasons. A direct invocation is delivered on a native stack -- on iOS a
+            // withCheckedContinuation inside perform(), which cannot proceed until the call
+            // returns -- so running the handler there left the assistant waiting on a call that
+            // had already been decided.
+            //
+            // A drained one has no caller waiting, and running it inline was worse rather than
+            // safer: the drain is a loop, so a first handler that blocks stops the second from
+            // ever starting, and with it the second's watchdog -- leaving *its* platform token
+            // unanswered for as long as the first runs. On iOS the same loop runs from the
+            // stub's main before Display.init, so a blocking handler there holds up the
+            // application's own startup.
+            //
+            // What the queue promises is the order they are started in, which is preserved:
+            // once Display exists these have always gone to separate threads, so completion
+            // order was never the guarantee.
+            new Thread(body, "CN1 Intent " + inv.intentId).start();
+            return;
+        }
+
+        Display.getInstance().startThread(body, "CN1 Intent " + inv.intentId).start();
+        Display.getInstance().startThread(watchdog, "CN1 Intent timeout").start();
+    }
+
+    /// Makes the one-call guarantee real. The platform side of this boundary --
+    /// a Swift continuation on iOS -- crashes hard when it is resumed twice, and
+    /// the timeout racing a slow handler is exactly the situation that would do
+    /// it, so the check has to be atomic rather than a plain flag test.
+    private static final class CompletionGuard {
+        private final IntentCompletion completion;
+        /// Set by whoever won the right to decide the outcome.
+        private boolean claimed;
+        /// Set once the platform has actually been told. Separate from `claimed` because the
+        /// gap between them is real work -- route navigation -- and the platform is owed an
+        /// answer whether or not that work finishes.
+        private boolean delivered;
+
+        CompletionGuard(IntentCompletion completion) {
+            this.completion = completion;
+        }
+
+        /// Blocks until the platform has been told, or the budget runs out. Returns true when
+        /// it was told in time.
+        ///
+        /// Waits on delivery rather than on the claim, and that is the whole point. Claiming
+        /// happens before navigation, and navigation reaches Navigation.dispatchExternalUrl,
+        /// which waits on the event dispatch thread -- so a busy or stalled EDT left the
+        /// platform with no answer at all while the watchdog had already gone home, with a
+        /// deadline this method exists to enforce.
+        boolean awaitCompletion(long millis) {
+            long giveUpAt = System.currentTimeMillis() + millis;
+            synchronized (this) {
+                while (!delivered) {
+                    long left = giveUpAt - System.currentTimeMillis();
+                    if (left <= 0) {
+                        return false;
+                    }
+                    try {
+                        wait(left);
+                    } catch (InterruptedException e) {
+                        return delivered;
+                    }
+                }
+                return true;
+            }
+        }
+
+        /// Claims the right to report this invocation, without reporting it yet.
+        ///
+        /// Split from the delivery because the completion is what releases the Android
+        /// service's latch, and that service then tears down the only runtime in the process.
+        /// Firing it before navigation meant stopContext could run concurrently with
+        /// foregrounding and route dispatch, so the destination sometimes never appeared.
+        /// Claiming first still stops the timeout thread from reporting a failure underneath us.
+        boolean claim() {
+            synchronized (this) {
+                if (claimed) {
+                    return false;
+                }
+                claimed = true;
+                return true;
+            }
+        }
+
+        /// Reports an outcome this caller has already claimed, if nobody has reported yet.
+        ///
+        /// Once-only on its own account rather than on the claim's: the deadline may have
+        /// answered the platform while this caller was still navigating, and resuming a Swift
+        /// continuation twice is a hard crash.
+        void deliver(IntentResult result) {
+            synchronized (this) {
+                if (delivered) {
+                    return;
+                }
+                delivered = true;
+                notifyAll();
+            }
+            if (completion != null) {
+                try {
+                    completion.onIntentResult(result == null ? IntentResult.ok() : result);
+                } catch (Throwable t) {
+                    logError(t);
+                }
+            }
+        }
+
+        /// Whether the platform has already been told how this invocation ended.
+        boolean answered() {
+            synchronized (this) {
+                return delivered;
+            }
+        }
+
+        /// Answers the platform for a deadline that expired, whoever holds the claim.
+        ///
+        /// Deliberately not gated on claiming. The ordinary case is that nothing has claimed
+        /// and this both claims and answers. The case that matters is the other one: a handler
+        /// claimed, started navigating, and navigation is waiting on an event dispatch thread
+        /// that is not answering. The claim is not worth honouring past the deadline when
+        /// honouring it means the platform is told nothing at all.
+        void deliverTimeout(IntentResult result) {
+            synchronized (this) {
+                claimed = true;
+            }
+            deliver(result);
+        }
+
+    }
+
+    private static final class PendingActivity {
+        private final String activityType;
+        private final Map<String, Object> params;
+
+        PendingActivity(String activityType, Map<String, Object> params) {
+            this.activityType = activityType;
+            this.params = params;
+        }
+    }
+
+    private static final class PendingInvocation {
+        private final String intentId;
+        private final Map<String, Object> params;
+        private final IntentSource source;
+        private final boolean headless;
+        private final IntentCompletion completion;
+
+        PendingInvocation(String intentId, Map<String, Object> params, IntentSource source,
+                          boolean headless, IntentCompletion completion) {
+            this.intentId = intentId;
+            this.params = params == null
+                    ? Collections.<String, Object>emptyMap()
+                    : new HashMap<String, Object>(params);
+            this.source = source;
+            this.headless = headless;
+            this.completion = completion;
+        }
+    }
+}

@@ -56,10 +56,10 @@
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
+    "pass": 178,
     "fail": 0,
-    "not-run": 0,
-    "pass": 177,
-    "skip": 1
+    "skip": 1,
+    "not-run": 0
   },
   "tests": {
     "ARApiTest": {
@@ -427,6 +427,10 @@
     },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "IntentsApiTest": {
+      "feature": "intents",
       "status": "pass"
     },
     "Java17Tests": {

@@ -32,6 +32,12 @@
 #import <objc/message.h>
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_USE_INTENTS
+// Core Spotlight is Objective-C and needs no Swift; it carries the indexing half of
+// com.codename1.intents. Imported under the define so an app that never references the
+// package links no additional framework.
+#import <CoreSpotlight/CoreSpotlight.h>
+#endif
 #import "CN1TapGestureRecognizer.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
@@ -91,6 +97,16 @@ extern UIView *editingComponent;
 
 #import "java_lang_NullPointerException.h"
 #import "java_lang_RuntimeException.h"
+#ifdef CN1_USE_INTENTS
+// The translated entry points the intents branches below call. Without this they are
+// implicit declarations: the iOS slice let that through as a warning and the Mac Catalyst
+// slice rejects it outright -- "call to undeclared function
+// 'com_codename1_impl_ios_IOSIntentCallbacks_nativeSpotlightItemSelected___java_lang_String'"
+// -- so the same source compiled on one platform and not the other. Inside the guard
+// because CodenameOne_GLViewController.h undefines CN1_USE_INTENTS for watchOS and tvOS,
+// where this class is not translated and the header does not exist.
+#import "com_codename1_impl_ios_IOSIntentCallbacks.h"
+#endif
 
 // A signal handler to handle bad accesses.  This will throw NPEs that we can catch
 // rather than crashing the app.
@@ -228,6 +244,24 @@ static void installSignalHandlers() {
     }
 }
 
+/// An activity that cold-launched the app, held until the VM callback has run the
+/// application's init/start. Nil at every other moment.
+static NSUserActivity *cn1PendingLaunchActivity = nil;
+
+/// Delivers the held launch activity, if there is one. Safe to call when there is not.
+- (void)cn1DeliverPendingLaunchActivity
+{
+    NSUserActivity *pending = cn1PendingLaunchActivity;
+    if (pending == nil) {
+        return;
+    }
+    // Cleared before delivery so a second call cannot deliver it twice, and released after,
+    // since this holds the only reference in the app target's manual-reference-counted build.
+    cn1PendingLaunchActivity = nil;
+    [self cn1ContinueUserActivity:pending];
+    [pending release];
+}
+
 - (BOOL)cn1ContinueUserActivity:(NSUserActivity *)userActivity
 {
     if (userActivity != nil && [NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
@@ -242,6 +276,55 @@ static void installSignalHandlers() {
 #endif
         return YES;
     }
+#ifdef CN1_USE_INTENTS
+    // Everything below is compiled only for an app that references
+    // com.codename1.intents, so a build without it produces exactly the function above.
+    // The browsing-web branch deliberately stays first and untouched: Universal Link
+    // behaviour must be bit-identical whether or not intents are in play.
+    if (userActivity != nil) {
+        if ([CSSearchableItemActionType isEqualToString:userActivity.activityType]) {
+            NSString *identifier = [userActivity.userInfo objectForKey:CSSearchableItemActivityIdentifier];
+            // Declared rather than redefined: the prefix has one definition, in IOSNative.m
+            // beside the indexing that writes it, so the two cannot drift apart.
+            extern NSString *cn1IntentUidFromItemId(NSString *identifier);
+            NSString *uid = cn1IntentUidFromItemId(identifier);
+            if (uid != nil) {
+                JAVA_OBJECT juid = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG uid);
+                com_codename1_impl_ios_IOSIntentCallbacks_nativeSpotlightItemSelected___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG juid);
+                return YES;
+            }
+            // Not one of ours. A Spotlight item the application indexed itself reaches here
+            // too, and handing its identifier to the framework would send it looking for an
+            // entity that does not exist -- so the activity falls through to the general
+            // branch below, where the app decides what to do with it.
+        }
+        // Any other activity type: hand it to Java and return Java's answer. Claiming
+        // everything would swallow handoff and third-party activities this app never
+        // declared, so the app decides rather than the delegate guessing.
+        NSString *payload = nil;
+        if (userActivity.userInfo != nil
+                && [NSJSONSerialization isValidJSONObject:userActivity.userInfo]) {
+            NSData *data = [NSJSONSerialization dataWithJSONObject:userActivity.userInfo
+                                                           options:0 error:nil];
+            if (data != nil) {
+                // Autoreleased: the app target is manual-reference-counted and this method
+                // returns without a release, so every continued donated activity would retain
+                // its serialized payload for the life of the process.
+                payload = [[[NSString alloc] initWithData:data
+                                                 encoding:NSUTF8StringEncoding] autorelease];
+            }
+        }
+        JAVA_OBJECT jtype = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG userActivity.activityType);
+        JAVA_OBJECT jpayload = payload == nil ? JAVA_NULL
+                : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG payload);
+#ifdef NEW_CODENAME_ONE_VM
+        JAVA_BOOLEAN handled = com_codename1_impl_ios_IOSIntentCallbacks_nativeUserActivity___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG jtype, jpayload);
+#else
+        JAVA_BOOLEAN handled = com_codename1_impl_ios_IOSIntentCallbacks_nativeUserActivity___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jtype, jpayload);
+#endif
+        return handled == JAVA_TRUE ? YES : NO;
+    }
+#endif
     return NO;
 }
 
@@ -442,7 +525,21 @@ static void installSignalHandlers() {
         if (activityDictionary) {
             NSUserActivity *userActivity = [activityDictionary valueForKey:@"UIApplicationLaunchOptionsUserActivityKey"];
             if (userActivity != nil) {
+#ifdef CN1_USE_INTENTS
+                // A donated activity cold-launching the app arrives here, before the VM
+                // callback below has run the application's init/start -- so the framework's
+                // dispatcher exists (the generated bootstrap installed it from main) while
+                // Display does not, and the handler would run inline with no event thread and
+                // no window. Held until initialization instead; browsing-web keeps its existing
+                // path, which only stores AppArg and is safe this early.
+                if (![NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType]) {
+                    cn1PendingLaunchActivity = [userActivity retain];
+                } else {
+                    [self cn1ContinueUserActivity:userActivity];
+                }
+#else
                 [self cn1ContinueUserActivity:userActivity];
+#endif
             }
         }
     }
@@ -457,6 +554,7 @@ static void installSignalHandlers() {
         if (locationValueDeferred) {
             com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         }
+        [self cn1DeliverPendingLaunchActivity];
     });
 #else
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
@@ -465,6 +563,7 @@ static void installSignalHandlers() {
     if (locationValue) {
         com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
+    [self cn1DeliverPendingLaunchActivity];
 #endif
     
 #ifdef INCLUDE_CN1_BACKGROUND_FETCH
@@ -581,7 +680,10 @@ static void installSignalHandlers() {
 }
 #endif
 
-#ifdef CN1_HANDLE_UNIVERSAL_LINKS
+// Compiled for universal links OR intents: without the second condition a Spotlight tap on a
+// legacy-lifecycle build (ios.uiscene=false) would silently do nothing, since the scene delegate
+// is what routes this on a default build.
+#if defined(CN1_HANDLE_UNIVERSAL_LINKS) || defined(CN1_USE_INTENTS)
 // https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content?language=objc
 // https://github.com/codenameone/CodenameOne/issues/2677
 - (BOOL)application:(UIApplication *)application

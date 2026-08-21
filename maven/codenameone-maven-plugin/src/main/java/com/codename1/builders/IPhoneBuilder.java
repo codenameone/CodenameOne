@@ -23,6 +23,7 @@
 package com.codename1.builders;
 
 import com.codename1.build.shared.PlatformFeatureCatalog;
+import com.codename1.util.IOSAppIntentsBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.MatterExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
@@ -281,6 +282,18 @@ public class IPhoneBuilder extends Executor {
     // target, the app group / CN1SurfacesAppGroup + NSSupportsLiveActivities plist injection and
     // the cn1surface URL scheme. Apps that never touch the API see no change.
     private boolean usesSurfaces;
+    // True when the app references com.codename1.intents. Gates the CN1_USE_INTENTS native
+    // define, CoreSpotlight.framework, the generated Swift App Intents declarations and, only
+    // when an @AppIntent is actually declared, the App Intents deployment floor.
+    private boolean usesIntents;
+    // True when intents.json declares at least one @AppIntent, as opposed to an app that only
+    // indexes content. The distinction is what keeps an indexing-only app off the newer floor.
+    private boolean declaresAppIntents;
+    /// True when the app declares intents but ios.intents.appIntents=false asked for the App
+    /// Intents declarations to be left out. Donation still needs its Swift bridge.
+    private boolean appIntentsSuppressed;
+    private java.util.List<Map<String, Object>> intentsManifest = new ArrayList<Map<String, Object>>();
+    private java.util.List<Map<String, Object>> entitiesManifest = new ArrayList<Map<String, Object>>();
     // usesSurfaces && ios.surfaces.extension != false. When the developer opts out with
     // ios.surfaces.extension=false the whole iOS lowering is skipped (no define flip, no
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
@@ -1469,6 +1482,13 @@ public class IPhoneBuilder extends Executor {
                     if (!usesWearable && cls.indexOf("com/codename1/wearable/") == 0) {
                         usesWearable = true;
                     }
+                    // App intents (com.codename1.intents.*). Gated on actual usage so
+                    // CoreSpotlight.framework, the CN1_USE_INTENTS natives and the generated
+                    // Swift declarations are only added for apps that expose something to
+                    // Siri or device search.
+                    if (!usesIntents && cls.indexOf("com/codename1/intents/") == 0) {
+                        usesIntents = true;
+                    }
                     // OidcClient + SystemBrowser rely on
                     // ASWebAuthenticationSession (AuthenticationServices.framework,
                     // iOS 12+).
@@ -1757,6 +1777,12 @@ public class IPhoneBuilder extends Executor {
         // resources, delivered alongside .ios.appext archives in resDir) and resolve the app
         // group. Widget kinds must be known at build time -- the Swift WidgetBundle is static.
         parseSurfacesManifest(resDir, request);
+
+        // App intents: read the build-time manifest the annotation processor emitted into the
+        // project jar. Deliberately softer than surfaces, where a missing manifest fails the
+        // build: indexing content and donating shortcuts are perfectly legitimate with no
+        // @AppIntent declared at all, so an absent manifest is simply "no declarations".
+        parseIntentsManifest(resDir, request);
 
         // Apply AI/ML dependency table hits accumulated during the
         // scan. We route iOS pods through the existing
@@ -2975,6 +3001,24 @@ public class IPhoneBuilder extends Executor {
             // slice: both halves of a pair run the same symmetric code.
             if (usesWearable) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WATCHCONNECTIVITY", "#define CN1_USE_WATCHCONNECTIVITY");
+            }
+
+            // com.codename1.intents usage compiles the Core Spotlight / App Intents glue (gated
+            // by CN1_USE_INTENTS so other builds carry no such symbols), and opens the
+            // non-browsing NSUserActivity path in the app delegate. The define lives in the
+            // shared CodenameOne_GLViewController.h so it reaches every intents translation
+            // unit, mirroring CN1_USE_WIDGETS.
+            if (usesIntents) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_INTENTS", "#define CN1_USE_INTENTS");
+            }
+            // Narrower than CN1_USE_INTENTS: this says declarations were actually generated, so
+            // the runtime can answer isVoiceInvocationSupported() honestly. An app that only
+            // indexes content, or that set ios.intents.appIntents=false, still gets the bridge
+            // Swift for donation and queries -- so the class being present proves nothing about
+            // whether an App Intent can run.
+            if (declaresAppIntents) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"),
+                        "//#define CN1_APP_INTENTS_DECLARED", "#define CN1_APP_INTENTS_DECLARED");
             }
 
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
@@ -4323,6 +4367,18 @@ public class IPhoneBuilder extends Executor {
                     addLibs += ";BackgroundTasks.framework";
                 }
 
+                // Core Spotlight backs the indexing half of com.codename1.intents. It is
+                // Objective-C and available well below this port's floor, so linking it costs
+                // an app nothing in minimum version. App Intents is autolinked by Swift and
+                // needs no entry here.
+                if (usesIntents) {
+                    if (addLibs == null) {
+                        addLibs = "CoreSpotlight.framework";
+                    } else if (!addLibs.toLowerCase().contains("corespotlight")) {
+                        addLibs += ";CoreSpotlight.framework";
+                    }
+                }
+
                 if (request.getArg("ios.useJavascriptCore", "false").equalsIgnoreCase("true")) {
                     replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_JAVASCRIPTCORE", "#define CN1_USE_JAVASCRIPTCORE");
                     if (addLibs == null) {
@@ -4865,6 +4921,13 @@ public class IPhoneBuilder extends Executor {
                         appendWidgetExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
                     }
 
+                    // App Intents needs no Xcode target of its own: the declarations compile
+                    // into the app target, which is what makes the system background-launch
+                    // the app to run them in-process, with the app's own storage and
+                    // singletons intact. Writing the sources here puts them in <Main>-src
+                    // before the schemes script sweeps that directory for Swift.
+                    generateAppIntentSources(new File(tmpFile, "dist"), request);
+
                     String installLocalizedStrings = "";
                     if (installLocalizedStringsScript.length() > 0) {
                         installLocalizedStrings = "begin\n"+
@@ -4936,6 +4999,20 @@ public class IPhoneBuilder extends Executor {
                             // translation describing a different program.
                             + "    swift_paths = swift_paths.reject{|p| p.include?('/"
                             + WatchNativeBuilder.WATCH_SRC_DIR + "/')}\n"
+                            // The Objective-C host that Swift reaches CN1IntentHost through is
+                            // staged into the same directory, and this sweep only globs Swift --
+                            // so without naming it the file is present, imported by the bridging
+                            // header, and never compiled, which is an undefined symbol at link
+                            // rather than a missing type at compile. Named explicitly rather than
+                            // globbing '*.m', because that directory is full of translated
+                            // Objective-C the project already lists.
+                            + "    Dir.glob(File.join(project_root, main_class_name + '-src', 'CN1IntentHost.m')).each do |host_path|\n"
+                            + "      rel_path = Pathname.new(host_path).relative_path_from(Pathname.new(project_root)).to_s\n"
+                            + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
+                            + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
+                            + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
+                            + "      end\n"
+                            + "    end\n"
                             + "    swift_paths.each do |swift_path|\n"
                             + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
                             + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
@@ -6078,6 +6155,321 @@ public class IPhoneBuilder extends Executor {
     /** Xcode target / folder name of the generated WidgetKit extension. */
     static final String SURFACES_EXTENSION_NAME = "CN1Widgets";
 
+    /// The iOS release App Intents first shipped in.
+    ///
+    /// **Not contributed as a deployment floor**, and that is a measured result rather than an
+    /// assumption: a target building at `IPHONEOS_DEPLOYMENT_TARGET = 13.0` with
+    /// availability-fenced App Intents declarations emits a complete `Metadata.appintents`
+    /// carrying every intent and entity. Xcode does not gate metadata extraction on the
+    /// deployment target. So the declarations ship, the app's minimum is untouched, and the
+    /// intents are simply not offered on devices too old to run them.
+    ///
+    /// It survives as the number quoted in diagnostics, and as the value a project can opt into
+    /// through `ios.intents.minDeploymentTarget`.
+    static final String APP_INTENTS_MIN_IOS = "16.0";
+
+    /// Declares that a tap on a Spotlight result should continue into this app.
+    ///
+    /// Gated on using the indexing API, deliberately *not* on declaring an intent. An app that
+    /// only calls Intents.index() declares none -- parseIntentsManifest treats a missing
+    /// manifest as a warning precisely so that app builds -- while the native bridge still
+    /// publishes its searchable items. Keying this off a declaration therefore made an entire
+    /// supported configuration silently useless: the content was findable, and tapping it did
+    /// nothing, because without this key iOS never continues the activity and
+    /// nativeSpotlightItemSelected is never reached.
+    static String withSpotlightContinuation(String inject, boolean usesIntents) {
+        if (!usesIntents || inject.contains("CoreSpotlightContinuation")) {
+            return inject;
+        }
+        return inject + "\n<key>CoreSpotlightContinuation</key><true/>";
+    }
+
+    /// Adds this app's intent ids to an NSUserActivityTypes array the project already declared.
+    ///
+    /// Returns the injection unchanged when the key's array cannot be located, because writing
+    /// a second NSUserActivityTypes key would produce a plist iOS reads unpredictably -- worse
+    /// than the ids being absent, which at least fails in one direction.
+    /// The `NSUserActivityTypes` key for an app that has not declared one itself, or the empty
+    /// string when there is nothing to declare.
+    ///
+    /// Carries only the ids `Intents.donate` can publish -- see
+    /// `IOSAppIntentsBuilder.publishesUserActivity` for why advertising the rest is not
+    /// harmlessly generous.
+    static String userActivityTypesKey(List<Map<String, Object>> intents) {
+        StringBuilder types = new StringBuilder();
+        for (Map<String, Object> intent : intents) {
+            Object id = intent.get("id");
+            if (id instanceof String && IOSAppIntentsBuilder.publishesUserActivity(intent)) {
+                types.append("<string>").append((String) id).append("</string>");
+            }
+        }
+        if (types.length() == 0) {
+            // An app whose only assistant-exposed intent is destructive reaches here and
+            // contributes nothing. Writing the key with an empty array would state that the app
+            // continues no activity at all -- into the plist of an app that may well continue
+            // its own -- so nothing is written when there is nothing to say.
+            return "";
+        }
+        return "\n<key>NSUserActivityTypes</key><array>" + types + "</array>";
+    }
+
+    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
+        int key = inject.indexOf("NSUserActivityTypes");
+        int open = key < 0 ? -1 : inject.indexOf("<array>", key);
+        int close = open < 0 ? -1 : inject.indexOf("</array>", open);
+        if (close < 0) {
+            return inject;
+        }
+        String existing = inject.substring(open, close);
+        StringBuilder add = new StringBuilder();
+        for (Map<String, Object> intent : intents) {
+            Object id = intent.get("id");
+            // Same filter as the emission path above: an id donation will never publish has no
+            // business in the app's own array either. See publishesUserActivity.
+            if (id instanceof String
+                    && IOSAppIntentsBuilder.publishesUserActivity(intent)
+                    && !existing.contains("<string>" + (String) id + "</string>")) {
+                add.append("<string>").append((String) id).append("</string>");
+            }
+        }
+        if (add.length() == 0) {
+            return inject;
+        }
+        return inject.substring(0, close) + add + inject.substring(close);
+    }
+
+    /// Reads the `intents.json` the annotation processor emitted into the project jar and
+    /// decides what this app has to pay for it.
+    ///
+    /// The deployment target is the interesting part, and the answer is that nothing here
+    /// moves it. That was measured rather than assumed: Xcode emits a complete
+    /// `Metadata.appintents` for a target deploying to 13.0, so availability-fenced
+    /// declarations ship and are simply not offered on devices too old for them. Indexing and
+    /// donation cost nothing either, being Objective-C APIs that predate the current floor.
+    ///
+    /// A project that would rather not ship a build whose intents are inert for part of its
+    /// audience can still contribute a floor with `ios.intents.minDeploymentTarget`, which is
+    /// the only path below that reaches `addMinDeploymentTarget`.
+    private void parseIntentsManifest(File resDir, BuildRequest request) throws BuildException {
+        if (!usesIntents) {
+            return;
+        }
+        // Namespaced: the root belongs to the application, and an app with its own
+        // intents.json must not have it read as framework metadata. See MANIFEST_RESOURCE in
+        // AppIntentAnnotationProcessor. Only this path is read -- falling back to the root
+        // would reintroduce exactly the collision the namespace exists to prevent.
+        File manifest = new File(resDir, "META-INF/codenameone/intents.json");
+        if (!manifest.exists()) {
+            // Legitimate: the app indexes content or donates shortcuts without declaring any
+            // @AppIntent, so the processor had nothing to emit.
+            debug("cn1: com.codename1.intents is used but no intents.json was generated; "
+                    + "building with indexing and donation only");
+            return;
+        }
+        Map<String, Object> parsed;
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(manifest), StandardCharsets.UTF_8)) {
+            parsed = new com.codename1.builders.util.JSONParser().parseJSON(reader);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to parse intents.json", ex);
+        }
+        intentsManifest = asMapList(parsed.get("intents"));
+        entitiesManifest = asMapList(parsed.get("entities"));
+
+        // A declared intent is what needs App Intents; an empty list means the project only
+        // declared entity types, or only indexes content at runtime.
+        // Only intents that actually reach the platform can justify the floor. One declared
+        // solely for a language model produces no App Intent at all, so raising the app's
+        // minimum for it would drop older devices for nothing.
+        declaresAppIntents = false;
+        for (Map<String, Object> intent : intentsManifest) {
+            if (com.codename1.util.IOSAppIntentsBuilder.isExposedToAssistant(intent)) {
+                declaresAppIntents = true;
+                break;
+            }
+        }
+        if (!declaresAppIntents) {
+            return;
+        }
+        if ("false".equals(request.getArg("ios.intents.appIntents", "true"))) {
+            // The explicit way to keep indexing and donation while staying off the newer floor.
+            // Recorded separately from declaresAppIntents so the donation bridge is still
+            // generated -- suppressing the declarations must not remove the implementation the
+            // native donation path trampolines through.
+            appIntentsSuppressed = true;
+            declaresAppIntents = false;
+            return;
+        }
+
+        // Defaults to contributing nothing; see the note on APP_INTENTS_MIN_IOS.
+        String floor = request.getArg("ios.intents.minDeploymentTarget", "");
+        if (floor == null || floor.trim().length() == 0) {
+            return;
+        }
+        String pinned = request.getArg("ios.deployment_target", null);
+        if (pinned != null && compareVersionStrings(pinned, floor) < 0) {
+            // Raising past an explicit pin would override a decision the developer made on
+            // purpose; silently dropping the intents would ship a build whose declared
+            // capabilities never appear, which is worse than not offering the feature. So say
+            // what happened and name both ways out. This can only fire on newly written
+            // opt-in code, never on an upgrade of an existing project.
+            throw new BuildException("ios.intents.minDeploymentTarget asks for iOS " + floor
+                    + ", but ios.deployment_target is pinned to " + pinned + ".\n"
+                    + "Raise ios.deployment_target to " + floor + ", or drop "
+                    + "ios.intents.minDeploymentTarget -- it is not required. App Intents "
+                    + "declarations are availability-fenced and their metadata is emitted for a "
+                    + "lower target, so intents simply do not appear on devices below iOS "
+                    + APP_INTENTS_MIN_IOS + ".");
+        }
+        addMinDeploymentTarget(floor);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.List<Map<String, Object>> asMapList(Object o) {
+        java.util.List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        if (o instanceof java.util.List) {
+            for (Object e : (java.util.List<Object>) o) {
+                if (e instanceof Map) {
+                    out.add((Map<String, Object>) e);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Writes the generated Swift App Intents declarations into the app target's source
+    /// directory. The existing scheme script sweeps every `.swift` under `<Main>-src` into the
+    /// app target, so no Xcode plumbing is added here.
+    ///
+    /// Runs only when the app declares an intent. An app that merely indexes content gets Core
+    /// Spotlight and no Swift at all, which is also why an empty `AppShortcutsProvider` is never
+    /// emitted -- Apple rejects one.
+    private void generateAppIntentSources(File distDir, BuildRequest request) throws IOException {
+        if (!declaresAppIntents && !appIntentsSuppressed) {
+            return;
+        }
+        if (appIntentsSuppressed) {
+            // Before any Swift is written, not after. Donation is Objective-C and needs no
+            // Swift at all -- which is what lets it keep working below the App Intents
+            // minimum, and the whole reason this opt-out exists. Emitting the bridge, the
+            // snippet view and the surface renderer anyway put SwiftUI types into a project
+            // that had just asked to stay off them, so a target pinned below iOS 13 failed
+            // Swift availability checking for a feature it had explicitly declined.
+            log("App Intents declarations suppressed (ios.intents.appIntents=false); "
+                    + "Spotlight indexing and donation are unaffected");
+            return;
+        }
+        File srcDir = new File(distDir, request.getMainClass() + "-src");
+        srcDir.mkdirs();
+
+        // The static half: the Java-to-Swift bridge, the donation shim, and the Objective-C
+        // host that is the only legal way for Swift to reach the translated Java.
+        String[] staticFiles = {"CN1IntentBridge.swift", "CN1IntentSnippetView.swift",
+                "CN1IntentHost.h", "CN1IntentHost.m"};
+        for (String name : staticFiles) {
+            copyResourceTo("/com/codename1/builders/intents/ios/" + name,
+                    new File(srcDir, name));
+        }
+        // Staging the header is not the same as making it visible. Objective-C declarations in
+        // the same target are not automatically in scope for Swift -- they have to come through
+        // the bridging header -- and this one was written with nothing but a comment in it, so
+        // every reference to CN1IntentHost in the generated Swift failed to compile with
+        // "cannot find 'CN1IntentHost' in scope". A device build is the only thing that could
+        // have said so, which is why the sample now declares an intent.
+        //
+        // Appended rather than written, and only once: the header is shared with anything else
+        // that needs to reach Objective-C from Swift. The path is relative to the header's own
+        // directory, which is SRCROOT -- SWIFT_OBJC_BRIDGING_HEADER points at
+        // $(SRCROOT)/cn1-Bridging-Header.h.
+        importIntoBridgingHeader(distDir,
+                request.getMainClass() + "-src/CN1IntentHost.h");
+        // A snippet is a small layout rendered while the app may be off screen, which is what a
+        // widget is, so it reuses the surfaces node renderer rather than growing a second
+        // layout vocabulary. Written under the same filenames the surfaces builder uses, so an
+        // app that has both features gets one copy rather than two conflicting declarations.
+        String[] sharedRenderer = {"CN1SurfaceModel.swift", "CN1SurfaceRenderer.swift"};
+        for (String name : sharedRenderer) {
+            copyResourceTo("/com/codename1/builders/surfaces/ios/" + name,
+                    new File(srcDir, name));
+        }
+        // The model resolves the surfaces App Group through a constant the surfaces builder
+        // generates. An app that declares an intent but publishes no widgets never gets that
+        // file, so the renderer would not compile -- written here only when it is absent, so a
+        // project using both features keeps the real app group the surfaces build wrote.
+        File config = new File(srcDir, "CN1SurfaceConfig.swift");
+        if (!config.exists()) {
+            String body = "// Auto-generated by Codename One. This application declares app\n"
+                    + "// intents but publishes no external surfaces, so there is no App Group\n"
+                    + "// to resolve: an intent snippet reads its images from a per-invocation\n"
+                    + "// directory rather than the shared container.\n"
+                    + "import Foundation\n\n"
+                    + "let cn1SurfacesAppGroup = \"\"\n";
+            try (FileOutputStream out = new FileOutputStream(config)) {
+                out.write(body.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        IOSAppIntentsBuilder gen = new IOSAppIntentsBuilder(intentsManifest, entitiesManifest);
+        Map<String, String> generated = gen.buildAppTargetFileMap();
+        if (!gen.getOmittedShortcutIds().isEmpty()) {
+            // Named rather than dropped quietly: the intents still work, they simply have no
+            // spoken phrase, and a developer who wrote one has to be able to find out why it
+            // never worked.
+            log("Apple allows ten App Shortcut phrases per app. These intents keep working and "
+                    + "are still offered in the Shortcuts app, but their phrases were left out: "
+                    + gen.getOmittedShortcutIds());
+        }
+        for (Map.Entry<String, String> e : generated.entrySet()) {
+            try (FileOutputStream out = new FileOutputStream(new File(srcDir, e.getKey()))) {
+                out.write(e.getValue().getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        log("Generating App Intents declarations (" + intentsManifest.size() + " intent(s), "
+                + entitiesManifest.size() + " entity type(s))");
+    }
+
+    /// Adds an `#import` to the project's Swift bridging header, creating the header when the
+    /// Swift settings injection has not written it yet.
+    ///
+    /// Idempotent because both this and the Swift-settings pass can reach the file, and a
+    /// duplicate import is a redefinition once the header is preprocessed into the Swift
+    /// interface.
+    private void importIntoBridgingHeader(File distDir, String relativeHeaderPath)
+            throws IOException {
+        File bridging = new File(distDir, "cn1-Bridging-Header.h");
+        String line = "#import \"" + relativeHeaderPath + "\"\n";
+        String existing = "";
+        if (bridging.exists()) {
+            existing = new String(java.nio.file.Files.readAllBytes(bridging.toPath()),
+                    StandardCharsets.UTF_8);
+            if (existing.contains(line)) {
+                return;
+            }
+        } else {
+            existing = "// Codename One generated Swift bridging header\n";
+        }
+        try (FileOutputStream out = new FileOutputStream(bridging)) {
+            out.write((existing + line).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /// Copies a plugin resource to disk, failing loudly when it is missing: a silently absent
+    /// bridge file would surface much later as an unresolved Swift symbol.
+    private void copyResourceTo(String resource, File target) throws IOException {
+        try (InputStream in = getClass().getResourceAsStream(resource)) {
+            if (in == null) {
+                throw new IOException("Missing plugin resource " + resource);
+            }
+            try (FileOutputStream out = new FileOutputStream(target)) {
+                byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) > 0) {
+                    out.write(buf, 0, r);
+                }
+            }
+        }
+    }
+
     /**
      * Parses the surfaces.json build-time manifest ({appGroup?, liveActivities?, kinds:[{id,
      * name, description, iosFamilies?, preview?}]}) and resolves the app group. Fails the
@@ -6767,6 +7159,40 @@ public class IPhoneBuilder extends Executor {
                 && walletAppGroup != null && walletAppGroup.trim().length() > 0 && !inject.contains("CN1WalletAppGroup")) {
             inject += "\n<key>CN1WalletAppGroup</key><string>" + walletAppGroup.trim() + "</string>";
         }
+
+        // App intents: iOS only offers an activity whose type the app declared here, so without
+        // these keys donation appears to succeed while nothing is ever suggested and a Spotlight
+        // result cannot continue into the app.
+        //
+        // Emitted for any app that declares an intent. It has nothing to do with the widget
+        // extension, and nesting it in that branch made it depend on an unrelated feature being
+        // switched on.
+        // Emitted whenever the app declares intents, including the appIntents=false opt-out:
+        // donation still runs there, and iOS only offers an activity whose type is declared
+        // here, so omitting it would make the opt-out donate into a void.
+        if (declaresAppIntents || appIntentsSuppressed) {
+            // Each key is decided on its own. Treating any existing NSUserActivityTypes as
+            // complete configuration meant an app that already declared one Handoff activity
+            // through ios.plistInject silently lost every intent id -- and lost
+            // CoreSpotlightContinuation too, which is a different key entirely, so a Spotlight
+            // result could not continue into the app either.
+            if (!inject.contains("NSUserActivityTypes")) {
+                inject += userActivityTypesKey(intentsManifest);
+            } else {
+                // Merge into the array the application supplied rather than replacing it: its
+                // own activity types have to keep working. Appended just before the closing
+                // </array> of that key, and only ids it does not already list.
+                inject = mergeUserActivityTypes(inject, intentsManifest);
+            }
+        }
+        // CoreSpotlightContinuation is about Spotlight, not about App Intents, and gating it on
+        // a declaration made an entire supported configuration silently useless: an app that
+        // only calls Intents.index() declares no intent at all -- parseIntentsManifest treats a
+        // missing manifest as a warning precisely so that app builds -- and the native bridge
+        // still publishes its searchable items. Without this key a tap on one of those results
+        // cannot continue into the app, so nativeSpotlightItemSelected is never reached and the
+        // content is findable but dead. Emitted for anything that uses the indexing API.
+        inject = withSpotlightContinuation(inject, usesIntents);
 
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
         // shared App Group container through this key; the CN1Widgets extension carries its own
