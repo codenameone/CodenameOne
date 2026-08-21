@@ -7785,6 +7785,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 File[] abandoned = storageScratchDir().listFiles();
                 if (abandoned != null) {
                     for (int iter = 0; iter < abandoned.length; iter++) {
+                        if (isStorageLockFile(abandoned[iter])) {
+                            continue;
+                        }
                         long expires = abandoned[iter].lastModified() + STORAGE_SCRATCH_MAX_AGE;
                         if (expires > now) {
                             nextSweep = Math.min(nextSweep, expires);
@@ -7813,7 +7816,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return;
             }
             for (int iter = 0; iter < scratch.length; iter++) {
-                if (!scratch[iter].delete()) {
+                if (!isStorageLockFile(scratch[iter]) && !scratch[iter].delete()) {
                     com.codename1.io.Log.p("Could not cancel the storage write "
                             + scratch[iter]);
                 }
@@ -7821,6 +7824,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (IOException err) {
             com.codename1.io.Log.e(err);
         }
+    }
+
+    /**
+     * Whether the given file is the one whose lock serializes the processes, rather
+     * than a write in progress.
+     *
+     * <p>It has to survive both the clear and the sweep. Linux lets a locked file be
+     * unlinked, and the lock goes with the inode rather than the name, so a process
+     * that removed it while holding it would leave the next process free to create
+     * the name afresh and take a lock on a different inode: both would then hold
+     * "the" lock and neither would wait for the other. Nothing writes to it either,
+     * so its age says nothing about whether it is in use.</p>
+     *
+     * @param file a file in the scratch directory
+     * @return true if the file is the lock
+     */
+    private static boolean isStorageLockFile(File file) {
+        return STORAGE_LOCK_FILE.equals(file.getName());
     }
 
     /**
