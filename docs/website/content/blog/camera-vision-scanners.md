@@ -15,7 +15,9 @@ The new vision analyzers could read barcodes, faces, poses, text, documents, and
 
 That was the correct low-level API and the wrong starting point for the common case.
 
-[PR #5575](https://github.com/codenameone/CodenameOne/pull/5575) adds the missing layers above the analyzers. The link originally supplied for this story, PR #5573, is an unrelated ParparVM garbage-collector change.
+This post continues [the weekly release series that began with portable encrypted SQLite](/blog/sqlite-portable-encrypted/).
+
+[PR #5575](https://github.com/codenameone/CodenameOne/pull/5575) adds the missing layers above the analyzers.
 
 ## One call owns the scanner screen
 

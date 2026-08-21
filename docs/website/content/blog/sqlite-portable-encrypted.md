@@ -152,7 +152,11 @@ Tapjacking happens when another Android application draws over a sensitive scree
 
 ```java
 DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
-DeviceIntegrity.addTapjackingListener(event -> showOverlayWarning());
+DeviceIntegrity.addTapjackingListener(event -> {
+    if (Boolean.TRUE.equals(event.getSource())) {
+        showOverlayWarning();
+    }
+});
 
 if (DeviceIntegrity.isHideOverlayWindowsSupported()) {
     DeviceIntegrity.setHideOverlayWindows(true);
@@ -167,7 +171,7 @@ Detection is touch-driven because Android supplies the obscured state on `Motion
 
 The on-device vision work added barcode recognition, face and pose detection, text recognition, segmentation, document scanning, and image labeling. It also exposed every piece of the camera-to-analyzer pipeline. That was useful for custom camera products and needlessly low-level for common cases.
 
-The camera story belongs to [PR #5575](https://github.com/codenameone/CodenameOne/pull/5575), not the unrelated PR #5573. `CodeScanner.scan()` now owns a complete scanner screen and returns one asynchronous result:
+[PR #5575](https://github.com/codenameone/CodenameOne/pull/5575) adds `CodeScanner.scan()`, which owns a complete scanner screen and returns one asynchronous result:
 
 ```java
 CodeScanner.scan().ready(code -> {
