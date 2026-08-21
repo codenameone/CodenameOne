@@ -551,9 +551,16 @@ public class Validator {
                 cmp.addFocusListener(new FocusListener() {
                     @Override
                     public void focusGained(Component cmp) {
-                        // special case. Before the form is showing don't show error dialogs
-                        Form p = cmp.getComponentForm();
-                        if (p != Display.getInstance().getCurrent()) { //NOPMD CompareObjectsWithEquals
+                        // special case. Before the top level is showing don't show
+                        // error dialogs. Resolved through the top level rather than the
+                        // form: getComponentForm() is null inside a Window, so this
+                        // returned every time and the configured popup never appeared
+                        // there at all.
+                        com.codename1.ui.TopLevelContainer p = cmp.getTopLevelContainer();
+                        boolean showing = p instanceof com.codename1.ui.Window
+                                ? ((com.codename1.ui.Window) p).isWindowShowing()
+                                : p == Display.getInstance().getCurrent(); //NOPMD CompareObjectsWithEquals
+                        if (!showing) {
                             return;
                         }
                         if (message != null) {
@@ -563,6 +570,9 @@ public class Validator {
                             String err = getErrorMessage(cmp);
                             if (err != null && err.length() > 0) {
                                 message = new InteractionDialog(err);
+                                // The emblem path below shows by rectangle, which has
+                                // no anchor component to resolve a host from.
+                                message.setTopLevelHost(p);
                                 message.getTitleComponent().setUIID(errorMessageUIID);
                                 message.setAnimateShow(false);
                                 if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {

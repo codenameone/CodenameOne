@@ -349,6 +349,12 @@ typedef struct {
      * the frame, but it can hide the title bar's title and toolbar, which is the
      * part an application replacing the chrome cares about. */
     int decorated;
+    /* Whether input is allowed inside the window. Recorded for the same reason as
+     * pendingVisible: a modal can block a window whose scene has not connected yet,
+     * and the request would otherwise be delivered to a nil window and dropped,
+     * leaving the newly connected window's native peers interactive underneath a
+     * modal that is supposed to be blocking them. 1 means enabled. */
+    int inputEnabled;
     /* The geometry asked for but not yet granted, in pixels, or 0 when nothing is
      * outstanding. A recycled scene reports the *previous* window's size the moment
      * it is adopted, before the new geometry request lands, and delivering that would
@@ -688,6 +694,9 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     g_macWindows[slot].pendingTitle = [title retain];
     g_macWindows[slot].resizable = resizable ? 1 : 0;
     g_macWindows[slot].decorated = decorated ? 1 : 0;
+    /* Set explicitly because the slot was just memset to zero, and zero here would
+     * mean "input disabled" -- every new window would come up inert. */
+    g_macWindows[slot].inputEnabled = 1;
 
     const int generation = g_macWindows[slot].generation;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -839,6 +848,10 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
     CN1MacWindowApplyDecoration(scene, w->decorated);
 
     w->window.rootViewController = w->controller;
+    /* As with visibility: honour the input state last asked for. A window opened
+     * while an application modal is already up has its blocking requested before the
+     * scene exists, and without this the peers inside it stayed interactive. */
+    w->window.userInteractionEnabled = w->inputEnabled ? YES : NO;
     /* Honour the visibility last asked for rather than always showing: a window
      * hidden before its scene arrived must not appear now. */
     if (w->pendingVisible) {
@@ -995,7 +1008,13 @@ void CN1MacWindowSetInputEnabled(int slot, BOOL enabled) {
     if (w == NULL) {
         return;
     }
+    /* Recorded before it is applied, so a request that arrives before the scene
+     * exists is honoured at adoption instead of being delivered to a nil window. */
+    w->inputEnabled = enabled ? 1 : 0;
     UIWindow* window = w->window;
+    if (window == nil) {
+        return;
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
         /* Covers every touch inside the window while a modal blocks it. The scene's
          * own title bar is AppKit chrome the app does not own, so its close button
@@ -1490,6 +1509,36 @@ UIView* CN1MacWindowEditingHostView(void) {
     }
     CN1MacWindow* w = slotAt(g_editingSlot);
     return w == NULL ? nil : w->content;
+}
+
+/*
+ * Blocks input to the application's own window while a Codename One window holds an
+ * application modal.
+ *
+ * The framework's event filter drops packed input events before they reach a
+ * component, but a UIKit peer -- a native editor, a web view, a media control --
+ * receives its touches directly from the window server and never passes through
+ * that filter. Without this the main window's peers stayed fully interactive
+ * underneath a modal that was supposed to be blocking them.
+ *
+ * The main scene is the connected window scene that no Codename One window claims,
+ * the same way CN1MacMonitorForMainWindow finds it.
+ */
+void CN1MacMainWindowSetInputEnabled(BOOL enabled) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            UIWindowScene* windowScene = (UIWindowScene*) scene;
+            if (CN1MacWindowIdForScene(windowScene) >= 0) {
+                continue;
+            }
+            for (UIWindow* window in windowScene.windows) {
+                window.userInteractionEnabled = enabled;
+            }
+        }
+    });
 }
 
 int CN1MacMonitorForMainWindow(void) {

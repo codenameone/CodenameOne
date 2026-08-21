@@ -217,6 +217,18 @@ public class MacWindowManager extends WindowManager {
         return s >= 0 && IOSImplementation.nativeInstance.macWindowReopen(s);
     }
 
+    /// {@inheritDoc}
+    ///
+    /// Implemented rather than left as the inherited no-op. The framework's event
+    /// filter drops packed input before it reaches a component, but a UIKit peer --
+    /// a native editor, a web view, a media control -- is handed its touches
+    /// directly by the window server and never passes through that filter, so the
+    /// main window's peers stayed interactive under an application modal.
+    @Override
+    public void setMainWindowInputEnabled(boolean enabled) {
+        IOSImplementation.nativeInstance.macMainWindowSetInputEnabled(enabled);
+    }
+
     @Override
     public void setInputEnabled(Object p, boolean enabled) {
         int s = slot(p);

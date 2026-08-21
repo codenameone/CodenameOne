@@ -2462,6 +2462,12 @@ void com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CN1
 #endif
 }
 
+void com_codename1_impl_ios_IOSNative_macMainWindowSetInputEnabled___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN enabled) {
+#if TARGET_OS_MACCATALYST
+    CN1MacMainWindowSetInputEnabled(enabled == JAVA_TRUE);
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowWatchScreens();

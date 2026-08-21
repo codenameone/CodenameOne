@@ -254,6 +254,8 @@ public final class IOSNative {
     /** Enables or disables touch input, used while a modal window blocks this one. */
     native void macWindowSetInputEnabled(int slot, boolean enabled);
 
+    native void macMainWindowSetInputEnabled(boolean enabled);
+
     /** Starts reporting display attach/remove/mode changes; idempotent. */
     native void macWindowWatchScreens();
 

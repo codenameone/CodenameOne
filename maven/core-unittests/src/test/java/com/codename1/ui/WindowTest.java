@@ -3358,4 +3358,44 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void aValidationErrorPopupAppearsInsideItsWindow() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        TextField field = new TextField("");
+        w.add(BorderLayout.CENTER, field);
+        w.show();
+        w.revalidate();
+        try {
+            com.codename1.ui.validation.Validator v =
+                    new com.codename1.ui.validation.Validator();
+            v.setShowErrorMessageForFocusedComponent(true);
+            v.addConstraint(field,
+                    new com.codename1.ui.validation.LengthConstraint(3, "too short"));
+            assertFalse(v.isValid(), "an empty field must fail the length constraint");
+
+            // Driven the way the framework drives it. Going through setFocused() does
+            // not work here: showing the window already focused its only focusable
+            // child, so setFocused() short-circuits and nothing fires -- a test built
+            // that way passes whatever the code does.
+            //
+            // The listener compared getComponentForm() with the current Form, and in a
+            // window that is null against a non-null form, so it returned every time
+            // and the configured popup never appeared.
+            field.fireFocusGained();
+            flushSerialCalls();
+            pumpAnimations(w);
+
+            assertNotNull(findDialogIn(w),
+                    "the validation error popup must appear inside the window");
+        } finally {
+            w.dispose();
+        }
+    }
 }
