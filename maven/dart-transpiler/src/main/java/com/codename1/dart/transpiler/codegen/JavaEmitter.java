@@ -319,6 +319,86 @@ public final class JavaEmitter {
         return new GeneratedFile(e.name + ".java", sb.toString());
     }
 
+    /**
+     * Whether a top-level variable must initialise LAZILY, on first read.
+     *
+     * <p>Dart initialises every top-level and static variable on first access,
+     * so the order they are written in cannot matter. Java runs static
+     * initialisers top to bottom, so the same source emitted as plain fields
+     * silently reads a not-yet-assigned neighbour as null. Shrine's theme is
+     * the shape of it:</p>
+     *
+     * <pre>
+     *   final ThemeData shrineTheme = _buildShrineTheme();   // reads the scheme
+     *   final ColorScheme _shrineColorScheme = ColorScheme(...);
+     * </pre>
+     *
+     * <p>which threw {@code ExceptionInInitializerError} on the class's very
+     * first use — the whole study failed to open. Only initialisers that
+     * cannot depend on anything (a bare literal) stay plain fields, so the
+     * common {@code const kPadding = 8.0} keeps reading as a constant.</p>
+     */
+    private static boolean isLazyTopLevel(FieldDecl v) {
+        return v.initializer != null && !isSelfContainedLiteral(v.initializer);
+    }
+
+    /** A literal whose value cannot reference any other declaration. */
+    private static boolean isSelfContainedLiteral(Expr e) {
+        if (e instanceof Ast.IntLit || e instanceof Ast.DoubleLit
+                || e instanceof Ast.BoolLit || e instanceof Ast.NullLit) {
+            return true;
+        }
+        if (e instanceof Ast.StringLit) {
+            for (Object part : ((Ast.StringLit) e).parts) {
+                if (!(part instanceof String)) {
+                    return false;   // interpolation can read anything
+                }
+            }
+            return true;
+        }
+        if (e instanceof Ast.Unary) {
+            return isSelfContainedLiteral(((Ast.Unary) e).operand);
+        }
+        return false;
+    }
+
+    /**
+     * A top-level variable as a lazily-initialised accessor pair. Named
+     * {@code get$x} / {@code set$x} so reads and writes route through the
+     * emitter's existing accessor handling — {@code x = v} becomes
+     * {@code Lib.set$x(v)} with no special case at the assignment site.
+     */
+    private String emitLazyTopLevel(FieldDecl v, TypeRef vt, String jt, Ctx ctx) {
+        ctx.pushWriter(3);
+        Out init = emitExpr(v.initializer, vt, ctx);
+        String lifted = ctx.popWriter();
+        StringBuilder sb = new StringBuilder();
+        sb.append("    private static ").append(jt).append(' ').append(v.name)
+                .append("$value;\n");
+        sb.append("    private static boolean ").append(v.name).append("$ready;\n\n");
+        sb.append("    /** Dart top-level `").append(v.name)
+                .append("` — initialised on first read, as Dart does. */\n");
+        sb.append("    public static ").append(jt).append(" get$").append(v.name)
+                .append("() {\n");
+        sb.append("        if (!").append(v.name).append("$ready) {\n");
+        // Marked ready BEFORE the initialiser runs: a variable whose own
+        // initialiser reads it back is a cycle, and returning the zero value
+        // beats recursing until the stack goes.
+        sb.append("            ").append(v.name).append("$ready = true;\n");
+        sb.append(lifted);
+        sb.append("            ").append(v.name).append("$value = ")
+                .append(coerce(init, vt, ctx)).append(";\n");
+        sb.append("        }\n");
+        sb.append("        return ").append(v.name).append("$value;\n");
+        sb.append("    }\n\n");
+        sb.append("    public static void set$").append(v.name).append('(')
+                .append(jt).append(" $v) {\n");
+        sb.append("        ").append(v.name).append("$ready = true;\n");
+        sb.append("        ").append(v.name).append("$value = $v;\n");
+        sb.append("    }\n\n");
+        return sb.toString();
+    }
+
     private GeneratedFile emitLibClass(Library lib) {
         Ctx ctx = new Ctx(null);
         ctx.currentLibrary = lib;
@@ -327,6 +407,10 @@ public final class JavaEmitter {
         for (FieldDecl v : lib.topLevelVars) {
             TypeRef vt = fieldType(v, ctx);
             String jt = javaType(vt, false, ctx);
+            if (isLazyTopLevel(v)) {
+                body.append(emitLazyTopLevel(v, vt, jt, ctx));
+                continue;
+            }
             body.append("    public static ").append(jt).append(' ').append(v.name);
             if (v.initializer != null) {
                 ctx.pushWriter(2);
@@ -3214,8 +3298,12 @@ public final class JavaEmitter {
         }
         if (program.topLevelVars.containsKey(n)) {
             Library owner = program.resolveTopLevelVarOwner(n, ctx.library(), prefix);
-            return new Out(Program.libClassName(owner.fileName) + "." + n,
-                    fieldType(program.topLevelVars.get(n), ctx));
+            FieldDecl v = program.topLevelVars.get(n);
+            // A lazily-initialised variable is an accessor pair, not a field —
+            // see isLazyTopLevel for why it cannot be a field.
+            String ref = Program.libClassName(owner.fileName)
+                    + (isLazyTopLevel(v) ? ".get$" + n + "()" : "." + n);
+            return new Out(ref, fieldType(v, ctx));
         }
         if (program.functions.containsKey(n)) {
             Library owner = program.resolveFunctionOwner(n, ctx.library(), prefix);

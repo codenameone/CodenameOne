@@ -172,8 +172,40 @@ public class ThemeData {
     public Color hintColor() { return hintColor; }
     public Color disabledColor() { return disabledColor; }
     public Color shadowColor() { return shadowColor; }
-    public IconThemeData iconTheme() { return iconTheme; }
-    public IconThemeData primaryIconTheme() { return primaryIconTheme; }
+    /**
+     * The ambient icon style, never null.
+     *
+     * <p>Flutter's {@code ThemeData()} fills every slot in, so app code reads
+     * {@code Theme.of(context).iconTheme} and calls {@code copyWith} on it
+     * without a null check — Shrine and Crane both build their theme as
+     * {@code _customIconTheme(base.iconTheme)}, which threw on a bare
+     * {@code ThemeData()} and took the whole study down with it.</p>
+     */
+    public IconThemeData iconTheme() {
+        if (iconTheme == null) {
+            iconTheme = defaultIconTheme(colorScheme().onSurface());
+        }
+        return iconTheme;
+    }
+
+    /** The icon style for surfaces painted in the primary colour, never null. */
+    public IconThemeData primaryIconTheme() {
+        if (primaryIconTheme == null) {
+            primaryIconTheme = defaultIconTheme(colorScheme().onPrimary());
+        }
+        return primaryIconTheme;
+    }
+
+    /** Material's default icon: 24 logical pixels, fully opaque, in {@code color}. */
+    private static IconThemeData defaultIconTheme(Color color) {
+        IconThemeData d = new IconThemeData();
+        d.size(24);
+        d.opacity(1.0);
+        if (color != null) {
+            d.color(color);
+        }
+        return d;
+    }
     public AppBarTheme appBarTheme() { return appBarTheme; }
     public ChipThemeData chipTheme() { return chipTheme; }
     public CheckboxThemeData checkboxTheme() { return checkboxTheme; }

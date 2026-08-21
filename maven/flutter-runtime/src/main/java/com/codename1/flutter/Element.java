@@ -90,6 +90,15 @@ public abstract class Element implements BuildContext {
     }
 
     /**
+     * The next element up the inheritance chain — {@link #parent()}, or the
+     * pushing context at a route root. Use this rather than {@code parent()}
+     * when walking for an ancestor widget, or the walk stops at every route.
+     */
+    public Element ancestor() {
+        return ancestorOf(this);
+    }
+
+    /**
      * Whether {@code o} is an instance of {@code type} — the single predicate
      * the whole inherited-widget mechanism rests on, kept in one place so any
      * future portability question about it has exactly one answer to change.

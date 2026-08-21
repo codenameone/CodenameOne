@@ -27,7 +27,21 @@ import dart.runtime.Funcs;
  * whenever the effective theme changes across rebuilds (see
  * {@link MaterialAppElement}).
  */
-public class MaterialApp extends StatelessWidget {
+public class MaterialApp extends StatelessWidget
+        implements com.codename1.flutter.navigation.Navigator.RouteTableHost {
+
+    /** This app's own route table — see {@link #build}. */
+    private com.codename1.flutter.navigation.Navigator.RouteTable routeTable;
+
+    @Override
+    public void routeTable(com.codename1.flutter.navigation.Navigator.RouteTable table) {
+        this.routeTable = table;
+    }
+
+    @Override
+    public com.codename1.flutter.navigation.Navigator.RouteTable routeTable() {
+        return routeTable;
+    }
 
     private String title;
     private ThemeData theme;
@@ -274,8 +288,11 @@ public class MaterialApp extends StatelessWidget {
     @Override
     public Widget build(BuildContext context) {
         // Publish the app's route table so Navigator.pushNamed(...) from anywhere
-        // below can resolve a name the same way this build does.
-        com.codename1.flutter.navigation.Navigator.installRouteTable(routes, onGenerateRoute, onUnknownRoute);
+        // below can resolve a name the same way this build does. The table belongs
+        // to THIS app: a study is a MaterialApp of its own, and one global table
+        // meant opening a study permanently replaced the gallery's.
+        boolean rootApp = com.codename1.flutter.navigation.Navigator.installRouteTable(
+                context, routes, onGenerateRoute, onUnknownRoute);
 
         Widget content = home;
         // A routing-based app (no home widget) renders its initial route — Flutter
@@ -293,7 +310,7 @@ public class MaterialApp extends StatelessWidget {
             content = self == null ? null : self.routeContent();
             if (content == null) {
                 Route route = com.codename1.flutter.navigation.Navigator.resolveRoute(
-                        initialRoute != null ? initialRoute : "/", null);
+                        context, initialRoute != null ? initialRoute : "/", null);
                 if (route instanceof MaterialPageRoute) {
                     Funcs.Func1<BuildContext, Widget> b =
                             ((MaterialPageRoute) route).getBuilder();
@@ -311,7 +328,7 @@ public class MaterialApp extends StatelessWidget {
         // tap, a test harness - inherits from here, so it sees the same Theme,
         // MediaQuery, Localizations and providers a push from a widget would.
         return wrapWithLocalizations(
-                new com.codename1.flutter.navigation.Navigator.RootScope(content));
+                new com.codename1.flutter.navigation.Navigator.RootScope(content, rootApp));
     }
 
     /**

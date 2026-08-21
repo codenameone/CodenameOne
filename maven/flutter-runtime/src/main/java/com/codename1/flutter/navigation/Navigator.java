@@ -184,72 +184,158 @@ public class Navigator extends StatelessWidget {
     // — the gallery reaches every one of its demos this way
     // (Navigator.of(context).restorablePushNamed('/demo/<slug>')).
 
-    private static Object routesTable;
-    private static Funcs.Func1<RouteSettings, Route> generateRoute;
-    private static Funcs.Func1<RouteSettings, Route> unknownRoute;
+    /**
+     * One app's route table: the {@code routes} map plus the two callbacks.
+     *
+     * <p>Per app, not per process. A study inside the gallery is a whole
+     * {@code MaterialApp} of its own, and while one global table was kept the
+     * study's table replaced the gallery's the moment the study built —
+     * permanently, since popping back does not rebuild the outer app. After
+     * one visit to Reply, every other study route resolved to nothing ("no
+     * route for '/shrine'") and re-entering Reply mounted its page under a
+     * table, and a root scope, that belonged to the wrong app.</p>
+     */
+    public static final class RouteTable {
 
-    /** Publishes the app's route table; called by MaterialApp on build. */
+        private final Object routes;
+        private final Funcs.Func1<RouteSettings, Route> generate;
+        private final Funcs.Func1<RouteSettings, Route> unknown;
+
+        RouteTable(Object routes, Funcs.Func1<RouteSettings, Route> generate,
+                Funcs.Func1<RouteSettings, Route> unknown) {
+            this.routes = routes;
+            this.generate = generate;
+            this.unknown = unknown;
+        }
+
+        /**
+         * Flutter's order: the {@code routes} map first, then
+         * {@code onGenerateRoute}, then {@code onUnknownRoute}.
+         */
+        @SuppressWarnings("unchecked")
+        Route resolve(RouteSettings settings) {
+            if (routes instanceof java.util.Map) {
+                Object builder = ((java.util.Map<Object, Object>) routes).get(settings.name());
+                if (builder instanceof Funcs.Func1) {
+                    MaterialPageRoute<Object> route = new MaterialPageRoute<Object>();
+                    route.builder((Funcs.Func1<BuildContext, Widget>) builder);
+                    route.settings(settings);
+                    return route;
+                }
+            }
+            Route r = generate != null ? generate.call(settings) : null;
+            if (r == null && unknown != null) {
+                r = unknown.call(settings);
+            }
+            return r;
+        }
+    }
+
+    /**
+     * Implemented by a widget that publishes a route table — {@code MaterialApp}
+     * and anything else that behaves like an app root. The table hangs off the
+     * widget so an ancestor walk finds the nearest one.
+     */
+    public interface RouteTableHost {
+
+        void routeTable(RouteTable table);
+
+        RouteTable routeTable();
+    }
+
+    /** The outermost app's table: what a context-less push resolves against. */
+    private static RouteTable rootTable;
+
+    /**
+     * Publishes an app's route table; called by MaterialApp on build.
+     *
+     * @return whether this is the ROOT app — no other app above it — which is
+     *         also what decides who owns the process-wide root scope
+     */
+    public static boolean installRouteTable(BuildContext owner, Object routes,
+            Funcs.Func1<RouteSettings, Route> onGenerateRoute,
+            Funcs.Func1<RouteSettings, Route> onUnknownRoute) {
+        RouteTable table = new RouteTable(routes, onGenerateRoute, onUnknownRoute);
+        Element self = owner instanceof Element ? (Element) owner : null;
+        if (self != null && self.widget() instanceof RouteTableHost) {
+            ((RouteTableHost) self.widget()).routeTable(table);
+        }
+        boolean root = self == null || hostAbove(self.ancestor()) == null;
+        if (root) {
+            rootTable = table;
+        }
+        return root;
+    }
+
+    /** Publishes a table with no owning element — tests and bare trees. */
     public static void installRouteTable(Object routes,
             Funcs.Func1<RouteSettings, Route> onGenerateRoute,
             Funcs.Func1<RouteSettings, Route> onUnknownRoute) {
-        routesTable = routes;
-        generateRoute = onGenerateRoute;
-        unknownRoute = onUnknownRoute;
+        installRouteTable(null, routes, onGenerateRoute, onUnknownRoute);
     }
 
     /** Test / hot-restart hook: forgets the installed route table. */
     public static void resetRouteTable() {
-        routesTable = null;
-        generateRoute = null;
-        unknownRoute = null;
+        rootTable = null;
+    }
+
+    /** The nearest route-table host at or above {@code e}, or null. */
+    private static RouteTableHost hostAbove(Element e) {
+        while (e != null) {
+            if (e.widget() instanceof RouteTableHost
+                    && ((RouteTableHost) e.widget()).routeTable() != null) {
+                return (RouteTableHost) e.widget();
+            }
+            e = e.ancestor();
+        }
+        return null;
     }
 
     /**
-     * Resolves a route name the way Flutter does — the {@code routes} map
-     * first, then {@code onGenerateRoute}, then {@code onUnknownRoute} — or
-     * null when nothing claims the name.
+     * Resolves a route name against the table of the nearest app above
+     * {@code context}, or — for a push from outside the tree — the root app's.
+     * Null when nothing claims the name.
      */
-    @SuppressWarnings("unchecked")
-    public static Route resolveRoute(String name, Object arguments) {
+    public static Route resolveRoute(BuildContext context, String name, Object arguments) {
         RouteSettings settings = new RouteSettings();
         settings.name(name);
         settings.arguments(arguments);
 
-        if (routesTable instanceof java.util.Map) {
-            Object builder = ((java.util.Map<Object, Object>) routesTable).get(name);
-            if (builder instanceof Funcs.Func1) {
-                MaterialPageRoute<Object> route = new MaterialPageRoute<Object>();
-                route.builder((Funcs.Func1<BuildContext, Widget>) builder);
-                route.settings(settings);
-                return route;
-            }
-        }
-        Route r = generateRoute != null ? generateRoute.call(settings) : null;
-        if (r == null && unknownRoute != null) {
-            r = unknownRoute.call(settings);
+        RouteTableHost host = context instanceof Element
+                ? hostAbove((Element) context) : null;
+        Route r = host != null ? host.routeTable().resolve(settings) : null;
+        if (r == null && rootTable != null
+                && (host == null || host.routeTable() != rootTable)) {
+            // A nested app that does not know the name: fall through to the
+            // app that owns the whole process, which is where a name it has
+            // never heard of ('/demo/banner' from inside a study) belongs.
+            r = rootTable.resolve(settings);
         }
         return r;
     }
 
+    /** Resolves against the root app's table. */
+    public static Route resolveRoute(String name, Object arguments) {
+        return resolveRoute(null, name, arguments);
+    }
+
     /**
      * Resolves a route name and pushes it, returning whether anything was
-     * pushed. An unresolvable name is logged rather than thrown: a dead link
-     * in one corner of an app should not take the app down.
+     * pushed. An unresolvable name is reported rather than thrown: a dead link
+     * in one corner of an app should not take the app down — but it IS a
+     * failure, and a screen that never opened must not read as a screen that
+     * opened cleanly.
      */
     public static boolean pushNamed(BuildContext context, String name, Object arguments) {
-        Route route = resolveRoute(name, arguments);
+        Route route = resolveRoute(context, name, arguments);
         if (route instanceof MaterialPageRoute) {
             // Name the screen so any error it raises reports where it happened.
             com.codename1.flutter.FlutterErrorReport.route(name);
             push(context, (MaterialPageRoute) route);
             return true;
         }
-        try {
-            com.codename1.io.Log.p("Flutter runtime: no route for '" + name + "'"
-                    + (route == null ? "" : " (unsupported route type " + route.getClass().getName() + ")"));
-        } catch (Throwable t) {
-            // headless: Log has no storage backend
-        }
+        com.codename1.flutter.FlutterErrorReport.noRoute(name, route == null ? null
+                : "(unsupported route type " + route.getClass().getName() + ")");
         return false;
     }
 
@@ -377,14 +463,29 @@ public class Navigator extends StatelessWidget {
     public static final class RootScope extends com.codename1.flutter.StatelessWidget {
 
         private final Widget child;
+        private final boolean root;
 
         public RootScope(Widget child) {
+            this(child, true);
+        }
+
+        /**
+         * @param root whether this scope belongs to the OUTERMOST app. A study
+         *             is a MaterialApp of its own and inserts a scope too; if
+         *             that one claimed the process-wide position, then once the
+         *             study was popped the remembered context was unmounted and
+         *             every later context-less push mounted its page above the
+         *             app's Theme, MediaQuery and Localizations — where
+         *             {@code GalleryLocalizations.of(context)!} is null.
+         */
+        public RootScope(Widget child, boolean root) {
             this.child = child;
+            this.root = root;
         }
 
         @Override
         public Widget build(BuildContext context) {
-            if (context instanceof com.codename1.flutter.Element) {
+            if (root && context instanceof com.codename1.flutter.Element) {
                 rootScopeContext = (com.codename1.flutter.Element) context;
             }
             return child;

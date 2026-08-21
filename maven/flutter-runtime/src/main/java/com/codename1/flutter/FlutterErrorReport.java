@@ -202,6 +202,37 @@ public final class FlutterErrorReport {
     }
 
     /**
+     * Records a route name that resolved to nothing.
+     *
+     * <p>This used to be a log line, and a screen that never opened therefore read
+     * as a screen that opened cleanly: a sweep that walks every route and asks for
+     * the error inventory said "0 routes reported something" while five of the six
+     * studies had silently not opened at all, leaving whatever was already showing
+     * on screen to be screenshotted in their place.</p>
+     *
+     * @param name   the route that was asked for
+     * @param detail what went wrong, or null for "nothing claimed the name"
+     */
+    public static synchronized void noRoute(String name, String detail) {
+        String message = "no route for '" + name + "'" + (detail == null ? "" : " " + detail);
+        String key = "no-route|" + message;
+        Entry existing = ENTRIES.get(key);
+        if (existing != null) {
+            existing.count++;
+            return;
+        }
+        Entry entry = new Entry("no-route", message,
+                dart.runtime.DartRuntime.diagnosticContext(), name, null);
+        ENTRIES.put(key, entry);
+        ORDER.add(entry);
+        try {
+            Log.p("Flutter error: " + entry);
+        } catch (Throwable ignored) {
+            // headless: Log has no storage backend
+        }
+    }
+
+    /**
      * Records that a widget rendered without its intended effect — a stub that passes
      * its child through, or draws nothing at all.
      *
