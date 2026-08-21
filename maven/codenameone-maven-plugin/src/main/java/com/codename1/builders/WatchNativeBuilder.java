@@ -1078,7 +1078,7 @@ class WatchNativeBuilder {
     ///
     /// Returns `at` when it is already outside both, the position just past the enclosing
     /// construct when it is not, and -1 when that construct never ends.
-    private static int skipMarkupBefore(String inject, int at, int from) {
+    static int skipMarkupBefore(String inject, int at, int from) {
         int cdata = inject.indexOf(CDATA_OPEN, from);
         int comment = inject.indexOf(COMMENT_OPEN, from);
         boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);

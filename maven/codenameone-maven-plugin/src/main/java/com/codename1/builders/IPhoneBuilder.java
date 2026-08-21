@@ -5782,11 +5782,11 @@ public class IPhoneBuilder extends Executor {
      */
     static String stampInfoPlistIdentity(String plist, String shortVersion, String bundleVersion,
             List<String> changes) {
-        if (plist == null || plist.lastIndexOf("</dict>") < 0) {
+        if (plist == null || rootDictAt(plist) < 0) {
             changes.add("not an XML property list");
             return null;
         }
-        String result = plist;
+        String result = openEmptyRootDict(plist);
         result = setPlistString(result, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)", false, changes);
         result = setPlistString(result, "CFBundleShortVersionString", shortVersion, true, changes);
         result = setPlistString(result, "CFBundleVersion", bundleVersion, true, changes);
@@ -5794,34 +5794,39 @@ public class IPhoneBuilder extends Executor {
     }
 
     /**
-     * Sets one string key in an XML plist, adding it when absent.
+     * Sets one string key among the ROOT dict's direct children, adding it when absent.
      *
-     * @param overwrite whether an existing literal value is replaced when it differs; false only
-     * adds the key when it is missing
+     * <p>Every lookup here is anchored to the top level because a plist is full of nested
+     * dictionaries that carry keys of their own -- NSExtension, CFBundleURLTypes,
+     * CFBundleDocumentTypes -- and a repository-wide text search finds whichever comes first in
+     * the file, not the bundle's identity. Reading a nested one as "already present" leaves the
+     * real key absent, and writing to it stamps a version number into an unrelated value.</p>
+     *
+     * @param overwriteNonEmpty whether a value that is already there and not empty is replaced
+     * when it differs. False fills only what is missing or empty, which is what an identifier
+     * wants: an explicit one is the extension's own business, an empty one is no identifier at
+     * all and fails the same embedded-binary validation as a missing one.
      */
-    private static String setPlistString(String plist, String key, String value, boolean overwrite,
-            List<String> changes) {
+    private static String setPlistString(String plist, String key, String value,
+            boolean overwriteNonEmpty, List<String> changes) {
         if (value == null || value.length() == 0) {
             return plist;
         }
-        // The key's OWN value, through the watch builder's scanners, which is not the same as the
-        // next <string> after it. A key whose value is <false/>, <integer>1</integer> or the valid
-        // empty form <string/> has no <string> of its own, and scanning forward from the key lands
-        // on an unrelated later one -- CFBundleName, or something inside the NSExtension dict --
-        // which this method would then rewrite with a version number. The same trap the comment on
-        // injectedPlistString records, in a real plist rather than a hint fragment.
-        int afterKey = WatchNativeBuilder.injectedValueAt(plist, key);
+        int afterKey = topLevelKeyEnd(plist, key);
         if (afterKey < 0) {
-            int dictEnd = plist.lastIndexOf("</dict>");
+            int dictEnd = rootDictCloseAt(plist);
+            if (dictEnd < 0) {
+                return plist;
+            }
             changes.add("added " + key + " = " + value);
             return plist.substring(0, dictEnd)
                     + "\t<key>" + key + "</key>\n\t<string>" + value + "</string>\n"
                     + plist.substring(dictEnd);
         }
-        if (!overwrite) {
-            return plist;
-        }
-        int element = WatchNativeBuilder.nextElementAt(plist, afterKey);
+        // The key's OWN value, not the next <string> anywhere after it. A key whose value is
+        // <false/> or <integer>1</integer> has no string of its own, and scanning forward lands on
+        // an unrelated later one -- the trap the comment on injectedPlistString records.
+        int element = nextMarkupAt(plist, afterKey);
         if (element < 0 || !"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
             // Not a string value. An extension is free to use whatever type it likes, and
             // rewriting a type we did not expect is worse than leaving a version alone.
@@ -5832,8 +5837,11 @@ public class IPhoneBuilder extends Executor {
             return plist;
         }
         if (plist.charAt(openEnd - 1) == '/') {
-            // <string/>: an empty value of the right type, so it is this key's and ours to fill.
-            changes.add("set " + key + " to " + value + " to match the app (was empty)");
+            // The empty form, <string/> or <string />: XML puts the slash against the '>' whatever
+            // whitespace precedes it, so one test covers both spellings. It is this key's own
+            // value and it is empty, which is never a usable identifier or version -- filled
+            // regardless of overwriteNonEmpty, since there is nothing here to preserve.
+            changes.add("set " + key + " to " + value + " (was empty)");
             return plist.substring(0, element) + "<string>" + value + "</string>"
                     + plist.substring(openEnd + 1);
         }
@@ -5842,11 +5850,179 @@ public class IPhoneBuilder extends Executor {
             return plist;
         }
         String current = plist.substring(openEnd + 1, valueEnd);
-        if (current.equals(value) || current.contains("$(")) {
+        if (current.trim().length() == 0) {
+            changes.add("set " + key + " to " + value + " (was empty)");
+            return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
+        }
+        if (!overwriteNonEmpty || current.equals(value) || current.contains("$(")) {
             return plist;
         }
         changes.add("set " + key + " to " + value + " to match the app (was " + current + ")");
         return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
+    }
+
+    /// A root written as {@code <dict/>} carries no keys and has nowhere to put one, so it is
+    /// opened into a pair before anything is added to it.
+    private static String openEmptyRootDict(String plist) {
+        int at = rootDictAt(plist);
+        int openEnd = at < 0 ? -1 : plist.indexOf('>', at);
+        if (openEnd < 0 || plist.charAt(openEnd - 1) != '/') {
+            return plist;
+        }
+        return plist.substring(0, at) + "<dict>\n</dict>" + plist.substring(openEnd + 1);
+    }
+
+    /// Index just past the {@code </key>} of {@code key}, when that key is a DIRECT child of the
+    /// root dict; -1 when the root dict has no such child. Nested dictionaries are stepped over
+    /// whole, so a key of the same name inside one is not mistaken for the bundle's own.
+    private static int topLevelKeyEnd(String plist, String key) {
+        int at = rootDictAt(plist);
+        int i = at < 0 ? -1 : plist.indexOf('>', at);
+        if (i < 0 || plist.charAt(i - 1) == '/') {
+            return -1;
+        }
+        i++;
+        while (true) {
+            int element = nextMarkupAt(plist, i);
+            if (element < 0 || plist.startsWith("</", element)) {
+                return -1;
+            }
+            int openEnd = plist.indexOf('>', element);
+            if (openEnd < 0) {
+                return -1;
+            }
+            if (!"key".equals(WatchNativeBuilder.tagAt(plist, element))) {
+                // A value with no key of ours in front of it. Step over it whole.
+                i = endOfElement(plist, element);
+                if (i < 0) {
+                    return -1;
+                }
+                continue;
+            }
+            if (plist.charAt(openEnd - 1) == '/') {
+                i = openEnd + 1;
+                continue;
+            }
+            int close = WatchNativeBuilder.closeOfElement(plist, openEnd + 1, "</key>");
+            int afterKey = close < 0 ? -1 : plist.indexOf('>', close);
+            if (afterKey < 0) {
+                return -1;
+            }
+            afterKey++;
+            // The key's CONTENT resolved, so a name spelled with CDATA or wrapped in a comment
+            // still matches -- an XML parser reads all of those as the same key.
+            String name = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, close));
+            if (key.equals(name)) {
+                return afterKey;
+            }
+            int valueElement = nextMarkupAt(plist, afterKey);
+            if (valueElement < 0) {
+                return -1;
+            }
+            i = endOfElement(plist, valueElement);
+            if (i < 0) {
+                return -1;
+            }
+        }
+    }
+
+    /// The {@code <} of the plist's root dict, or -1 when this is not a dict-rooted XML plist.
+    /// The declaration, the doctype and the {@code <plist>} wrapper are stepped past.
+    private static int rootDictAt(String plist) {
+        int i = 0;
+        while (true) {
+            int element = nextMarkupAt(plist, i);
+            if (element < 0) {
+                return -1;
+            }
+            int gt = plist.indexOf('>', element);
+            if (gt < 0) {
+                return -1;
+            }
+            String tag = WatchNativeBuilder.tagAt(plist, element);
+            if ("dict".equals(tag)) {
+                return element;
+            }
+            if (tag.length() > 0 && !"plist".equals(tag)) {
+                // A plist rooted in an array or a bare value. It has no keys to stamp.
+                return -1;
+            }
+            i = gt + 1;
+        }
+    }
+
+    /// The {@code <} of the tag that closes the root dict, which is where a missing key is added.
+    private static int rootDictCloseAt(String plist) {
+        int at = rootDictAt(plist);
+        int end = at < 0 ? -1 : endOfElement(plist, at);
+        return end < 0 ? -1 : plist.lastIndexOf('<', end);
+    }
+
+    /// Index just past the element opening at {@code element}, everything nested inside it
+    /// included. Depth is counted on the element's own name, so a dict inside a dict closes in
+    /// the right place.
+    private static int endOfElement(String plist, int element) {
+        String tag = WatchNativeBuilder.tagAt(plist, element);
+        int openEnd = plist.indexOf('>', element);
+        if (openEnd < 0) {
+            return -1;
+        }
+        if (plist.charAt(openEnd - 1) == '/') {
+            return openEnd + 1;
+        }
+        int depth = 1;
+        int i = openEnd + 1;
+        while (depth > 0) {
+            int at = nextMarkupAt(plist, i);
+            if (at < 0) {
+                return -1;
+            }
+            int gt = plist.indexOf('>', at);
+            if (gt < 0) {
+                return -1;
+            }
+            if (plist.startsWith("</", at)) {
+                if (tag.equals(closeTagAt(plist, at))) {
+                    depth--;
+                }
+            } else if (plist.charAt(gt - 1) != '/'
+                    && tag.equals(WatchNativeBuilder.tagAt(plist, at))) {
+                depth++;
+            }
+            i = gt + 1;
+        }
+        return i;
+    }
+
+    /// The element name of the end tag at {@code at}, lowercased, or empty when that is not one.
+    private static String closeTagAt(String plist, int at) {
+        StringBuilder tag = new StringBuilder();
+        for (int j = at + 2; j < plist.length() && Character.isLetterOrDigit(plist.charAt(j)); j++) {
+            tag.append(plist.charAt(j));
+        }
+        return tag.toString().toLowerCase(java.util.Locale.ENGLISH);
+    }
+
+    /// The {@code <} of the next markup at or after {@code from}, with comments and CDATA stepped
+    /// over whole so a {@code <} inside either is not read as a tag.
+    private static int nextMarkupAt(String plist, int from) {
+        int i = from;
+        while (i < plist.length()) {
+            int at = plist.indexOf('<', i);
+            if (at < 0) {
+                return -1;
+            }
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, i);
+            if (skipped < 0) {
+                return -1;
+            }
+            if (skipped != at) {
+                i = skipped;
+                continue;
+            }
+            return at;
+        }
+        return -1;
     }
 
     /// The Info.plist the extension target is actually built with.
