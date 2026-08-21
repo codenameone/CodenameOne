@@ -540,6 +540,29 @@ public class Window extends Container implements TopLevelContainer {
         commandListeners.fireActionEvent(ev);
     }
 
+    /// Adds a component to the window's own border layout, outside the content pane,
+    /// which is where structural furniture such as a permanent side menu belongs. The
+    /// counterpart of `Form`'s form-level add.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraints`: the layout constraint
+    ///
+    /// - `cmp`: the component to add
+    final void addComponentToWindow(Object constraints, Component cmp) {
+        super.addComponent(constraints, cmp);
+    }
+
+    /// Removes a component previously added with
+    /// `#addComponentToWindow(Object, Component)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to remove
+    void removeComponentFromWindow(Component cmp) {
+        super.removeComponent(cmp);
+    }
+
     @Override
     public void dispatchCommand(Command cmd, ActionEvent ev) {
         cmd.actionPerformed(ev);

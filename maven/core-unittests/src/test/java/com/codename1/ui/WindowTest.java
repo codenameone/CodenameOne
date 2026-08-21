@@ -33,6 +33,7 @@ import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -2727,6 +2728,23 @@ class WindowTest extends UITestBase {
         }
     }
 
+    /// Finds the button a `Command` was rendered into, anywhere under the top level.
+    private static Button findButtonForCommand(Container c, Command cmd) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Button && ((Button) cmp).getCommand() == cmd) {
+                return (Button) cmp;
+            }
+            if (cmp instanceof Container) {
+                Button b = findButtonForCommand((Container) cmp, cmd);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
+    }
+
     /// Finds the first button carrying a `Command`, which is how the test reaches a
     /// toolbar's back arrow without a public accessor for it.
     private static Button findFirstCommandButton(Container c) {
@@ -2869,6 +2887,66 @@ class WindowTest extends UITestBase {
             assertFalse(tb.isHidden(),
                     "the restored toolbar must be visible again");
         } finally {
+            w.dispose();
+        }
+    }
+
+
+    @FormTest
+    void addingAPermanentSideMenuCommandInsideAWindowWorks() {
+        implementation.setMultiWindowSupported(true);
+        boolean oldPermanent = Toolbar.isPermanentSideMenu();
+        Toolbar.setPermanentSideMenu(true);
+        Window w = new Window("menu", new BorderLayout());
+        try {
+            w.setWindowSize(400, 300);
+            Toolbar tb = new Toolbar();
+            w.setToolbar(tb);
+            w.show();
+            w.revalidate();
+
+            // markInstalledOnWindow raises the initialized flag, so this call gets past
+            // checkIfInitialized -- and then constructPermanentSideMenu assigned
+            // getComponentForm() to a local and dereferenced it, which is null here.
+            Command item = new Command("Item");
+            tb.addCommandToLeftSideMenu(item);
+            w.revalidate();
+
+            assertNotNull(findButtonForCommand(w, item),
+                    "the side menu command must end up in the window's own hierarchy");
+        } finally {
+            Toolbar.setPermanentSideMenu(oldPermanent);
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void sideMenuCommandsOfAWindowToolbarReadTheWindowsCommands() {
+        implementation.setMultiWindowSupported(true);
+        boolean oldPermanent = Toolbar.isPermanentSideMenu();
+        boolean oldOnTop = Toolbar.isOnTopSideMenu();
+        Toolbar.setPermanentSideMenu(false);
+        Toolbar.setOnTopSideMenu(false);
+        Window w = new Window("menu", new BorderLayout());
+        try {
+            w.setWindowSize(400, 300);
+            Toolbar tb = new Toolbar();
+            w.setToolbar(tb);
+            w.show();
+            Command item = new Command("Item");
+            w.addCommand(item);
+
+            // Without a side menu container this read the command list off
+            // getComponentForm() with no null check at all.
+            ArrayList<Command> found = new ArrayList<Command>();
+            for (Command c : tb.getSideMenuCommands()) {
+                found.add(c);
+            }
+            assertTrue(found.contains(item),
+                    "a window toolbar's side menu commands are the window's commands");
+        } finally {
+            Toolbar.setPermanentSideMenu(oldPermanent);
+            Toolbar.setOnTopSideMenu(oldOnTop);
             w.dispose();
         }
     }

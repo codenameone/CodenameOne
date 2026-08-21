@@ -291,4 +291,40 @@ final class TopLevelSupport {
                     + "Guard with Desktop.isSupported() or CN.isMultiWindowSupported().");
         }
     }
+
+    /// Adds a component to the top level's own layout, outside the content pane. Both
+    /// `Form` and `Window` keep that structural add package private rather than on
+    /// `TopLevelContainer`, since widening it would hand every caller a way to place
+    /// components beside the content pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to add to
+    ///
+    /// - `constraints`: the layout constraint
+    ///
+    /// - `cmp`: the component to add
+    static void addComponentToTopLevel(TopLevelContainer top, Object constraints, Component cmp) {
+        if (top instanceof Form) {
+            ((Form) top).addComponentToForm(constraints, cmp);
+        } else if (top instanceof Window) {
+            ((Window) top).addComponentToWindow(constraints, cmp);
+        }
+    }
+
+    /// The counterpart to
+    /// `#addComponentToTopLevel(TopLevelContainer, Object, Component)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to remove from
+    ///
+    /// - `cmp`: the component to remove
+    static void removeComponentFromTopLevel(TopLevelContainer top, Component cmp) {
+        if (top instanceof Form) {
+            ((Form) top).removeComponentFromForm(cmp);
+        } else if (top instanceof Window) {
+            ((Window) top).removeComponentFromWindow(cmp);
+        }
+    }
 }

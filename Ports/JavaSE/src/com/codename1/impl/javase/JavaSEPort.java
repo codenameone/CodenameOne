@@ -14769,6 +14769,32 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
         
+        /**
+         * Converts one axis of a screen coordinate into the owning canvas's Codename
+         * One coordinate space.
+         *
+         * <p>The scale passed in is the <em>owning canvas's</em>, not the global
+         * retinaScale. A peer is laid out with peerScale(), which already answers from
+         * the canvas's monitor; converting the hit test with the main monitor's scale
+         * instead makes the preliminary lookup in sendToCn1() test a different point
+         * than the peer occupies on a mixed-DPI desktop. That lookup can then find an
+         * unrelated component, set cn1GrabbedDrag and swallow mouse input meant for a
+         * browser or other native control.
+         *
+         * @param screenCoordinate the event's coordinate on screen
+         * @param canvasOriginOnScreen the owning canvas's origin on screen
+         * @param canvasOffset the owning canvas's offset within its frame
+         * @param screenCoordsOffset the skin's screen-coordinate offset
+         * @param zoom the active zoom level
+         * @param canvasScale the owning canvas's backing scale
+         * @return the coordinate in the canvas's Codename One space
+         */
+        static int toCn1Coordinate(int screenCoordinate, int canvasOriginOnScreen,
+                int canvasOffset, int screenCoordsOffset, double zoom, double canvasScale) {
+            return (int) ((screenCoordinate - canvasOriginOnScreen
+                    - (canvasOffset + screenCoordsOffset) * zoom / canvasScale) / zoom * canvasScale);
+        }
+
         private int getCN1X(MouseEvent e) {
             if (ownerCanvas() == null) {
                 int out = e.getXOnScreen();
@@ -14807,7 +14833,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            return (int)((x - ownerCanvas().getLocationOnScreen().x - (ownerCanvas().x + screenCoords.x) * zoom / retinaScale) / zoom * retinaScale);
+            return toCn1Coordinate(x, ownerCanvas().getLocationOnScreen().x,
+                    ownerCanvas().x, screenCoords.x, zoom, ownerCanvas().canvasScale());
         }
 
         private int getCN1Y(MouseEvent e) {
@@ -14847,7 +14874,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            return (int)((y - ownerCanvas().getLocationOnScreen().y - (ownerCanvas().y + screenCoords.y) * zoom / retinaScale) / zoom * retinaScale);
+            return toCn1Coordinate(y, ownerCanvas().getLocationOnScreen().y,
+                    ownerCanvas().y, screenCoords.y, zoom, ownerCanvas().canvasScale());
 
         }
         

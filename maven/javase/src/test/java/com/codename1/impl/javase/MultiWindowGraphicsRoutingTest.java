@@ -457,4 +457,37 @@ class MultiWindowGraphicsRoutingTest {
             secondary.disposeGestureListeners();
         }
     }
+
+    @Test
+    void aPeerHitTestConvertsWithItsOwnCanvasScale() {
+        // The companion to aPeerIsScaledForItsOwnWindowsMonitorNotTheMainDisplay: the
+        // peer is positioned with peerScale(), so the hit test that decides whether a
+        // mouse event belongs to it has to use the same scale. Converting with the
+        // global retinaScale instead tests a different point on a mixed-DPI desktop,
+        // and the lookup can then find an unrelated component, set cn1GrabbedDrag and
+        // swallow input meant for a browser or native editor.
+        //
+        // The conversion is isolated in a helper precisely so this can be checked
+        // without showing a real window on a second monitor.
+        int screenCoordinate = 400;
+        int canvasOriginOnScreen = 100;
+        int canvasOffset = 10;
+        int screenCoordsOffset = 5;
+        double zoom = 1.0;
+        double canvasMonitorScale = 2.0;
+        double mainDisplayScale = 1.0;
+
+        int withOwnCanvas = JavaSEPort.CN1JPanel.toCn1Coordinate(screenCoordinate,
+                canvasOriginOnScreen, canvasOffset, screenCoordsOffset, zoom, canvasMonitorScale);
+        int withMainDisplay = JavaSEPort.CN1JPanel.toCn1Coordinate(screenCoordinate,
+                canvasOriginOnScreen, canvasOffset, screenCoordsOffset, zoom, mainDisplayScale);
+
+        assertNotEquals(withMainDisplay, withOwnCanvas,
+                "the two scales have to disagree or this test proves nothing");
+        assertEquals((int) ((screenCoordinate - canvasOriginOnScreen
+                        - (canvasOffset + screenCoordsOffset) * zoom / canvasMonitorScale)
+                        / zoom * canvasMonitorScale),
+                withOwnCanvas,
+                "a hit test must convert with the owning canvas's backing scale");
+    }
 }

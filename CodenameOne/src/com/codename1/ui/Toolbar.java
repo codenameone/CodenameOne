@@ -1560,13 +1560,20 @@ public class Toolbar extends Container {
     private void constructPermanentSideMenu() {
         if (permanentSideMenuContainer == null) {
             permanentSideMenuContainer = constructSideNavigationComponent();
-            Form parent = getComponentForm();
+            // Through the top level: markInstalledOnWindow lets a toolbar in a Window
+            // past checkIfInitialized, so this is reachable there, and
+            // getComponentForm() is null by design in a Window.
+            TopLevelContainer parent = getTopLevelContainer();
+            if (parent == null) {
+                return;
+            }
             if (sidemenuSouthComponent != null) {
                 Container c = BorderLayout.center(permanentSideMenuContainer);
                 c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
-                parent.addComponentToForm(BorderLayout.WEST, c);
+                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.WEST, c);
             } else {
-                parent.addComponentToForm(BorderLayout.WEST, permanentSideMenuContainer);
+                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.WEST,
+                        permanentSideMenuContainer);
             }
         }
     }
@@ -1574,13 +1581,17 @@ public class Toolbar extends Container {
     private void constructPermanentRightSideMenu() {
         if (permanentRightSideMenuContainer == null) {
             permanentRightSideMenuContainer = constructRightSideNavigationComponent();
-            Form parent = getComponentForm();
+            TopLevelContainer parent = getTopLevelContainer();
+            if (parent == null) {
+                return;
+            }
             if (rightSidemenuSouthComponent != null) {
                 Container c = BorderLayout.center(permanentRightSideMenuContainer);
                 c.add(BorderLayout.SOUTH, rightSidemenuSouthComponent);
-                parent.addComponentToForm(BorderLayout.EAST, c);
+                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.EAST, c);
             } else {
-                parent.addComponentToForm(BorderLayout.EAST, permanentRightSideMenuContainer);
+                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.EAST,
+                        permanentRightSideMenuContainer);
             }
         }
     }
@@ -1594,7 +1605,13 @@ public class Toolbar extends Container {
                 permanentRightSideMenuContainer = constructRightSideNavigationComponent();
             }
 
-            final Form parent = getComponentForm();
+            // As above, reachable for a toolbar installed in a Window. Every member
+            // used below is on Container, so the top level's container is enough.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel == null) {
+                return;
+            }
+            final Container parent = topLevel.asContainer();
             if (!isPointerPressedListenerAdded) {
                 parent.addPointerPressedListener(new ActionListener() {
                     @Override
@@ -1720,7 +1737,7 @@ public class Toolbar extends Container {
                 parent.addPointerDraggedListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
-                        Form f = getComponentForm();
+                        TopLevelContainer f = getTopLevelContainer();
                         if (f == null || Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || f.findCurrentlyEditingComponent() != null || f.isEditing()) {
                             return;
                         }
@@ -2238,11 +2255,14 @@ public class Toolbar extends Container {
                 sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
             } else {
                 if (permanentSideMenu && permanentSideMenuContainer != null) {
-                    Form parent = getComponentForm();
-                    parent.removeComponentFromForm(permanentSideMenuContainer);
+                    TopLevelContainer parent = getTopLevelContainer();
+                    if (parent == null) {
+                        return;
+                    }
+                    TopLevelSupport.removeComponentFromTopLevel(parent, permanentSideMenuContainer);
                     Container c = BorderLayout.center(permanentSideMenuContainer);
                     c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
-                    parent.addComponentToForm(BorderLayout.WEST, c);
+                    TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.WEST, c);
                 }
             }
         }
@@ -2268,11 +2288,14 @@ public class Toolbar extends Container {
                 rightSidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
             } else {
                 if (permanentSideMenu && permanentSideMenuContainer != null) {
-                    Form parent = getComponentForm();
-                    parent.removeComponentFromForm(permanentRightSideMenuContainer);
+                    TopLevelContainer parent = getTopLevelContainer();
+                    if (parent == null) {
+                        return;
+                    }
+                    TopLevelSupport.removeComponentFromTopLevel(parent, permanentRightSideMenuContainer);
                     Container c = BorderLayout.center(permanentRightSideMenuContainer);
                     c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
-                    parent.addComponentToForm(BorderLayout.EAST, c);
+                    TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.EAST, c);
                 }
             }
         }
@@ -2758,6 +2781,14 @@ public class Toolbar extends Container {
     /// Adds a status bar space to the north of the Component, subclasses can
     /// override this default behavior.
     protected void initTitleBarStatus() {
+        // markInstalledOnWindow calls this, so it runs for a toolbar in a Window too.
+        // A desktop window has no device status bar to leave room for -- the OS draws
+        // its own title bar outside the Codename One surface -- so it takes the same
+        // path as a Form that does not paint one.
+        if (getTopLevelContainer() instanceof Window) {
+            setSafeArea(true);
+            return;
+        }
         Form f = getComponentForm();
         if (f != null && !f.shouldPaintStatusBar()) {
             setSafeArea(true);
@@ -2970,9 +3001,9 @@ public class Toolbar extends Container {
     }
 
     private void bindScrollListener(boolean bind) {
-        final Form f = getComponentForm();
+        final TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
-            final Container actualPane = f.getActualPane();
+            final Container actualPane = TopLevelSupport.actualPaneOf(f);
             final Container contentPane = f.getContentPane();
             if (bind) {
                 initVars(actualPane);
@@ -3010,11 +3041,11 @@ public class Toolbar extends Container {
                                     actualPane.setSmoothScrolling(false);
                                     actualPane.setScrollY(scrollY - oldY + actualPane.getY());
                                     actualPane.setSmoothScrolling(smooth);
-                                    actualPane.setHeight(f.getHeight() - getHeight() - getY());
+                                    actualPane.setHeight(f.asContainer().getHeight() - getHeight() - getY());
 
                                     actualPane.doLayout();
                                 }
-                                f.repaint();
+                                f.asContainer().repaint();
                             }
                         } finally {
                             entered = false;
@@ -3036,7 +3067,7 @@ public class Toolbar extends Container {
                                 hideToolbar();
                             }
                         }
-                        f.repaint();
+                        f.asContainer().repaint();
                     }
                 };
                 contentPane.addPointerReleasedListener(releasedListener);
@@ -3114,7 +3145,13 @@ public class Toolbar extends Container {
             }
             return cmds;
         }
-        Form f = getComponentForm();
+        // Through the top level: a Window has commands of its own, and this
+        // dereference was unguarded, so asking a window's toolbar for its side menu
+        // commands threw.
+        TopLevelContainer f = getTopLevelContainer();
+        if (f == null) {
+            return cmds;
+        }
         int commands = f.getCommandCount();
         for (int iter = 0; iter < commands; iter++) {
             cmds.add(f.getCommand(iter));
