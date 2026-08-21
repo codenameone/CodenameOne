@@ -1,36 +1,36 @@
 {
-  "commit": "a4a684840af4c14905ca0c0466ddbf2f82b95363",
-  "generated_at": "2026-08-21T04:17:39Z",
+  "commit": "2b5a004eeab2cab16c6e06ec4b07eaa8017ca6fe",
+  "generated_at": "2026-08-21T04:59:53Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 811728000
+        "duration_ns": 363242000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 241130000
+        "duration_ns": 149571000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 215006000
+        "duration_ns": 162018000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 142136000
+        "duration_ns": 106986000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 608145000
+        "duration_ns": 422417000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 392942000
+        "duration_ns": 319426000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 999789000
+        "duration_ns": 705964000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32441458123",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32446174233",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 1,
+    "fail": 0,
     "not-run": 0,
-    "pass": 170,
+    "pass": 171,
     "skip": 8
   },
   "tests": {
@@ -525,10 +525,7 @@
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=capture-requested"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "PaletteOverrideThemeScreenshotTest": {
       "feature": "theme-palette-css",
