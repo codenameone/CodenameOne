@@ -7823,9 +7823,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     
+    /// tvOS and watchOS have no rotatable device orientation. IOSNative's
+    /// lockOrientation compiles the rotation away on both of those slices and
+    /// only records the requested lock, so answering true here promised callers
+    /// something the port cannot deliver. Anything that then waited for the
+    /// rotation to land waited for an event that could never arrive: an Apple TV
+    /// frame is landscape by construction, so a poll for portrait never settles
+    /// and burns its entire budget before giving up. That is what pushed
+    /// OrientationLockScreenshotTest past the compliance suite's per-test
+    /// timeout on tvOS. Reporting the truth sends those callers down their
+    /// fixed-orientation path immediately instead.
     @Override
     public boolean canForceOrientation() {
-        return true;
+        return !isWatch() && !isTV();
     }
 
     /*@Override
