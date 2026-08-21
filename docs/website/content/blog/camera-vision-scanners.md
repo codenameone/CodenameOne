@@ -71,6 +71,7 @@ flowchart LR
 {{< /mermaid >}}
 
 ```java
+Form previous = Display.getInstance().getCurrent();
 FaceDetector detector = new FaceDetector();
 VisionCameraView<Face[]> view = new VisionCameraView<>(detector);
 view.setFacing(CameraFacing.FRONT);
@@ -87,10 +88,16 @@ view.setListener(new VisionPipelineListener<Face[]>() {
 Form form = new Form("Faces", new BorderLayout());
 form.add(BorderLayout.CENTER, view);
 form.add(BorderLayout.SOUTH, countLabel);
+form.getToolbar().setBackCommand("Back", event -> {
+    view.close();
+    previous.showBack();
+});
 form.show();
 ```
 
 The analyzer remains caller-constructed. That is how the build decides which native model to package. A face-detection application should not carry barcode, pose, and segmentation dependencies merely because a high-level component knows those analyzers exist.
+
+Leaving the form temporarily stops the camera but keeps the analyzer ready in case the form is shown again. Call `close()` from the navigation path that discards the screen permanently. It releases both resources and cannot be reversed.
 
 ## Results use types and component coordinates
 

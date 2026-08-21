@@ -42,21 +42,37 @@ The port owns conversions that are easy to get wrong. Matter brightness uses a 0
 
 ```java
 SmartHome home = SmartHome.getInstance();
-HomeAvailability availability = home.getAvailability();
+home.refresh().onResult((structures, error) -> {
+    HomeAvailability availability = home.getAvailability();
 
-if (availability == HomeAvailability.PROVIDER_NOT_INSTALLED
-        || availability == HomeAvailability.PROVIDER_UPDATE_REQUIRED) {
-    home.openProviderSetup();
-    return;
-}
-if (availability == HomeAvailability.NOT_CONFIGURED) {
-    home.openEcosystemApp();
-    return;
-}
-if (availability == HomeAvailability.COMMISSIONING_ONLY) {
-    showAddDeviceOnlyUI();
-}
+    if (availability == HomeAvailability.PROVIDER_NOT_INSTALLED
+            || availability == HomeAvailability.PROVIDER_UPDATE_REQUIRED) {
+        home.openProviderSetup();
+        return;
+    }
+    if (availability == HomeAvailability.PERMISSION_REQUIRED) {
+        home.requestAuthorization();
+        return;
+    }
+    if (availability == HomeAvailability.PERMISSION_DENIED) {
+        home.openHomeSettings();
+        return;
+    }
+    if (availability == HomeAvailability.NOT_CONFIGURED) {
+        home.openEcosystemApp();
+        return;
+    }
+    if (error != null) {
+        Log.e(error);
+        return;
+    }
+    if (availability == HomeAvailability.COMMISSIONING_ONLY) {
+        showAddDeviceOnlyUI();
+    }
+});
 ```
+
+Read availability from the completion path even when `refresh()` fails. On iOS, the initial value is `NOT_STARTED` because connecting to HomeKit is what reveals the authorization and home state.
 
 `COMMISSIONING_ONLY` is the normal Android result without Google Home developer setup. Play services can add a Matter accessory to the user's Google Home. Reading or controlling the accessory graph requires Google Home APIs, a Google Cloud project, and a Home Developer Console registration containing the application's signing-key SHA-1. Codename One cannot create those credentials for an application.
 
@@ -105,7 +121,8 @@ Nothing in this release wakes a stopped application for an accessory change. The
 Both mobile ports hand Matter commissioning to a system-owned flow. The user may need to power on the accessory, hold a physical button, scan a label, and join Wi-Fi. The application receives no determinate progress to display.
 
 ```java
-Commissioner commissioner = SmartHome.getInstance().getCommissioner();
+SmartHome home = SmartHome.getInstance();
+Commissioner commissioner = home.getCommissioner();
 SetupPayload payload = SetupPayload.parse(scannedCode);
 
 commissioner.commission(new CommissioningRequest()
@@ -116,15 +133,22 @@ commissioner.commission(new CommissioningRequest()
             Log.e(error);
             return;
         }
-        if (result.wasCommissionedToThisApp()) {
-            SmartHome.getInstance().refresh();
-        } else {
+        if (home.getAvailability() == HomeAvailability.COMMISSIONING_ONLY) {
             showAddedToHome(result.getAccessoryName());
+            return;
         }
+
+        home.refresh().onResult((structures, refreshError) -> {
+            if (refreshError != null) {
+                Log.e(refreshError);
+                return;
+            }
+            showUpdatedHome(structures, result.getAccessoryId());
+        });
     });
 ```
 
-Success can mean the device joined the user's home without becoming addressable by the application. `wasCommissionedToThisApp()` distinguishes those outcomes.
+Success can mean the device joined the user's home without becoming addressable by the application. That is the normal result on an Android build with commissioning alone. On graph-capable builds, refresh after every successful flow. The default iOS Matter sheet does not return an accessory ID even though the new device appears in HomeKit, so the application must inspect the refreshed graph. `wasCommissionedToThisApp()` is useful when a backend returns a directly addressable ID, but it is not a substitute for that refresh.
 
 The iOS build adds HomeKit entitlements only when application code touches accessories. Commissioning lives in its own package because it adds a generated app-extension target. An application that never references `com.codename1.home` gets no framework, entitlement, Play services dependency, or extension.
 
