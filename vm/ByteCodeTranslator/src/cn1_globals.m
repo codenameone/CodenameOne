@@ -554,6 +554,55 @@ static void cn1ReportPacingParks(void) {
             minHead < 0 ? -1L : minHead / 1024);
 }
 
+// Mark-worklist overflow accounting, reported by CN1_LOG_GC_OVERFLOW at exit and
+// asserted on by GcOverflowSpiralIntegrationTest. Overflow is a correctness backstop that is
+// meant to be rare: recovering from it costs a full O(heap) rescan, so a workload that
+// overflows EVERY cycle has a collector several times slower than the one it is supposed
+// to have -- the runaway of issue #5537. The cycle count is the direct signal for that,
+// and unlike a footprint reading it is a property of the code rather than of how much
+// RAM the machine running it happened to have free.
+static _Atomic long cn1GcOverflowCycles = 0;
+static _Atomic long cn1GcGraceDrains = 0;
+// Calls to the FULL gcMarkDrain, which rescans allObjectsInHeap from index 0 every time.
+// A cycle makes a fixed handful of them by construction (roots, each grace pass, the
+// belt, the SATB fixpoint), so this figure tracks the cycle count and nothing else.
+// Cheap enough to leave in: one relaxed increment on a path that already walks the whole
+// heap.
+static _Atomic long cn1GcFullDrains = 0;
+// Of those, the ones made while a GRACE PASS is running. Exactly one per pass -- the full
+// drain that ends it -- and that is the point: the passes ALSO drain periodically to keep
+// the worklist from overflowing, and those drains must be worklist-only. Pointing them at
+// gcMarkDrain instead makes the cost of a pass quadratic in the heap; measured as a Mac
+// Catalyst screenshot suite that never finished a single collection, with the EDT stacked
+// up in the pacing park behind it. A count that tracks the number of periodic drains
+// rather than the number of passes is that regression, and it is a property of the code
+// rather than a timing, so it fails the same way on any machine.
+static _Atomic long cn1GcGraceFullDrains = 0;
+// Set only while a grace pass is running, on the GC thread that runs it.
+static __thread int cn1GcInGracePass = 0;
+static _Atomic int cn1GcOverflowTrace = -1;
+static int cn1GcOverflowTraceOn(void) {
+    int on = atomic_load_explicit(&cn1GcOverflowTrace, memory_order_relaxed);
+    if(on < 0) {
+        on = getenv("CN1_LOG_GC_OVERFLOW") ? 1 : 0;
+        atomic_store_explicit(&cn1GcOverflowTrace, on, memory_order_relaxed);
+    }
+    return on;
+}
+
+static void cn1ReportGcOverflow(void) {
+    if(!cn1GcOverflowTraceOn()) {
+        return;
+    }
+    fprintf(stderr, "[GC-OVERFLOW] overflowCycles=%ld graceDrains=%ld fullDrains=%ld"
+                    " graceFullDrains=%ld cycles=%d\n",
+            atomic_load_explicit(&cn1GcOverflowCycles, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcGraceDrains, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcFullDrains, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcGraceFullDrains, memory_order_relaxed),
+            currentGcMarkValue);
+}
+
 static void cn1ReportLowMemoryParks(void) {
     if(!cn1LowMemoryTraceOn()) {
         return;
@@ -1261,6 +1310,9 @@ static void cn1DrainDeadThreadPending() {
     unlockCriticalSection();
 }
 static void gcMarkDrain(CODENAME_ONE_THREAD_STATE);
+// Worklist-only drain (no heap rescan) -- see its definition for why the two are
+// separate functions and which callers may use which.
+static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE);
 // Parallel variant of gcMarkDrain: fans the transitive mark-drain out across a small
 // pool of worker threads. Falls back to the serial gcMarkDrain when only one marker
 // is configured. Defined further down (after gcMarkDrain). See the big comment block
@@ -1319,9 +1371,16 @@ long gcMarkNewObjectCount = 0;
 // without racing the others on this flag.
 static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
 #endif
-// Forward (tentative) declaration -- the real definition is below near the worklist;
-// the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
+// Forward (tentative) declarations -- the real definitions are below near the worklist.
+// The belt pass in codenameOneGCMark forces the overflow flag to trigger the full BiBOP
+// rescan, and the grace pass reads the cursor to drain before it can overflow (see the
+// interleaved drain there). The size macro is hoisted with them for the same reason;
+// its rationale stays at the worklist definition.
+#ifndef CN1_GC_MARK_WORKLIST_SIZE
+#define CN1_GC_MARK_WORKLIST_SIZE 65536
+#endif
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
+static int gcMarkWorklistTop;
 static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 #ifndef CN1_DISABLE_BIBOP
 // Forward declarations -- defined below; the grace-subtree pass in codenameOneGCMark
@@ -1412,6 +1471,15 @@ static JAVA_BOOLEAN cn1SweepRemoving;
 static __thread int cn1GcTrustedRoots = 0;
 #define CN1_GC_TRUSTED_BEGIN() int __cn1TrustSaved = cn1GcTrustedRoots; cn1GcTrustedRoots = 1
 #define CN1_GC_TRUSTED_END()   cn1GcTrustedRoots = __cn1TrustSaved
+// An untrusted HOLE inside a trusted walk, for a pass that has to drain the mark
+// worklist part-way through its registry walk (the grace passes). BEGIN/END cannot
+// express that: they save and restore a block-scoped local, so a pair inside the walk
+// would shadow the walk's own saved value and would restore whatever the ENCLOSING
+// window held rather than the "untrusted" a drain requires. Trust is a property of the
+// POINTERS being read -- authoritative in a registry walk, arbitrary in a drain that
+// follows child words out of mark functions -- so the two really are independent here.
+#define CN1_GC_TRUSTED_SUSPEND() cn1GcTrustedRoots = 0
+#define CN1_GC_TRUSTED_RESUME()  cn1GcTrustedRoots = 1
 #endif
 
 #ifdef CN1_GC_VERIFY
@@ -1817,6 +1885,7 @@ void codenameOneGCMark() {
 #else
         CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
 #endif
+        cn1GcInGracePass = 1;   // see cn1GcGraceFullDrains
         while(gp != 0) {
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
@@ -1840,9 +1909,50 @@ void codenameOneGCMark() {
             }
             CN1_GC_TRUSTED_END();
             gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
+            // DRAIN AS WE GO (issue #5537). This pass pushes EVERY fresh object on
+            // every page, and "fresh" means "allocated since the last cycle" -- a
+            // number set by the mutator's allocation rate, not by the live set. A
+            // thread churning short-lived objects produces far more than the worklist
+            // holds (65536 entries against ~500K fresh objects per cycle on the
+            // reporter's game-tree search), so pushing the whole walk before draining
+            // once overflowed the worklist as a matter of course.
+            //
+            // Overflow is survivable but ruinously expensive: it arms the belt, whose
+            // recovery pass is a full O(heap) rescan. That makes the cycle several
+            // times longer, which lets the mutator produce several times more fresh
+            // objects before the next one, which overflows again -- the collector
+            // never returns to the fast path, RSS climbs without bound (measured 90MB
+            // to 6.2GB in 20 seconds with a live set of a few hundred bytes) and the
+            // app is killed by the iOS per-process ceiling, or, once the process-budget
+            // pacing of #5563 holds it under that ceiling, parks on every allocation
+            // and appears frozen. Both were reported on this issue.
+            //
+            // Draining between pages costs nothing that the end-of-pass drain would
+            // not have cost anyway -- the same objects are scanned, just sooner -- and
+            // it bounds the cursor, so the pass cannot overflow by volume. It must run
+            // OUTSIDE the trusted window: a drain follows child words out of arbitrary
+            // mark functions, which is exactly what the resolve guard is there for.
+            //
+            // gcMarkDrainWorklist, NOT gcMarkDrain: the latter also rescans
+            // allObjectsInHeap from index 0 on every call, which is affordable a few
+            // times a cycle and quadratic for a caller that drains periodically. Doing
+            // it here hung the Mac Catalyst suite outright. The pass still ends with a
+            // full gcMarkDrain, which is what closes the fixpoint.
+            if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE / 2) {
+                atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
+                gcMarkDrainWorklist(d);
+            }
         }
         gcMarkDrain(d);
+        cn1GcInGracePass = 0;
     }
+    // A single page's slot walk runs between two of those checks, so the worklist must
+    // have room for a whole page of pushes above the drain threshold. True by a wide
+    // margin at the defaults (2048 slots against 32768 of headroom); asserted so that
+    // raising CN1_BIBOP_PAGE_SIZE or shrinking the worklist fails the build instead of
+    // quietly restoring the overflow spiral above.
+    _Static_assert(CN1_BIBOP_PAGE_SIZE / 32 <= CN1_GC_MARK_WORKLIST_SIZE / 2,
+                   "a BiBOP page's slots must fit in the grace pass's worklist headroom");
 #endif
 
     // GRACE-SUBTREE MARKING, LEGACY HALF (same correctness argument as the page
@@ -1869,6 +1979,7 @@ void codenameOneGCMark() {
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "legacy-grace-pass"; }
 #endif
+        cn1GcInGracePass = 1;   // see cn1GcGraceFullDrains
         int gt = currentSizeOfAllObjectsInHeap;
         for(int gi = 0 ; gi < gt ; gi++) {
             JAVA_OBJECT go = allObjectsInHeap[gi];
@@ -1880,6 +1991,20 @@ void codenameOneGCMark() {
                && go->__codenameOneParentClsReference != 0
                && go->__codenameOneParentClsReference->markFunction != 0) {
                 gcMarkObject(d, go, JAVA_FALSE);
+                // Same interleaved drain as the page walk above, and for the same
+                // reason: the number of fresh entries here is set by the allocation
+                // rate (everything over CN1_BIBOP_MAX_OBJECT lands in this table, as
+                // does everything the survivor-heavy bypass diverts off the page
+                // heap), so a busy cycle can push more of them than the worklist
+                // holds and drop the collector into the overflow spiral described
+                // there. Checked only on a push, since nothing else moves the cursor,
+                // and outside the trusted window for the reason spelled out below.
+                if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE / 2) {
+                    atomic_fetch_add_explicit(&cn1GcGraceDrains, 1, memory_order_relaxed);
+                    CN1_GC_TRUSTED_SUSPEND();
+                    gcMarkDrainWorklist(d);
+                    CN1_GC_TRUSTED_RESUME();
+                }
             }
         }
         // Trust covers ONLY the registry walk above. Every fresh entry is already
@@ -1889,6 +2014,7 @@ void codenameOneGCMark() {
         // whose fields can dangle. That is precisely what the guard exists to stop.
         CN1_GC_TRUSTED_END();
         gcMarkDrain(d);
+        cn1GcInGracePass = 0;
     }
 #endif /* CN1_DISABLE_LEGACY_GRACE -- A/B escape hatch, mirrors CN1_DISABLE_SATB */
 
@@ -6382,6 +6508,9 @@ static int cn1ForceVisitedTestAndSet(JAVA_OBJECT obj, int key) {
 // can have more). Smaller sizes still work via the heap-rescan slow path, but the
 // rescan adds non-trivial cost and the path is harder to test, so the default errs
 // on the side of avoiding overflow for any normal app.
+// (The #define itself is hoisted to the forward-declaration block far above, next to
+// gcMarkWorklistTop, because the grace pass needs it; this #ifndef is what keeps a
+// -D override authoritative in both places.)
 #ifndef CN1_GC_MARK_WORKLIST_SIZE
 #define CN1_GC_MARK_WORKLIST_SIZE 65536
 #endif
@@ -6497,7 +6626,13 @@ static void gcMarkFlushLocal(struct gcMarkLocalBuffer* lb) {
     for(int i = 0 ; i < lb->count ; i++) {
         if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
             gcMarkWorklistOverflow = JAVA_TRUE;
-            atomic_store_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release);
+            // EXCHANGE, so the counter below reads once per CYCLE rather than once per
+            // dropped push: what an overflow costs is the belt's O(heap) rescan, and
+            // that runs once however many pushes were dropped. Only ever executed on
+            // the overflow path, so the atomic RMW is off every normal mark.
+            if(!atomic_exchange_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release)) {
+                atomic_fetch_add_explicit(&cn1GcOverflowCycles, 1, memory_order_relaxed);
+            }
             break;
         }
         gcMarkWorklist[gcMarkWorklistTop] = lb->entries[i];
@@ -6526,7 +6661,10 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     // Serial path: identical to the original single-threaded push.
     if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
         gcMarkWorklistOverflow = JAVA_TRUE;
-        atomic_store_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release);
+        // See the matching exchange in gcMarkFlushLocal.
+        if(!atomic_exchange_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release)) {
+            atomic_fetch_add_explicit(&cn1GcOverflowCycles, 1, memory_order_relaxed);
+        }
         return;
     }
     gcMarkWorklist[gcMarkWorklistTop].obj = obj;
@@ -7224,73 +7362,99 @@ static JAVA_BOOLEAN cn1BibopRescanStep() {
 // starved, leaving their children unmarked and freeing reachable memory at sweep.
 // BiBOP page slots are NOT in allObjectsInHeap, so once an overflow is seen the rescan
 // additionally walks the page registry (cn1BibopRescan*) under the same fixed point.
+// Run the mark functions of everything currently on the worklist, and of everything they
+// push, until it is empty. NOTHING else -- no heap rescan, no fixpoint, no adopt-buffer
+// registration. That distinction is the whole reason this exists as its own function
+// (issue #5537).
+//
+// gcMarkDrain below is not "drain the worklist": every call to it also walks
+// allObjectsInHeap from index 0 and re-pushes every object already marked this cycle, so
+// that a marked-but-unscanned object left behind by an overflow gets its mark function
+// run. That is right for the handful of times a cycle calls it, and catastrophic for a
+// caller that needs to drain PERIODICALLY: the grace pass drains once per half-worklist,
+// which on a real app turned one O(table) rescan per cycle into hundreds of them. The
+// collector then never finished a cycle, mutators piled up in the pacing park, and the
+// app hung -- measured on the Mac Catalyst screenshot suite, where the legacy table is a
+// live UI rather than the handful of objects a translated micro-benchmark holds.
+//
+// Callers that need the fixpoint still call gcMarkDrain; a pass that only needs room in
+// the worklist calls this. Anything this leaves behind is picked up by the full drain
+// that ends the same pass.
+static void gcMarkDrainWorklist(CODENAME_ONE_THREAD_STATE) {
+    while(gcMarkWorklistTop > 0) {
+        gcMarkWorklistTop--;
+        JAVA_OBJECT obj = gcMarkWorklist[gcMarkWorklistTop].obj;
+        JAVA_BOOLEAN force = gcMarkWorklist[gcMarkWorklistTop].force;
+#ifdef CN1_BIBOP_VALIDATE
+        // The (serial) mark drain crashed here calling obj->parentCls->markFunction
+        // on an object whose parentCls is a non-null GARBAGE pointer (fp jumped into
+        // libc). A live, correctly-enqueued object always carries gcMark ==
+        // currentGcMarkValue (gcMarkObject stamps it BEFORE pushing) or -1 (grace),
+        // and a real clazz's markFunction lies in the app text (never a libc/heap
+        // address). Abort AT the source with the full object + fp state so the next
+        // run says whether this is a freed/reused slot (stale gcMark) or a
+        // corrupted-parentCls object.
+        {
+            gcMarkFunctionPointer __vfp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)
+                && obj->__codenameOneParentClsReference != 0)
+                ? obj->__codenameOneParentClsReference->markFunction : (gcMarkFunctionPointer)0;
+            int __vmark = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__codenameOneGcMark : -999;
+            int __vhp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__heapPosition : -999;
+            // A real markFunction lives in the app text segment; anchor off a
+            // known app function (&gcMarkObject) and flag any fp more than 256MB
+            // away (the observed garbage fp was a libc-range address).
+            uintptr_t __anchor = (uintptr_t)(void*)&gcMarkObject;
+            uintptr_t __fpv = (uintptr_t)(void*)__vfp;
+            int __fpBad = (__vfp != 0) &&
+                ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
+            if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) ||
+               obj->__codenameOneParentClsReference == 0 ||
+               (__vhp != CN1_BIBOP_HEAP_POS && __vhp != CN1_BIBOP_ADOPTED && __vhp < -1) ||
+               (__vmark != currentGcMarkValue && __vmark != -1) ||
+               __fpBad) {
+                fprintf(stderr, "CN1BIBOP MARKDRAIN CORRUPT: obj=%p tagged=%d parentCls=%p "
+                        "markFn=%p heapPosition=%d gcMark=%d curMark=%d FREE_MARK=%d force=%d\n",
+                        (void*)obj, (int)CN1_IS_TAGGED(obj),
+                        (obj && !CN1_IS_TAGGED(obj)) ? (void*)obj->__codenameOneParentClsReference : (void*)0,
+                        (void*)__vfp, __vhp, __vmark, currentGcMarkValue,
+                        CN1_BIBOP_FREE_MARK, (int)force);
+                fflush(stderr);
+                abort();
+            }
+        }
+#endif
+        gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+        if(fp != 0) {
+#ifdef CN1_BIBOP_VALIDATE
+            gcMarkCurrentDrainObj = obj;
+#endif
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+            // Cascade: if this object has been MATURED, mature the children its mark
+            // function is about to mark, so the whole reachable subtree graduates
+            // together (never half a tree). Restored after the call.
+            JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
+            gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
+#endif
+            fp(threadStateData, obj, force);
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+            gcCurrentlyMaturing = __savedMaturing;
+#endif
+        }
+    }
+}
+
 static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
+    atomic_fetch_add_explicit(&cn1GcFullDrains, 1, memory_order_relaxed);
+    if(cn1GcInGracePass) {
+        atomic_fetch_add_explicit(&cn1GcGraceFullDrains, 1, memory_order_relaxed);
+    }
     int rescanCursor = 0;
 #ifndef CN1_DISABLE_BIBOP
     JAVA_BOOLEAN bibopActive = JAVA_FALSE;
     JAVA_BOOLEAN bibopDone = JAVA_TRUE;
 #endif
     while(JAVA_TRUE) {
-        while(gcMarkWorklistTop > 0) {
-            gcMarkWorklistTop--;
-            JAVA_OBJECT obj = gcMarkWorklist[gcMarkWorklistTop].obj;
-            JAVA_BOOLEAN force = gcMarkWorklist[gcMarkWorklistTop].force;
-#ifdef CN1_BIBOP_VALIDATE
-            // The (serial) mark drain crashed here calling obj->parentCls->markFunction
-            // on an object whose parentCls is a non-null GARBAGE pointer (fp jumped into
-            // libc). A live, correctly-enqueued object always carries gcMark ==
-            // currentGcMarkValue (gcMarkObject stamps it BEFORE pushing) or -1 (grace),
-            // and a real clazz's markFunction lies in the app text (never a libc/heap
-            // address). Abort AT the source with the full object + fp state so the next
-            // run says whether this is a freed/reused slot (stale gcMark) or a
-            // corrupted-parentCls object.
-            {
-                gcMarkFunctionPointer __vfp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)
-                    && obj->__codenameOneParentClsReference != 0)
-                    ? obj->__codenameOneParentClsReference->markFunction : (gcMarkFunctionPointer)0;
-                int __vmark = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__codenameOneGcMark : -999;
-                int __vhp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__heapPosition : -999;
-                // A real markFunction lives in the app text segment; anchor off a
-                // known app function (&gcMarkObject) and flag any fp more than 256MB
-                // away (the observed garbage fp was a libc-range address).
-                uintptr_t __anchor = (uintptr_t)(void*)&gcMarkObject;
-                uintptr_t __fpv = (uintptr_t)(void*)__vfp;
-                int __fpBad = (__vfp != 0) &&
-                    ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
-                if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) ||
-                   obj->__codenameOneParentClsReference == 0 ||
-                   (__vhp != CN1_BIBOP_HEAP_POS && __vhp != CN1_BIBOP_ADOPTED && __vhp < -1) ||
-                   (__vmark != currentGcMarkValue && __vmark != -1) ||
-                   __fpBad) {
-                    fprintf(stderr, "CN1BIBOP MARKDRAIN CORRUPT: obj=%p tagged=%d parentCls=%p "
-                            "markFn=%p heapPosition=%d gcMark=%d curMark=%d FREE_MARK=%d force=%d\n",
-                            (void*)obj, (int)CN1_IS_TAGGED(obj),
-                            (obj && !CN1_IS_TAGGED(obj)) ? (void*)obj->__codenameOneParentClsReference : (void*)0,
-                            (void*)__vfp, __vhp, __vmark, currentGcMarkValue,
-                            CN1_BIBOP_FREE_MARK, (int)force);
-                    fflush(stderr);
-                    abort();
-                }
-            }
-#endif
-            gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
-            if(fp != 0) {
-#ifdef CN1_BIBOP_VALIDATE
-                gcMarkCurrentDrainObj = obj;
-#endif
-#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
-                // Cascade: if this object has been MATURED, mature the children its mark
-                // function is about to mark, so the whole reachable subtree graduates
-                // together (never half a tree). Restored after the call.
-                JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
-                gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
-#endif
-                fp(threadStateData, obj, force);
-#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
-                gcCurrentlyMaturing = __savedMaturing;
-#endif
-            }
-        }
+        gcMarkDrainWorklist(threadStateData);
 #ifndef CN1_DISABLE_BIBOP
 #if CN1_ADOPT_POLICY != 0
         // A rescan drain can mature more descendants. Register each batch before
@@ -7899,6 +8063,7 @@ void initConstantPool() {
     // hook. Both are no-ops unless their environment variable is set.
     atexit(cn1ReportLowMemoryParks);
     atexit(cn1ReportPacingParks);
+    atexit(cn1ReportGcOverflow);
     cn1StartSimulatedMemoryWarnings();
 
     // it will wait two seconds unless an explicit GC occurs
