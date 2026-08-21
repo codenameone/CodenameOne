@@ -32,6 +32,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.Window;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
@@ -1093,7 +1094,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
         int x = 0;
         int y = 0;
 
-        boolean showPortrait = bias;
+        // A window has no device orientation, so its shape is what decides which
+        // placement algorithm applies. Taking Display.isPortrait() there measured the
+        // main surface and could open the popup on the wrong side of its anchor. A
+        // Form keeps the device orientation it was given.
+        boolean showPortrait = f instanceof Window
+                ? f.asContainer().getHeight() >= f.asContainer().getWidth()
+                : bias;
 
         // if we don't have enough space then disregard device orientation
         if (showPortrait) {

@@ -1704,7 +1704,13 @@ public class Window extends Container implements TopLevelContainer {
         // main window's disable count, leaving the main window disabled for good.
         releaseModal();
         modalityType = type;
-        if (type != MODALITY_NONE && nativeVisible) {
+        // iconified counts as live here, exactly as it does in isModalFinished() and
+        // in hideNotify(): a minimized window is still open and still modal. Testing
+        // nativeVisible alone released the old blocker and never took the new one, and
+        // showNotify() does not reacquire on restore -- so a modality change made
+        // while minimized left the window visibly non-modal while getModalityType()
+        // still reported the mode that was asked for.
+        if (type != MODALITY_NONE && (nativeVisible || iconified)) {
             acquireModal();
         }
     }
