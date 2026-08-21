@@ -517,11 +517,23 @@ public class Storage {
         // failure there would carry off the rest of this method, and the write left
         // open would be published by the finally that closes it.
         //
-        // The entry goes, and the cached copy with it. Leaving that behind hid the
-        // failure for the rest of the session: every read was answered from memory
-        // with the object that never reached the storage, and the entry only turned
-        // up missing after the app was restarted.
-        deleteStorageFile(name);
+        // The cached copy goes either way. Leaving it behind hid the failure for the
+        // rest of the session: every read was answered from memory with the object
+        // that never reached the storage, and the entry only turned up missing after
+        // the app was restarted.
+        //
+        // Whether the entry itself has to go depends on where the failed write went.
+        // An implementation that writes into the entry has left half an object there
+        // and deleting is the only way to be rid of it. One that assembles the value
+        // elsewhere and puts it in place in a single step never touched the entry, so
+        // deleting it would answer a write that failed by throwing away the value
+        // that was already stored -- which is worse than the failure itself, and is
+        // what running out of memory partway through a large object used to do.
+        if (Util.getImplementation().abandonStorageWrite(name)) {
+            cache.delete(name);
+        } else {
+            deleteStorageFile(name);
+        }
         if (includeLogging) {
             Log.e(err);
             if (Log.isCrashBound()) {

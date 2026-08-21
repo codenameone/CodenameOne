@@ -6800,6 +6800,28 @@ public abstract class CodenameOneImplementation {
     /// - `name`: the name of the storage file
     public abstract void deleteStorageFile(String name);
 
+    /// Gives up a write that failed partway through, for an implementation that can
+    /// throw one away without the entry it was replacing being any the worse for it.
+    ///
+    /// An implementation that writes into the entry itself leaves half an object
+    /// behind when a write fails, and the only way to be rid of that is to delete the
+    /// entry, so the default here reports that it cannot help. One that prepares the
+    /// new value elsewhere and puts it in place in a single step has not touched the
+    /// entry at all, and deleting it would throw away a good value on account of a
+    /// write that never reached it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the storage file being written
+    ///
+    /// #### Returns
+    ///
+    /// true if the pending write was discarded and the entry left as it was, false if
+    /// the caller still has to delete the entry to be rid of a partial write
+    public boolean abandonStorageWrite(String name) {
+        return false;
+    }
+
     /// Deletes all the files in the application storage
     public void clearStorage() {
         String[] l = listStorageEntries();

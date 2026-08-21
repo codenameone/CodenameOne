@@ -7521,16 +7521,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static final String STORAGE_SCRATCH_DIR = "cn1-storage-scratch";
 
     /**
-     * How old a scratch file must be before it is taken for abandoned.
+     * Suffix of the file each process locks for as long as it is running, so that the
+     * others can tell whether the writes it left behind are still being written.
      *
-     * <p>Age rather than bookkeeping because an application may run more than one
-     * process, each with its own copy of this class and so its own idea of what is
-     * open. A process that swept on behalf of all of them would delete writes another
-     * process had in flight, and since the failed publish makes writeObject take its
-     * error path, that would destroy the entry being written. Nothing legitimate
-     * holds a storage stream open for a day.</p>
+     * <p>This replaces judging a scratch file by its age. An application may run more
+     * than one process, each with its own copy of this class and so its own idea of
+     * what is open, and age was the only thing they all agreed on -- but
+     * {@code lastModified} is a wall clock reading, and a clock that jumps forward
+     * makes a file being written this moment look arbitrarily old. A lock says
+     * whether the writer is there, and the system drops it when a process ends
+     * however it ends, so it cannot outlive the process it stands for.</p>
      */
-    private static final long STORAGE_SCRATCH_MAX_AGE = 24L * 60L * 60L * 1000L;
+    private static final String STORAGE_LIVE_SUFFIX = ".live";
+
+    /**
+     * How long to leave between sweeps. A rate limit rather than a judgement about
+     * any file, measured on the monotonic clock so that setting the wall clock cannot
+     * disturb it.
+     */
+    private static final long STORAGE_SWEEP_INTERVAL = 5L * 60L * 1000L;
 
     /**
      * Distinguishes the scratch files of concurrent writes. Paired with the process
@@ -7557,6 +7566,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private static RandomAccessFile storageLockHandle;
     private static FileLock storageLockAcrossProcesses;
+
+    /**
+     * The lock this process holds for as long as it runs, saying that the scratch
+     * files bearing its process id are still being written. Never released: the
+     * system takes it back when the process ends.
+     */
+    private static RandomAccessFile storageLiveHandle;
+    private static FileLock storageLiveLock;
 
     /**
      * How many nested claims this process has on the cross process lock. A
@@ -7647,10 +7664,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             new ArrayList<StorageOutputStream>();
 
     /**
-     * When the scratch area is next worth looking at, as a wall clock time. Set to
-     * the expiry of the youngest file that was kept, so that a process which lives
-     * for weeks still collects a file that was merely too young the first time it
-     * looked. Guarded by {@link #storagePublishLock}.
+     * When the scratch area is next worth looking at, on the monotonic clock. Keeps
+     * the sweep from running on every write without ever being the thing that decides
+     * whether a file is abandoned. Guarded by {@link #storagePublishLock}.
      */
     private static long nextStorageScratchSweep;
 
@@ -7731,6 +7747,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
+    public boolean abandonStorageWrite(String name) {
+        synchronized (storagePublishLock) {
+            for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+                openStorageWrites.get(iter).cancel(name);
+            }
+        }
+        // the entry is untouched until a write is published, so a write that never
+        // gets that far leaves whatever was stored exactly as it was
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public OutputStream createStorageOutputStream(String name) throws IOException {
         sweepStorageScratchFiles();
         return new StorageOutputStream(name);
@@ -7776,37 +7806,131 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private void sweepStorageScratchFiles() {
         synchronized (storagePublishLock) {
-            long now = System.currentTimeMillis();
+            long now = android.os.SystemClock.elapsedRealtime();
             if (now < nextStorageScratchSweep) {
                 return;
             }
-            // looked at again when the youngest file that survived this pass comes of
-            // age. Setting a flag once instead would let a file that was a few minutes
-            // old at the first write of a long lived process sit there for the life of
-            // that process, however large it is.
-            long nextSweep = now + STORAGE_SCRATCH_MAX_AGE;
+            nextStorageScratchSweep = now + STORAGE_SWEEP_INTERVAL;
             try {
-                File[] abandoned = storageScratchDir().listFiles();
-                if (abandoned != null) {
-                    for (int iter = 0; iter < abandoned.length; iter++) {
-                        if (isStorageLockFile(abandoned[iter])
-                                || isOpenStorageWrite(abandoned[iter])) {
-                            continue;
-                        }
-                        long expires = abandoned[iter].lastModified() + STORAGE_SCRATCH_MAX_AGE;
-                        if (expires > now) {
-                            nextSweep = Math.min(nextSweep, expires);
-                        } else if (!abandoned[iter].delete()) {
-                            com.codename1.io.Log.p("Could not remove the abandoned storage "
-                                    + "scratch file " + abandoned[iter]);
-                        }
+                File dir = storageScratchDir();
+                File[] files = dir.listFiles();
+                if (files == null) {
+                    return;
+                }
+                int mine = android.os.Process.myPid();
+                for (int iter = 0; iter < files.length; iter++) {
+                    if (isStorageLockFile(files[iter])) {
+                        continue;
+                    }
+                    int owner = storageScratchOwner(files[iter].getName());
+                    // this process knows what it is doing without asking, and never
+                    // tries to lock its own liveness file, which it already holds
+                    if (owner < 0 || owner == mine || isProcessWriting(dir, owner)) {
+                        continue;
+                    }
+                    if (!files[iter].delete()) {
+                        com.codename1.io.Log.p("Could not remove the abandoned storage "
+                                + "scratch file " + files[iter]);
                     }
                 }
             } catch (Throwable t) {
                 // a sweep that fails costs disk space, never correctness
                 com.codename1.io.Log.e(t);
             }
-            nextStorageScratchSweep = nextSweep;
+        }
+    }
+
+    /**
+     * The process a file in the scratch directory belongs to.
+     *
+     * @param fileName the name of the file
+     * @return the process id, or -1 if the name does not carry one
+     */
+    private static int storageScratchOwner(String fileName) {
+        String pid;
+        if (fileName.endsWith(STORAGE_LIVE_SUFFIX)) {
+            pid = fileName.substring(0, fileName.length() - STORAGE_LIVE_SUFFIX.length());
+        } else {
+            int digest = fileName.indexOf('-');
+            int counter = digest < 0 ? -1 : fileName.indexOf('-', digest + 1);
+            if (counter < 0) {
+                return -1;
+            }
+            pid = fileName.substring(digest + 1, counter);
+        }
+        try {
+            return Integer.parseInt(pid);
+        } catch (NumberFormatException err) {
+            return -1;
+        }
+    }
+
+    /**
+     * Whether the given process is still running, and so may still be writing the
+     * scratch files that carry its id.
+     *
+     * <p>Asked of the filesystem rather than of {@code /proc}, which since Android 9
+     * shows a process only itself. A lock that can be taken is one nobody is holding.
+     * Anything unexpected counts as running, since deleting another process's work on
+     * a guess is the one outcome worth avoiding here.</p>
+     *
+     * @param dir the scratch directory
+     * @param pid the process to ask about
+     * @return true if that process appears to be running
+     */
+    private static boolean isProcessWriting(File dir, int pid) {
+        File live = new File(dir, pid + STORAGE_LIVE_SUFFIX);
+        if (!live.exists()) {
+            return false;
+        }
+        RandomAccessFile handle = null;
+        FileLock held = null;
+        try {
+            handle = new RandomAccessFile(live, "rw");
+            held = handle.getChannel().tryLock();
+            return held == null;
+        } catch (Throwable t) {
+            return true;
+        } finally {
+            try {
+                if (held != null) {
+                    held.release();
+                }
+                if (handle != null) {
+                    handle.close();
+                }
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+        }
+    }
+
+    /**
+     * Says, for as long as this process runs, that the scratch files carrying its
+     * process id are still being written.
+     *
+     * @param dir the scratch directory
+     */
+    private static void claimStorageLiveness(File dir) {
+        synchronized (storagePublishLock) {
+            if (storageLiveLock != null) {
+                return;
+            }
+            try {
+                storageLiveHandle = new RandomAccessFile(
+                        new File(dir, android.os.Process.myPid() + STORAGE_LIVE_SUFFIX), "rw");
+                storageLiveLock = storageLiveHandle.getChannel().lock();
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+                try {
+                    if (storageLiveHandle != null) {
+                        storageLiveHandle.close();
+                    }
+                } catch (Throwable ignored) {
+                    com.codename1.io.Log.e(ignored);
+                }
+                storageLiveHandle = null;
+            }
         }
     }
 
@@ -7847,28 +7971,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private static boolean isStorageLockFile(File file) {
         return STORAGE_LOCK_FILE.equals(file.getName());
-    }
-
-    /**
-     * Whether the given scratch file belongs to a write this process has open.
-     *
-     * <p>Age alone would not tell: {@code lastModified} is a wall clock reading, and
-     * a clock that jumps forward -- an automatic correction, say -- can make a file
-     * being written this moment look like a day old. What this process is doing it
-     * knows exactly, so it never has to guess.</p>
-     *
-     * <p>The caller must hold {@link #storagePublishLock}.</p>
-     *
-     * @param file a file in the scratch directory
-     * @return true if a write in this process is using it
-     */
-    private static boolean isOpenStorageWrite(File file) {
-        for (int iter = 0; iter < openStorageWrites.size(); iter++) {
-            if (openStorageWrites.get(iter).scratch.equals(file)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -7974,6 +8076,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 throw new IOException("Could not create the storage scratch directory "
                         + dir);
             }
+            claimStorageLiveness(dir);
             // the digest of the entry lets another process find and cancel this write.
             // The process id separates concurrent processes, whose counters both start
             // from the beginning, and the counter separates writes within one.
