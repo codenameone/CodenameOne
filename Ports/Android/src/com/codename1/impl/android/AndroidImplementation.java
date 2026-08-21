@@ -7696,8 +7696,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         + dir);
             }
             this.scratch = new File(dir, name + "." + storageScratchCounter.incrementAndGet());
-            this.out = new FileOutputStream(scratch);
+            // created and registered as one step under the lock a deletion takes.
+            // Registering afterwards would leave a write whose scratch file already
+            // exists but which a concurrent deleteStorageFile cannot see to cancel,
+            // and that write would rename itself over the entry that was deleted.
             synchronized (storagePublishLock) {
+                this.out = new FileOutputStream(scratch);
                 openStorageWrites.add(this);
             }
         }
