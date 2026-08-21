@@ -170,7 +170,14 @@ func cn1Color(_ spec: Any?) -> Color? {
         case "secondaryLabel":
             return Color.secondary
         case "background":
+            // systemBackground is API_UNAVAILABLE(watchos). A watch face composites over
+            // black and has no light appearance, so black is the answer the role means
+            // there rather than a stand-in for one.
+#if os(watchOS)
+            return Color.black
+#else
             return Color(UIColor.systemBackground)
+#endif
         case "accent":
             return Color.accentColor
         default:
@@ -181,9 +188,16 @@ func cn1Color(_ spec: Any?) -> Color? {
         return nil
     }
     let dark = cn1Int(dict["d"]) ?? light
+    // colorWithDynamicProvider: is API_UNAVAILABLE(watchos), and there is nothing to resolve
+    // there anyway: watchOS has no light appearance, so the dark half of the pair is the
+    // right colour rather than a degraded one.
+#if os(watchOS)
+    return Color(cn1UIColor(argb: dark))
+#else
     return Color(UIColor { trait in
         trait.userInterfaceStyle == .dark ? cn1UIColor(argb: dark) : cn1UIColor(argb: light)
     })
+#endif
 }
 
 // MARK: - Vector node parsing

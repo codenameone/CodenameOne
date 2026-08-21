@@ -507,30 +507,11 @@ public class IOSWidgetExtensionBuilder {
 
     /// The portable family name for a declaration, resolving the WidgetKit spellings.
     ///
-    /// Normalised in ONE place because four decisions read these names -- the Swift family list,
-    /// the watch-only classification, whether a kind has any watch family at all, and the corner
-    /// complication's platform guard -- and three of them tested `startsWith("watch")`. So
-    /// `accessoryCircular` was accepted by none of them: the kind looked like an iOS surface and
-    /// fell through to the systemSmall/Medium/Large default, turning a complication into three
-    /// home-screen widgets rather than withholding it.
-    ///
-    /// ONLY accessoryCorner. The other accessory spellings are not watch families:
-    /// `.accessoryCircular`, `.accessoryInline` and `.accessoryRectangular` are the iPhone
-    /// LOCK-SCREEN families as well as watch ones, and CN1DescriptorWidget.swift already renders
-    /// all three on iOS -- they sit under `if #available(iOS 16.0, watchOS 9.0)`, while only
-    /// `.accessoryCorner` is inside `#if os(watchOS)`. Folding them into the watch names withheld a
-    /// lock-screen widget the manifest had asked for, which is the mirror of the bug this method
-    /// was added to fix.
-    ///
-    /// So the two namings are NOT interchangeable for these three, and accessoryRectangular already
-    /// said so: it maps to the portable `lockscreen`, not to watchRectangular. The portable
-    /// `watch*` names mean "complication only"; the WidgetKit spellings mean the WidgetKit family,
-    /// which on iOS is the lock screen.
+    /// Kept as a method here because this class and its tests read it by this name; the rule
+    /// itself, and the long account of what getting it wrong costs, lives in
+    /// [SurfaceKindFamilies#normalize(String)] so the Android builder applies exactly the same one.
     static String normalizeFamily(String family) {
-        if ("accessoryCorner".equals(family)) {
-            return "watchCorner";
-        }
-        return family;
+        return SurfaceKindFamilies.normalize(family);
     }
 
     private static String mapFamily(String rawFamily, boolean watchTarget) {
@@ -618,29 +599,11 @@ public class IOSWidgetExtensionBuilder {
     }
 
     public static boolean isWatchOnly(Kind kind) {
-        List<String> families = kind.getIosFamilies();
-        if (families == null || families.isEmpty()) {
-            return false;
-        }
-        for (String family : families) {
-            if (family != null && !normalizeFamily(family).startsWith("watch")) {
-                return false;
-            }
-        }
-        return true;
+        return SurfaceKindFamilies.isWatchOnly(kind.getIosFamilies());
     }
 
     public static boolean hasWatchFamily(Kind kind) {
-        List<String> families = kind.getIosFamilies();
-        if (families == null) {
-            return false;
-        }
-        for (String family : families) {
-            if (family != null && normalizeFamily(family).startsWith("watch")) {
-                return true;
-            }
-        }
-        return false;
+        return SurfaceKindFamilies.hasWatchFamily(kind.getIosFamilies());
     }
 
     private static void plistKeyString(StringBuilder sb, String key, String value) {

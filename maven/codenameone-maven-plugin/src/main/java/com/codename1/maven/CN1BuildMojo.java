@@ -1737,9 +1737,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
                 String extension = name.substring(dotpos);
                 String base = name.substring(0, dotpos);
-                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + extension);
+                // The role suffix has to survive into the copied name. Every entry used to land on
+                // target/<finalName><extension>, keyed on the extension alone, so a build that
+                // returns two artifacts of the same kind -- a phone APK and its companion Wear APK
+                // -- collapsed both onto one path and the last one written won. That is silent and
+                // it corrupts the primary artifact, not merely the secondary one.
+                String roleSuffix = roleSuffixOf(base);
+                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + roleSuffix + extension);
                 FileUtils.copyFile(child, copyTo);
-                if (".war".equals(extension)) {
+                if (roleSuffix.length() > 0) {
+                    // Attached with a classifier so the companion artifact is installed and
+                    // deployed beside the primary one rather than being an orphan in target/.
+                    projectHelper.attachArtifact(project, extension.substring(1),
+                            roleSuffix.substring(1), copyTo);
+                } else if (".war".equals(extension)) {
                     projectHelper.attachArtifact(project, "war", copyTo);
                 } else if (".zip".equals(extension) && "javascript".equals(buildTarget)) {
                     projectHelper.attachArtifact(project, "zip", "webapp", copyTo);
@@ -2459,6 +2470,41 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     protected void afterBuild() {
 
+    }
+
+    /**
+     * Role suffixes a returned artifact may carry, longest first so a future
+     * "-wear-debug" cannot be shadowed by "-wear".
+     *
+     * <p>Kept deliberately closed. Anything not on this list is the primary artifact and
+     * keeps the plain {@code <finalName><extension>} name it has always had, so adding a
+     * role here is the only way to change where a file lands.</p>
+     */
+    private static final String[] ARTIFACT_ROLE_SUFFIXES = {"-wear"};
+
+    /**
+     * The role suffix carried by a result entry's base name, or an empty string when it is
+     * the primary artifact.
+     *
+     * <p>A build may hand back more than one artifact of the same kind -- an Android
+     * companion build returns the phone APK and the Wear APK beside it -- and the two
+     * cannot share a destination path. The builder names the secondary one with a role
+     * suffix; this recovers it so the copy keeps it and the artifact can be attached
+     * under a matching classifier.</p>
+     *
+     * @param base the result file's name with its extension already removed
+     * @return the matching role suffix including its leading dash, or an empty string
+     */
+    static String roleSuffixOf(String base) {
+        if (base == null) {
+            return "";
+        }
+        for (String suffix : ARTIFACT_ROLE_SUFFIXES) {
+            if (base.endsWith(suffix)) {
+                return suffix;
+            }
+        }
+        return "";
     }
 
     private static class LibraryPropertiesException extends Exception {

@@ -6547,13 +6547,11 @@ public class IPhoneBuilder extends Executor {
                 if (kindMap.get("preview") instanceof String) {
                     kind.setPreviewName((String) kindMap.get("preview"));
                 }
-                if (kindMap.get("iosFamilies") instanceof List) {
-                    List<String> families = new ArrayList<String>();
-                    for (Object family : (List<Object>) kindMap.get("iosFamilies")) {
-                        if (family instanceof String) {
-                            families.add((String) family);
-                        }
-                    }
+                // "families" is the portable spelling and "iosFamilies" the legacy one; the
+                // shared reader picks between them so Android resolves a kind's families the
+                // same way rather than parsing a key with "ios" in its name.
+                List<String> families = com.codename1.util.SurfaceKindFamilies.read(kindMap);
+                if (!families.isEmpty()) {
                     kind.setIosFamilies(families);
                 }
                 surfacesKinds.add(kind);
