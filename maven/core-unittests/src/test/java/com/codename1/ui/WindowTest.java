@@ -2950,4 +2950,37 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void movingAShownWindowInvalidatesItsCachedMonitor() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        java.util.List<TestWindowManager.FakeMonitor> two =
+                new ArrayList<TestWindowManager.FakeMonitor>();
+        two.add(new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+        two.add(new TestWindowManager.FakeMonitor(1440, 0, 2560, 1440, 2.0, 192, "second"));
+        wm.setMonitors(two);
+
+        Window w = new Window("mover", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        // Populate the cache while the window is still on the primary display.
+        assertEquals(0, w.getMonitor().getIndex());
+        assertEquals(1.0, w.getScale(), 0.0001);
+
+        // Now it sits on the second display. A real port reports this through the
+        // monitor-change callback, which is queued back to the event dispatch thread
+        // -- so a move followed by a query in the same turn has to answer correctly
+        // without it, or centerOnDesktop() sends the window back where it came from.
+        peer.setMonitor(1);
+        w.setWindowLocation(1500, 100);
+
+        assertEquals(1, w.getMonitor().getIndex(),
+                "a move must invalidate the cached monitor");
+        assertEquals(2.0, w.getScale(), 0.0001,
+                "and the scale that is answered from it");
+        w.dispose();
+    }
 }

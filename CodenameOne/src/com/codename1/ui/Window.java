@@ -1217,6 +1217,13 @@ public class Window extends Container implements TopLevelContainer {
         pendingPositionSet = true;
         pendingWidth = w;
         pendingHeight = h;
+        // A move can land the window on a different display, so the cached monitor no
+        // longer answers for it. Without this the cache stood until the port's
+        // monitor-change callback arrived, and that callback is queued back to the
+        // event dispatch thread: a centerOnDesktop(), getScale() or getDensity() in
+        // the same turn still read the old display, and centring right after a move
+        // to another monitor put the window back on the one it came from.
+        currentMonitor = null;
         if (nativePeer != null) {
             manager().setBounds(nativePeer, x, y, w, h);
         }
