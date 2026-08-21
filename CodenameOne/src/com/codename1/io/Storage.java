@@ -484,22 +484,46 @@ public class Storage {
             d = null;
             writing.close();
             return true;
+            // Errors are caught too, and rethrown. An OutOfMemoryError partway
+            // through a large object would otherwise leave the entry to the finally,
+            // which closes the stream, and an implementation that publishes an entry
+            // as it closes would put those few bytes in place of a good entry. The
+            // error still reaches the caller, it just does not take the entry with it.
+        } catch (Error err) {
+            failedWrite(name, err, includeLogging);
+            throw err;
         } catch (Exception err) {
-            if (includeLogging) {
-                Log.e(err);
-                if (Log.isCrashBound()) {
-                    Log.sendLog();
-                }
-            }
-            // the entry is gone, so the cached copy has to go with it. Leaving it
-            // behind hid the failure for the rest of the session: every read was
-            // answered from memory with the object that never reached the storage,
-            // and the entry only turned up missing after the app was restarted.
-            deleteStorageFile(name);
+            failedWrite(name, err, includeLogging);
             return false;
         } finally {
             Util.getImplementation().cleanup(d);
         }
+    }
+
+    /// Gives up on a write that failed partway through, leaving neither a partial
+    /// entry on the storage nor the object that never reached it in the cache.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name, already normalized
+    ///
+    /// - `err`: what went wrong
+    ///
+    /// - `includeLogging`: whether the failure may be logged, which is unsafe during
+    /// app initialization
+    private void failedWrite(String name, Throwable err, boolean includeLogging) {
+        if (includeLogging) {
+            Log.e(err);
+            if (Log.isCrashBound()) {
+                Log.sendLog();
+            }
+        }
+        // the entry is gone, so the cached copy has to go with it. Leaving it behind
+        // hid the failure for the rest of the session: every read was answered from
+        // memory with the object that never reached the storage, and the entry only
+        // turned up missing after the app was restarted. This also abandons the write
+        // that is still open, so nothing partial is published when it is closed.
+        deleteStorageFile(name);
     }
 
     /// Reads the object from the storage, returns null if the object isn't there

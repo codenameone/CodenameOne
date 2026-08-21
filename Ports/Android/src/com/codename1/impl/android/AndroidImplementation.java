@@ -7507,19 +7507,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Directory under the files dir that holds storage writes still in progress.
+     * Directory holding storage writes still in progress.
      *
-     * <p>A directory rather than a suffix on the entry name: a name the storage API
-     * accepts must never be mistaken for a write in progress, and no pattern over a
-     * flat namespace can promise that. Nothing but this implementation puts anything
-     * in here, so a scratch file cannot collide with an entry however the entry is
-     * named.</p>
+     * <p>A sibling of the files dir rather than something inside it. Every name is a
+     * legal storage key, so no name reserved inside that namespace can be kept clear
+     * of the application: a key called after the scratch area would either be
+     * unstorable or, if it already existed as a file, would stop the directory being
+     * created and fail every write from then on. Outside the namespace there is
+     * nothing to collide with. It stays on the same filesystem as the entries, which
+     * is what lets a write be published by renaming.</p>
      */
-    private static final String STORAGE_SCRATCH_DIR = ".cn1-storage-scratch";
+    private static final String STORAGE_SCRATCH_DIR = "cn1-storage-scratch";
 
     /**
-     * Distinguishes the scratch files of concurrent writes, so two threads writing
-     * the same entry cannot interleave their bytes into one file.
+     * How old a scratch file must be before it is taken for abandoned.
+     *
+     * <p>Age rather than bookkeeping because an application may run more than one
+     * process, each with its own copy of this class and so its own idea of what is
+     * open. A process that swept on behalf of all of them would delete writes another
+     * process had in flight, and since the failed publish makes writeObject take its
+     * error path, that would destroy the entry being written. Nothing legitimate
+     * holds a storage stream open for a day.</p>
+     */
+    private static final long STORAGE_SCRATCH_MAX_AGE = 24L * 60L * 60L * 1000L;
+
+    /**
+     * Distinguishes the scratch files of concurrent writes. Paired with the process
+     * id, since a second process counts from the beginning as well.
      */
     private static final AtomicLong storageScratchCounter = new AtomicLong();
 
@@ -7539,8 +7553,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             new ArrayList<StorageOutputStream>();
 
     /**
-     * Whether the scratch files abandoned by a previous run of this application have
-     * been removed. Guarded by {@link #storagePublishLock}.
+     * Whether the scratch files abandoned by an earlier run have been removed.
+     * Guarded by {@link #storagePublishLock}.
      */
     private static boolean storageScratchSwept;
 
@@ -7563,6 +7577,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
+    public void clearStorage() {
+        synchronized (storagePublishLock) {
+            // every open write, not just the ones for entries that exist. A write to
+            // an entry that is not there yet is absent from listStorageEntries, so the
+            // inherited implementation never reaches it, and it would publish a new
+            // entry moments after the storage was supposedly emptied.
+            for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+                openStorageWrites.get(iter).cancel();
+            }
+            super.clearStorage();
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
     public OutputStream createStorageOutputStream(String name) throws IOException {
         sweepStorageScratchFiles();
         return new StorageOutputStream(name);
@@ -7579,9 +7609,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean storageFileExists(String name) {
-        if (STORAGE_SCRATCH_DIR.equals(name)) {
-            return false;
-        }
         String[] fileList = getContext().fileList();
         for (int iter = 0; iter < fileList.length; iter++) {
             if (fileList[iter].equals(name)) {
@@ -7595,40 +7622,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String[] listStorageEntries() {
-        String[] fileList = getContext().fileList();
-        int keep = 0;
-        for (int iter = 0; iter < fileList.length; iter++) {
-            if (!STORAGE_SCRATCH_DIR.equals(fileList[iter])) {
-                fileList[keep] = fileList[iter];
-                keep++;
-            }
-        }
-        if (keep == fileList.length) {
-            return fileList;
-        }
-        String[] entries = new String[keep];
-        System.arraycopy(fileList, 0, entries, 0, keep);
-        return entries;
+        return getContext().fileList();
     }
 
     /**
      * @inheritDoc
      */
     public int getStorageEntrySize(String name) {
-        if (STORAGE_SCRATCH_DIR.equals(name)) {
-            return 0;
-        }
         return (int)new File(getContext().getFilesDir(), name).length();
     }
 
     /**
-     * Removes the scratch files left behind by a previous run that died mid write.
-     * They are already invisible to the storage API, this only stops them
-     * accumulating.
-     *
-     * <p>Every write calls this before it creates its scratch file and the sweep
-     * itself holds the lock, so the one sweep that runs is over before any scratch
-     * file of this process exists and cannot delete a write that is in flight.</p>
+     * Removes the scratch files left behind by a run that died mid write, once they
+     * are old enough that nothing can still be writing them.
      */
     private void sweepStorageScratchFiles() {
         synchronized (storagePublishLock) {
@@ -7641,8 +7647,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (abandoned == null) {
                     return;
                 }
+                long oldest = System.currentTimeMillis() - STORAGE_SCRATCH_MAX_AGE;
                 for (int iter = 0; iter < abandoned.length; iter++) {
-                    if (!abandoned[iter].delete()) {
+                    if (abandoned[iter].lastModified() < oldest && !abandoned[iter].delete()) {
                         com.codename1.io.Log.p("Could not remove the abandoned storage "
                                 + "scratch file " + abandoned[iter]);
                     }
@@ -7658,9 +7665,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * The directory holding the writes that are in progress.
      *
      * @return the scratch directory, which is not guaranteed to exist yet
+     * @throws IOException if the application has no data directory to put it in
      */
-    private static File storageScratchDir() {
-        return new File(getContext().getFilesDir(), STORAGE_SCRATCH_DIR);
+    private static File storageScratchDir() throws IOException {
+        File files = getContext().getFilesDir();
+        File data = files.getParentFile();
+        if (data == null) {
+            throw new IOException("No application data directory above " + files);
+        }
+        return new File(data, STORAGE_SCRATCH_DIR);
     }
 
     /**
@@ -7695,7 +7708,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 throw new IOException("Could not create the storage scratch directory "
                         + dir);
             }
-            this.scratch = new File(dir, name + "." + storageScratchCounter.incrementAndGet());
+            // named for the writer rather than the entry: an entry name is allowed to
+            // reach the filesystem's limit on its own, and anything appended to it
+            // would push the scratch file past that limit and fail a write that used
+            // to work. The process id separates concurrent processes, whose counters
+            // both start from the beginning.
+            this.scratch = new File(dir, android.os.Process.myPid() + "-"
+                    + storageScratchCounter.incrementAndGet());
             // created and registered as one step under the lock a deletion takes.
             // Registering afterwards would leave a write whose scratch file already
             // exists but which a concurrent deleteStorageFile cannot see to cancel,
@@ -7704,6 +7723,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 this.out = new FileOutputStream(scratch);
                 openStorageWrites.add(this);
             }
+        }
+
+        /**
+         * Marks this write as one that must not be published, whatever entry it is
+         * for. Called holding {@link #storagePublishLock}.
+         */
+        void cancel() {
+            cancelled = true;
         }
 
         /**
