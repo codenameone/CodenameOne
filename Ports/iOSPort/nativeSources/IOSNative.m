@@ -15302,23 +15302,39 @@ static Class cn1SurfacesBridgeClass() {
     return NSClassFromString(@"CN1SurfaceBridge");
 }
 
-// True when the running OS meets the CN1Widgets extension's deployment target
+// True when the running OS meets the widget extension's deployment target
 // (CN1SurfacesMinOS Info.plist key, injected by the builder from
-// ios.surfaces.deploymentTarget; defaults to 16.1). Below that version the
+// ios.surfaces.deploymentTarget; defaults to 16.1 on iOS). Below that version the
 // extension cannot run or appear in the widget gallery, so the API must not
 // report widget support even though WidgetKit itself shipped with iOS 14.
+//
+// The fallback is per-platform because the two extensions have different floors and this
+// compares against the OS actually running. The watch app's CN1WatchWidgets extension targets
+// watchOS 10, so the iOS default of 16.1 would be compared against a watchOS version and never
+// be met -- every watch would have reported no widget support, whatever was in the plist.
 static BOOL cn1SurfacesMinOSSupported() {
     NSString *min = nil;
     id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesMinOS"];
     if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
         min = (NSString *)v;
     } else {
+#if TARGET_OS_WATCH
+        min = @"10.0";
+#else
         min = @"16.1";
+#endif
     }
     NSArray *parts = [min componentsSeparatedByString:@"."];
     NSOperatingSystemVersion required;
-    required.majorVersion = parts.count > 0 ? [[parts objectAtIndex:0] integerValue] : 16;
-    required.minorVersion = parts.count > 1 ? [[parts objectAtIndex:1] integerValue] : 1;
+#if TARGET_OS_WATCH
+    NSInteger defaultMajor = 10;
+    NSInteger defaultMinor = 0;
+#else
+    NSInteger defaultMajor = 16;
+    NSInteger defaultMinor = 1;
+#endif
+    required.majorVersion = parts.count > 0 ? [[parts objectAtIndex:0] integerValue] : defaultMajor;
+    required.minorVersion = parts.count > 1 ? [[parts objectAtIndex:1] integerValue] : defaultMinor;
     required.patchVersion = parts.count > 2 ? [[parts objectAtIndex:2] integerValue] : 0;
     return [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:required];
 }
@@ -15361,6 +15377,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_Str
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT descriptorJson) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return JAVA_NULL;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         JAVA_OBJECT result = JAVA_NULL;
@@ -15377,9 +15400,17 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_S
         return result;
     }
     return JAVA_NULL;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT stateJson) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         Class bridge = cn1SurfacesBridgeClass();
@@ -15391,9 +15422,17 @@ void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_
         }
         POOL_END();
     }
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT finalStateJson, JAVA_BOOLEAN dismissImmediately) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         Class bridge = cn1SurfacesBridgeClass();
@@ -15406,6 +15445,7 @@ void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_jav
         }
         POOL_END();
     }
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
@@ -15420,6 +15460,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THR
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return JAVA_FALSE;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         BOOL supported = NO;
@@ -15433,6 +15480,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_
         return supported ? JAVA_TRUE : JAVA_FALSE;
     }
     return JAVA_FALSE;
+#endif
 }
 
 #else // CN1_USE_WIDGETS
