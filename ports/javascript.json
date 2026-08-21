@@ -1,48 +1,48 @@
 {
-  "commit": "b411fb7be7ce7e07f98594922748cd98dd95ab4c",
-  "generated_at": "2026-08-20T17:37:45Z",
+  "commit": "487ed60a19601985376ccd0ae379b5c66a2f053c",
+  "generated_at": "2026-08-21T03:32:39Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1486000000
+        "duration_ns": 1496300001
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 961600000
+        "duration_ns": 912399999
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 13777300000
+        "duration_ns": 13577100000
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 674000000
+        "duration_ns": 681600000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 3478700000
+        "duration_ns": 3511699999
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 556700000
+        "duration_ns": 556900000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 2928200000
+        "duration_ns": 2967000000
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 558500000
+        "duration_ns": 558199999
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1023500000
+        "duration_ns": 1018800001
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 1079000000
+        "duration_ns": 1044300000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32394307351",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32441344554",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 176,
+    "pass": 177,
     "skip": 2
   },
   "tests": {
@@ -427,6 +427,10 @@
     },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "IntentsApiTest": {
+      "feature": "intents",
       "status": "pass"
     },
     "Java17Tests": {
