@@ -4859,6 +4859,22 @@ public class IPhoneBuilder extends Executor {
                             buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", codeSignEntitlements);
                             buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
                             buildSettingsMap.put("INFOPLIST_FILE", extensionName + "/Info.plist");
+                            // Both of these every extension this builder generates sets, and the
+                            // generic path did not. An extension that supports fewer device
+                            // families than the app is an App Store rejection on upload, and
+                            // without SKIP_INSTALL the .appex is installed into the archive's
+                            // Products as a second copy of a bundle already inside the .app.
+                            buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+                            buildSettingsMap.put("SKIP_INSTALL", "YES");
+                            if (containsSwiftSource(appExtension)) {
+                                // The project's Swift settings are applied to the app target
+                                // alone, so a brought-in extension with .swift in it reached the
+                                // compiler with no SWIFT_VERSION and failed on "SWIFT_VERSION ''
+                                // is unsupported" -- after its sources had been added to the
+                                // target. Apple's own Wallet extension templates are Swift.
+                                buildSettingsMap.put("SWIFT_VERSION", request.getArg("ios.swiftVersion", "5.0"));
+                                buildSettingsMap.put("ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES", "YES");
+                            }
 
                             File buildSettingsProps = new File(appExtension, "buildSettings.properties");
                             if (buildSettingsProps.exists()) {
@@ -6286,6 +6302,60 @@ public class IPhoneBuilder extends Executor {
     /// the extension folder's parent. A value that still holds a build-setting reference after
     /// the two obvious project-root spellings is not resolvable here, and null says so rather
     /// than guessing at a file to edit.
+    /// The first symbolic link under {@code dir} that resolves outside {@code root}, or null.
+    ///
+    /// unzip refuses an absolute path or a ../ traversal in an entry NAME, but it happily creates
+    /// a symlink, and the entry that plants one is an ordinary-looking file. Everything under an
+    /// extension folder is then handed to Xcode -- added to the target, copied into the bundle,
+    /// swept into the sources tarball -- so a link pointing at the build machine's provisioning
+    /// profiles or another build's directory would be read through and shipped. The build stops
+    /// rather than following it.
+    static File symlinkEscaping(File dir, File root) throws IOException {
+        File[] entries = dir == null ? null : dir.listFiles();
+        if (entries == null) {
+            return null;
+        }
+        String rootPath = root.getCanonicalPath();
+        if (!rootPath.endsWith(File.separator)) {
+            rootPath += File.separator;
+        }
+        for (File f : entries) {
+            if (!f.getCanonicalPath().startsWith(rootPath)) {
+                return f;
+            }
+            if (Files.isSymbolicLink(f.toPath())) {
+                // Inside the folder, so harmless as a path -- but a link to a directory would let
+                // the walk below leave through it, and it is not something an archive needs.
+                continue;
+            }
+            if (f.isDirectory()) {
+                File escaping = symlinkEscaping(f, root);
+                if (escaping != null) {
+                    return escaping;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Whether an extension folder holds Swift anywhere in it.
+    static boolean containsSwiftSource(File dir) {
+        File[] entries = dir == null ? null : dir.listFiles();
+        if (entries == null) {
+            return false;
+        }
+        for (File f : entries) {
+            if (f.isDirectory()) {
+                if (containsSwiftSource(f)) {
+                    return true;
+                }
+            } else if (f.getName().endsWith(".swift")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// The minimum iOS version a brought-in app extension declares.
     ///
     /// Xcode writes the target's IPHONEOS_DEPLOYMENT_TARGET into the built .appex as
@@ -6294,25 +6364,25 @@ public class IPhoneBuilder extends Executor {
     /// exported. The generic path used to hand every extension 10.0, which is below the floor the
     /// current SDK will even build against, let alone what a Wallet extension needs.
     ///
-    /// In order: what the archive says, because an extension knows its own APIs; then 14.0 for an
-    /// issuer-provisioning Wallet extension, since PKIssuerProvisioningExtensionHandler arrived in
-    /// iOS 14 and Apple rejects anything lower ("Please ensure the MinimumOSVersion value of your
-    /// extension is 14 or later"); then the app's own target, never below the 12.0 the SDK
-    /// supports. An extension is allowed to require MORE than the app that carries it -- widgets
-    /// have done that since iOS 14 -- so raising it here costs the app nothing.
+    /// What the archive says wins, because an extension knows which APIs it calls -- but only
+    /// above the floor, which is 14.0 when its entitlements ask for payment-pass-provisioning
+    /// (PKIssuerProvisioningExtensionHandler is an iOS 14 API and Apple rejects anything lower)
+    /// and 12.0 otherwise, the lowest the current SDK builds against. With nothing declared the
+    /// app's own target is used, under the same floor.
     ///
     /// @param declared the extension's own IPHONEOS_DEPLOYMENT_TARGET, or null
     /// @param entitlements the extension's .entitlements, or null when it has none
     /// @param appTarget the ios.deployment_target build hint, or null
     static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget) {
-        if (declared != null && declared.trim().length() > 0) {
-            return declared.trim();
-        }
-        if (fileContains(entitlements, PAYMENT_PASS_PROVISIONING)) {
-            return "14.0";
-        }
-        String floor = "12.0";
-        return isDeploymentTargetBelow(appTarget, floor) ? floor : normalizeVersion(appTarget.trim());
+        // The floor is a floor, not a default. An archive exported from an old project may carry
+        // IPHONEOS_DEPLOYMENT_TARGET = 10.0 of its own, and honouring that unconditionally would
+        // reproduce the very rejection this exists to prevent -- 10.0 does not even build against
+        // the current SDK, and an issuer-provisioning Wallet extension is refused below 14.
+        String floor = fileContains(entitlements, PAYMENT_PASS_PROVISIONING) ? "14.0" : "12.0";
+        String chosen = declared != null && declared.trim().length() > 0
+                ? declared.trim()
+                : appTarget;
+        return isDeploymentTargetBelow(chosen, floor) ? floor : normalizeVersion(chosen.trim());
     }
 
     /// A bare major ("12") as the major.minor Apple's plists carry ("12.0"). The app's own hint is
@@ -7704,6 +7774,14 @@ public class IPhoneBuilder extends Executor {
                     throw new IOException("Failed to unzip appExtension "+appExtension);
                 }
 
+                File escaping = symlinkEscaping(extractedDir, extractedDir);
+                if (escaping != null) {
+                    throw new IOException("The " + extractedDir.getName() + " app extension "
+                            + "contains a symbolic link, " + escaping.getName() + ", that points "
+                            + "outside the extension. Xcode copies what an extension folder holds "
+                            + "into the app, so a link out of it would put a file from the build "
+                            + "machine into your app. Remove the link and rebuild.");
+                }
                 out.add(extractedDir);
             } catch (IOException ex) {
                 throw ex;
