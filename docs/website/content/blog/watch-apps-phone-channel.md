@@ -57,11 +57,15 @@ Register the listener during `init()`. A payload can be the reason the platform 
 ```java
 WearableConnection.addDataListener(new WearableDataListener() {
     public void dataChanged(WearableMessage data) {
-        stepsLabel.setText("" + data.getInt("count", 0));
+        if ("/steps".equals(data.getPath())) {
+            stepsLabel.setText("" + data.getInt("count", 0));
+        }
     }
 
     public void dataRemoved(String path) {
-        stepsLabel.setText("--");
+        if ("/steps".equals(path)) {
+            stepsLabel.setText("--");
+        }
     }
 });
 ```
@@ -71,22 +75,20 @@ Each data path holds the latest value. Two rapid writes can arrive as one update
 Use `sendMessage()` when both applications must be awake and the sender needs an answer now:
 
 ```java
-if (WearableConnection.isReachable()) {
-    WearableConnection.sendMessage(
-            new WearableMessage("/workout/start"),
-            new WearableReplyHandler() {
-                public void replyReceived(WearableMessage reply) {
-                    showWorkout(reply.getString("id", null));
-                }
+WearableConnection.sendMessage(
+        new WearableMessage("/workout/start"),
+        new WearableReplyHandler() {
+            public void replyReceived(WearableMessage reply) {
+                showWorkout(reply.getString("id", null));
+            }
 
-                public void replyFailed(String message) {
-                    showReplicatedWorkoutState();
-                }
-            });
-}
+            public void replyFailed(String message) {
+                showReplicatedWorkoutState();
+            }
+        });
 ```
 
-Failure is a normal branch. The phone may be asleep, out of range, or running an older version that does not know the message path. `transferFile()` covers files and large payloads that can arrive later.
+Failure is a normal branch. The phone may be asleep, out of range, or running an older version that does not know the message path. Do not use `isReachable()` as a preflight for a request with a fallback. Reachability can change after it is checked, and its first value during a cold start may still be unknown. Let `replyFailed()` select the replicated state instead. `transferFile()` covers files and large payloads that can arrive later.
 
 ## The simulator runs two processes
 
