@@ -1077,14 +1077,30 @@ void CN1MacWindowSetTitle(int slot, NSString* title) {
         return;
     }
     NSString* retained = [title retain];
-    NSString* old = w->pendingTitle;
+    NSString* old;
+    NSString* forBlock;
+    UIWindowScene* scene;
+    /* Swapped under the slot lock. This runs on the event dispatch thread while
+     * CN1MacWindowSceneConnected can be adopting the same slot on UIKit's main
+     * queue, and adoption reads pendingTitle under this lock. Unsynchronized, a
+     * title change could release the very string adoption was about to assign --
+     * this file builds without ARC, so that is a use after free rather than a
+     * missed update. */
+    pthread_mutex_lock(&g_slotLock);
+    old = w->pendingTitle;
     w->pendingTitle = retained;
+    scene = w->scene;
+    /* An extra reference for the block: the slot's reference belongs to the slot,
+     * and a later setTitle can replace and release it before the block runs. */
+    forBlock = [retained retain];
+    pthread_mutex_unlock(&g_slotLock);
+    /* Released outside the lock, because -release can run arbitrary teardown. */
     [old release];
-    UIWindowScene* scene = w->scene;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (scene != nil) {
-            scene.title = retained == nil ? @"" : retained;
+            scene.title = forBlock == nil ? @"" : forBlock;
         }
+        [forBlock release];
     });
 }
 
@@ -1143,8 +1159,13 @@ void CN1MacWindowGetBounds(int slot, int* out) {
         out[2] = (int) (f.size.width * scale);
         out[3] = (int) (f.size.height * scale);
     } else {
-        out[0] = 0;
-        out[1] = 0;
+        /* The requested origin, not (0,0). A window that has returned from show()
+         * but whose scene has not connected yet is still readable, and a
+         * setWindowSize() reads these bounds and writes the whole rectangle back --
+         * so reporting a zero origin here overwrote an explicitly placed window's
+         * position before it ever appeared. The size below already worked this way. */
+        out[0] = w->pendingX;
+        out[1] = w->pendingY;
         out[2] = w->pendingWidth;
         out[3] = w->pendingHeight;
     }
