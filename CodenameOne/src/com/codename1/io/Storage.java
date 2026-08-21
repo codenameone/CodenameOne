@@ -475,6 +475,13 @@ public class Storage {
         try {
             d = new DataOutputStream(createOutputStream(name));
             Util.writeObject(o, d);
+            // closed here rather than left to the finally, because closing is where
+            // an implementation that writes the entry in one step does the writing.
+            // From the finally the failure would reach cleanup(), which logs and
+            // swallows it, and this method would report a write that never landed.
+            DataOutputStream writing = d;
+            d = null;
+            writing.close();
             return true;
         } catch (Exception err) {
             if (includeLogging) {

@@ -7507,11 +7507,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Marks a file that holds a storage write still in progress. Such a file is
-     * invisible to every storage entry point and is renamed over the real entry
-     * once its bytes are on the device.
+     * Directory under the files dir that holds storage writes still in progress.
+     *
+     * <p>A directory rather than a suffix on the entry name: a name the storage API
+     * accepts must never be mistaken for a write in progress, and no pattern over a
+     * flat namespace can promise that. Nothing but this implementation puts anything
+     * in here, so a scratch file cannot collide with an entry however the entry is
+     * named.</p>
      */
-    private static final String STORAGE_SCRATCH_SUFFIX = ".cn1tmp";
+    private static final String STORAGE_SCRATCH_DIR = ".cn1-storage-scratch";
 
     /**
      * Distinguishes the scratch files of concurrent writes, so two threads writing
@@ -7520,8 +7524,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static final AtomicLong storageScratchCounter = new AtomicLong();
 
     /**
+     * Guards the instant at which a write is published or abandoned, and the set of
+     * writes that are still open. Deleting an entry and publishing one have to take
+     * turns: otherwise a write that renames its scratch file just after another
+     * thread deleted the entry brings the deleted entry back.
+     */
+    private static final Object storagePublishLock = new Object();
+
+    /**
+     * The writes that are currently open, so that deleting an entry can cancel them.
+     * Guarded by {@link #storagePublishLock}.
+     */
+    private static final List<StorageOutputStream> openStorageWrites =
+            new ArrayList<StorageOutputStream>();
+
+    /**
      * Whether the scratch files abandoned by a previous run of this application have
-     * been removed. Guarded by the class monitor.
+     * been removed. Guarded by {@link #storagePublishLock}.
      */
     private static boolean storageScratchSwept;
 
@@ -7529,8 +7548,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void deleteStorageFile(String name) {
-        getContext().deleteFile(name);
-        discardStorageScratchFiles(name);
+        synchronized (storagePublishLock) {
+            // cancelled before the entry goes, and under the same lock the publishing
+            // rename takes, so a write that is already mid close cannot put the entry
+            // back afterwards. Unlinking the entry used to make that impossible on its
+            // own, since the write held a descriptor on an inode with no name left.
+            for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+                openStorageWrites.get(iter).cancel(name);
+            }
+            getContext().deleteFile(name);
+        }
     }
 
     /**
@@ -7552,7 +7579,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean storageFileExists(String name) {
-        if (isStorageScratchName(name)) {
+        if (STORAGE_SCRATCH_DIR.equals(name)) {
             return false;
         }
         String[] fileList = getContext().fileList();
@@ -7571,7 +7598,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String[] fileList = getContext().fileList();
         int keep = 0;
         for (int iter = 0; iter < fileList.length; iter++) {
-            if (!isStorageScratchName(fileList[iter])) {
+            if (!STORAGE_SCRATCH_DIR.equals(fileList[iter])) {
                 fileList[keep] = fileList[iter];
                 keep++;
             }
@@ -7588,50 +7615,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public int getStorageEntrySize(String name) {
-        if (isStorageScratchName(name)) {
+        if (STORAGE_SCRATCH_DIR.equals(name)) {
             return 0;
         }
         return (int)new File(getContext().getFilesDir(), name).length();
-    }
-
-    /**
-     * Whether the given file holds a storage write in progress rather than a storage
-     * entry of its own.
-     *
-     * @param name the file name
-     * @return true when the file belongs to a write in progress
-     */
-    private static boolean isStorageScratchName(String name) {
-        int suffix = name.lastIndexOf(STORAGE_SCRATCH_SUFFIX);
-        if (suffix < 0 || suffix + STORAGE_SCRATCH_SUFFIX.length() >= name.length()) {
-            return false;
-        }
-        // the counter that follows the suffix is what keeps an entry whose own name
-        // happens to end in ".cn1tmp" visible
-        for (int iter = suffix + STORAGE_SCRATCH_SUFFIX.length(); iter < name.length(); iter++) {
-            char c = name.charAt(iter);
-            if (c < '0' || c > '9') {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Abandons any write still in progress against the given entry, so that a caller
-     * that deletes an entry it has just failed to write does not find those failed
-     * bytes renamed over it afterwards.
-     *
-     * @param name the storage entry
-     */
-    private void discardStorageScratchFiles(String name) {
-        String prefix = name + STORAGE_SCRATCH_SUFFIX;
-        String[] fileList = getContext().fileList();
-        for (int iter = 0; iter < fileList.length; iter++) {
-            if (fileList[iter].startsWith(prefix) && isStorageScratchName(fileList[iter])) {
-                getContext().deleteFile(fileList[iter]);
-            }
-        }
     }
 
     /**
@@ -7639,20 +7626,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * They are already invisible to the storage API, this only stops them
      * accumulating.
      *
-     * <p>Runs before the first scratch file of this process exists, and holds the
-     * monitor across the sweep, so it cannot delete a write that is in flight.</p>
+     * <p>Every write calls this before it creates its scratch file and the sweep
+     * itself holds the lock, so the one sweep that runs is over before any scratch
+     * file of this process exists and cannot delete a write that is in flight.</p>
      */
     private void sweepStorageScratchFiles() {
-        synchronized (AndroidImplementation.class) {
+        synchronized (storagePublishLock) {
             if (storageScratchSwept) {
                 return;
             }
             storageScratchSwept = true;
             try {
-                String[] fileList = getContext().fileList();
-                for (int iter = 0; iter < fileList.length; iter++) {
-                    if (isStorageScratchName(fileList[iter])) {
-                        getContext().deleteFile(fileList[iter]);
+                File[] abandoned = storageScratchDir().listFiles();
+                if (abandoned == null) {
+                    return;
+                }
+                for (int iter = 0; iter < abandoned.length; iter++) {
+                    if (!abandoned[iter].delete()) {
+                        com.codename1.io.Log.p("Could not remove the abandoned storage "
+                                + "scratch file " + abandoned[iter]);
                     }
                 }
             } catch (Throwable t) {
@@ -7660,6 +7652,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 com.codename1.io.Log.e(t);
             }
         }
+    }
+
+    /**
+     * The directory holding the writes that are in progress.
+     *
+     * @return the scratch directory, which is not guaranteed to exist yet
+     */
+    private static File storageScratchDir() {
+        return new File(getContext().getFilesDir(), STORAGE_SCRATCH_DIR);
     }
 
     /**
@@ -7680,17 +7681,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * <p>The entry now changes in a single rename, which the filesystem cannot show
      * half done, and the bytes reach the device before that rename is made.</p>
      */
-    private final class StorageOutputStream extends OutputStream {
+    private static final class StorageOutputStream extends OutputStream {
         private final String name;
-        private final String scratchName;
+        private final File scratch;
         private final FileOutputStream out;
         private boolean closed;
+        private boolean cancelled;
 
         StorageOutputStream(String name) throws IOException {
             this.name = name;
-            this.scratchName = name + STORAGE_SCRATCH_SUFFIX
-                    + storageScratchCounter.incrementAndGet();
-            this.out = getContext().openFileOutput(scratchName, 0);
+            File dir = storageScratchDir();
+            if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
+                throw new IOException("Could not create the storage scratch directory "
+                        + dir);
+            }
+            this.scratch = new File(dir, name + "." + storageScratchCounter.incrementAndGet());
+            this.out = new FileOutputStream(scratch);
+            synchronized (storagePublishLock) {
+                openStorageWrites.add(this);
+            }
+        }
+
+        /**
+         * Marks this write as one that must not be published, because the entry it
+         * would publish over has been deleted since it opened. Called holding
+         * {@link #storagePublishLock}.
+         *
+         * @param entry the entry being deleted
+         */
+        void cancel(String entry) {
+            if (name.equals(entry)) {
+                cancelled = true;
+            }
         }
 
         @Override
@@ -7720,24 +7742,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             closed = true;
             try {
-                out.flush();
-                out.getFD().sync();
+                try {
+                    out.flush();
+                    out.getFD().sync();
+                } finally {
+                    out.close();
+                }
+                publish();
             } finally {
-                out.close();
+                synchronized (storagePublishLock) {
+                    openStorageWrites.remove(this);
+                }
+                if (scratch.exists() && !scratch.delete()) {
+                    com.codename1.io.Log.p("Could not remove the storage scratch file "
+                            + scratch);
+                }
             }
-            File dir = getContext().getFilesDir();
-            File scratch = new File(dir, scratchName);
-            if (scratch.renameTo(new File(dir, name))) {
+        }
+
+        /**
+         * Renames the scratch file over the entry, which is the point at which the
+         * write becomes visible.
+         *
+         * @throws IOException if the entry could not be replaced, so that the caller
+         *   that wrote it hears about it rather than being told the write succeeded
+         */
+        private void publish() throws IOException {
+            synchronized (storagePublishLock) {
+                if (cancelled) {
+                    return;
+                }
+                File dir = getContext().getFilesDir();
+                if (!scratch.renameTo(new File(dir, name))) {
+                    throw new IOException("Could not store " + name);
+                }
                 syncStorageDirectory(dir);
-                return;
             }
-            if (!scratch.exists()) {
-                // deleteStorageFile abandoned this write while it was open, which is
-                // how a caller cancels one; there is nothing left to publish
-                return;
-            }
-            getContext().deleteFile(scratchName);
-            throw new IOException("Could not store " + name);
         }
     }
 

@@ -99,6 +99,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, byte[]> storageEntries = new ConcurrentHashMap<>();
     private final List<StorageOutput> openStorageWrites = new CopyOnWriteArrayList<>();
+    private boolean storageWriteFailsOnClose;
     private final Map<String, TestFile> fileSystem = new ConcurrentHashMap<>();
     private final Map<String, TestConnection> connections = new ConcurrentHashMap<>();
     private final Map<String, TestSocket> sockets = new ConcurrentHashMap<>();
@@ -3109,6 +3110,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * Makes storage writes fail at the point an entry would be published, which is
+     * where an implementation that replaces the entry in one step does the writing.
+     *
+     * @param failsOnClose whether closing a storage output stream should fail
+     */
+    public void setStorageWriteFailsOnClose(boolean failsOnClose) {
+        storageWriteFailsOnClose = failsOnClose;
+    }
+
     public void putStorageEntry(String name, byte[] data) {
         if (data == null) {
             storageEntries.remove(name);
@@ -4365,7 +4376,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     private final class StorageOutput extends ByteArrayOutputStream {
         private final String name;
-        private volatile boolean discarded;
+        private boolean discarded;
 
         StorageOutput(String name) {
             this.name = name;
@@ -4382,6 +4393,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public void close() throws IOException {
             super.close();
             openStorageWrites.remove(this);
+            if (storageWriteFailsOnClose) {
+                // an implementation that publishes the entry on close fails here
+                throw new IOException("Could not store " + name);
+            }
             if (!discarded) {
                 storageEntries.put(name, toByteArray());
             }
