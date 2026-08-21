@@ -1204,11 +1204,19 @@ class WatchNativeBuilder {
     /// entity decoding applies as before. The assembled value is trimmed, matching what this did
     /// before CDATA was understood at all.
     static String plistStringContent(String raw) {
+        String exact = plistStringContentExact(raw);
+        return exact == null ? null : exact.trim();
+    }
+
+    /// The same content WITHOUT the trim, for a caller that has to see the value a plist parser
+    /// would: <string> 5.4 </string> and <string><![CDATA[ 5.4 ]]></string> both carry padding
+    /// that Apple compares and this method must not throw away.
+    static String plistStringContentExact(String raw) {
         if (raw == null) {
             return null;
         }
         if (raw.indexOf(CDATA_OPEN) < 0) {
-            return decodeXmlEntities(stripComments(raw).trim());
+            return decodeXmlEntities(stripComments(raw));
         }
         StringBuilder out = new StringBuilder(raw.length());
         int i = 0;
@@ -1229,7 +1237,7 @@ class WatchNativeBuilder {
             out.append(raw, body, end);
             i = end + CDATA_CLOSE.length();
         }
-        return out.toString().trim();
+        return out.toString();
     }
 
     /// Turns the five predefined XML entities back into their characters.

@@ -4906,9 +4906,15 @@ public class IPhoneBuilder extends Executor {
                             // The minimum iOS this extension declares, which App Store validation
                             // reads out of the built .appex as MinimumOSVersion. Computed after the
                             // properties are folded in, so an archive that states its own wins.
+                            // The entitlements the TARGET IS SIGNED WITH, which is not
+                            // necessarily the one picked by name: buildSettings.properties may set
+                            // CODE_SIGN_ENTITLEMENTS at another file, and it is that file's
+                            // payment-pass-provisioning that decides whether iOS 14 is the floor.
+                            File signedEntitlements = appExtensionSignedEntitlements(appExtension,
+                                    buildSettingsMap.get("CODE_SIGN_ENTITLEMENTS"), extEntitlementsFile);
                             String extDeploymentTarget = appExtensionDeploymentTarget(
                                     buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
-                                    extEntitlementsFile,
+                                    signedEntitlements,
                                     request.getArg("ios.deployment_target", null));
                             buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
 
@@ -5804,7 +5810,8 @@ public class IPhoneBuilder extends Executor {
             // already matched its app into one that does not -- the very validation failure this
             // method exists to prevent.
             List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
-                    embeddedExtensionBundleVersion(request), appExtensionBuildSettings(appExtension));
+                    embeddedExtensionBundleVersion(request), request.getPackageName(),
+                    appExtensionBuildSettings(appExtension));
             if (changes == null) {
                 debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
                         + " as an XML property list, so its bundle identity was left as it is. If "
@@ -5824,10 +5831,15 @@ public class IPhoneBuilder extends Executor {
     /// null when this is not an XML plist this build can edit
     static List<String> stampPlistFile(File infoPlist, String shortVersion, String bundleVersion,
             Map<String, String> archiveSettings) throws IOException {
+        return stampPlistFile(infoPlist, shortVersion, bundleVersion, null, archiveSettings);
+    }
+
+    static List<String> stampPlistFile(File infoPlist, String shortVersion, String bundleVersion,
+            String hostBundleId, Map<String, String> archiveSettings) throws IOException {
         PlistText original = readPlistText(infoPlist);
         List<String> changes = new ArrayList<String>();
         String result = stampInfoPlistIdentity(original.text, shortVersion, bundleVersion,
-                archiveSettings, changes);
+                hostBundleId, archiveSettings, changes);
         if (changes.isEmpty()) {
             return changes;
         }
@@ -5925,6 +5937,15 @@ public class IPhoneBuilder extends Executor {
         if (bom == BOM_UTF16LE) {
             return StandardCharsets.UTF_16LE;
         }
+        // UTF-16 without a byte order mark: its declaration is NUL-interleaved, so the probe below
+        // reads gibberish and falls through to UTF-8, and the plist then fails to parse and goes
+        // unstamped. The first characters of an XML document are "<?".
+        if (data.length >= 4 && data[0] == 0 && data[1] == '<' && data[2] == 0 && data[3] == '?') {
+            return StandardCharsets.UTF_16BE;
+        }
+        if (data.length >= 4 && data[0] == '<' && data[1] == 0 && data[2] == '?' && data[3] == 0) {
+            return StandardCharsets.UTF_16LE;
+        }
         // The declaration is ASCII-compatible in every encoding that can carry one, except the
         // UTF-16 forms, which the marks above have already answered for.
         String head = new String(data, 0, Math.min(data.length, 512), StandardCharsets.ISO_8859_1);
@@ -5997,13 +6018,23 @@ public class IPhoneBuilder extends Executor {
      */
     static String stampInfoPlistIdentity(String plist, String shortVersion, String bundleVersion,
             Map<String, String> archiveSettings, List<String> changes) {
+        return stampInfoPlistIdentity(plist, shortVersion, bundleVersion, null, archiveSettings, changes);
+    }
+
+    /// @param hostBundleId the containing app's bundle identifier, so a literal identifier that
+    /// could never be one of its extensions can be recognised; null skips that check
+    static String stampInfoPlistIdentity(String plist, String shortVersion, String bundleVersion,
+            String hostBundleId, Map<String, String> archiveSettings, List<String> changes) {
         if (plist == null || rootDictAt(plist) < 0) {
             changes.add("not an XML property list");
             return null;
         }
         String result = openEmptyRootDict(plist);
+        // A literal left over from another project is not prefixed by the host's bundle id, and
+        // PRODUCT_BUNDLE_IDENTIFIER cannot save it: the literal is what ships. One that could be
+        // this app's extension is kept; one that could not is replaced.
         result = setPlistString(result, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)",
-                false, archiveSettings, changes);
+                !identifierBelongsToApp(result, hostBundleId), archiveSettings, changes);
         result = setPlistString(result, "CFBundleShortVersionString", shortVersion,
                 true, archiveSettings, changes);
         result = setPlistString(result, "CFBundleVersion", bundleVersion,
@@ -6031,6 +6062,35 @@ public class IPhoneBuilder extends Executor {
         result = setPlistString(result, "CFBundleDevelopmentRegion", "$(DEVELOPMENT_LANGUAGE)",
                 false, archiveSettings, changes);
         return result;
+    }
+
+    /// Whether the identifier the plist already carries can be an extension of this app: absent,
+    /// a build-setting reference, or a literal under the host's own bundle id.
+    static boolean identifierBelongsToApp(String plist, String hostBundleId) {
+        if (hostBundleId == null || hostBundleId.length() == 0) {
+            return true;
+        }
+        int afterKey = topLevelKeyEnd(plist, "CFBundleIdentifier");
+        if (afterKey < 0) {
+            return true;
+        }
+        int element = nextMarkupAt(plist, afterKey);
+        if (element < 0 || !"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
+            return true;
+        }
+        int openEnd = plist.indexOf('>', element);
+        if (openEnd < 0 || plist.charAt(openEnd - 1) == '/') {
+            return true;
+        }
+        int valueEnd = WatchNativeBuilder.closeOfElement(plist, openEnd + 1, "</string>");
+        if (valueEnd < 0) {
+            return true;
+        }
+        String current = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, valueEnd));
+        if (current == null || current.length() == 0 || current.contains("$(") || current.contains("${")) {
+            return true;
+        }
+        return current.startsWith(hostBundleId + ".");
     }
 
     /**
@@ -6109,9 +6169,20 @@ public class IPhoneBuilder extends Executor {
         if (currentText == null) {
             currentText = "";
         }
+        // And the same content untrimmed, because a plist parser keeps padding wherever it is
+        // written -- <string> 5.4 </string> and <string><![CDATA[ 5.4 ]]></string> both parse as
+        // " 5.4 ", which Apple compares against the app's "5.4" and rejects. Emptiness is judged
+        // on the trimmed text; everything else on the exact one.
+        String currentExact = WatchNativeBuilder.plistStringContentExact(current);
+        if (currentExact == null) {
+            currentExact = "";
+        }
         if (currentText.length() == 0) {
             changes.add("set " + key + " to " + value + " (was empty)");
             return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
+        }
+        if (currentExact.equals(value)) {
+            return plist;
         }
         if (!overwriteNonEmpty) {
             return plist;
@@ -6123,12 +6194,10 @@ public class IPhoneBuilder extends Executor {
         // since the target this build generates has no version settings of its own. Both fail the
         // embedded-bundle check; only a reference that already lands on the app's own version is
         // left standing.
-        String resolved = resolveSettingsInValue(currentText, archiveSettings);
-        // Accepted as it stands only when it lands on the app's version AND carries no padding of
-        // its own: a plist parser keeps the spaces in <string> 5.4 </string>, so Apple compares
-        // " 5.4 " against the app's "5.4" and rejects the pair. Spelling that resolves cleanly --
-        // CDATA, entities, a build-setting reference -- is left as the archive wrote it.
-        if (value.equals(resolved) && current.equals(current.trim())) {
+        // Resolved from the exact text, so padding written inside CDATA or as entities counts
+        // exactly as padding written outside it would.
+        String resolved = resolveSettingsInValue(currentExact, archiveSettings);
+        if (value.equals(resolved)) {
             return plist;
         }
         changes.add("set " + key + " to " + value + " to match the app (was " + currentText
@@ -6231,7 +6300,10 @@ public class IPhoneBuilder extends Executor {
     private static int rootDictCloseAt(String plist) {
         int at = rootDictAt(plist);
         int end = at < 0 ? -1 : endOfElement(plist, at);
-        return end < 0 ? -1 : plist.lastIndexOf('<', end);
+        // end - 1, not end: endOfElement returns the index just PAST the closing '>', which in a
+        // compact plist ending "</dict></plist>" is the '<' of </plist>. An inclusive search from
+        // there picked that one and inserted the keys between the two closing tags.
+        return end < 1 ? -1 : plist.lastIndexOf('<', end - 1);
     }
 
     /// Index just past the element opening at {@code element}, everything nested inside it
@@ -6399,6 +6471,21 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return false;
+    }
+
+    /// The entitlements file the extension target is signed with.
+    ///
+    /// CODE_SIGN_ENTITLEMENTS is a path relative to the project directory, the same shape as
+    /// INFOPLIST_FILE, and the archive may point it at a file other than the one named after the
+    /// extension. What it names is what Xcode signs against, so it is also what decides the
+    /// entitlement-driven deployment floor. Falls back to the named pick when the setting is
+    /// absent, still a placeholder, or points somewhere this build will not read.
+    static File appExtensionSignedEntitlements(File extensionFolder, String configured, File byName) {
+        if (configured == null || configured.trim().length() == 0 || configured.contains("$(NS_")) {
+            return byName;
+        }
+        File resolved = resolveInfoPlistPath(configured.trim(), extensionFolder);
+        return resolved != null && resolved.isFile() ? resolved : byName;
     }
 
     /// The minimum iOS version a brought-in app extension declares.
@@ -6636,7 +6723,7 @@ public class IPhoneBuilder extends Executor {
                 String before = out;
                 for (Map.Entry<String, String> setting : archiveSettings.entrySet()) {
                     out = replaceBuildSetting(out, setting.getKey(),
-                            setting.getValue() == null ? "" : setting.getValue().trim());
+                            setting.getValue() == null ? "" : setting.getValue());
                 }
                 if (out.equals(before)) {
                     // Nothing left that this archive defines; the strip below handles the rest.
@@ -6646,7 +6733,9 @@ public class IPhoneBuilder extends Executor {
         }
         // What survives names a setting the archive does not define, or sits in a cycle that never
         // settles. Xcode resolves those to nothing, and so does this.
-        return BUILD_SETTING_REFERENCE.matcher(out).replaceAll("").trim();
+        // Not trimmed: the properties file's own trailing whitespace is written into the Xcode
+        // setting verbatim, so MARKETING_VERSION = "5.4 " really does expand to "5.4 ".
+        return BUILD_SETTING_REFERENCE.matcher(out).replaceAll("");
     }
 
     /// A build-setting reference in either spelling Xcode accepts.
