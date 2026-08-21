@@ -5971,6 +5971,24 @@ public class IPhoneBuilder extends Executor {
                 true, archiveSettings, changes);
         result = setPlistString(result, "CFBundleVersion", bundleVersion,
                 true, archiveSettings, changes);
+        // The rest of what makes a directory an app-extension BUNDLE rather than a folder with a
+        // program in it. Without CFBundleExecutable the .appex does not claim its own binary, and
+        // App Store validation rejects the upload -- "the ... binary file is not permitted. Your
+        // app cannot contain standalone executables or libraries, other than a valid
+        // CFBundleExecutable of supported bundles" -- after a build that succeeded and an archive
+        // that exported cleanly. Every extension this builder generates itself writes exactly
+        // these; a brought-in one whose plist leaves them to GENERATE_INFOPLIST_FILE arrives
+        // without them, and nothing downstream puts them back.
+        result = setPlistString(result, "CFBundleExecutable", "$(EXECUTABLE_NAME)",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundlePackageType", "XPC!",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleName", "$(PRODUCT_NAME)",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleInfoDictionaryVersion", "6.0",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleDevelopmentRegion", "en",
+                false, archiveSettings, changes);
         return result;
     }
 
