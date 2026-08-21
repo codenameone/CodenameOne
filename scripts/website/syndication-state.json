@@ -1680,6 +1680,21 @@
         "url": "https://dzone.com/content/3673201/edit.html",
         "syndicated_at": "2026-08-15T04:53:25+00:00"
       }
+    },
+    "third-generation-gui-builder": {
+      "devto": {
+        "id": 4454482,
+        "url": "https://dev.to/codenameone/the-third-generation-gui-builder-one-workspace-for-every-form-4mdh",
+        "syndicated_at": "2026-08-21T13:39:35+00:00"
+      },
+      "foojay": {
+        "id": 125372,
+        "url": "https://foojay.io/wp-admin/post.php?post=125372&action=edit",
+        "preview_url": "https://foojay.io/?p=125372",
+        "featured_media_id": 125371,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-08-21T13:40:38+00:00"
+      }
     }
   }
 }
