@@ -8088,9 +8088,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * after a crash or a reboot the files an earlier incarnation abandoned can be
      * sitting under the id this one has just been given. The sweep passes over
      * anything bearing its own id, on the grounds that a process knows its own work,
-     * which would leave those files where they are for good. Running this before the
-     * first write, when this process owns nothing yet, makes that assumption true:
-     * anything already here under its id belongs to the incarnation before it.</p>
+     * which would leave those files where they are for good.</p>
+     *
+     * <p>Usually this runs before the first write, when the process owns nothing and
+     * everything under its id must belong to the incarnation before it. That is not
+     * guaranteed: a claim that fails is retried by the next write, by which time this
+     * process may have writes of its own open. Those are known exactly and are left
+     * alone -- deleting one would fail a write that had already been serialized.</p>
      *
      * <p>The caller must hold {@link #storagePublishLock}.</p>
      *
@@ -8105,11 +8109,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         for (int iter = 0; iter < files.length; iter++) {
             if (!isStorageMarkerFile(files[iter])
                     && storageScratchOwner(files[iter].getName()) == mine
+                    && !isOpenStorageWrite(files[iter])
                     && !files[iter].delete()) {
                 com.codename1.io.Log.p("Could not remove the abandoned storage scratch "
                         + "file " + files[iter]);
             }
         }
+    }
+
+    /**
+     * Whether the given scratch file belongs to a write this process has open.
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     *
+     * @param file a file in the scratch directory
+     * @return true if a write in this process is using it
+     */
+    private static boolean isOpenStorageWrite(File file) {
+        for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+            if (openStorageWrites.get(iter).scratch.equals(file)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -8233,6 +8255,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 throw new IOException("Could not create the storage scratch directory "
                         + dir);
             }
+            // the write goes ahead whether or not that succeeded. A claim can only
+            // fail where the filesystem will not lock, and refusing to write would
+            // turn that into an application that cannot store anything -- far worse
+            // than what it costs, which is that another process sweeping at that
+            // moment may take this write for abandoned and unlink it. That fails the
+            // write, honestly, and leaves what was already stored where it is; the
+            // next write claims again. Same trade the cross process lock makes.
             claimStorageLiveness(dir);
             // the digest of the entry lets another process find and cancel this write.
             // The process id separates concurrent processes, whose counters both start
