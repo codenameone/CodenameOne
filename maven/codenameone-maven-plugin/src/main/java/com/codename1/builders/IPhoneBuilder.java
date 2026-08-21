@@ -47,6 +47,10 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
+import java.nio.charset.Charset;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.io.DataInputStream;
 import java.util.regex.Pattern;
 
 /**
@@ -5732,47 +5736,218 @@ public class IPhoneBuilder extends Executor {
      * that is already correct, and one written as a {@code $(...)} reference, are left alone.</p>
      */
     private void stampAppExtensionInfoPlist(File appExtension, BuildRequest request) throws IOException {
-        File infoPlist = appExtensionInfoPlist(appExtension);
-        if (infoPlist == null) {
-            debug("The " + appExtension.getName() + " app extension points INFOPLIST_FILE at a path "
-                    + "this build will not edit -- it either names a build setting that cannot be "
-                    + "resolved here, or it lands outside the project directory -- so its bundle "
-                    + "identifier and versions were left as they are. If the archive fails on the "
-                    + "embedded binary's bundle identifier, write the path relative to the project "
-                    + "directory.");
-            return;
+        Map<String, File> plists = appExtensionInfoPlists(appExtension);
+        Set<String> stamped = new LinkedHashSet<String>();
+        for (Map.Entry<String, File> candidate : plists.entrySet()) {
+            File infoPlist = candidate.getValue();
+            if (infoPlist == null) {
+                debug("The " + appExtension.getName() + " app extension names '" + candidate.getKey()
+                        + "' as an Info.plist this build will not edit -- it either holds a build "
+                        + "setting that cannot be resolved here, or it lands outside the project "
+                        + "directory -- so that plist was left as it is. If the archive fails on "
+                        + "the embedded binary's bundle identifier, write the path relative to the "
+                        + "project directory.");
+                continue;
+            }
+            if (!infoPlist.isFile()) {
+                debug("The " + appExtension.getName() + " app extension names '" + candidate.getKey()
+                        + "' as an Info.plist, and there is no such file. Xcode cannot build an "
+                        + "extension target without the plist its settings point at; add it to the "
+                        + ".ios.appext archive.");
+                continue;
+            }
+            if (!stamped.add(infoPlist.getCanonicalPath())) {
+                // Two settings naming the same file. Stamping is idempotent, but saying so twice
+                // in the log reads like two files were touched.
+                continue;
+            }
+            // Through the shared resolvers rather than buildVersion / the ios.bundleVersion hint
+            // directly: an app that sets either version key through ios.plistInject ships that
+            // value, and stamping the raw hint here would rewrite an extension version that
+            // already matched its app into one that does not -- the very validation failure this
+            // method exists to prevent.
+            List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
+                    embeddedExtensionBundleVersion(request), appExtensionBuildSettings(appExtension));
+            if (changes == null) {
+                debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
+                        + " as an XML property list, so its bundle identity was left as it is. If "
+                        + "the build fails on the embedded binary's bundle identifier, convert the "
+                        + "file with 'plutil -convert xml1 " + infoPlist.getName() + "' and rebuild.");
+                continue;
+            }
+            for (String change : changes) {
+                debug("Adjusted " + appExtension.getName() + "/" + infoPlist.getName() + ": " + change);
+            }
         }
-        if (!infoPlist.isFile()) {
-            debug("The " + appExtension.getName() + " app extension has no " + infoPlist.getName()
-                    + ". Xcode cannot build an extension target without one; add it to the "
-                    + ".ios.appext archive.");
-            return;
-        }
-        String plist = readFileToString(infoPlist);
+    }
+
+    /// Stamps one Info.plist in place, in the encoding it was written in.
+    ///
+    /// @return what changed, empty when the plist was already right and must not be rewritten, or
+    /// null when this is not an XML plist this build can edit
+    static List<String> stampPlistFile(File infoPlist, String shortVersion, String bundleVersion,
+            Map<String, String> archiveSettings) throws IOException {
+        PlistText original = readPlistText(infoPlist);
         List<String> changes = new ArrayList<String>();
-        // Through the shared resolvers rather than buildVersion / the ios.bundleVersion hint
-        // directly: an app that sets either version key through ios.plistInject ships that value,
-        // and stamping the raw hint here would rewrite an extension version that already matched
-        // its app into one that does not -- the very validation failure this method exists to
-        // prevent.
-        String stamped = stampInfoPlistIdentity(plist, embeddedExtensionShortVersion(request),
-                embeddedExtensionBundleVersion(request), appExtensionBuildSettings(appExtension),
-                changes);
+        String result = stampInfoPlistIdentity(original.text, shortVersion, bundleVersion,
+                archiveSettings, changes);
         if (changes.isEmpty()) {
-            return;
+            return changes;
         }
-        if (stamped == null) {
-            debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
-                    + " as an XML property list, "
-                    + "so its bundle identity was left as it is. If the build fails on the embedded "
-                    + "binary's bundle identifier, convert the file with "
-                    + "'plutil -convert xml1 Info.plist' and rebuild.");
-            return;
+        if (result == null) {
+            return null;
         }
-        createFile(infoPlist, stamped.getBytes("UTF-8"));
-        for (String change : changes) {
-            debug("Adjusted " + appExtension.getName() + "/" + infoPlist.getName() + ": " + change);
+        writePlistText(infoPlist, original, result);
+        return changes;
+    }
+
+    /// An Info.plist decoded the way its own bytes say it is encoded, so it can be written back
+    /// the same way.
+    private static final class PlistText {
+        final String text;
+        final Charset charset;
+        final byte[] bom;
+
+        PlistText(String text, Charset charset, byte[] bom) {
+            this.text = text;
+            this.charset = charset;
+            this.bom = bom;
         }
+    }
+
+    /// Reads a plist as text, honouring its byte order mark or its XML declaration.
+    ///
+    /// The default charset is not good enough for a file that arrives from someone else's machine:
+    /// a UTF-16 plist read as UTF-8 is noise, so the stamper would decline to parse it and the
+    /// extension would ship unstamped, and a Latin-1 plist read as UTF-8 loses every accented
+    /// character -- which this method would then write back, corrupting a display name to fix an
+    /// identifier.
+    private static PlistText readPlistText(File infoPlist) throws IOException {
+        byte[] data = readFileBytes(infoPlist);
+        byte[] bom = bomOf(data);
+        Charset charset = charsetOf(data, bom);
+        int from = bom == null ? 0 : bom.length;
+        return new PlistText(new String(data, from, data.length - from, charset), charset, bom);
+    }
+
+    /// Writes the stamped text back in the charset it was read in, byte order mark included, so
+    /// the file's own XML declaration stays true.
+    private static void writePlistText(File infoPlist, PlistText original, String text)
+            throws IOException {
+        byte[] body = text.getBytes(original.charset);
+        byte[] out = body;
+        if (original.bom != null) {
+            out = new byte[original.bom.length + body.length];
+            System.arraycopy(original.bom, 0, out, 0, original.bom.length);
+            System.arraycopy(body, 0, out, original.bom.length, body.length);
+        }
+        FileOutputStream stream = new FileOutputStream(infoPlist);
+        try {
+            stream.write(out);
+        } finally {
+            try { stream.close(); } catch (Throwable t) {}
+        }
+    }
+
+    private static byte[] readFileBytes(File file) throws IOException {
+        byte[] data = new byte[(int) file.length()];
+        DataInputStream in = new DataInputStream(new FileInputStream(file));
+        try {
+            in.readFully(data);
+        } finally {
+            try { in.close(); } catch (Throwable t) {}
+        }
+        return data;
+    }
+
+    private static final byte[] BOM_UTF8 = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    private static final byte[] BOM_UTF16BE = {(byte) 0xFE, (byte) 0xFF};
+    private static final byte[] BOM_UTF16LE = {(byte) 0xFF, (byte) 0xFE};
+
+    private static byte[] bomOf(byte[] data) {
+        for (byte[] bom : new byte[][]{BOM_UTF8, BOM_UTF16BE, BOM_UTF16LE}) {
+            if (data.length >= bom.length) {
+                boolean match = true;
+                for (int i = 0; i < bom.length; i++) {
+                    match &= data[i] == bom[i];
+                }
+                if (match) {
+                    return bom;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// The charset a plist's bytes declare: its byte order mark first, then the encoding named in
+    /// its XML declaration, and UTF-8 when it says neither -- which is what an XML parser does.
+    private static Charset charsetOf(byte[] data, byte[] bom) {
+        if (bom == BOM_UTF16BE) {
+            return StandardCharsets.UTF_16BE;
+        }
+        if (bom == BOM_UTF16LE) {
+            return StandardCharsets.UTF_16LE;
+        }
+        // The declaration is ASCII-compatible in every encoding that can carry one, except the
+        // UTF-16 forms, which the marks above have already answered for.
+        String head = new String(data, 0, Math.min(data.length, 512), StandardCharsets.ISO_8859_1);
+        Matcher declared = XML_ENCODING.matcher(head);
+        if (declared.find()) {
+            try {
+                return Charset.forName(declared.group(1));
+            } catch (Exception unsupported) {
+                // An encoding this JVM does not know. UTF-8 is the better guess than the platform
+                // default, and a plist that then fails to parse is left alone rather than rewritten.
+            }
+        }
+        return StandardCharsets.UTF_8;
+    }
+
+    private static final Pattern XML_ENCODING = Pattern.compile(
+            "<\\?xml[^>]*encoding\\s*=\\s*[\"\']([A-Za-z0-9_.:-]+)[\"\']");
+
+    /// Every Info.plist this extension's target might be built with, by the setting that names it.
+    ///
+    /// Not just INFOPLIST_FILE: Xcode honours a qualified setting -- INFOPLIST_FILE[sdk=iphoneos*]
+    /// -- and the archive's buildSettings.properties are copied into the target verbatim, so a
+    /// qualified one takes precedence for the builds it matches while the base value serves the
+    /// rest. Which one applies depends on the sdk, configuration and arch of the build Xcode is
+    /// running, so every one of them is stamped: they are all plists this extension may ship, and
+    /// stamping is idempotent.
+    ///
+    /// (An UNescaped `INFOPLIST_FILE[sdk=iphoneos*] = x` in a .properties file is not one of
+    /// these. Properties splits on that first `=`, leaving the key `INFOPLIST_FILE[sdk`, which
+    /// Xcode does not recognise as a setting at all -- so the base value still decides, and this
+    /// map is right to ignore it.)
+    ///
+    /// @return the raw setting value that named each plist, mapped to the resolved file, or to
+    /// null when that value is unresolvable or lands outside the project directory
+    static Map<String, File> appExtensionInfoPlists(File extensionFolder) {
+        Map<String, String> settings = appExtensionBuildSettings(extensionFolder);
+        Map<String, File> out = new LinkedHashMap<String, File>();
+        String base = settings.get("INFOPLIST_FILE");
+        if (base == null || base.trim().length() == 0) {
+            File byDefault = new File(extensionFolder, "Info.plist");
+            out.put("Info.plist",
+                    insideProjectDir(byDefault, extensionFolder.getParentFile()) ? byDefault : null);
+        } else {
+            out.put(base.trim(), resolveInfoPlistPath(base.trim(), extensionFolder));
+        }
+        for (Map.Entry<String, String> setting : settings.entrySet()) {
+            String key = setting.getKey();
+            // Closing bracket included: an unescaped conditional leaves Properties with the key
+            // INFOPLIST_FILE[sdk and the rest of the line as its value, and that is not a setting
+            // Xcode honours -- picking it up here would send the stamper after a path built out of
+            // the wreckage.
+            if (!key.startsWith("INFOPLIST_FILE[") || !key.endsWith("]")) {
+                continue;
+            }
+            String value = setting.getValue() == null ? "" : setting.getValue().trim();
+            if (value.length() > 0 && !out.containsKey(value)) {
+                out.put(value, resolveInfoPlistPath(value, extensionFolder));
+            }
+        }
+        return out;
     }
 
     /**
@@ -6086,6 +6261,12 @@ public class IPhoneBuilder extends Executor {
             File byDefault = new File(extensionFolder, "Info.plist");
             return insideProjectDir(byDefault, extensionFolder.getParentFile()) ? byDefault : null;
         }
+        return resolveInfoPlistPath(override, extensionFolder);
+    }
+
+    /// One INFOPLIST_FILE value as a file this build may write to, or null when it holds a setting
+    /// that cannot be resolved here or lands outside the project directory.
+    private static File resolveInfoPlistPath(String override, File extensionFolder) {
         String path = override;
         if (path.length() > 1 && path.startsWith("\"") && path.endsWith("\"")) {
             path = path.substring(1, path.length() - 1).trim();
