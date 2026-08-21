@@ -4911,7 +4911,8 @@ public class IPhoneBuilder extends Executor {
                             // CODE_SIGN_ENTITLEMENTS at another file, and it is that file's
                             // payment-pass-provisioning that decides whether iOS 14 is the floor.
                             File signedEntitlements = appExtensionSignedEntitlements(appExtension,
-                                    buildSettingsMap.get("CODE_SIGN_ENTITLEMENTS"), extEntitlementsFile);
+                                    buildSettingsMap.get("CODE_SIGN_ENTITLEMENTS"), extEntitlementsFile,
+                                    buildSettingsMap);
                             String extDeploymentTarget = appExtensionDeploymentTarget(
                                     buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
                                     signedEntitlements,
@@ -5809,9 +5810,14 @@ public class IPhoneBuilder extends Executor {
             // value, and stamping the raw hint here would rewrite an extension version that
             // already matched its app into one that does not -- the very validation failure this
             // method exists to prevent.
+            // The settings the TARGET will carry, so a $(PRODUCT_BUNDLE_IDENTIFIER) in the plist
+            // is judged by the identifier it will actually resolve to.
+            Map<String, String> settings = appExtensionBuildSettings(appExtension);
+            String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
+            settings.put("PRODUCT_BUNDLE_IDENTIFIER", declaredId != null ? declaredId
+                    : request.getPackageName() + "." + appExtension.getName());
             List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
-                    embeddedExtensionBundleVersion(request), request.getPackageName(),
-                    appExtensionBuildSettings(appExtension));
+                    embeddedExtensionBundleVersion(request), request.getPackageName(), settings);
             if (changes == null) {
                 debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
                         + " as an XML property list, so its bundle identity was left as it is. If "
@@ -6034,7 +6040,7 @@ public class IPhoneBuilder extends Executor {
         // PRODUCT_BUNDLE_IDENTIFIER cannot save it: the literal is what ships. One that could be
         // this app's extension is kept; one that could not is replaced.
         result = setPlistString(result, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)",
-                !identifierBelongsToApp(result, hostBundleId), archiveSettings, changes);
+                !identifierBelongsToApp(result, hostBundleId, archiveSettings), archiveSettings, changes);
         result = setPlistString(result, "CFBundleShortVersionString", shortVersion,
                 true, archiveSettings, changes);
         result = setPlistString(result, "CFBundleVersion", bundleVersion,
@@ -6066,7 +6072,8 @@ public class IPhoneBuilder extends Executor {
 
     /// Whether the identifier the plist already carries can be an extension of this app: absent,
     /// a build-setting reference, or a literal under the host's own bundle id.
-    static boolean identifierBelongsToApp(String plist, String hostBundleId) {
+    static boolean identifierBelongsToApp(String plist, String hostBundleId,
+            Map<String, String> archiveSettings) {
         if (hostBundleId == null || hostBundleId.length() == 0) {
             return true;
         }
@@ -6087,10 +6094,18 @@ public class IPhoneBuilder extends Executor {
             return true;
         }
         String current = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, valueEnd));
-        if (current == null || current.length() == 0 || current.contains("$(") || current.contains("${")) {
+        if (current == null || current.length() == 0) {
             return true;
         }
-        return current.startsWith(hostBundleId + ".");
+        // Through the settings, because $(PRODUCT_BUNDLE_IDENTIFIER) is not automatically safe:
+        // the archive may override PRODUCT_BUNDLE_IDENTIFIER itself, with the identifier from the
+        // project the extension was exported from, and those overrides are written onto this
+        // target. A reference is only as good as what it lands on.
+        String resolved = resolveSettingsInValue(current, archiveSettings);
+        if (resolved.length() == 0 || resolved.contains("$(") || resolved.contains("${")) {
+            return true;
+        }
+        return resolved.startsWith(hostBundleId + ".");
     }
 
     /**
@@ -6127,10 +6142,24 @@ public class IPhoneBuilder extends Executor {
         // <false/> or <integer>1</integer> has no string of its own, and scanning forward lands on
         // an unrelated later one -- the trap the comment on injectedPlistString records.
         int element = nextMarkupAt(plist, afterKey);
-        if (element < 0 || !"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
-            // Not a string value. An extension is free to use whatever type it likes, and
-            // rewriting a type we did not expect is worse than leaving a version alone.
+        if (element < 0) {
             return plist;
+        }
+        if (!"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
+            // The key's OWN value, of a type it may not have: every key this stamper manages is a
+            // bundle identity key and Apple requires a string. <integer>7</integer> for
+            // CFBundleVersion is not a version to preserve, it is an invalid bundle -- and leaving
+            // it while reporting success is how the stamper would hand back one that still fails.
+            // (Wandering off to some LATER key's <string> is the different mistake, and the search
+            // above is anchored to this key precisely so that cannot happen.)
+            int valueEnds = endOfElement(plist, element);
+            if (valueEnds < 0) {
+                return plist;
+            }
+            changes.add("set " + key + " to " + value + " (was "
+                    + WatchNativeBuilder.tagAt(plist, element) + ", which is not a string)");
+            return plist.substring(0, element) + "<string>" + value + "</string>"
+                    + plist.substring(valueEnds);
         }
         int openEnd = plist.indexOf('>', element);
         if (openEnd < 0) {
@@ -6480,11 +6509,15 @@ public class IPhoneBuilder extends Executor {
     /// extension. What it names is what Xcode signs against, so it is also what decides the
     /// entitlement-driven deployment floor. Falls back to the named pick when the setting is
     /// absent, still a placeholder, or points somewhere this build will not read.
-    static File appExtensionSignedEntitlements(File extensionFolder, String configured, File byName) {
+    static File appExtensionSignedEntitlements(File extensionFolder, String configured, File byName,
+            Map<String, String> settings) {
         if (configured == null || configured.trim().length() == 0 || configured.contains("$(NS_")) {
             return byName;
         }
-        File resolved = resolveInfoPlistPath(configured.trim(), extensionFolder);
+        // From the settings MAP, not from buildSettings.properties: that file is loaded into the
+        // map and deleted before this runs, so a path holding $(PRODUCT_NAME) would resolve
+        // against an override that is no longer readable and quietly name a different file.
+        File resolved = resolveInfoPlistPath(configured.trim(), extensionFolder, settings);
         return resolved != null && resolved.isFile() ? resolved : byName;
     }
 
@@ -6587,11 +6620,16 @@ public class IPhoneBuilder extends Executor {
     /// One INFOPLIST_FILE value as a file this build may write to, or null when it holds a setting
     /// that cannot be resolved here or lands outside the project directory.
     private static File resolveInfoPlistPath(String override, File extensionFolder) {
+        return resolveInfoPlistPath(override, extensionFolder, null);
+    }
+
+    private static File resolveInfoPlistPath(String override, File extensionFolder,
+            Map<String, String> settings) {
         String path = override;
         if (path.length() > 1 && path.startsWith("\"") && path.endsWith("\"")) {
             path = path.substring(1, path.length() - 1).trim();
         }
-        path = resolveXcodeSettingsInPath(path, extensionFolder);
+        path = resolveXcodeSettingsInPath(path, extensionFolder, settings);
         if (path == null || path.length() == 0) {
             return null;
         }
@@ -6687,8 +6725,17 @@ public class IPhoneBuilder extends Executor {
     /// value -- and null says so, because the alternative is editing whichever file the
     /// half-resolved path happens to name.
     private static String resolveXcodeSettingsInPath(String path, File extensionFolder) {
+        return resolveXcodeSettingsInPath(path, extensionFolder, null);
+    }
+
+    /// @param settings the target's settings when they are already gathered, since the properties
+    /// file they came from is deleted once it is loaded
+    private static String resolveXcodeSettingsInPath(String path, File extensionFolder,
+            Map<String, String> settings) {
         String targetName = extensionFolder.getName();
-        String productName = appExtensionBuildSetting(extensionFolder, "PRODUCT_NAME");
+        String productName = settings != null && settings.get("PRODUCT_NAME") != null
+                ? settings.get("PRODUCT_NAME").trim()
+                : appExtensionBuildSetting(extensionFolder, "PRODUCT_NAME");
         if (productName == null || productName.indexOf('$') >= 0) {
             productName = targetName;
         }
