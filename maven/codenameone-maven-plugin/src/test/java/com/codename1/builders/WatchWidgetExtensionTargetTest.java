@@ -224,6 +224,51 @@ class WatchWidgetExtensionTargetTest {
         assertTrue(plist.contains("<string>10.0</string>"), plist);
     }
 
+    /// A complication tap launches the watch app with the widgetURL rather than delivering it to
+    /// a delegate -- there is no UIApplicationDelegate on watchOS -- so the SwiftUI scene is the
+    /// only place it can be caught. Without this the tap opened the app and the action was lost.
+    @Test
+    void aComplicationTapReachesTheActionHandler(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        WatchNativeBuilder b = parse(req);
+        b.setWidgetExtension(extensionDir(tmp), "group.com.mycompany.myapp", "10.0");
+        File srcDir = new File(tmp.toFile(), "src");
+        srcDir.mkdirs();
+
+        b.writeWatchEntry(req, srcDir);
+        String swift = new String(Files.readAllBytes(
+                new File(srcDir, "CN1WatchApp.swift").toPath()), StandardCharsets.UTF_8);
+        String bridging = new String(Files.readAllBytes(
+                new File(srcDir, "MyApp-Watch-Bridging-Header.h").toPath()), StandardCharsets.UTF_8);
+
+        assertTrue(swift.contains(".onOpenURL"), swift);
+        assertTrue(swift.contains("cn1_watch_surface_url(url.absoluteString)"), swift);
+        // A plain C function is invisible to Swift unless the bridging header declares it.
+        assertTrue(bridging.contains("void cn1_watch_surface_url(const char *url);"), bridging);
+    }
+
+    /// A watch app with no complication keeps the scene it had, and a bridging header naming
+    /// nothing it cannot call.
+    @Test
+    void noComplicationMeansNoTapPlumbing(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        WatchNativeBuilder b = parse(req);
+        File srcDir = new File(tmp.toFile(), "src");
+        srcDir.mkdirs();
+
+        b.writeWatchEntry(req, srcDir);
+        String swift = new String(Files.readAllBytes(
+                new File(srcDir, "CN1WatchApp.swift").toPath()), StandardCharsets.UTF_8);
+        String bridging = new String(Files.readAllBytes(
+                new File(srcDir, "MyApp-Watch-Bridging-Header.h").toPath()), StandardCharsets.UTF_8);
+
+        assertFalse(swift.contains("onOpenURL"), swift);
+        assertTrue(swift.contains("WindowGroup { CN1WatchRootView() }"), swift);
+        assertFalse(bridging.contains("cn1_watch_surface_url"), bridging);
+    }
+
     /// A watch app that publishes nothing must not carry either key.
     @Test
     void aWatchThatPublishesNothingCarriesNoSurfacesKeys(@TempDir Path tmp) throws Exception {

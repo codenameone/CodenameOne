@@ -15339,6 +15339,62 @@ static BOOL cn1SurfacesMinOSSupported() {
     return [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:required];
 }
 
+// Decodes a cn1surface://a?src=..&id=..&p=<url-encoded JSON> deep link -- a widget, live
+// activity or complication tap -- and hands it to the Java framework.
+//
+// Shared because the two platforms reach it from opposite directions. On iOS every openURL path
+// funnels through the app delegate, which is entirely #if !TARGET_OS_WATCH; on watchOS there is
+// no UIApplicationDelegate at all and the URL arrives at the SwiftUI scene's onOpenURL, which
+// calls cn1_watch_surface_url below. Leaving the decode in the delegate meant a complication tap
+// launched the watch app and then dropped the action on the floor.
+//
+// Surfaces.dispatchAction queues internally until the app registers its handler, so a cold-start
+// tap -- which is the usual case for a complication -- is safe.
+BOOL cn1HandleSurfaceURL(NSURL *url) {
+    if (url == nil || url.scheme == nil
+            || [@"cn1surface" caseInsensitiveCompare:url.scheme] != NSOrderedSame) {
+        return NO;
+    }
+    NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+    NSString *src = nil;
+    NSString *actionId = nil;
+    NSString *params = nil;
+    for (NSURLQueryItem *item in components.queryItems) {
+        if ([item.name isEqualToString:@"src"]) {
+            src = item.value;
+        } else if ([item.name isEqualToString:@"id"]) {
+            actionId = item.value;
+        } else if ([item.name isEqualToString:@"p"]) {
+            // NSURLQueryItem.value is already percent-decoded JSON.
+            params = item.value;
+        }
+    }
+    JAVA_OBJECT jSrc = src == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG src);
+    JAVA_OBJECT jActionId = actionId == nil ? JAVA_NULL
+            : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG actionId);
+    JAVA_OBJECT jParams = params == nil ? JAVA_NULL
+            : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG params);
+    com_codename1_impl_ios_IOSSurfaceCallbacks_nativeSurfaceAction___java_lang_String_java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG jSrc, jActionId, jParams);
+    return YES;
+}
+
+#if TARGET_OS_WATCH
+// Called from the generated CN1WatchApp.swift scene's onOpenURL. A complication tap launches the
+// watch app with the URL rather than delivering it to a delegate, so this is the whole path.
+void cn1_watch_surface_url(const char *url) {
+    if (url == NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    NSString *str = [NSString stringWithUTF8String:url];
+    if (str != nil) {
+        cn1HandleSurfaceURL([NSURL URLWithString:str]);
+    }
+    POOL_END();
+}
+#endif
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
     NSString *path = cn1SurfacesContainerPath();

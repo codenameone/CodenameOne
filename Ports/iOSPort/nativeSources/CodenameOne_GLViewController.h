@@ -183,6 +183,14 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 #undef CN1_USE_WIDGETS
 #endif
 
+#ifdef CN1_USE_WIDGETS
+// Decodes a cn1surface:// deep link -- a widget, live activity or complication tap -- and
+// dispatches it to the Java framework. Implemented in IOSNative.m rather than in the app
+// delegate because the delegate is #if !TARGET_OS_WATCH and the watch reaches the same link
+// through its SwiftUI scene. Returns YES when the URL was ours and has been consumed.
+BOOL cn1HandleSurfaceURL(NSURL *url);
+#endif
+
 // CN1_USE_INTENTS gates the app intents native bridge: the IOSNative intents* implementations
 // (Core Spotlight directly, App Intents through the generated Swift CN1IntentBridge via the
 // CN1IntentHost Objective-C shim) plus the non-browsing NSUserActivity handling in

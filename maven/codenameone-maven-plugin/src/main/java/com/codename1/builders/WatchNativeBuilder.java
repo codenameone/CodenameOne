@@ -624,9 +624,23 @@ class WatchNativeBuilder {
           .append("@main\n")
           .append("struct CN1WatchApp: App {\n")
           .append("    @WKApplicationDelegateAdaptor var delegate: CN1WatchAppDelegate\n")
-          .append("    var body: some Scene {\n")
-          .append("        WindowGroup { CN1WatchRootView() }\n")
-          .append("    }\n")
+          .append("    var body: some Scene {\n");
+        if (watchWidgetExtensionDir != null) {
+            // A complication tap launches the watch app with the widgetURL rather than handing it
+            // to a delegate -- there is no UIApplicationDelegate here at all -- so the scene is
+            // the only place it can be caught. Without this the tap opened the app and the action
+            // went nowhere. Surfaces.dispatchAction queues until the handler registers, which is
+            // what makes the cold-start case (the usual one for a complication) work.
+            sw.append("        WindowGroup {\n")
+              .append("            CN1WatchRootView()\n")
+              .append("                .onOpenURL { url in\n")
+              .append("                    cn1_watch_surface_url(url.absoluteString)\n")
+              .append("                }\n")
+              .append("        }\n");
+        } else {
+            sw.append("        WindowGroup { CN1WatchRootView() }\n");
+        }
+        sw.append("    }\n")
           .append("}\n\n")
           .append("final class CN1WatchAppDelegate: NSObject, WKApplicationDelegate {\n")
           .append("    func applicationDidBecomeActive() { CN1WatchHost.shared().applicationDidBecomeActive() }\n")
@@ -780,8 +794,17 @@ class WatchNativeBuilder {
                 bs.toString().getBytes(StandardCharsets.UTF_8));
 
         // 3) Bridging header.
+        StringBuilder bridging = new StringBuilder("#import \"CN1WatchHost.h\"\n");
+        if (watchWidgetExtensionDir != null) {
+            // The complication tap path. A plain C function rather than an Objective-C class, so
+            // Swift only sees it if it is declared in the bridging header -- and the SwiftUI
+            // scene's onOpenURL is the only place a watch app can catch that URL at all.
+            bridging.append("\n// Complication tap: implemented in IOSNative.m, called from the\n")
+                    .append("// generated CN1WatchApp scene's onOpenURL.\n")
+                    .append("void cn1_watch_surface_url(const char *url);\n");
+        }
         owner.createFile(new File(appSrcDir, mainClass + "-Watch-Bridging-Header.h"),
-                "#import \"CN1WatchHost.h\"\n".getBytes(StandardCharsets.UTF_8));
+                bridging.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     /**
