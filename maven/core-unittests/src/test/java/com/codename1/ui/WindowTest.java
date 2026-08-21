@@ -3071,4 +3071,57 @@ class WindowTest extends UITestBase {
         assertEquals(900, r.getWidth());
         assertEquals(700, r.getHeight());
     }
+
+    @FormTest
+    void anInteractionDialogShowsOnTheWindowItWasGiven() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        w.show();
+        w.revalidate();
+
+        com.codename1.components.InteractionDialog dlg =
+                new com.codename1.components.InteractionDialog("in the window");
+        dlg.setAnimateShow(false);
+        try {
+            // Without a host the dialog resolves Display.getCurrent() and lands in the
+            // main form's layered pane -- so it appears on the main window while the
+            // window that asked for it is merely dimmed.
+            dlg.setTopLevelHost(w);
+            dlg.show(10, 10, 10, 10);
+            flushSerialCalls();
+
+            assertSame(w, dlg.getTopLevelContainer(),
+                    "the dialog must be attached to the window it was given");
+            assertNull(dlg.getComponentForm(),
+                    "and therefore to no form at all");
+        } finally {
+            dlg.dispose();
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void anInteractionDialogWithNoHostStillUsesTheCurrentForm() {
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        com.codename1.components.InteractionDialog dlg =
+                new com.codename1.components.InteractionDialog("on the form");
+        dlg.setAnimateShow(false);
+        try {
+            // The historical behaviour, which every single-window application relies on.
+            dlg.show(10, 10, 10, 10);
+            flushSerialCalls();
+            assertSame(main, dlg.getComponentForm(),
+                    "an unhosted dialog must still land on the current form");
+        } finally {
+            dlg.dispose();
+        }
+    }
 }

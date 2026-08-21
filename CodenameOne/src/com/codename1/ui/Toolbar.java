@@ -613,9 +613,11 @@ public class Toolbar extends Container {
         if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
             return;
         }
-        // Capture the host form before remove() detaches cnt -- after
-        // remove() cnt.getComponentForm() returns null.
-        Form host = cnt.getComponentForm();
+        // Capture the host before remove() detaches cnt -- afterwards cnt no longer
+        // resolves one. Through the top level rather than the form: a toolbar in a
+        // Window has no form, so the repaint below was skipped and the shaded pixels
+        // stayed on screen until something unrelated forced a redraw.
+        TopLevelContainer host = cnt.getTopLevelContainer();
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency(0);
         cnt.remove();
@@ -625,7 +627,7 @@ public class Toolbar extends Container {
         // something else forces a redraw. revalidateLater queues a
         // single relayout/repaint pass for the next paint cycle.
         if (host != null) {
-            host.revalidateLater();
+            host.asContainer().revalidateLater();
         }
     }
 
@@ -2057,9 +2059,11 @@ public class Toolbar extends Container {
             sidemenuDialog.setAnimateShow(false);
             sidemenuDialog.setVisible(false);
             if (!isRTL()) {
+                sidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 sidemenuDialog.show(0, 0, 0, dw - v);
                 sidemenuDialog.disposeToTheLeft();
             } else {
+                sidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 sidemenuDialog.show(0, 0, dw - v, 0);
                 sidemenuDialog.disposeToTheRight();
             }
@@ -2088,6 +2092,7 @@ public class Toolbar extends Container {
         s.setBgTransparency((int) f);
         s.setBgColor(0);
 
+        sidemenuDialog.setTopLevelHost(getTopLevelContainer());
         sidemenuDialog.show(0, 0, 0, dw - actualV);
         if (!isRTL()) {
             if (draggedX > 0) {
@@ -2192,9 +2197,11 @@ public class Toolbar extends Container {
             rightSidemenuDialog.setAnimateShow(false);
             rightSidemenuDialog.setVisible(false);
             if (!isRTL()) {
+                rightSidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 rightSidemenuDialog.show(0, 0, dw - v, 0);
                 rightSidemenuDialog.disposeToTheRight();
             } else {
+                rightSidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 rightSidemenuDialog.show(0, 0, 0, dw - v);
                 rightSidemenuDialog.disposeToTheLeft();
             }
@@ -2223,6 +2230,7 @@ public class Toolbar extends Container {
         s.setBgTransparency((int) f);
         s.setBgColor(0);
 
+        rightSidemenuDialog.setTopLevelHost(getTopLevelContainer());
         rightSidemenuDialog.show(0, 0, dw - actualV, 0);
         if (!isRTL()) {
             if (draggedX > 0) {

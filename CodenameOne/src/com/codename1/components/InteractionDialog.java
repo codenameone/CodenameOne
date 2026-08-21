@@ -31,7 +31,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Dialog;
-import com.codename1.ui.Form;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
@@ -328,7 +328,53 @@ public class InteractionDialog extends Container implements AbstractDialog {
         return getUIManager().getThemeConstant("interactionDialogSpeedInt", 400);
     }
 
-    private void cleanupLayer(Form f) {
+    /// The top level this dialog appears on when it is shown.
+    ///
+    /// A dialog is not attached to anything at the moment `#show(int, int, int, int)`
+    /// runs, so it cannot resolve its own host the way an attached component can. Left
+    /// unset it uses the current `Form`, which is the historical behaviour and the
+    /// right answer for an application with one window. Set it to put the dialog on a
+    /// `com.codename1.ui.Window` instead: without it the dialog is added to the main
+    /// form's layered pane, so it appears on the main window while the window that
+    /// asked for it is merely dimmed -- and in an application with no form at all
+    /// there is nothing to resolve and showing it fails.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the top level to show on, or null for the current form
+    public void setTopLevelHost(TopLevelContainer host) {
+        this.hostTopLevel = host;
+    }
+
+    /// Returns the top level set with `#setTopLevelHost(TopLevelContainer)`.
+    ///
+    /// #### Returns
+    ///
+    /// the explicit host, or null when none was set
+    public TopLevelContainer getTopLevelHost() {
+        return hostTopLevel;
+    }
+
+    /// The top level to operate on: the explicit host, else the one this dialog is
+    /// already attached to, else the current form.
+    ///
+    /// #### Returns
+    ///
+    /// the host top level, or null when there is none
+    private TopLevelContainer resolveHost() {
+        if (hostTopLevel != null) {
+            return hostTopLevel;
+        }
+        TopLevelContainer attached = getTopLevelContainer();
+        if (attached != null) {
+            return attached;
+        }
+        return Display.getInstance().getCurrent();
+    }
+
+    private TopLevelContainer hostTopLevel;
+
+    private void cleanupLayer(TopLevelContainer f) {
         if (stackable) {
             // Stackable mode: several InteractionDialogs can share the class
             // layer at once (layered by show() order). Tearing the whole layer
@@ -352,7 +398,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
     }
 
-    private Container getLayeredPane(Form f) {
+    private Container getLayeredPane(TopLevelContainer f) {
         //return f.getLayeredPane();
         Container c;
         if (formMode) {
@@ -372,13 +418,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
     protected void deinitialize() {
         super.deinitialize();
         if (disposed) {
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
             if (f != null) {
                 if (pressedListener != null) {
-                    f.removePointerPressedListener(pressedListener);
+                    f.asContainer().removePointerPressedListener(pressedListener);
                 }
                 if (releasedListener != null) {
-                    f.removePointerReleasedListener(releasedListener);
+                    f.asContainer().removePointerReleasedListener(releasedListener);
                 }
                 Container pp = getLayeredPane(f);
                 Container p = getParent();
@@ -395,7 +441,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     public void resize(final int top, final int bottom, final int left, final int right) {
         if (!disposed) {
-            final Form f = Display.getInstance().getCurrent();
+            final TopLevelContainer f = resolveHost();
+            if (f == null) {
+                return;
+            }
 
             Style unselectedStyle = getUnselectedStyle();
 
@@ -437,7 +486,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
     public void show(int top, int bottom, int left, int right) {
         getUnselectedStyle().setOpacity(255);
         disposed = false;
-        Form f = Display.getInstance().getCurrent();
+        TopLevelContainer f = resolveHost();
+        if (f == null) {
+            return;
+        }
         shownInFormMode = formMode;
         Style unselectedStyle = getUnselectedStyle();
 
@@ -460,8 +512,8 @@ public class InteractionDialog extends Container implements AbstractDialog {
             if (showAnimationSetup != null) {
                 showAnimationSetup.run();
             } else if (repositionAnimation) {
-                int x = left + (f.getWidth() - right - left) / 2;
-                int y = top + (f.getHeight() - bottom - top) / 2;
+                int x = left + (f.asContainer().getWidth() - right - left) / 2;
+                int y = top + (f.asContainer().getHeight() - bottom - top) / 2;
                 getParent().setX(x);
                 getParent().setY(y);
                 getParent().setWidth(1);
@@ -477,7 +529,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
             getLayeredPane(f).animateLayout(resolveAnimationSpeed());
         } else {
             //getLayeredPane(f).revalidate();
-            f.revalidateWithAnimationSafety();
+            f.asContainer().revalidateWithAnimationSafety();
         }
         /*
         Form f = Display.getInstance().getCurrent();
@@ -508,7 +560,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         disposed = true;
         Container p = getParent();
         if (p != null) {
-            Form f = p.getComponentForm();
+            TopLevelContainer f = p.getTopLevelContainer();
             if (f != null) {
                 if (animateShow) {
                     if (disposeAnimationSetup != null) {
@@ -541,7 +593,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 // pixels on screen until something else (scroll, hover)
                 // forces a redraw (#5067). Force a form-level revalidate
                 // so the next paint cycle clears those pixels.
-                f.revalidateWithAnimationSafety();
+                f.asContainer().revalidateWithAnimationSafety();
             } else {
                 p.remove();
             }
@@ -612,7 +664,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         disposed = true;
         final Container p = getParent();
         if (p != null) {
-            final Form f = p.getComponentForm();
+            final TopLevelContainer f = p.getTopLevelContainer();
             if (f != null) {
                 switch (direction) {
                     case Component.LEFT:
@@ -819,7 +871,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     private void installPointerOutOfBoundsListeners() {
 
-        final Form f = getComponentForm();
+        final TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             if (pressedListener == null) {
                 pressedListener = new ActionListener() {
@@ -827,8 +879,8 @@ public class InteractionDialog extends Container implements AbstractDialog {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
                         if (disposed) {
-                            f.removePointerPressedListener(pressedListener);
-                            f.removePointerReleasedListener(releasedListener);
+                            f.asContainer().removePointerPressedListener(pressedListener);
+                            f.asContainer().removePointerReleasedListener(releasedListener);
                             return;
                         }
                         pressedOutOfBounds = disposeWhenPointerOutOfBounds &&
@@ -846,8 +898,8 @@ public class InteractionDialog extends Container implements AbstractDialog {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
                         if (disposed) {
-                            f.removePointerPressedListener(pressedListener);
-                            f.removePointerReleasedListener(releasedListener);
+                            f.asContainer().removePointerPressedListener(pressedListener);
+                            f.asContainer().removePointerReleasedListener(releasedListener);
                             return;
                         }
                         if (disposeWhenPointerOutOfBounds &&
@@ -855,15 +907,15 @@ public class InteractionDialog extends Container implements AbstractDialog {
                                 !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &&
                                 !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())) {
                             evt.consume();
-                            f.removePointerPressedListener(pressedListener);
-                            f.removePointerReleasedListener(releasedListener);
+                            f.asContainer().removePointerPressedListener(pressedListener);
+                            f.asContainer().removePointerReleasedListener(releasedListener);
                             dispose();
                         }
                     }
                 };
             }
-            f.addPointerPressedListener(pressedListener);
-            f.addPointerReleasedListener(releasedListener);
+            f.asContainer().addPointerPressedListener(pressedListener);
+            f.asContainer().addPointerReleasedListener(releasedListener);
 
         }
     }
@@ -896,7 +948,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (c == null) {
             throw new IllegalArgumentException("Component cannot be null");
         }
-        Form f = c.getComponentForm(); // PMD Fix: BrokenNullCheck
+        TopLevelContainer f = c.getTopLevelContainer(); // PMD Fix: BrokenNullCheck
         if (f != null && !formMode && !f.getContentPane().contains(c)) {
             setFormMode(true);
         }
@@ -941,7 +993,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
         }
-        Form f = Display.getInstance().getCurrent();
+        TopLevelContainer f = resolveHost();
+        if (f == null) {
+            return;
+        }
         Rectangle origRect = rect;
         rect = new Rectangle(rect);
         rect.setX(rect.getX() - getLayeredPane(f).getAbsoluteX());
@@ -1441,7 +1496,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (timeout <= 0) {
             return;
         }
-        UITimer.timer((int) timeout, false, Display.getInstance().getCurrent(), new Runnable() {
+        UITimer.timer((int) timeout, false, resolveHost(), new Runnable() {
             @Override
             public void run() {
                 dispose();
