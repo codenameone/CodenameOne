@@ -251,8 +251,13 @@ public final class SurfaceRasterizer {
     }
 
     /// Picks the layout of a timeline document for a size name (`small` / `medium` / `large` /
-    /// `lockscreen`): the explicit per-size layout when present, else the `default` layout, else
-    /// null.
+    /// `lockscreen` / the `watch*` complication families): the explicit per-size layout when
+    /// present, else a family-specific substitute, else the `default` layout, else null.
+    ///
+    /// Two substitutions, matching what the platform renderers do so a preview and a device
+    /// agree. `watchCorner` falls back to `watchCircular`, because a corner complication is
+    /// round and Wear OS has no corner slot at all; `watchRectangular` falls back to
+    /// `lockscreen`, which is the same WidgetKit family on Apple.
     ///
     /// #### Parameters
     ///
@@ -274,6 +279,17 @@ public final class SurfaceRasterizer {
         }
         Map<String, Object> layouts = (Map<String, Object>) layoutsObj;
         Object layout = sizeName == null ? null : layouts.get(sizeName);
+        if (!(layout instanceof Map) && sizeName != null) {
+            String substitute = null;
+            if ("watchCorner".equals(sizeName)) {
+                substitute = "watchCircular";
+            } else if ("watchRectangular".equals(sizeName)) {
+                substitute = "lockscreen";
+            }
+            if (substitute != null) {
+                layout = layouts.get(substitute);
+            }
+        }
         if (!(layout instanceof Map)) {
             layout = layouts.get("default");
         }
