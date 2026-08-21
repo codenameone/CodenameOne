@@ -116,6 +116,9 @@ segmenter.process(VisionImage.encoded(jpegBytes)).ready(mask -> {
     Image person = mask.cutOut(photo, 0.6f);
     preview.setIcon(person);
     segmenter.close();
+}).except(error -> {
+    Log.e(error);
+    segmenter.close();
 });
 ```
 

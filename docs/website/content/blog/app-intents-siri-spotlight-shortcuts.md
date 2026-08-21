@@ -62,11 +62,11 @@ They meet when the intent should open a screen. `opensRoute` passes bound parame
 ```java
 @AppIntent(value = "show_workout", title = "Show a workout",
         phrases = {"Show my ${workout} in ${applicationName}"},
-        opensRoute = "/workouts/:id")
+        opensRoute = "/workouts/{workout}")
 public static IntentResult showWorkout(
         @IntentParam(value = "workout", title = "Which workout?")
         Workout workout) {
-    return IntentResult.opens("/workouts/" + workout.getId());
+    return IntentResult.ok();
 }
 
 @Route("/workouts/:id")
@@ -75,7 +75,7 @@ public static Form workoutForm(@RouteParam("id") String id) {
 }
 ```
 
-The screen keeps one address. A deep link and a system intent reach it through the same router.
+The `{workout}` placeholder expands to the selected entity's stable ID before the router matches `/workouts/:id`. The screen keeps one address. A deep link and a system intent reach it through the same router.
 
 ## Entities let the platform ask which object you meant
 
