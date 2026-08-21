@@ -4833,6 +4833,8 @@ public class IPhoneBuilder extends Executor {
 
 
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
+                            stampAppExtensionInfoPlist(appExtension,
+                                    request.getArg("ios.bundleVersion", buildVersion));
                             buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
                             buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
                             buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", codeSignEntitlements);
@@ -5665,6 +5667,109 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to create workspace metadata at " + workspaceData.getAbsolutePath(), ex);
         }
+    }
+
+    /**
+     * Fills in the bundle identity a brought-in {@code .ios.appext} usually leaves to Xcode,
+     * because nothing in the archive supplies it here.
+     *
+     * <p>A modern Xcode target keeps CFBundleIdentifier and the two version strings in build
+     * settings and generates them into the plist, so an extension folder exported from such a
+     * project ships an Info.plist with those keys simply absent. The target gets
+     * PRODUCT_BUNDLE_IDENTIFIER, but nothing copies it into the plist:
+     * {@code builtin-infoPlistUtility} expands {@code $(...)} references that are already there,
+     * it does not add the key. The .appex is then built with no identifier and the archive fails
+     * at the very end, in the app's own target, with "Embedded binary's bundle identifier is not
+     * prefixed with the parent app's bundle identifier -- Embedded Binary Bundle Identifier:
+     * (null)".</p>
+     *
+     * <p>Apple also requires an embedded extension to carry the same version strings as the app
+     * containing it, so a stale or absent version is the same failure one step later. Both are
+     * aligned here, and every change is logged: this edits a file the developer supplied. A value
+     * that is already correct, and one written as a {@code $(...)} reference, are left alone.</p>
+     */
+    private void stampAppExtensionInfoPlist(File appExtension, String bundleVersion) throws IOException {
+        File infoPlist = new File(appExtension, "Info.plist");
+        if (!infoPlist.isFile()) {
+            debug("The " + appExtension.getName() + " app extension has no Info.plist. Xcode cannot "
+                    + "build an extension target without one; add it to the .ios.appext archive.");
+            return;
+        }
+        String plist = readFileToString(infoPlist);
+        List<String> changes = new ArrayList<String>();
+        String stamped = stampInfoPlistIdentity(plist, buildVersion, bundleVersion, changes);
+        if (changes.isEmpty()) {
+            return;
+        }
+        if (stamped == null) {
+            debug("Could not read " + appExtension.getName() + "/Info.plist as an XML property list, "
+                    + "so its bundle identity was left as it is. If the build fails on the embedded "
+                    + "binary's bundle identifier, convert the file with "
+                    + "'plutil -convert xml1 Info.plist' and rebuild.");
+            return;
+        }
+        createFile(infoPlist, stamped.getBytes("UTF-8"));
+        for (String change : changes) {
+            debug("Adjusted " + appExtension.getName() + "/Info.plist: " + change);
+        }
+    }
+
+    /**
+     * The text half of {@link #stampAppExtensionInfoPlist}, kept separate so it can be tested.
+     *
+     * @param changes collects a human-readable line per edit; empty means the plist was already
+     * right and must not be rewritten
+     * @return the new plist text, or null when this is not an XML plist we can edit -- in which
+     * case {@code changes} carries the reason and the file is left alone
+     */
+    static String stampInfoPlistIdentity(String plist, String shortVersion, String bundleVersion,
+            List<String> changes) {
+        if (plist == null || plist.lastIndexOf("</dict>") < 0) {
+            changes.add("not an XML property list");
+            return null;
+        }
+        String result = plist;
+        result = setPlistString(result, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)", false, changes);
+        result = setPlistString(result, "CFBundleShortVersionString", shortVersion, true, changes);
+        result = setPlistString(result, "CFBundleVersion", bundleVersion, true, changes);
+        return result;
+    }
+
+    /**
+     * Sets one string key in an XML plist, adding it when absent.
+     *
+     * @param overwrite whether an existing literal value is replaced when it differs; false only
+     * adds the key when it is missing
+     */
+    private static String setPlistString(String plist, String key, String value, boolean overwrite,
+            List<String> changes) {
+        if (value == null || value.length() == 0) {
+            return plist;
+        }
+        String keyTag = "<key>" + key + "</key>";
+        int keyAt = plist.indexOf(keyTag);
+        if (keyAt < 0) {
+            int dictEnd = plist.lastIndexOf("</dict>");
+            changes.add("added " + key + " = " + value);
+            return plist.substring(0, dictEnd)
+                    + "\t<key>" + key + "</key>\n\t<string>" + value + "</string>\n"
+                    + plist.substring(dictEnd);
+        }
+        if (!overwrite) {
+            return plist;
+        }
+        int valueStart = plist.indexOf("<string>", keyAt + keyTag.length());
+        int valueEnd = valueStart < 0 ? -1 : plist.indexOf("</string>", valueStart);
+        if (valueStart < 0 || valueEnd < 0) {
+            // Not a string value (an extension is free to use whatever type it likes); leave it.
+            return plist;
+        }
+        String current = plist.substring(valueStart + "<string>".length(), valueEnd);
+        if (current.equals(value) || current.contains("$(")) {
+            return plist;
+        }
+        changes.add("set " + key + " to " + value + " to match the app (was " + current + ")");
+        return plist.substring(0, valueStart + "<string>".length()) + value + plist.substring(valueEnd);
     }
 
     /**
