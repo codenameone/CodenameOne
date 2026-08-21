@@ -1814,6 +1814,13 @@ public class Window extends Container implements TopLevelContainer {
         // leaves a hidden drag component and a latched pressed component behind, and
         // windowDisposed below only forgets the framework's records.
         cancelPendingInput();
+        // Before the native window is destroyed, not merely before the Java reference
+        // is cleared: the terminal Hidden and Disposed events below report bounds, and
+        // every port tears the slot down inside dispose() -- Win32 destroys it
+        // synchronously through SendMessage, Linux waits for its destroy, Catalyst
+        // memsets the slot -- so a read afterwards answers with zeros and leaves the
+        // stale requested rectangle in place.
+        rememberNativeBounds();
         if (nativePeer != null) {
             WindowManager wm = manager();
             wm.hide(nativePeer);
@@ -1823,9 +1830,6 @@ public class Window extends Container implements TopLevelContainer {
         // window cannot pin its component tree
         Display.impl.disposePaintSurface(paintSurface);
         paintSurface = null;
-        // Before the peer goes: the terminal Hidden and Disposed events below report
-        // bounds, and once nativePeer is null there is nothing left to ask.
-        rememberNativeBounds();
         nativePeer = null;
         windowGraphics = null;
         // showModal parks on Display.lock and wakes on this flag, so publish it under

@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -3123,5 +3124,71 @@ class WindowTest extends UITestBase {
         } finally {
             dlg.dispose();
         }
+    }
+
+    @FormTest
+    void sideMenuGeometryComesFromTheHostWindowNotTheDisplay() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        Toolbar tb = new Toolbar();
+        w.setToolbar(tb);
+        w.show();
+        w.revalidate();
+
+        Toolbar formToolbar = new Toolbar();
+        main.setToolbar(formToolbar);
+        main.revalidate();
+        try {
+            int displayWidth = Display.getInstance().getDisplayWidth();
+            int displayHeight = Display.getInstance().getDisplayHeight();
+            assertNotEquals(displayHeight, w.getHeight(),
+                    "the window and the display have to differ or this proves nothing");
+
+            // The side menu covers the surface its toolbar sits on, and every gesture
+            // threshold is measured against that surface. Taken from Display, a
+            // right-edge swipe in a narrow window was compared with the display's right
+            // edge and could never activate, and landscape margins could exceed the
+            // host width.
+            assertEquals(w.getWidth(), invokeHostGeometry(tb, "hostWidth"),
+                    "a toolbar in a window measures the window");
+            assertEquals(w.getHeight(), invokeHostGeometry(tb, "hostHeight"));
+
+            // The Form path has to stay exactly as it was.
+            assertEquals(displayWidth, invokeHostGeometry(formToolbar, "hostWidth"),
+                    "a toolbar in a form still measures the display");
+            assertEquals(displayHeight, invokeHostGeometry(formToolbar, "hostHeight"));
+        } finally {
+            w.dispose();
+        }
+    }
+
+    private static int invokeHostGeometry(Toolbar tb, String method) throws Exception {
+        java.lang.reflect.Method m = Toolbar.class.getDeclaredMethod(method);
+        m.setAccessible(true);
+        return ((Integer) m.invoke(tb)).intValue();
+    }
+
+    /// The side menu's dialog, found by walking the window rather than through an
+    /// accessor the toolbar does not expose.
+    private static com.codename1.components.InteractionDialog findSideMenuDialog(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof com.codename1.components.InteractionDialog) {
+                return (com.codename1.components.InteractionDialog) cmp;
+            }
+            if (cmp instanceof Container) {
+                com.codename1.components.InteractionDialog inner =
+                        findSideMenuDialog((Container) cmp);
+                if (inner != null) {
+                    return inner;
+                }
+            }
+        }
+        return null;
     }
 }

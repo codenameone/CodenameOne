@@ -1598,6 +1598,60 @@ public class Toolbar extends Container {
         }
     }
 
+    /// The width of the surface this toolbar's side menu covers.
+    ///
+    /// For a toolbar in a `com.codename1.ui.Window` that is the window, which on a
+    /// desktop is neither the size nor the shape of the main display: a right-edge
+    /// swipe was being compared against the display's right edge and so could never
+    /// activate in a narrow window, and landscape menu margins could exceed the host.
+    /// A toolbar in a `Form` keeps answering from `Display` exactly as before.
+    ///
+    /// #### Returns
+    ///
+    /// the host width in pixels
+    private int hostWidth() {
+        TopLevelContainer top = getTopLevelContainer();
+        if (top instanceof Window) {
+            int w = top.asContainer().getWidth();
+            if (w > 0) {
+                return w;
+            }
+        }
+        return Display.getInstance().getDisplayWidth();
+    }
+
+    /// The height of the surface this toolbar's side menu covers. See
+    /// `#hostWidth()`.
+    ///
+    /// #### Returns
+    ///
+    /// the host height in pixels
+    private int hostHeight() {
+        TopLevelContainer top = getTopLevelContainer();
+        if (top instanceof Window) {
+            int h = top.asContainer().getHeight();
+            if (h > 0) {
+                return h;
+            }
+        }
+        return Display.getInstance().getDisplayHeight();
+    }
+
+    /// Whether the surface this toolbar sits on is taller than it is wide.
+    ///
+    /// A window has no device orientation, so its shape is the only meaningful
+    /// answer; a `Form` keeps using the device orientation it always did.
+    ///
+    /// #### Returns
+    ///
+    /// true when the host is portrait shaped
+    private boolean hostPortrait() {
+        if (getTopLevelContainer() instanceof Window) {
+            return hostHeight() >= hostWidth();
+        }
+        return Display.getInstance().isPortrait();
+    }
+
     private void constructOnTopSideMenu(boolean isLeft) {
 
         if ((isLeft && sidemenuDialog == null) || (!isLeft && rightSidemenuDialog == null)) {
@@ -1636,7 +1690,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                int displayWidth = hostWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() < sensitiveSection) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
@@ -1649,12 +1703,12 @@ public class Toolbar extends Container {
                         }
                         if (sidemenuDialog != null && isRTL()) {
                             if (sidemenuDialog.isShowing()) {
-                                if (evt.getX() < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {
+                                if (evt.getX() < hostWidth() - sidemenuDialog.getWidth()) {
                                     //parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                                     //closeSideMenu();
                                     evt.consume();
                                 } else {
-                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {
+                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < hostWidth() - sidemenuDialog.getWidth()) {
                                         parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
                                     } else {
                                         parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
@@ -1664,7 +1718,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                int displayWidth = hostWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() > displayWidth - sensitiveSection) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
@@ -1677,12 +1731,12 @@ public class Toolbar extends Container {
                         }
                         if (rightSidemenuDialog != null && !isRTL()) {
                             if (rightSidemenuDialog.isShowing()) {
-                                if (evt.getX() < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
+                                if (evt.getX() < hostWidth() - rightSidemenuDialog.getWidth()) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
                                     closeRightSideMenu();
                                     evt.consume();
                                 } else {
-                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
+                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < hostWidth() - rightSidemenuDialog.getWidth()) {
                                         parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
                                     } else {
                                         parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
@@ -1692,7 +1746,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                int displayWidth = hostWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() > displayWidth - sensitiveSection) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
@@ -1720,7 +1774,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = Display.getInstance().getDisplayWidth();
+                                int displayWidth = hostWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() < sensitiveSection) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
@@ -1750,7 +1804,7 @@ public class Toolbar extends Container {
                                 if (!isRTL()) {
                                     showOnTopSidemenu(evt.getX(), false);
                                 } else {
-                                    showOnTopSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
+                                    showOnTopSidemenu(hostWidth() - evt.getX(), false);
                                 }
                             } else {
                                 if (sidemenuDialog.isShowing()) {
@@ -1763,7 +1817,7 @@ public class Toolbar extends Container {
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$rightSidemenuActivated", Boolean.TRUE);
                                 if (!isRTL()) {
-                                    showOnTopRightSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
+                                    showOnTopRightSidemenu(hostWidth() - evt.getX(), false);
                                 } else {
                                     showOnTopRightSidemenu(evt.getX(), false);
                                 }
@@ -1786,7 +1840,7 @@ public class Toolbar extends Container {
                             return;
                         }
                         if (sidemenuDialog != null) {
-                            if ((!isRTL() && evt.getX() > sidemenuDialog.getWidth()) || (isRTL() && evt.getX() < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth())) {
+                            if ((!isRTL() && evt.getX() > sidemenuDialog.getWidth()) || (isRTL() && evt.getX() < hostWidth() - sidemenuDialog.getWidth())) {
                                 if (sidemenuDialog.isShowing() && !isRTL()) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                                     evt.consume();
@@ -1797,7 +1851,7 @@ public class Toolbar extends Container {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$sidemenuActivated", null);
-                                if ((evt.getX() < parent.getWidth() / 4 && !isRTL()) || (evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) && isRTL())) {
+                                if ((evt.getX() < parent.getWidth() / 4 && !isRTL()) || (evt.getX() > hostWidth() - (parent.getWidth() / 4) && isRTL())) {
                                     closeSideMenu();
                                 } else {
                                     showOnTopSidemenu(-1, true);
@@ -1813,7 +1867,7 @@ public class Toolbar extends Container {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$rightSidemenuActivated", null);
-                                if ((evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) && !isRTL()) || (evt.getX() < parent.getWidth() / 4 && isRTL())) {
+                                if ((evt.getX() > hostWidth() - (parent.getWidth() / 4) && !isRTL()) || (evt.getX() < parent.getWidth() / 4 && isRTL())) {
                                     closeRightSideMenu();
                                 } else {
                                     showOnTopRightSidemenu(-1, true);
@@ -2011,8 +2065,8 @@ public class Toolbar extends Container {
 
     void showOnTopSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
-        int dw = Display.getInstance().getDisplayWidth();
-        if (Display.getInstance().isPortrait()) {
+        int dw = hostWidth();
+        if (hostPortrait()) {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
@@ -2071,13 +2125,13 @@ public class Toolbar extends Container {
             sidemenuDialog.putClientProperty("cn1$firstShow", Boolean.TRUE);
             sidemenuDialog.setAnimateShow(draggedX < 1);
         }
-        sidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
+        sidemenuDialog.setHeight(hostHeight());
         sidemenuDialog.setWidth(v);
         if (!fromCurrent) {
             if (!isRTL()) {
                 sidemenuDialog.setX(-v);
             } else {
-                sidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);
+                sidemenuDialog.setX(hostWidth() + v);
             }
         }
         sidemenuDialog.setRepositionAnimation(false);
@@ -2149,8 +2203,8 @@ public class Toolbar extends Container {
 
     void showOnTopRightSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
-        int dw = Display.getInstance().getDisplayWidth();
-        if (Display.getInstance().isPortrait()) {
+        int dw = hostWidth();
+        if (hostPortrait()) {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
@@ -2209,11 +2263,11 @@ public class Toolbar extends Container {
             rightSidemenuDialog.putClientProperty("cn1$firstRightShow", Boolean.TRUE);
             rightSidemenuDialog.setAnimateShow(draggedX < 1);
         }
-        rightSidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
+        rightSidemenuDialog.setHeight(hostHeight());
         rightSidemenuDialog.setWidth(v);
         if (!fromCurrent) {
             if (!isRTL()) {
-                rightSidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);
+                rightSidemenuDialog.setX(hostWidth() + v);
             } else {
                 rightSidemenuDialog.setX(-v);
             }
