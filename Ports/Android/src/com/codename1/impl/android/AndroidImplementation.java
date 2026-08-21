@@ -8006,21 +8006,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // land in the middle of another process deciding that id is gone
             lockStorageAcrossProcesses();
             try {
-                storageLiveHandle = new RandomAccessFile(
-                        new File(dir, android.os.Process.myPid() + STORAGE_LIVE_SUFFIX), "rw");
-                storageLiveLock = storageLiveHandle.getChannel().lock();
-                discardEarlierIncarnation(dir);
-            } catch (Throwable t) {
-                // android's log for the same reason as above
-                Log.e("CodenameOne", "Could not claim the storage liveness file", t);
                 try {
-                    if (storageLiveHandle != null) {
-                        storageLiveHandle.close();
+                    storageLiveHandle = new RandomAccessFile(
+                            new File(dir, android.os.Process.myPid() + STORAGE_LIVE_SUFFIX), "rw");
+                    storageLiveLock = storageLiveHandle.getChannel().lock();
+                } catch (Throwable t) {
+                    // android's log for the same reason as above
+                    Log.e("CodenameOne", "Could not claim the storage liveness file", t);
+                    try {
+                        if (storageLiveHandle != null) {
+                            storageLiveHandle.close();
+                        }
+                    } catch (Throwable ignored) {
+                        Log.e("CodenameOne", "Could not close the liveness file", ignored);
                     }
-                } catch (Throwable ignored) {
-                    Log.e("CodenameOne", "Could not close the liveness file", ignored);
+                    // the lock as well as the handle: closing the handle gives up the
+                    // lock, and a lock this process still believed it held is one it
+                    // would never take again, which leaves every other process reading
+                    // it as gone and free to delete the writes it has in flight
+                    storageLiveHandle = null;
+                    storageLiveLock = null;
+                    return;
                 }
-                storageLiveHandle = null;
+                try {
+                    discardEarlierIncarnation(dir);
+                } catch (Throwable t) {
+                    // separately, because the claim above has already succeeded and
+                    // clearing up after whoever held this id last is not worth giving
+                    // it up for. The leftovers keep until a later sweep.
+                    Log.e("CodenameOne", "Could not clear the earlier incarnation", t);
+                }
             } finally {
                 unlockStorageAcrossProcesses();
             }
