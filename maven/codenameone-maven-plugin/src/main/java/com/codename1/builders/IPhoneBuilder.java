@@ -4819,20 +4819,7 @@ public class IPhoneBuilder extends Executor {
                                     + "				CLANG_WARN_UNREACHABLE_CODE = YES;\n"
                                     + "				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;";
 
-                            Map<String, String> buildSettingsMap = new HashMap<String, String>();
-                            String[] lines = buildSettingsStr.split("\n");
-                            for (String line : lines) {
-                                if (line.trim().isEmpty()) {
-                                    continue;
-                                }
-                                String key = line.substring(0, line.indexOf("=")).trim();
-                                String val = line.substring(line.indexOf("=") + 1).trim();
-                                if (val.endsWith(";")) {
-                                    val = val.substring(val.length() - 1);
-                                }
-                                buildSettingsMap.put(key, val);
-
-                            }
+                            Map<String, String> buildSettingsMap = parseXcodeBuildSettings(buildSettingsStr);
 
                             String extensionName = appExtension.getName();
                             String codeSignEntitlements = "$(NS_CODE_SIGN_ENTITLEMENTS)";
@@ -5678,6 +5665,43 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to create workspace metadata at " + workspaceData.getAbsolutePath(), ex);
         }
+    }
+
+    /**
+     * Parses the pbxproj-shaped block of build settings an app extension target is
+     * seeded with -- one {@code KEY = VALUE;} per line -- into the map that is written
+     * back out as Ruby string literals in the project fixup script.
+     *
+     * Two details the value has to lose, both of which failed silently here. The
+     * trailing semicolon: keeping it (the old code sliced the last character INSTEAD
+     * of dropping it, so every value became ";") left CLANG_ENABLE_MODULES off, which
+     * drops -fmodules, which drops clang's autolinking, which is why an extension that
+     * imports UIKit reached ld with Foundation alone and died on
+     * _OBJC_CLASS_$_UIView. And the quotes Xcode wraps a non-identifier value in:
+     * re-emitted inside the Ruby literal those become ""gnu++14"", a syntax error that
+     * takes the whole fixup script down with it.
+     */
+    static Map<String, String> parseXcodeBuildSettings(String buildSettingsStr) {
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        for (String line : buildSettingsStr.split("\n")) {
+            if (line.trim().isEmpty()) {
+                continue;
+            }
+            int equals = line.indexOf("=");
+            if (equals < 0) {
+                continue;
+            }
+            String key = line.substring(0, equals).trim();
+            String val = line.substring(equals + 1).trim();
+            if (val.endsWith(";")) {
+                val = val.substring(0, val.length() - 1).trim();
+            }
+            if (val.length() > 1 && val.startsWith("\"") && val.endsWith("\"")) {
+                val = val.substring(1, val.length() - 1);
+            }
+            buildSettingsMap.put(key, val);
+        }
+        return buildSettingsMap;
     }
 
     static void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {
