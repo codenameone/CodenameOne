@@ -4847,8 +4847,7 @@ public class IPhoneBuilder extends Executor {
 
 
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
-                            stampAppExtensionInfoPlist(appExtension,
-                                    request.getArg("ios.bundleVersion", buildVersion));
+                            stampAppExtensionInfoPlist(appExtension, request);
                             buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
                             buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
                             buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", codeSignEntitlements);
@@ -5684,6 +5683,36 @@ public class IPhoneBuilder extends Executor {
     }
 
     /**
+     * The marketing version an embedded extension must declare.
+     *
+     * <p>Apple validates an embedded extension's versions against its containing app, so a
+     * hard-coded pair fails archive validation for every release that is not literally 1.0.
+     * Resolved exactly as the watch builder resolves the same two keys, including the
+     * injected-plist override -- which is the whole point: an app that sets
+     * CFBundleShortVersionString through ios.plistInject ships THAT version, and the raw build
+     * version is then the wrong answer for every extension beside it.</p>
+     *
+     * <p>Used by the Matter extension and by every brought-in .ios.appext.</p>
+     */
+    static String embeddedExtensionShortVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request,
+                "CFBundleShortVersionString");
+        return injected != null ? injected : WatchNativeBuilder.shortVersion(request);
+    }
+
+    /**
+     * The build version an embedded extension must declare.
+     *
+     * <p>The fallback is shortVersion, NOT the marketing version resolved above: the two keys
+     * are independent, and deriving one from the other is what produced the watch mismatch.</p>
+     */
+    static String embeddedExtensionBundleVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request, "CFBundleVersion");
+        return injected != null ? injected
+                : request.getArg("ios.bundleVersion", WatchNativeBuilder.shortVersion(request));
+    }
+
+    /**
      * Fills in the bundle identity a brought-in {@code .ios.appext} usually leaves to Xcode,
      * because nothing in the archive supplies it here.
      *
@@ -5702,7 +5731,7 @@ public class IPhoneBuilder extends Executor {
      * aligned here, and every change is logged: this edits a file the developer supplied. A value
      * that is already correct, and one written as a {@code $(...)} reference, are left alone.</p>
      */
-    private void stampAppExtensionInfoPlist(File appExtension, String bundleVersion) throws IOException {
+    private void stampAppExtensionInfoPlist(File appExtension, BuildRequest request) throws IOException {
         File infoPlist = new File(appExtension, "Info.plist");
         if (!infoPlist.isFile()) {
             debug("The " + appExtension.getName() + " app extension has no Info.plist. Xcode cannot "
@@ -5711,7 +5740,13 @@ public class IPhoneBuilder extends Executor {
         }
         String plist = readFileToString(infoPlist);
         List<String> changes = new ArrayList<String>();
-        String stamped = stampInfoPlistIdentity(plist, buildVersion, bundleVersion, changes);
+        // Through the shared resolvers rather than buildVersion / the ios.bundleVersion hint
+        // directly: an app that sets either version key through ios.plistInject ships that value,
+        // and stamping the raw hint here would rewrite an extension version that already matched
+        // its app into one that does not -- the very validation failure this method exists to
+        // prevent.
+        String stamped = stampInfoPlistIdentity(plist, embeddedExtensionShortVersion(request),
+                embeddedExtensionBundleVersion(request), changes);
         if (changes.isEmpty()) {
             return;
         }
@@ -6130,15 +6165,8 @@ public class IPhoneBuilder extends Executor {
         // The host's own versions, through the helpers the watch builder uses
         // for the same rule: an embedded extension whose marketing or build
         // version differs from its containing app fails archive validation.
-        String injectedShort = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleShortVersionString");
-        String extShort = injectedShort != null ? injectedShort
-                : WatchNativeBuilder.shortVersion(request);
-        String injectedBundle = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleVersion");
-        String extBundle = injectedBundle != null ? injectedBundle
-                : request.getArg("ios.bundleVersion",
-                        WatchNativeBuilder.shortVersion(request));
+        String extShort = embeddedExtensionShortVersion(request);
+        String extBundle = embeddedExtensionBundleVersion(request);
         // The hint is an override, not the only way in: an app whose
         // setCommissionToThisApp(true) the scanner saw needs no hint, and one
         // that reaches the API through reflection has no other way to say so.
