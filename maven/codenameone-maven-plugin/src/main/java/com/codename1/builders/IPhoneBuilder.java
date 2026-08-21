@@ -44,6 +44,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.Comparator;
+import java.util.Collections;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -4841,14 +4843,22 @@ public class IPhoneBuilder extends Executor {
 
                             String extensionName = appExtension.getName();
                             String codeSignEntitlements = "$(NS_CODE_SIGN_ENTITLEMENTS)";
-                            File extEntitlementsFile = null;
-                            if (appExtension.isDirectory()) {
-                                for (File f : appExtension.listFiles()) {
-                                    if (f.getName().endsWith(".entitlements")) {
-                                        codeSignEntitlements = extensionName + "/" + f.getName();
-                                        extEntitlementsFile = f;
-                                    }
-                                }
+                            // An extension folder exported from Xcode often carries a pair --
+                            // WalletNonUIExtension.entitlements beside
+                            // WalletNonUIExtensionRelease.entitlements -- and this used to take
+                            // whichever listFiles() returned last, which is filesystem order. The
+                            // file picked here is the one the target is SIGNED with, so which of
+                            // them wins must not be luck.
+                            List<File> entitlements = extensionFilesEndingWith(appExtension, ".entitlements");
+                            File extEntitlementsFile = preferredExtensionFile(entitlements, extensionName, ".entitlements");
+                            if (entitlements.size() > 1) {
+                                debug("The " + extensionName + " app extension carries "
+                                        + entitlements.size() + " .entitlements files; signing with "
+                                        + extEntitlementsFile.getName() + ". Name the one you mean "
+                                        + extensionName + ".entitlements.");
+                            }
+                            if (extEntitlementsFile != null) {
+                                codeSignEntitlements = extensionName + "/" + extEntitlementsFile.getName();
                             }
 
 
@@ -6302,6 +6312,41 @@ public class IPhoneBuilder extends Executor {
     /// the extension folder's parent. A value that still holds a build-setting reference after
     /// the two obvious project-root spellings is not resolvable here, and null says so rather
     /// than guessing at a file to edit.
+    /// The extension folder's files with the given suffix, in a fixed order.
+    static List<File> extensionFilesEndingWith(File extensionFolder, String suffix) {
+        List<File> out = new ArrayList<File>();
+        File[] entries = extensionFolder == null ? null : extensionFolder.listFiles();
+        if (entries == null) {
+            return out;
+        }
+        for (File f : entries) {
+            if (f.isFile() && f.getName().endsWith(suffix)) {
+                out.add(f);
+            }
+        }
+        Collections.sort(out, new Comparator<File>() {
+            public int compare(File a, File b) {
+                return a.getName().compareTo(b.getName());
+            }
+        });
+        return out;
+    }
+
+    /// Which of them to use: the one named after the extension if it is there, else the first by
+    /// name. Never the accident of directory order, because this file decides how the target is
+    /// signed and what it is signed to allow.
+    static File preferredExtensionFile(List<File> candidates, String extensionName, String suffix) {
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        for (File f : candidates) {
+            if (f.getName().equals(extensionName + suffix)) {
+                return f;
+            }
+        }
+        return candidates.get(0);
+    }
+
     /// The first symbolic link under {@code dir} that resolves outside {@code root}, or null.
     ///
     /// unzip refuses an absolute path or a ../ traversal in an entry NAME, but it happily creates
