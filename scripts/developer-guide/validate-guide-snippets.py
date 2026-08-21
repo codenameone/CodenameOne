@@ -312,6 +312,7 @@ import com.codename1.charts.models.*;
 import com.codename1.charts.renderers.*;
 import com.codename1.charts.views.*;
 import com.codename1.capture.*;
+import com.codename1.db.*;
 import com.codename1.io.*;
 import com.codename1.l10n.*;
 import com.codename1.location.*;

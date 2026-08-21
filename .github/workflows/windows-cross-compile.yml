@@ -34,6 +34,10 @@ jobs:
   cross-compile:
     name: cross-compile (x64 PE on Linux)
     runs-on: ubuntu-latest
+    # A ceiling, because there was not one: this job hung in apt and ran for six
+    # hours before GitHub's own limit stopped it. The work takes well under an
+    # hour, so anything past that is stuck rather than slow.
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@v6

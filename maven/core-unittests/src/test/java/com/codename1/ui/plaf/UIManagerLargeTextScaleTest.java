@@ -188,4 +188,89 @@ public class UIManagerLargeTextScaleTest extends UITestBase {
         assertEquals(18f, label.getStyle().getFont().getPixelSize(), 0.01f);
     }
 
+
+    /// A theme with `@includeNativeBool: true` -- what every project generated
+    /// by the archetype or Initializr ships -- makes `buildTheme` install the
+    /// native theme first, and that re-enters the whole
+    /// `setThemeProps -> buildTheme` path with only the native theme's entries
+    /// in themeProps. The larger-text pass used to run on that inner build too:
+    /// it could not see any of the app theme's font keys, so its rollback left
+    /// them alone and then cleared the bookkeeping that remembered their
+    /// unscaled originals. The outer build then re-scaled fonts that were
+    /// already scaled, with nothing left to roll back -- so simply toggling
+    /// Dark/Light Mode in the simulator (which calls `refreshTheme`) grew every
+    /// font by the scale factor again, and again, on each toggle. Regression
+    /// cover for issue #5565.
+    @Test
+    public void testRefreshWithNativeThemeDoesNotCompound() {
+        TestCodenameOneImplementation impl = implementation;
+        UIManager manager = UIManager.getInstance();
+        manager.setUseLargerTextScale(true);
+        impl.setLargerTextEnabled(true);
+        impl.setLargerTextScale(1.5f);
+
+        Font nativeFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR)
+                .derive(10f, Font.STYLE_PLAIN);
+        Hashtable nativeTheme = new Hashtable();
+        nativeTheme.put("Label.font", nativeFont);
+        impl.setNativeTheme(nativeTheme);
+
+        Font appFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR)
+                .derive(20f, Font.STYLE_PLAIN);
+        Hashtable theme = new Hashtable();
+        theme.put("@includeNativeBool", "true");
+        theme.put("Title.font", appFont);
+        manager.setThemeProps(theme);
+
+        assertEquals(30f, manager.getComponentStyle("Title").getFont().getPixelSize(), 0.01f);
+        assertEquals(15f, manager.getComponentStyle("Label").getFont().getPixelSize(), 0.01f);
+
+        // Every refresh (the Dark/Light Mode menu does one per click) has to be
+        // idempotent -- the size must stay at original * scale, forever.
+        for (int iter = 0; iter < 5; iter++) {
+            manager.refreshTheme();
+            assertEquals(30f, manager.getComponentStyle("Title").getFont().getPixelSize(), 0.01f,
+                    "app theme font must not compound on refresh " + iter);
+            assertEquals(15f, manager.getComponentStyle("Label").getFont().getPixelSize(), 0.01f,
+                    "native theme font must not compound on refresh " + iter);
+        }
+
+        // And the scale must still be reversible after those refreshes.
+        impl.setLargerTextEnabled(false);
+        impl.setLargerTextScale(1.0f);
+        manager.refreshTheme();
+        assertEquals(20f, manager.getComponentStyle("Title").getFont().getPixelSize(), 0.01f);
+        assertEquals(10f, manager.getComponentStyle("Label").getFont().getPixelSize(), 0.01f);
+    }
+
+    /// The same layered install with the scale left at its default must be a
+    /// no-op: repeated refreshes may not touch the fonts at all. Issue #5565.
+    @Test
+    public void testRefreshWithNativeThemeKeepsUnscaledFonts() {
+        TestCodenameOneImplementation impl = implementation;
+        UIManager manager = UIManager.getInstance();
+        manager.setUseLargerTextScale(true);
+        impl.setLargerTextEnabled(false);
+        impl.setLargerTextScale(1.0f);
+
+        Font nativeFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR)
+                .derive(11f, Font.STYLE_PLAIN);
+        Hashtable nativeTheme = new Hashtable();
+        nativeTheme.put("Label.font", nativeFont);
+        impl.setNativeTheme(nativeTheme);
+
+        Font appFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR)
+                .derive(22f, Font.STYLE_PLAIN);
+        Hashtable theme = new Hashtable();
+        theme.put("@includeNativeBool", "true");
+        theme.put("Title.font", appFont);
+        manager.setThemeProps(theme);
+
+        for (int iter = 0; iter < 5; iter++) {
+            manager.refreshTheme();
+            assertEquals(22f, manager.getComponentStyle("Title").getFont().getPixelSize(), 0.01f);
+            assertEquals(11f, manager.getComponentStyle("Label").getFont().getPixelSize(), 0.01f);
+        }
+    }
+
 }

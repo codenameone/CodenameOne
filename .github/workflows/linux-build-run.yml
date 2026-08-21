@@ -88,9 +88,14 @@ jobs:
         with: { distribution: 'temurin', java-version: '8' }
 
       - name: Build plugin + cn1-ads-mock (JDK 8)
+        # Maven Central intermittently serves 403/429 from the runner CDN edge and Maven treats it
+        # as a permanent resolution failure, which killed this job at dependency download before
+        # anything was compiled. See scripts/ci/retry.sh; these steps only build, so a blanket
+        # retry cannot turn a flaky test into a pass.
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
+            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       - name: Build hellocodenameone-common (JDK 17)
@@ -102,7 +107,8 @@ jobs:
           sleep 2
           mkdir -p "$HOME/.codenameone"
           [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
-          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+          bash scripts/ci/retry.sh \
+            mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
 
       - name: Package suite classes
         run: |
@@ -181,9 +187,23 @@ jobs:
       # plugin -- so this step works on arm64 too. The suite classes the translator
       # also needs come from the prepare-suite artifact below.
       - name: Build core + Linux port (JDK 8)
+        # Retried for the same reason as the two steps above, which this one was left out of:
+        # Maven Central answers 429 from the runner CDN edge and Maven treats it as a permanent
+        # resolution failure, so the job dies at plugin download with nothing built. See
+        # scripts/ci/retry.sh; this step only builds, so a blanket retry cannot turn a flaky test
+        # into a pass.
+        #
+        # Five attempts a minute apart rather than the default three at thirty seconds: this failed
+        # with "authorization failed for https://repo.maven.apache.org" on all three, one of
+        # several jobs Central refused on this branch in a day, and a window of about a minute is
+        # shorter than those refusals have lasted.
+        env:
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux -am \
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
+            mvn -B -pl linux -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       - name: Download suite classes
@@ -265,7 +285,7 @@ jobs:
           echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope >/dev/null 2>&1 || true
           mkdir -p /tmp/cn1-cores
           rc=0
-          mvn -B clean package -pl JavaAPI -am -DskipTests
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am \
             '-Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux' \
             '-Dsurefire.failIfNoSpecifiedTests=false' || rc=$?

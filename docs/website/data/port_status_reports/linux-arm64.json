@@ -1,48 +1,48 @@
 {
-  "commit": "42ebdde8da10f6809c3660710f09cb3088ea7a66",
-  "generated_at": "2026-08-08T01:16:27Z",
+  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
+  "generated_at": "2026-08-19T10:56:05Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 170499731
+        "duration_ns": 178201190
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 24938082
+        "duration_ns": 24615262
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 35228203
+        "duration_ns": 35635763
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 62857914
+        "duration_ns": 62902952
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 39309604
+        "duration_ns": 39311436
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 274791392
+        "duration_ns": 274731843
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 4317530564
+        "duration_ns": 3428129909
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 94804535
+        "duration_ns": 93424737
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 133658516
+        "duration_ns": 137446629
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 49459521
+        "duration_ns": 46220590
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,11 +52,11 @@
     "suite_checksum": 0
   },
   "port": "linux-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31231209720",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868573",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 168,
+    "pass": 176,
     "fail": 0,
     "skip": 3,
     "not-run": 0
@@ -261,6 +261,34 @@
       "feature": "theme-palette-css",
       "status": "pass"
     },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
     "DesktopModeScreenshotTest": {
       "feature": "desktop-mode",
       "status": "pass"
@@ -366,11 +394,11 @@
       "status": "pass"
     },
     "GoogleWebMapScreenshotTest": {
-      "status": "skip",
       "feature": "native-web-maps",
       "reasons": [
         "no-api-key"
-      ]
+      ],
+      "status": "skip"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -402,6 +430,10 @@
     },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "IntentsApiTest": {
+      "feature": "intents",
       "status": "pass"
     },
     "Java17Tests": {
@@ -641,11 +673,11 @@
       "status": "pass"
     },
     "SurfacesRemoteViewsScreenshotTest": {
-      "status": "skip",
       "feature": "surfaces",
       "reasons": [
         "android-only-remoteviews-lowering"
-      ]
+      ],
+      "status": "skip"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -744,12 +776,12 @@
       "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
-      "status": "pass",
-      "feature": "video-decoding"
+      "feature": "video-decoding",
+      "status": "pass"
     },
     "VideoIORoundTripTest": {
-      "status": "pass",
-      "feature": "video-round-trip"
+      "feature": "video-round-trip",
+      "status": "pass"
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",

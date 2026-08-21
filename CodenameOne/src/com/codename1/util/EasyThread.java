@@ -41,6 +41,14 @@ public final class EasyThread {
     private List<ErrorListener> errorListenenrs;
     private boolean running = true;
 
+    /// Set by `#killWhenIdle()`: the thread stops once its queue is empty, rather than dropping
+    /// whatever is still in it the way `#kill()` does.
+    private boolean stopWhenDrained;
+
+    /// Set by the thread itself as it leaves its loop, so work is never handed to a thread that
+    /// will not run it. Read and written under `LOCK` only.
+    private boolean finished;
+
     private EasyThread(String name) {
         t = Display.getInstance().startThread(new Runnable() {
             @Override
@@ -57,6 +65,16 @@ public final class EasyThread {
                                     queue.remove(0);
                                 }
                                 queue.remove(0);
+                            } else if (stopWhenDrained) {
+                                // Asked to stop, and there is nothing left to run. Both flags go
+                                // under this one lock: a caller that read "not finished" and then
+                                // queued would wait on a thread that had already decided to
+                                // leave, so the decision and the refusal have to be the same
+                                // moment. The loop sets it again on its way out, for the paths
+                                // that end it from elsewhere.
+                                running = false;
+                                finished = true;
+                                LOCK.notifyAll();
                             } else {
                                 Util.wait(LOCK);
                             }
@@ -74,6 +92,14 @@ public final class EasyThread {
                     }
                     current = null;
                     resultCallback = null;
+                }
+                synchronized (LOCK) {
+                    // Every way out of that loop, not only the drained one: kill() ends it too,
+                    // and a thread that has ended must not be handed work that will never run.
+                    // Recorded here so the guards on the blocking calls refuse rather than wait
+                    // for a worker that is gone.
+                    finished = true;
+                    LOCK.notifyAll();
                 }
             }
         }, name);
@@ -140,6 +166,7 @@ public final class EasyThread {
     /// - `t`: object is passed to the success callback
     public <T> void run(RunnableWithResult<T> r, SuccessCallback<T> t) {
         synchronized (LOCK) {
+            requireAccepting();
             queue.add(r);
             queue.add(t);
             LOCK.notifyAll();
@@ -153,6 +180,7 @@ public final class EasyThread {
     /// - `r`: the runnable
     public void run(Runnable r) {
         synchronized (LOCK) {
+            requireAccepting();
             queue.add(r);
             LOCK.notifyAll();
         }
@@ -175,6 +203,7 @@ public final class EasyThread {
         final SuccessCallback<T> sc = new RunSuccessCallback<T>(flag, result);
         RunnableWithResult<T> rr = new RunCallbackRunnableWithResult<T>(sc, r);
         synchronized (LOCK) {
+            requireAccepting();
             queue.add(rr);
             queue.add(sc);
             LOCK.notifyAll();
@@ -191,10 +220,83 @@ public final class EasyThread {
     public void runAndWait(final Runnable r) {
         final boolean[] flag = new boolean[1];
         synchronized (LOCK) {
+            requireAccepting();
             queue.add(new InQueueRunnable(r, flag));
             LOCK.notifyAll();
         }
         Display.getInstance().invokeAndBlock(new RunAndWaitRunnable(flag));
+    }
+
+    /// Refuses work that this thread will not run, for the calls that block until it does.
+    ///
+    /// A stop that has been asked for is enough: `#kill()` drops whatever is queued behind the
+    /// task it interrupts, and `#killWhenIdle()` may already have found the queue empty and
+    /// decided to leave. Both leave a caller waiting for a callback that never arrives, so the
+    /// answer is given here instead.
+    ///
+    /// The fire and forget calls refuse too. Nobody is blocked on those, but a task accepted and
+    /// then never run is a silent loss -- and the one that takes a `SuccessCallback` does have
+    /// somebody waiting, just asynchronously. Saying no beats acknowledging work that will not
+    /// happen.
+    ///
+    /// Must be called while holding `LOCK`.
+    private void requireAccepting() {
+        if (finished || !running || stopWhenDrained) {
+            throw new IllegalStateException("This thread has been stopped and cannot run "
+                    + "anything else");
+        }
+    }
+
+    /// Stops the thread once everything already queued has run.
+    ///
+    /// `#kill()` stops it after the current task, which drops whatever is behind that task -- and
+    /// a caller blocked on one of those never hears back. This one lets the queue drain first, so
+    /// the thread ends without abandoning work that was handed to it. Anything offered after it
+    /// has ended is refused rather than accepted and forgotten.
+    public void killWhenIdle() {
+        synchronized (LOCK) {
+            stopWhenDrained = true;
+            LOCK.notifyAll();
+        }
+    }
+
+    /// Whether the thread has ended and will not run anything else.
+    ///
+    /// #### Returns
+    ///
+    /// true once the thread has left its loop
+    public boolean isFinished() {
+        synchronized (LOCK) {
+            return finished;
+        }
+    }
+
+    /// Blocks until the thread has left its loop.
+    ///
+    /// `#isFinished()` answers whether that has happened; this waits for it. The two are not the
+    /// same question as "has a stop been asked for": `#kill()` and `#killWhenIdle()` make this
+    /// thread refuse new work immediately, while whatever it had already accepted keeps running.
+    /// A caller that reads the refusal as "the thread is gone" and then touches what the thread
+    /// was working on is racing the tasks still in flight.
+    ///
+    /// Returns immediately when called from the thread itself, which cannot wait for its own exit.
+    public void awaitFinished() {
+        if (isThisIt()) {
+            return;
+        }
+        Display.getInstance().invokeAndBlock(new AwaitFinishedRunnable());
+    }
+
+    /// Waits off the EDT, in the style of the other blocking calls here.
+    private class AwaitFinishedRunnable implements Runnable {
+        @Override
+        public void run() {
+            synchronized (LOCK) {
+                while (!finished) {
+                    Util.wait(LOCK);
+                }
+            }
+        }
     }
 
     /// Stops the thread once the current task completes

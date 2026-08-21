@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.db;
 
 import com.codename1.junit.FormTest;
@@ -59,5 +81,96 @@ class DatabaseTest extends UITestBase {
 
         Database.delete(name);
         assertNull(implementation.getTestDatabase(name));
+    }
+
+    @FormTest
+    void deleteIsRefusedWhileTheDatabaseIsOpen() throws IOException {
+        // Every platform here unlinks an open file quite happily and leaves the handle attached
+        // to something with no name: reopening the name makes a different database and whatever
+        // the old handle writes goes away with it.
+        String name = "delete-while-open.db";
+        Database db = Database.openOrCreate(name);
+        assertNotNull(db);
+        try {
+            Database.delete(name);
+            fail("deleting a database that is still open has to be refused");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().indexOf("still open") >= 0,
+                    "the message should say what is wrong: " + expected.getMessage());
+        }
+        assertNotNull(implementation.getTestDatabase(name), "and the database is still there");
+        db.close();
+        Database.delete(name);
+        assertNull(implementation.getTestDatabase(name));
+    }
+
+    @FormTest
+    void deleteIsRefusedWhileAnUnidentifiedConnectionIsOpen() throws IOException {
+        // A connection wrapped by name-less means -- SEDatabase(Connection) over a URL that names
+        // no file -- is counted without a key, so it cannot be matched against the database being
+        // deleted. It could be this one, and unlinking underneath it loses its writes, so the
+        // only safe reading of "I do not know" is to refuse. A key change already reads the same
+        // counter this way.
+        String name = "delete-with-unidentified.db";
+        Database db = Database.openOrCreate(name);
+        assertNotNull(db);
+        UnidentifiedDatabase stranger = new UnidentifiedDatabase();
+        try {
+            db.close();
+            Database.delete(name);
+            fail("an unidentified connection has to block the delete");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().indexOf("opened from a connection") >= 0,
+                    "the message should name the reason: " + expected.getMessage());
+        } finally {
+            stranger.close();
+        }
+        // With it gone the delete goes through, which is what shows the refusal was about that
+        // connection and not about something left behind by the test.
+        Database.delete(name);
+        assertNull(implementation.getTestDatabase(name));
+    }
+
+    /// Stands in for a connection whose file cannot be named, which is what registering a null
+    /// key means.
+    private static final class UnidentifiedDatabase extends Database {
+        private UnidentifiedDatabase() throws IOException {
+            registerOpenDatabase(null);
+        }
+
+        @Override
+        public void beginTransaction() throws IOException {
+        }
+
+        @Override
+        public void commitTransaction() throws IOException {
+        }
+
+        @Override
+        public void rollbackTransaction() throws IOException {
+        }
+
+        @Override
+        public void close() throws IOException {
+            releaseOpenDatabase(null);
+        }
+
+        @Override
+        public void execute(String sql) throws IOException {
+        }
+
+        @Override
+        public void execute(String sql, String[] params) throws IOException {
+        }
+
+        @Override
+        public Cursor executeQuery(String sql, String[] params) throws IOException {
+            return null;
+        }
+
+        @Override
+        public Cursor executeQuery(String sql) throws IOException {
+            return null;
+        }
     }
 }

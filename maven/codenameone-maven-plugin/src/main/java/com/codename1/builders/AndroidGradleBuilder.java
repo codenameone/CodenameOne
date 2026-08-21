@@ -312,6 +312,13 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+    /// True when the app references com.codename1.intents. Gates the shortcut resources, the
+    /// trampoline activity and the headless service, so an app that exposes nothing to the
+    /// launcher carries none of them.
+    private boolean usesIntents;
+    /// The `android.app.shortcuts` meta-data, which must be spliced into the launcher activity
+    /// rather than emitted beside it. Empty when the app declares no static shortcuts.
+    private String intentsShortcutsMetaData = "";
     // Set when the app references com.codename1.wearable.* (the phone-to-watch link). Gates the
     // play-services-wearable dependency, the WearableListenerService manifest entry and the
     // injected Data Layer glue.
@@ -735,6 +742,14 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+    /** The catalog entry that carries the SQLCipher dependencies and their minimum SDK. */
+    private static final String DATABASE_CIPHER_CATALOG_CLASS = "com/codename1/db/DatabaseConfig";
+
+    boolean dbCipherSupport;
+
+    /// Whether the application touches com.codename1.db at all, which is what the database
+    /// compatibility default is keyed on.
+    private boolean usesDatabase;
     private boolean visionSupport;
     private boolean inferenceSupport;
     private boolean languageSupport;
@@ -1756,6 +1771,23 @@ public class AndroidGradleBuilder extends Executor {
         // thread. The mutable feature flags and source set are intentionally
         // unsynchronized; parallelizing the scanner requires revisiting them.
         try {
+            DatabaseUsage databaseUsage = scanForDatabaseUsage(dummyClassesDir);
+            // libs as well as the classes: unzip writes submitted library jars there, and the
+            // generated gradle links them through a fileTree, so encryption used only inside a
+            // library is invisible to a scan of the loose class tree -- and the build would then
+            // delete the cipher implementation out from under the library that calls it.
+            DatabaseUsage libraryUsage = scanForDatabaseUsage(libsDir);
+            usesDatabase = databaseUsage.usesDatabase() || libraryUsage.usesDatabase();
+            // Keeps the SQLCipher-backed impl package, which is deleted below for apps that never
+            // encrypt, and pulls in the AAR through the catalog. The AAR carries minSdk 23, so a
+            // false positive here raises the floor of every application that never encrypts.
+            dbCipherSupport = databaseUsage.usesDatabaseCipher()
+                    || libraryUsage.usesDatabaseCipher();
+            if (dbCipherSupport) {
+                // Fed by name rather than by the scan, so the catalog applies its dependencies and
+                // its minimum SDK only when the application itself configures encryption.
+                aiAcc.consume(DATABASE_CIPHER_CATALOG_CLASS);
+            }
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
                 @Override
                 public void implementsInterface(String cls, String iface) {
@@ -1782,7 +1814,15 @@ public class AndroidGradleBuilder extends Executor {
 
                 @Override
                 public void usesClass(String cls) {
-                    aiAcc.consume(cls);
+                    // The catalog matches on a class reference and this callback cannot say which
+                    // class made one, so the SQLCipher entry is withheld here and fed from the
+                    // attributed scan below instead. Display references DatabaseConfig, so letting
+                    // it through adds both SQLCipher dependencies and takes minSdk to 23 for every
+                    // application -- which the later deletion of the cipher source package does
+                    // not undo, since the dependency and the floor are already in the gradle file.
+                    if (!DATABASE_CIPHER_CATALOG_CLASS.equals(cls)) {
+                        aiAcc.consume(cls);
+                    }
                     String aiAdapter = androidAiAdapterSource(cls);
                     if (aiAdapter != null) {
                         includedAiAdapterSources.add(aiAdapter);
@@ -1798,6 +1838,11 @@ public class AndroidGradleBuilder extends Executor {
                             && cls.indexOf("com/codename1/ai/language/") == 0) {
                         languageSupport = true;
                     }
+                    // Deliberately not scanned here. This callback cannot say which class made
+                    // the reference, and the tree it walks is the application merged with the
+                    // framework, where Display alone carries openOrCreate(String, DatabaseConfig)
+                    // -- so the cipher gate would answer yes for every application ever built and
+                    // raise its minimum SDK to 23 for nothing. Attributed below instead.
                     if (cls.indexOf("com/codename1/ar/") == 0) {
                         // Keeps the ARCore-backed impl sources (deleted for
                         // non-AR apps below) and bumps minSdk to the ARCore
@@ -1889,6 +1934,9 @@ public class AndroidGradleBuilder extends Executor {
                     // pre-baked layout resources are only added for apps that publish surfaces.
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
+                    }
+                    if (!usesIntents && cls.indexOf("com/codename1/intents/") == 0) {
+                        usesIntents = true;
                     }
 
                     // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage so the
@@ -3354,6 +3402,14 @@ public class AndroidGradleBuilder extends Executor {
         // appwidget-provider metadata. The matching manifest receivers and the tap trampoline
         // activity are assembled here and injected into the manifest further below. No gradle
         // dependencies are involved -- the runtime lowering is plain RemoteViews in the port.
+        String intentsManifestEntries = usesIntents
+                ? buildIntentsManifestEntries(assetsDir, resDir, request.getPackageName())
+                : "";
+        // The launcher only reads a shortcut list through meta-data on the activity carrying the
+        // LAUNCHER intent filter, so this half is spliced into the main activity rather than
+        // sitting beside it at application level, where it would be silently ignored.
+        String intentsActivityMetaData = intentsShortcutsMetaData;
+
         String surfacesManifestEntries = "";
         if (usesSurfaces) {
             File surfacesJsonFile = new File(assetsDir, "surfaces.json");
@@ -3626,6 +3682,21 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
             arPackage.delete();
+        }
+
+        if (!dbCipherSupport) {
+            // The SQLCipher-backed database impl compiles against net.zetetic, which is only on
+            // the classpath when the catalog has added the dependency. AndroidImplementation
+            // reaches it through reflection only, so deleting it here costs nothing for apps that
+            // never open an encrypted database, and saves them the native library.
+            File cipherPackage = new File(srcDir, "com/codename1/impl/android/cipher");
+            File[] cipherFiles = cipherPackage.listFiles();
+            if (cipherFiles != null) {
+                for (File f : cipherFiles) {
+                    f.delete();
+                }
+            }
+            cipherPackage.delete();
         }
 
         pruneOptionalAiSources(srcDir);
@@ -4047,6 +4118,7 @@ public class AndroidGradleBuilder extends Executor {
         if (useHMS) {
             nativeThemeStubProps += "        Display.getInstance().setProperty(\"cn1.push.transport\", \"huawei\");\n";
         }
+        nativeThemeStubProps += databaseLegacyStubProperty(request, usesDatabase);
 
         String gcmSenderId = request.getArg("gcm.sender_id", null);
         if (gcmSenderId != null) {
@@ -4682,6 +4754,7 @@ public class AndroidGradleBuilder extends Executor {
                 + tvLeanbackCategory
                 + "            </intent-filter>\n"
                 + request.getArg("android.xintent_filter", "")
+                + intentsActivityMetaData
                 + "        </activity>\n"
                 + facebookActivityMetaData
                 + facebookActivity
@@ -4707,6 +4780,7 @@ public class AndroidGradleBuilder extends Executor {
                 + carAppService
                 + wearableListenerService
                 + surfacesManifestEntries
+                + intentsManifestEntries
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
                 + basePermissions
@@ -4793,6 +4867,14 @@ public class AndroidGradleBuilder extends Executor {
             // so apps that never touch com.codename1.surfaces keep it strippable
             localNotificationCode
                     += "        com.codename1.impl.android.AndroidImplementation.deliverPendingSurfaceActions();\n";
+        }
+
+        if (usesIntents) {
+            // Same shape, different trampoline: a non-headless intent tapped in the launcher is
+            // parked rather than dispatched, because its handler may touch a Form and there is
+            // no window at the moment of the tap. This is the point where there is one.
+            localNotificationCode
+                    += "        com.codename1.impl.android.AndroidImplementation.deliverPendingIntentRequests();\n";
         }
 
 
@@ -5969,6 +6051,11 @@ public class AndroidGradleBuilder extends Executor {
                         ? "-keep class com.codename1.impl.android.CN1Widget_* { *; }\n\n"
                         + "-keep class com.codename1.impl.android.surfaces.** { *; }\n\n"
                         : "")
+                // Intents: a headless shortcut can start CN1IntentService into a dead process,
+                // where the main Activity -- which is where the generated bootstrap is spliced
+                // -- never runs. The service loads it by name instead, so the name has to
+                // survive R8.
+                + (usesIntents ? "-keep class cn1app.IntentBootstrap { *; }\n\n" : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 // App-hardening keep rules for R8. On Android the engine does not rename (R8 is the
@@ -6471,6 +6558,25 @@ public class AndroidGradleBuilder extends Executor {
         debug("Gradle File start\n-------\n");
         debug(gradleProps);
         debug("-------\nGradle File end \n");
+
+        // Two dependency statements run together are valid Groovy -- a method call on the
+        // dependency the first one returned -- so Gradle reports them as "Could not find method
+        // implementation()" against a generated build.gradle line the developer never wrote, and
+        // names neither the hint nor the library that produced it. Say it plainly instead. This
+        // is not only about hand written values: a cn1lib's codenameone_library_appended.properties
+        // used to be concatenated onto the project's own value with no separator, so a project
+        // built by an older Maven plugin still arrives here corrupted.
+        String unseparated = findUnseparatedGradleStatement(request.getArg("android.gradleDep", ""));
+        if (unseparated != null) {
+            log("The android.gradleDep build hint runs two Gradle statements together with no "
+                    + "separator between them, near: " + unseparated + " -- separate them with ';' "
+                    + "or a newline. If you did not write this value by hand, a cn1lib appended a "
+                    + "dependency to it: check your libraries for a "
+                    + "codenameone_library_appended.properties that sets android.gradleDep, and "
+                    + "make sure your own value ends with ';'.");
+            return false;
+        }
+
         File gradleFile = new File(projectDir, "build.gradle");
 
         try {
@@ -6644,7 +6750,12 @@ public class AndroidGradleBuilder extends Executor {
         if ("com/codename1/ai/vision/TextRecognizer".equals(cls)) {
             return "AndroidTextRecognitionAdapter.java";
         }
-        if ("com/codename1/ai/vision/BarcodeScanner".equals(cls)) {
+        if ("com/codename1/ai/vision/BarcodeScanner".equals(cls)
+                || "com/codename1/ai/vision/CodeScanner".equals(cls)) {
+            // CodeScanner is the ready-made scanner screen built on top of
+            // BarcodeScanner. An app that only references the high-level class
+            // never names BarcodeScanner itself, so it has to select the same
+            // adapter or the feature ships inert.
             return "AndroidBarcodeScanningAdapter.java";
         }
         if ("com/codename1/ai/vision/FaceDetector".equals(cls)) {
@@ -7478,6 +7589,332 @@ public class AndroidGradleBuilder extends Executor {
         return new File(dir, childFileName);
     }
 
+
+    /// Writes the static shortcut resource and returns the manifest fragment for app intents.
+    ///
+    /// Android's half of this feature is launcher shortcuts, not an assistant: there is no
+    /// contract by which Google Assistant invokes an app capability and receives a typed result,
+    /// so nothing here claims one. What it does produce is real -- a static shortcut per
+    /// discoverable intent, the invisible trampoline that routes a tap, and the service that
+    /// runs a headless intent with no Activity.
+    ///
+    /// A missing manifest is not an error, mirroring iOS: an app may reference the package purely
+    /// to index content or donate shortcuts at runtime, in which case the processor emitted
+    /// nothing to compile in.
+    /// Builds the intents manifest fragments and the shortcuts resource.
+    ///
+    /// `packageName` is passed rather than read from a placeholder because res/xml is not
+    /// processed for manifest placeholders: `${applicationId}` written there reaches the
+    /// launcher literally, so the explicit component cannot resolve and every generated static
+    /// shortcut silently fails to launch anything.
+    private String buildIntentsManifestEntries(File assetsDir, File resDir, String packageName)
+            throws BuildException {
+        StringBuilder entries = new StringBuilder();
+
+        // The trampoline is the only exported door. Everything else -- notably the service that
+        // can run an application capability -- stays internal, so no other installed app can ask
+        // this one to perform an action.
+        entries.append("        <activity android:name=\"com.codename1.impl.android.intents.CN1IntentTrampolineActivity\"\n")
+                .append("                  android:theme=\"@android:style/Theme.NoDisplay\"\n")
+                .append("                  android:exported=\"true\"\n")
+                .append("                  android:excludeFromRecents=\"true\"\n")
+                .append("                  android:noHistory=\"true\"\n")
+                .append("                  android:taskAffinity=\"\">\n")
+                .append("            <intent-filter>\n")
+                .append("                <action android:name=\"android.intent.action.VIEW\" />\n")
+                .append("                <category android:name=\"android.intent.category.DEFAULT\" />\n")
+                .append("                <data android:scheme=\"cn1intent\" />\n")
+                .append("            </intent-filter>\n")
+                .append("        </activity>\n");
+        entries.append("        <service android:name=\"com.codename1.impl.android.intents.CN1IntentService\"\n")
+                .append("                 android:exported=\"false\" />\n");
+
+        // Namespaced, and only this path: the assets root is the application's, so reading
+        // intents.json from it would treat an app's own asset as framework metadata. See
+        // MANIFEST_RESOURCE in AppIntentAnnotationProcessor.
+        File manifest = new File(assetsDir, "META-INF/codenameone/intents.json");
+        if (!manifest.exists()) {
+            return entries.toString();
+        }
+        Map<String, Object> parsed;
+        try {
+            parsed = new JSONParser().parseJSON(new InputStreamReader(
+                    new FileInputStream(manifest), StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to parse intents.json", ex);
+        }
+        java.util.List<Object> declared = (java.util.List<Object>) parsed.get("intents");
+        if (declared == null || declared.isEmpty()) {
+            return entries.toString();
+        }
+
+        StringBuilder xml = new StringBuilder();
+        xml.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+        xml.append("<shortcuts xmlns:android=\"http://schemas.android.com/apk/res/android\">\n");
+        // shortcutShortLabel is defined as a resource reference, so a literal string is rejected
+        // by AAPT during resource linking rather than merely looking wrong.
+        StringBuilder strings = new StringBuilder();
+        strings.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<resources>\n");
+        int count = 0;
+        for (Object o : stableOrder(declared)) {
+            if (!(o instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> intent = (Map<String, Object>) o;
+            Object id = intent.get("id");
+            Object discoverable = intent.get("discoverable");
+            boolean offered = discoverable == null || Boolean.TRUE.equals(discoverable)
+                    || "true".equals(discoverable);
+            if (!(id instanceof String) || !offered) {
+                continue;
+            }
+            // exposure says which consumers an intent opted into. One that only offered itself
+            // to a language model must not appear on the launcher.
+            if (!isExposedToAssistant(intent)) {
+                continue;
+            }
+            if (count == MAX_STATIC_SHORTCUTS) {
+                // Deliberately below the platform's own cap. getMaxShortcutCountPerActivity()
+                // returns 5 on plenty of devices, and that is the *combined* static and dynamic
+                // quota for the launcher activity -- so filling it here left index() and
+                // donate() nothing to publish into, and both went silently inert on exactly the
+                // apps that declare the most intents. pushDynamicShortcut cannot rescue them
+                // either: it evicts a dynamic shortcut to make room, and cannot evict a
+                // manifest one. Reserving is the only thing the build can do about it.
+                log("Only the first " + MAX_STATIC_SHORTCUTS + " intents become static launcher "
+                        + "shortcuts. The rest remain invocable and can be donated, and the "
+                        + "reserved slots are what lets Intents.index() and Intents.donate() "
+                        + "publish at all on a device whose shortcut quota is 5.");
+                break;
+            }
+            // Destructive is judged first, because it is the stronger restriction and the one
+            // whose message has to be the one the developer reads. An intent that is both
+            // destructive and parameterized would otherwise be told to donate it below.
+            //
+            // A static shortcut is minted at build time, so it carries no runtime nonce and the
+            // trampoline treats it as unauthenticated -- and that policy refuses anything
+            // destructive, deliberately. Emitting one anyway produces a launcher entry that on
+            // every tap opens the app and logs a refusal, which reads to the user as the action
+            // being broken rather than protected.
+            Object destructive = intent.get("destructive");
+            if (Boolean.TRUE.equals(destructive) || "true".equals(destructive)) {
+                // And it is not donatable either: Intents.donate refuses a destructive
+                // declaration for the same reason this does, since a donated shortcut also runs
+                // on one tap with nothing between the tap and the action. Telling the developer
+                // to donate it described a path that ends in a runtime diagnostic and no
+                // shortcut. The guide already says this; the build now says the same thing.
+                log("Not offering \"" + id + "\" as a launcher shortcut: it is destructive, and "
+                        + "a static shortcut cannot be confirmed the way the platform confirms "
+                        + "a Shortcuts or assistant invocation. It is not donatable either, for "
+                        + "the same reason. It stays available through the assistant and the "
+                        + "Shortcuts app, which confirm first.");
+                continue;
+            }
+            // A static shortcut carries no parameters and Android has no picker on this path,
+            // so an intent with a required parameter would be invoked with a null or zero and
+            // quietly do the wrong thing. Only intents that can run as declared are offered;
+            // the rest stay invocable and donatable, they simply are not launcher shortcuts.
+            if (!isLaunchableWithoutParameters(intent)) {
+                log("Not offering \"" + id + "\" as a launcher shortcut: it has a required "
+                        + "parameter and a static shortcut cannot supply one. It remains "
+                        + "invocable and can be donated with its values bound.");
+                continue;
+            }
+            String label = intent.get("title") instanceof String
+                    ? (String) intent.get("title") : (String) id;
+            // The raw id is a legal Android resource-name suffix already, so it is not
+            // sanitized here: @AppIntent ids are validated against [a-z][a-z0-9_]{2,63} by
+            // AppIntentAnnotationProcessor before intents.json is written, which is exactly
+            // the character set AAPT accepts. Lower-casing or rewriting it here would be
+            // worse than a no-op -- the id is also the dispatch key in the cn1intent:// URI
+            // and in the declaration table, so a rewritten resource key that no longer
+            // matched would have to be carried as a second name for the life of the build.
+            // A hand-edited intents.json can still carry an out-of-grammar id; that fails
+            // loudly at AAPT rather than silently, which is the right outcome for a manifest
+            // nothing generated.
+            String labelRes = "cn1_shortcut_" + ((String) id);
+            // formatted="false" because a title is displayed verbatim and never formatted.
+            // Without it AAPT parses the label as a format string and rejects any title
+            // carrying more than one non-positional token -- "Move %s to %s" fails the whole
+            // build, and the developer is told to use positional arguments for a string that
+            // is never an argument to anything.
+            strings.append("    <string formatted=\"false\" name=\"").append(labelRes)
+                    .append("\">")
+                    .append(androidStringValue(label)).append("</string>\n");
+            // The headless flag rides in the URI so the trampoline can route a cold-start tap
+            // without the declaration table, which is not installed yet at that point.
+            Object headlessValue = intent.get("headless");
+            // An intent naming a route is never headless on this path, however it was declared:
+            // the route has to open somewhere the user can see, and the trampoline applies the
+            // same rule when a declaration is available. iOS decides it statically too.
+            Object routeValue = intent.get("opensRoute");
+            boolean opensRoute = routeValue instanceof String
+                    && ((String) routeValue).length() > 0;
+            String headlessFlag = !opensRoute
+                    && (Boolean.TRUE.equals(headlessValue) || "true".equals(headlessValue))
+                    ? "&amp;h=1" : "";
+            xml.append("    <shortcut android:shortcutId=\"").append(xmlEscape((String) id))
+                    .append("\"\n")
+                    .append("              android:enabled=\"true\"\n")
+                    .append("              android:shortcutShortLabel=\"@string/")
+                    .append(labelRes).append("\">\n")
+                    .append("        <intent android:action=\"android.intent.action.VIEW\"\n")
+                    .append("                android:targetPackage=\"")
+                    .append(xmlEscape(packageName == null ? "" : packageName)).append("\"\n")
+                    .append("                android:targetClass=\"com.codename1.impl.android.intents.CN1IntentTrampolineActivity\"\n")
+                    .append("                android:data=\"cn1intent://run?id=")
+                    .append(xmlEscape((String) id)).append(headlessFlag).append("\" />\n")
+                    .append("    </shortcut>\n");
+            count++;
+        }
+        xml.append("</shortcuts>\n");
+        strings.append("</resources>\n");
+
+        if (count > 0) {
+            File xmlValues = new File(resDir, "xml");
+            xmlValues.mkdirs();
+            File values = new File(resDir, "values");
+            values.mkdirs();
+            try {
+                createFile(new File(values, "cn1_shortcuts_strings.xml"),
+                        strings.toString().getBytes("UTF-8"));
+                createFile(new File(xmlValues, "cn1_shortcuts.xml"),
+                        xml.toString().getBytes("UTF-8"));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write the app intent shortcuts", ex);
+            }
+            // Recorded rather than appended here: this one fragment has to land inside the
+            // launcher activity, and putting it at application level would be accepted by the
+            // manifest merger and then quietly do nothing.
+            intentsShortcutsMetaData =
+                    "            <meta-data android:name=\"android.app.shortcuts\"\n"
+                    + "                       android:resource=\"@xml/cn1_shortcuts\" />\n";
+        }
+        return entries.toString();
+    }
+
+    /// True when the intent offered itself to the platform. An absent list means the default,
+    /// which is platform exposure.
+    @SuppressWarnings("unchecked")
+    /// The declarations in an order that does not depend on the machine that built them.
+    ///
+    /// The quota below keeps the first few and drops the rest, and the order it was keeping them
+    /// in came from ClassScanner walking File.listFiles(), which the filesystem orders however
+    /// it likes. Two clean builds of unchanged source on different runners could therefore
+    /// publish different launcher shortcuts -- an action a user had could vanish on a rebuild
+    /// that changed nothing, and nothing in the build would say why. Sorted by intent id, which
+    /// the build already requires to be unique and well formed.
+    private static java.util.List<Object> stableOrder(java.util.List<Object> declared) {
+        java.util.List<Object> sorted = new java.util.ArrayList<Object>(declared);
+        java.util.Collections.sort(sorted, new java.util.Comparator<Object>() {
+            @Override
+            public int compare(Object a, Object b) {
+                return idOf(a).compareTo(idOf(b));
+            }
+        });
+        return sorted;
+    }
+
+    /// An entry's id, or the empty string when it has none -- those are skipped by the caller,
+    /// and sorting must not throw on one.
+    private static String idOf(Object entry) {
+        if (!(entry instanceof Map)) {
+            return "";
+        }
+        Object id = ((Map<String, Object>) entry).get("id");
+        return id instanceof String ? (String) id : "";
+    }
+
+    private static boolean isExposedToAssistant(Map<String, Object> intent) {
+        Object exposure = intent.get("exposure");
+        if (!(exposure instanceof java.util.List)) {
+            // No exposure key at all: an older manifest, or a declaration that never said. The
+            // default is what an omitted element means.
+            return true;
+        }
+        // An empty list is not the same as no list. A declaration that wrote exposure = {} chose
+        // no platform consumer, and the processor preserves that -- so treating it as the
+        // default here published a launcher shortcut that this app's own trampoline then
+        // refuses, which reads to the user as the action being broken.
+        java.util.List<Object> list = (java.util.List<Object>) exposure;
+        for (Object o : list) {
+            if ("ASSISTANT".equals(o)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// True when every declared parameter can be satisfied without asking the user: either the
+    /// intent takes none, or each required one carries a default.
+    @SuppressWarnings("unchecked")
+    private static boolean isLaunchableWithoutParameters(Map<String, Object> intent) {
+        Object params = intent.get("params");
+        if (!(params instanceof java.util.List)) {
+            return true;
+        }
+        for (Object o : (java.util.List<Object>) params) {
+            if (!(o instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> p = (Map<String, Object>) o;
+            Object required = p.get("required");
+            boolean isRequired = required == null || Boolean.TRUE.equals(required)
+                    || "true".equals(required);
+            if (!isRequired) {
+                continue;
+            }
+            Object def = p.get("default");
+            if (!(def instanceof String) || ((String) def).length() == 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A string-resource *value*, which is not the same thing as XML-escaped text.
+    ///
+    /// AAPT applies its own escaping layer inside the XML, and an intent title is application
+    /// text that will eventually contain an apostrophe -- "Today's workout" is the obvious one.
+    /// XML has nothing to say about an apostrophe, so it arrived at AAPT bare and AAPT rejected
+    /// the resource, failing the Android build on a title the developer was entitled to write.
+    /// The app_name resource in this same builder has escaped apostrophes for exactly this
+    /// reason for years; nothing else here had learned it.
+    ///
+    /// Applied before xmlEscape rather than after, which is the part that is easy to get wrong:
+    /// xmlEscape turns a double quote into `&quot;`, so escaping afterwards would never see one
+    /// and the bare quote would reach AAPT, where a lone quote is a string-trimming directive
+    /// rather than a character. Backslash goes first for the same reason within this method.
+    /// How many static launcher shortcuts the build will emit.
+    ///
+    /// Three rather than five: five is the whole quota on a device where
+    /// getMaxShortcutCountPerActivity() returns it, and that quota covers dynamic shortcuts
+    /// too. Two slots are left for the runtime to publish indexed content and donations into.
+    private static final int MAX_STATIC_SHORTCUTS = 3;
+
+    private static String androidStringValue(String s) {
+        if (s == null) {
+            return "";
+        }
+        String escaped = s.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\"", "\\\"");
+        if (escaped.startsWith("@") || escaped.startsWith("?")) {
+            // Leading @ is a resource reference and leading ? a theme attribute; a title may
+            // legitimately begin with either.
+            escaped = "\\" + escaped;
+        }
+        return xmlEscape(escaped);
+    }
+
+    private static String xmlEscape(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
     private String permissionAdd(BuildRequest request, String permission, String text) {
         if(xPermissions.contains(permission)) {
             return "";
@@ -7572,6 +8009,36 @@ public class AndroidGradleBuilder extends Executor {
 
     protected String getReleaseCertificateFile() {
         return "android.ks";
+    }
+
+    /**
+     * A Gradle configuration keyword opening a dependency declaration directly after the closing
+     * quote of the previous one, with no ';' or newline between the two.
+     */
+    private static final java.util.regex.Pattern UNSEPARATED_GRADLE_STATEMENT =
+            java.util.regex.Pattern.compile(
+                "['\"][ \\t]*(implementation|api|compile|compileOnly|runtimeOnly"
+                + "|annotationProcessor|kapt|testImplementation|androidTestImplementation"
+                + "|debugImplementation|releaseImplementation)[ \\t]*['\"(]");
+
+    /**
+     * Finds two Gradle dependency statements run together with no separator between them.
+     *
+     * @param gradleDep the android.gradleDep hint value
+     * @return the offending excerpt, or null when the value is well formed
+     */
+    static String findUnseparatedGradleStatement(String gradleDep) {
+        if (gradleDep == null || gradleDep.length() == 0) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = UNSEPARATED_GRADLE_STATEMENT.matcher(gradleDep);
+        if (!matcher.find()) {
+            return null;
+        }
+        int from = Math.max(0, matcher.start() - 40);
+        int to = Math.min(gradleDep.length(), matcher.end() + 40);
+        return (from > 0 ? "..." : "") + gradleDep.substring(from, to)
+                + (to < gradleDep.length() ? "..." : "");
     }
 
     private String addNewlineIfMissing(String s) {

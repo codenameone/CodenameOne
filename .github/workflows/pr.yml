@@ -5,33 +5,67 @@ on:
   pull_request:
     branches:
       - master
-    paths-ignore:
-      - '.github/workflows/scripts-android.yml'
-      - '.github/workflows/scripts-ios.yml'
-      - 'scripts/**'
-      - '!scripts/setup-workspace.sh'
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/workflows/developer-guide-docs.yml'
-      - '.github/workflows/website-docs.yml'
-      - '.github/workflows/initializr-cn1-version-pr.yml'
-      - 'CodenameOneDesigner/**'
-      - 'Ports/IOSPort/**'
+    # paths rather than paths-ignore, because this list both excludes and re-includes and only
+    # this form supports that: a "!" entry in paths-ignore is not a re-inclusion, so the entries
+    # for setup-workspace.sh and the database check scripts below never took effect there. The
+    # last matching pattern decides, so this reads as "everything, except these, except these".
+    paths:
+      - '**'
+      - '!.github/workflows/scripts-android.yml'
+      - '!.github/workflows/scripts-ios.yml'
+      - '!scripts/**'
+      - 'scripts/setup-workspace.sh'
+      # Run from this workflow and nowhere else, so ignoring the whole directory meant a change
+      # to one of them -- including one that breaks the check itself -- merged without it ever
+      # running.
+      - 'scripts/ci/db-cipher-interop.sh'
+      - 'scripts/ci/check-android-cipher-package-compiles.sh'
+      - 'scripts/ci/check-js-sqlite-wasm.sh'
+      # Every Maven step in this matrix runs through retry.sh, and the apt helpers gate the
+      # Linux legs, so a change to one of them that nothing exercises can merge and then break
+      # the matrix it was meant to protect.
+      - 'scripts/ci/retry.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/apt-get-install.sh'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/developer-guide-docs.yml'
+      - '!.github/workflows/website-docs.yml'
+      - '!.github/workflows/initializr-cn1-version-pr.yml'
+      - '!CodenameOneDesigner/**'
+      - '!Ports/IOSPort/**'
   push:
     branches:
       - master
-    paths-ignore:
-      - '.github/workflows/scripts-android.yml'
-      - '.github/workflows/scripts-ios.yml'
-      - 'scripts/**'
-      - '!scripts/setup-workspace.sh'
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/workflows/developer-guide-docs.yml'
-      - '.github/workflows/website-docs.yml'
-      - '.github/workflows/initializr-cn1-version-pr.yml'
-      - 'CodenameOneDesigner/**'
-      - 'Ports/IOSPort/**'
+    # paths rather than paths-ignore, because this list both excludes and re-includes and only
+    # this form supports that: a "!" entry in paths-ignore is not a re-inclusion, so the entries
+    # for setup-workspace.sh and the database check scripts below never took effect there. The
+    # last matching pattern decides, so this reads as "everything, except these, except these".
+    paths:
+      - '**'
+      - '!.github/workflows/scripts-android.yml'
+      - '!.github/workflows/scripts-ios.yml'
+      - '!scripts/**'
+      - 'scripts/setup-workspace.sh'
+      # Run from this workflow and nowhere else, so ignoring the whole directory meant a change
+      # to one of them -- including one that breaks the check itself -- merged without it ever
+      # running.
+      - 'scripts/ci/db-cipher-interop.sh'
+      - 'scripts/ci/check-android-cipher-package-compiles.sh'
+      - 'scripts/ci/check-js-sqlite-wasm.sh'
+      # Every Maven step in this matrix runs through retry.sh, and the apt helpers gate the
+      # Linux legs, so a change to one of them that nothing exercises can merge and then break
+      # the matrix it was meant to protect.
+      - 'scripts/ci/retry.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/apt-get-install.sh'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/developer-guide-docs.yml'
+      - '!.github/workflows/website-docs.yml'
+      - '!.github/workflows/initializr-cn1-version-pr.yml'
+      - '!CodenameOneDesigner/**'
+      - '!Ports/IOSPort/**'
 
 permissions:
   contents: write
@@ -168,7 +202,9 @@ jobs:
         # tests to load the library. Also baked into the pr-ci-container image
         # (.ci/container/Dockerfile); this step covers running against the
         # previously published container before the rebuild propagates.
-        run: apt-get update -qq && apt-get install -y -qq libdbus-1-3
+        # Bounded, because a stalled mirror is a hang rather than a failure: three jobs on this
+        # branch sat in apt until their job limit, two of them for six hours.
+        run: timeout 300 apt-get update -qq && timeout 300 apt-get install -y -qq libdbus-1-3
       - name: Run JavaSE port unit tests
         if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher
@@ -190,6 +226,16 @@ jobs:
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl javase -Plocal-dev-javase test
+      - name: Verify encrypted databases interoperate with reference SQLCipher
+        if: ${{ matrix.java-version == 8 }}
+        # The portability claim is that every port writes one on-disk format. A cipher
+        # misconfiguration produces files each platform reads happily and nothing else can
+        # touch, which no single-platform test would catch, so check ours against the stock
+        # sqlcipher client in both directions.
+        run: |
+          # Bounded for the same reason as the libdbus install above.
+          timeout 300 apt-get update -qq && timeout 300 apt-get install -y -qq sqlcipher
+          scripts/ci/db-cipher-interop.sh
       - name: Determine AI/ad cn1libs to build
         id: cn1libs
         if: ${{ matrix.java-version == 8 }}
@@ -353,6 +399,20 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
             -pl android,ios,codenameone-maven-plugin -am verify
+      - name: Type-check the SQLCipher-backed database package
+        if: ${{ matrix.java-version == 8 }}
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        # That package is excluded from the port build on purpose, so nothing above compiles it
+        # and a member of com.codename1.impl.android it reaches can stop being public without
+        # anything noticing until an Android app build forty minutes later. Runs after the port
+        # is compiled, which is what it type-checks against.
+        run: scripts/ci/check-android-cipher-package-compiles.sh
+      - name: Compile the bundled SQLite WebAssembly module
+        if: ${{ matrix.java-version == 8 }}
+        # A module no engine accepts does not fail anything on its own: the JavaScript port just
+        # reports the database as unavailable and its tests skip.
+        run: scripts/ci/check-js-sqlite-wasm.sh
       - name: Run SpotBugs for ByteCodeTranslator
         if: ${{ matrix.java-version == 8 }}
         run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify
@@ -382,7 +442,21 @@ jobs:
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm
-        run: mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
+        # Narrowed to resolution failures, because this step RUNS A TEST: retrying every nonzero
+        # exit would let an intermittent product failure pass on a later attempt and take the gate
+        # green with it. What this does cover is the run that died here with
+        # "Plugin org.apache.maven.plugins:maven-dependency-plugin:3.6.1 or one of its dependencies
+        # could not be resolved" before a single test had run -- a Maven Central failure, which a
+        # missing plugin version fails identically on every attempt anyway.
+        env:
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+          # Five attempts a minute apart rather than three at thirty seconds: Central
+          # refused two different jobs on this branch today, and a window of about a
+          # minute is shorter than the incidents have been. It costs nothing on a real
+          # failure, which RETRY_ONLY_MATCHING returns on the first attempt.
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: bash ../scripts/ci/retry.sh mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:

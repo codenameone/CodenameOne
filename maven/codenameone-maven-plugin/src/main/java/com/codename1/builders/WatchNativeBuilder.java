@@ -123,6 +123,11 @@ class WatchNativeBuilder {
             // CarPlay.framework is iOS-only (absent on watchOS); it is linked on the iOS slice when
             // the app references com.codename1.car, so weak-link it for the watch slice.
             + "CarPlay.framework;"
+            // CoreSpotlight backs the indexing half of com.codename1.intents and is linked on the
+            // iOS slice when the app references that package. The watch never uses it: the
+            // CN1_USE_INTENTS define is explicitly undone for TARGET_OS_WATCH, so the intent
+            // natives compile to their unsupported stubs there and nothing calls into it.
+            + "CoreSpotlight.framework;"
             // ARKit and SceneKit are absent on watchOS; they are linked on the iOS slice when the
             // app references com.codename1.ar, so weak-link them for the watch slice.
             + "ARKit.framework;SceneKit.framework;"

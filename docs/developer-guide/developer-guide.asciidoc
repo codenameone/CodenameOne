@@ -141,6 +141,8 @@ include::Authentication-And-Identity.asciidoc[]
 
 include::Deep-Links-Routing.asciidoc[]
 
+include::App-Intents.asciidoc[]
+
 include::Annotation-JSON-XML-Mapping.asciidoc[]
 
 include::Annotation-Component-Binding.asciidoc[]

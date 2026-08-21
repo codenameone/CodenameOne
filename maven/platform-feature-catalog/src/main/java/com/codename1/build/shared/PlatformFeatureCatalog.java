@@ -258,6 +258,28 @@ public final class PlatformFeatureCatalog {
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS barcode backend"));
 
+        // CodeScanner is the ready-made scanner screen and builds a
+        // BarcodeScanner internally. An application that references only the
+        // high-level class never names BarcodeScanner, so without its own
+        // entry the generated Android project retains the barcode adapter
+        // source with no com.google.mlkit:barcode-scanning to compile it
+        // against. The camera half is registered further down, beside the
+        // low-level camera entry.
+        e.add(new Entry("com/codename1/ai/vision/CodeScanner")
+                .iosFrameworks("Vision", "CoreImage")
+                .androidGradle("com.google.mlkit:barcode-scanning:17.2.0")
+                .androidMinimumSdk(21)
+                .description("Barcode scanning (ready-made scanner screen)"));
+        e.add(new Entry("com/codename1/ai/vision/CodeScanner")
+                .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                        "mlKitBarcodeScanning")
+                .iosPod("GoogleMLKit/BarcodeScanning")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .description("ML Kit iOS barcode backend"
+                        + " (ready-made scanner screen)"));
+
         e.add(new Entry("com/codename1/ai/vision/FaceDetector")
                 .iosFrameworks("Vision", "CoreImage")
                 .androidGradle("com.google.mlkit:face-detection:16.1.5")
@@ -401,6 +423,41 @@ public final class PlatformFeatureCatalog {
                 .androidGradle("androidx.camera:camera-video:1.3.4")
                 .androidMinimumSdk(21)
                 .description("Cross-platform camera (preview + frames + photo + video)"));
+
+        // CodeScanner and VisionCameraView drive the camera themselves. An
+        // application using one of them never references
+        // com.codename1.camera, so without these entries it gets no CameraX,
+        // no CAMERA permission and no AVFoundation or privacy string, and the
+        // preview opens on hardware the build never provisioned.
+        //
+        // These deliberately do NOT request the microphone: both classes open
+        // their session with captureAudio(false), and a barcode scanner asking
+        // for RECORD_AUDIO is a privacy smell and an app-review question. The
+        // CameraX artifact list mirrors the low-level entry rather than
+        // trimming to preview-only, because AndroidCameraImpl reflects over
+        // the whole CameraX surface in one class.
+        String[][] cameraBackedVision = {
+            {"com/codename1/ai/vision/CodeScanner",
+             "ready-made barcode scanner screen"},
+            {"com/codename1/ai/vision/VisionCameraView",
+             "live analyzer camera preview"},
+        };
+        for (String[] cameraBacked : cameraBackedVision) {
+            e.add(new Entry(cameraBacked[0])
+                    .iosFrameworks("AVFoundation", "CoreMedia", "CoreVideo")
+                    .iosPlist("NSCameraUsageDescription",
+                             "Used to analyze the camera image on this device.")
+                    .androidPermissions("android.permission.CAMERA")
+                    .androidFeatures("android.hardware.camera",
+                                     "android.hardware.camera.autofocus")
+                    .androidGradle("androidx.camera:camera-core:1.3.4")
+                    .androidGradle("androidx.camera:camera-camera2:1.3.4")
+                    .androidGradle("androidx.camera:camera-lifecycle:1.3.4")
+                    .androidGradle("androidx.camera:camera-view:1.3.4")
+                    .androidGradle("androidx.camera:camera-video:1.3.4")
+                    .androidMinimumSdk(21)
+                    .description("Camera for the " + cameraBacked[1]));
+        }
 
         // First-class Bluetooth (com.codename1.bluetooth.*): CoreBluetooth
         // on iOS with the two privacy strings defaulted only-if-unset via
@@ -566,6 +623,15 @@ public final class PlatformFeatureCatalog {
         // drives the camera. The com.google.ar.core meta-data marks
         // ARCore optional so the app still installs on non-AR devices;
         // the android.ar.required=true build hint flips it to required.
+        // Encrypted databases. Keyed on DatabaseConfig rather than on the db package: every
+        // application that uses a database references com.codename1.db, but only the ones that
+        // encrypt reference DatabaseConfig, and SQLCipher's minimum SDK is above ours.
+        e.add(new Entry("com/codename1/db/DatabaseConfig")
+                .androidGradle("net.zetetic:sqlcipher-android:4.17.0@aar")
+                .androidGradle("androidx.sqlite:sqlite:2.4.0")
+                .androidMinimumSdk(23)
+                .description("Encrypted SQLite databases (SQLCipher)"));
+
         e.add(new Entry("com/codename1/ar/")
                 .iosFrameworks("ARKit", "SceneKit")
                 .iosPlist("NSCameraUsageDescription",

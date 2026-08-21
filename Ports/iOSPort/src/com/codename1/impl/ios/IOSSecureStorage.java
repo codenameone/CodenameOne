@@ -72,6 +72,55 @@ public final class IOSSecureStorage extends SecureStorage {
         }
     }
 
+    /**
+     * Creates the entry through the keychain's own add, which is atomic between processes.
+     *
+     * <p>The base implementation checks and then writes, and an application can be running in more
+     * than one process: both can find nothing stored, generate different managed database keys,
+     * and each overwrite the other, after which the database is encrypted with a key nobody has.
+     * SecItemAdd settles that inside the keychain daemon -- one caller creates the item and the
+     * other is told it already exists, and takes the value that won.</p>
+     *
+     * @param account the account to create
+     * @param value the value to store when there is none
+     * @return the value now stored, which may be another process's, or null if the keychain could
+     *   not say
+     */
+    @Override
+    public String setIfAbsent(String account, String value) {
+        if (account == null || value == null) {
+            return null;
+        }
+        int created;
+        try {
+            created = nativeInstance.secureStorageAddPlain(account, value);
+        } catch (Throwable cannotAsk) {
+            return get(account);
+        }
+        if (created == 1) {
+            return value;
+        }
+        // Already there, or the keychain refused to say. Either way what matters is what it holds,
+        // and never what this caller wanted to put there.
+        return get(account);
+    }
+
+    @Override
+    public int entryState(String account) {
+        if (account == null) {
+            return ENTRY_UNKNOWN;
+        }
+        try {
+            int state = nativeInstance.secureStorageEntryStatePlain(account);
+            if (state == 1) {
+                return ENTRY_PRESENT;
+            }
+            return state == 0 ? ENTRY_ABSENT : ENTRY_UNKNOWN;
+        } catch (Throwable cannotAsk) {
+            return ENTRY_UNKNOWN;
+        }
+    }
+
     @Override
     public String get(String account) {
         if (account == null) {

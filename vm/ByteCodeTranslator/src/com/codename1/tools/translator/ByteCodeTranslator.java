@@ -149,6 +149,89 @@ public class ByteCodeTranslator {
     /**
      * @param args the command line arguments
      */
+
+    /**
+     * True when the application uses com.codename1.db and therefore needs the bundled SQLite
+     * engine compiled in. Set by the platform builders from their class scan.
+     */
+    static boolean isBundledSqliteEnabled() {
+        return "true".equals(System.getProperty("cn1.sqlite", "false"));
+    }
+
+    /**
+     * True when the application uses encrypted databases. On iOS this additionally replaces the
+     * system libsqlite3, which has no cipher support, with the bundled engine.
+     */
+    static boolean isBundledSqliteCipherEnabled() {
+        return "true".equals(System.getProperty("cn1.sqlcipher", "false"));
+    }
+
+    /// Writes the bundled SQLite engine into a source root, or takes it back out.
+    ///
+    /// Emitted only for an application that uses `com.codename1.db`, and its ciphers only for one
+    /// that configures encryption -- but a source root is reused between runs, and the CMake
+    /// project globs every `.c` beside it. An engine left behind by an earlier run with the
+    /// switch on would be compiled by a build with it off: the gate would appear to do nothing,
+    /// and a plaintext application would carry the ciphers it was meant to be spared. So the
+    /// files this decides on are removed when they are not wanted, rather than merely not
+    /// written.
+    ///
+    /// #### Parameters
+    ///
+    /// - `srcRoot`: the directory the translated sources are written to
+    private static void emitBundledSqlite(File srcRoot) throws IOException {
+        File sqliteUnity = new File(srcRoot, "cn1_sqlite3.c");
+        File sqliteHeader = new File(srcRoot, "cn1_sqlite3.h");
+        File sqliteAmalgamation = new File(srcRoot, "cn1_sqlite3_amalgamation.h");
+        File sqliteCipherMarker = new File(srcRoot, "cn1_sqlite3_cipher.h");
+        if (isBundledSqliteEnabled()) {
+            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.c"),
+                    Files.newOutputStream(sqliteUnity.toPath()));
+            replaceInFile(sqliteUnity, "//#define CN1_INCLUDE_SQLITE", "#define CN1_INCLUDE_SQLITE");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.h"),
+                    Files.newOutputStream(sqliteHeader.toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_amalgamation.h"),
+                    Files.newOutputStream(sqliteAmalgamation.toPath()));
+        } else {
+            deleteIfPresent(sqliteUnity);
+            deleteIfPresent(sqliteHeader);
+            deleteIfPresent(sqliteAmalgamation);
+        }
+        if (isBundledSqliteEnabled() && isBundledSqliteCipherEnabled()) {
+            // A marker, not a define: the engine, the shared bindings and IOSNative.m are three
+            // translation units that all have to agree on whether a cipher exists, and
+            // __has_include is the only thing they can agree on without per-target compiler
+            // flags. Emitted only for an application that configures encryption, so everyone else
+            // compiles the engine as plain SQLite and links no keying code at all.
+            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_cipher.h"),
+                    Files.newOutputStream(sqliteCipherMarker.toPath()));
+        } else {
+            // Left behind, this would put the ciphers back into an engine emitted without them --
+            // __has_include does not care which run wrote the file.
+            deleteIfPresent(sqliteCipherMarker);
+        }
+    }
+
+    /// Removes a file this run decided not to emit, and says so if it cannot.
+    ///
+    /// Silence here would be the failure the caller is trying to avoid: the stale file would be
+    /// compiled and nothing would report why.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stale`: the file to remove
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the file is there and cannot be removed
+    private static void deleteIfPresent(File stale) throws IOException {
+        if (stale.exists() && !stale.delete()) {
+            throw new IOException("A previous build left " + stale + " behind and it could not be "
+                    + "removed. It would be compiled into this one, which is what emitting it "
+                    + "conditionally is meant to prevent.");
+        }
+    }
+
     public static void main(String[] args) throws Exception {        
         if(args.length == 0) {
             new File("build/kitchen").mkdirs();
@@ -289,6 +372,16 @@ public class ByteCodeTranslator {
             File rpmalloch = new File(srcRoot, "rpmalloc.h");
             copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), Files.newOutputStream(rpmalloch.toPath()));
         }
+        // The bundled SQLite engine is emitted only for applications that actually use
+        // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
+        // CN1_INCLUDE_SQLITE internally as well, so an emitted-but-undefined build compiles it
+        // to an empty object rather than failing.
+        // Always emitted: it defines the native entry points either way, as real bindings when
+        // the engine is present and as stubs when it is not, so an application that references
+        // com.codename1.db links regardless of how the translator was invoked.
+        File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), Files.newOutputStream(sqliteBindings.toPath()));
+        emitBundledSqlite(srcRoot);
         File xmlvm = new File(srcRoot, "xmlvm.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), Files.newOutputStream(xmlvm.toPath()));
 
@@ -630,6 +723,16 @@ public class ByteCodeTranslator {
             File rpmalloch = new File(srcRoot, "rpmalloc.h");
             copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), Files.newOutputStream(rpmalloch.toPath()));
         }
+        // The bundled SQLite engine is emitted only for applications that actually use
+        // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
+        // CN1_INCLUDE_SQLITE internally as well, so an emitted-but-undefined build compiles it
+        // to an empty object rather than failing.
+        // Always emitted: it defines the native entry points either way, as real bindings when
+        // the engine is present and as stubs when it is not, so an application that references
+        // com.codename1.db links regardless of how the translator was invoked.
+        File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), Files.newOutputStream(sqliteBindings.toPath()));
+        emitBundledSqlite(srcRoot);
 
         Parser.writeOutput(srcRoot);
 
@@ -703,8 +806,14 @@ public class ByteCodeTranslator {
         includeFrameworks.add("libxml2.dylib");
         includeFrameworks.add("QuartzCore.framework");
         includeFrameworks.add("AddressBook.framework");
-        includeFrameworks.add("libsqlite3.dylib");
-        includeFrameworks.add("libsqlite3.0.dylib");
+        if (!isBundledSqliteCipherEnabled()) {
+            // The system libsqlite3 has no cipher support, so an application that encrypts
+            // databases links the bundled engine instead. Linking both would put two SQLite
+            // implementations in one process, which is at best wasteful and at worst confusing
+            // to debug when they disagree about a file.
+            includeFrameworks.add("libsqlite3.dylib");
+            includeFrameworks.add("libsqlite3.0.dylib");
+        }
         includeFrameworks.add("GameKit.framework");
         includeFrameworks.add("Security.framework");
         //includeFrameworks.add("StoreKit.framework");

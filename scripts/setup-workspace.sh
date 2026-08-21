@@ -70,6 +70,31 @@ JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u4
 JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
 MAVEN_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.tar.gz"
 
+# Downloads a toolchain archive, waiting out a rate limit rather than sprinting into it.
+#
+# curl's own --retry has a flat delay, and this script already knows why that is not enough:
+# the note on mvn_retry below says a flat retry lands inside the same window a 429 is still
+# rate limiting in. The downloads were doing exactly that -- six attempts fifteen seconds
+# apart, ninety seconds in total, against repo.maven.apache.org handing out 429s to a whole
+# CI matrix provisioning at once. The inner --retry still handles a dropped connection
+# quickly; the outer loop is what survives a throttle.
+download_archive() {
+  local url="$1" out="$2" delay
+  for delay in 0 30 120 300; do
+    if [ "$delay" -gt 0 ]; then
+      log "download failed; retrying in ${delay}s in case the mirror is rate limiting"
+      sleep "$delay"
+    fi
+    # curl waits for the larger of --retry-delay and any Retry-After the server sends.
+    if curl -fL --retry 3 --retry-delay 5 --retry-max-time 120 --retry-all-errors \
+        "$url" -o "$out"; then
+      return 0
+    fi
+  done
+  log "could not download $url" >&2
+  return 1
+}
+
 install_jdk() {
   local url="$1" dest_var="$2"
   local archive="$DOWNLOAD_DIR/$(basename "$url")"
@@ -78,13 +103,9 @@ install_jdk() {
     log "Using cached JDK archive $(basename "$archive")"
   else
     log "Downloading JDK from $url"
-    # --retry-delay 15: curl's default backoff is 1s, 2s, 4s, which is nothing
-    # against a rate limit. Every Android job provisions its own JDKs from the
-    # same GitHub release at the same moment, so the whole matrix can trip 429
-    # together and all of it gave up inside seven seconds. curl waits for the
-    # larger of this and any Retry-After the server sends, and --retry-max-time
-    # bounds the whole thing so a genuinely dead mirror still fails the job.
-    curl -fL --retry 6 --retry-delay 15 --retry-max-time 300 --retry-all-errors "$url" -o "$archive"
+    # Every Android job provisions its own JDKs from the same GitHub release at the
+    # same moment, so the whole matrix can trip 429 together.
+    download_archive "$url" "$archive"
   fi
 
   local top
@@ -136,7 +157,7 @@ if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
   else
     log "Downloading Maven from $MAVEN_URL"
-    curl -fL --retry 6 --retry-delay 15 --retry-max-time 300 --retry-all-errors "$MAVEN_URL" -o "$mvn_archive"
+    download_archive "$MAVEN_URL" "$mvn_archive"
   fi
   mvn_top=$(tar -tzf "$mvn_archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
   if [ -z "$mvn_top" ]; then

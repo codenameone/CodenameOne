@@ -29,6 +29,8 @@ import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseEncryptionException;
+import com.codename1.db.DatabaseConfig;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.location.Location;
 import com.codename1.ui.Component;
@@ -416,6 +418,23 @@ public class IOSImplementation extends CodenameOneImplementation {
             surfaceBridge = IOSSurfaceCallbacks.getBridge(nativeInstance);
         }
         return surfaceBridge;
+    }
+
+    private IOSIntentBridge intentBridge;
+
+    @Override
+    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        // Only meaningful in builds that linked the intent natives (CN1_USE_INTENTS, flipped by
+        // the builder when the app references com.codename1.intents). Always returned: the
+        // bridge's own is...Supported methods answer honestly through the natives, which stub to
+        // unsupported when the define is off. Going through IOSIntentCallbacks rather than
+        // constructing directly is deliberate -- touching that class is what runs its static
+        // initializer, which is what keeps the native callback targets alive through the iOS
+        // translator's dead-code elimination.
+        if (intentBridge == null) {
+            intentBridge = IOSIntentCallbacks.getBridge(nativeInstance);
+        }
+        return intentBridge;
     }
 
     @Override
@@ -11189,28 +11208,224 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     private static native boolean instanceofDoubleArrayI(Object o);
 
+    /**
+     * Resolves a database name to an absolute path. Bare names live in the documents directory;
+     * a file:// URL is resolved through FileSystemStorage, which is what makes custom database
+     * paths work here the way they already do on Android and the simulator.
+     */
+    private String resolveDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return FileSystemStorage.getInstance().toNativePath(databaseName);
+        }
+        return nativeInstance.sqlDbPath(databaseName);
+    }
+
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException{
-        return new DatabaseImpl(databaseName);
+        return new DatabaseImpl(databaseName, resolveDatabasePath(databaseName));
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            return openOrCreateDB(databaseName);
+        }
+        if (!isDatabaseEncryptionSupported()) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                    "This build was not compiled with encrypted database support");
+        }
+        // The resolved file, not the name it was asked for: a managed key with no explicit alias
+        // is stored under what is passed here, so two accepted spellings of one database would
+        // derive two different keys and the second open would report a wrong key against intact
+        // data.
+        String path = resolveDatabasePath(databaseName);
+        return new DatabaseImpl(databaseName, path,
+                config.resolveKeyMaterial(databaseManagedKeyIdentity(databaseName)));
+    }
+
+    @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return managedKeyAliasForPath(resolveDatabasePath(databaseName));
+    }
+
+    /// The managed alias for an already resolved database file.
+    ///
+    /// Keyed on the path rather than the name so the connection object can ask the same question:
+    /// it holds the path, not the name it was opened under, and a key written under one alias and
+    /// looked for under another is a wrong key reported against intact data. One method, so the
+    /// open and the re-key cannot answer differently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the resolved database file
+    ///
+    /// #### Returns
+    ///
+    /// the identity a managed key for that file is filed under
+    static String managedKeyAliasForPath(String path) {
+        return Database.normalizeDatabaseKey(containerRelative(resolveLinks(path)));
+    }
+
+    /// The path with its links followed, the way SQLite follows them.
+    ///
+    /// The engine reports the file it opened with every link resolved -- `PRAGMA database_list`
+    /// answers `/private/var/mobile/...` for a database this port names `/var/mobile/...`, since
+    /// `/var` is itself a link, and it resolves `/a/link/../db` to wherever the link really
+    /// points rather than to `/a/db`. A key built from the unresolved spelling names a file the
+    /// engine has never heard of, so a delete or a key change asked for by one form does not see
+    /// a connection registered under the other.
+    ///
+    /// Both sides of the comparison go through here, including the container prefix below, so
+    /// the two are always in the same form.
+    ///
+    /// Through a native rather than `java.io.File`. That class's `exists` and `getCanonicalPath`
+    /// natives are not linked into the watch and tv targets, so naming them here broke those
+    /// builds at the link step -- with the app itself compiling perfectly well, since the Java
+    /// side is identical for every target.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: a native path, which need not exist yet
+    ///
+    /// #### Returns
+    ///
+    /// the resolved path, or the path itself when the filesystem cannot resolve it
+    private static String resolveLinks(String path) {
+        if (path == null || path.length() == 0) {
+            return path;
+        }
+        String resolved = nativeInstance.realPath(path);
+        return resolved == null || resolved.length() == 0 ? path : resolved;
+    }
+
+    /// Where a database sits inside this application, rather than where the device is keeping it
+    /// today.
+    ///
+    /// A managed key with no alias of its own is stored under whatever this returns, so what this
+    /// returns has to survive everything the key survives. The keychain item does survive an
+    /// encrypted backup and a restore onto another device -- that is the promise the security
+    /// notes make -- but the absolute path does not: iOS gives the application a fresh container
+    /// directory, and the same database comes back at
+    /// /var/mobile/Containers/Data/Application/<a different UUID>/Documents/app.db. Keying on that
+    /// meant the restored keychain still held the key under the old container while the open
+    /// derived a new one under the new container, so a database that restored perfectly reported
+    /// a wrong key against intact data.
+    ///
+    /// Taking the path apart rather than using the name it was asked for keeps the property the
+    /// absolute path was chosen for: two spellings of one database still resolve to one file and
+    /// therefore to one key. What changes is that the part which moves is removed.
+    ///
+    /// A path outside the container is left as it is. There is nothing stable to measure it
+    /// against, and an application that puts a database there has told us where it wants it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name or file URL the application opened
+    ///
+    /// #### Returns
+    ///
+    /// the identity to store a managed key under, never null
+    private static String containerRelative(String path) {
+        String container = applicationContainerPath();
+        if (container != null && path.startsWith(container)) {
+            return path.substring(container.length());
+        }
+        return path;
+    }
+
+    /// The directory iOS hands this application, which is the part of a database path that moves.
+    ///
+    /// Derived from the application home rather than asked for directly: the home is the Documents
+    /// directory inside the container, so its parent is the container itself, and taking the
+    /// parent covers a database the application put somewhere else inside the sandbox as well.
+    ///
+    /// #### Returns
+    ///
+    /// the container path with a trailing separator, or null if it cannot be determined
+    private static String applicationContainerPath() {
+        String home = FileSystemStorage.getInstance().getAppHomePath();
+        if (home == null || home.length() == 0) {
+            return null;
+        }
+        String nativeHome = FileSystemStorage.getInstance().toNativePath(home);
+        if (nativeHome == null || nativeHome.length() == 0) {
+            return null;
+        }
+        // Resolved like the paths it is matched against. The home directory arrives as
+        // /var/mobile/... and a resolved database path reads /private/var/mobile/..., so an
+        // unresolved prefix never matched and the alias kept the container's UUID in it -- the
+        // one thing being container relative exists to keep out, since that UUID changes when the
+        // application is restored onto another device and the managed key would be lost with it.
+        nativeHome = resolveLinks(nativeHome);
+        int end = nativeHome.length();
+        while (end > 0 && nativeHome.charAt(end - 1) == '/') {
+            end--;
+        }
+        int parent = nativeHome.lastIndexOf('/', end - 1);
+        if (parent < 0) {
+            return null;
+        }
+        return nativeHome.substring(0, parent + 1);
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        // The encryption-capable SQLite build is only linked in for applications that reference
+        // DatabaseConfig, so ask the engine rather than assuming.
+        return nativeInstance.sqlDbIsCipherAvailable();
+    }
+
+    @Override
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        // The managed key is a generic-password keychain item, so what backs it is the device's
+        // key hierarchy, which every iOS device since the A7 roots in the Secure Enclave. That is
+        // a real hardware guarantee on a device and none at all in the Simulator, where the
+        // keychain is an ordinary file on the host. Applications are told they may use this to
+        // refuse to store sensitive data, so answering true there would be a false assurance --
+        // and the security notes already say the simulator is the weaker case.
+        return !nativeInstance.isSimulator();
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
     }
 
     @Override
     public String getDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return databaseName;
+        }
         String s = nativeInstance.getDocumentsDir();
         if(!s.endsWith("/")) {
             s += "/";
         }
         return s + databaseName;
     }
-    
+
     @Override
     public void deleteDB(String databaseName) throws IOException{
-        nativeInstance.sqlDbDelete(databaseName);
+        String path = resolveDatabasePath(databaseName);
+        // The companions first, so removing the database itself is the last destructive step: a
+        // failure before it leaves a database the caller can really delete again, rather than an
+        // error reported over a database that is already gone. See databaseSidecarPaths.
+        // Removing one that is not there is a no-op in the native binding, so the ones this
+        // database never had cost a stat apiece.
+        String[] sidecars = databaseSidecarPaths(path);
+        for (int iter = 0; iter < sidecars.length; iter++) {
+            nativeInstance.sqlDbDelete(sidecars[iter]);
+        }
+        nativeInstance.sqlDbDelete(path);
     }
-    
+
     @Override
     public boolean existsDB(String databaseName){
-        return nativeInstance.sqlDbExists(databaseName);
+        return nativeInstance.sqlDbExists(resolveDatabasePath(databaseName));
     }
 
     /**

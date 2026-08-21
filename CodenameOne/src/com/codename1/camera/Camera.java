@@ -56,10 +56,18 @@ import java.io.IOException;
 ///                                   new CameraSessionOptions());
 ///     CameraView v = s.createView();
 ///     // add v to a Form...
-///     s.setFrameListener(frame ->
-///         BarcodeScanner.scan(frame.getJpegBytes()).ready(codes -> { ... }));
+///     s.setFrameListener(frame -> analyze(frame.getJpegBytes()));
 /// }
 /// ```
+///
+/// **For on-device analysis, do not write the frame listener yourself.**
+/// `com.codename1.ai.vision.VisionCameraView` is a component that owns the
+/// session, streams frames into an analyzer with keep-only-the-newest
+/// backpressure, and delivers results on the EDT; and
+/// `com.codename1.ai.vision.CodeScanner` is an entire barcode scanner screen
+/// in one call. Use this class directly when the application drives the
+/// camera itself -- a custom capture UI, video recording, or torch and zoom
+/// control.
 public final class Camera {
     private static final Object ACTIVE_LOCK = new Object();
     private static CameraSession active;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import platform
+import re
 import shutil
 import subprocess
 import time
@@ -47,6 +48,37 @@ def tail_text(path: Path, max_lines: int = 60) -> str:
         return ""
     text = path.read_text("utf-8", errors="replace").splitlines()
     return "\n".join(text[-max_lines:])
+
+
+# What a repository problem looks like in a Maven log, and nothing else. Each of
+# these says a file could not be FETCHED; none of them can be produced by code
+# that fails to compile or a test that fails, which is the distinction the retry
+# above rests on. Deliberately narrow: "Could not resolve dependencies" is left
+# out because a dependency this repo declares and never published prints it too,
+# and waiting seventeen minutes to be told that again helps nobody. The 403 that
+# prompted this is caught by "Could not transfer artifact", which Maven prints
+# alongside every one of the shapes it wraps -- an unresolveable build extension
+# and a non-resolvable import POM included.
+_TRANSFER_FAILURE = re.compile(
+    r"Could not transfer artifact"
+    r"|transfer failed for"
+    r"|status code: (?:40[38]|409|425|429|5\d\d)"
+    r"|Too Many Requests"
+    r"|Connection reset"
+    r"|Connection timed out"
+    r"|SocketTimeoutException"
+    r"|UnknownHostException"
+    r"|Premature end of Content-Length"
+    r"|Remote host (?:closed connection|terminated the handshake)",
+    re.IGNORECASE,
+)
+
+
+def is_repository_transfer_failure(log_path: Path) -> bool:
+    if not log_path.exists():
+        # No log at all is not evidence of Central misbehaving.
+        return False
+    return _TRANSFER_FAILURE.search(log_path.read_text("utf-8", errors="replace")) is not None
 
 
 def find_recent_file(name: str, started_at: float):
@@ -137,25 +169,44 @@ def install_runtime():
     # and Maven treats those as PERMANENT resolution failures (observed: junit-bom
     # 403 killed the whole smoke 53s in, before any project code built, and later
     # a 429 killed it three times in a row while reading the root POM). Retry the
-    # install with a growing pause -- a genuine build failure fails identically on
-    # every attempt.
+    # install with a growing pause.
     #
     # The backoff has to grow. A flat 30s wait is inside the window Central is
     # still rate limiting in, so all three attempts fail for the same reason and
-    # the retry buys nothing; a 429 in particular wants minutes, not seconds.
-    backoffs = [30, 120, 300]
+    # the retry buys nothing; a 429 in particular wants minutes, not seconds. The
+    # 30/120/300 budget was still short of a real outage -- Central answered 403
+    # for longer than the seven and a half minutes it covered -- so there is a
+    # ten minute tail on the end.
+    #
+    # That tail is only affordable because a failure is now read before it is
+    # waited on. Retrying anything at all meant a compile error also cost eight
+    # minutes and then reported "in case Maven Central was throwing transient
+    # 403/429/5xx", which names the one thing that was NOT wrong; the real error
+    # sat in an artifact nobody downloads for a green-looking category of
+    # failure. A build that fails for its own reasons now says so on the first
+    # attempt, and prints the end of the log where the step output shows it.
+    backoffs = [30, 120, 300, 600]
     attempts = len(backoffs) + 1
+    log_path = ARTIFACTS_DIR / "build-runtime.log"
     for attempt in range(1, attempts + 1):
         try:
             run(cmd, log_name="build-runtime.log", timeout=1800)
             return
         except RuntimeError:
+            if not is_repository_transfer_failure(log_path):
+                log("runtime install failed, and the log holds no sign of a repository "
+                    "transfer problem, so this is a real build failure -- not retrying. "
+                    "The end of build-runtime.log:")
+                print(tail_text(log_path), flush=True)
+                raise
             if attempt == attempts:
+                log(f"runtime install failed {attempts} times, every one of them on a "
+                    "repository transfer. Maven Central was unreachable from this runner "
+                    "for longer than the retry budget.")
                 raise
             delay = backoffs[attempt - 1]
-            log(f"runtime install failed (attempt {attempt}/{attempts}); "
-                f"retrying in {delay}s in case Maven Central was throwing "
-                "transient 403/429/5xx")
+            log(f"runtime install failed (attempt {attempt}/{attempts}) on a repository "
+                f"transfer; retrying in {delay}s")
             time.sleep(delay)
 
 

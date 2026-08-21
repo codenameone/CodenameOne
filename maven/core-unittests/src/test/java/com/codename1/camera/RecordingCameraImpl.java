@@ -49,6 +49,8 @@ class RecordingCameraImpl extends CameraImpl {
     float lastFocusX = Float.NaN;
     float lastFocusY = Float.NaN;
     FrameListener lastFrameListener;
+    Boolean previewMirrored;
+    ScaleType previewScaleType;
     boolean frameListenerCleared;
     String videoPath;
     boolean videoAudio;
@@ -100,6 +102,16 @@ class RecordingCameraImpl extends CameraImpl {
         if (listener == null) {
             frameListenerCleared = true;
         }
+    }
+
+    @Override
+    public void setPreviewMirrored(boolean mirrored) {
+        this.previewMirrored = Boolean.valueOf(mirrored);
+    }
+
+    @Override
+    public void setPreviewScaleType(ScaleType scaleType) {
+        this.previewScaleType = scaleType;
     }
 
     @Override

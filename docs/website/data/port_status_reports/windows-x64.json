@@ -1,48 +1,48 @@
 {
-  "commit": "159c7e3cc8a0eb161ba96891b6912f1d06cd03c4",
-  "generated_at": "2026-08-07T14:42:03Z",
+  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
+  "generated_at": "2026-08-19T10:48:15Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 265639000
+        "duration_ns": 296472000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 25064000
+        "duration_ns": 25444000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 84056000
+        "duration_ns": 72049000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 79403000
+        "duration_ns": 87100000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 61068000
+        "duration_ns": 63857000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 176769000
+        "duration_ns": 175366000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 4944242000
+        "duration_ns": 4228935000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 139518000
+        "duration_ns": 138532000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 242933000
+        "duration_ns": 226805000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 71447000
+        "duration_ns": 45716000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,11 +52,11 @@
     "suite_checksum": 0
   },
   "port": "windows-x64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31186472517",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868555",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 168,
+    "pass": 176,
     "fail": 0,
     "skip": 3,
     "not-run": 0
@@ -261,6 +261,34 @@
       "feature": "theme-palette-css",
       "status": "pass"
     },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
     "DesktopModeScreenshotTest": {
       "feature": "desktop-mode",
       "status": "pass"
@@ -366,11 +394,11 @@
       "status": "pass"
     },
     "GoogleWebMapScreenshotTest": {
-      "status": "skip",
       "feature": "native-web-maps",
       "reasons": [
         "no-api-key"
-      ]
+      ],
+      "status": "skip"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -402,6 +430,10 @@
     },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "IntentsApiTest": {
+      "feature": "intents",
       "status": "pass"
     },
     "Java17Tests": {
@@ -641,11 +673,11 @@
       "status": "pass"
     },
     "SurfacesRemoteViewsScreenshotTest": {
-      "status": "skip",
       "feature": "surfaces",
       "reasons": [
         "android-only-remoteviews-lowering"
-      ]
+      ],
+      "status": "skip"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",

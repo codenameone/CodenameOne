@@ -67,12 +67,12 @@ import com.codename1.push.PushCallback;
 import com.codename1.teavm.ext.localforage.LocalForage;
 import com.codename1.teavm.ext.localforage.LocalForage.ItemSavedListener;
 import com.codename1.teavm.ext.usermedia.PhotoCapture;
-import com.codename1.teavm.ext.websql.WebSQL;
 import com.codename1.teavm.geom.JSAffineTransform;
 import com.codename1.teavm.geom.JSMatrix4;
 import com.codename1.teavm.io.BlobUtil;
 import com.codename1.teavm.jso.io.Blob;
 import com.codename1.teavm.jso.io.FileList;
+import com.codename1.html5.js.browser.MediaQueryList;
 import com.codename1.teavm.jso.util.EventUtil;
 import com.codename1.teavm.jso.util.JSDateFormat;
 import com.codename1.teavm.jso.util.JSNumberFormat;
@@ -85,6 +85,7 @@ import com.codename1.ui.CN;
 import static com.codename1.ui.CN.invokeAndBlock;
 import com.codename1.ui.Component;
 import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.AnimationManager;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
@@ -103,6 +104,7 @@ import com.codename1.ui.TextInputConfig;
 import com.codename1.ui.TextInputState;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
+import com.codename1.ui.Command;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
@@ -110,14 +112,6 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.accessibility.AccessibilityAction;
-import com.codename1.ui.accessibility.AccessibilityCheckedState;
-import com.codename1.ui.accessibility.AccessibilityCollectionItemInfo;
-import com.codename1.ui.accessibility.AccessibilityLiveRegion;
-import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
-import com.codename1.ui.accessibility.AccessibilityRange;
-import com.codename1.ui.accessibility.AccessibilityRole;
-import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -174,6 +168,7 @@ import com.codename1.html5.js.dom.HTMLButtonElement;
 import com.codename1.html5.js.dom.HTMLCanvasElement;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.html5.js.dom.PopStateEvent;
 import com.codename1.html5.js.dom.HTMLImageElement;
 import com.codename1.html5.js.dom.HTMLInputElement;
 import com.codename1.html5.js.dom.HTMLTextAreaElement;
@@ -610,6 +605,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     HTMLElement peersContainer;
     private HTMLElement accessibilityContainer;
+
+    /**
+     * Projects the component tree into the DOM overlay above the canvas. Created lazily on the
+     * first semantic invalidation and reused from then on, since it retains the element-per-node
+     * state the incremental update depends on.
+     */
+    private JavaScriptSemanticOverlay semanticOverlay;
+
+    /**
+     * Holds the DOM elements carrying the visible text that was promoted off the canvas.
+     */
+    private HTMLElement textLayerContainer;
+
+    /**
+     * Promotes text runs off the canvas into real DOM text. Non-null once {@code __init()} has
+     * built its container.
+     */
+    JavaScriptTextLayer textLayer;
+
+    /**
+     * False when ?cn1TextLayer=0 asked for canvas-only text.
+     */
+    private boolean textLayerEnabled = true;
+
+    /**
+     * True once the application has read the screen back as pixels, which permanently returns
+     * text to the canvas so those reads can see it.
+     */
+    private boolean textLayerDisabledByReadback;
+
+    /**
+     * False when ?cn1Semantics=0 asked for no ARIA projection.
+     */
+    private boolean semanticOverlayEnabled = true;
     
     
     /**
@@ -1005,31 +1034,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             inputEl.setAttribute("class", "cn1-edit-string");
             inputEl.getStyle().setProperty("outline", "none");  // for chrome
             
-            String inputType = "text";
-            if (ta.isSingleLineTextArea()) {
-                
-                switch (ta.getConstraint()) {
-                    case TextArea.PASSWORD:
-                        inputType = "password";
-                        break;
-                    case TextArea.EMAILADDR:
-                        inputType = "email";
-                        break;
-                    case TextArea.NUMERIC:
-                        inputType = "number";
-                        break;
-                    case TextArea.PHONENUMBER:
-                        inputType = "tel";
-                        break;
-                    case TextArea.URL:
-                        inputType = "url";
-                        break;
-                    
-                }
-                inputEl.setAttribute("type", inputType);
-                
-                
-            }
+            applyInputConstraints(inputEl, ta);
             
             
             
@@ -1281,7 +1286,110 @@ public class HTML5Implementation extends CodenameOneImplementation {
             NativeOverlay no = (NativeOverlay)overlay;
             no.updateIfMovedAndFocused();
         }
-        
+        if (textLayer != null && isDisplayGraphics(g)) {
+            if (!textLayer.isPainting()) {
+                updateTextLayerSuspension();
+            }
+            // Whether this paint can see the whole component decides both whether its runs mean
+            // the full sequence and whether a shorter sequence means the rest are stale. The
+            // display graphics reports its clip in absolute coordinates, the space component
+            // bounds are in; Graphics.getClipX() subtracts the translation and would not be.
+            textLayer.beginComponent(c, coversComponent(c), isEditingText(c),
+                    graphics.getClipWidth() <= 0 || graphics.getClipHeight() <= 0,
+                    graphics.getClipX(), graphics.getClipY(),
+                    graphics.getClipWidth(), graphics.getClipHeight());
+        }
+    }
+
+    /**
+     * True while the form is running an animation the framework schedules -- a layout
+     * animation, a component morph, a transition between two states of the same form.
+     *
+     * @param f the form to look at, may be null
+     * @return true while an animation is in flight
+     */
+    private boolean isAnimationRunning(Form f) {
+        if (f == null) {
+            return false;
+        }
+        AnimationManager animations = f.getAnimationManager();
+        return animations != null && animations.isAnimating();
+    }
+
+    /**
+     * Decides whether text promotion is suspended, before any component of the frame paints.
+     *
+     * <p>The decision cannot wait until the frame is flushed. By then the components have
+     * already painted under the old setting -- their strings either promoted and left off the
+     * canvas, or rasterized onto it -- so flipping the flag afterwards leaves the frame either
+     * missing its text or showing it twice.</p>
+     */
+    private void updateTextLayerSuspension() {
+        Form currentForm = Display.getInstance().getCurrent();
+        boolean overlayBlocked = com.codename1.ui.Accessor.paintsOverChildren(currentForm);
+        // While an animation is running the layout moves every frame, and every frame would
+        // rewrite the style of every run through the bridge -- which slows the animation down
+        // enough to be seen. The canvas carries the text for the duration, and it comes back to
+        // the DOM the moment the form is still again.
+        boolean animating = isAnimationRunning(currentForm);
+        boolean shouldSuspend = Display.getInstance().isInTransition() || overlayBlocked
+                || animating;
+        if (textLayerDisabledByReadback) {
+            // A pixel read has already claimed the canvas as the source of truth.
+            return;
+        }
+        if (shouldSuspend == textLayer.isSuspended()) {
+            return;
+        }
+        textLayer.setSuspended(shouldSuspend);
+        // Only the dirty region is repainting, so whatever lies outside it still carries the
+        // previous representation -- and suspending hides the layer as a whole, so every run on
+        // the form goes with it, not only the ones the dirty region covers. Ask for a full
+        // repaint so the whole form agrees, whichever way the switch went. A transition needs no
+        // help: it painted its buffers offscreen, which always rasterizes text.
+        if (currentForm != null && (overlayBlocked || animating || !shouldSuspend)) {
+            currentForm.repaint();
+        }
+    }
+
+    @Override
+    public void afterComponentPaint(Component c, Graphics g) {
+        super.afterComponentPaint(c, g);
+        if (textLayer != null && isDisplayGraphics(g)) {
+            // The display graphics reports its clip in absolute coordinates, which is the space
+            // component bounds are in. Graphics.getClipX() subtracts the current translation, so
+            // it would be component-local and the comparison would almost never hold.
+            textLayer.endComponent(c);
+        }
+    }
+
+    /**
+     * True when a paint is aimed at the display rather than at an offscreen image.
+     *
+     * <p>These callbacks fire for every component paint, including the ones that render into a
+     * buffer -- {@code Component.toImage()}, {@code ComponentImage}, a paint lock, a drag image,
+     * a transition buffer. Those paint through a plain {@link HTML5Graphics}, so no run is
+     * promoted; opening and closing a text-layer frame around them would make the component
+     * look like it had stopped drawing any text and release the DOM runs it still has on
+     * screen. Creating a drag image would then blank the labels under it until the next
+     * repaint.</p>
+     */
+    /**
+     * True when the display clip contains the whole component.
+     */
+    private boolean coversComponent(Component c) {
+        if (c == null || graphics == null) {
+            return false;
+        }
+        int x = c.getAbsoluteX();
+        int y = c.getAbsoluteY();
+        return graphics.getClipX() <= x && graphics.getClipY() <= y
+                && graphics.getClipX() + graphics.getClipWidth() >= x + c.getWidth()
+                && graphics.getClipY() + graphics.getClipHeight() >= y + c.getHeight();
+    }
+
+    private boolean isDisplayGraphics(Graphics g) {
+        return graphics != null && com.codename1.ui.Accessor.nativeGraphics(g) == graphics;
     }
     
     
@@ -1312,8 +1420,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
     
+    /**
+     * The port maps every Codename One cursor onto its CSS equivalent, so applications that ask
+     * before setting one -- the documented way, via {@code Component.isSetCursorSupported()} --
+     * get the right answer. The hover path itself remains gated on
+     * {@code Form.isEnableCursors()}.
+     */
+    @Override
+    public boolean isSetCursorSupported() {
+        return true;
+    }
+
     private int currCursorType;
-    
+
     private void setCursor(int cursorType) {
         if (currCursorType != cursorType) {
             currCursorType = cursorType;
@@ -1530,6 +1649,51 @@ public class HTML5Implementation extends CodenameOneImplementation {
         accessibilityContainer.setAttribute("role", "application");
         accessibilityContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483646;");
         outputCanvas.getParentNode().insertBefore(accessibilityContainer, outputCanvas);
+        // The text layer sits above the canvas but below the semantic tree. It carries the
+        // visible text, so it is hidden from assistive technology -- the semantic tree is what
+        // announces content, and without aria-hidden every label would be read twice.
+        //
+        // It takes no pointer events, which means a drag across a label does not begin a native
+        // text selection. Review asked for that to change; it does not, and the reason is that
+        // the canvas owns hit testing here. Pointer routing decides between the canvas and the
+        // native peers behind it by probing canvas alpha, and every gesture the application
+        // reacts to -- a tap on a button, a drag that scrolls a list, a swipe that opens a side
+        // menu -- arrives as a pointer event on the canvas. A span that answered pointer events
+        // would swallow the gestures that land on text, which is most of the interactive surface
+        // of a Codename One form, and forwarding a synthesized copy to the canvas afterwards
+        // gives the application either a doubled gesture or none, depending on which event is
+        // cancelled to let the selection through.
+        //
+        // What the layer does deliver is real text in the document: find-in-page matches it,
+        // the browser reads it, assistive technology can select and copy through the semantic
+        // tree, and it rasterizes as text rather than as pixels. Pointer selection would need
+        // the port's input path to accept synthesized events and to tell a selection drag from
+        // an application drag before either has finished -- a change to input, not to this
+        // layer, and not one to make quietly at the end of a rendering change.
+        textLayerContainer = (HTMLElement)document.createElement("div");
+        textLayerContainer.setAttribute("id", "cn1-text-layer");
+        textLayerContainer.setAttribute("aria-hidden", "true");
+        textLayerContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
+        outputCanvas.getParentNode().insertBefore(textLayerContainer, outputCanvas);
+        // ?cn1TextLayer=0 / ?cn1Semantics=0 turn the two DOM layers off at runtime. Both are
+        // new behaviour layered onto a canvas renderer, so being able to take one out without
+        // rebuilding is what makes a rendering or timing regression bisectable.
+        textLayerEnabled = !"0".equals(getParameterByName("cn1TextLayer"));
+        semanticOverlayEnabled = !"0".equals(getParameterByName("cn1Semantics"));
+        if (textLayerEnabled) {
+            textLayer = new JavaScriptTextLayer(document, textLayerContainer);
+        }
+        if (textLayerEnabled) {
+            // Paint locking caches a component's pixels in an image and serves that image
+            // instead of painting, returning from Component.paintInternal() before the
+            // per-component hooks run. A locked component therefore stops reporting its text
+            // while its DOM runs stay on screen, so the cached image's rasterized text and the
+            // live DOM text are both visible. The two cannot be reconciled, and the lock is only
+            // an optimisation, so it is switched off -- but only when there are DOM runs for it
+            // to conflict with. With the text layer off the canvas-only path keeps the caching
+            // that Tabs, among others, relies on during a swipe.
+            Display.getInstance().setProperty("paintLockEnabled", "false");
+        }
         outputCanvas.setAttribute("role", "presentation");
         outputCanvas.setAttribute("aria-hidden", "true");
         
@@ -1587,23 +1751,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         };
         
+        // The one popstate handler. It used to run the back command directly, with no notion of
+        // which direction the traversal went or of the entries the port itself spends, so it is
+        // routed through the history logic instead of having a second listener beside it --
+        // which would make a single Back run two back commands.
         final EventListener popstateListener = new EventListener() {
             @Override
             public void handleEvent(Event evt) {
-                JavaScriptBrowserLifecycleCoordinator.handlePopState(new JavaScriptBrowserLifecycleCoordinator.BackNavigationHooks() {
-                    @Override
-                    public void callSerially(Runnable runnable) {
-                        HTML5Implementation.this.callSerially(runnable);
-                    }
-
-                    @Override
-                    public void runBackCommand() {
-                        Form f = getCurrentForm();
-                        if (f != null && f.getBackCommand() != null) {
-                            f.getBackCommand().actionPerformed(new ActionEvent(f, ActionEvent.Type.Other));
-                        }
-                    }
-                });
+                handlePopStateEvent(evt);
             }
             
         };
@@ -3341,6 +3496,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (frame.isEmpty()) {
             return false;
         }
+        if (textLayer != null) {
+            // A form transition paints two pre-rendered offscreen buffers instead of painting
+            // components, so no run is refreshed while it runs. Those buffers carry their own
+            // rasterized text, so the layer must step aside for the duration or the outgoing
+            // form's text would float above the animation.
+            // A buffered transition -- a fade, where areMutableImagesFast() is true -- paints
+            // only its prebuilt images and never puts a component through the display graphics,
+            // so the frame-start hook never runs and would leave the outgoing form's DOM text
+            // fixed above the animation for its whole duration. Catch it here, which does run
+            // every display frame.
+            //
+            // Suspending only, never resuming: the components of this frame have already
+            // painted, so lifting the suspension now would show runs that this frame's canvas
+            // also rasterized. Resuming is left to the frame-start hook, which runs before any
+            // component paints.
+            if (!textLayer.isSuspended() && Display.getInstance().isInTransition()) {
+                textLayer.setSuspended(true);
+            }
+            // Releases runs whose component has been removed, hidden, or whose form is no
+            // longer displayed; none of those ever paints again, so nothing else would clean
+            // them up.
+            Form displayed = Display.getInstance().getCurrent();
+            textLayer.syncToForm(displayed);
+            if (textLayer.consumeReattachFlag() && displayed != null) {
+                // A run came back after being detached, so it holds a fresh stacking index
+                // while everything that did not repaint still holds an older one. One full
+                // repaint puts the whole form on the same footing.
+                displayed.repaint();
+            }
+        }
         // Record the whole frame into the display surface's command buffer (the
         // display graphics draws onto DISPLAY_SURFACE_ID) and ship it in one
         // flush. The host replays it onto the output canvas -- the worker never
@@ -3402,7 +3587,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         ClipRect.resetClip(context, graphics.getClipState());
         context.restore();
         graphics.flush();
+        // The batch is on its way, so the sources it blits can be collected again.
+        blitSourcesInFlight.clear();
         return true;
+    }
+
+    /**
+     * Images whose surface a recorded blit refers to, held until the batch carrying it has been
+     * shipped.
+     *
+     * <p>A blit records a surface id, not the image. An image drawn into and blitted within one
+     * paint -- which is what a component rendering through a fresh mutable image every frame
+     * does -- is unreachable the moment that paint returns, so its finalizer can tell the host
+     * to release the surface while the batch that blits it is still waiting to be replayed. The
+     * result is a blank where the image should be. Holding the image until the batch is on its
+     * way closes that window.</p>
+     */
+    private final List<Object> blitSourcesInFlight = new ArrayList<Object>();
+
+    /**
+     * Keeps a blit's source image alive until the batch referring to it has been shipped.
+     *
+     * @param source the image whose surface a recorded blit refers to
+     */
+    void retainBlitSource(Object source) {
+        if (source != null) {
+            blitSourcesInFlight.add(source);
+        }
     }
 
     private void scheduleAnimationFrame() {
@@ -3697,6 +3908,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void updateCanvasSize() {
+        refreshDevicePixelRatio();
         JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
                 doc().getBody().getClientWidth(),
                 window.getInnerHeight(),
@@ -3716,6 +3928,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             outputCanvas.getStyle().setProperty("height", dimensions.getStyleHeight());
             canvas.getStyle().setProperty("width", dimensions.getStyleWidth());
             canvas.getStyle().setProperty("height", dimensions.getStyleHeight());
+        } else {
+            // Back to a 1x display, where the backing store is the CSS size and no override is
+            // wanted. Leaving the HiDPI width/height behind would stretch the new store over the
+            // old dimensions and put the canvas and the overlays out of alignment.
+            outputCanvas.getStyle().removeProperty("width");
+            outputCanvas.getStyle().removeProperty("height");
+            canvas.getStyle().removeProperty("width");
+            canvas.getStyle().removeProperty("height");
         }
     }
 
@@ -3731,188 +3951,86 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void accessibilityTreeChanged(int changeType) {
-        if (accessibilityContainer == null) return;
-        AccessibilityTreeSnapshot tree = getAccessibilityTreeSnapshot();
-        accessibilityContainer.setInnerHTML("");
-        final Map<Long, HTMLElement> elements = new HashMap<Long, HTMLElement>();
-        for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
-            final long nodeId = node.getId();
-            final HTMLElement element = (HTMLElement)document.createElement("div");
-            elements.put(Long.valueOf(nodeId), element);
-            element.setAttribute("data-cn1-accessibility-id", String.valueOf(nodeId));
-            applyAria(element, node);
-            if (node.getParentId() >= 0 && elements.get(Long.valueOf(node.getParentId())) != null) {
-                elements.get(Long.valueOf(node.getParentId())).appendChild(element);
-            } else {
-                accessibilityContainer.appendChild(element);
-            }
-            final AccessibilityAction activate = node.getAction(AccessibilityAction.ACTIVATE);
-            if (activate != null && activate.isEnabled()) {
-                element.addEventListener("click", new EventListener() {
-                    public void handleEvent(Event event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        performAccessibilityAction(nodeId, AccessibilityAction.ACTIVATE, null);
-                    }
-                });
-            }
-            final AccessibilityAction focus = node.getAction(AccessibilityAction.FOCUS);
-            if (focus != null && focus.isEnabled()) {
-                element.addEventListener("focus", new EventListener() {
-                    public void handleEvent(Event event) {
-                        performAccessibilityAction(nodeId, AccessibilityAction.FOCUS, null);
-                    }
-                });
-            }
-            element.addEventListener("keydown", new EventListener() {
-                public void handleEvent(Event event) {
-                    JSOImplementations.KeyEvent key = (JSOImplementations.KeyEvent)event;
-                    int code = key.getKeyCode();
-                    if ((code == 13 || code == 32) && activate != null) {
-                        event.preventDefault();
-                        performAccessibilityAction(nodeId, AccessibilityAction.ACTIVATE, null);
-                    } else if (code == 38 || code == 39) {
-                        performAccessibilityAction(nodeId, AccessibilityAction.INCREMENT, null);
-                    } else if (code == 37 || code == 40) {
-                        performAccessibilityAction(nodeId, AccessibilityAction.DECREMENT, null);
-                    }
-                }
-            });
-            addWebCustomActions(element, node);
+        if (accessibilityContainer == null || !semanticOverlayEnabled) {
+            return;
         }
+        if (semanticOverlay == null) {
+            semanticOverlay = new JavaScriptSemanticOverlay(document, accessibilityContainer,
+                    new JavaScriptSemanticOverlay.ActionDispatcher() {
+                        @Override
+                        public void performAction(long nodeId, String actionId, Object argument) {
+                            performAccessibilityAction(nodeId, actionId, argument);
+                        }
+                    });
+        }
+        // Always on: the reasoning is recorded in the overlay, but in short a screen reader has
+        // no other reliable route to an ordinary label, since the visible text layer is
+        // aria-hidden and a role-less div's aria-label is not dependably announced.
+        semanticOverlay.setTextContentEnabled(true);
+        if (deferSemanticsWhileAnimating()) {
+            return;
+        }
+        semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
     }
+
+    /**
+     * Holds the semantic tree still while an animation runs.
+     *
+     * <p>Every frame of an animation moves components, and every move invalidates the tree --
+     * so the overlay would diff and rewrite geometry across the bridge on every frame of it.
+     * Assistive technology has nothing to gain from following an animation frame by frame, and
+     * the cost is paid by the animation itself, which runs visibly slower for it. The tree is
+     * brought up to date once, when the form is still again.</p>
+     *
+     * @return true when the update was put off
+     */
+    private boolean deferSemanticsWhileAnimating() {
+        if (!isAnimationRunning(Display.getInstance().getCurrent())) {
+            return false;
+        }
+        if (!semanticRefreshPending) {
+            semanticRefreshPending = true;
+            awaitStillForSemantics(System.currentTimeMillis() + SEMANTIC_STILLNESS_TIMEOUT_MILLIS);
+        }
+        return true;
+    }
+
+    /**
+     * How long the tree is held still for an animation before it is brought up to date anyway.
+     * On the clock rather than on turns of the event loop: an idle loop turns many times a
+     * frame, so a count of turns runs out in a fraction of an animation and starts again on the
+     * next invalidation -- rebuilding through the animation this is meant to sit out. On the
+     * clock, an animation that never ends costs one refresh per interval.
+     */
+    private static final long SEMANTIC_STILLNESS_TIMEOUT_MILLIS = 2000;
+
+    private void awaitStillForSemantics(final long deadline) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (System.currentTimeMillis() < deadline
+                        && isAnimationRunning(Display.getInstance().getCurrent())) {
+                    awaitStillForSemantics(deadline);
+                    return;
+                }
+                semanticRefreshPending = false;
+                if (semanticOverlay != null && accessibilityContainer != null) {
+                    semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
+                }
+            }
+        });
+    }
+
+    /**
+     * True while an update is waiting for the form to stop animating.
+     */
+    private boolean semanticRefreshPending;
 
     @Override
     public boolean isAccessibilityTreeSupported() {
         return true;
     }
 
-    private void applyAria(HTMLElement element, AccessibilityNodeSnapshot node) {
-        String role = ariaRole(node.getRole());
-        if (role != null) element.setAttribute("role", role);
-        if (node.getLabel() != null) element.setAttribute("aria-label", node.getLabel());
-        String description = node.getDescription();
-        if (node.getHint() != null) description = description == null ? node.getHint() : description + ". " + node.getHint();
-        if (node.getValidationError() != null) description = description == null ? node.getValidationError() : description + ". " + node.getValidationError();
-        if (description != null) element.setAttribute("aria-description", description);
-        if (node.getIdentifier() != null) element.setAttribute("id", node.getIdentifier());
-        if (node.getRoleDescription() != null) element.setAttribute("aria-roledescription", node.getRoleDescription());
-        if (node.getValue() != null) element.setAttribute("aria-valuetext", node.getValue());
-        if (node.getSelected() != null) element.setAttribute("aria-selected", String.valueOf(node.getSelected()));
-        if (node.getExpanded() != null) element.setAttribute("aria-expanded", String.valueOf(node.getExpanded()));
-        if (node.getEnabled() != null && !node.getEnabled().booleanValue()) element.setAttribute("aria-disabled", "true");
-        if (node.getInvalid() != null) element.setAttribute("aria-invalid", String.valueOf(node.getInvalid()));
-        if (node.getBusy() != null) element.setAttribute("aria-busy", String.valueOf(node.getBusy()));
-        if (node.getReadOnly() != null) element.setAttribute("aria-readonly", String.valueOf(node.getReadOnly()));
-        if (node.getRequired() != null) element.setAttribute("aria-required", String.valueOf(node.getRequired()));
-        if (node.getMultiline() != null) element.setAttribute("aria-multiline", String.valueOf(node.getMultiline()));
-        if (node.getCurrent() != null && node.getCurrent().booleanValue()) element.setAttribute("aria-current", "true");
-        if (node.isModal()) element.setAttribute("aria-modal", "true");
-        if (node.getHeadingLevel() > 0) element.setAttribute("aria-level", String.valueOf(node.getHeadingLevel()));
-        if (node.getChecked() != AccessibilityCheckedState.UNSPECIFIED) {
-            element.setAttribute("aria-checked", node.getChecked() == AccessibilityCheckedState.MIXED
-                    ? "mixed" : String.valueOf(node.getChecked() == AccessibilityCheckedState.CHECKED));
-        }
-        if (node.getPressed() != null) element.setAttribute("aria-pressed", String.valueOf(node.getPressed()));
-        if (node.getLiveRegion() != AccessibilityLiveRegion.OFF) {
-            element.setAttribute("aria-live", node.getLiveRegion() == AccessibilityLiveRegion.ASSERTIVE ? "assertive" : "polite");
-            element.setAttribute("aria-atomic", "true");
-        }
-        AccessibilityRange range = node.getRange();
-        if (range != null) {
-            element.setAttribute("aria-valuemin", String.valueOf(range.getMinimum()));
-            element.setAttribute("aria-valuemax", String.valueOf(range.getMaximum()));
-            element.setAttribute("aria-valuenow", String.valueOf(range.getCurrent()));
-            if (range.getText() != null) element.setAttribute("aria-valuetext", range.getText());
-        }
-        AccessibilityCollectionItemInfo item = node.getCollectionItemInfo();
-        if (item != null) {
-            if (item.getPositionInSet() > 0) element.setAttribute("aria-posinset", String.valueOf(item.getPositionInSet()));
-            if (item.getSetSize() != 0) element.setAttribute("aria-setsize", String.valueOf(item.getSetSize()));
-            if (item.getLevel() > 0) element.setAttribute("aria-level", String.valueOf(item.getLevel()));
-            if (item.getRowIndex() >= 0) element.setAttribute("aria-rowindex", String.valueOf(item.getRowIndex() + 1));
-            if (item.getColumnIndex() >= 0) element.setAttribute("aria-colindex", String.valueOf(item.getColumnIndex() + 1));
-            if (item.getRowSpan() > 1) element.setAttribute("aria-rowspan", String.valueOf(item.getRowSpan()));
-            if (item.getColumnSpan() > 1) element.setAttribute("aria-colspan", String.valueOf(item.getColumnSpan()));
-        }
-        Rectangle bounds = node.getBounds();
-        double ratio = getDevicePixelRatio();
-        element.getStyle().setCssText("position:absolute;opacity:0.001;pointer-events:none;overflow:hidden;"
-                + "left:" + bounds.getX() / ratio + "px;top:" + bounds.getY() / ratio + "px;"
-                + "width:" + Math.max(1, bounds.getWidth()) / ratio + "px;height:"
-                + Math.max(1, bounds.getHeight()) / ratio + "px;");
-        if (node.isFocusable()) element.setTabIndex(0);
-        else element.setTabIndex(-1);
-        if (node.getRole() == AccessibilityRole.STATIC_TEXT || node.getRole() == AccessibilityRole.HEADING) {
-            element.setTextContent(node.getLabel() == null ? "" : node.getLabel());
-        }
-    }
-
-    private void addWebCustomActions(HTMLElement parent, AccessibilityNodeSnapshot node) {
-        for (final AccessibilityAction action : node.getActions()) {
-            if (!action.isEnabled() || isStandardWebAction(action.getId())) continue;
-            final long nodeId = node.getId();
-            HTMLElement button = (HTMLElement)document.createElement("button");
-            button.setAttribute("type", "button");
-            button.setAttribute("aria-label", action.getLabel() == null ? action.getId() : action.getLabel());
-            button.setTextContent(action.getLabel() == null ? action.getId() : action.getLabel());
-            button.getStyle().setCssText("position:absolute;opacity:0.001;pointer-events:none;width:1px;height:1px;");
-            button.addEventListener("click", new EventListener() {
-                public void handleEvent(Event event) {
-                    event.preventDefault();
-                    performAccessibilityAction(nodeId, action.getId(), null);
-                }
-            });
-            parent.appendChild(button);
-        }
-    }
-
-    private boolean isStandardWebAction(String id) {
-        return AccessibilityAction.ACTIVATE.equals(id) || AccessibilityAction.FOCUS.equals(id)
-                || AccessibilityAction.INCREMENT.equals(id) || AccessibilityAction.DECREMENT.equals(id)
-                || AccessibilityAction.SET_TEXT.equals(id) || AccessibilityAction.SCROLL_FORWARD.equals(id)
-                || AccessibilityAction.SCROLL_BACKWARD.equals(id);
-    }
-
-    private String ariaRole(AccessibilityRole role) {
-        switch (role) {
-            case BUTTON:
-            case TOGGLE_BUTTON: return "button";
-            case CHECKBOX: return "checkbox";
-            case RADIO_BUTTON: return "radio";
-            case SWITCH: return "switch";
-            case HEADING: return "heading";
-            case LINK: return "link";
-            case IMAGE: return "img";
-            case TEXT_FIELD: return "textbox";
-            case SEARCH_FIELD: return "searchbox";
-            case SLIDER: return "slider";
-            case PROGRESS_BAR: return "progressbar";
-            case LIST: return "list";
-            case LIST_ITEM: return "listitem";
-            case GRID: return "grid";
-            case ROW: return "row";
-            case CELL: return "gridcell";
-            case COLUMN_HEADER: return "columnheader";
-            case ROW_HEADER: return "rowheader";
-            case TAB_LIST: return "tablist";
-            case TAB: return "tab";
-            case TAB_PANEL: return "tabpanel";
-            case DIALOG: return "dialog";
-            case ALERT: return "alert";
-            case MENU: return "menu";
-            case MENU_ITEM: return "menuitem";
-            case TOOLBAR: return "toolbar";
-            case SCROLL_BAR: return "scrollbar";
-            case SPIN_BUTTON: return "spinbutton";
-            case COMBO_BOX: return "combobox";
-            case TREE: return "tree";
-            case TREE_ITEM: return "treeitem";
-            case SEPARATOR: return "separator";
-            case GENERIC: return "group";
-            default: return null;
-        }
-    }
     
     public static void setMainClass(Object main) {
         JavaScriptBootstrapCoordinator.bindMainClass(main,
@@ -4425,23 +4543,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static native boolean isIPad();
     
     
-    // Codename One has always preferred to work in CSS pixels (logical
-    // "real" pixels) end-to-end on the JS port -- we don't auto-scale to
-    // device pixels. Defaulting ``overridePixelRatio`` to 1 keeps:
-    //   * the canvas backing dimensions equal to CSS dimensions (no
-    //     HiDPI 2x backing surface),
-    //   * pointer-event coordinates flowing through unmultiplied (so a
-    //     click at CSS (574, 455) is delivered to Form.pointerPressed
-    //     as (574, 455), not (1148, 910) on a retina display),
-    //   * scaleCoord / unscaleCoord becoming no-ops.
-    // Anyone who specifically wants HiDPI rendering can opt in via the
-    // ``?pixelRatio=2`` URL parameter.
+    // Codename One addresses DEVICE pixels. The iOS port detects the retina factor and
+    // multiplies/divides the values it hands the native primitives, so the framework
+    // draws at the display's real resolution; this port works the same way, with
+    // scaleCoord/unscaleCoord converting at the DOM boundary (peers, overlays, pointer
+    // coordinates) and nowhere else.
+    //
+    // This used to default to 1, which made the canvas backing store equal to the CSS
+    // size -- so on any HiDPI display the browser upscaled a 1x bitmap, softening
+    // everything and text most visibly. ``?pixelRatio=N`` still pins a specific factor
+    // for the screenshot harness and the skin designer.
     @JSBody(params={}, script="if (window.overridePixelRatio === undefined) {"
             + "    var ratioStr = getParameterByName('pixelRatio');"
             + "    if (ratioStr != '') {"
             + "        window.overridePixelRatio = parseFloat(ratioStr);"
-            + "    } else {"
-            + "        window.overridePixelRatio = 1;"
             + "    }"
             + "    if (window.cn1ScaleCoord === undefined){ window.cn1ScaleCoord = function(x) { return x===-1?-1:x/(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"
             + "    if (window.cn1UnscaleCoord === undefined){ window.cn1UnscaleCoord = function(x) { return x===-1?-1:x*(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"
@@ -4453,6 +4568,48 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={"name"}, script="return getParameterByName(name);")
     static native String getParameterByName(String name);
     
+    /**
+     * Re-reads the display's scale factor from the main thread.
+     *
+     * <p>The cached value is taken once at start-up, but the ratio changes when the page is
+     * zoomed or the window moves between displays. Left stale, the canvas backing store no
+     * longer matches the display and the browser rescales it -- the same softening this port
+     * used to have by rendering at 1x. Read on resize only, which is when it can change and is
+     * rare enough for a round trip.</p>
+     */
+    private void refreshDevicePixelRatio() {
+        try {
+            // ?pixelRatio=N pins the factor deliberately -- the screenshot harness and the skin
+            // designer depend on it -- so the physical ratio must not overwrite it.
+            String override = getParameterByName("pixelRatio");
+            if (override != null && override.length() > 0) {
+                return;
+            }
+            double ratio = window.getDevicePixelRatio();
+            if (ratio > 0 && ratio != devicePixelRatio) {
+                devicePixelRatio = ratio;
+                // Density, the styles resolved from it and the font sizes derived from those are
+                // all fixed at the ratio in force when they were resolved. Moving between
+                // displays would otherwise keep a 36 device-pixel font at 36 CSS pixels, so text
+                // and controls would roughly double in size.
+                dDensity = -1;
+                // Derived from the density, and cached on first use, so it has to go with it --
+                // otherwise convertToPixels() keeps answering in the old density's units while
+                // getDeviceDensity() reports the new one.
+                ppi = 0;
+                // Copied from when a font carries no height of its own, so it has to be current
+                // before any of those copies are taken.
+                if (defaultFont != null) {
+                    defaultFont.syncDensity();
+                }
+                themeGeneration++;
+                refreshThemeIfStale(getCurrentForm());
+            }
+        } catch (Throwable ignored) {
+            // Keep whatever was resolved at start-up.
+        }
+    }
+
     static double getDevicePixelRatio() {
         if (devicePixelRatio < 0) {
             devicePixelRatio = getDevicePixelRatio_();
@@ -5707,6 +5864,138 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private boolean nextEditPending, prevEditPending;
     
     
+    /**
+     * Configures the native editing element from a text component's constraint.
+     *
+     * <p>The constraint is a base type in the low bits with flags above it, so it has to be
+     * masked rather than compared whole -- {@code PASSWORD} is {@code 0x10000}, which means a
+     * field declared {@code PASSWORD | EMAILADDR} previously matched no case at all and was
+     * edited as clear text.</p>
+     *
+     * <p>Beyond the input type this carries the attributes a browser actually reads:
+     * {@code inputmode} selects the on-screen keyboard, {@code autocomplete} is what lets a
+     * password manager or address autofill offer a value, and {@code autocapitalize} /
+     * {@code spellcheck} reproduce what the equivalent constraint does on a native platform.
+     * An application can override the autocomplete token -- to distinguish a sign-in field
+     * from a change-password field, say -- with the {@code cn1$autocomplete} client property.</p>
+     */
+    private String applyInputConstraints(HTMLInputElement inputEl, TextArea ta) {
+        return applyTextInputConstraints(inputEl, ta, ta.isSingleLineTextArea());
+    }
+
+    /**
+     * The same constraint metadata, for an element this class did not build.
+     *
+     * <p>The editor is not the only place a field is typed into: the accessibility overlay
+     * exposes an editable field to a screen reader through a control of its own, and a control
+     * that skipped this would offer the wrong keyboard and would let prediction and autofill
+     * reach a field whose constraint forbids them. The shape of that control is decided by the
+     * caller rather than read from the component -- an obscured field is given a single-line
+     * masking input whether or not the component is multiline -- so whether to write a
+     * {@code type} at all is passed in instead of asked of the {@code TextArea}.</p>
+     *
+     * @param inputEl the element to configure, an input or a textarea
+     * @param ta the field the element edits
+     * @param singleLine true when the element is an input and so carries a type
+     * @return the resolved input type, "text" for anything without one of its own
+     */
+    static String applyTextInputConstraints(HTMLElement inputEl, TextArea ta, boolean singleLine) {
+        int constraint = ta.getConstraint();
+        int base = constraint & 0xffff;
+        boolean password = (constraint & TextArea.PASSWORD) != 0;
+        boolean sensitive = (constraint & TextArea.SENSITIVE) != 0
+                || (constraint & TextArea.NON_PREDICTIVE) != 0;
+        boolean username = (constraint & TextArea.USERNAME) != 0;
+
+        String resolvedType = "text";
+        if (password) {
+            resolvedType = "password";
+        } else if (base == TextArea.EMAILADDR) {
+            resolvedType = "email";
+        } else if (base == TextArea.NUMERIC) {
+            resolvedType = "number";
+        } else if (base == TextArea.PHONENUMBER) {
+            resolvedType = "tel";
+        } else if (base == TextArea.URL) {
+            resolvedType = "url";
+        }
+        if (singleLine) {
+            inputEl.setAttribute("type", resolvedType);
+        } else {
+            // A textarea has no type attribute, and callers treat "text" as the plain case.
+            resolvedType = "text";
+        }
+
+        String inputMode = null;
+        if (!password) {
+            if (base == TextArea.NUMERIC) {
+                inputMode = "numeric";
+            } else if (base == TextArea.DECIMAL) {
+                inputMode = "decimal";
+            } else if (base == TextArea.PHONENUMBER) {
+                inputMode = "tel";
+            } else if (base == TextArea.EMAILADDR) {
+                inputMode = "email";
+            } else if (base == TextArea.URL) {
+                inputMode = "url";
+            }
+        }
+        if (inputMode == null) {
+            inputEl.removeAttribute("inputmode");
+        } else {
+            inputEl.setAttribute("inputmode", inputMode);
+        }
+
+        Object override = ta.getClientProperty("cn1$autocomplete");
+        String autocomplete;
+        if (override != null) {
+            autocomplete = override.toString();
+        } else if (sensitive) {
+            // Checked ahead of the password case on purpose: SENSITIVE asks that the value is
+            // never retained for predictive or completing schemes, and "current-password" is an
+            // explicit invitation to offer a stored one.
+            autocomplete = "off";
+        } else if (password) {
+            autocomplete = "current-password";
+        } else if (username) {
+            // Ahead of the address-style tokens: an application that marks a field as the
+            // username has said what it is for, and a password manager needs that token to
+            // pair it with the password field rather than treating the two as unrelated. An
+            // email address used as a username is still the username here.
+            autocomplete = "username";
+        } else if (base == TextArea.EMAILADDR) {
+            autocomplete = "email";
+        } else if (base == TextArea.PHONENUMBER) {
+            autocomplete = "tel";
+        } else if (base == TextArea.URL) {
+            autocomplete = "url";
+        } else {
+            autocomplete = "on";
+        }
+        inputEl.setAttribute("autocomplete", autocomplete);
+
+        // A stable name lets a password manager pair a username with a password rather than
+        // treating each edit as an unrelated field.
+        String name = ta.getName();
+        if (name == null || name.length() == 0) {
+            inputEl.removeAttribute("name");
+        } else {
+            inputEl.setAttribute("name", name);
+        }
+
+        String autoCapitalize = "none";
+        if ((constraint & TextArea.INITIAL_CAPS_WORD) != 0) {
+            autoCapitalize = "words";
+        } else if ((constraint & TextArea.INITIAL_CAPS_SENTENCE) != 0) {
+            autoCapitalize = "sentences";
+        }
+        inputEl.setAttribute("autocapitalize", autoCapitalize);
+        inputEl.setAttribute("spellcheck",
+                password || sensitive || base == TextArea.EMAILADDR || base == TextArea.URL
+                        ? "false" : "true");
+        return resolvedType;
+    }
+
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, final String origText, int initiatingKeycode) {
         if (cmp.getNativeOverlay() != null) {
@@ -5981,32 +6270,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             inputEl.getStyle().setProperty("margin", "0");
             inputEl.getStyle().setProperty("outline", "none");  // for chrome
             
-            int cnst = ta.getConstraint();
-            String inputType = "text";
-            if (ta.isSingleLineTextArea()) {
-                
-                switch (cnst) {
-                    case TextArea.PASSWORD:
-                        inputType = "password";
-                        break;
-                    case TextArea.EMAILADDR:
-                        inputType = "email";
-                        break;
-                    case TextArea.NUMERIC:
-                        inputType = "number";
-                        break;
-                    case TextArea.PHONENUMBER:
-                        inputType = "tel";
-                        break;
-                    case TextArea.URL:
-                        inputType = "url";
-                        break;
-                    
-                }
-                inputEl.setAttribute("type", inputType);
-                
-                
-            }
+            final String inputType = applyInputConstraints(inputEl, ta);
             
 
 
@@ -6466,6 +6730,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
+        displayFlushes++;
         JavaScriptRenderQueueCoordinator.waitUntilFlushable(new JavaScriptRenderQueueCoordinator.FlushBarrier() {
             @Override
             public boolean isGraphicsLocked() {
@@ -6519,7 +6784,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void screenshot(SuccessCallback<Image> callback) {
+    public void screenshot(final SuccessCallback<Image> callback) {
         if (callback == null) {
             return;
         }
@@ -6527,6 +6792,138 @@ public class HTML5Implementation extends CodenameOneImplementation {
             super.screenshot(callback);
             return;
         }
+        // Reading the screen back as pixels and promoting text into the DOM cannot both be
+        // authoritative: a surface read cannot see a DOM layer, so a capture taken while text is
+        // promoted comes back with its labels missing. An application that reads pixels is
+        // telling us which representation it needs, so promotion stops for good at the first
+        // such call and the text returns to the canvas, where the reads can see it.
+        //
+        // The first capture then has to wait for a frame that was actually painted with
+        // promotion off. That paint is NOT driven from inside this call: calling paintDirty()
+        // here re-enters the render queue at a point it is not built for, and it measurably
+        // breaks rendering -- graphics-draw-gradient-stops came back with its gradients
+        // unpainted, reproducibly and across a re-run, while every other golden was unchanged.
+        // The repaint is requested and the read deferred instead, which this API can do because
+        // it answers through a callback. The read then waits for the painting to actually stop
+        // rather than for a fixed number of event-thread hops: a form whose paint takes more
+        // than one flush -- this application's image grid does -- can be caught between them,
+        // and what comes back is a frame with the last panels still unpainted.
+        if (readbackRepaintPending) {
+            // A capture is already waiting for the frame that puts the text back on the canvas.
+            // Reading now would hand this caller the canvas as it stands, which is the one
+            // missing every promoted glyph, so this capture waits for the same frame.
+            pendingReadbacks.add(callback);
+            return;
+        }
+        if (textLayer != null && !textLayer.isSuspended()) {
+            textLayer.setSuspended(true);
+            textLayerDisabledByReadback = true;
+            readbackRepaintPending = true;
+            // The semantic overlay stops mirroring labels while the text layer renders them and
+            // starts again once it does not. Nothing else would notice the switch, so ask for a
+            // semantic refresh here -- otherwise find-in-page would keep finding nothing until
+            // some unrelated invalidation happened along.
+            com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
+            Form current = getCurrentForm();
+            if (current != null) {
+                current.repaint();
+            }
+            awaitPaintedFrame(new Runnable() {
+                        @Override
+                        public void run() {
+                            readbackRepaintPending = false;
+                            // Whatever else asked for a capture while this one was waiting reads
+                            // the same frame, rather than the one before the text came back. The
+                            // waiting list is taken and emptied before any of them run: a
+                            // callback that throws would otherwise leave the rest of the list
+                            // standing with nothing left to drain it -- the flag that sends a
+                            // capture to the queue is already down, so every later capture would
+                            // take the immediate path and walk straight past them.
+                            List<SuccessCallback<Image>> waiting =
+                                    new ArrayList<SuccessCallback<Image>>(pendingReadbacks);
+                            pendingReadbacks.clear();
+                            deliverReadback(callback);
+                            for (int i = 0; i < waiting.size(); i++) {
+                                deliverReadback(waiting.get(i));
+                            }
+                        }
+                    });
+            return;
+        }
+        readDisplaySurface(callback);
+    }
+
+    /**
+     * Hands one waiting capture its frame, keeping its failure to itself.
+     *
+     * <p>These callbacks belong to unrelated callers that happened to ask during the same
+     * frame, so one of them throwing is not a reason for the others to go unanswered.</p>
+     *
+     * @param callback the capture to satisfy
+     */
+    private void deliverReadback(SuccessCallback<Image> callback) {
+        try {
+            readDisplaySurface(callback);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    /**
+     * Runs the given work once the display has stopped painting.
+     *
+     * <p>Counts flushes rather than event-thread hops. A repaint is not one flush: a form can
+     * paint over several, and a read taken between them returns a frame whose last components
+     * were never drawn -- blank where the application had put something. Two consecutive checks
+     * with no flush in between mean the frame is finished.</p>
+     *
+     * <p>Bounded, because a form that animates never stops flushing and a capture still has to
+     * be answered: after enough checks the read goes ahead with whatever is on the canvas, which
+     * is what it would have done immediately before.</p>
+     *
+     * @param work what to run once the frame has settled
+     */
+    private void awaitPaintedFrame(final Runnable work) {
+        final int[] state = new int[] { displayFlushes, 0, 0 };
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                boolean flushed = displayFlushes != state[0];
+                state[0] = displayFlushes;
+                state[1] = flushed ? 0 : state[1] + 1;
+                state[2]++;
+                if (state[1] >= 2 || state[2] >= 60) {
+                    work.run();
+                    return;
+                }
+                Display.getInstance().callSerially(this);
+            }
+        });
+    }
+
+    /**
+     * How many times the display surface has been flushed. Only ever compared with itself, to
+     * tell a frame that is still being painted from one that has settled.
+     */
+    private int displayFlushes;
+
+    /**
+     * True while a capture is waiting for the frame that rasterizes the text the layer had
+     * promoted. Any capture asked for in the meantime waits for that frame too.
+     */
+    private boolean readbackRepaintPending;
+
+    /**
+     * Captures asked for while that frame is on its way.
+     */
+    private final List<SuccessCallback<Image>> pendingReadbacks = new ArrayList<SuccessCallback<Image>>();
+
+    /**
+     * Reads the display surface back and hands the pixels to the caller.
+     *
+     * @param callback receives the captured image
+     */
+    private void readDisplaySurface(SuccessCallback<Image> callback) {
         flushGraphics();
         final int width = getDisplayWidth();
         final int height = getDisplayHeight();
@@ -8337,6 +8734,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             ctx.drawImage(src.img, parkX, parkY);
         } else if (src.mutableGraphics != null) {
             src.mutableGraphics.flush();
+            retainBlitSource(src);
             ((SurfaceCommandRecorder)ctx).blitSurface(src.mutableGraphics.getSurfaceId(), parkX, parkY, -1, -1);
         }
         ctx.restore();
@@ -8571,6 +8969,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
         g(graphics).drawArc(x,y,width,height,startAngle, arcAngle);
+    }
+
+    /**
+     * Draws text that carries a decoration.
+     *
+     * <p>The lines an underline or a strike-through are made of are drawn after the glyphs and
+     * over them. Promoting the glyphs into the DOM layer would lift them above the whole
+     * canvas, and the line meant to cross the text would end up behind it, broken wherever a
+     * glyph stands. Decorated runs therefore stay on the canvas entirely.</p>
+     */
+    @Override
+    public void drawString(Object nativeGraphics, Object nativeFont, String str, int x, int y,
+            int textDecoration) {
+        if (textDecoration == 0 || !(g(nativeGraphics) instanceof BufferedGraphics)) {
+            super.drawString(nativeGraphics, nativeFont, str, x, y, textDecoration);
+            return;
+        }
+        BufferedGraphics buffered = (BufferedGraphics) g(nativeGraphics);
+        buffered.setPromotionSuspended(true);
+        try {
+            super.drawString(nativeGraphics, nativeFont, str, x, y, textDecoration);
+        } finally {
+            buffered.setPromotionSuspended(false);
+        }
     }
 
     @Override
@@ -9152,6 +9574,38 @@ public class HTML5Implementation extends CodenameOneImplementation {
             + "if (density) return parseInt(density); else return 0;")
     private native static int getDensityOverride();
     
+    /**
+     * How much a font is scaled for the display's density.
+     *
+     * <p>Font heights are kept in device pixels, and this is the band the base size is scaled
+     * by when a font is created. Keeping an existing font current as the display changes is a
+     * different question, answered by the pixel ratio rather than the band -- see
+     * {@code NativeFont.syncDensity()}.</p>
+     *
+     * @return the multiplier applied to the base font size
+     */
+    private double fontDensityFactor() {
+        switch (getDeviceDensity()) {
+            case Display.DENSITY_LOW:
+            case Display.DENSITY_VERY_LOW:
+                return 0.5;
+            case Display.DENSITY_HIGH:
+                return 1.5;
+            case Display.DENSITY_VERY_HIGH:
+                return 2;
+            case Display.DENSITY_HD:
+                return 3;
+            case Display.DENSITY_560:
+                return 4;
+            case Display.DENSITY_2HD:
+                return 5;
+            case Display.DENSITY_4K:
+                return 6;
+            default:
+                return 1;
+        }
+    }
+
     @Override
     public Object createFont(int face, int style, int size) {
         
@@ -9159,23 +9613,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (height == 0) {
             height = 16;
         }
-        switch (getDeviceDensity()) {
-            case Display.DENSITY_LOW:
-            case Display.DENSITY_VERY_LOW:
-                height = height/2; break;
-            case Display.DENSITY_HIGH:
-                height = height + height/2; break;
-            case Display.DENSITY_VERY_HIGH:
-                height = height * 2; break;
-            case Display.DENSITY_HD:
-                height = height * 3; break;
-            case Display.DENSITY_560:
-                height = height * 4; break;
-            case Display.DENSITY_2HD:
-                height = height * 5; break;
-            case Display.DENSITY_4K:
-                height = height * 6; break; 
-        }
+        height = (int) (height * fontDensityFactor());
         int diff = height / 3;
 
         switch (size) {
@@ -10492,14 +10930,519 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return buildVersion;
     }
 
-    @JSBody(script="try {history.pushState(\"jibberish\", null, null)} catch (e){console.log('history.pushState not supported. Back command will not work.')}")
-    private native static void pushHistoryState();
-    
+    /**
+     * True while a back command is being dispatched in response to popstate, so the form change
+     * it causes does not push a new entry and trap the user in the app.
+     */
+    private boolean handlingPopState;
+
+    /**
+     * Pushes a history entry so the browser's Back button has something to pop.
+     *
+     * <p>This used to be a {@code @JSBody}, which is compiled into the worker -- where there is
+     * no {@code history} object, so it threw on every form change and the port logged that the
+     * back command would not work. Going through the window binding puts the call on the main
+     * thread, where the History API actually exists.</p>
+     */
+    /**
+     * Monotonic id stamped into each pushed history entry. popstate fires for forward
+     * traversal too, and comparing the restored id against this one is what tells the two
+     * apart.
+     */
+    private int historyIndex;
+
+    /**
+     * The highest id this session has pushed.
+     *
+     * <p>An entry carrying more than this was not created by this session, whatever it says: the
+     * entry the page was loaded on keeps the id a previous life of the application left there,
+     * and a reload starts the counters again from zero. Every entry the port can traverse to
+     * carries an id it pushed, so anything above this belongs to the page rather than the
+     * application -- which is what tells a stale id apart from a genuine Forward.</p>
+     */
+    private int historyHighWater;
+
+    private void pushHistoryState() {
+        if (handlingPopState) {
+            return;
+        }
+        if (historyUnavailable) {
+            return;
+        }
+        try {
+            historyIndex++;
+            window.getHistory().pushState(HISTORY_STATE_PREFIX + historyIndex, "");
+            historyHighWater = Math.max(historyHighWater, historyIndex);
+            historyEntriesPushed++;
+        } catch (Throwable ignored) {
+            // A sandboxed or file:// document can refuse pushState. Back stays inert from here
+            // on: the entry was never created, and going on as though it had been would have a
+            // later in-app back traverse history that does not belong to this application --
+            // out of the document, rather than back a form.
+            historyIndex--;
+            historyUnavailable = true;
+        }
+    }
+
+    /**
+     * Traversals the port itself asked the browser to make, each with the moment it stops being
+     * expected. A popstate takes the oldest of them rather than clearing a single flag: two
+     * in-app back navigations can each ask for one before either event arrives, and one flag
+     * would let the first event answer for both -- leaving the second to be read as the user
+     * pressing Back and a form leaving that the user never asked to leave.
+     */
+    private final List<Long> suppressedTraversals = new ArrayList<Long>();
+
+    /**
+     * How long a traversal the port asked for is given to raise its popstate before it stops
+     * being expected. On the clock rather than on turns of the event loop: the event comes from
+     * the main thread and an idle loop can turn many times while it is on its way.
+     */
+    private static final long SUPPRESSION_TIMEOUT_MILLIS = 1000;
+
+    /**
+     * Asks the browser to traverse history on the port's own behalf, and expects the popstate
+     * that follows to be ignored.
+     *
+     * <p>The traversal may not happen at all -- asking to go further back than the session has
+     * entries does nothing, and raises no popstate. The expectation is therefore given up after a
+     * bounded wait: left standing it would swallow the user's next real Back and leave the
+     * application on a form the browser has already moved away from.</p>
+     *
+     * @param delta entries to move, negative for backwards
+     */
+    private void requestSuppressedTraversal(int delta) {
+        if (delta == 0 || historyUnavailable) {
+            return;
+        }
+        suppressedTraversals.add(Long.valueOf(System.currentTimeMillis() + SUPPRESSION_TIMEOUT_MILLIS));
+        try {
+            window.getHistory().go(delta);
+        } catch (Throwable ignored) {
+            suppressedTraversals.remove(suppressedTraversals.size() - 1);
+            return;
+        }
+        awaitSuppressionConsumed();
+    }
+
+    /**
+     * True when this popstate belongs to a traversal the port asked for, in which case it is that
+     * traversal's and no form should move for it.
+     */
+    private boolean consumeSuppressedTraversal() {
+        if (suppressedTraversals.isEmpty()) {
+            return false;
+        }
+        suppressedTraversals.remove(0);
+        return true;
+    }
+
+    private void awaitSuppressionConsumed() {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                while (!suppressedTraversals.isEmpty()
+                        && suppressedTraversals.get(0).longValue() <= now) {
+                    // Never arrived -- a traversal the browser had nowhere to make. Giving it up
+                    // keeps it from swallowing the user's next real Back.
+                    suppressedTraversals.remove(0);
+                }
+                if (!suppressedTraversals.isEmpty()) {
+                    awaitSuppressionConsumed();
+                }
+            }
+        });
+    }
+
+    /**
+     * Handles a history traversal.
+     *
+     * <p>popstate fires for Forward as well as Back. Without telling them apart, pressing
+     * Forward would run the form's back command and immediately undo the navigation the user
+     * asked for.</p>
+     */
+    private void handlePopStateEvent(Event evt) {
+        final int restored = parseHistoryIndex(((PopStateEvent) evt).getState());
+        final int previous = historyIndex;
+        final boolean backward = restored < previous;
+        if (restored > historyHighWater) {
+            // An id this session never pushed. The entry the page loaded on keeps whatever a
+            // previous life of the application wrote there while these counters start again at
+            // zero, so an id above everything pushed since is that entry -- not a step forward
+            // through this session's history, which can only reach entries it created. The
+            // numbering is left where it was: nothing in it has been traversed.
+            consumeSuppressedTraversal();
+            return;
+        }
+        historyIndex = restored;
+        if (consumeSuppressedTraversal()) {
+            // The port asked for this one, to spend an entry belonging to a form an in-app back
+            // command had already left.
+            return;
+        }
+        if (restored == previous) {
+            // Neither direction, as far as this port can tell: the entry carries no id of ours
+            // and the application is on its root, which reads the same way. It belongs to
+            // whatever hosts this page -- a site that navigates around the canvas -- and the
+            // user asked for it. Stepping anywhere from here would take the page off the entry
+            // they chose.
+            return;
+        }
+        if (!backward) {
+            // Forward traversal. The port cannot replay it -- it has no way to know which form
+            // an entry stood for, and re-showing one would need the application's own
+            // navigation -- so rather than leave the browser sitting on an entry the app is not
+            // on, step back to the entry that does match. Forward is inert, which is the honest
+            // degradation.
+            //
+            // The whole way back, not one step: the Forward menu can jump several entries at
+            // once, and returning only one would leave the browser somewhere in between, out
+            // of step with the form on screen for every Back after it.
+            requestSuppressedTraversal(previous - restored);
+            return;
+        }
+        // A traversal can cross more than one entry at once -- the Back button's history menu,
+        // or history.go(-N) -- so the distance decides how many forms to leave, not one.
+        final int distance = Math.max(1, previous - restored);
+        historyEntriesPushed = Math.max(0, historyEntriesPushed - distance);
+        // The browser has already crossed every entry of the jump in this one traversal, so
+        // the count of what the application still owes is the state the replay works from --
+        // and what a back command that skips forms draws down as it goes.
+        //
+        // Added to rather than assigned: a second Back pressed while a transition is still
+        // running arrives here before the first has landed, and overwriting would lose the
+        // entries the first one was still working through -- the browser would end up several
+        // entries ahead of the application, for good.
+        pendingTraversalEntries += distance;
+        if (traversalActive) {
+            // A replay is already walking the forms; it reads the count after each one lands,
+            // so this traversal joins the one in flight rather than starting a second that
+            // would run the same form's back command twice.
+            return;
+        }
+        // Which entries were crossed is read from the event here, synchronously, because the
+        // event does not outlive the call. Running the back command belongs on the EDT, and
+        // that is the coordinator's shape.
+        JavaScriptBrowserLifecycleCoordinator.handlePopState(
+                new JavaScriptBrowserLifecycleCoordinator.BackNavigationHooks() {
+                    @Override
+                    public void callSerially(Runnable runnable) {
+                        HTML5Implementation.this.callSerially(runnable);
+                    }
+
+                    @Override
+                    public void runBackCommand() {
+                        replayTraversal();
+                    }
+                });
+    }
+
+    /**
+     * Marks a history entry as this port's. A page can be running its own navigation before
+     * Codename One starts -- a host application embedding the canvas, for instance -- and its
+     * states are commonly plain numbers too. Without something to tell them apart, returning to
+     * one of those entries would read as a Codename One id and be taken for a Forward, which
+     * bounces the browser straight back out again without ever running the form's back command.
+     */
+    private static final String HISTORY_STATE_PREFIX = "cn1-history:";
+
+    /**
+     * True once the document has refused to take an entry. Nothing this port pushed is there to
+     * traverse, so it stops asking.
+     */
+    private boolean historyUnavailable;
+
+    /**
+     * Reads the id stamped into a history entry. Entries this port did not push -- the document
+     * entry the app started on, or anything the host page pushed -- carry no id of ours and
+     * read as being before everything.
+     */
+    private int parseHistoryIndex(Object state) {
+        // Anything that is not one of this port's own stamps reads as being before everything,
+        // and a host page's router object is exactly that: not a string, and not ours.
+        if (!(state instanceof String)) {
+            return 0;
+        }
+        String text = (String) state;
+        if (!text.startsWith(HISTORY_STATE_PREFIX)) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(text.substring(HISTORY_STATE_PREFIX.length()));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Entries a browser traversal has already crossed that the application has not yet
+     * followed. A back command can leave more than one form at a time, so the replay draws
+     * this down by however many forms each step actually left rather than by one.
+     */
+    private int pendingTraversalEntries;
+
+    /**
+     * True while the replay is walking forms. Further traversals add to the count it reads
+     * rather than starting a walk of their own.
+     */
+    private boolean traversalActive;
+
+    /**
+     * Runs one step of a browser traversal and, once it lands, whatever is still outstanding.
+     *
+     * <p>The steps cannot be run in a loop: a transition defers the form change, so a second
+     * back command issued straight away would read the form the first one was still leaving and
+     * run its command again -- two entries would be spent while the application moved one.
+     * Each step waits for the form to actually change before the next is issued.</p>
+     */
+    /**
+     * How long a back command is given to land before it is taken as refused. Long enough for a
+     * form transition, which the framework runs before installing the destination.
+     */
+    private static final long BACK_OUTCOME_TIMEOUT_MILLIS = 2000;
+
+    private void replayTraversal() {
+        if (pendingTraversalEntries <= 0) {
+            traversalActive = false;
+            return;
+        }
+        final Form current = Display.getInstance().getCurrent();
+        if (current == null) {
+            pendingTraversalEntries = 0;
+            traversalActive = false;
+            return;
+        }
+        Command back = current.getBackCommand();
+        if (back == null) {
+            pendingTraversalEntries = 0;
+            traversalActive = false;
+            leaveDocument();
+            return;
+        }
+        traversalActive = true;
+        // Held until the form change actually lands, not just until the command returns: a
+        // transition defers the change, and if the flag were already clear by then the change
+        // would look like an ordinary showBack() and traverse the entry this gesture had
+        // already spent.
+        handlingPopState = true;
+        // Read before the command runs. With transitions off the form changes inside
+        // dispatchCommand, and the count is drawn down before this line -- so reading it
+        // afterwards would report nothing outstanding and the wait would take the change for a
+        // form it was not unwinding towards.
+        int outstanding = pendingTraversalEntries;
+        current.dispatchCommand(back, new ActionEvent(back));
+        awaitBackOutcome(current, outstanding,
+                System.currentTimeMillis() + BACK_OUTCOME_TIMEOUT_MILLIS);
+        // Nothing is pushed to replace the entry that was just popped. Every form show pushes
+        // one, so the history depth already tracks the navigation depth: popping one entry and
+        // going back one form keeps them in step. Re-pushing here left a dead entry behind, so
+        // from the root form the first Back did nothing and only the second left the app.
+    }
+
+    /**
+     * Waits for a back command to either navigate or turn out to have been refused.
+     *
+     * @param before the form that was displayed when the command was dispatched
+     * @param outstanding entries owed when the command was dispatched, read before it ran
+     * @param deadline when to stop waiting and take the command as refused
+     */
+    private void awaitBackOutcome(final Form before, final int outstanding, final long deadline) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (Display.getInstance().getCurrent() != before) {
+                    handlingPopState = false;
+                    if (pendingTraversalEntries >= outstanding) {
+                        // The form that appeared was not one this traversal was unwinding
+                        // towards, so nothing was drawn down. Count the step anyway: the
+                        // application has moved and the replay has to end somewhere. Never below
+                        // nothing owed -- a negative count would have to be climbed back through
+                        // before the next Back was replayed at all.
+                        pendingTraversalEntries = Math.max(0, outstanding - 1);
+                    }
+                    replayTraversal();
+                    return;
+                }
+                if (System.currentTimeMillis() < deadline) {
+                    // Waited on the clock rather than on a number of turns of the event loop. A
+                    // form transition takes a couple of hundred milliseconds and the framework
+                    // does not install the destination until it ends, while forty turns of an
+                    // idle loop can pass in a fraction of that -- and reading that as a refusal
+                    // pushes browser history the wrong way for a navigation that was about to
+                    // land.
+                    awaitBackOutcome(before, outstanding, deadline);
+                    return;
+                }
+                // The same form is still showing, so a pop guard refused the navigation. The
+                // browser has already moved across every entry still outstanding, so all of
+                // them are returned, not only this step's. The steps after it are dropped:
+                // they would ask the same guard again on the same form, and one of the later
+                // answers could navigate even though the traversal was refused.
+                handlingPopState = false;
+                traversalActive = false;
+                int owed = pendingTraversalEntries;
+                pendingTraversalEntries = 0;
+                restoreTraversal(owed);
+            }
+        });
+    }
+
+    /**
+     * Returns the browser to the entry a refused traversal started from.
+     *
+     * <p>Going forward rather than pushing: the entries the gesture moved across are still
+     * there to return to, while a push would replace them and lose everything the user could
+     * still have reached with Forward.</p>
+     *
+     * @param steps how many entries the traversal crossed without the application following
+     */
+    private void restoreTraversal(int steps) {
+        if (steps <= 0) {
+            return;
+        }
+        historyEntriesPushed += steps;
+        requestSuppressedTraversal(steps);
+    }
+
+    /**
+     * Carries a Back gesture outwards, out of the document.
+     *
+     * <p>That is what Back means on a form offering no back action: the form was shown
+     * normally so it has an entry, but popping that entry would look like a press that did
+     * nothing and the user would have to press again.</p>
+     */
+    private void leaveDocument() {
+        if (historyUnavailable) {
+            return;
+        }
+        // Every entry this port pushed has to go, not just one: a form reached through several
+        // others still has theirs above the document, and stepping over a single one would
+        // leave the browser inside a history the application has no forms for.
+        //
+        // The document's own entry counts too. The gesture that got here has already spent the
+        // entry belonging to the form being left, so what remains above the document is the
+        // rest of the pushed entries -- traversing only those would land on the document with
+        // the same form still showing, and the user would have to press Back again to leave.
+        int remaining = historyEntriesPushed + 1;
+        int available = 0;
+        try {
+            available = window.getHistory().getLength() - 1;
+        } catch (Throwable ignored) {
+            // No length to go by; ask for the full distance and let the browser stop where its
+            // history does.
+        }
+        if (available > 0 && remaining > available) {
+            remaining = available;
+        }
+        requestSuppressedTraversal(-remaining);
+    }
+
+    /**
+     * True once a form has been shown, so the very first one does not push an entry.
+     */
+    private boolean historyRootShown;
+
+    /**
+     * The forms shown so far, newest last, used to recognise a backward navigation. The
+     * implementation is not told the direction of a form change, so it is inferred from whether
+     * the incoming form is the one behind the current entry.
+     *
+     * <p>Bounded: an app that never navigates back would otherwise accumulate an entry per
+     * screen for the life of the session. Losing the oldest entries only means a very deep
+     * unwind stops being recognised, which degrades to the old behaviour of pushing.</p>
+     */
+    private final java.util.List<Form> historyStack = new java.util.ArrayList<Form>();
+
+    private static final int HISTORY_STACK_LIMIT = 32;
+
+    /**
+     * How many entries this port has pushed and not yet spent.
+     *
+     * <p>Counted separately from the form chain because that chain is bounded -- it only has to
+     * be long enough to recognise a backward jump -- while the browser keeps every entry. Using
+     * the chain's length to leave the document would land inside the history rather than out of
+     * it once an application had navigated more times than the chain holds.</p>
+     */
+    private int historyEntriesPushed;
+
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
+        // A form built before the last scheme or density change still holds the styles it
+        // resolved then, so it is brought up to date as it appears rather than coming back in
+        // the old palette.
+        refreshThemeIfStale(f);
+        // Taken for every arrival, whatever is done with it: the framework queues one direction
+        // per display asked for, and a queue read only on some paths would drift out of step
+        // with what is still waiting.
+        boolean navigatingBack = com.codename1.ui.Accessor.isNavigatingBack(f);
+        if (!historyRootShown) {
+            // The first form has nothing behind it. Pushing for it left a dead entry that the
+            // first Back popped without navigating anywhere, so leaving the app from the root
+            // form took two presses.
+            historyRootShown = true;
+            historyStack.add(f);
+            return;
+        }
+        int depth = historyStack.size();
+        int previousIndex = f == null ? -1 : historyStack.lastIndexOf(f);
+        if (previousIndex >= 0 && previousIndex == depth - 1) {
+            // The form already on screen. One navigation can arrive here twice: dismissing a
+            // menu restores the form underneath it and then shows it again, and when the form
+            // being shown is the one being restored both arrivals name the same form. Nothing
+            // moved, so nothing is pushed -- an entry here is one the user has to press Back
+            // through to get out of a screen they never left.
+            return;
+        }
+        // The direction comes from the framework rather than from which form appeared: an
+        // application can legitimately show an earlier form again as forward navigation --
+        // A, B, then A again -- and treating that as a back would spend entries the user can
+        // still reach.
+        if (previousIndex >= 0 && previousIndex < depth - 1
+                && (handlingPopState || navigatingBack)) {
+            // Backward navigation, from a toolbar back command or showBack(). Keeping the whole
+            // chain rather than a single predecessor is what lets consecutive unwinds -- C to B
+            // to A -- each be recognised.
+            //
+            // The browser entry has to be spent as well, not just the Java one: leaving it in
+            // place means the next browser Back pops an entry that no longer corresponds to a
+            // form, finds no back command, and appears to do nothing. Going back fires popstate,
+            // which is why the next one is marked as already accounted for.
+            // A back command can skip forms -- A, B, C then showBack() to A -- so every form
+            // above the one being shown is being left, and one entry per form has to go with
+            // them. Recognising only a single step left the extra entries behind for later
+            // Back presses to pop without any form change.
+            int steps = depth - 1 - previousIndex;
+            for (int i = 0; i < steps; i++) {
+                historyStack.remove(historyStack.size() - 1);
+            }
+            if (handlingPopState) {
+                // The gesture has already crossed entries the application had not yet
+                // followed, so those are what this form change settles first. Only forms left
+                // beyond them still have an entry standing above the displayed form, and only
+                // those need a traversal of their own -- going back for the ones the user's
+                // own gesture already crossed would leave the document early, or spend an
+                // entry the replay was about to account for.
+                int settled = Math.min(steps, pendingTraversalEntries);
+                pendingTraversalEntries -= settled;
+                int extra = steps - settled;
+                if (extra > 0) {
+                    historyEntriesPushed = Math.max(0, historyEntriesPushed - extra);
+                    requestSuppressedTraversal(-extra);
+                }
+                return;
+            }
+            historyEntriesPushed = Math.max(0, historyEntriesPushed - steps);
+            // One traversal for the whole jump, so it raises a single popstate.
+            requestSuppressedTraversal(-steps);
+            return;
+        }
+        historyStack.add(f);
+        if (historyStack.size() > HISTORY_STACK_LIMIT) {
+            historyStack.remove(0);
+        }
         pushHistoryState();
-        
     }
     
     
@@ -11043,6 +11986,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // (so the host has its pixels) then record a blit by id onto
                     // the target surface. No canvas host-ref crosses.
                     mutableGraphics.flush();
+                    retainBlitSource(NativeImage.this);
                     ((SurfaceCommandRecorder)ctx).blitSurface(mutableGraphics.getSurfaceId(), drawX, drawY, drawWidth, drawHeight);
                 }
             }, x, y, width, height);
@@ -11179,8 +12123,45 @@ public class HTML5Implementation extends CodenameOneImplementation {
         double height;
         String fileName;
         String fontName;
+        // The display's pixel ratio when this font's height was worked out. A height is in
+        // device pixels and everything drawn with it is divided by the ratio to reach CSS
+        // pixels, so the height only means anything alongside the ratio it was sized against.
+        double ratioBasis = getDevicePixelRatio();
+        // The height this font was created with, which never changes. Identity has to be built
+        // from something that does not move: a font can be a key in a map when the display's
+        // ratio changes, and a hash that changes underneath a stored key loses it.
+        double identityHeight = Double.NaN;
         
         String cssCached_, cssFontFamilyCached__;
+
+        /**
+         * Brings the height up to the current display density.
+         *
+         * <p>A browser zoom or a move to another screen changes the density under a font that
+         * has already been created and handed to a style. Left alone, its height stays in the
+         * old display's pixels while everything drawn with it is divided by the new ratio, so
+         * text comes out at the wrong size -- half of it, going from a 1x display to a 2x one.
+         * Styles hold their fonts, and the theme holds the ones it loaded, so there is no
+         * single place to recreate them: each brings itself up to date as it is used.</p>
+         */
+        void syncDensity() {
+            double current = getDevicePixelRatio();
+            if (current <= 0 || ratioBasis <= 0 || current == ratioBasis) {
+                return;
+            }
+            // Scaled by the ratio itself rather than by the density band it falls in. A ratio
+            // can change without changing bands -- a desktop window moved to a 1.5x display --
+            // and the band would then report no change while every coordinate drawn with this
+            // font is divided by the new ratio: text would come out two thirds of its size.
+            double scale = current / ratioBasis;
+            if (Double.isNaN(identityHeight)) {
+                identityHeight = height;
+            }
+            height = height * scale;
+            ascent = (int) Math.round(ascent * scale);
+            ratioBasis = current;
+            cssCached_ = null;
+        }
         
         public int fontLeading() {
             return (int)Math.ceil(determineFontLeading(getCSS()));
@@ -11307,6 +12288,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public String getCSS(){
+            syncDensity();
             if (cssCached_ == null) {
                 StringBuilder sb = new StringBuilder();
                 //sb.append(height).append("px ");
@@ -11330,7 +12312,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public String getScaledCSS(){
-            
+            syncDensity();
             StringBuilder sb = new StringBuilder();
             //sb.append(height).append("px ");
             //if ((style & Font.STYLE_ITALIC) != 0) {
@@ -11369,6 +12351,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return getCSS()+" (Face: "+face+" style "+style+" size "+size+")";
         }
 
+        /**
+         * The height this font is identified by, which is the one it was created with even after
+         * the display's pixel ratio has moved the height it draws at. A font can be a key in a
+         * map, and a key whose hash changes while it is stored is a key that cannot be found
+         * again.
+         */
+        private double identity() {
+            return Double.isNaN(identityHeight) ? height : identityHeight;
+        }
+
         @Override
         public boolean equals(Object obj) {
             if (this == obj) {
@@ -11381,7 +12373,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return face == other.face
                     && style == other.style
                     && size == other.size
-                    && Double.doubleToLongBits(height) == Double.doubleToLongBits(other.height)
+                    && Double.doubleToLongBits(identity()) == Double.doubleToLongBits(other.identity())
                     && java.util.Objects.equals(fileName, other.fileName)
                     && java.util.Objects.equals(fontName, other.fontName);
         }
@@ -11392,7 +12384,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             hash = 31 * hash + face;
             hash = 31 * hash + style;
             hash = 31 * hash + size;
-            long heightBits = Double.doubleToLongBits(height);
+            long heightBits = Double.doubleToLongBits(identity());
             hash = 31 * hash + (int)(heightBits ^ (heightBits >>> 32));
             hash = 31 * hash + (fileName != null ? fileName.hashCode() : 0);
             hash = 31 * hash + (fontName != null ? fontName.hashCode() : 0);
@@ -11502,8 +12494,150 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
-        WebSQL.Database db = WebSQL.openDatabase(databaseName, "1.0", databaseName, defaultFileSystemSize);
-        return new DatabaseImpl(db);
+        return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, com.codename1.db.DatabaseConfig config)
+            throws IOException {
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            throw new IOException("The SQLite engine could not be loaded");
+        }
+        String key = null;
+        if (config != null && config.isEncrypted()) {
+            // The resolved file, not the name it was asked for: a managed key with no explicit
+            // alias is stored under what is passed here, so two accepted spellings of one database
+            // would derive two different keys and the second open would report a wrong key against
+            // intact data.
+            key = config.resolveKeyMaterial(DatabaseImpl.poolKeyFor(databaseName));
+        }
+        return new DatabaseImpl(databaseName, key);
+    }
+
+    /// The file an implicit managed key is stored under; see the open path, which resolves the
+    /// same way so two spellings of one database derive one key.
+    @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return com.codename1.impl.html5.database.DatabaseImpl.poolKeyFor(databaseName);
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        return com.codename1.impl.html5.database.SQLiteNative.init()
+                && com.codename1.impl.html5.database.SQLiteNative.isCipherAvailable();
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        // Storage is a virtual pool keyed by name, not a filesystem, so there are no paths.
+        return false;
+    }
+
+    /// Whether a database of this name is in the storage pool.
+    ///
+    /// An engine that will not start is not an empty pool. The load can fail for reasons that have
+    /// nothing to do with what is stored -- another tab holding the OPFS pool is the likely one --
+    /// and answering "no such database" there says the user's data is gone. It is worse than
+    /// unhelpful: `Database#isEncrypted(String)` gives up on a database that does not exist and
+    /// reports false, so an unreachable engine would have described an encrypted database as
+    /// plaintext.
+    ///
+    /// So an unreachable engine is not reported as absence. The caller goes on to open, which
+    /// fails with what actually happened, rather than concluding the database was never there.
+    @Override
+    public boolean existsDB(String databaseName) {
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            return true;
+        }
+        return com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
+    }
+
+    /// The browser's non-prompting secure store.
+    ///
+    /// Without one the base class answers "unknown" to every question, and ManagedKeys refuses to
+    /// generate a key it cannot prove is absent -- so DatabaseConfig.managed() failed at every
+    /// open on a port that reports encryption as supported. See HTML5SecureStorage for what this
+    /// does and does not protect: it is persistence in origin storage, not a key store.
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new HTML5SecureStorage();
+        }
+        return secureStorage;
+    }
+
+    private com.codename1.security.SecureStorage secureStorage;
+
+    @Override
+    public boolean isRelativeAttachmentNameResolvable() {
+        // No filesystem and no working directory: the engine is SQLite compiled to wasm over a
+        // storage pool, so a bare name in an ATTACH is a pool entry -- the same entry this port
+        // would open under that name. There is nothing here for a relative name to resolve
+        // against differently, so the reservation names the database that really gets attached.
+        return true;
+    }
+
+    @Override
+    public String databaseIdentityForEngineFile(String engineFile) {
+        // The engine here is SQLite compiled to wasm over a storage pool, so what it reports is a
+        // pool entry rather than a path. Dressing it as a file URL, which is right on every port
+        // backed by a filesystem, produced a name the pool has never held -- so the reservation
+        // for the database that really was attached got released and one was taken on nothing.
+        if (engineFile == null || engineFile.length() == 0) {
+            return null;
+        }
+        return com.codename1.impl.html5.database.DatabaseImpl.poolKeyFor(engineFile);
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws IOException {
+        // A failed init is not "nothing to delete". The engine is unavailable - another tab
+        // holding the storage, most likely - and the database is still there, so returning
+        // normally would report a deletion that did not happen.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            throw new IOException("The database " + databaseName + " could not be deleted "
+                    + "because the SQLite engine is unavailable");
+        }
+        if (!com.codename1.impl.html5.database.SQLiteNative.delete(databaseName)) {
+            throw new IOException("The database " + databaseName + " could not be deleted: "
+                    + com.codename1.impl.html5.database.SQLiteNative.lastError());
+        }
+    }
+
+    @Override
+    public int isDatabaseFileEncrypted(String databaseName) {
+        // Databases live in a browser storage pool, not a filesystem, so there is no header to
+        // read. Ask the engine: opening without a key succeeds only for a plaintext database.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            // Unreachable, so unanswered. Reporting "not encrypted" from here would be this port
+            // asserting the one thing it must never get wrong about a database it could not open.
+            return DATABASE_ENCRYPTION_UNKNOWN;
+        }
+        if (!com.codename1.impl.html5.database.SQLiteNative.exists(databaseName)) {
+            return DATABASE_NOT_ENCRYPTED;
+        }
+        try {
+            long peer = com.codename1.impl.html5.database.SQLiteNative.open(databaseName, null);
+            if (peer == 0) {
+                return DATABASE_ENCRYPTED;
+            }
+            com.codename1.impl.html5.database.SQLiteNative.close(peer);
+            return DATABASE_NOT_ENCRYPTED;
+        } catch (IOException cannotOpenUnkeyed) {
+            return DATABASE_ENCRYPTED;
+        }
+    }
+
+    @Override
+    public String getDatabasePath(String databaseName) {
+        // The name inside the storage pool. Not a real filesystem path, and deliberately not
+        // presented as one: FileSystemStorage cannot open it.
+        return databaseName;
     }
 
     @Override
@@ -12680,16 +13814,117 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
-    @JSBody(params={}, script="return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)")
-    private static native boolean isDarkMode_();
-    
-    @Override
-    public Boolean isDarkMode() {
-        return isDarkMode_();
+    private static final String DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+
+    /**
+     * Bumped whenever something invalidates resolved styles for every form, not just the one on
+     * screen -- a colour-scheme switch, a change of display density.
+     */
+    private int themeGeneration;
+
+    private static final String THEME_GENERATION_PROPERTY = "cn1$themeGeneration";
+
+    /**
+     * Re-resolves a form's styles if they predate the current generation.
+     *
+     * <p>A form that is not displayed still holds the Style instances it resolved, and nothing
+     * refreshes them when it is shown again, so without this a cached form would come back
+     * wearing the palette that was in force when it was last built.</p>
+     */
+    private void refreshThemeIfStale(Form f) {
+        if (f == null) {
+            return;
+        }
+        Object seen = f.getClientProperty(THEME_GENERATION_PROPERTY);
+        int generation = seen instanceof Integer ? ((Integer) seen).intValue() : 0;
+        if (generation == themeGeneration) {
+            return;
+        }
+        f.putClientProperty(THEME_GENERATION_PROPERTY, Integer.valueOf(themeGeneration));
+        if (generation != 0 || themeGeneration != 0) {
+            f.refreshTheme();
+        }
     }
 
-    @JSBody(params={"query"}, script="return !!(window.matchMedia && window.matchMedia(query).matches);")
-    private static native boolean matchesMediaQuery(String query);
+    @Override
+    public Boolean isDarkMode() {
+        return Boolean.valueOf(matchesMediaQuery(DARK_SCHEME_QUERY));
+    }
+
+    /**
+     * Last known value of each media query, keyed by query text.
+     */
+    private final Map<String, Boolean> mediaQueryCache = new HashMap<String, Boolean>();
+
+    /**
+     * Evaluates an OS-level preference media query.
+     *
+     * <p>These used to be {@code @JSBody} scripts calling {@code window.matchMedia}. That script
+     * is compiled into the worker, which has no {@code matchMedia}, so every query silently
+     * answered false: dark mode was never detected, and neither was reduced motion or forced
+     * colors. The query is now evaluated on the main thread through the window binding.</p>
+     *
+     * <p>The result is cached and refreshed by a change listener rather than re-read per call,
+     * because reading it crosses the worker boundary and callers such as the theme layer ask
+     * repeatedly.</p>
+     *
+     * @param query the media query text
+     * @return true when the query currently matches
+     */
+    private boolean matchesMediaQuery(final String query) {
+        Boolean cached = mediaQueryCache.get(query);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        boolean matches = false;
+        try {
+            MediaQueryList list = window.matchMedia(query);
+            if (list != null) {
+                matches = list.getMatches();
+                list.addEventListener("change", new EventListener() {
+                    @Override
+                    public void handleEvent(Event evt) {
+                        onMediaQueryChanged(query);
+                    }
+                });
+            }
+        } catch (Throwable ignored) {
+            // An old browser without matchMedia keeps the platform default of "not matching".
+        }
+        mediaQueryCache.put(query, Boolean.valueOf(matches));
+        return matches;
+    }
+
+    private void onMediaQueryChanged(final String query) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    MediaQueryList list = window.matchMedia(query);
+                    if (list != null) {
+                        mediaQueryCache.put(query, Boolean.valueOf(list.getMatches()));
+                    }
+                } catch (Throwable ignored) {
+                    return;
+                }
+                Form current = Display.getInstance().getCurrent();
+                if (current == null) {
+                    return;
+                }
+                if (DARK_SCHEME_QUERY.equals(query)) {
+                    // Components hold the Style instances they resolved, and the dark variant is
+                    // chosen at resolution time, so repainting alone would redraw the old
+                    // colours. Forms that are not on screen hold theirs too, and refreshing only
+                    // this one would bring the old palette back when the user navigated to a
+                    // cached form -- so the generation is bumped and every form refreshes as it
+                    // is shown.
+                    themeGeneration++;
+                    refreshThemeIfStale(current);
+                }
+                current.repaint();
+            }
+        });
+    }
 
     @Override
     public boolean isHighContrastEnabled() {

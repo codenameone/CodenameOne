@@ -9,3 +9,10 @@ name: "Codename One CodeQL configuration"
 # String sinks across the rest of the codebase).
 paths-ignore:
   - 'scripts/cn1playground/**/bsh/cn1/gen/**'
+  # Vendored SQLite engine (SQLite3 Multiple Ciphers), 13MB of upstream C carried
+  # verbatim. Analysing it reports upstream's findings as ours, and its sheer size
+  # pushes CodeQL off incremental analysis so it re-reports pre-existing alerts
+  # across unrelated files. Provenance and update instructions are in
+  # vm/ByteCodeTranslator/src/cn1_sqlite3_README.md.
+  - 'vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h'
+  - 'vm/ByteCodeTranslator/src/cn1_sqlite3.h'

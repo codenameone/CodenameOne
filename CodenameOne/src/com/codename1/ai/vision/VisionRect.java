@@ -22,9 +22,26 @@
  */
 package com.codename1.ai.vision;
 
+import com.codename1.ui.Component;
+import com.codename1.ui.geom.Rectangle;
+
 /// Immutable normalized rectangle using a top-left origin. X/Y identify the
 /// upper-left corner and width/height are fractions of the oriented input
 /// dimensions. {@link #EMPTY} represents unavailable geometry.
+///
+/// {@link #toBounds(int, int, int, int)} converts one back to pixels for
+/// drawing:
+///
+/// ```java
+/// public void paint(Graphics g) {
+///     super.paint(g);
+///     g.setColor(0x34c759);
+///     for (Barcode code : lastCodes) {
+///         Rectangle r = code.getBounds().toBounds(this);
+///         g.drawRect(r.getX(), r.getY(), r.getWidth(), r.getHeight(), 3);
+///     }
+/// }
+/// ```
 public final class VisionRect {
     public static final VisionRect EMPTY = new VisionRect(0, 0, 0, 0);
 
@@ -63,5 +80,50 @@ public final class VisionRect {
     /// @return height as a fraction of oriented input height
     public float getHeight() {
         return height;
+    }
+
+    /// Whether this rectangle carries no geometry, which is what a backend
+    /// that located a result without reporting where reports.
+    ///
+    /// @return {@code true} when the rectangle has no area
+    public boolean isEmpty() {
+        return width <= 0 || height <= 0;
+    }
+
+    /// Maps this normalized rectangle onto a pixel rectangle.
+    ///
+    /// The mapping stretches the whole 0..1 range across {@code width} and
+    /// {@code height}. That is correct when the destination has the same
+    /// aspect ratio as the analyzed image, which is the usual case for an
+    /// image drawn to fit. A live preview scaled with
+    /// {@link com.codename1.camera.ScaleType#CROP} does not: pass the
+    /// rectangle the frame actually occupies rather than the component's own
+    /// bounds.
+    ///
+    /// @param x left edge of the destination rectangle in pixels
+    /// @param y top edge of the destination rectangle in pixels
+    /// @param width destination width in pixels
+    /// @param height destination height in pixels
+    /// @return the corresponding pixel rectangle, rounded to whole pixels
+    public Rectangle toBounds(int x, int y, int width, int height) {
+        int left = Math.round(this.x * width);
+        int top = Math.round(this.y * height);
+        int right = Math.round((this.x + this.width) * width);
+        int bottom = Math.round((this.y + this.height) * height);
+        return new Rectangle(x + left, y + top, right - left, bottom - top);
+    }
+
+    /// Maps this normalized rectangle onto a component's absolute on-screen
+    /// bounds, which is the coordinate space a {@code paint} method draws in.
+    ///
+    /// @param target component the analyzed image is displayed in
+    /// @return the corresponding absolute pixel rectangle
+    /// @throws NullPointerException if {@code target} is {@code null}
+    public Rectangle toBounds(Component target) {
+        if (target == null) {
+            throw new NullPointerException("target");
+        }
+        return toBounds(target.getAbsoluteX(), target.getAbsoluteY(),
+                target.getWidth(), target.getHeight());
     }
 }

@@ -54,6 +54,7 @@ public final class ProcessorContext {
     private final List<ProcessingError> errors = new ArrayList<ProcessingError>();
     private final Map<String, byte[]> emittedClasses = new LinkedHashMap<String, byte[]>();
     private final Map<String, String> emittedStubSources = new LinkedHashMap<String, String>();
+    private final Map<String, byte[]> emittedResources = new LinkedHashMap<String, byte[]>();
 
     public ProcessorContext(File outputClassDir, File stubSourceDir,
                              Map<String, AnnotatedClass> classIndex, Log log) {
@@ -105,6 +106,32 @@ public final class ProcessorContext {
     /// same `com/example/Foo` convention as #emitClass.
     public void emitStubSource(String internalName, String javaSource) {
         emittedStubSources.put(internalName, javaSource);
+    }
+
+    /// Queues a generated resource for write-out under the output class
+    /// directory, so it is packaged into the project jar alongside the classes.
+    ///
+    /// This is the route by which build-time metadata reaches the **native**
+    /// builders. A resource in the jar survives the trip to a cloud build
+    /// server, where the whole artifact is uploaded and unpacked, and the
+    /// iOS/Android builders already read project resources that way.
+    ///
+    /// Emitting through the context rather than writing the file directly is
+    /// what keeps the Mojo's fail-fast promise intact: nothing is written when a
+    /// processor reported an error, so a build that failed validation cannot
+    /// leave a stale manifest behind for the native build to compile against.
+    ///
+    /// #### Parameters
+    ///
+    /// - `relativePath`: path relative to the output class directory, e.g.
+    ///   `intents.json`
+    /// - `content`: the file content
+    public void emitResource(String relativePath, byte[] content) {
+        emittedResources.put(relativePath, content);
+    }
+
+    public Map<String, byte[]> getEmittedResources() {
+        return Collections.unmodifiableMap(emittedResources);
     }
 
     public boolean hasErrors() { return !errors.isEmpty(); }

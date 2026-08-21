@@ -31,6 +31,8 @@ import com.codename1.components.ToastBar;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.javase.simulator.*;
 import com.codename1.impl.javase.ffmpeg.FFMPEGMedia;
 import com.codename1.impl.javase.util.MavenUtils;
@@ -86,6 +88,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import com.codename1.io.Properties;
@@ -453,6 +456,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return surfaceBridge;
+    }
+
+    /// Returns the JavaSE app-intents bridge, created lazily on first use. The desktop has no
+    /// assistant and no system search index, so the bridge records what the application publishes
+    /// and the simulator presents it -- which lets an intent be built and debugged with no device,
+    /// against the same generated table a device would read.
+    ///
+    /// Synchronized because the lazy construction is a race otherwise, and losing it is silent:
+    /// two callers arriving together -- startup publishing the declaration table while a
+    /// background thread indexes -- each see a null field and each build a bridge, so one
+    /// records its declarations, donations or indexed entities into the instance that loses the
+    /// assignment, and the simulator then reads the winner and shows nothing of it. Nothing
+    /// throws and nothing is logged; the operation simply is not there.
+    @Override
+    public synchronized com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        if (intentBridge == null) {
+            intentBridge = new JavaSEIntentBridge();
+        }
+        return intentBridge;
     }
 
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
@@ -1114,6 +1136,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     // simulator mode and the desktop floating widget windows in desktop mode. Created lazily so
     // apps that never touch the surfaces API pay nothing.
     private JavaSEWidgetBridge surfaceBridge;
+    private JavaSEIntentBridge intentBridge;
     // Phone-to-watch link (com.codename1.wearable). Both halves of a paired pair run their own
     // simulator process and meet through the shared app home; created lazily so apps that never
     // touch the wearable API pay nothing.
@@ -6736,6 +6759,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(arSim);
 
+        JMenuItem intentsSim = new JMenuItem("App Intents");
+        intentsSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                // Hand it the real bridge and let it drive the real dispatch
+                // entry point. A simulator control that shortcuts the framework
+                // would report a state it did not actually cause, which is the
+                // failure this window exists to catch.
+                SimulatorIntents.showWindow(
+                        (JavaSEIntentBridge) getIntentBridge(), window);
+            }
+        });
+        simulateMenu.add(intentsSim);
+
         JMenuItem pushSim = new JMenuItem("Push Simulation");
         pushSim.addActionListener(new ActionListener() {
             @Override
@@ -6835,6 +6872,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         final JMenu nfcMenu = installNfcSimulationMenu(simulateMenu, pref);
 
         final JMenu foldableMenu = installFoldableSimulationMenu(simulateMenu, pref);
+
+        final JMenu visionMenu = installVisionSimulationMenu(simulateMenu, pref);
 
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
@@ -7352,6 +7391,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(shieldMenu);
         simulateMenu.add(nfcMenu);
         simulateMenu.add(foldableMenu);
+        simulateMenu.add(visionMenu);
         simulateMenu.add(statusBarTapDiag);
         simulateMenu.addSeparator();
         simulateMenu.add(darkLightModeMenu);
@@ -8866,6 +8906,182 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// Builds *Simulate &gt; Vision*, which scripts what
+    /// {@link JavaSEVisionImpl} hands back to `com.codename1.ai.vision`
+    /// analyzers. The desktop cannot run the models, so this is what lets a
+    /// scanner screen, an overlay, or a "nothing found" branch be built
+    /// without a device.
+    private JMenu installVisionSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        JMenu visionMenu = new JMenu("Vision");
+        visionMenu.setToolTipText("Script the results the on-device vision "
+                + "analyzers return in the simulator");
+
+        final JCheckBoxMenuItem supported = new JCheckBoxMenuItem(
+                "Vision Supported", pref.getBoolean("VisionSim.supported", true));
+        JavaSEVisionImpl.simSupported = supported.isSelected();
+        supported.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.simSupported = supported.isSelected();
+                pref.putBoolean("VisionSim.supported", supported.isSelected());
+            }
+        });
+        visionMenu.add(supported);
+
+        visionMenu.addSeparator();
+
+        JMenu outcomeMenu = new JMenu("Analysis outcome");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        try {
+            JavaSEVisionImpl.outcome = JavaSEVisionImpl.SimOutcome.valueOf(
+                    pref.get("VisionSim.outcome",
+                            JavaSEVisionImpl.SimOutcome.RESULT.name()));
+        } catch (IllegalArgumentException ex) {
+            JavaSEVisionImpl.outcome = JavaSEVisionImpl.SimOutcome.RESULT;
+        }
+        for (final JavaSEVisionImpl.SimOutcome o
+                : JavaSEVisionImpl.SimOutcome.values()) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(o.name(),
+                    o == JavaSEVisionImpl.outcome);
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.outcome = o;
+                    pref.put("VisionSim.outcome", o.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        visionMenu.add(outcomeMenu);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.barcodeValue = pref.get("VisionSim.barcodeValue",
+                JavaSEVisionImpl.barcodeValue);
+        JMenuItem barcodeValue = new JMenuItem("Set scanned code value...");
+        barcodeValue.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Value the simulated barcode scanner decodes:",
+                        JavaSEVisionImpl.barcodeValue);
+                if (value != null) {
+                    JavaSEVisionImpl.barcodeValue = value;
+                    pref.put("VisionSim.barcodeValue", value);
+                }
+            }
+        });
+        visionMenu.add(barcodeValue);
+
+        JavaSEVisionImpl.barcodeFormat = pref.get("VisionSim.barcodeFormat",
+                JavaSEVisionImpl.barcodeFormat);
+        JMenu formatMenu = new JMenu("Scanned code format");
+        ButtonGroup formatGroup = new ButtonGroup();
+        String[] formats = {"QR_CODE", "EAN_13", "UPC_A", "CODE_128",
+            "DATA_MATRIX", "PDF417", "AZTEC"};
+        for (final String format : formats) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(format,
+                    format.equals(JavaSEVisionImpl.barcodeFormat));
+            formatGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.barcodeFormat = format;
+                    pref.put("VisionSim.barcodeFormat", format);
+                }
+            });
+            formatMenu.add(item);
+        }
+        visionMenu.add(formatMenu);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.recognizedText = pref.get("VisionSim.text",
+                JavaSEVisionImpl.recognizedText);
+        JMenuItem recognizedText = new JMenuItem("Set recognized text...");
+        recognizedText.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Text the simulated recognizer reads "
+                        + "(\\n separates blocks):",
+                        JavaSEVisionImpl.recognizedText.replace("\n", "\\n"));
+                if (value != null) {
+                    JavaSEVisionImpl.recognizedText = value.replace("\\n", "\n");
+                    pref.put("VisionSim.text", JavaSEVisionImpl.recognizedText);
+                }
+            }
+        });
+        visionMenu.add(recognizedText);
+
+        JavaSEVisionImpl.imageLabels = pref.get("VisionSim.labels",
+                JavaSEVisionImpl.imageLabels);
+        JMenuItem imageLabels = new JMenuItem("Set image labels...");
+        imageLabels.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Comma separated label:confidence pairs:",
+                        JavaSEVisionImpl.imageLabels);
+                if (value != null) {
+                    JavaSEVisionImpl.imageLabels = value;
+                    pref.put("VisionSim.labels", value);
+                }
+            }
+        });
+        visionMenu.add(imageLabels);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.faceCount = pref.getInt("VisionSim.faces",
+                JavaSEVisionImpl.faceCount);
+        JMenu faceMenu = new JMenu("Detected faces");
+        ButtonGroup faceGroup = new ButtonGroup();
+        for (int i = 0; i <= 3; i++) {
+            final int count = i;
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(
+                    String.valueOf(count), count == JavaSEVisionImpl.faceCount);
+            faceGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.faceCount = count;
+                    pref.putInt("VisionSim.faces", count);
+                }
+            });
+            faceMenu.add(item);
+        }
+        visionMenu.add(faceMenu);
+
+        final JCheckBoxMenuItem smiling = new JCheckBoxMenuItem(
+                "Faces are smiling", pref.getBoolean("VisionSim.smiling", true));
+        JavaSEVisionImpl.smilingProbability = smiling.isSelected() ? .8f : .1f;
+        smiling.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.smilingProbability =
+                        smiling.isSelected() ? .8f : .1f;
+                pref.putBoolean("VisionSim.smiling", smiling.isSelected());
+            }
+        });
+        visionMenu.add(smiling);
+
+        final JCheckBoxMenuItem pose = new JCheckBoxMenuItem(
+                "Body pose detected", pref.getBoolean("VisionSim.pose", true));
+        JavaSEVisionImpl.poseDetected = pose.isSelected();
+        pose.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.poseDetected = pose.isSelected();
+                pref.putBoolean("VisionSim.pose", pose.isSelected());
+            }
+        });
+        visionMenu.add(pose);
+
+        return visionMenu;
+    }
+
     private JMenu installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
         JMenu nfcMenu = new JMenu("NFC");
 
@@ -10129,7 +10345,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 "cn1app.RestClientBootstrap",
                 "cn1app.ProtoBootstrap",
                 "cn1app.GrpcClientBootstrap",
-                "cn1app.GraphQLClientBootstrap"}) {
+                "cn1app.GraphQLClientBootstrap",
+                "cn1app.IntentBootstrap"}) {
             try {
                 Class.forName(bootstrap).newInstance();
             } catch (ClassNotFoundException ignored) {
@@ -13729,6 +13946,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ("simulator.skin".equalsIgnoreCase(key)) {
             return getCurrentSkinName();
         }
+        if ("db.legacy".equals(key)) {
+            // No builder runs for the simulator, so the build hint has to be resolved here or
+            // testing the compatibility switch would need a device.
+            String legacy = buildHint("db.legacy");
+            if (legacy != null) {
+                return legacy;
+            }
+            return defaultValue;
+        }
         if(key.equalsIgnoreCase("cn1_push_prefix") 
                 || key.equalsIgnoreCase("cellId") 
                 || key.equalsIgnoreCase("IMEI") 
@@ -16256,6 +16482,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     public com.codename1.impl.ARImpl createARImpl() {
         return new JavaSEARImpl();
     }
+
+    /// The desktop has no on-device vision models, so the simulator serves the
+    /// results scripted in *Simulate &gt; Vision* instead of reporting every
+    /// analyzer as unsupported. That keeps scanner and overlay code buildable
+    /// without a device.
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        return new JavaSEVisionImpl();
+    }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
         SwingUtilities.invokeLater(new Runnable() {
@@ -17056,11 +17291,18 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
+        return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, DatabaseConfig config) throws IOException {
         try {
             // Load the sqlite database Engine JDBC driver
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException ex) {
         }
+        java.sql.Connection conn = null;
+        String openKey = null;
         try {
             // connect to the database.   This will load the db files and start the
             // database if it is not alread running.
@@ -17068,28 +17310,160 @@ public class JavaSEPort extends CodenameOneImplementation {
             // of the db.
             // It can contain directory names relative to the
             // current working directory
-            SQLiteConfig config = new SQLiteConfig();
-            config.enableLoadExtension(true);
             File file = getDatabaseFile(databaseName);
-             
-            
+
             File dir = file.getParentFile();
             if (!dir.exists()) {
                 dir.mkdirs();
             }
-            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" +
-                    file.getAbsolutePath(),
-                    config.toProperties()
-            );
 
-            return new SEDatabase(conn);
+            // The claim comes before the driver opens the file: a key change in progress is
+            // rewriting it, and a connection that got in first would read pages from both sides of
+            // that rewrite before the refusal reached it.
+            openKey = canonicalDatabaseKey(file);
+            SEDatabase.reserveConnection(openKey);
+
+            java.util.Properties properties;
+            if (config != null && config.isEncrypted()) {
+                warnAboutSimulatorKeyStorage(config);
+                properties = sqlCipherProperties(databaseKeyMaterial(config, databaseName));
+            } else {
+                SQLiteConfig plain = new SQLiteConfig();
+                plain.enableLoadExtension(true);
+                properties = plain.toProperties();
+            }
+
+            conn = DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath(), properties);
+            // Set rather than left to the driver. Measured: this driver enforces declared foreign
+            // keys as soon as a connection opens, and the one the simulator used before it did
+            // not -- nor do the Android and Apple engines, which is what an application actually
+            // ships against. A default that only bites in the simulator turns a violation into a
+            // failure that cannot be reproduced on a device, and a default that only bites on a
+            // device is worse. Applications that want enforcement ask for it with
+            // "PRAGMA foreign_keys = ON", which works on every port.
+            disableForeignKeyEnforcement(conn);
+
+            if (config != null && config.isEncrypted()) {
+                probeKey(conn);
+            }
+            // The resolved file, not the name: a name is resolved against the storage directory
+            // unless it looks like a path, so two names can be one file and the registry a key
+            // change consults has to see them as one. The claim taken above moves to it.
+            SEDatabase result = new SEDatabase(conn, databaseName, openKey);
+            conn = null;
+            openKey = null;
+            return result;
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            closeQuietly(conn);
+            // This driver applies the key while the connection is being set up, so a wrong key
+            // surfaces here rather than on the first read the way it does on the device ports.
+            if (isNotADatabase(ex) && config != null && config.isEncrypted()) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database", ex);
+            }
+            throw new IOException(ex.getMessage(), ex);
+        } catch (IOException ex) {
+            // probeKey turns a rejected key into a DatabaseEncryptionException, which is an
+            // IOException and so slipped past the SQLException handler above with the connection
+            // still open. Repeated passphrase attempts then piled up live handles and kept the
+            // file locked.
+            closeQuietly(conn);
+            throw ex;
+        } finally {
+            // Still set means the connection never reached an SEDatabase, so nothing else will
+            // give the claim back and the file would stay unopenable for the rest of the process.
+            SEDatabase.releaseConnection(openKey);
         }
     }
 
-    
+    /**
+     * Confirms the key really decrypts the database. SQLCipher applies a key lazily, so on the
+     * device ports a wrong key is only discovered on the first read.
+     */
+    private static void probeKey(java.sql.Connection conn) throws SQLException, IOException {
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            s.executeQuery("SELECT count(*) FROM sqlite_master").close();
+        } catch (SQLException ex) {
+            if (isNotADatabase(ex)) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database", ex);
+            }
+            throw ex;
+        } finally {
+            if (s != null) {
+                try {
+                    s.close();
+                } catch (SQLException ignored) {
+                }
+            }
+        }
+    }
+
+    private static boolean isNotADatabase(SQLException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && (message.indexOf("SQLITE_NOTADB") >= 0 || message.indexOf("not a database") >= 0);
+    }
+
+    private static void closeQuietly(java.sql.Connection conn) {
+        if (conn != null) {
+            try {
+                conn.close();
+            } catch (SQLException ignored) {
+            }
+        }
+    }
+
+    /**
+     * Resolves the key literal for a config. Package visible because SEDatabase needs it when
+     * re-keying an already open connection.
+     */
+    static String databaseKeyMaterial(DatabaseConfig config, String databaseName) throws IOException {
+        // Keyed on the resolved file rather than the name: a managed key with no explicit alias is
+        // stored under what is passed here, and two spellings of one database would otherwise
+        // derive two different keys, so the second open would report a wrong key against intact
+        // data.
+        JavaSEPort port = instance;
+        String identity = port == null ? databaseName
+                : canonicalDatabaseKey(port.getDatabaseFile(databaseName));
+        return config.resolveKeyMaterial(identity);
+    }
+
+    private static boolean simulatorKeyWarningShown;
+
+    /**
+     * The simulator has no hardware key store, so a managed key here is protected only by a
+     * software derived key in the desktop user profile. That is fine for development and must not
+     * be mistaken for the protection a real device provides, so say so out loud, once.
+     */
+    private static void warnAboutSimulatorKeyStorage(DatabaseConfig config) {
+        if (simulatorKeyWarningShown || config.getKeyMode() != DatabaseConfig.KEY_MANAGED) {
+            return;
+        }
+        simulatorKeyWarningShown = true;
+        System.out.println("**** Managed database keys in the simulator are protected by a "
+                + "software derived key in the desktop user profile, not by a hardware key store. "
+                + "Do not treat a simulator run as evidence that real user data is protected. ****");
+    }
+
+
+    /**
+     * The registry key for a database file: its canonical path where the filesystem can give one,
+     * and its absolute path otherwise. Canonical resolves "." segments and symlinks, which is what
+     * makes "/tmp/app.db" and "/tmp/./app.db" one entry rather than two.
+     */
+    private static String canonicalDatabaseKey(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException err) {
+            // A file that cannot be canonicalized has not been created yet or sits behind a
+            // permission wall. The absolute path still identifies it more precisely than the name.
+            return f.getAbsolutePath();
+        }
+    }
+
     private File getDatabaseFile(String databaseName) {
         File f = new File(getStorageDir() + File.separator+ "database" + File.separator + databaseName);
         if (exposeFilesystem) {
@@ -17105,15 +17479,126 @@ public class JavaSEPort extends CodenameOneImplementation {
         return f;
     }
     
-    //@Override
+    @Override
     public boolean isDatabaseCustomPathSupported() {
         return true;
     }
-    
+
+    /// The file an implicit managed key is stored under; see the open path, which resolves the
+    /// same way so two spellings of one database derive one key.
+    @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return canonicalDatabaseKey(getDatabaseFile(databaseName));
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        return isCipherCapableDriverPresent();
+    }
+
+    private static Boolean cipherCapableDriver;
+
+    /**
+     * Whether the SQLite JDBC driver on the classpath carries the encryption extension.
+     *
+     * The Maven build ships the cipher-capable driver, but the Ant build links whichever
+     * sqlite-jdbc is pinned in cn1-binaries, which may not. Probing rather than assuming means the
+     * simulator reports honestly instead of failing at open time.
+     */
+    private static boolean isCipherCapableDriverPresent() {
+        if (cipherCapableDriver == null) {
+            try {
+                Class.forName("org.sqlite.mc.SQLiteMCConfig");
+                cipherCapableDriver = Boolean.TRUE;
+            } catch (Throwable notPresent) {
+                cipherCapableDriver = Boolean.FALSE;
+            }
+        }
+        return cipherCapableDriver.booleanValue();
+    }
+
+    /**
+     * Connection properties selecting the SQLCipher 4 on-disk format.
+     *
+     * These are the values the driver's own SQLCipher-v4 preset produces, written out literally so
+     * that this file does not need the driver's builder API on its compile classpath. The Ant build
+     * links an older sqlite-jdbc without it, and importing the class would break that build even
+     * for applications that never encrypt anything.
+     *
+     * legacy=4 is the load-bearing value: it selects genuine SQLCipher 4. The driver's own default
+     * of 0 is a different scheme that no other Codename One platform, and no SQLCipher tool, can
+     * read.
+     */
+    /// Puts a fresh connection on SQLite's own foreign-key default, whatever the driver's is.
+    ///
+    /// Best effort: a driver that will not accept the pragma leaves the connection as it was, and
+    /// the conformance suite reports the difference rather than this failing an open over it.
+    private static void disableForeignKeyEnforcement(java.sql.Connection c) {
+        Statement s = null;
+        try {
+            s = c.createStatement();
+            s.execute("PRAGMA foreign_keys = OFF");
+        } catch (SQLException cannotSet) {
+            // Reported by the conformance suite, which checks the behaviour rather than the call.
+        } finally {
+            if (s != null) {
+                try {
+                    s.close();
+                } catch (SQLException ignored) {
+                    // Nothing useful to do with a failed close of a pragma statement.
+                }
+            }
+        }
+    }
+
+    private static java.util.Properties sqlCipherProperties(String key) {
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty("config_class_name", "org.sqlite.mc.SQLiteMCConfig");
+        p.setProperty("cipher", "sqlcipher");
+        p.setProperty("legacy", "4");
+        p.setProperty("legacy_page_size", "4096");
+        p.setProperty("kdf_iter", "256000");
+        p.setProperty("fast_kdf_iter", "2");
+        p.setProperty("kdf_algorithm", "2");
+        p.setProperty("hmac_algorithm", "2");
+        p.setProperty("hmac_use", "1");
+        p.setProperty("hmac_pgno", "1");
+        p.setProperty("hmac_salt_mask", "58");
+        p.setProperty("plaintext_header_size", "0");
+        p.setProperty("hexkey_mode", "NONE");
+        p.setProperty("key", key);
+        p.setProperty("password", key);
+        return p;
+    }
+
+    @Override
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        // There is no hardware key store on the desktop; SecureStorage falls back to a key derived
+        // from the OS user account. Saying so lets security sensitive apps refuse to run here.
+        return false;
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
     @Override
     public void deleteDB(String databaseName) throws IOException {
-        System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = getDatabaseFile(databaseName);
+        // The companions first, so removing the database itself is the last destructive step: a
+        // failure before it leaves a database the caller can really delete again, rather than an
+        // error reported over a database that is already gone. See databaseSidecarPaths.
+        // A crash leaves rows in them, and deleting the database alone leaves that data on disk
+        // under a name nobody looks at. One that was never created is nothing to do.
+        String[] sidecars = databaseSidecarPaths(f.getAbsolutePath());
+        for (int iter = 0; iter < sidecars.length; iter++) {
+            File sidecar = new File(sidecars[iter]);
+            if (sidecar.exists() && !sidecar.delete()) {
+                throw new IOException("Failed to delete " + sidecar + ", which holds part of the "
+                        + "database. It may be in use; close the database connection first.");
+            }
+        }
         if (f.exists()) {
             if (!f.delete()) {
                 throw new IOException("Failed to delete database file "+f+".  It may be in use.  Make sure to close the database connection before deleting the database.");
@@ -17126,7 +17611,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean existsDB(String databaseName) {
-        System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = getDatabaseFile(databaseName);
         return f.exists();
     }

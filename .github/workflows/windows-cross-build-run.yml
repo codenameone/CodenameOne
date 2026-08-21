@@ -32,6 +32,12 @@ on:
       - 'maven/windows/**'
       - 'scripts/windows/**'
       - 'scripts/hellocodenameone/**'
+      # This job's first step runs through both CI shell helpers, so a change to either has
+      # to be exercised here rather than merged untested -- the same reason every other
+      # consumer lists them.
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/retry.sh'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -42,6 +48,9 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'maven/windows/**'
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/apt-get-update.sh'
+      - 'scripts/ci/retry.sh'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -61,17 +70,34 @@ jobs:
       # clang (older clang-cl trips STL1000 "Unexpected compiler version"), so
       # pin LLVM 19 for the cross-build rather than the distro default.
       - name: Install LLVM 19 + CMake/Ninja
+        # Capped well inside the job's 60 minutes. The inner bounds give a stalled mirror a
+        # second chance; this one guarantees that however they compound, the step cannot eat
+        # the budget the build itself needs -- which is what happened twice on 2026-08-19,
+        # each time surfacing as "Artifact not found" in a different job.
+        timeout-minutes: 20
         run: |
           set -e
-          bash scripts/ci/apt-get-update.sh
+          # No explicit index refresh here: apt-get-install.sh does one itself, and doing it
+          # twice doubles the time a stalling mirror can take before anything is installed.
           # xvfb: the CN1 CSS compiler (codenameone-maven-plugin css goal) renders
           # via CEF/AWT and throws HeadlessException without a display, so the
           # hellocodenameone-common build below runs under a virtual X server.
-          sudo apt-get install -y cmake ninja-build unzip xvfb
-          wget -q https://apt.llvm.org/llvm.sh
+          # Every network call here is bounded and retried. On 2026-08-19 this step sat in
+          # its first line for a full hour and was cancelled having installed nothing, which
+          # then failed the screenshot-comment job downstream for a missing artifact. That is
+          # the same hang apt-get-install.sh was written for -- a hung mirror should cost one
+          # attempt, not the job -- and this workflow had never adopted it.
+          bash scripts/ci/apt-get-install.sh cmake ninja-build unzip xvfb
+          # apt.llvm.org is a single host with no mirror, and llvm.sh both adds its repo and
+          # installs from it, so it is the likeliest thing in this step to stall forever.
+          RETRY_ATTEMPTS=3 bash scripts/ci/retry.sh \
+            wget -q --timeout=30 --tries=3 -O llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 19
-          sudo apt-get install -y clang-19 lld-19 llvm-19
+          # Two attempts of ten minutes, not three of fifteen: the point of a bound is to
+          # leave the job enough budget to do its actual work afterwards, and 3x900s is
+          # three quarters of the runner's hour.
+          RETRY_ATTEMPTS=2 bash scripts/ci/retry.sh timeout 600 sudo ./llvm.sh 19
+          bash scripts/ci/apt-get-install.sh clang-19 lld-19 llvm-19
           echo "/usr/lib/llvm-19/bin" >> "$GITHUB_PATH"
           /usr/lib/llvm-19/bin/clang-cl --version
           /usr/lib/llvm-19/bin/lld-link --version 2>&1 | head -1 || true
@@ -182,9 +208,19 @@ jobs:
           CN1_CLANG_CL: clang-cl
           CN1_LLVM_RC: llvm-rc
           CN1_CROSS_EXE_OUT: ${{ github.workspace }}/artifacts/WinHelloMain.exe
+          # Narrowed to resolution failures, because this step RUNS A TEST. The wrapper
+          # retries every nonzero exit unless it is told what to look for, so a cross-build or
+          # translation failure that came and went would have passed on attempt two and taken
+          # the gate green with it -- laundering exactly the kind of intermittent product bug
+          # this job exists to catch. The unit test workflow narrows it for the same reason.
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
         run: |
           cd vm
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl tests -am test \
+          # Through the retry wrapper: this resolves plugins from Maven Central and the runner
+          # edge intermittently resets the connection mid-download, which Maven treats as a
+          # permanent resolution failure -- this run died on a truncated plexus-utils with nothing
+          # compiled yet. A real failure fails the same way on every attempt.
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh mvn -B -pl tests -am test \
             '-Dtest=CleanTargetIntegrationTest#crossBuildsHelloSuiteExe' \
             '-Dsurefire.failIfNoSpecifiedTests=false'
           test -f "$CN1_CROSS_EXE_OUT"

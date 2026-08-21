@@ -34,6 +34,37 @@ import com.codename1.util.SuccessCallback;
 /// slow model cannot build an unbounded queue. Results and errors arrive on
 /// the EDT. The pipeline owns and closes the analyzer but not the camera
 /// session.
+///
+/// Use this when the application already owns a {@link CameraSession} -- it is
+/// taking photos or recording video as well as analyzing. When the screen only
+/// needs a preview that analyzes, {@link VisionCameraView} does the same thing
+/// and owns the session too, which is one less lifecycle to get right.
+///
+/// ```java
+/// CameraSession session = Camera.open(Camera.getDefault(CameraFacing.BACK),
+///         new CameraSessionOptions().frameMaxFps(10).captureAudio(false));
+/// form.add(BorderLayout.CENTER, session.createView());
+///
+/// VisionPipeline<Barcode[]> pipeline = new VisionPipeline<Barcode[]>(
+///         session, new BarcodeScanner(),
+///         new VisionPipelineListener<Barcode[]>() {
+///             public void result(Barcode[] codes, VisionImage source) {
+///                 if (codes.length > 0) {
+///                     found(codes[0].getValue());
+///                 }
+///             }
+///             public void error(Throwable error) {
+///                 Log.e(error);
+///             }
+///         });
+///
+/// // Closing the pipeline detaches the frame listener and closes the
+/// // analyzer. The session is yours to close.
+/// form.addCloseListener(e -> {
+///     pipeline.close();
+///     session.close();
+/// });
+/// ```
 public final class VisionPipeline<T> implements AutoCloseable {
     private final CameraSession session;
     private final VisionAnalyzer<T> analyzer;

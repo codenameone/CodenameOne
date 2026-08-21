@@ -22,7 +22,27 @@
  */
 package com.codename1.ai.vision;
 
-/// Creates reusable foreground/person segmentation analyzers.
+/// Separates a person from the background, for background replacement or blur.
+///
+/// ```java
+/// SelfieSegmenter segmenter = new SelfieSegmenter();
+/// EncodedImage photo = EncodedImage.create(jpegBytes);
+///
+/// segmenter.process(VisionImage.encoded(jpegBytes)).ready(mask -> {
+///     // Everything below 60% foreground confidence becomes transparent, so
+///     // whatever is painted behind this image shows through.
+///     Image person = mask.cutOut(photo, 0.6f);
+///     preview.setIcon(person);
+///     segmenter.close();
+/// }).except(error -> {
+///     Log.e(error);
+///     segmenter.close();
+/// });
+/// ```
+///
+/// The mask has the model's own resolution rather than the frame's;
+/// {@link SegmentationMask#cutOut(com.codename1.ui.Image, float)} and
+/// {@link SegmentationMask#toMaskImage(int)} rescale it for you.
 public final class SelfieSegmenter extends AbstractVisionAnalyzer<SegmentationMask> {
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions

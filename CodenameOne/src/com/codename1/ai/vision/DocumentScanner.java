@@ -22,7 +22,32 @@
  */
 package com.codename1.ai.vision;
 
-/// Creates reusable document-boundary and perspective-correction analyzers.
+/// Finds a page in a photo and returns it flattened, with the perspective
+/// corrected.
+///
+/// ```java
+/// DocumentScanner scanner = new DocumentScanner();
+/// if (!scanner.isSupported()) {
+///     // Android's document scanner is an interactive Google flow rather than
+///     // an analyzer, so this reports unsupported there.
+///     scanner.close();
+///     return;
+/// }
+/// scanner.process(VisionImage.fromFile(photoPath)).ready(result -> {
+///     for (int i = 0; i < result.getPageCount(); i++) {
+///         pages.add(EncodedImage.create(result.getPage(i)));
+///     }
+///     scanner.close();
+/// }).except(error -> {
+///     Log.e(error);
+///     scanner.close();
+/// });
+/// ```
+///
+/// This is a still-image analyzer: capture the photo however you like -- the
+/// {@link com.codename1.capture.Capture} API, a
+/// {@link com.codename1.camera.CameraSession}, or the gallery -- and hand the
+/// bytes over.
 public final class DocumentScanner extends AbstractVisionAnalyzer<DocumentScanResult> {
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions

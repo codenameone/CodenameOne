@@ -29,6 +29,7 @@ import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.ImplementationFactory;
@@ -1639,12 +1640,14 @@ public final class Display extends CN1Constants {
         if (edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
-
         if (!isEdt()) {
             // when not running callSerially executes synchronously and would recurse here forever (#4811)
             if (!codenameOneRunning) {
                 throw new IllegalStateException("Display.setCurrent must be invoked after Codename One has started running. Call it from start() or via callSerially.");
             }
+            // The direction is not recorded here: this call comes back round on the EDT and
+            // records it there. Doing it in both places would leave one entry behind for a
+            // later navigation to the same form to take.
             callSerially(new RunnableWrapper(newForm, null, reverse));
             return;
         }
@@ -1674,12 +1677,19 @@ public final class Display extends CN1Constants {
                 case SHOW_DURING_EDIT_IGNORE:
                     return;
                 case SHOW_DURING_EDIT_SET_AS_NEXT:
+                    newForm.setShownWithReverse(reverse);
                     impl.setCurrentForm(newForm);
                     return;
                 default:
                     break;
             }
         }
+
+        // Recorded once the call is known to be going through: on the EDT, with the form
+        // changing, and past the cases that decline to show anything while text is being
+        // edited. Recording it any earlier would queue a direction that no arrival takes, and a
+        // later navigation to the same form would take that stale one instead of its own.
+        newForm.setShownWithReverse(reverse);
 
         if (current != null) {
             if (current.isInitialized()) {
@@ -1730,6 +1740,18 @@ public final class Display extends CN1Constants {
                     }
                 }
                 current = current.getPreviousForm();
+                if (current != null) {
+                    // Coming out of a menu back to the form underneath it, which is a backward
+                    // move: without saying so, this arrival takes whatever direction that form
+                    // has left over and a port that keeps browser history in step reads it as a
+                    // step forward, pushing an entry for a form that was already behind.
+                    //
+                    // At the head of the queue, because this arrival comes first: when the form
+                    // being revealed is also the one being shown, its own direction is already
+                    // waiting, and appending would have this restoration take that one and leave
+                    // this one for the show.
+                    current.insertShownWithReverse(true);
+                }
                 impl.setCurrentForm(current);
             }
 
@@ -4045,6 +4067,12 @@ public final class Display extends CN1Constants {
         if ("Component.revalidateOnStyleChange".equals(key)) {
             Component.setRevalidateOnStyleChange("true".equalsIgnoreCase(value));
         }
+        if ("db.legacy".equals(key)) {
+            // Keep the static flag and the property in step, so setting this through the
+            // generated application stub, through CN.setProperty or through
+            // Database.setLegacyBehavior all behave identically.
+            Database.setLegacyBehavior("true".equalsIgnoreCase(value));
+        }
         if (key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
             return;
@@ -4801,6 +4829,17 @@ public final class Display extends CN1Constants {
     /// the surface bridge, or null
     public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
         return impl.getSurfaceBridge();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.intents` API to expose the
+    /// application's capabilities to the system, or null when unsupported on this port. Internal --
+    /// application code uses the `com.codename1.intents` API rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the intent bridge, or null
+    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        return impl.getIntentBridge();
     }
 
     /// Returns true if the device has dialing capabilities
@@ -6109,6 +6148,154 @@ public final class Display extends CN1Constants {
         return impl.openOrCreateDB(databaseName);
     }
 
+    /// Opens an encrypted database or creates one if it does not exist.
+    ///
+    /// Prefer `com.codename1.db.Database#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)`,
+    /// which validates the name and the platform's capability before delegating here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// - `config`: how the database should be keyed
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened, created or decrypted
+    public Database openOrCreate(String databaseName, DatabaseConfig config) throws IOException {
+        return impl.openOrCreateDB(databaseName, config);
+    }
+
+    /// Indicates whether this platform can open encrypted databases.
+    ///
+    /// #### Returns
+    ///
+    /// true if encrypted databases are supported
+    public boolean isDatabaseEncryptionSupported() {
+        return impl.isDatabaseEncryptionSupported();
+    }
+
+    /// Opens a plaintext database through an engine able to encrypt it in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened
+    public Database openOrCreateForRekey(String databaseName) throws IOException {
+        return impl.openOrCreateDBForRekey(databaseName);
+    }
+
+    /// Indicates whether managed database keys are held in hardware backed storage here.
+    ///
+    /// #### Returns
+    ///
+    /// true when a hardware backed key store protects managed keys
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        return impl.isDatabaseManagedKeyHardwareBacked();
+    }
+
+    /// Reports whether a database is encrypted, when the platform can tell without reading the
+    /// file itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// one of the `CodenameOneImplementation` DATABASE_ENCRYPT* constants
+    /// The identity a managed database key with no explicit alias is stored under.
+    ///
+    /// See `com.codename1.impl.CodenameOneImplementation#databaseManagedKeyIdentity(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name the application opens the database under
+    ///
+    /// #### Returns
+    ///
+    /// the identity, which is the name itself unless the port resolves it
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return impl.databaseManagedKeyIdentity(databaseName);
+    }
+
+    /// See `com.codename1.impl.CodenameOneImplementation#databaseRegistryIdentity(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the database, as an application named it
+    ///
+    /// #### Returns
+    ///
+    /// the key it is registered under
+    public String databaseRegistryIdentity(String databaseName) {
+        return impl.databaseRegistryIdentity(databaseName);
+    }
+
+    /// See `com.codename1.impl.CodenameOneImplementation#isRelativeAttachmentNameResolvable()`.
+    ///
+    /// #### Returns
+    ///
+    /// whether a relative attachment name resolves to the database this port would open
+    public boolean isRelativeAttachmentNameResolvable() {
+        return impl.isRelativeAttachmentNameResolvable();
+    }
+
+    /// See `com.codename1.impl.CodenameOneImplementation#databaseIdentityForEngineFile(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `engineFile`: the filename the engine reported
+    ///
+    /// #### Returns
+    ///
+    /// the registry identity for it
+    public String databaseIdentityForEngineFile(String engineFile) {
+        return impl.databaseIdentityForEngineFile(engineFile);
+    }
+
+    /// See `com.codename1.impl.CodenameOneImplementation#openDatabaseConnections(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name or path being deleted
+    ///
+    /// #### Returns
+    ///
+    /// the number of connections the port has open on it
+    public int openDatabaseConnections(String databaseName) {
+        return impl.openDatabaseConnections(databaseName);
+    }
+
+    public int isDatabaseFileEncrypted(String databaseName) {
+        return impl.isDatabaseFileEncrypted(databaseName);
+    }
+
+    /// Indicates whether `byte[]` values may be used as query parameters.
+    ///
+    /// #### Returns
+    ///
+    /// true if blobs are accepted as query parameters
+    public boolean isBlobQueryParameterSupported() {
+        return impl.isBlobQueryParameterSupported();
+    }
+
+    /// Indicates whether this platform accepts a file path as a database name.
+    ///
+    /// #### Returns
+    ///
+    /// true if custom database paths are supported
     public boolean isDatabaseCustomPathSupported() {
         return impl.isDatabaseCustomPathSupported();
     }

@@ -1,6 +1,29 @@
 = sqlite-jdbc Shaded Jar
 
-This is a shaded jar that includes the sqlite-jdbc jar with the slf4j-api jar shaded into it at a different package,
-so as not to conflict with other libraries that might include slf4j.
+This is a shaded jar of the SQLite JDBC driver, with slf4j-api relocated to a different package so
+it cannot conflict with whatever slf4j an application already carries. The relocation was added
+when the driver first grew an slf4j-api dependency.
 
-We needed to add this when we upgraded to version 3.46.1.0 of the sqlite-jdbc library, because it adds a dependency on slf4j-api.
+== Why the willena build rather than xerial
+
+The shaded artifact is `io.github.willena:sqlite-jdbc`, not `org.xerial:sqlite-jdbc`. It is the
+same driver with the SQLite3MC encryption extension compiled into its native library: the same
+`org.sqlite` package, the same `SQLiteConfig`, and identical behaviour on unencrypted databases.
+What it adds is the SQLCipher-compatible cipher, which is what lets the simulator open a database
+created by an app on a device.
+
+The two cannot be used together. They publish the same fully qualified class names, so one would
+silently shadow the other, and relocating either is not an option because the driver loads a JNI
+library whose exported symbols are derived from the `org.sqlite` package name.
+
+Pick the willena version that matches the upstream xerial release you would otherwise have used;
+its version numbers track them.
+
+== Publication
+
+This module used to be excluded from publication and pinned to its last published build, on the
+grounds that a shade of a fixed upstream driver never changed and cost 13.5MB of every release.
+That reasoning no longer applies: the shaded driver now carries the SQLite engine used to read
+encrypted databases, so it has to be able to move with upstream security releases, and consumers
+have to be able to resolve whatever the current one is. It is published normally again, and
+`codenameone-javase` depends on `${project.version}`.

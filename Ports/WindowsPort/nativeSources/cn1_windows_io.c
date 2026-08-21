@@ -33,6 +33,8 @@
 #ifdef _WIN32
 
 #include "cn1_windows.h"
+
+extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 #include <shlobj.h>
 #include <shellapi.h>  /* ShellExecuteW -- not pulled in by WIN32_LEAN_AND_MEAN */
 #include <commdlg.h>   /* GetOpenFileNameW / GetSaveFileNameW (comdlg32) */
@@ -206,6 +208,79 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fileClose___long(CODENAME_ONE
     }
 }
 
+/*
+ * Creates a file only if it does not exist, and says which of the two happened.
+ *
+ * CREATE_NEW is decided by the filesystem, so two processes racing here cannot both be told they
+ * created it. That is what a first managed database key needs: without it both processes generate
+ * a key, each overwrites the other, and the database ends up encrypted under one that no longer
+ * exists anywhere.
+ *
+ * 1 created, 0 already there, -1 the attempt failed for another reason.
+ */
+/*
+ * Takes an exclusive lock on a file, creating it if needed, and answers the handle holding it.
+ *
+ * A lock rather than the file's existence, because Windows closes the handle -- and so releases
+ * the lock -- when the process ends however it ends. A process that died between creating a gate
+ * file and storing its value left that file behind forever, and every later attempt read it as a
+ * live writer, so the key could never be created again. There is nothing to leave behind here.
+ *
+ * Opened without sharing, so a second caller waits in CreateFileW rather than proceeding as
+ * though the entry were absent. 0 when the lock could not be taken.
+ */
+JAVA_LONG com_codename1_impl_windows_WindowsNative_fileLockExclusive___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    HANDLE handle;
+    int attempt;
+    if (path == NULL) {
+        return 0;
+    }
+    /* Retried rather than failed: a holder releases within milliseconds, and CreateFileW answers
+     * ERROR_SHARING_VIOLATION immediately rather than waiting like flock does. */
+    for (attempt = 0; attempt < 600; attempt++) {
+        handle = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL, NULL);
+        if (handle != INVALID_HANDLE_VALUE) {
+            free(path);
+            return (JAVA_LONG) (intptr_t) handle;
+        }
+        if (GetLastError() != ERROR_SHARING_VIOLATION) {
+            break;
+        }
+        Sleep(50);
+    }
+    free(path);
+    return 0;
+}
+
+/* Releases what fileLockExclusive took; closing the handle drops the lock. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_fileUnlock___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    if (handle != 0) {
+        CloseHandle((HANDLE) (intptr_t) handle);
+    }
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_fileCreateExclusive___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    HANDLE handle;
+    DWORD error;
+    if (path == NULL) {
+        return -1;
+    }
+    handle = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (handle != INVALID_HANDLE_VALUE) {
+        CloseHandle(handle);
+        free(path);
+        return 1;
+    }
+    error = GetLastError();
+    free(path);
+    return error == ERROR_FILE_EXISTS ? 0 : -1;
+}
+
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileExists___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
@@ -216,6 +291,79 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileExists___java_lang_Str
     attrs = GetFileAttributesW(path);
     free(path);
     return (attrs != INVALID_FILE_ATTRIBUTES) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/*
+ * Upper-case a string the way the filesystem does.
+ *
+ * NTFS decides that two names are one file with an upcase table, and CharUpperW is that table --
+ * not the process locale. String.toLowerCase on this target folds through towlower, which reads
+ * the C locale and commonly maps ASCII alone, so two spellings of a non-ASCII name folded apart
+ * and derived two different managed keys: the second open of an intact database then reported a
+ * wrong key.
+ *
+ * Deliberately text and not a file handle. A managed key has to be found again after its database
+ * has been deleted and recreated, so its alias cannot depend on the file existing.
+ */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_caseFold___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* text = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    int bytes;
+    char* utf8;
+    JAVA_OBJECT out;
+    if (text == NULL) {
+        return JAVA_NULL;
+    }
+    CharUpperW(text);
+    bytes = WideCharToMultiByte(CP_UTF8, 0, text, -1, NULL, 0, NULL, NULL);
+    if (bytes <= 0) {
+        free(text);
+        return JAVA_NULL;
+    }
+    utf8 = (char*) malloc((size_t) bytes);
+    if (utf8 == NULL) {
+        free(text);
+        return JAVA_NULL;
+    }
+    if (WideCharToMultiByte(CP_UTF8, 0, text, -1, utf8, bytes, NULL, NULL) <= 0) {
+        free(utf8);
+        free(text);
+        return JAVA_NULL;
+    }
+    free(text);
+    out = newStringFromCString(threadStateData, utf8);
+    free(utf8);
+    return out;
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileIdentity___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    HANDLE h;
+    BY_HANDLE_FILE_INFORMATION info;
+    char identity[96];
+    if (path == NULL) {
+        return JAVA_NULL;
+    }
+    h = CreateFileW(path, FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    free(path);
+    if (h == INVALID_HANDLE_VALUE) {
+        /* No file, no identity. The caller falls back to the name, which is all there is to go on
+         * before the file exists. */
+        return JAVA_NULL;
+    }
+    if (!GetFileInformationByHandle(h, &info)) {
+        CloseHandle(h);
+        return JAVA_NULL;
+    }
+    CloseHandle(h);
+    snprintf(identity, sizeof(identity), "winfile:%lu:%lu:%lu",
+            (unsigned long) info.dwVolumeSerialNumber,
+            (unsigned long) info.nFileIndexHigh,
+            (unsigned long) info.nFileIndexLow);
+    return newStringFromCString(threadStateData, identity);
 }
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileIsDirectory___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {

@@ -57,7 +57,7 @@
       "test": "GoogleWebMapScreenshotTest",
       "reason": "The live Google Maps JavaScript map needs three things at once: a web view that composites into the screenshot, a billed Google Maps API key, and network access to Google's tile servers. The deterministic desktop and web pipelines are not given the key, the Mac Catalyst and browser captures do not composite the native web view, tvOS ships no WebKit, and the watch form factor has no map surface at all.",
       "platform_support": "Every listed port supports BrowserComponent and the map API where the table says so; this skip is about one live, key-gated and network-dependent third-party map rendering inside a screenshot comparison, not about map support.",
-      "verification": "The Android and iOS legs are given the API key and render the live Google map end to end, comparing the painted tiles against a stored golden. The offline vector maps that need no key are exercised on every port by the VectorMap and RealOsmVector tests.",
+      "verification": "The Android and iOS legs are given the API key and render the live Google map end to end, comparing the painted tiles against a stored golden. The offline vector maps that need no key are exercised on every port by the VectorMap and RealOsmVector tests. Where the key and a web view are present, a map that never finishes loading is recorded as this skip rather than as a failure: after a full wait budget and a retry on a warm web view, what the run has established is that the tiles could not be fetched, which is a property of the runner's network rather than of the port. A map that does load is compared against its golden as strictly as before, so a rendering change still fails on the pixels.",
       "reason_codes": [
         {
           "prefix": "no-api-key",
@@ -85,6 +85,14 @@
           "prefix": "watch-form-factor",
           "ports": [
             "watchos"
+          ]
+        },
+        {
+          "prefix": "map-tiles-never-loaded",
+          "ports": [
+            "ios-gl",
+            "ios-metal",
+            "android"
           ]
         }
       ]

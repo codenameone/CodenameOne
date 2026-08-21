@@ -2718,8 +2718,47 @@ public class LinuxImplementation extends CodenameOneImplementation {
     ///
     /// Never returns the literal "null": an unset AppName and packageName is
     /// what made the base implementation produce "/null/" in the first place.
+    /// The application's package, as the build stamped it.
+    ///
+    /// Read through Display rather than the implementation's own getProperty: the generated
+    /// stub publishes it with setProperty, and only Display holds what was set that way. The
+    /// implementation's own accessor answers from the value derived during initImpl, which a
+    /// native desktop build never has -- its stub calls Display.init(null), so there is no
+    /// object to take a package from.
+    ///
+    /// #### Returns
+    ///
+    /// the package name, or null when the build did not stamp one
+    private String packageIdentity() {
+        try {
+            return com.codename1.ui.Display.getInstance().getProperty("package_name", null);
+        } catch (RuntimeException tooEarly) {
+            // Asked before Display is ready. The caller falls back, and the next call answers.
+            return null;
+        }
+    }
+
     private String appHomeDirName() {
-        String name = getProperty("AppName", null);
+        // The package first, because on this platform the directory name IS the isolation
+        // boundary. Android and iOS put the app home inside an OS sandbox, so two applications
+        // cannot reach each other whatever the directory is called, and the simulator
+        // deliberately shares one home so several projects can be run from one workspace. A
+        // native desktop build has neither: it is a plain directory under the user account, and
+        // anything that can be named twice is a directory two applications share.
+        //
+        // AppName is a display name -- two vendors can both ship "Notes", and the sanitizer below
+        // maps several reserved characters onto "_", so names that differ can still collide. The
+        // package is what the store, the installer and the build all treat as the application's
+        // identity, so it is what this keys on. AppName remains the fallback for a build that
+        // does not carry one.
+        //
+        // Nothing is migrated out of a directory an earlier build used. Every native desktop
+        // build until now landed on the same name, so what is in there cannot be attributed to
+        // one application, and moving it would hand one application another's files.
+        String name = packageIdentity();
+        if (name == null || name.length() == 0) {
+            name = getProperty("AppName", null);
+        }
         if (name == null || name.length() == 0) {
             name = getPackageName();
         }
@@ -3214,5 +3253,133 @@ public class LinuxImplementation extends CodenameOneImplementation {
             };
         }
         return l10n;
+    }
+
+    // ---------------------------------------------------------------- database
+
+    /**
+     * Resolves a database name to an absolute path. Bare names live in a "database" directory
+     * under the application's storage directory; a file:// URL is resolved through
+     * FileSystemStorage, matching the other ports that support custom paths.
+     */
+    private String resolveDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return com.codename1.io.FileSystemStorage.getInstance().toNativePath(databaseName);
+        }
+        // Under this application's own directory, not storageDir() alone: that one names the
+        // Codename One directory shared by every CN1 application under this user account, so two
+        // applications opening "app.db" opened one file -- each able to read the other's rows and
+        // overwrite them. getAppHomePath() adds the per-application component for the same reason.
+        return LinuxNative.storageDir() + "/" + appHomeDirName() + "/database/" + databaseName;
+    }
+
+    @Override
+    public com.codename1.db.Database openOrCreateDB(String databaseName) throws java.io.IOException {
+        return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public com.codename1.db.Database openOrCreateDB(String databaseName,
+            com.codename1.db.DatabaseConfig config) throws java.io.IOException {
+        String path = resolveDatabasePath(databaseName);
+        int sep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        if (sep > 0) {
+            makeDirectories(path.substring(0, sep));
+        }
+        String key = null;
+        if (config != null && config.isEncrypted()) {
+            // The resolved file, not the name it was asked for: a managed key with no explicit
+            // alias is stored under what is passed here, so two accepted spellings of one database
+            // would derive two different keys and the second open would report a wrong key against
+            // intact data.
+            key = config.resolveKeyMaterial(LinuxDatabase.registryKeyFor(path));
+        }
+        return new LinuxDatabase(databaseName, path, key);
+    }
+
+    /// Creates a directory and every parent of it that is missing.
+    ///
+    /// mkdir() is one level: the native call behind it is a bare mkdir/CreateDirectoryW, which
+    /// fails when the parent is not there and reports nothing. The database lives two levels
+    /// under the storage directory -- the per-application directory, then "database" -- and on a
+    /// first run neither exists, so a single mkdir silently did nothing and the open that
+    /// followed failed with SQLite unable to create the file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativePath`: the directory to create, as a native path
+    private void makeDirectories(String nativePath) {
+        int from = 0;
+        // Past the root, so the first component asked for is a real directory name rather than
+        // "/", which is a call that can only fail.
+        //
+        // No drive-letter handling here, deliberately. This started as one helper written for
+        // both native desktop ports, and skipping everything before a colon is right on Windows
+        // and wrong here: a colon is an ordinary character in a Linux directory name, so
+        // /tmp/missing/tag:one/app.db had every component before "tag:one" skipped and its parent
+        // was never created. The two ports have their own copies; each keeps the rule its
+        // filesystem actually has.
+        while (from < nativePath.length() && nativePath.charAt(from) == '/') {
+            from++;
+        }
+        for (int iter = from; iter <= nativePath.length(); iter++) {
+            boolean end = iter == nativePath.length();
+            if (!end && nativePath.charAt(iter) != '/' && nativePath.charAt(iter) != '\\') {
+                continue;
+            }
+            String upTo = nativePath.substring(0, iter);
+            if (upTo.length() > 0 && !exists("file://" + upTo)) {
+                mkdir("file://" + upTo);
+            }
+        }
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
+    }
+
+    /// The file an implicit managed key is stored under; see the open path, which resolves the
+    /// same way so two spellings of one database derive one key.
+    @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return LinuxDatabase.registryKeyFor(resolveDatabasePath(databaseName));
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        return LinuxNative.sqlDbIsCipherAvailable();
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws java.io.IOException {
+        String path = resolveDatabasePath(databaseName);
+        // The companions first, so removing the database itself is the last destructive step: a
+        // failure before it leaves a database the caller can really delete again, rather than an
+        // error reported over a database that is already gone. See databaseSidecarPaths.
+        // A name that is not there is the documented no-op in the native binding.
+        String[] sidecars = databaseSidecarPaths(path);
+        for (int iter = 0; iter < sidecars.length; iter++) {
+            LinuxNative.sqlDbDelete(sidecars[iter]);
+        }
+        LinuxNative.sqlDbDelete(path);
+    }
+
+    @Override
+    public boolean existsDB(String databaseName) {
+        return LinuxNative.sqlDbExists(resolveDatabasePath(databaseName));
+    }
+
+    @Override
+    public String getDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return databaseName;
+        }
+        return resolveDatabasePath(databaseName);
     }
 }

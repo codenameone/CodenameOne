@@ -22,7 +22,44 @@
  */
 package com.codename1.ai.vision;
 
-/// Creates reusable body-pose analyzers.
+/// Locates body joints, for rep counting, form feedback, or gesture input.
+///
+/// Counting arm raises from the live camera:
+///
+/// ```java
+/// VisionCameraView<Pose> view =
+///         new VisionCameraView<Pose>(new PoseDetector());
+/// view.setListener(new VisionPipelineListener<Pose>() {
+///     private boolean wasUp;
+///
+///     public void result(Pose pose, VisionImage source) {
+///         Pose.Landmark wrist = pose.getLandmark(PoseLandmarks.RIGHT_WRIST);
+///         Pose.Landmark shoulder =
+///                 pose.getLandmark(PoseLandmarks.RIGHT_SHOULDER);
+///         if (wrist == null || shoulder == null
+///                 || wrist.getConfidence() < 0.6f) {
+///             return;
+///         }
+///         // Y grows downwards, so the wrist being "above" the shoulder is a
+///         // smaller Y.
+///         boolean up = wrist.getPosition().getY()
+///                 < shoulder.getPosition().getY();
+///         if (up && !wasUp) {
+///             reps++;
+///             repLabel.setText(String.valueOf(reps));
+///         }
+///         wasUp = up;
+///     }
+///
+///     public void error(Throwable error) {
+///         Log.e(error);
+///     }
+/// });
+/// ```
+///
+/// Backends detect different subsets of the skeleton, so look joints up by
+/// name with {@link Pose#getLandmark(String)} and handle {@code null} rather
+/// than indexing a fixed array. {@link PoseLandmarks} holds the names.
 public final class PoseDetector extends AbstractVisionAnalyzer<Pose> {
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions

@@ -22,7 +22,32 @@
  */
 package com.codename1.ai.vision;
 
-/// Creates reusable on-device image classifiers.
+/// Classifies what an image contains, as ranked labels with confidences.
+///
+/// ```java
+/// ImageLabeler labeler = new ImageLabeler(new VisionOptions()
+///         .minimumConfidence(0.6f)
+///         .maximumResults(5));
+///
+/// labeler.process(VisionImage.fromFile(photoPath)).ready(labels -> {
+///     StringBuilder summary = new StringBuilder();
+///     for (ImageLabel label : labels) {
+///         summary.append(label.getText())
+///                .append(" (")
+///                .append(Math.round(label.getConfidence() * 100))
+///                .append("%)\n");
+///     }
+///     resultLabel.setText(summary.toString());
+///     labeler.close();
+/// }).except(error -> {
+///     Log.e(error);
+///     labeler.close();
+/// });
+/// ```
+///
+/// The label text is the portable part. {@link ImageLabel#getIndex()} is a
+/// model class index that differs between backends and is {@code -1} on Apple
+/// Vision, so branch on {@link ImageLabel#getText()}.
 public final class ImageLabeler extends AbstractVisionAnalyzer<ImageLabel[]> {
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions

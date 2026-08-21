@@ -22,9 +22,48 @@
  */
 package com.codename1.ai.vision;
 
-/// Creates reusable on-device OCR analyzers. The default recognizes the Latin
-/// script; select {@link VisionOptions#textScript(TextScript)} to read Chinese,
-/// Devanagari, Japanese or Korean text.
+/// Reads the text in an image. The default recognizes the Latin script; select
+/// {@link VisionOptions#textScript(TextScript)} to read Chinese, Devanagari,
+/// Japanese or Korean text.
+///
+/// Reading a photographed receipt or label:
+///
+/// ```java
+/// TextRecognizer recognizer = new TextRecognizer();
+/// recognizer.process(VisionImage.fromFile(photoPath)).ready(result -> {
+///     textArea.setText(result.getText());
+///     recognizer.close();
+/// }).except(error -> {
+///     Log.e(error);
+///     recognizer.close();
+/// });
+/// ```
+///
+/// Reading text out of the live camera and stopping at the first line that
+/// looks like the value you want:
+///
+/// ```java
+/// VisionCameraView<TextRecognitionResult> view =
+///         new VisionCameraView<TextRecognitionResult>(new TextRecognizer());
+/// view.setListener(new VisionPipelineListener<TextRecognitionResult>() {
+///     public void result(TextRecognitionResult text, VisionImage source) {
+///         for (TextRecognitionResult.TextBlock block : text.getBlocks()) {
+///             if (block.getText().startsWith("SN-")) {
+///                 accept(block.getText());
+///                 return;
+///             }
+///         }
+///     }
+///     public void error(Throwable error) {
+///         Log.e(error);
+///     }
+/// });
+/// ```
+///
+/// {@link TextRecognitionResult#getText()} is the whole page in reading order;
+/// {@link TextRecognitionResult#getBlocks()} adds per-region text, confidence,
+/// and normalized bounds. Recognize one script per analyzer -- create a second
+/// analyzer when a screen needs two.
 public final class TextRecognizer extends AbstractVisionAnalyzer<TextRecognitionResult> {
     /// Creates an analyzer using the platform default backend and options,
     /// reading the Latin script.

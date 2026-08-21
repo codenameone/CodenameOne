@@ -1,36 +1,36 @@
 {
-  "commit": "159c7e3cc8a0eb161ba96891b6912f1d06cd03c4",
-  "generated_at": "2026-08-07T18:51:33Z",
+  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
+  "generated_at": "2026-08-19T14:55:20Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 425181000
+        "duration_ns": 436593000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 200390000
+        "duration_ns": 180134000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 235233000
+        "duration_ns": 203189000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 142005000
+        "duration_ns": 127759000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 552536000
+        "duration_ns": 498230000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 431016000
+        "duration_ns": 450828000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 978658000
+        "duration_ns": 952488000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,11 +44,11 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31186473652",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868735",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 163,
+    "pass": 171,
     "fail": 0,
     "skip": 8,
     "not-run": 0
@@ -253,6 +253,34 @@
       "feature": "theme-palette-css",
       "status": "pass"
     },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "pass"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
+      "status": "pass"
+    },
     "DesktopModeScreenshotTest": {
       "feature": "desktop-mode",
       "status": "pass"
@@ -358,11 +386,11 @@
       "status": "pass"
     },
     "GoogleWebMapScreenshotTest": {
-      "status": "skip",
       "feature": "native-web-maps",
       "reasons": [
         "tv-no-webview"
-      ]
+      ],
+      "status": "skip"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -394,6 +422,10 @@
     },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "IntentsApiTest": {
+      "feature": "intents",
       "status": "pass"
     },
     "Java17Tests": {
@@ -485,11 +517,11 @@
       "status": "pass"
     },
     "NativeMapFallbackScreenshotTest": {
-      "status": "skip",
       "feature": "vector-maps",
       "reasons": [
         "native-provider-active"
-      ]
+      ],
+      "status": "skip"
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
@@ -632,18 +664,18 @@
       "status": "pass"
     },
     "SurfacesRasterizerScreenshotTest": {
-      "status": "skip",
       "feature": "surfaces",
       "reasons": [
         "surfaces-not-on-tv-or-watch"
-      ]
+      ],
+      "status": "skip"
     },
     "SurfacesRemoteViewsScreenshotTest": {
-      "status": "skip",
       "feature": "surfaces",
       "reasons": [
         "android-only-remoteviews-lowering"
-      ]
+      ],
+      "status": "skip"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -722,11 +754,11 @@
       "status": "pass"
     },
     "VRStereoSceneScreenshotTest": {
-      "status": "skip",
       "feature": "immersive-media",
       "reasons": [
         "tv-no-stereo-vr"
-      ]
+      ],
+      "status": "skip"
     },
     "ValidatorLightweightPickerScreenshotTest": {
       "feature": "pickers-validation",
@@ -745,11 +777,11 @@
       "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
-      "status": "skip",
       "feature": "video-decoding",
       "reasons": [
         "videoio-unavailable-on-ios"
-      ]
+      ],
+      "status": "skip"
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",

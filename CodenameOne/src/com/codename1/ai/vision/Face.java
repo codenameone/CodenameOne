@@ -31,6 +31,24 @@ import java.util.Map;
 /// <p>Euler angles are expressed in degrees. Bounds and landmark points use
 /// the normalized, top-left-origin coordinate space defined by
 /// {@link VisionRect} and {@link VisionPoint}.</p>
+///
+/// <p>Not every backend fills in every field. {@link #getSmilingProbability()}
+/// and {@link #getTrackingId()} return a negative value when the backend does
+/// not expose them -- Apple Vision reports neither -- and a landmark the
+/// backend could not locate is absent from the map. Test for those rather than
+/// assuming a complete observation.</p>
+///
+/// ```java
+/// FaceDetector detector = new FaceDetector();
+/// detector.process(VisionImage.encoded(jpeg)).ready(faces -> {
+///     for (Face face : faces) {
+///         Rectangle box = face.getBounds().toBounds(photoLabel);
+///         if (face.getSmilingProbability() > 0.7f) {
+///             Log.p("smiling face at " + box);
+///         }
+///     }
+/// }).except(error -> Log.e(error));
+/// ```
 public final class Face {
     private final VisionRect bounds;
     private final Map<String, VisionPoint> landmarks;
@@ -84,6 +102,19 @@ public final class Face {
     /// @return normalized top-left-origin face bounds
     public VisionRect getBounds() {
         return bounds;
+    }
+
+    /// Looks up one named landmark.
+    ///
+    /// A landmark the backend could not locate is absent rather than present
+    /// at a meaningless position, so a {@code null} return means "not found in
+    /// this face", not "unsupported".
+    ///
+    /// @param name one of the {@link FaceLandmarks} constants
+    /// @return the normalized landmark position, or {@code null} when the
+    ///         backend did not report it
+    public VisionPoint getLandmark(String name) {
+        return name == null ? null : landmarks.get(name);
     }
 
     /// @return immutable named landmark map; possibly empty
