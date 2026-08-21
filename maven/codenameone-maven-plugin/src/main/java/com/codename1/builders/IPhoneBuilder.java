@@ -6168,13 +6168,38 @@ public class IPhoneBuilder extends Executor {
     private static String resolveSettingsInValue(String value, Map<String, String> archiveSettings) {
         String out = value;
         if (archiveSettings != null) {
-            for (Map.Entry<String, String> setting : archiveSettings.entrySet()) {
-                out = replaceBuildSetting(out, setting.getKey(),
-                        setting.getValue() == null ? "" : setting.getValue().trim());
+            // To a fixed point, not one pass. A setting's value may name another setting and Xcode
+            // keeps expanding until none is left, while one traversal of the map expands nested
+            // references only when the iteration order happens to be the dependency order -- and
+            // for Properties that is hash order. MARKETING_VERSION = 5.4$(VERSION_SUFFIX) visited
+            // before VERSION_SUFFIX left the inner reference behind, the strip below deleted it as
+            // though nothing defined it, and a version the device resolves to 5.41 was judged to
+            // be the app's own 5.4 and left standing.
+            for (int pass = 0; pass < MAX_SETTING_EXPANSIONS
+                    && BUILD_SETTING_REFERENCE.matcher(out).find(); pass++) {
+                String before = out;
+                for (Map.Entry<String, String> setting : archiveSettings.entrySet()) {
+                    out = replaceBuildSetting(out, setting.getKey(),
+                            setting.getValue() == null ? "" : setting.getValue().trim());
+                }
+                if (out.equals(before)) {
+                    // Nothing left that this archive defines; the strip below handles the rest.
+                    break;
+                }
             }
         }
-        return out.replaceAll("\\$[({][A-Za-z0-9_]+[)}]", "").trim();
+        // What survives names a setting the archive does not define, or sits in a cycle that never
+        // settles. Xcode resolves those to nothing, and so does this.
+        return BUILD_SETTING_REFERENCE.matcher(out).replaceAll("").trim();
     }
+
+    /// A build-setting reference in either spelling Xcode accepts.
+    private static final Pattern BUILD_SETTING_REFERENCE =
+            Pattern.compile("\\$[({][A-Za-z0-9_]+[)}]");
+
+    /// Expansion passes before a value is called unresolvable. Settings nest a level or two in
+    /// practice; the cap is what stops A = $(B), B = $(A) from spinning.
+    private static final int MAX_SETTING_EXPANSIONS = 16;
 
     /// One build setting, in either of the two spellings Xcode accepts for a reference.
     private static String replaceBuildSetting(String path, String name, String value) {
