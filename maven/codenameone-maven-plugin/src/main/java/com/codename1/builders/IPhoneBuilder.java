@@ -5854,11 +5854,22 @@ public class IPhoneBuilder extends Executor {
             return plist;
         }
         String current = plist.substring(openEnd + 1, valueEnd);
-        if (current.trim().length() == 0) {
+        if (current.equals(value)) {
+            return plist;
+        }
+        // What the value IS, not how it is spelled: a CDATA section resolved, a comment stripped,
+        // entities decoded. <string><!-- filled in by CI --></string> is a nonzero run of text and
+        // an empty value, and reading it as "an identifier is already here" leaves the extension
+        // with none -- the same failure as the plainly empty forms above.
+        String currentText = WatchNativeBuilder.plistStringContent(current);
+        if (currentText == null) {
+            currentText = "";
+        }
+        if (currentText.length() == 0) {
             changes.add("set " + key + " to " + value + " (was empty)");
             return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
         }
-        if (!overwriteNonEmpty || current.equals(value)) {
+        if (!overwriteNonEmpty) {
             return plist;
         }
         // A value written as $(MARKETING_VERSION) is judged by what it RESOLVES to, not by being a
@@ -5868,12 +5879,16 @@ public class IPhoneBuilder extends Executor {
         // since the target this build generates has no version settings of its own. Both fail the
         // embedded-bundle check; only a reference that already lands on the app's own version is
         // left standing.
-        String resolved = resolveSettingsInValue(current, archiveSettings);
-        if (value.equals(resolved)) {
+        String resolved = resolveSettingsInValue(currentText, archiveSettings);
+        // Accepted as it stands only when it lands on the app's version AND carries no padding of
+        // its own: a plist parser keeps the spaces in <string> 5.4 </string>, so Apple compares
+        // " 5.4 " against the app's "5.4" and rejects the pair. Spelling that resolves cleanly --
+        // CDATA, entities, a build-setting reference -- is left as the archive wrote it.
+        if (value.equals(resolved) && current.equals(current.trim())) {
             return plist;
         }
-        changes.add("set " + key + " to " + value + " to match the app (was " + current
-                + (resolved.equals(current) ? "" : ", which resolves to '" + resolved + "' here")
+        changes.add("set " + key + " to " + value + " to match the app (was " + currentText
+                + (resolved.equals(currentText) ? "" : ", which resolves to '" + resolved + "' here")
                 + ")");
         return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
     }
