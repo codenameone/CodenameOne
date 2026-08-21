@@ -128,6 +128,9 @@ public class IPhoneBuilder extends Executor {
     private boolean runSpm=false;
     private boolean photoLibraryUsage;
     private String buildVersion;
+    // Where the .ios.appext archives are parked between being taken out of the resources
+    // directory and being unpacked into dist/. Null when the app brought none.
+    private File appExtensionArchiveDir;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
     private boolean usesAppReview;
@@ -984,6 +987,15 @@ public class IPhoneBuilder extends Executor {
         // We must now go through and extract this tar file into a separate directory so that we can copy them
         // into the project folder after ByteCodeTranslator has created the Xcode project.
         
+        // Before anything walks the resources: an .ios.appext is unpacked much later, once the
+        // Xcode project exists, but it has to leave resDir now. See stageAppExtensionArchives.
+        try {
+            appExtensionArchiveDir = stageAppExtensionArchives(resDir, new File(tmpFile, "appext"));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to stage the app extension archives out of the "
+                    + "resources directory", ex);
+        }
+
         // Look for frameworks and localized strings
         Set<String> variantGroups = new HashSet<String>();
         for (File child : resDir.listFiles()) {
@@ -4730,7 +4742,7 @@ public class IPhoneBuilder extends Executor {
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
-                    || hasAppExtensionArchives(resDir);
+                    || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
                 try {
                     List<File> podSpecFileList = new ArrayList<File>();
@@ -4788,7 +4800,9 @@ public class IPhoneBuilder extends Executor {
 
                     // Let's extract and add app extensions here
 
-                    File[] appExtensions = extractAppExtensions(resDir, new File(tmpFile, "dist"));
+                    File[] appExtensions = appExtensionArchiveDir == null
+                            ? new File[0]
+                            : extractAppExtensions(appExtensionArchiveDir, new File(tmpFile, "dist"));
                     StringBuilder appExtensionsBuilder = new StringBuilder();
                     {
                         StringBuilder sb = appExtensionsBuilder;
@@ -6878,6 +6892,40 @@ public class IPhoneBuilder extends Executor {
         }
         sb.append("}\n");
         sb.append("end\n");
+    }
+
+    /**
+     * Moves every {@code .ios.appext} archive out of the resources directory, into a staging
+     * directory the extension wiring reads much later.
+     *
+     * <p>The unpacking cannot happen this early -- it wants the Xcode project that does not
+     * exist yet -- but the move cannot happen any later. The resources directory is handed to
+     * the translator, which copies it into {@code <main>-src}, and every file in there becomes
+     * an app resource: the archive shipped inside the .app, an unbuilt second copy of the
+     * extension sitting next to the .appex it had been unpacked into. Deleting it from resDir
+     * at unpack time is too late to stop that copy. Every other archive kind consumed out of
+     * resDir deletes itself for the same reason.</p>
+     *
+     * @return the staging directory, or null when the app brought no extension archive
+     */
+    static File stageAppExtensionArchives(File resDir, File stagingDir) throws IOException {
+        File[] entries = resDir == null ? null : resDir.listFiles();
+        if (entries == null) {
+            return null;
+        }
+        File staged = null;
+        for (File child : entries) {
+            if (!child.isFile() || !child.getName().endsWith(".ios.appext")) {
+                continue;
+            }
+            if (staged == null) {
+                staged = stagingDir;
+                staged.mkdirs();
+            }
+            Files.move(child.toPath(), new File(staged, child.getName()).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
+        }
+        return staged;
     }
 
     private File[] extractAppExtensions(File sourceDirectory, File targetDirectory) throws IOException {
