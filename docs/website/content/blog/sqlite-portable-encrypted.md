@@ -108,7 +108,7 @@ On Android, encryption raises the minimum SDK to 23 and requires AndroidX becaus
 
 A watch is not a small second window owned by the phone process. It has its own executable, storage, startup sequence, and failure modes. [PR #5487](https://github.com/codenameone/CodenameOne/pull/5487) makes that model explicit.
 
-One `codename1.watchMain` setting builds the watch entry point on Apple Watch and Wear OS. The simulator can launch the phone and watch as separate processes and connect them on the desktop. The pair shares source, resources, CSS, and the surfaces model. It does not share `Storage`, `Preferences`, or SQLite.
+One `codename1.watchMain` setting adds the Apple Watch companion entry point. On Android, `codename1.watchStandalone=true` builds that entry point as the Wear OS product instead of the phone application; a companion Wear artifact beside the phone APK is not generated yet. The simulator can launch the phone and watch as separate processes and connect them on the desktop. The pair shares source, resources, CSS, and the surfaces model. It does not share `Storage`, `Preferences`, or SQLite.
 
 `WearableConnection` models the three transports the platforms actually provide. `sendMessage()` asks a live peer for an immediate reply. `putData()` replicates the latest state and survives sleep or relaunch. `transferFile()` moves a larger payload in the background. The API uses `WCSession` on Apple platforms and the Wearable Data Layer on Android.
 

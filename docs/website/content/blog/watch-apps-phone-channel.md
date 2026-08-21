@@ -4,8 +4,8 @@ slug: watch-apps-phone-channel
 url: /blog/watch-apps-phone-channel/
 date: '2026-08-22'
 author: Shai Almog
-description: "Codename One now builds a separate watch application from one watch entry point and connects it to the phone through a portable asynchronous API for messages, state, and files."
-feed_html: '<img src="https://www.codenameone.com/blog/watch-apps-phone-channel.jpg" alt="A phone and watch running separate Codename One applications connected by an asynchronous data channel" /> Codename One now builds a separate watch application from one watch entry point and connects it to the phone through a portable asynchronous API for messages, state, and files.'
+description: "Codename One now builds Apple Watch companions and standalone Wear OS products from one watch entry point, with a portable asynchronous API for messages, state, and files."
+feed_html: '<img src="https://www.codenameone.com/blog/watch-apps-phone-channel.jpg" alt="A phone and watch running separate Codename One applications connected by an asynchronous data channel" /> Codename One now builds Apple Watch companions and standalone Wear OS products from one watch entry point, with a portable asynchronous API for messages, state, and files.'
 series: ["release-2026-08-21"]
 ---
 
@@ -13,7 +13,7 @@ series: ["release-2026-08-21"]
 
 A watch app is not a second form in the phone process. It is another application on another device, with its own storage, startup sequence, and periods when the other side is unreachable.
 
-[PR #5487](https://github.com/codenameone/CodenameOne/pull/5487) now builds that application from `codename1.watchMain` on Apple Watch and Wear OS. It also adds one phone-to-watch API that maps to `WCSession` on Apple platforms and the Wearable Data Layer on Android.
+[PR #5487](https://github.com/codenameone/CodenameOne/pull/5487) now builds an Apple Watch companion from `codename1.watchMain`. On Wear OS, the same entry point becomes the Android product when `codename1.watchStandalone=true`; a companion Wear APK beside the phone application is not generated yet. The release also adds one phone-to-watch API that maps to `WCSession` on Apple platforms and the Wearable Data Layer on Android.
 
 This follows the [portable SQLite and weekly release overview](/blog/sqlite-portable-encrypted/). Both changes replace an interface-shaped promise with behavior that runs in the simulator and in port tests.
 
@@ -23,9 +23,14 @@ The watch application starts from a fully qualified class name:
 
 ```properties
 codename1.watchMain=com.example.MyWatchApp
+
+# For a standalone Wear OS product:
+codename1.watchStandalone=true
 ```
 
-The build derives the watch bundle identifier, deployment target, signing team, and display name from settings the project already has. `codename1.watchStandalone=true` is the only additional choice because a build cannot infer whether the watch is a companion or the product itself.
+On Apple platforms, `watchMain` adds a companion target to the phone build. On Android, `watchStandalone=true` replaces the phone product with the Wear OS application rooted at `watchMain`. Without that flag, the Android build remains the phone application. The build logs that no companion Wear artifact was produced instead of quietly implying otherwise.
+
+The Apple build derives the watch bundle identifier, deployment target, signing team, and display name from settings the project already has.
 
 The phone and watch share source files, resources, CSS, and themes. They do not share runtime state. Each has its own `Storage`, `Preferences`, and SQLite files.
 
