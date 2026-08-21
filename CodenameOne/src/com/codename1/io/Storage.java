@@ -479,7 +479,8 @@ public class Storage {
             // an implementation that writes the entry in one step does the writing.
             // From the finally the failure would reach cleanup(), which logs and
             // swallows it, and this method would report a write that never landed.
-            DataOutputStream writing = d;
+            // handed off so the finally does not close it a second time
+            DataOutputStream writing = d; //NOPMD CloseResource
             d = null;
             writing.close();
             return true;
