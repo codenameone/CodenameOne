@@ -5754,7 +5754,8 @@ public class IPhoneBuilder extends Executor {
         // its app into one that does not -- the very validation failure this method exists to
         // prevent.
         String stamped = stampInfoPlistIdentity(plist, embeddedExtensionShortVersion(request),
-                embeddedExtensionBundleVersion(request), changes);
+                embeddedExtensionBundleVersion(request), appExtensionBuildSettings(appExtension),
+                changes);
         if (changes.isEmpty()) {
             return;
         }
@@ -5781,15 +5782,18 @@ public class IPhoneBuilder extends Executor {
      * case {@code changes} carries the reason and the file is left alone
      */
     static String stampInfoPlistIdentity(String plist, String shortVersion, String bundleVersion,
-            List<String> changes) {
+            Map<String, String> archiveSettings, List<String> changes) {
         if (plist == null || rootDictAt(plist) < 0) {
             changes.add("not an XML property list");
             return null;
         }
         String result = openEmptyRootDict(plist);
-        result = setPlistString(result, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)", false, changes);
-        result = setPlistString(result, "CFBundleShortVersionString", shortVersion, true, changes);
-        result = setPlistString(result, "CFBundleVersion", bundleVersion, true, changes);
+        result = setPlistString(result, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleShortVersionString", shortVersion,
+                true, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleVersion", bundleVersion,
+                true, archiveSettings, changes);
         return result;
     }
 
@@ -5808,7 +5812,7 @@ public class IPhoneBuilder extends Executor {
      * all and fails the same embedded-binary validation as a missing one.
      */
     private static String setPlistString(String plist, String key, String value,
-            boolean overwriteNonEmpty, List<String> changes) {
+            boolean overwriteNonEmpty, Map<String, String> archiveSettings, List<String> changes) {
         if (value == null || value.length() == 0) {
             return plist;
         }
@@ -5854,10 +5858,23 @@ public class IPhoneBuilder extends Executor {
             changes.add("set " + key + " to " + value + " (was empty)");
             return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
         }
-        if (!overwriteNonEmpty || current.equals(value) || current.contains("$(")) {
+        if (!overwriteNonEmpty || current.equals(value)) {
             return plist;
         }
-        changes.add("set " + key + " to " + value + " to match the app (was " + current + ")");
+        // A value written as $(MARKETING_VERSION) is judged by what it RESOLVES to, not by being a
+        // reference. The archive's buildSettings.properties are copied into this target's build
+        // configurations further down, so the reference lands on whatever they say -- a stale 1.0
+        // under an app at 5.4 -- and a setting they do not define resolves to nothing at all,
+        // since the target this build generates has no version settings of its own. Both fail the
+        // embedded-bundle check; only a reference that already lands on the app's own version is
+        // left standing.
+        String resolved = resolveSettingsInValue(current, archiveSettings);
+        if (value.equals(resolved)) {
+            return plist;
+        }
+        changes.add("set " + key + " to " + value + " to match the app (was " + current
+                + (resolved.equals(current) ? "" : ", which resolves to '" + resolved + "' here")
+                + ")");
         return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
     }
 
@@ -6060,9 +6077,23 @@ public class IPhoneBuilder extends Executor {
     /// properties are folded into it -- and a setting that decides which files the build touches
     /// has to be known before we touch them.
     static String appExtensionBuildSetting(File extensionFolder, String key) {
+        String value = appExtensionBuildSettings(extensionFolder).get(key);
+        if (value == null || value.trim().length() == 0) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    /// Every build setting the archive overrides, as its buildSettings.properties declares them.
+    ///
+    /// These are not advisory: further down each one is written into the extension target's build
+    /// configurations, so they decide what a {@code $(...)} reference in the extension's own
+    /// Info.plist resolves to when Xcode processes it.
+    static Map<String, String> appExtensionBuildSettings(File extensionFolder) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
         File settings = new File(extensionFolder, "buildSettings.properties");
         if (!settings.isFile()) {
-            return null;
+            return out;
         }
         Properties props = new Properties();
         FileInputStream fis = null;
@@ -6070,17 +6101,18 @@ public class IPhoneBuilder extends Executor {
             fis = new FileInputStream(settings);
             props.load(fis);
         } catch (IOException ex) {
-            return null;
+            return out;
         } finally {
             if (fis != null) {
                 try { fis.close(); } catch (Throwable t) {}
             }
         }
-        String value = props.getProperty(key);
-        if (value == null || value.trim().length() == 0) {
-            return null;
+        for (Object key : props.keySet()) {
+            if (key instanceof String) {
+                out.put((String) key, props.getProperty((String) key));
+            }
         }
-        return value.trim();
+        return out;
     }
 
     /// Substitutes the build settings whose values this build already knows, so that the ordinary
@@ -6110,6 +6142,23 @@ public class IPhoneBuilder extends Executor {
         out = replaceBuildSetting(out, "TARGET_NAME", targetName);
         out = replaceBuildSetting(out, "PRODUCT_NAME", productName);
         return out.indexOf('$') >= 0 ? null : out;
+    }
+
+    /// A plist value with the archive's own build settings substituted, so a {@code $(...)}
+    /// reference can be compared with the version it will actually resolve to on the device.
+    ///
+    /// A reference to a setting the archive does not define resolves to the empty string, which is
+    /// what Xcode does with it too: the extension target this build generates carries only the
+    /// settings written here, and no version among them.
+    private static String resolveSettingsInValue(String value, Map<String, String> archiveSettings) {
+        String out = value;
+        if (archiveSettings != null) {
+            for (Map.Entry<String, String> setting : archiveSettings.entrySet()) {
+                out = replaceBuildSetting(out, setting.getKey(),
+                        setting.getValue() == null ? "" : setting.getValue().trim());
+            }
+        }
+        return out.replaceAll("\\$[({][A-Za-z0-9_]+[)}]", "").trim();
     }
 
     /// One build setting, in either of the two spellings Xcode accepts for a reference.
