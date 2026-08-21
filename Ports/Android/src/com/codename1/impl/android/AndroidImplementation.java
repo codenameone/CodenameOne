@@ -7886,6 +7886,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return;
             }
             nextStorageScratchSweep = now + STORAGE_SWEEP_INTERVAL;
+            // under the lock the other processes take to start a write or to say they
+            // are running. Finding an owner gone and then deleting its files are two
+            // steps, and a process id is handed out again the moment its holder is
+            // gone: without this a process could be given the id just examined, say so
+            // and start writing, and have this sweep delete the write it had only just
+            // begun -- or the very file it had said it was alive with, after which
+            // every later sweep would take it for gone.
+            lockStorageAcrossProcesses();
             try {
                 File dir = storageScratchDir();
                 File[] files = dir.listFiles();
@@ -7911,6 +7919,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } catch (Throwable t) {
                 // a sweep that fails costs disk space, never correctness
                 com.codename1.io.Log.e(t);
+            } finally {
+                unlockStorageAcrossProcesses();
             }
         }
     }
@@ -7991,6 +8001,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (storageLiveLock != null) {
                 return;
             }
+            // under the same lock the sweep takes, so that saying this process is
+            // running and clearing what the last holder of its id left behind cannot
+            // land in the middle of another process deciding that id is gone
+            lockStorageAcrossProcesses();
             try {
                 storageLiveHandle = new RandomAccessFile(
                         new File(dir, android.os.Process.myPid() + STORAGE_LIVE_SUFFIX), "rw");
@@ -8007,6 +8021,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     Log.e("CodenameOne", "Could not close the liveness file", ignored);
                 }
                 storageLiveHandle = null;
+            } finally {
+                unlockStorageAcrossProcesses();
             }
         }
     }
