@@ -7945,7 +7945,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return;
             }
             for (int iter = 0; iter < scratch.length; iter++) {
-                if (!isStorageLockFile(scratch[iter]) && !scratch[iter].delete()) {
+                if (!isStorageMarkerFile(scratch[iter]) && !scratch[iter].delete()) {
                     com.codename1.io.Log.p("Could not cancel the storage write "
                             + scratch[iter]);
                 }
@@ -7971,6 +7971,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private static boolean isStorageLockFile(File file) {
         return STORAGE_LOCK_FILE.equals(file.getName());
+    }
+
+    /**
+     * Whether the given file is one of the markers the processes keep about
+     * themselves, rather than a write in progress.
+     *
+     * <p>Clearing the storage throws away the writes, and nothing else. A process
+     * whose liveness file was taken from underneath it goes on holding the lock, so
+     * it never notices and never makes the name again, and from then on every other
+     * process reads it as gone and feels free to delete the writes it has in flight.
+     * The sweep is the one place a liveness file is removed, and only once its owner
+     * is known to be gone.</p>
+     *
+     * @param file a file in the scratch directory
+     * @return true if the file is a marker rather than a pending write
+     */
+    private static boolean isStorageMarkerFile(File file) {
+        return isStorageLockFile(file) || file.getName().endsWith(STORAGE_LIVE_SUFFIX);
     }
 
     /**
