@@ -13,7 +13,7 @@ A watch app is not a small form running inside the phone process.
 
 It has another executable, another sandbox, and another lifecycle. The phone may be asleep when the watch wakes. `Storage`, `Preferences`, and SQLite are local to each device.
 
-Codename One now builds the watch application from one `codename1.watchMain` entry point on Apple Watch and Wear OS. The simulator launches the phone and watch as separate processes and connects them on the desktop.
+On Apple platforms, `codename1.watchMain` adds the companion application. On Wear OS, add `codename1.watchStandalone=true`; the watch application becomes the Android product because a companion Wear APK beside the phone build is not generated yet. The simulator launches the phone and watch as separate processes and connects them on the desktop.
 
 `WearableConnection` makes the runtime boundary explicit:
 
