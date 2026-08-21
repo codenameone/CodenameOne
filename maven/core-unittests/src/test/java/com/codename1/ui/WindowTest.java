@@ -3191,4 +3191,37 @@ class WindowTest extends UITestBase {
         }
         return null;
     }
+
+    @FormTest
+    void aPopupForAWindowComponentOpensInThatWindow() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        Button anchor = new Button("anchor");
+        w.add(BorderLayout.CENTER, anchor);
+        w.show();
+        w.revalidate();
+
+        com.codename1.components.InteractionDialog dlg =
+                new com.codename1.components.InteractionDialog("popup");
+        dlg.setAnimateShow(false);
+        try {
+            // The popup is anchored to a component in the window, and its rectangle is
+            // in that window's coordinate space. Resolving the current form instead
+            // opened it over the main window at coordinates that mean nothing there.
+            dlg.showPopupDialog(anchor);
+            flushSerialCalls();
+
+            assertSame(w, dlg.getTopLevelContainer(),
+                    "a popup anchored in a window must open in that window");
+            assertNull(dlg.getComponentForm());
+        } finally {
+            dlg.dispose();
+            w.dispose();
+        }
+    }
 }

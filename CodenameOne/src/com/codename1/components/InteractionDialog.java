@@ -952,6 +952,15 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (f != null && !formMode && !f.getContentPane().contains(c)) {
             setFormMode(true);
         }
+        // The popup is anchored to c, and the rectangle below is in c's top level's
+        // coordinate space, so that top level is the surface it has to appear on --
+        // this overrides any host set earlier rather than deferring to it. Without it
+        // the delegation below resolved the current form, so a popup requested for a
+        // component in a window opened over the main window instead, at coordinates
+        // that mean nothing there.
+        if (f != null) {
+            setTopLevelHost(f);
+        }
         disposed = false;
         getUnselectedStyle().setOpacity(255);
         Rectangle componentPos = c.getSelectedRect();
