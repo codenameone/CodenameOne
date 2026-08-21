@@ -6037,40 +6037,84 @@ public class IPhoneBuilder extends Executor {
     /// the two obvious project-root spellings is not resolvable here, and null says so rather
     /// than guessing at a file to edit.
     static File appExtensionInfoPlist(File extensionFolder) {
-        File settings = new File(extensionFolder, "buildSettings.properties");
-        String override = null;
-        if (settings.isFile()) {
-            Properties props = new Properties();
-            FileInputStream fis = null;
-            try {
-                fis = new FileInputStream(settings);
-                props.load(fis);
-                override = props.getProperty("INFOPLIST_FILE");
-            } catch (IOException ex) {
-                override = null;
-            } finally {
-                if (fis != null) {
-                    try { fis.close(); } catch (Throwable t) {}
-                }
-            }
-        }
-        if (override == null || override.trim().length() == 0) {
+        String override = appExtensionBuildSetting(extensionFolder, "INFOPLIST_FILE");
+        if (override == null) {
             return new File(extensionFolder, "Info.plist");
         }
-        String path = override.trim();
+        String path = override;
         if (path.length() > 1 && path.startsWith("\"") && path.endsWith("\"")) {
             path = path.substring(1, path.length() - 1).trim();
         }
-        for (String projectRoot : new String[]{"$(SRCROOT)/", "$(PROJECT_DIR)/"}) {
-            if (path.startsWith(projectRoot)) {
-                path = path.substring(projectRoot.length());
-            }
-        }
-        if (path.contains("$(")) {
+        path = resolveXcodeSettingsInPath(path, extensionFolder);
+        if (path == null || path.length() == 0) {
             return null;
         }
         File resolved = new File(path);
         return resolved.isAbsolute() ? resolved : new File(extensionFolder.getParentFile(), path);
+    }
+
+    /// One build setting as the extension's own buildSettings.properties overrides it, or null
+    /// when the archive carries no such override.
+    ///
+    /// Read from the file rather than from the settings map because the callers run before the
+    /// properties are folded into it -- and a setting that decides which files the build touches
+    /// has to be known before we touch them.
+    static String appExtensionBuildSetting(File extensionFolder, String key) {
+        File settings = new File(extensionFolder, "buildSettings.properties");
+        if (!settings.isFile()) {
+            return null;
+        }
+        Properties props = new Properties();
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(settings);
+            props.load(fis);
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (fis != null) {
+                try { fis.close(); } catch (Throwable t) {}
+            }
+        }
+        String value = props.getProperty(key);
+        if (value == null || value.trim().length() == 0) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    /// Substitutes the build settings whose values this build already knows, so that the ordinary
+    /// Xcode spelling of an extension's plist path resolves.
+    ///
+    /// {@code $(SRCROOT)/$(TARGET_NAME)/Info.plist} is what an Xcode project writes for the file
+    /// that sits in the extension's own folder, and every part of it is known here: SRCROOT and
+    /// PROJECT_DIR are the project directory, which is where the extension folders are extracted,
+    /// and TARGET_NAME is the folder's name, because that is the name the target is created with.
+    /// PRODUCT_NAME follows TARGET_NAME unless the archive overrode it with a literal.
+    ///
+    /// Both spellings, {@code $(NAME)} and {@code ${NAME}}. Anything still holding a {@code $}
+    /// afterwards is a setting this build cannot evaluate -- CONFIGURATION, an SDK-dependent
+    /// value -- and null says so, because the alternative is editing whichever file the
+    /// half-resolved path happens to name.
+    private static String resolveXcodeSettingsInPath(String path, File extensionFolder) {
+        String targetName = extensionFolder.getName();
+        String productName = appExtensionBuildSetting(extensionFolder, "PRODUCT_NAME");
+        if (productName == null || productName.indexOf('$') >= 0) {
+            productName = targetName;
+        }
+        File projectDir = extensionFolder.getParentFile();
+        String projectPath = projectDir == null ? "." : projectDir.getAbsolutePath();
+        String out = path;
+        out = replaceBuildSetting(out, "SRCROOT", projectPath);
+        out = replaceBuildSetting(out, "PROJECT_DIR", projectPath);
+        out = replaceBuildSetting(out, "TARGET_NAME", targetName);
+        out = replaceBuildSetting(out, "PRODUCT_NAME", productName);
+        return out.indexOf('$') >= 0 ? null : out;
+    }
+
+    /// One build setting, in either of the two spellings Xcode accepts for a reference.
+    private static String replaceBuildSetting(String path, String name, String value) {
+        return path.replace("$(" + name + ")", value).replace("${" + name + "}", value);
     }
 
     /**
