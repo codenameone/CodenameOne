@@ -22,6 +22,8 @@ This closes the [weekly release series that began with portable encrypted SQLite
 An app intent can run in a process the system started only to answer it. There may be no application object and no visible form.
 
 ```java
+private static final Object WORKOUT_TOTAL_LOCK = new Object();
+
 @AppIntent(value = "log_workout", title = "Log a workout",
         description = "Records a completed workout",
         phrases = {"Log a workout in ${applicationName}"},
@@ -30,14 +32,17 @@ public static IntentResult logWorkout(
         @IntentParam(value = "kind", title = "What kind of workout?",
                 options = {"run", "ride", "swim"}) String kind,
         @IntentParam(value = "minutes", title = "How many minutes?") int minutes) {
-    int total = Preferences.get("totalMinutes", 0) + minutes;
-    Preferences.set("totalMinutes", total);
+    int total;
+    synchronized (WORKOUT_TOTAL_LOCK) {
+        total = Preferences.get("totalMinutes", 0) + minutes;
+        Preferences.set("totalMinutes", total);
+    }
     return IntentResult.value(String.valueOf(total))
             .withDialog("Logged " + minutes + " minutes.");
 }
 ```
 
-The method is static because the build generates a direct call. Runtime annotation lookup is unavailable in translated iOS code, and dead-code elimination removes methods with no Java caller. A reflection-based dispatcher could compile successfully and disappear from the shipped application.
+The method is static because the build generates a direct call. Runtime annotation lookup is unavailable in translated iOS code, and dead-code elimination removes methods with no Java caller. A reflection-based dispatcher could compile successfully and disappear from the shipped application. Intent handlers can run concurrently, so the preference update protects its read-modify-write sequence.
 
 {{< mermaid >}}
 flowchart TD

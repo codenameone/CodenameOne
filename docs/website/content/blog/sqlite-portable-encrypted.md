@@ -65,8 +65,16 @@ Encryption is selected by passing a `DatabaseConfig` when the database opens:
 ```java
 if (Database.isEncryptionSupported()) {
     DatabaseConfig config = DatabaseConfig.managed();
-    Database db = Database.openOrCreate("secure.db", config);
-    config.wipe();
+    Database db = null;
+    try {
+        db = Database.openOrCreate("secure.db", config);
+        // Read and write through db.
+    } finally {
+        config.wipe();
+        if (db != null) {
+            db.close();
+        }
+    }
 }
 ```
 
