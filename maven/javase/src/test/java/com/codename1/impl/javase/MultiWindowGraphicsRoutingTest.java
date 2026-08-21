@@ -66,21 +66,29 @@ class MultiWindowGraphicsRoutingTest {
 
         JavaSEPort.C first = port.createWindowCanvas(1);
         JavaSEPort.C second = port.createWindowCanvas(2);
-        first.setSize(320, 240);
-        second.setSize(400, 300);
+        try {
+            first.setSize(320, 240);
+            second.setSize(400, 300);
 
-        Object gFirst = port.getNativeGraphics(first);
-        Object gSecond = port.getNativeGraphics(second);
-        assertNotNull(gFirst);
-        assertNotNull(gSecond);
+            Object gFirst = port.getNativeGraphics(first);
+            Object gSecond = port.getNativeGraphics(second);
+            assertNotNull(gFirst);
+            assertNotNull(gSecond);
 
-        Graphics2D awtFirst = port.getGraphics(gFirst);
-        Graphics2D awtSecond = port.getGraphics(gSecond);
-        assertNotNull(awtFirst);
-        assertNotNull(awtSecond);
-        assertNotSame(awtFirst, awtSecond,
-                "two canvases must not share one screen buffer, or a second window "
-                        + "would draw into the first window's pixels");
+            Graphics2D awtFirst = port.getGraphics(gFirst);
+            Graphics2D awtSecond = port.getGraphics(gSecond);
+            assertNotNull(awtFirst);
+            assertNotNull(awtSecond);
+            assertNotSame(awtFirst, awtSecond,
+                    "two canvases must not share one screen buffer, or a second window "
+                            + "would draw into the first window's pixels");
+        } finally {
+            // The canvas holds a Toolkit-global wheel listener for the life of the VM
+            // unless it is released, so a test that drops one leaks into every test
+            // after it.
+            first.disposeGestureListeners();
+            second.disposeGestureListeners();
+        }
     }
 
     @Test
@@ -90,23 +98,27 @@ class MultiWindowGraphicsRoutingTest {
         assertNotNull(port);
 
         JavaSEPort.C canvas = port.createWindowCanvas(3);
-        canvas.setSize(200, 150);
-        Graphics2D windowGraphics = port.getGraphics(port.getNativeGraphics(canvas));
-        assertTrue(port.isScreenGraphics(windowGraphics),
-                "a secondary window's buffer is still a screen buffer; answering false "
-                        + "here mis-scales its native peers");
+        try {
+            canvas.setSize(200, 150);
+            Graphics2D windowGraphics = port.getGraphics(port.getNativeGraphics(canvas));
+            assertTrue(port.isScreenGraphics(windowGraphics),
+                    "a secondary window's buffer is still a screen buffer; answering false "
+                            + "here mis-scales its native peers");
 
-        // The primary canvas must keep answering true -- that is the behaviour the old
-        // identity comparison had, and every existing baseline depends on it.
-        Graphics2D primaryGraphics = port.getGraphics(port.getNativeGraphics());
-        assertTrue(port.isScreenGraphics(primaryGraphics),
-                "the primary canvas's buffer must still be recognised");
+            // The primary canvas must keep answering true -- that is the behaviour the
+            // old identity comparison had, and every existing baseline depends on it.
+            Graphics2D primaryGraphics = port.getGraphics(port.getNativeGraphics());
+            assertTrue(port.isScreenGraphics(primaryGraphics),
+                    "the primary canvas's buffer must still be recognised");
 
-        // A mutable image is not a screen buffer and must not be mistaken for one.
-        Image mutable = Image.createImage(64, 64);
-        Graphics2D imageGraphics = port.getGraphics(port.getNativeGraphics(mutable.getImage()));
-        assertFalse(port.isScreenGraphics(imageGraphics),
-                "a mutable image's graphics must never be treated as a screen buffer");
+            // A mutable image is not a screen buffer and must not be mistaken for one.
+            Image mutable = Image.createImage(64, 64);
+            Graphics2D imageGraphics = port.getGraphics(port.getNativeGraphics(mutable.getImage()));
+            assertFalse(port.isScreenGraphics(imageGraphics),
+                    "a mutable image's graphics must never be treated as a screen buffer");
+        } finally {
+            canvas.disposeGestureListeners();
+        }
     }
 
     @Test
@@ -116,18 +128,26 @@ class MultiWindowGraphicsRoutingTest {
         assertNotNull(port);
 
         java.awt.Toolkit toolkit = java.awt.Toolkit.getDefaultToolkit();
-        int before = toolkit.getAWTEventListeners(java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK).length;
+        java.util.List<java.awt.event.AWTEventListener> before = wheelListeners(toolkit);
 
         JavaSEPort.C canvas = port.createWindowCanvas(11);
-        int during = toolkit.getAWTEventListeners(java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK).length;
+        java.util.List<java.awt.event.AWTEventListener> registered = wheelListeners(toolkit);
+        registered.removeAll(before);
         canvas.disposeGestureListeners();
-        int after = toolkit.getAWTEventListeners(java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK).length;
+        java.util.List<java.awt.event.AWTEventListener> after = wheelListeners(toolkit);
 
         // The Toolkit holds its listeners for the life of the VM, so a window that
         // never releases one leaks the canvas and its whole hierarchy, and keeps
         // inspecting every wheel event in the application.
-        assertTrue(during >= before, "the canvas registers a global wheel listener");
-        assertEquals(before, after, "disposing must hand that listener back");
+        //
+        // Asserted against the identity of the listener this canvas registered rather
+        // than against the size of the Toolkit's list: the list is global to the VM and
+        // the simulator's event dispatch thread is live alongside this test, so a count
+        // taken here also sees registrations that have nothing to do with this canvas.
+        assertFalse(registered.isEmpty(), "the canvas registers a global wheel listener");
+        for (java.awt.event.AWTEventListener l : registered) {
+            assertFalse(after.contains(l), "disposing must hand that listener back");
+        }
     }
 
     @Test
@@ -142,6 +162,7 @@ class MultiWindowGraphicsRoutingTest {
         // surface -- so merely laying out a secondary frame resized the main form's
         // hierarchy to the secondary canvas's dimensions.
         JavaSEPort.C secondary = port.createWindowCanvas(7);
+        try {
 
         // Driven through the funnel rather than through setBounds. setBounds only
         // reaches it when no skin is loaded, so a setBounds-based test passes with
@@ -163,6 +184,9 @@ class MultiWindowGraphicsRoutingTest {
         assertEquals(-1, width.getInt(secondary),
                 "a secondary canvas must not stage a main-surface resize; its own size "
                         + "is reported window-tagged through componentResized");
+        } finally {
+            secondary.disposeGestureListeners();
+        }
     }
 
     @Test
@@ -489,5 +513,22 @@ class MultiWindowGraphicsRoutingTest {
                         / zoom * canvasMonitorScale),
                 withOwnCanvas,
                 "a hit test must convert with the owning canvas's backing scale");
+    }
+
+    /// The Toolkit's wheel listeners, unwrapped from the proxies it hands out.
+    ///
+    /// `getAWTEventListeners(mask)` builds a fresh `AWTEventListenerProxy` per call, so
+    /// comparing the returned objects by identity never matches. The listener inside
+    /// the proxy is the stable one.
+    private static java.util.List<java.awt.event.AWTEventListener> wheelListeners(
+            java.awt.Toolkit toolkit) {
+        java.util.List<java.awt.event.AWTEventListener> out =
+                new java.util.ArrayList<java.awt.event.AWTEventListener>();
+        for (java.awt.event.AWTEventListener l
+                : toolkit.getAWTEventListeners(java.awt.AWTEvent.MOUSE_WHEEL_EVENT_MASK)) {
+            out.add(l instanceof java.awt.event.AWTEventListenerProxy
+                    ? ((java.awt.event.AWTEventListenerProxy) l).getListener() : l);
+        }
+        return out;
     }
 }
