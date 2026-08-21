@@ -5987,7 +5987,11 @@ public class IPhoneBuilder extends Executor {
                 false, archiveSettings, changes);
         result = setPlistString(result, "CFBundleInfoDictionaryVersion", "6.0",
                 false, archiveSettings, changes);
-        result = setPlistString(result, "CFBundleDevelopmentRegion", "en",
+        // The reference rather than a literal "en", as the generated Wallet and push extensions
+        // both write it: the archive's own DEVELOPMENT_LANGUAGE is copied into this target's build
+        // settings, so an extension whose development language is not English gets its own value
+        // here instead of advertising the wrong fallback localization.
+        result = setPlistString(result, "CFBundleDevelopmentRegion", "$(DEVELOPMENT_LANGUAGE)",
                 false, archiveSettings, changes);
         return result;
     }
