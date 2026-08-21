@@ -5860,9 +5860,17 @@ public class IPhoneBuilder extends Executor {
             return plist;
         }
         // What the value IS, not how it is spelled: a CDATA section resolved, a comment stripped,
-        // entities decoded. <string><!-- filled in by CI --></string> is a nonzero run of text and
-        // an empty value, and reading it as "an identifier is already here" leaves the extension
-        // with none -- the same failure as the plainly empty forms above.
+        // entities decoded, and TRIMMED -- both of plistStringContent's paths end in .trim().
+        // <string><!-- filled in by CI --></string> is a nonzero run of text and an empty value,
+        // and reading it as "an identifier is already here" leaves the extension with none.
+        //
+        // So every spelling of empty arrives here as "" and needs no test of its own: whitespace
+        // between the tags, a comment, an empty or whitespace-only CDATA section, and any mix.
+        // <string/> and <string /> are handled further up -- XML puts the slash against the '>'
+        // whatever whitespace precedes it, so the character before '>' identifies both. Please do
+        // not add another emptiness special case here without a failing test first; several
+        // proposed ones were already covered, and the daemon's AppExtensionInfoPlistTest pins
+        // each form.
         String currentText = WatchNativeBuilder.plistStringContent(current);
         if (currentText == null) {
             currentText = "";
