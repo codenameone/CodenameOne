@@ -1008,10 +1008,18 @@ void CN1MacWindowSetInputEnabled(int slot, BOOL enabled) {
     if (w == NULL) {
         return;
     }
+    UIWindow* window;
     /* Recorded before it is applied, so a request that arrives before the scene
-     * exists is honoured at adoption instead of being delivered to a nil window. */
+     * exists is honoured at adoption instead of being delivered to a nil window --
+     * and recorded under the slot lock, because CN1MacWindowSceneConnected reads
+     * this field and installs the window while holding it. Unsynchronized, adoption
+     * could enable the hierarchy from the value this call is in the middle of
+     * replacing while this call sees a nil window and returns, leaving the peers
+     * interactive underneath the modal. */
+    pthread_mutex_lock(&g_slotLock);
     w->inputEnabled = enabled ? 1 : 0;
-    UIWindow* window = w->window;
+    window = [w->window retain];
+    pthread_mutex_unlock(&g_slotLock);
     if (window == nil) {
         return;
     }
@@ -1020,6 +1028,7 @@ void CN1MacWindowSetInputEnabled(int slot, BOOL enabled) {
          * own title bar is AppKit chrome the app does not own, so its close button
          * stays live -- see the note on CN1MacWindowSceneDisconnected. */
         window.userInteractionEnabled = enabled;
+        [window release];
     });
 }
 
@@ -1058,9 +1067,14 @@ void CN1MacWindowShow(int slot, BOOL visible) {
     if (w == NULL) {
         return;
     }
-    /* Recorded whether or not a scene exists yet, so adoption can honour it. */
+    UIWindow* window;
+    /* Recorded whether or not a scene exists yet, so adoption can honour it, and
+     * under the slot lock for the same reason as the input state: adoption reads
+     * pendingVisible while holding it. */
+    pthread_mutex_lock(&g_slotLock);
     w->pendingVisible = visible ? 1 : 0;
-    UIWindow* window = w->window;
+    window = [w->window retain];
+    pthread_mutex_unlock(&g_slotLock);
     dispatch_async(dispatch_get_main_queue(), ^{
         if (window != nil) {
             window.hidden = visible ? NO : YES;
@@ -1068,6 +1082,7 @@ void CN1MacWindowShow(int slot, BOOL visible) {
                 [window makeKeyAndVisible];
             }
         }
+        [window release];
     });
 }
 
