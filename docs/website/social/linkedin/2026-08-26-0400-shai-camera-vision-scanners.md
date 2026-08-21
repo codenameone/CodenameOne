@@ -1,5 +1,5 @@
 ---
-title: "A complete low-level API can still be the wrong starting point"
+title: "Scan a barcode without rebuilding the camera pipeline"
 slug: 2026-08-26-0400-shai-camera-vision-scanners
 platform: linkedin
 account: shai
@@ -11,7 +11,7 @@ image: /blog/camera-vision-scanners.jpg
 
 We added on-device analyzers for barcodes, faces, poses, text, documents, labels, and segmentation. Then we made a developer wire the entire camera pipeline to scan one QR code.
 
-The low-level pieces were useful. They were also the wrong starting point for the common case.
+Those pieces remain useful for custom camera products. They should not be required for a common scanner flow.
 
 `CodeScanner.scan()` now owns a complete scanner screen and returns one asynchronous result. `VisionCameraView` packages the camera-to-analyzer pipeline as a component for forms that need a custom flow.
 
@@ -19,6 +19,6 @@ Typed barcode formats and landmark names replace backend strings. Geometry helpe
 
 The lower level remains available when a product needs direct frame control. The normal case no longer starts by rebuilding camera setup, backpressure, event-thread delivery, cancellation, and cleanup.
 
-Good API design includes a short path and an escape hatch.
+Applications that need direct frame control keep the low-level API. Everyone else can start with the scanner screen or camera component.
 
 {{canonical}}

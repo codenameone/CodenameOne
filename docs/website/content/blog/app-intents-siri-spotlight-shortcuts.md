@@ -4,18 +4,18 @@ slug: app-intents-siri-spotlight-shortcuts
 url: /blog/app-intents-siri-spotlight-shortcuts/
 date: '2026-08-27'
 author: Shai Almog
-description: "Codename One App Intents generate reflection-free handlers for Siri, Spotlight, Shortcuts, Android launcher shortcuts, widgets, and an application command layer from Java annotations."
-feed_html: '<img src="https://www.codenameone.com/blog/app-intents-siri-spotlight-shortcuts.jpg" alt="One Java app-intent declaration branching to Siri, Spotlight, Shortcuts, Android, and widgets" /> Codename One App Intents generate reflection-free handlers for Siri, Spotlight, Shortcuts, Android launcher shortcuts, widgets, and an application command layer from Java annotations.'
+description: "Codename One App Intents generate reflection-free handlers for Siri, Spotlight, Shortcuts, Android launcher shortcuts, and an application command layer from Java annotations."
+feed_html: '<img src="https://www.codenameone.com/blog/app-intents-siri-spotlight-shortcuts.jpg" alt="A Java application action connected to Siri through generated App Intents code" /> Codename One App Intents generate reflection-free handlers for Siri, Spotlight, Shortcuts, Android launcher shortcuts, and an application command layer from Java annotations.'
 series: ["release-2026-08-21"]
 ---
 
-![One Java app-intent declaration branching to Siri, Spotlight, Shortcuts, Android, and widgets](/blog/app-intents-siri-spotlight-shortcuts.jpg)
+![A Java application action connected to Siri through generated App Intents code](/blog/app-intents-siri-spotlight-shortcuts.jpg)
 
-Siri, Spotlight, the Shortcuts app, an Android launcher shortcut, and a widget button all need the application to describe an action and run it later. The operating-system surfaces differ. The application capability does not.
+`@AppIntent` can expose a public static Java method to Siri, Spotlight, and Shortcuts. The same declaration can also drive an Android launcher shortcut or an internal application command.
 
-[PR #5559](https://github.com/codenameone/CodenameOne/pull/5559) adds `com.codename1.intents` and build-time annotations for declaring that capability once. The build projects it onto the native surfaces each target supports.
+[PR #5559](https://github.com/codenameone/CodenameOne/pull/5559) adds `com.codename1.intents` and the build-time annotations behind that integration. The build generates only the native declarations each target supports.
 
-This closes the [weekly release series that began with portable encrypted SQLite](/blog/sqlite-portable-encrypted/). Both features rely on generated or tested platform adapters while keeping the application contract in Java.
+For encrypted SQLite and the rest of this week's work, see the [weekly release overview](/blog/sqlite-portable-encrypted/).
 
 ## A handler is a public static method
 
@@ -119,7 +119,7 @@ Platform-dispatched handlers do not run on the event dispatch thread. A foregrou
 
 Each invocation has a deadline. Cancellation is cooperative through `IntentContext.isCancelled()`. Commit durable changes as the work proceeds because a result returned after the platform deadline can be discarded.
 
-## Android receives the surfaces it can support
+## Android shortcuts are not Siri
 
 Android has no equivalent to Siri's typed invocation contract and spoken result channel. The API does not label launcher shortcuts as voice parity.
 
@@ -136,6 +136,8 @@ Branch on `Intents.isVoiceInvocationSupported()` before telling a user to speak 
 
 `Intents.invoke(...)` works on every port because it calls the generated Java dispatcher. A desktop or web application can use the same intent as an internal command even when the operating system provides no external intent surface.
 
+Widget actions use the separate surfaces API. A tap arrives through `Surfaces.setActionHandler(...)`; that handler can call `Intents.invoke(...)` when a widget should reuse an intent. Declaring `@AppIntent` alone does not generate a widget action.
+
 ## System integrations stay out when unused
 
 An application that never references `com.codename1.intents` gets no native intent plumbing, shortcut resources, frameworks, manifest entries, or deployment-target change.
@@ -144,7 +146,7 @@ Spotlight indexing and donation use older Objective-C APIs and do not raise the 
 
 The simulator's **Simulate > App Intents** window lists the generated declarations, builds parameter forms, fills entity pickers from the real query methods, and invokes the same dispatch table used by the native ports.
 
-This release is another form of surface reuse. A workout action remains one piece of application logic while Siri, Spotlight, a widget, Android, and the application's own UI decide how to expose it. The platform integration is native. The behavior and tests stay with the shared code.
+A workout handler remains one piece of Java application logic. Siri can invoke it by voice, Spotlight can find its entities, Android can publish it as a shortcut, and the application can call it directly through `Intents.invoke()`. Each platform integration remains native to that platform.
 
 Return to [the parent post](/blog/sqlite-portable-encrypted/) for the database, watch, web, smart-home, camera, and security work that shipped with it.
 

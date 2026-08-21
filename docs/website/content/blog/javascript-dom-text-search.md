@@ -1,5 +1,5 @@
 ---
-title: "JavaScript Text Is Text Again: Searchable Pages Above the Canvas"
+title: "JavaScript Find in Page: DOM Text Above the Codename One Canvas"
 slug: javascript-dom-text-search
 url: /blog/javascript-dom-text-search/
 date: '2026-08-23'
@@ -15,13 +15,13 @@ Browser search cannot find pixels. That was the JavaScript port's text model: Co
 
 [PR #5552](https://github.com/codenameone/CodenameOne/pull/5552) keeps the canvas renderer and promotes eligible visible text into a DOM layer. Codename One still measures and places every run. The browser handles the part it is better at: text rasterization, selection, search, accessibility, input metadata, and device-pixel resolution.
 
-This is the web follow-up to [this week's portable SQLite release](/blog/sqlite-portable-encrypted/). The same principle applies: preserve one application model, but use the host platform where it improves the result without changing that model.
+For encrypted SQLite and the rest of this week's work, see the [weekly release overview](/blog/sqlite-portable-encrypted/).
 
 ## A DOM component tree was the wrong trade
 
 Replacing each Codename One component with a DOM element would hand layout and paint ordering to the browser. It would also create two UI implementations to keep consistent.
 
-The useful split is narrower:
+We kept application components on the canvas and projected only the text and accessibility data the browser needs:
 
 {{< mermaid >}}
 flowchart TB
@@ -39,7 +39,7 @@ The page now has a shape similar to this:
 
 ```html
 <canvas role="presentation" aria-hidden="true"></canvas>
-<div id="cn1-text-layer">
+<div id="cn1-text-layer" aria-hidden="true">
     <span style="position:absolute; white-space:pre">Account balance</span>
 </div>
 <div id="cn1-accessibility-tree" aria-label="Account balance"></div>
@@ -96,7 +96,7 @@ Drag selection is also disabled for now. The text layer takes no pointer events 
 
 Vertical placement can differ from browser font metrics by roughly one pixel. A sheet covering text inside the same form can also leave that text represented in the DOM until same-form occlusion is modeled.
 
-## Web-native behavior without a second renderer
+## Search works without handing layout to the browser
 
 The JavaScript port still ships the Codename One UI. A browser cannot reflow a label, substitute a component, or change a layout after an OS update. The application owns those decisions.
 

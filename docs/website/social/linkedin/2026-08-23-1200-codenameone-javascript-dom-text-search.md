@@ -1,5 +1,5 @@
 ---
-title: "Canvas pixels can behave like browser text"
+title: "Find in page now works in the JavaScript port"
 slug: 2026-08-23-1200-codenameone-javascript-dom-text-search
 platform: linkedin
 account: codenameone
@@ -22,6 +22,6 @@ That narrow split restores the browser features users expect:
 
 Transformed, clipped, offscreen, and bitmap-font text stays on the canvas. Drag selection still needs pointer routing because the canvas owns application hit testing.
 
-One renderer keeps application layout consistent. Two small DOM projections let the page behave like a page.
+Codename One keeps control of application layout. The browser handles search, selection, accessibility, and text rasterization.
 
 {{canonical}}

@@ -11,11 +11,11 @@ series: ["release-2026-08-21"]
 
 ![A protected Android confirmation screen rejecting a touch from behind a malicious overlay](/blog/tapjacking-protection.jpg)
 
-A confirmation screen can be correct and still receive a tap the user did not understand. On Android, another application can draw over the screen and make a transfer button look like part of a different interaction.
+We are continuing our security hardening work with protection for the input path. A confirmation screen can be correct and still receive a tap the user did not understand. On Android, another application can draw over the screen and make a transfer button look like part of a different interaction.
 
 [PR #5553](https://github.com/codenameone/CodenameOne/pull/5553) adds tapjacking and screen-overlay protection to `DeviceIntegrity`. It can report the condition, drop the full gesture, and ask Android 12 or newer to prevent overlay windows on a sensitive screen.
 
-This work extends the security thread in the [portable encrypted SQLite release overview](/blog/sqlite-portable-encrypted/). Database encryption protects stored bytes. Tapjacking protection controls input while the application is running.
+The [weekly release overview](/blog/sqlite-portable-encrypted/) also covers encrypted SQLite, which protects stored bytes. Tapjacking protection controls input while the application is running.
 
 ## Android reports the overlay on the touch
 
@@ -98,7 +98,7 @@ android.tapjackingGuard.hideOverlays=true
 
 Clear `setHideOverlayWindows(false)` and `setSecureScreen(false)` when the application leaves the sensitive flow if the rest of the product allows those features.
 
-## The platform boundary is part of the API
+## iOS does not allow the same cross-application overlay
 
 iOS does not let one application draw a window over another, so the policy has no iOS work to do. Screen recording and mirroring are different threats and use `ios.disableScreenshots=true`.
 
@@ -106,7 +106,7 @@ The simulator exposes **Simulate > App Shield > Screen Overlay (Tapjacking)**. I
 
 Tapjacking is not reported as a standing device-compromise reason. An overlay is transient and can be benign. Folding it into `isDeviceCompromised()` would make a notification shade look like a rooted device. Instead it raises its own App Shield signal and remains available as a local input policy.
 
-Secure-by-default does not mean enabling the strictest switch everywhere. It means the normal path blocks the high-confidence case, the API exposes the cost of stronger settings, and unsupported platforms do not claim a protection they cannot provide.
+`BLOCK` handles the high-confidence case by default. `STRICT` remains an explicit choice because partially obscured touches can come from benign system UI. Unsupported platforms do not report protection they cannot provide.
 
 The {{< post-link path="/blog/camera-vision-scanners" text="next post restores a short path for common camera and vision cases" >}}.
 

@@ -9,7 +9,7 @@ timezone: Asia/Jerusalem
 image: /blog/tapjacking-protection.jpg
 ---
 
-A malicious Android application can draw over a transfer screen and change what the user believes a tap will confirm.
+Our security hardening work now covers another part of the path between the user and a sensitive operation. A malicious Android application can draw over a transfer screen and change what the user believes a tap will confirm.
 
 Codename One now exposes tapjacking protection through `DeviceIntegrity`.
 

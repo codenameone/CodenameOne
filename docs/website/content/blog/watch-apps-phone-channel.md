@@ -15,9 +15,9 @@ A watch app is not a second form in the phone process. It is another application
 
 [PR #5487](https://github.com/codenameone/CodenameOne/pull/5487) now builds an Apple Watch companion from `codename1.watchMain`. On Wear OS, the same entry point becomes the Android product when `codename1.watchStandalone=true`; a companion Wear APK beside the phone application is not generated yet. The release also adds one phone-to-watch API that maps to `WCSession` on Apple platforms and the Wearable Data Layer on Android.
 
-This follows the [portable SQLite and weekly release overview](/blog/sqlite-portable-encrypted/). Both changes replace an interface-shaped promise with behavior that runs in the simulator and in port tests.
+For encrypted SQLite and the rest of this week's work, see the [weekly release overview](/blog/sqlite-portable-encrypted/).
 
-## One setting creates the second entry point
+## One entry point builds the watch application
 
 The watch application starts from a fully qualified class name:
 
@@ -131,11 +131,11 @@ The system targets that render those watch families are not generated yet. watch
 
 Android has one more current limit. Standalone Wear applications build today. A companion configuration does not yet produce a second Wear APK beside the phone APK. Apple Watch supports both companion and standalone targets, although standalone App Store submission still needs a manual archive step in Xcode.
 
-## Reuse should survive the platform boundary
+## Share code without pretending the watch is a phone
 
-The useful reuse here is not pretending the watch and phone are the same screen. They are separate products sharing application rules, visual assets, and surface descriptions. `WearableConnection` then makes the real runtime boundary visible in ordinary Java code.
+The watch and phone are separate products. They can still share application rules, visual assets, and surface descriptions. `WearableConnection` keeps the connection between them visible in ordinary Java code.
 
-That distinction matters for write-once-run-anywhere. Reuse is strongest when the common layer expresses what the applications share and leaves different lifecycles intact. A phone message can fail. A replicated value can arrive after a relaunch. A complication can render while neither application is active.
+Write once, run anywhere does not require pretending every screen has the same lifecycle. A phone message can fail. A replicated value can arrive after a relaunch. A complication can render while neither application is active. The shared code handles those cases without hiding them.
 
 The {{< post-link path="/blog/javascript-dom-text-search" text="next post keeps the Codename One renderer while restoring browser-native text behavior" >}}.
 

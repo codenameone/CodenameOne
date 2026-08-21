@@ -1,5 +1,5 @@
 ---
-title: "Smart Home: HomeKit, Matter, and Google Home Behind One API"
+title: "One Java API for HomeKit, Matter, and Google Home"
 slug: smart-home-homekit-matter
 url: /blog/smart-home-homekit-matter/
 date: '2026-08-24'
@@ -15,7 +15,7 @@ A light can expose brightness through a HomeKit characteristic or a Matter clust
 
 [PR #5554](https://github.com/codenameone/CodenameOne/pull/5554) adds `com.codename1.home`, a portable model for listing accessories, reading and writing traits, watching changes, running scenes, and commissioning Matter devices.
 
-The difficult part is not naming the common methods. It is preserving the cases where the platforms cannot give the same answer. This post follows the [portable API theme in this week's release overview](/blog/sqlite-portable-encrypted/).
+The API also reports cases where the platforms cannot give the same answer. For the other work that shipped this week, see the [weekly release overview](/blog/sqlite-portable-encrypted/).
 
 ## Traits describe the device, not the platform
 
@@ -116,7 +116,7 @@ Where push delivery is unavailable, call `drainChanges()` when the application r
 
 Nothing in this release wakes a stopped application for an accessory change. The home hub owns background automation. The phone application owns a foreground view of current state.
 
-## Commissioning belongs to the operating system
+## Commissioning uses the operating system's setup flow
 
 Both mobile ports hand Matter commissioning to a system-owned flow. The user may need to power on the accessory, hold a physical button, scan a label, and join Wi-Fi. The application receives no determinate progress to display.
 
@@ -160,7 +160,7 @@ Those cases make the application handle missing values, partial failures, constr
 
 Automations, triggers, background events, topology writes, camera streams, alarm panels, and Matter events remain outside this release. By default Codename One also commissions through the Apple Home or Google Home ecosystem rather than becoming a Matter controller with its own fabric.
 
-This API expands Codename One onto another native surface without making the application carry platform cluster IDs or characteristic strings. The common model is useful because its capability queries preserve the differences that product code must handle.
+Application code can work with brightness, temperature, locks, and scenes without carrying HomeKit characteristic strings or Matter cluster IDs. Capability queries still expose the platform differences the product must handle.
 
 The {{< post-link path="/blog/tapjacking-protection" text="next post adds tapjacking protection to the security work" >}}.
 

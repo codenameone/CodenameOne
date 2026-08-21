@@ -1,5 +1,5 @@
 ---
-title: "One-Call Vision Scanners: Camera APIs Without the Wiring"
+title: "CodeScanner.scan(): Barcode Scanning Without Rebuilding the Camera Pipeline"
 slug: camera-vision-scanners
 url: /blog/camera-vision-scanners/
 date: '2026-08-26'
@@ -13,11 +13,9 @@ series: ["release-2026-08-21"]
 
 The new vision analyzers could read barcodes, faces, poses, text, documents, and segmentation masks. Scanning one QR code still meant opening a camera, configuring a session, listening for frames, converting each frame, feeding a pipeline, moving the result to the event thread, and restoring the previous form.
 
-That was the correct low-level API and the wrong starting point for the common case.
+The low-level layer remains necessary for custom camera products. It should not be a prerequisite for reading one code or counting faces.
 
-This post continues [the weekly release series that began with portable encrypted SQLite](/blog/sqlite-portable-encrypted/).
-
-[PR #5575](https://github.com/codenameone/CodenameOne/pull/5575) adds the missing layers above the analyzers.
+[PR #5575](https://github.com/codenameone/CodenameOne/pull/5575) adds the missing layers above the analyzers. For the other work that shipped this week, see the [weekly release overview](/blog/sqlite-portable-encrypted/).
 
 ## One call owns the scanner screen
 
@@ -147,7 +145,7 @@ The preview remains a native view. iOS and Android do not give native peers the 
 
 The low-level APIs remain available for products that need direct frame control. The change is that barcode scanning, face counting, and common camera analysis no longer start by rebuilding the plumbing.
 
-The {{< post-link path="/blog/app-intents-siri-spotlight-shortcuts" text="next post turns one Java declaration into several system entry points" >}}.
+The {{< post-link path="/blog/app-intents-siri-spotlight-shortcuts" text="next post shows how to expose a Java intent to Siri, Spotlight, and Shortcuts" >}}.
 
 ---
 

@@ -11,25 +11,23 @@ series: ["release-2026-08-21"]
 
 ![A locked SQLite database connected to mobile, web, desktop, and watch applications](/blog/sqlite-portable-encrypted.jpg)
 
-We have called `com.codename1.db` portable since 2012. The interface was portable. Its behavior was not.
+The original `com.codename1.db` implementation delegated SQLite calls to the database supplied by each operating system. We knew this was less portable than the rest of Codename One, but fixing it meant taking ownership of SQLite on every target. That looked like a deep rabbit hole, so we exposed escape hatches instead. The [pluggable SpatiaLite work we described in 2018](/blog/spatial-pluggable-sqlite/) is one example.
 
 On Windows and Linux, `Database.openOrCreate()` returned `null`. JavaScript depended on WebSQL, which Chrome removed and Firefox never implemented. An iOS cursor could report success on an empty result set, then read unset memory. The simulator counted rows from one while the other ports counted from zero. Encryption had no sensible place to live because there was no single database contract underneath it.
 
-[PR #5526](https://github.com/codenameone/CodenameOne/pull/5526) replaces that collection of similar APIs with one specified and tested SQLite contract. It also resolves the long-standing [encrypted database request](https://github.com/codenameone/CodenameOne/issues/3848). The same encrypted file can move between ports and open in a standard SQLCipher 4 client.
+[PR #5526](https://github.com/codenameone/CodenameOne/pull/5526) follows that rabbit hole to the end. It replaces the platform-dependent implementations with one specified and tested SQLite contract. It also resolves the long-standing [encrypted database request](https://github.com/codenameone/CodenameOne/issues/3848). The same encrypted file can move between ports and open in a standard SQLCipher 4 client.
 
-That is the main work this week. The other releases extend the same idea beyond the database: one declared behavior, projected onto each platform, with the differences exposed instead of hidden.
+## TL;DR
 
-## This week in one page
-
-- [SQLite now has one tested contract](#the-interface-hid-five-different-databases), including native Windows and Linux implementations, SQLite compiled to WebAssembly for JavaScript, and encryption with three key models.
+- [SQLite now has one tested contract](#each-port-had-different-sqlite-behavior), including native Windows and Linux implementations, SQLite compiled to WebAssembly for JavaScript, and encryption with three key models.
 - The {{< post-link path="/blog/watch-apps-phone-channel" text="watch apps deep dive" >}} treats the phone and watch as separate applications with separate lifecycles. `WearableConnection` gives them one asynchronous API for messages, replicated state, and files.
 - {{< post-link path="/blog/javascript-dom-text-search" text="JavaScript text" >}} now appears as real DOM text above the canvas. Browser search, selection, accessibility, autofill, and native-resolution rendering work without handing layout to the browser.
 - {{< post-link path="/blog/smart-home-homekit-matter" text="Smart home support" >}} maps HomeKit, Matter, and Google Home concepts onto `com.codename1.home`, including a simulated house for desktop development.
 - {{< post-link path="/blog/tapjacking-protection" text="Tapjacking protection" >}} detects and can reject Android gestures that begin behind another app's overlay.
 - {{< post-link path="/blog/camera-vision-scanners" text="Camera and vision" >}} regain the one-call ergonomics that were lost when the old scanner libraries were replaced by lower-level on-device analyzers.
-- {{< post-link path="/blog/app-intents-siri-spotlight-shortcuts" text="App Intents" >}} declare an application capability once and project it to Siri, Spotlight, Shortcuts, Android launcher shortcuts, widgets, and an internal command layer.
+- {{< post-link path="/blog/app-intents-siri-spotlight-shortcuts" text="App Intents" >}} expose a Java handler to Siri, Spotlight, Shortcuts, Android launcher shortcuts, and an internal command layer.
 
-## The interface hid five different databases
+## Each port had different SQLite behavior
 
 The old API looked uniform because every port implemented the same Java methods. That said nothing about the result.
 
@@ -56,9 +54,11 @@ flowchart TD
 
 Cursor navigation now derives from two primitives, `rewind()` and `stepForward()`, instead of being reimplemented on every port. Transactions return to autocommit after either commit or rollback. Blobs and typed parameters behave consistently. Windows and Linux finally open a database instead of returning `null`.
 
-Existing Ant projects keep their old behavior by default. Maven projects receive the portable contract. The `db.legacy` build hint makes the choice explicit in either direction, which matters when an Ant project moves to Maven.
+Fixing these inconsistencies changes behavior that some existing applications may rely on. A cursor index or transaction quirk can become part of application code even when the behavior was accidental. The `db.legacy` build hint keeps the previous implementations available during migration.
 
-## Encryption belongs above the ports
+Older Ant projects default to legacy mode. They may be stable applications that only need another maintenance release, and forcing a database migration on them would be reckless. Newer Maven projects default to the corrected contract so new code does not inherit the old problems. Either project type can set `db.legacy=true` for the old behavior or `db.legacy=false` for the corrected contract.
+
+## DatabaseConfig opens the same encrypted format everywhere
 
 Encryption is selected by passing a `DatabaseConfig` when the database opens:
 
@@ -112,9 +112,11 @@ The build also remains pay-for-what-you-use. An application that never reference
 
 On Android, encryption raises the minimum SDK to 23 and requires AndroidX because those are SQLCipher's requirements. The unencrypted database path keeps the older floor.
 
-## Watch apps are now two real applications
+That covers the database work. Six more changes shipped this week, each with its own detailed post.
 
-A watch is not a small second window owned by the phone process. It has its own executable, storage, startup sequence, and failure modes. [PR #5487](https://github.com/codenameone/CodenameOne/pull/5487) makes that model explicit.
+## The watch and phone now run as separate applications
+
+A watch is not a small second window owned by the phone process. It has its own executable, storage, startup sequence, and failure modes. The [watch applications post](/blog/watch-apps-phone-channel/) covers the complete model introduced by [PR #5487](https://github.com/codenameone/CodenameOne/pull/5487).
 
 One `codename1.watchMain` setting adds the Apple Watch companion entry point. On Android, `codename1.watchStandalone=true` builds that entry point as the Wear OS product instead of the phone application; a companion Wear artifact beside the phone APK is not generated yet. The simulator can launch the phone and watch as separate processes and connect them on the desktop. The pair shares source, resources, CSS, and the surfaces model. It does not share `Storage`, `Preferences`, or SQLite.
 
@@ -128,15 +130,15 @@ WearableConnection.putData(new WearableMessage("/steps")
 
 Complications join the existing surfaces vocabulary through watch-specific `WidgetSize` families. This reuses the same content and timeline model already used for widgets and Live Activities. The generated watchOS complication target and Wear OS complication service are not part of this release yet. Android also supports standalone Wear apps today, but does not yet generate a companion Wear artifact beside a phone APK.
 
-## A canvas app can still behave like a web page
+## Browser search now works in the JavaScript port
 
 The JavaScript port has always rendered through a canvas. That gives Codename One control over layout and keeps the UI consistent, but it also turned visible text into pixels. Browser search could not find it. Users could not select it. The browser could not rasterize it at native resolution or expose it as ordinary text.
 
-[PR #5552](https://github.com/codenameone/CodenameOne/pull/5552) keeps the canvas renderer and adds two targeted DOM layers above it. The text layer holds visible text runs at the positions Codename One already calculated. The accessibility layer holds the ARIA projection and updates it incrementally.
+The [JavaScript text post](/blog/javascript-dom-text-search/) explains how [PR #5552](https://github.com/codenameone/CodenameOne/pull/5552) keeps the canvas renderer and adds two targeted DOM layers above it. The text layer holds visible text runs at the positions Codename One already calculated. The accessibility layer holds the ARIA projection and updates it incrementally.
 
 ```html
 <canvas role="presentation" aria-hidden="true"></canvas>
-<div id="cn1-text-layer">Selectable, searchable text</div>
+<div id="cn1-text-layer" aria-hidden="true">Selectable, searchable text</div>
 <div id="cn1-accessibility-tree" aria-label="..."></div>
 ```
 
@@ -144,9 +146,9 @@ The browser never gets to reflow a line or decide where a component belongs. It 
 
 Drag selection is still off because the text layer cannot take pointer events without changing canvas hit testing. Shape-clipped and transformed text stays on the canvas. Same-form occlusion, such as a sheet over text in the underlying form, also needs more work.
 
-## Smart-home portability starts with admitting the gaps
+## One API for HomeKit, Matter, and Google Home
 
-[PR #5554](https://github.com/codenameone/CodenameOne/pull/5554) adds `com.codename1.home`, a common model for HomeKit, Matter, and Google Home. An accessory contains services. Services expose canonical traits such as `ON_OFF`, `BRIGHTNESS`, and `TARGET_TEMPERATURE`. Platform identifiers and unit conventions stay in the port.
+The [smart-home post](/blog/smart-home-homekit-matter/) introduces `com.codename1.home` from [PR #5554](https://github.com/codenameone/CodenameOne/pull/5554), a common model for HomeKit, Matter, and Google Home. An accessory contains services. Services expose canonical traits such as `ON_OFF`, `BRIGHTNESS`, and `TARGET_TEMPERATURE`. Platform identifiers and unit conventions stay in the port.
 
 That sounds like a normal abstraction until the platforms disagree. Matter and HomeKit express covering position in opposite directions. Matter has no single thermostat setpoint in automatic mode. Android can commission a Matter accessory into Google Home with little setup, but reading the accessory graph requires Google Home developer registration that Codename One cannot create for you.
 
@@ -154,9 +156,9 @@ The API reports that default Android state as `COMMISSIONING_ONLY`, not `AVAILAB
 
 Automations, background accessory events, camera streams, alarm panels, and the Google Home accessory graph on Android are outside this release. Each gap has a capability query or a specific availability state instead of turning into an empty list that looks like a real answer.
 
-## A secure screen must control the tap as well as the pixels
+## Tapjacking protection continues our security hardening work
 
-Tapjacking happens when another Android application draws over a sensitive screen and changes what the user believes a tap will do. [PR #5553](https://github.com/codenameone/CodenameOne/pull/5553) adds a `TapjackingPolicy` to `DeviceIntegrity`.
+We are continuing the push to make Codename One the secure default for application developers. The [tapjacking protection post](/blog/tapjacking-protection/) covers the input side of that work. Tapjacking happens when another Android application draws over a sensitive screen and changes what the user believes a tap will do. [PR #5553](https://github.com/codenameone/CodenameOne/pull/5553) adds a `TapjackingPolicy` to `DeviceIntegrity`.
 
 ```java
 DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
@@ -175,11 +177,11 @@ if (DeviceIntegrity.isHideOverlayWindowsSupported()) {
 
 Detection is touch-driven because Android supplies the obscured state on `MotionEvent`. An overlay that appears without a touch is not detected by polling. On Android 12 and newer, `setHideOverlayWindows(true)` prevents overlay windows instead of reacting to their touches. iOS does not let one application draw over another, so the policy is an Android-only control rather than a fake cross-platform checkbox.
 
-## The high-level camera path is back
+## Scan a barcode without rebuilding the camera pipeline
 
 The on-device vision work added barcode recognition, face and pose detection, text recognition, segmentation, document scanning, and image labeling. It also exposed every piece of the camera-to-analyzer pipeline. That was useful for custom camera products and needlessly low-level for common cases.
 
-[PR #5575](https://github.com/codenameone/CodenameOne/pull/5575) adds `CodeScanner.scan()`, which owns a complete scanner screen and returns one asynchronous result:
+The [camera and vision post](/blog/camera-vision-scanners/) covers the higher-level APIs in [PR #5575](https://github.com/codenameone/CodenameOne/pull/5575). `CodeScanner.scan()` owns a complete scanner screen and returns one asynchronous result:
 
 ```java
 CodeScanner.scan().ready(code -> {
@@ -193,9 +195,9 @@ CodeScanner.scan().ready(code -> {
 
 The preview remains a native peer. Components cannot be painted over it uniformly on every target, so controls and reticles should sit around it. One camera session can be open at a time. The simulator now scripts vision results, which lets the flow, overlay geometry, cancellation, and error paths run before the application reaches a device.
 
-## One intent can reach several system surfaces
+## Expose an intent to Siri, Spotlight, and Shortcuts
 
-Siri, Spotlight, Shortcuts, an Android launcher shortcut, and a widget button all need a declaration of what an application can do. [PR #5559](https://github.com/codenameone/CodenameOne/pull/5559) puts that declaration in Java:
+The [App Intents post](/blog/app-intents-siri-spotlight-shortcuts/) shows how to expose a Java method to Siri, Spotlight, Shortcuts, or an Android launcher shortcut. [PR #5559](https://github.com/codenameone/CodenameOne/pull/5559) puts the declaration in Java:
 
 ```java
 @AppIntent(value = "log_workout", title = "Log a workout",
@@ -213,13 +215,13 @@ Entities let the platform ask the user which application object they meant. `Int
 
 Android is not presented as Siri parity. It gets launcher shortcuts, donation, indexing, and headless execution. Voice invocation, system disambiguation, and spoken assistant results are iOS capabilities. `Intents.invoke(...)` still works on every port as an internal command layer, even when the operating system exposes no intent surface.
 
-## Security and portability are becoming properties we can test
+## Security now covers storage, code, backend trust, and input
 
 This week closes several gaps that used to be explained away as platform differences. SQLite now has one documented contract and one portable encrypted format. The watch and phone are separate applications with a defined channel. Smart-home traits and app intents project one application model onto native system services without pretending those services are identical. The web port keeps our renderer while restoring browser behavior users expect.
 
-The security work follows the same pattern. App Shield moves trust decisions to the backend. App Hardening raises the cost of reading and modifying the shipped binary. Encrypted SQLite protects stored data. Tapjacking protection rejects a class of misleading input on Android. None of these controls makes a device trustworthy by itself. Each one owns a boundary and states where that boundary ends.
+App Shield moves trust decisions to the backend. App Hardening raises the cost of reading and modifying the shipped binary. Encrypted SQLite protects stored data. Tapjacking protection rejects a class of misleading input on Android. None of these controls makes a compromised device trustworthy. Together they cover more of the path from stored bytes to the tap that authorizes an operation.
 
-That is how secure-by-default programming becomes practical in a cross-platform framework. The safe path must be available from ordinary application code, included only when used, and exercised on the targets we claim to support.
+We want Codename One to lead cross-platform development on security. That requires more than adding isolated security switches. The safe path must be available from ordinary application code, included only when used, and tested on every target we claim to support. This week's encrypted database and tapjacking work move two more boundaries into that default path.
 
 Start with the [database guide](/developer-guide/#sql-encryption) if you have data at rest to migrate. Existing Ant applications should set `db.legacy` explicitly before moving to Maven. Applications with WebSQL-era browser data need an export plan before taking the new JavaScript engine.
 
