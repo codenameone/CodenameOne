@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -312,6 +313,12 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+    /// The kinds declaring a watch complication family, as {id, label, comma-joined families}.
+    ///
+    /// Collected while the surfaces manifest is parsed and consumed after the module layout is
+    /// known, because where the generated services go -- the phone module or a separate wear one
+    /// -- depends on the distribution and there is only one code path for both.
+    private final List<String[]> watchSurfaceKinds = new ArrayList<String[]>();
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -338,6 +345,41 @@ public class AndroidGradleBuilder extends Executor {
     /** The declared watch lifecycle class, or an empty string when the project declares none. */
     private static String watchMainClass(BuildRequest request) {
         return request.getArg("watchMain", "").trim();
+    }
+
+    /**
+     * Which Gradle module is the Wear OS product, or null when this build produces none.
+     *
+     * <p>One question, answered once, because everything downstream -- where the complication
+     * services are generated, which manifest carries them, which module gets the androidx.wear
+     * dependencies -- is the same code either way and differs only in the destination.</p>
+     *
+     * <ul>
+     *   <li>{@code app} when the build is a standalone Wear APK: the single artifact IS the
+     *       watch app.</li>
+     *   <li>{@code wear} for a companion build, where the watch app is a second module beside
+     *       the phone one.</li>
+     *   <li>null when the project declares no watch lifecycle class, which is every project
+     *       that has not asked for a watch.</li>
+     * </ul>
+     *
+     * @param request the build being generated
+     * @return the module directory name, or null
+     */
+    static String watchModuleName(BuildRequest request) {
+        if (watchMainClass(request).length() == 0) {
+            return null;
+        }
+        if ("true".equals(request.getArg("watchStandalone", "false"))) {
+            return "app";
+        }
+        // A companion build generates the watch app beside the phone app. Opting out leaves the
+        // phone build exactly as it was, which is what a project that only wants the wearable
+        // link -- not a watch app -- is asking for.
+        if ("false".equals(request.getArg("android.watchModule", "true"))) {
+            return null;
+        }
+        return "wear";
     }
 
     /// Whether the new wearable declaration governs, leaving the retired android.wear hints out.
@@ -3386,15 +3428,6 @@ public class AndroidGradleBuilder extends Executor {
                 throw new BuildException("Failed to write the wearable capability declaration", ex);
             }
         }
-        if (watchMainClass(request).length() > 0
-                && !"true".equals(request.getArg("watchStandalone", "false"))) {
-            // Say so rather than quietly producing one artifact: a companion Wear APK is not
-            // generated yet (see the wearables chapter of the developer guide).
-            log("[wearable] codename1.watchMain is set without codename1.watchStandalone. The "
-                    + "Apple Watch companion is built, but a companion Wear OS APK is not produced "
-                    + "yet -- set codename1.watchStandalone=true to build the watch app as the "
-                    + "Android product.");
-        }
 
         // External surfaces (com.codename1.surfaces): parse the build-time kinds manifest,
         // generate one thin widget provider subclass per kind, copy the pre-baked RemoteViews
@@ -3490,6 +3523,22 @@ public class AndroidGradleBuilder extends Executor {
                     throw new BuildException("Invalid widget kind id '" + kindId
                             + "' in surfaces.json; ids must match [a-z][a-z0-9_]*");
                 }
+                java.util.List<String> kindFamilies =
+                        com.codename1.util.SurfaceKindFamilies.read(surfaceKind);
+                boolean watchBearing =
+                        com.codename1.util.SurfaceKindFamilies.hasWatchFamily(kindFamilies);
+                if (watchBearing) {
+                    watchSurfaceKinds.add(new String[] {kindId,
+                            surfaceKind.get("name") instanceof String
+                                    ? (String) surfaceKind.get("name") : kindId,
+                            joinFamilies(kindFamilies)});
+                }
+                if (!com.codename1.util.SurfaceKindFamilies.hasPhoneFamily(kindFamilies)) {
+                    // A complication is not a home-screen widget, and rendering one as though it
+                    // were puts a surface in front of the user that the manifest never asked for.
+                    // iOS already refuses the same thing, so this is the two platforms agreeing.
+                    continue;
+                }
                 String providerClass = "CN1Widget_" + surfaceKindClassSuffix(kindId);
                 String providerSource = "package com.codename1.impl.android;\n\n"
                         + "/** Generated by the Codename One build from surfaces.json. */\n"
@@ -3558,6 +3607,7 @@ public class AndroidGradleBuilder extends Executor {
                 // runtime permission declared (permissionAdd dedups against user overrides)
                 postNotificationsPermission = true;
             }
+            reportWatchSurfaces(request);
         }
 
 
@@ -6874,6 +6924,118 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * Says what happens to the declared watch complication families, loudly and every time.
+     *
+     * <p>The failure this exists to prevent is silence. A developer declares a complication,
+     * hears nothing, and gets no surface: on a build with no watch product there is nothing to
+     * host it, and a watch-only kind no longer produces a home-screen widget either -- which is
+     * correct, and would otherwise look like the declaration was ignored.</p>
+     *
+     * @param request the build being generated
+     */
+    private void reportWatchSurfaces(BuildRequest request) {
+        if (watchSurfaceKinds.isEmpty()) {
+            return;
+        }
+        StringBuilder ids = new StringBuilder();
+        for (String[] kind : watchSurfaceKinds) {
+            if (ids.length() > 0) {
+                ids.append(", ");
+            }
+            ids.append(kind[0]);
+        }
+        if (watchModuleName(request) == null) {
+            log("[surfaces] NOTE: these kinds declare watch complication families and will NOT "
+                    + "appear on any device in this build: " + ids + ". They are hosted by a Wear "
+                    + "OS product, and this build produces none -- declare codename1.watchMain "
+                    + "(with codename1.watchStandalone for a watch-only APK), or declare a phone "
+                    + "family alongside them.");
+            return;
+        }
+        log("[surfaces] Generating Wear OS complication data sources for: " + ids);
+        for (String[] kind : watchSurfaceKinds) {
+            String families = kind[2];
+            if (families.contains("watchCorner")) {
+                log("[surfaces] Kind \"" + kind[0] + "\" declares watchCorner. Wear OS has no "
+                        + "corner slot, so it renders as the circular family.");
+            }
+            if (declaresTile(families)) {
+                log("[surfaces] Kind \"" + kind[0] + "\" declares watchRectangular: generating a "
+                        + "LONG_TEXT complication data source and a Tile.");
+            }
+        }
+    }
+
+    /** Joins declared families for the codegen tables, normalized to the portable spelling. */
+    static String joinFamilies(List<String> families) {
+        StringBuilder sb = new StringBuilder();
+        for (String family : families) {
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
+            sb.append(com.codename1.util.SurfaceKindFamilies.normalize(family));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The Wear complication types a kind's declared families map onto, as the comma-separated
+     * SUPPORTED_TYPES value the manifest meta-data carries.
+     *
+     * <p>A watch face asks a data source for one specific type and gets nothing if the source
+     * does not offer it, so this is what decides whether a complication can be placed in a given
+     * slot at all. The mapping is the one {@code WidgetSize} documents: circular is a gauge or a
+     * glyph, inline is one short string, rectangular is the roomy one. SHORT_TEXT is offered
+     * everywhere because every family can degrade to a number or a word, and a slot that would
+     * otherwise refuse the source entirely is better filled than empty.</p>
+     *
+     * @param familiesCsv the kind's declared families, comma separated
+     * @return the SUPPORTED_TYPES value, never empty when any watch family was declared
+     */
+    static String complicationTypes(String familiesCsv) {
+        LinkedHashSet<String> types = new LinkedHashSet<String>();
+        for (String family : familiesCsv.split(",")) {
+            String f = family.trim();
+            if ("watchCircular".equals(f) || "watchCorner".equals(f)) {
+                // Wear OS has no corner slot; a corner complication is round, so it renders as
+                // the circular family here exactly as WidgetSize says it does.
+                types.add("RANGED_VALUE");
+                types.add("MONOCHROMATIC_IMAGE");
+                types.add("SHORT_TEXT");
+            } else if ("watchRectangular".equals(f)) {
+                types.add("LONG_TEXT");
+                types.add("SHORT_TEXT");
+            } else if ("watchInline".equals(f)) {
+                types.add("SHORT_TEXT");
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String type : types) {
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
+            sb.append(type);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Whether a kind also earns a Tile: the rectangular family is the only one roomy enough for
+     * a layout rather than a readout.
+     *
+     * @param familiesCsv the kind's declared families, comma separated
+     * @return true if a TileService should be generated
+     */
+    static boolean declaresTile(String familiesCsv) {
+        for (String family : familiesCsv.split(",")) {
+            if ("watchRectangular".equals(family.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
