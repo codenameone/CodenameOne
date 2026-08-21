@@ -474,11 +474,16 @@ public class Storage {
         OutputStream writing = null; //NOPMD CloseResource
         DataOutputStream d = null; //NOPMD CloseResource
         try {
-            // the implementation's own stream is kept, because that is what names the
+            // asks for a stream that becomes the entry only once it is closed, which
+            // createOutputStream deliberately is not: that one is the public streaming
+            // API, where a caller may hold the stream open and read back what it has
+            // flushed, and the log writer does exactly that.
+            //
+            // The implementation's own stream is kept, because that is what names the
             // write to be given up if this one fails. Giving up by entry name would
             // reach every write to that entry, and a second thread writing the same
             // one would be told its value was stored after it had been discarded.
-            writing = createOutputStream(name);
+            writing = Util.getImplementation().createStorageOutputStream(name, true);
             d = new DataOutputStream(writing);
             Util.writeObject(o, d);
             // closed here rather than left to the finally, because closing is where

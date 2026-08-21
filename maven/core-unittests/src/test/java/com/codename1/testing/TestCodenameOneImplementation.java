@@ -3111,6 +3111,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     /**
+     * Models an implementation that only replaces the entry when the write is closed,
+     * so a write given up before then leaves whatever was stored untouched.
+     *
+     * @param name the entry being written
+     * @param writing the stream handed out for the write that failed
+     * @return true, since this double never writes into the entry itself
+     */
+    @Override
+    public boolean abandonStorageWrite(String name, OutputStream writing) {
+        if (writing instanceof StorageOutput) {
+            ((StorageOutput) writing).discard();
+            return true;
+        }
+        return writing == null;
+    }
+
+    /**
      * Makes storage writes fail at the point an entry would be published, which is
      * where an implementation that replaces the entry in one step does the writing.
      *
@@ -4387,6 +4404,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             if (name.equals(entry)) {
                 discarded = true;
             }
+        }
+
+        void discard() {
+            discarded = true;
         }
 
         @Override

@@ -7614,7 +7614,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     storageLockAcrossProcesses = storageLockHandle.getChannel().lock();
                 }
             } catch (Throwable t) {
-                com.codename1.io.Log.e(t);
+                // android's log, not ours: the default log writer is a storage stream,
+                // so reporting this through it would come back through here with the
+                // depth still at zero and fail the same way, again and again
+                Log.e("CodenameOne", "Could not lock the storage", t);
                 releaseStorageLock();
             }
         }
@@ -7643,7 +7646,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 storageLockAcrossProcesses.release();
             }
         } catch (Throwable t) {
-            com.codename1.io.Log.e(t);
+            Log.e("CodenameOne", "Could not release the storage lock", t);
         }
         storageLockAcrossProcesses = null;
         try {
@@ -7651,7 +7654,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 storageLockHandle.close();
             }
         } catch (Throwable t) {
-            com.codename1.io.Log.e(t);
+            Log.e("CodenameOne", "Could not close the storage lock", t);
         }
         storageLockHandle = null;
     }
@@ -7755,19 +7758,87 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             synchronized (storagePublishLock) {
                 ((StorageOutputStream) writing).cancel();
             }
+            // such a write leaves the entry untouched until it is published, so
+            // whatever was stored is still there
+            return true;
         }
-        // the entry is untouched until a write is published, so a write that never
-        // gets that far -- including one whose stream never opened -- leaves whatever
-        // was stored exactly as it was
-        return true;
+        // a stream that never opened cannot have touched anything either. Anything
+        // else wrote into the entry itself and the caller has to clear up after it.
+        return writing == null;
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * <p>Writes into the entry, as it always has. A caller may hold this open and
+     * expect what it flushes to be readable meanwhile -- the log writer keeps one for
+     * the life of the application and sendLog reads the entry behind its back -- so
+     * an entry that appeared only on close would leave the log unreadable and lose
+     * everything written since the process started. What can be given here without
+     * changing when the entry appears is the flush that Android does not do on
+     * close.</p>
+     */
+    public OutputStream createStorageOutputStream(String name) throws IOException {
+        return new SyncingStorageOutputStream(getContext().openFileOutput(name, 0));
     }
 
     /**
      * @inheritDoc
      */
-    public OutputStream createStorageOutputStream(String name) throws IOException {
+    public OutputStream createStorageOutputStream(String name, boolean replaceWhenClosed)
+            throws IOException {
+        if (!replaceWhenClosed) {
+            return createStorageOutputStream(name);
+        }
         sweepStorageScratchFiles();
         return new StorageOutputStream(name);
+    }
+
+    /**
+     * Forces a stream onto the device as it closes, which Android does not do by
+     * itself, without changing anything about when what is written becomes visible.
+     */
+    private static final class SyncingStorageOutputStream extends OutputStream {
+        private final FileOutputStream out;
+        private boolean closed;
+
+        SyncingStorageOutputStream(FileOutputStream out) {
+            this.out = out;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            out.write(b, off, len);
+        }
+
+        @Override
+        public void flush() throws IOException {
+            out.flush();
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                out.flush();
+                out.getFD().sync();
+            } finally {
+                out.close();
+            }
+        }
     }
 
     /**
@@ -7926,13 +7997,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 storageLiveLock = storageLiveHandle.getChannel().lock();
                 discardEarlierIncarnation(dir);
             } catch (Throwable t) {
-                com.codename1.io.Log.e(t);
+                // android's log for the same reason as above
+                Log.e("CodenameOne", "Could not claim the storage liveness file", t);
                 try {
                     if (storageLiveHandle != null) {
                         storageLiveHandle.close();
                     }
                 } catch (Throwable ignored) {
-                    com.codename1.io.Log.e(ignored);
+                    Log.e("CodenameOne", "Could not close the liveness file", ignored);
                 }
                 storageLiveHandle = null;
             }

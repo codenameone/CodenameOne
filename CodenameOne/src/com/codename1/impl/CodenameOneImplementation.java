@@ -6800,6 +6800,31 @@ public abstract class CodenameOneImplementation {
     /// - `name`: the name of the storage file
     public abstract void deleteStorageFile(String name);
 
+    /// Creates an output stream that holds the whole new value and only becomes the
+    /// entry once it is closed, for an implementation that can offer that.
+    ///
+    /// This is not what `createStorageOutputStream` does, and the two are kept apart
+    /// on purpose. That one backs a public streaming API: a caller may hold it open
+    /// for the life of the application and expect what it has flushed to be readable
+    /// meanwhile, which is exactly how the log writer uses it. An entry that appears
+    /// only on close would leave such a caller writing to something nothing can read.
+    ///
+    /// Writing a whole value at once has no such expectation, and gains what the
+    /// streaming form cannot be given: the entry is never seen partly written, and
+    /// what was there before survives a write that fails.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name
+    ///
+    /// #### Returns
+    ///
+    /// an output stream, which replaces the entry as one step when closed if this
+    /// implementation is able to
+    public OutputStream createStorageOutputStream(String name, boolean replaceWhenClosed) throws IOException {
+        return createStorageOutputStream(name);
+    }
+
     /// Gives up a write that failed partway through, for an implementation that can
     /// throw one away without the entry it was replacing being any the worse for it.
     ///

@@ -137,13 +137,33 @@ class StorageTest extends UITestBase {
         String key = "unwritable";
         assertTrue(storage.writeObject(key, "the value that is really stored"));
 
-        // Object is not one of the supported types, so Util.writeObject throws and
-        // the entry is removed. The cached copy has to go with it, otherwise reads
-        // keep answering from memory until the app is restarted.
+        // Object is not one of the supported types, so Util.writeObject throws. The
+        // object is cached before the write is attempted, so it has to be dropped
+        // again: otherwise reads answer from memory with a value the storage never
+        // took, and the write only looks to have failed once the app is restarted.
+        Object neverStored = new Object();
+        assertFalse(storage.writeObject(key, neverStored, false));
+
+        Object read = storage.readObject(key);
+        assertNotSame(neverStored, read);
+        assertEquals("the value that is really stored", read);
+    }
+
+    @EdtTest
+    void aFailedWriteLeavesThePreviousValueInPlace() {
+        String key = "keeps";
+        assertTrue(storage.writeObject(key, "the value that was already stored"));
+        storage.clearCache();
+
+        // Object is not a supported type, so serialization fails partway. An
+        // implementation that only replaces the entry when the write is closed never
+        // touched it, so answering the failure by deleting it would throw away a good
+        // value on account of a write that never reached the storage.
         assertFalse(storage.writeObject(key, new Object(), false));
 
-        assertFalse(storage.exists(key));
-        assertNull(storage.readObject(key));
+        storage.clearCache();
+        assertTrue(storage.exists(key));
+        assertEquals("the value that was already stored", storage.readObject(key));
     }
 
     @EdtTest
