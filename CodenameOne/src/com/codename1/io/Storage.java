@@ -474,16 +474,11 @@ public class Storage {
         OutputStream writing = null; //NOPMD CloseResource
         DataOutputStream d = null; //NOPMD CloseResource
         try {
-            // asks for a stream that becomes the entry only once it is closed, which
-            // createOutputStream deliberately is not: that one is the public streaming
-            // API, where a caller may hold the stream open and read back what it has
-            // flushed, and the log writer does exactly that.
-            //
-            // The implementation's own stream is kept, because that is what names the
-            // write to be given up if this one fails. Giving up by entry name would
-            // reach every write to that entry, and a second thread writing the same
-            // one would be told its value was stored after it had been discarded.
-            writing = Util.getImplementation().createStorageOutputStream(name, true);
+            // the stream is kept, because that is what names the write to be given up
+            // if this one fails. Giving up by entry name would reach every write to
+            // that entry, and a second thread writing the same one would be told its
+            // value was stored after it had been discarded.
+            writing = createOutputStreamForWrite(name);
             d = new DataOutputStream(writing);
             Util.writeObject(o, d);
             // closed here rather than left to the finally, because closing is where
@@ -509,6 +504,37 @@ public class Storage {
         } finally {
             Util.getImplementation().cleanup(d);
         }
+    }
+
+    /// Creates the stream that `writeObject` writes a whole value into.
+    ///
+    /// This is deliberately not `createOutputStream`. That one is the public
+    /// streaming API, where a caller may hold the stream open and read back what it
+    /// has flushed -- the log writer keeps one for the life of the application -- so
+    /// it goes on writing into the entry. A whole value has no such expectation, and
+    /// so can be given what streaming cannot: it is assembled away from the entry and
+    /// put in place as one step, where the platform is able to, so the entry is never
+    /// seen half written and a write that fails leaves what was stored alone.
+    ///
+    /// A `Storage` installed through `setStorageInstance` to wrap the bytes -- the
+    /// seamless encryption that extension point exists for -- has always had
+    /// `writeObject` go through its own `createOutputStream`, and still does:
+    /// bypassing it would write those bytes past the encryption while reads went on
+    /// expecting it. Such a subclass can override this method to take the stronger
+    /// guarantee as well, wrapping what the superclass returns.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name, already normalized
+    ///
+    /// #### Returns
+    ///
+    /// the stream to write the value into
+    protected OutputStream createOutputStreamForWrite(String name) throws IOException {
+        if (getClass() != Storage.class) {
+            return createOutputStream(name);
+        }
+        return Util.getImplementation().createStorageOutputStream(name, true);
     }
 
     /// Gives up on a write that failed partway through, leaving neither a partial

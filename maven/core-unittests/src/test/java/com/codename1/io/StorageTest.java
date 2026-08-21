@@ -28,7 +28,11 @@ import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -147,6 +151,82 @@ class StorageTest extends UITestBase {
         Object read = storage.readObject(key);
         assertNotSame(neverStored, read);
         assertEquals("the value that is really stored", read);
+    }
+
+    @EdtTest
+    void writeObjectGoesThroughACustomStoragesOwnStreams() {
+        // setStorageInstance exists so an application can wrap the bytes, seamless
+        // encryption being the case the API documents. writeObject has always gone
+        // through the subclass's createOutputStream, and has to keep doing so:
+        // writing past the wrapper leaves bytes the matching reader cannot decode.
+        final List<String> wrapped = new ArrayList<String>();
+        Storage custom = new Storage() {
+            @Override
+            public OutputStream createOutputStream(String name) throws IOException {
+                wrapped.add(name);
+                return new InvertingOutputStream(super.createOutputStream(name));
+            }
+
+            @Override
+            public InputStream createInputStream(String name) throws IOException {
+                return new InvertingInputStream(super.createInputStream(name));
+            }
+        };
+        Storage.setStorageInstance(custom);
+        try {
+            assertTrue(custom.writeObject("wrappedEntry", "the value"));
+            assertTrue(wrapped.contains("wrappedEntry"), "the write bypassed the subclass");
+
+            custom.clearCache();
+            // only decodes if the write went through the wrapper too
+            assertEquals("the value", custom.readObject("wrappedEntry"));
+        } finally {
+            Storage.setStorageInstance(null);
+        }
+    }
+
+    /// Stands in for a Storage that transforms the bytes on their way out.
+    private static final class InvertingOutputStream extends OutputStream {
+        private final OutputStream out;
+
+        InvertingOutputStream(OutputStream out) {
+            this.out = out;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            out.write((~b) & 0xff);
+        }
+
+        @Override
+        public void flush() throws IOException {
+            out.flush();
+        }
+
+        @Override
+        public void close() throws IOException {
+            out.close();
+        }
+    }
+
+    /// The matching reader, which only makes sense of what the writer above produced.
+    private static final class InvertingInputStream extends InputStream {
+        private final InputStream in;
+
+        InvertingInputStream(InputStream in) {
+            this.in = in;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b = in.read();
+            return b < 0 ? b : (~b) & 0xff;
+        }
+
+        @Override
+        public void close() throws IOException {
+            in.close();
+        }
     }
 
     @EdtTest
