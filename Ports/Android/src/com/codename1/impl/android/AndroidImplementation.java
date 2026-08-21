@@ -192,6 +192,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileLock;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.net.HttpURLConnection;
@@ -7546,6 +7547,95 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static final Object storagePublishLock = new Object();
 
     /**
+     * Name of the file whose lock serializes storage writes between processes.
+     */
+    private static final String STORAGE_LOCK_FILE = ".lock";
+
+    /**
+     * The cross process lock, and the handle it is taken on, while this process holds
+     * it. Guarded by {@link #storagePublishLock}, so only one thread here ever has it.
+     */
+    private static RandomAccessFile storageLockHandle;
+    private static FileLock storageLockAcrossProcesses;
+
+    /**
+     * How many nested claims this process has on the cross process lock. A
+     * {@code FileLock} is held by the whole VM and cannot be taken twice, and
+     * clearStorage claims it and then calls deleteStorageFile for every entry.
+     */
+    private static int storageLockDepth;
+
+    /**
+     * Claims the storage for this process, so that creating a scratch file, deleting
+     * an entry and publishing a write cannot interleave between processes.
+     *
+     * <p>Unlinking a writer's scratch file is what cancels it, and that only reaches
+     * the writes that exist when the deletion looks. Without this a second process
+     * could create its scratch file just after a deletion had scanned for them, and
+     * publish over the entry that deletion went on to remove. A lock the filesystem
+     * arbitrates is the only thing both processes can see; the system drops it when a
+     * process ends however it ends, so it cannot be left held by a crash.</p>
+     *
+     * <p>Best effort: if the lock cannot be taken the work still goes ahead, since a
+     * storage that stops writing would be worse than one exposed to a race that only
+     * an application with more than one process can reach at all.</p>
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     */
+    private static void lockStorageAcrossProcesses() {
+        if (storageLockDepth == 0) {
+            try {
+                File dir = storageScratchDir();
+                if (dir.isDirectory() || dir.mkdirs() || dir.isDirectory()) {
+                    RandomAccessFile handle =
+                            new RandomAccessFile(new File(dir, STORAGE_LOCK_FILE), "rw");
+                    storageLockAcrossProcesses = handle.getChannel().lock();
+                    storageLockHandle = handle;
+                }
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+                releaseStorageLock();
+            }
+        }
+        storageLockDepth++;
+    }
+
+    /**
+     * Gives up this process's claim on the storage.
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     */
+    private static void unlockStorageAcrossProcesses() {
+        storageLockDepth--;
+        if (storageLockDepth == 0) {
+            releaseStorageLock();
+        }
+    }
+
+    /**
+     * Drops the cross process lock and the handle it was taken on, whichever of them
+     * this process actually got.
+     */
+    private static void releaseStorageLock() {
+        try {
+            if (storageLockAcrossProcesses != null) {
+                storageLockAcrossProcesses.release();
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        storageLockAcrossProcesses = null;
+        try {
+            if (storageLockHandle != null) {
+                storageLockHandle.close();
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        storageLockHandle = null;
+    }
+
+    /**
      * The writes that are currently open, so that deleting an entry can cancel them.
      * Guarded by {@link #storagePublishLock}.
      */
@@ -7565,21 +7655,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void deleteStorageFile(String name) {
         synchronized (storagePublishLock) {
-            // cancelled before the entry goes, and under the same lock the publishing
-            // rename takes, so a write that is already mid close cannot put the entry
-            // back afterwards.
-            for (int iter = 0; iter < openStorageWrites.size(); iter++) {
-                openStorageWrites.get(iter).cancel(name);
+            lockStorageAcrossProcesses();
+            try {
+                // cancelled before the entry goes, and under the same lock the
+                // publishing rename takes, so a write that is already mid close
+                // cannot put the entry back afterwards.
+                for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+                    openStorageWrites.get(iter).cancel(name);
+                }
+                // the same for writes in another process, which the monitor above
+                // knows nothing about. Unlinking a scratch file cancels it: the
+                // writer keeps a working descriptor on an inode with no name, exactly
+                // as it used to keep one on an entry deleted underneath it, and the
+                // rename that would have published it can no longer find anything to
+                // rename. Scratch files go first, so a publish that slips through
+                // between the two still leaves an entry for the delete to remove.
+                discardScratchFilesFor(name);
+                getContext().deleteFile(name);
+            } finally {
+                unlockStorageAcrossProcesses();
             }
-            // the same for writes in another process, which this lock knows nothing
-            // about. Unlinking a scratch file cancels it: the writer keeps a working
-            // descriptor on an inode with no name, exactly as it used to keep one on
-            // an entry that had been deleted underneath it, and the rename that would
-            // have published it can no longer find anything to rename. Scratch files
-            // go first, so a publish that slips through between the two still leaves
-            // an entry for the delete below to remove.
-            discardScratchFilesFor(name);
-            getContext().deleteFile(name);
         }
     }
 
@@ -7616,11 +7711,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // an entry that is not there yet is absent from listStorageEntries, so the
             // inherited implementation never reaches it, and it would publish a new
             // entry moments after the storage was supposedly emptied.
-            for (int iter = 0; iter < openStorageWrites.size(); iter++) {
-                openStorageWrites.get(iter).cancel();
+            lockStorageAcrossProcesses();
+            try {
+                for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+                    openStorageWrites.get(iter).cancel();
+                }
+                discardAllScratchFiles();
+                super.clearStorage();
+            } finally {
+                unlockStorageAcrossProcesses();
             }
-            discardAllScratchFiles();
-            super.clearStorage();
         }
     }
 
@@ -7837,8 +7937,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // exists but which a concurrent deleteStorageFile cannot see to cancel,
             // and that write would rename itself over the entry that was deleted.
             synchronized (storagePublishLock) {
-                this.out = new FileOutputStream(scratch);
-                openStorageWrites.add(this);
+                lockStorageAcrossProcesses();
+                try {
+                    this.out = new FileOutputStream(scratch);
+                    openStorageWrites.add(this);
+                } finally {
+                    unlockStorageAcrossProcesses();
+                }
             }
         }
 
@@ -7917,20 +8022,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
          */
         private void publish() throws IOException {
             synchronized (storagePublishLock) {
-                if (cancelled) {
-                    return;
+                lockStorageAcrossProcesses();
+                try {
+                    if (cancelled) {
+                        return;
+                    }
+                    if (scratch.renameTo(target)) {
+                        syncStorageDirectory(target.getParentFile());
+                        return;
+                    }
+                    if (!scratch.exists()) {
+                        // another process deleted this entry, or cleared the storage,
+                        // while the write was open. Unlinking the scratch file is how
+                        // it says so, and there is nothing left to publish.
+                        return;
+                    }
+                    throw new IOException("Could not store " + name);
+                } finally {
+                    unlockStorageAcrossProcesses();
                 }
-                if (scratch.renameTo(target)) {
-                    syncStorageDirectory(target.getParentFile());
-                    return;
-                }
-                if (!scratch.exists()) {
-                    // another process deleted this entry, or cleared the storage,
-                    // while the write was open. Unlinking the scratch file is how it
-                    // says so, and there is nothing left to publish.
-                    return;
-                }
-                throw new IOException("Could not store " + name);
             }
         }
     }

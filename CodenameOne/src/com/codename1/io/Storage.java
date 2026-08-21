@@ -512,18 +512,22 @@ public class Storage {
     /// - `includeLogging`: whether the failure may be logged, which is unsafe during
     /// app initialization
     private void failedWrite(String name, Throwable err, boolean includeLogging) {
+        // before the logging, which can fail in its own right. Reporting an
+        // OutOfMemoryError means building a message and a stack trace, so a second
+        // failure there would carry off the rest of this method, and the write left
+        // open would be published by the finally that closes it.
+        //
+        // The entry goes, and the cached copy with it. Leaving that behind hid the
+        // failure for the rest of the session: every read was answered from memory
+        // with the object that never reached the storage, and the entry only turned
+        // up missing after the app was restarted.
+        deleteStorageFile(name);
         if (includeLogging) {
             Log.e(err);
             if (Log.isCrashBound()) {
                 Log.sendLog();
             }
         }
-        // the entry is gone, so the cached copy has to go with it. Leaving it behind
-        // hid the failure for the rest of the session: every read was answered from
-        // memory with the object that never reached the storage, and the entry only
-        // turned up missing after the app was restarted. This also abandons the write
-        // that is still open, so nothing partial is published when it is closed.
-        deleteStorageFile(name);
     }
 
     /// Reads the object from the storage, returns null if the object isn't there
