@@ -7553,10 +7553,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             new ArrayList<StorageOutputStream>();
 
     /**
-     * Whether the scratch files abandoned by an earlier run have been removed.
-     * Guarded by {@link #storagePublishLock}.
+     * When the scratch area is next worth looking at, as a wall clock time. Set to
+     * the expiry of the youngest file that was kept, so that a process which lives
+     * for weeks still collects a file that was merely too young the first time it
+     * looked. Guarded by {@link #storagePublishLock}.
      */
-    private static boolean storageScratchSwept;
+    private static long nextStorageScratchSweep;
 
     /**
      * @inheritDoc
@@ -7565,12 +7567,43 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         synchronized (storagePublishLock) {
             // cancelled before the entry goes, and under the same lock the publishing
             // rename takes, so a write that is already mid close cannot put the entry
-            // back afterwards. Unlinking the entry used to make that impossible on its
-            // own, since the write held a descriptor on an inode with no name left.
+            // back afterwards.
             for (int iter = 0; iter < openStorageWrites.size(); iter++) {
                 openStorageWrites.get(iter).cancel(name);
             }
+            // the same for writes in another process, which this lock knows nothing
+            // about. Unlinking a scratch file cancels it: the writer keeps a working
+            // descriptor on an inode with no name, exactly as it used to keep one on
+            // an entry that had been deleted underneath it, and the rename that would
+            // have published it can no longer find anything to rename. Scratch files
+            // go first, so a publish that slips through between the two still leaves
+            // an entry for the delete below to remove.
+            discardScratchFilesFor(name);
             getContext().deleteFile(name);
+        }
+    }
+
+    /**
+     * Unlinks every scratch file being written for the given entry, in this process
+     * or any other, which is what cancels those writes.
+     *
+     * @param name the storage entry
+     */
+    private static void discardScratchFilesFor(String name) {
+        try {
+            String prefix = storageScratchPrefix(name);
+            File[] scratch = storageScratchDir().listFiles();
+            if (scratch == null) {
+                return;
+            }
+            for (int iter = 0; iter < scratch.length; iter++) {
+                if (scratch[iter].getName().startsWith(prefix) && !scratch[iter].delete()) {
+                    com.codename1.io.Log.p("Could not cancel the storage write "
+                            + scratch[iter]);
+                }
+            }
+        } catch (IOException err) {
+            com.codename1.io.Log.e(err);
         }
     }
 
@@ -7586,6 +7619,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             for (int iter = 0; iter < openStorageWrites.size(); iter++) {
                 openStorageWrites.get(iter).cancel();
             }
+            discardAllScratchFiles();
             super.clearStorage();
         }
     }
@@ -7638,27 +7672,109 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private void sweepStorageScratchFiles() {
         synchronized (storagePublishLock) {
-            if (storageScratchSwept) {
+            long now = System.currentTimeMillis();
+            if (now < nextStorageScratchSweep) {
                 return;
             }
-            storageScratchSwept = true;
+            // looked at again when the youngest file that survived this pass comes of
+            // age. Setting a flag once instead would let a file that was a few minutes
+            // old at the first write of a long lived process sit there for the life of
+            // that process, however large it is.
+            long nextSweep = now + STORAGE_SCRATCH_MAX_AGE;
             try {
                 File[] abandoned = storageScratchDir().listFiles();
-                if (abandoned == null) {
-                    return;
-                }
-                long oldest = System.currentTimeMillis() - STORAGE_SCRATCH_MAX_AGE;
-                for (int iter = 0; iter < abandoned.length; iter++) {
-                    if (abandoned[iter].lastModified() < oldest && !abandoned[iter].delete()) {
-                        com.codename1.io.Log.p("Could not remove the abandoned storage "
-                                + "scratch file " + abandoned[iter]);
+                if (abandoned != null) {
+                    for (int iter = 0; iter < abandoned.length; iter++) {
+                        long expires = abandoned[iter].lastModified() + STORAGE_SCRATCH_MAX_AGE;
+                        if (expires > now) {
+                            nextSweep = Math.min(nextSweep, expires);
+                        } else if (!abandoned[iter].delete()) {
+                            com.codename1.io.Log.p("Could not remove the abandoned storage "
+                                    + "scratch file " + abandoned[iter]);
+                        }
                     }
                 }
             } catch (Throwable t) {
                 // a sweep that fails costs disk space, never correctness
                 com.codename1.io.Log.e(t);
             }
+            nextStorageScratchSweep = nextSweep;
         }
+    }
+
+    /**
+     * Unlinks every scratch file there is, cancelling every write in progress in any
+     * process.
+     */
+    private static void discardAllScratchFiles() {
+        try {
+            File[] scratch = storageScratchDir().listFiles();
+            if (scratch == null) {
+                return;
+            }
+            for (int iter = 0; iter < scratch.length; iter++) {
+                if (!scratch[iter].delete()) {
+                    com.codename1.io.Log.p("Could not cancel the storage write "
+                            + scratch[iter]);
+                }
+            }
+        } catch (IOException err) {
+            com.codename1.io.Log.e(err);
+        }
+    }
+
+    /**
+     * The start of the name of every scratch file for the given entry.
+     *
+     * <p>A digest rather than the entry itself: an entry name may be as long as the
+     * filesystem allows on its own, so anything built by appending to one would be
+     * refused. Fixed width, and specific enough that one entry's deletion does not
+     * cancel another's write.</p>
+     *
+     * @param name the storage entry
+     * @return the prefix shared by that entry's scratch files
+     * @throws IOException if the digest is unavailable
+     */
+    private static String storageScratchPrefix(String name) throws IOException {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(name.getBytes("UTF-8"));
+            StringBuilder b = new StringBuilder(digest.length * 2);
+            for (int iter = 0; iter < digest.length; iter++) {
+                b.append(Character.forDigit((digest[iter] >> 4) & 0xf, 16));
+                b.append(Character.forDigit(digest[iter] & 0xf, 16));
+            }
+            return b.append('-').toString();
+        } catch (java.security.NoSuchAlgorithmException err) {
+            throw new IOException("No SHA-256 to name storage scratch files with", err);
+        }
+    }
+
+    /**
+     * Resolves a storage entry to its file, refusing anything that would land outside
+     * the storage directory.
+     *
+     * <p>{@code openFileOutput} used to make this check on our behalf and reject any
+     * name holding a path separator. Publishing by rename does not: with name
+     * normalization turned off a key like {@code ../shared_prefs/settings.xml}
+     * reaches here as it was written, and {@code File} resolves it, which would put
+     * the rename anywhere in the application's private data and leave behind an entry
+     * that Storage itself could no longer read or delete.</p>
+     *
+     * @param name the storage entry
+     * @return the file the entry is stored in
+     * @throws IOException if the name does not name an entry in the storage directory
+     */
+    private static File storageEntryFile(String name) throws IOException {
+        File dir = getContext().getFilesDir();
+        if (name.indexOf('/') >= 0 || name.indexOf(File.separatorChar) >= 0) {
+            throw new IOException("Storage entry " + name + " contains a path separator");
+        }
+        File entry = new File(dir, name);
+        if (!dir.equals(entry.getParentFile())) {
+            throw new IOException("Storage entry " + name + " resolves outside " + dir);
+        }
+        return entry;
     }
 
     /**
@@ -7696,6 +7812,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private static final class StorageOutputStream extends OutputStream {
         private final String name;
+        private final File target;
         private final File scratch;
         private final FileOutputStream out;
         private boolean closed;
@@ -7703,17 +7820,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         StorageOutputStream(String name) throws IOException {
             this.name = name;
+            this.target = storageEntryFile(name);
             File dir = storageScratchDir();
             if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
                 throw new IOException("Could not create the storage scratch directory "
                         + dir);
             }
-            // named for the writer rather than the entry: an entry name is allowed to
-            // reach the filesystem's limit on its own, and anything appended to it
-            // would push the scratch file past that limit and fail a write that used
-            // to work. The process id separates concurrent processes, whose counters
-            // both start from the beginning.
-            this.scratch = new File(dir, android.os.Process.myPid() + "-"
+            // the digest of the entry lets another process find and cancel this write.
+            // The process id separates concurrent processes, whose counters both start
+            // from the beginning, and the counter separates writes within one.
+            this.scratch = new File(dir, storageScratchPrefix(name)
+                    + android.os.Process.myPid() + "-"
                     + storageScratchCounter.incrementAndGet());
             // created and registered as one step under the lock a deletion takes.
             // Registering afterwards would leave a write whose scratch file already
@@ -7803,11 +7920,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (cancelled) {
                     return;
                 }
-                File dir = getContext().getFilesDir();
-                if (!scratch.renameTo(new File(dir, name))) {
-                    throw new IOException("Could not store " + name);
+                if (scratch.renameTo(target)) {
+                    syncStorageDirectory(target.getParentFile());
+                    return;
                 }
-                syncStorageDirectory(dir);
+                if (!scratch.exists()) {
+                    // another process deleted this entry, or cleared the storage,
+                    // while the write was open. Unlinking the scratch file is how it
+                    // says so, and there is nothing left to publish.
+                    return;
+                }
+                throw new IOException("Could not store " + name);
             }
         }
     }
