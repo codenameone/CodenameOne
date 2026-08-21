@@ -12,6 +12,7 @@ on:
   pull_request:
     branches: [ master ]
     paths:
+      - 'scripts/ci/apt-get-install.sh'
       - 'Ports/JavaSE/**'
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
@@ -24,6 +25,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci/apt-get-install.sh'
       - 'Ports/JavaSE/**'
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
@@ -55,7 +57,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - name: Install xvfb
-        run: bash scripts/ci/apt-get-update.sh && sudo apt-get install -y --no-install-recommends xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb
       - name: Build Codename One Maven artifacts (includes archetypes)
         # Through the retry wrapper, narrowed to resolution failures: this died with
         # "Plugin maven-install-plugin:2.5.2 or one of its dependencies could not be resolved"

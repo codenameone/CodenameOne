@@ -16,6 +16,7 @@ on:
     branches:
       - master
     paths:
+      - 'scripts/ci/retry.sh'
       - 'native-themes/**'
       - 'maven/css-compiler/**'
       - 'scripts/build-native-themes.sh'
@@ -62,7 +63,7 @@ jobs:
       - name: Build css-compiler
         run: |
           cd maven
-          mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
 
       - name: Rebuild native themes
         run: ./scripts/build-native-themes.sh

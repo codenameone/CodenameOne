@@ -15732,6 +15732,525 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_bo
     return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+// --- App intents (Core Spotlight + App Intents) ------------------------------
+// Gated by CN1_USE_INTENTS, which the builder defines when the app references
+// com.codename1.intents. Two frameworks with very different availability sit behind this:
+//
+//  - Core Spotlight is Objective-C and long predates this port's deployment floor, so
+//    indexing is implemented directly here and works on every supported device.
+//  - App Intents is Swift-only and needs a newer iOS, so it is reached through the generated
+//    Swift declarations via CN1IntentHost (an Objective-C shim). It has to be an Objective-C
+//    shim rather than Swift calling Java directly: the translator's dead-code eliminator
+//    only scans .m sources for mangled symbols, so a Java method named only from Swift is
+//    silently eliminated into an empty stub.
+//
+// Builds without the define compile the stub branch and link neither framework.
+#ifdef CN1_USE_INTENTS
+#import <CoreSpotlight/CoreSpotlight.h>
+#import <MobileCoreServices/MobileCoreServices.h>
+
+// PNG blobs staged by Java ahead of an index/complete call, keyed by the name the serializer
+// embedded in the JSON. Guarded because staging happens on the caller's thread while the
+// consuming call may run on another.
+static NSMutableDictionary *cn1IntentImages = nil;
+static NSObject *cn1IntentImagesLock = nil;
+
+static void cn1IntentsEnsureStaging() {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1IntentImages = [[NSMutableDictionary alloc] init];
+        cn1IntentImagesLock = [[NSObject alloc] init];
+    });
+}
+
+/// The Core Spotlight domain this framework owns.
+///
+/// Everything indexed through Intents lives under it, so clearing "everything this framework
+/// indexed" is a domain delete rather than deleting the application's entire Spotlight index --
+/// which is what it used to be, and which took content the app indexed itself along with it.
+///
+/// **The recursive delete is documented Core Spotlight behaviour, not an assumption.** Review
+/// twice read this as an exact-match API that would leave every typed item behind. It is not;
+/// CSSearchableIndex.h says so directly, above deleteSearchableItemsWithDomainIdentifiers:
+///
+///   "The delete is recursive so if domain identifiers are of the form
+///    <account-id>.<mailbox-id>, for example, calling delete with <account-id> will delete all
+///    the searchable items with that account and any mailbox."
+///
+/// (Quoted from the iPhoneOS SDK header.) That is precisely this scheme: the root is the
+/// account, an entity type is the mailbox. Deleting the root therefore clears every type.
+#define CN1_INTENT_DOMAIN_ROOT @"com.codename1.intents"
+
+/// The subdomain an entity type is indexed under.
+///
+/// The dot is what makes the hierarchy, so a dot *inside* an entity type would make one nobody
+/// asked for: with types "order" and "order.line" -- ordinary enough for a reverse-DNS naming
+/// scheme -- clearIndex("order") would take "order.line" with it, two unrelated types clearing
+/// as one. Percent-escaping the separator keeps every type exactly one level below the root, so
+/// the hierarchy means only what this file intends it to mean. The escape is applied on both
+/// paths because index and clear share this function.
+static NSString *cn1IntentDomain(NSString *entityType) {
+    if (entityType == nil || [entityType length] == 0) {
+        return CN1_INTENT_DOMAIN_ROOT;
+    }
+    NSString *escaped = [entityType stringByReplacingOccurrencesOfString:@"%"
+                                                             withString:@"%25"];
+    escaped = [escaped stringByReplacingOccurrencesOfString:@"." withString:@"%2E"];
+    return [NSString stringWithFormat:@"%@.%@", CN1_INTENT_DOMAIN_ROOT, escaped];
+}
+
+/// The prefix every Spotlight item this framework indexes carries.
+///
+/// A CSSearchableItem's uniqueIdentifier is scoped to the application, not to the domain -- the
+/// domain namespaces *deletion by domain*, and nothing else. So an entity indexed here as
+/// "order:42" and an item the application indexed itself under that same string are one item:
+/// indexing through Intents would replace the app's row, and removeFromIndex would delete it.
+/// Ownership has to be stamped on the identifier as well.
+#define CN1_INTENT_UID_PREFIX @"cn1entity:"
+
+/// The Spotlight identifier for an entity uid.
+NSString *cn1IntentItemId(NSString *uid) {
+    return [CN1_INTENT_UID_PREFIX stringByAppendingString:uid];
+}
+
+/// The entity uid behind a Spotlight identifier, or nil when the item is not ours.
+///
+/// nil matters: a selection may arrive for an item the application indexed itself, and handing
+/// its raw identifier to the framework would have it look for an entity that does not exist.
+NSString *cn1IntentUidFromItemId(NSString *identifier) {
+    if (identifier == nil || ![identifier hasPrefix:CN1_INTENT_UID_PREFIX]) {
+        return nil;
+    }
+    return [identifier substringFromIndex:[CN1_INTENT_UID_PREFIX length]];
+}
+
+/// The generated Swift bridge, present only when the app declares an @AppIntent. Absent is a
+/// normal state (an app may only index content), so callers must tolerate nil.
+static Class cn1IntentBridgeClass() {
+    static Class c = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        c = NSClassFromString(@"CN1IntentBridge");
+    });
+    return c;
+}
+
+/// Donated activities have to outlive the call that created them.
+static NSMutableArray *cn1IntentActivities = nil;
+
+static void cn1IntentsRetainActivity(NSUserActivity *activity) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1IntentActivities = [[NSMutableArray alloc] init];
+    });
+    @synchronized (cn1IntentActivities) {
+        // Bounded: a long-running app that donates on every user action would otherwise grow
+        // this without limit, and only the recent ones are of any use to the system.
+        if ([cn1IntentActivities count] > 32) {
+            [cn1IntentActivities removeObjectAtIndex:0];
+        }
+        [cn1IntentActivities addObject:activity];
+    }
+}
+
+/// How long a staged snippet directory is kept before the next invocation reclaims it.
+///
+/// Generous against the thing it has to outlive: an invocation is capped at 25 seconds by the
+/// framework and its snippet is rendered during the interaction, so ten minutes is orders of
+/// magnitude past any live reader while still bounding what accumulates.
+#define CN1_INTENT_IMAGE_TTL_SECONDS (10 * 60)
+
+/// Deletes staged directories from earlier invocations.
+///
+/// Each invocation writes its blobs under its own token, and nothing removed them: the
+/// completion path does not, and the SwiftUI view that reads them cannot, because it has no
+/// idea when the last reader is done. Left alone they accumulate for the life of the install
+/// -- image-heavy intents run many times a day -- and the caches directory is only reclaimed
+/// by iOS under storage pressure, which is not a plan.
+///
+/// Pruned by age at the moment the next one is staged, rather than deleted on completion:
+/// a snippet can still be on screen after perform() returns, so deleting it then would race
+/// the renderer for the picture the user is looking at.
+static void cn1IntentsPruneStagedImages(NSString *root) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray *names = [fm contentsOfDirectoryAtPath:root error:nil];
+    if (names == nil) {
+        return;
+    }
+    NSDate *cutoff = [NSDate dateWithTimeIntervalSinceNow:-CN1_INTENT_IMAGE_TTL_SECONDS];
+    for (NSString *name in names) {
+        NSString *path = [root stringByAppendingPathComponent:name];
+        NSDictionary *attrs = [fm attributesOfItemAtPath:path error:nil];
+        if (attrs == nil) {
+            continue;
+        }
+        NSDate *modified = [attrs objectForKey:NSFileModificationDate];
+        if (modified != nil && [modified compare:cutoff] == NSOrderedAscending) {
+            [fm removeItemAtPath:path error:nil];
+        }
+    }
+}
+
+/// Writes the staged blobs into a per-invocation directory and returns its path, or nil when
+/// there was nothing to write. The directory is under the caches folder, so the OS can reclaim
+/// it -- a snippet is transient and there is nothing to keep once it has been shown.
+static NSString *cn1IntentsWriteStagedImages(NSString *token) {
+    cn1IntentsEnsureStaging();
+    NSDictionary *snapshot;
+    @synchronized (cn1IntentImagesLock) {
+        if ([cn1IntentImages count] == 0) {
+            return nil;
+        }
+        // Autoreleased rather than owned: this function has four exits and the app target is
+        // MRC, so a plain -copy would leak every staged blob on three of them. The caller is
+        // inside a POOL_BEGIN/POOL_END pair.
+        snapshot = [[cn1IntentImages copy] autorelease];
+    }
+    NSArray *caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory,
+            NSUserDomainMask, YES);
+    if ([caches count] == 0) {
+        return nil;
+    }
+    NSString *root = [[caches objectAtIndex:0] stringByAppendingPathComponent:@"cn1intents"];
+    // Before this invocation adds one, take away the ones nobody can still be reading.
+    cn1IntentsPruneStagedImages(root);
+    NSString *dir = [root stringByAppendingPathComponent:token];
+    NSError *err = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:&err];
+    if (err != nil) {
+        NSLog(@"CN1 intents: could not create the snippet image directory: %@", err);
+        return nil;
+    }
+    for (NSString *name in snapshot) {
+        NSData *data = [snapshot objectForKey:name];
+        // The .png suffix is part of the contract, not decoration: CN1SurfaceRenderer's
+        // cn1LoadImage appends it to every name it is asked for, so a blob staged under the
+        // bare name is never found and the node renders as Color.clear -- an image silently
+        // missing from every App Intent snippet. IOSSurfaceBridge writes <name>.png for the
+        // widget and live-activity paths that share this renderer; this one had not.
+        NSString *file = [name stringByAppendingString:@".png"];
+        [data writeToFile:[dir stringByAppendingPathComponent:file] atomically:YES];
+    }
+    return dir;
+}
+
+static NSDictionary *cn1IntentsParseJson(NSString *json) {
+    if (json == nil) {
+        return nil;
+    }
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    if (data == nil) {
+        return nil;
+    }
+    NSError *err = nil;
+    id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:&err];
+    if (err != nil || ![parsed isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    return (NSDictionary *)parsed;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_TRUE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_APP_INTENTS_DECLARED
+    if (@available(iOS 16.0, *)) {
+        // The class test still matters: it is what catches a device below the App Intents
+        // minimum, where the Swift is present but its types are unavailable.
+        return cn1IntentBridgeClass() != nil ? JAVA_TRUE : JAVA_FALSE;
+    }
+#endif
+    // No declarations were generated -- either the app declares no @AppIntent, or it set
+    // ios.intents.appIntents=false. Answering true here made isVoiceInvocationSupported() and
+    // isHeadlessExecutionSupported() promise an assistant path that cannot exist, so apps built
+    // Siri UI that could never work.
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    BOOL supported = [CSSearchableIndex isIndexingAvailable];
+    POOL_END();
+    return supported ? JAVA_TRUE : JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_intentsRegister___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT declarationsJson) {
+    if (@available(iOS 16.0, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1IntentBridgeClass();
+        if (bridge != nil && declarationsJson != JAVA_NULL) {
+            NSString *json = toNSString(CN1_THREAD_STATE_PASS_ARG declarationsJson);
+            ((void (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"registerIntents:"), json);
+        }
+        POOL_END();
+    }
+}
+
+/// Donation is deliberately Objective-C and carries no availability gate.
+///
+/// It is NSUserActivity underneath, which long predates App Intents, so gating it on iOS 16
+/// made every donation a no-op on exactly the devices the ios.intents.appIntents=false opt-out
+/// exists to keep working. Nothing here needs Swift.
+void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT title, JAVA_OBJECT paramsJson) {
+    if (intentId == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    NSString *iid = toNSString(CN1_THREAD_STATE_PASS_ARG intentId);
+    NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:iid];
+    // eligibleForPrediction arrived in iOS 12, and this donation path is the one an app on a
+    // lower deployment target keeps -- indexing and donation need no App Intents and no newer
+    // floor, which is the whole reason the floor is not raised for them. Sending the setter to
+    // an older system is an unrecognized selector and a crash, where the honest outcome is
+    // simply that the system does not predict this activity.
+    if (@available(iOS 12.0, *)) {
+        activity.eligibleForPrediction = YES;
+    }
+    // eligibleForSearch is iOS 9 and is deliberately not guarded: no build can reach this with
+    // a target older than that. IPhoneBuilder starts minDeploymentTargets at 12.0, adds
+    // DEFAULT_MIN_DEPLOYMENT_VERSION (13.0) unconditionally at the top of every build, and
+    // getDeploymentTarget returns maxVersionString over that list -- so ios.deployment_target
+    // can only ever raise the floor. A project pinning 8.0 still builds at 13.0.
+    //
+    // eligibleForPrediction above is guarded because 12.0 is exactly the floor, and a guard at
+    // the boundary costs nothing while documenting which iOS introduced the property. Guarding
+    // this one as well would suggest a configuration that cannot exist.
+    activity.eligibleForSearch = YES;
+    // The activity type has to be the machine id -- it is what the continuation path matches on
+    // -- but the title is what Siri suggestions and Spotlight show a person. Using the id for
+    // both put "log_workout" in front of the user next to the "Log a workout" the app declared.
+    NSString *label = (title == JAVA_NULL) ? iid : toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    activity.title = ([label length] > 0) ? label : iid;
+    if (paramsJson != JAVA_NULL) {
+        NSDictionary *params = cn1IntentsParseJson(
+                toNSString(CN1_THREAD_STATE_PASS_ARG paramsJson));
+        if (params != nil) {
+            // userInfo has to be property-list representable, so anything else is dropped
+            // rather than risking an exception inside what is only ever a hint to the system.
+            NSMutableDictionary *safe = [NSMutableDictionary dictionary];
+            for (id key in params) {
+                id value = [params objectForKey:key];
+                if ([key isKindOfClass:[NSString class]]
+                        && ([value isKindOfClass:[NSString class]]
+                                || [value isKindOfClass:[NSNumber class]])) {
+                    [safe setObject:value forKey:key];
+                }
+            }
+            activity.userInfo = safe;
+        }
+    }
+    [activity becomeCurrent];
+    // Held by the array, not by us: an NSUserActivity that is released outright stops being
+    // current and the donation is lost, so ownership moves to cn1IntentActivities. Dropping
+    // this alloc's own reference is what makes that array's bound mean anything -- without it
+    // evicting an old entry releases only the array's retain and every donated activity stays
+    // alive for the life of the process.
+    cn1IntentsRetainActivity(activity);
+    [activity release];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsStageImage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT name, JAVA_OBJECT dataArr, JAVA_INT length) {
+    if (name == JAVA_NULL || dataArr == JAVA_NULL || length <= 0) {
+        return;
+    }
+    cn1IntentsEnsureStaging();
+    POOL_BEGIN();
+    NSString *key = toNSString(CN1_THREAD_STATE_PASS_ARG name);
+    JAVA_ARRAY byteArray = (JAVA_ARRAY)dataArr;
+    NSData *data = [NSData dataWithBytes:(JAVA_BYTE *)byteArray->data length:length];
+    @synchronized (cn1IntentImagesLock) {
+        [cn1IntentImages setObject:data forKey:key];
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entitiesJson) {
+    if (entitiesJson == JAVA_NULL || ![CSSearchableIndex isIndexingAvailable]) {
+        return;
+    }
+    cn1IntentsEnsureStaging();
+    POOL_BEGIN();
+    NSDictionary *doc = cn1IntentsParseJson(toNSString(CN1_THREAD_STATE_PASS_ARG entitiesJson));
+    NSArray *entities = [doc objectForKey:@"entities"];
+    if ([entities isKindOfClass:[NSArray class]]) {
+        NSMutableArray *items = [NSMutableArray array];
+        for (id raw in entities) {
+            if (![raw isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            NSDictionary *e = (NSDictionary *)raw;
+            NSString *uid = [e objectForKey:@"uid"];
+            if (uid == nil) {
+                continue;
+            }
+            // Autoreleased: the app target is MRC and this loop runs once per entity, so an
+            // owned attribute set would leak its thumbnail data on every index call.
+            CSSearchableItemAttributeSet *attrs = [[[CSSearchableItemAttributeSet alloc]
+                    initWithItemContentType:(NSString *)kUTTypeItem] autorelease];
+            attrs.title = [e objectForKey:@"title"];
+            attrs.contentDescription = [e objectForKey:@"subtitle"];
+            id keywords = [e objectForKey:@"keywords"];
+            if ([keywords isKindOfClass:[NSArray class]]) {
+                attrs.keywords = (NSArray *)keywords;
+            }
+            NSString *imageName = [e objectForKey:@"image"];
+            if (imageName != nil) {
+                @synchronized (cn1IntentImagesLock) {
+                    NSData *png = [cn1IntentImages objectForKey:imageName];
+                    if (png != nil) {
+                        attrs.thumbnailData = png;
+                    }
+                }
+            }
+            // The domain is namespaced under one this framework owns. It was the bare entity
+            // type, which is app-chosen and collides with any domain the app indexes into Core
+            // Spotlight itself -- and clearIndex(null) below deleted the app's entire index
+            // rather than this framework's part of it.
+            NSString *domain = cn1IntentDomain([e objectForKey:@"type"]);
+            CSSearchableItem *item = [[[CSSearchableItem alloc]
+                    initWithUniqueIdentifier:cn1IntentItemId(uid)
+                            domainIdentifier:domain
+                                attributeSet:attrs] autorelease];
+            [items addObject:item];
+        }
+        if ([items count] > 0) {
+            [[CSSearchableIndex defaultSearchableIndex] indexSearchableItems:items
+                    completionHandler:^(NSError *error) {
+                        if (error != nil) {
+                            NSLog(@"CN1 intents: indexing failed: %@", error);
+                        }
+                    }];
+        }
+    }
+    @synchronized (cn1IntentImagesLock) {
+        [cn1IntentImages removeAllObjects];
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsRemoveFromIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT idsJson) {
+    if (idsJson == JAVA_NULL || ![CSSearchableIndex isIndexingAvailable]) {
+        return;
+    }
+    POOL_BEGIN();
+    NSDictionary *doc = cn1IntentsParseJson(toNSString(CN1_THREAD_STATE_PASS_ARG idsJson));
+    NSArray *refs = [doc objectForKey:@"refs"];
+    if ([refs isKindOfClass:[NSArray class]]) {
+        NSMutableArray *uids = [NSMutableArray array];
+        for (id raw in refs) {
+            if ([raw isKindOfClass:[NSDictionary class]]) {
+                NSString *uid = [(NSDictionary *)raw objectForKey:@"uid"];
+                if (uid != nil) {
+                    // The same stamp indexing applied. Deleting the raw uid would delete an
+                    // item the application indexed itself under that string, and leave ours.
+                    [uids addObject:cn1IntentItemId(uid)];
+                }
+            }
+        }
+        if ([uids count] > 0) {
+            [[CSSearchableIndex defaultSearchableIndex]
+                    deleteSearchableItemsWithIdentifiers:uids completionHandler:nil];
+        }
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsClearIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entityType) {
+    if (![CSSearchableIndex isIndexingAvailable]) {
+        return;
+    }
+    POOL_BEGIN();
+    CSSearchableIndex *index = [CSSearchableIndex defaultSearchableIndex];
+    // Never deleteAllSearchableItems. This API clears what was indexed *through Intents*, and
+    // that call clears everything the application ever put in Core Spotlight -- including
+    // content indexed by native code or another library, which this framework did not publish
+    // and has no business removing. Core Spotlight deletes a domain's subdomains along with it,
+    // so the framework's own root domain is exactly the right scope for "all of ours", and one
+    // subdomain for "all of this type".
+    NSString *domain = (entityType == JAVA_NULL)
+            ? CN1_INTENT_DOMAIN_ROOT
+            : cn1IntentDomain(toNSString(CN1_THREAD_STATE_PASS_ARG entityType));
+    [index deleteSearchableItemsWithDomainIdentifiers:[NSArray arrayWithObject:domain]
+                                    completionHandler:nil];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsCompleteInvocation___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token, JAVA_OBJECT resultJson) {
+    if (@available(iOS 16.0, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1IntentBridgeClass();
+        if (bridge != nil && token != JAVA_NULL) {
+            NSString *t = toNSString(CN1_THREAD_STATE_PASS_ARG token);
+            NSString *json = (resultJson == JAVA_NULL) ? @"{}"
+                    : toNSString(CN1_THREAD_STATE_PASS_ARG resultJson);
+            // A snippet's images reach the renderer as files, not bytes: it resolves them from
+            // a directory, the same way the widget extension does, so the two render paths stay
+            // identical rather than growing a second image pipeline.
+            NSString *imagesDir = cn1IntentsWriteStagedImages(t);
+            // The Swift side owns the one-shot guarantee for its continuation; the Java side
+            // has already guaranteed this fires once per token.
+            ((void (*)(id, SEL, NSString *, NSString *, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"completeInvocation:resultJson:imagesDir:"),
+                    t, json, imagesDir);
+        }
+        POOL_END();
+    }
+    // Staged for this result and now consumed. Without this an app returning fresh imagery on
+    // every invocation retains every blob for the life of the process.
+    cn1IntentsEnsureStaging();
+    @synchronized (cn1IntentImagesLock) {
+        [cn1IntentImages removeAllObjects];
+    }
+}
+
+#else // CN1_USE_INTENTS
+
+// Intents not enabled: no Core Spotlight or App Intents references, everything unsupported.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_intentsRegister___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT declarationsJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT title, JAVA_OBJECT paramsJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsStageImage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT name, JAVA_OBJECT dataArr, JAVA_INT length) {
+}
+void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entitiesJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsRemoveFromIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT idsJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsClearIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entityType) {
+}
+void com_codename1_impl_ios_IOSNative_intentsCompleteInvocation___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token, JAVA_OBJECT resultJson) {
+}
+#endif // CN1_USE_INTENTS
+
+// New-VM (return-type-encoded) manglings for the value-returning intent natives. Defined after
+// the implementations/stubs above so each call targets an already-declared function. The void
+// intents* methods need no _R_ wrapper. Always defined regardless of CN1_USE_INTENTS.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_intentsSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
 // --- Phone-to-watch link (com.codename1.wearable / WatchConnectivity) --------
 //
 // Compiled into BOTH the phone target and the watch target: WCSession is symmetric, so the two

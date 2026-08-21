@@ -25,6 +25,15 @@ package com.codename1.ai.vision;
 import com.codename1.util.AsyncResource;
 
 /// Reusable, closable on-device analyzer for still images or camera frames.
+///
+/// This is the type {@link VisionCameraView} is parameterized on, so the
+/// concrete analyzer and its result type travel together:
+///
+/// ```java
+/// VisionAnalyzer<Barcode[]> analyzer = new BarcodeScanner();
+/// VisionCameraView<Barcode[]> view = new VisionCameraView<Barcode[]>(analyzer);
+/// ```
+///
 /// Implementations may retain native detectors and models between calls, so
 /// create one analyzer per stream/workflow and close it when finished.
 /// Backend creation, request scheduling, capability checks, and close are

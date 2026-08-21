@@ -39,11 +39,12 @@ import com.codename1.ui.layouts.BorderLayout;
 /// f.add(BorderLayout.CENTER, view);
 /// f.show();
 ///
-/// session.setFrameListener(frame ->
-///     BarcodeScanner.scan(frame.getJpegBytes()).ready(codes -> {
-///         if (codes.length > 0) Log.p("scanned " + codes[0]);
-///     }));
+/// session.setFrameListener(frame -> analyze(frame.getJpegBytes()));
 /// ```
+///
+/// To run an on-device vision analyzer over the preview, prefer
+/// `com.codename1.ai.vision.VisionCameraView`, which creates and owns this
+/// view along with the frame plumbing.
 ///
 /// The view holds a back-reference to its `CameraSession`; closing the session
 /// while the view is still attached to a form leaves the view rendering its
@@ -70,8 +71,13 @@ public final class CameraView extends Container {
 
     /// Whether to horizontally mirror the preview. Usually `true` for front
     /// cameras (matches the "mirror" feel users expect from a selfie view).
+    ///
+    /// A port that cannot mirror its preview records the value without
+    /// changing what is rendered, so `#isMirrored()` can report `true` on a
+    /// preview that looks unmirrored.
     public void setMirrored(boolean m) {
         this.mirrored = m;
+        session.getImpl().setPreviewMirrored(m);
     }
 
     /// True when the preview is horizontally mirrored.
@@ -81,8 +87,13 @@ public final class CameraView extends Container {
 
     /// How the live preview is fitted inside the component bounds.
     /// Defaults to `ScaleType#CROP` (filling the view, cropping at edges).
+    ///
+    /// A port that renders its preview one fixed way records the value
+    /// without changing what is rendered, so `#getScaleType()` can report a
+    /// mode the preview is not actually using.
     public void setScaleType(ScaleType s) {
         this.scaleType = s == null ? ScaleType.CROP : s;
+        session.getImpl().setPreviewScaleType(this.scaleType);
     }
 
     /// Current scale type. Defaults to `ScaleType#CROP`.

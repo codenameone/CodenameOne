@@ -1,0 +1,2007 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven.processors;
+
+import com.codename1.maven.annotations.AbstractAnnotationProcessor;
+import com.codename1.maven.annotations.AnnotatedClass;
+import com.codename1.maven.annotations.AnnotationValues;
+import com.codename1.maven.annotations.FieldInfo;
+import com.codename1.maven.annotations.JavaSourceCompiler;
+import com.codename1.maven.annotations.MethodInfo;
+import com.codename1.maven.annotations.ProcessingException;
+import com.codename1.maven.annotations.ProcessorContext;
+
+import org.objectweb.asm.Type;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.regex.Pattern;
+
+/// Turns `AppIntent` and `IntentEntity` declarations into the two things the
+/// framework needs: a reflection-free Java dispatch table, and an `intents.json`
+/// manifest the native builders read to generate each platform's declarations.
+///
+/// #### Why everything is generated rather than looked up
+///
+/// On a translated iOS build there is no reflection to fall back on --
+/// `Class.getAnnotation` returns null and `Class.forName` is banned in the
+/// framework -- and the translator's dead-code eliminator strips any method
+/// with no Java caller. So the generated registry calls every handler and every
+/// entity query by **direct static invocation**. That is simultaneously what
+/// keeps the methods alive through DCE and what lets Android's obfuscator rename
+/// the call site and the target together.
+///
+/// #### Why the generated coercion never casts
+///
+/// Parameter values arrive from a platform payload as whatever the wire format
+/// carried. ParparVM's `CHECKCAST` expands to nothing, so a bad cast does not
+/// throw -- it hands the wrong object to the next instruction and crashes
+/// natively somewhere else. Every generated conversion is therefore
+/// `instanceof`-guarded with an explicit fallback, and entity parameters are
+/// never cast at all: they arrive as an id string and become objects only by
+/// calling the entity's own `BY_ID` query.
+///
+/// Validation surfaces every offending declaration in one build run through
+/// `ProcessorContext#error`; nothing is generated while an error is pending.
+public final class AppIntentAnnotationProcessor extends AbstractAnnotationProcessor {
+
+    public static final String APP_INTENT_DESC = "Lcom/codename1/annotations/AppIntent;";
+    public static final String INTENT_PARAM_DESC = "Lcom/codename1/annotations/IntentParam;";
+    public static final String INTENT_ENTITY_DESC = "Lcom/codename1/annotations/IntentEntity;";
+    public static final String ENTITY_ID_DESC = "Lcom/codename1/annotations/EntityId;";
+    public static final String ENTITY_TITLE_DESC = "Lcom/codename1/annotations/EntityTitle;";
+    public static final String ENTITY_SUBTITLE_DESC = "Lcom/codename1/annotations/EntitySubtitle;";
+    public static final String ENTITY_IMAGE_DESC = "Lcom/codename1/annotations/EntityImage;";
+    public static final String ENTITY_QUERY_DESC = "Lcom/codename1/annotations/EntityQuery;";
+
+    static final String REGISTRY_PACKAGE = "com.codename1.intents.generated";
+    static final String REGISTRY_SIMPLE = "IntentRegistry";
+    static final String BOOTSTRAP_PACKAGE = "cn1app";
+    static final String BOOTSTRAP_SIMPLE = "IntentBootstrap";
+    /// Where the generated manifest is written inside the jar.
+    ///
+    /// Namespaced rather than sitting at the root, because the root is the application's. An
+    /// app with its own src/main/resources/intents.json has it copied to target/classes by the
+    /// resources phase, and this processor would then overwrite it -- or, worse, delete it in
+    /// deleteGenerated() when the app declares no intents at all. That is an application which
+    /// never used this feature silently losing one of its own assets on a plugin upgrade,
+    /// which no build-time convenience is worth.
+    ///
+    /// META-INF is the established place for exactly this: metadata a tool owns rather than
+    /// content the application authored. The path survives the trip to the builders unchanged,
+    /// because Executor.unzip routes every non-class, non-source, non-lib entry through
+    /// resolveArchiveEntry, which preserves the entry's relative path under the resource root.
+    static final String MANIFEST_RESOURCE = "META-INF/codenameone/intents.json";
+
+    private static final String INTENT_RESULT_BINARY = "com.codename1.intents.IntentResult";
+    private static final String INTENT_CONTEXT_DESC = "Lcom/codename1/intents/IntentContext;";
+    private static final String DATE_DESC = "Ljava/util/Date;";
+    private static final String STRING_DESC = "Ljava/lang/String;";
+    private static final String ENCODED_IMAGE_DESC = "Lcom/codename1/ui/EncodedImage;";
+
+    private static final Pattern ID_PATTERN = Pattern.compile("[a-z][a-z0-9_]{2,63}");
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Za-z0-9_]+)\\}");
+    /// Apple rejects an App Shortcut phrase that does not name the app.
+    private static final String APP_NAME_TOKEN = "${applicationName}";
+
+    private static final Set<String> DESCRIPTORS;
+    static {
+        Set<String> s = new LinkedHashSet<String>();
+        s.add(APP_INTENT_DESC);
+        s.add(INTENT_ENTITY_DESC);
+        DESCRIPTORS = Collections.unmodifiableSet(s);
+    }
+
+    /// TreeMaps so the emitted source and manifest are byte-stable regardless of
+    /// the order the class scan happened to walk the tree in.
+    private final TreeMap<String, IntentDef> intents = new TreeMap<String, IntentDef>();
+    private final TreeMap<String, EntityDef> entities = new TreeMap<String, EntityDef>();
+    private final List<String> routePatterns = new ArrayList<String>();
+
+    @Override
+    public Set<String> getAnnotationDescriptors() {
+        return DESCRIPTORS;
+    }
+
+    @Override
+    public void start(ProcessorContext ctx) throws ProcessingException {
+        intents.clear();
+        entities.clear();
+        routePatterns.clear();
+        collectRoutePatterns(ctx);
+    }
+
+    /// Independently re-collects the project's `Route` patterns so `opensRoute`
+    /// can be validated against them.
+    ///
+    /// The processor SPI has no way to express "run after the route processor",
+    /// and inventing one for a single cross-check would be a heavier change than
+    /// re-reading the annotations. This is a scan of an index that is already in
+    /// memory.
+    private void collectRoutePatterns(ProcessorContext ctx) {
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            addRoutePatterns(cls.getClassAnnotation(RouteAnnotationProcessor.ROUTE_DESC));
+            addRouteContainer(cls.getClassAnnotation(RouteAnnotationProcessor.ROUTES_DESC));
+            for (MethodInfo m : cls.getMethods()) {
+                addRoutePatterns(m.getAnnotation(RouteAnnotationProcessor.ROUTE_DESC));
+                addRouteContainer(m.getAnnotation(RouteAnnotationProcessor.ROUTES_DESC));
+            }
+        }
+    }
+
+    private void addRoutePatterns(AnnotationValues route) {
+        if (route == null) {
+            return;
+        }
+        String v = route.getString("value");
+        if (v != null) {
+            routePatterns.add(v);
+        }
+    }
+
+    private void addRouteContainer(AnnotationValues container) {
+        if (container == null) {
+            return;
+        }
+        for (Object o : asList(container.get("value"))) {
+            if (o instanceof AnnotationValues) {
+                addRoutePatterns((AnnotationValues) o);
+            }
+        }
+    }
+
+    @Override
+    public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        if (cls.isSynthetic()) {
+            return;
+        }
+        AnnotationValues entity = cls.getClassAnnotation(INTENT_ENTITY_DESC);
+        if (entity != null) {
+            processEntity(cls, entity, ctx);
+        }
+        for (MethodInfo m : cls.getMethods()) {
+            AnnotationValues intent = m.getAnnotation(APP_INTENT_DESC);
+            if (intent != null) {
+                processIntent(cls, m, intent, ctx);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Entities
+    // ------------------------------------------------------------------
+
+    private void processEntity(AnnotatedClass cls, AnnotationValues ann, ProcessorContext ctx) {
+        String type = ann.getString("value");
+        if (type == null || !ID_PATTERN.matcher(type).matches()) {
+            ctx.error(cls, "@IntentEntity id \"" + type + "\" must match "
+                    + ID_PATTERN.pattern());
+            return;
+        }
+        if (entities.containsKey(type)) {
+            ctx.error(cls, "@IntentEntity id \"" + type + "\" is already declared by "
+                    + entities.get(type).binaryName);
+            return;
+        }
+        if (cls.isInterface() || cls.isAbstract()) {
+            ctx.error(cls, "@IntentEntity requires a concrete class; "
+                    + cls.getBinaryName() + " is abstract or an interface");
+            return;
+        }
+
+        EntityDef def = new EntityDef();
+        def.type = type;
+        def.binaryName = cls.getBinaryName();
+        // getStringOrDefault only fills in when the element is absent, and an explicitly
+        // written title="" -- or one of spaces -- is present. It then travels into intents.json
+        // and becomes an empty iOS TypeDisplayRepresentation, so the entity picker shows a blank
+        // where the type name belongs. A title that is not a title falls back to the same place
+        // an omitted one does.
+        def.title = ann.getStringOrDefault("title", type);
+        if (def.title == null || def.title.trim().length() == 0) {
+            def.title = type;
+        }
+        def.indexed = ann.getBoolOrDefault("indexed", false);
+
+        def.idAccessor = findAccessor(cls, ENTITY_ID_DESC, ctx, "@EntityId");
+        def.titleAccessor = findAccessor(cls, ENTITY_TITLE_DESC, ctx, "@EntityTitle");
+        def.subtitleAccessor = findAccessor(cls, ENTITY_SUBTITLE_DESC, ctx, "@EntitySubtitle");
+        def.imageAccessor = findAccessor(cls, ENTITY_IMAGE_DESC, ctx, "@EntityImage");
+
+        if (def.idAccessor == null) {
+            ctx.error(cls, "@IntentEntity " + cls.getBinaryName()
+                    + " must declare exactly one @EntityId member returning String");
+        } else if (!STRING_DESC.equals(def.idAccessor.typeDescriptor)) {
+            ctx.error(cls, "@EntityId on " + cls.getBinaryName() + " must return String, not "
+                    + readable(def.idAccessor.typeDescriptor));
+        }
+        if (def.indexed && def.titleAccessor == null) {
+            ctx.error(cls, "@IntentEntity " + cls.getBinaryName()
+                    + " is indexed, so it must declare an @EntityTitle to display");
+        }
+        if (def.imageAccessor != null
+                && !ENCODED_IMAGE_DESC.equals(def.imageAccessor.typeDescriptor)) {
+            ctx.error(cls, "@EntityImage on " + cls.getBinaryName()
+                    + " must return EncodedImage, not "
+                    + readable(def.imageAccessor.typeDescriptor));
+        }
+
+        for (MethodInfo m : cls.getMethods()) {
+            AnnotationValues q = m.getAnnotation(ENTITY_QUERY_DESC);
+            if (q == null) {
+                continue;
+            }
+            String kind = enumConstant(q.get("value"));
+            if (kind == null) {
+                ctx.error(cls, "@EntityQuery on " + cls.getBinaryName() + "." + m.getName()
+                        + " must name a Kind");
+                continue;
+            }
+            if (!m.isStatic() || !m.isPublic()) {
+                ctx.error(cls, "@EntityQuery " + cls.getBinaryName() + "." + m.getName()
+                        + " must be public static -- the platform calls it directly, with no"
+                        + " instance of your class in existence");
+                continue;
+            }
+            String expected = expectedQueryDescriptor(kind, cls.getBinaryName());
+            if (expected != null && !expected.equals(m.getDescriptor())) {
+                // Only the method *name* is recorded, so the generated call resolves by
+                // overload rules rather than by which method carried the annotation. Annotating
+                // byId(int) beside an unannotated byId(String) therefore built a call that
+                // compiled, ran, and invoked the method the developer did not mark.
+                ctx.error(cls, "@EntityQuery(" + kind + ") on " + cls.getBinaryName() + "."
+                        + m.getName() + " has the wrong signature. Expected "
+                        + describeQuery(kind, cls.getBinaryName()) + ", found " + m.getDescriptor()
+                        + ". The generated code calls this by name, so an overload with the "
+                        + "right shape would be invoked instead of the one you annotated.");
+                continue;
+            }
+            if (expected != null && expected.endsWith("Ljava/util/List;")
+                    && !returnsListOf(m, cls.getBinaryName())) {
+                // The descriptor is erased, so every List looks alike here -- List<String>
+                // passes a check that only sees java/util/List. The generated adapter then
+                // takes each element as the entity type, and on ParparVM a failed CHECKCAST
+                // does not throw: it reads entity members out of whatever was in the list and
+                // crashes natively, where no Java catch can see it. The generic signature is
+                // the only place the element type survives, so it is what gets checked.
+                ctx.error(cls, "@EntityQuery(" + kind + ") on " + cls.getBinaryName() + "."
+                        + m.getName() + " must return " + describeQuery(kind, cls.getBinaryName())
+                        + ". A raw List, or a List of anything else, compiles here and then "
+                        + "hands the generated adapter an object that is not a "
+                        + cls.getBinaryName().substring(cls.getBinaryName().lastIndexOf('.') + 1)
+                        + ".");
+                continue;
+            }
+            String existing = def.queries.get(kind);
+            if (existing != null) {
+                // Silently keeping the later one picks a resolver by declaration order, which
+                // is not something the author chose. A second BY_ID in particular decides which
+                // object every entity id in the app resolves to.
+                ctx.error(cls, "@IntentEntity " + cls.getBinaryName() + " declares "
+                        + kind + " twice, on " + existing + " and " + m.getName()
+                        + ". Each query kind resolves to exactly one method; keep the one the "
+                        + "platform should call.");
+                continue;
+            }
+            def.queries.put(kind, m.getName());
+        }
+
+        if (!def.queries.containsKey("BY_ID")) {
+            ctx.error(cls, "@IntentEntity " + cls.getBinaryName()
+                    + " must declare an @EntityQuery(BY_ID) method: an entity crosses to the"
+                    + " platform as its id, so resolving that id back is the one lookup the"
+                    + " framework cannot do without");
+        }
+        entities.put(type, def);
+    }
+
+    /// The descriptor an `@EntityQuery` method of this kind must have, or null when the kind
+    /// is not one this framework generates a call for.
+    ///
+    /// BY_ID takes the id and returns the entity; SUGGESTED takes nothing and SEARCH takes the
+    /// query string, both returning a List. Checked because only the name is recorded, so a
+    /// mismatch does not fail to compile -- it silently calls a different overload.
+    private static String expectedQueryDescriptor(String kind, String binaryName) {
+        String entity = "L" + binaryName.replace('.', '/') + ";";
+        if ("BY_ID".equals(kind)) {
+            return "(Ljava/lang/String;)" + entity;
+        }
+        if ("SUGGESTED".equals(kind)) {
+            return "()Ljava/util/List;";
+        }
+        if ("SEARCH".equals(kind)) {
+            return "(Ljava/lang/String;)Ljava/util/List;";
+        }
+        return null;
+    }
+
+    /// Whether this method's generic signature says it returns a List of exactly this entity.
+    ///
+    /// False for a raw List too: without a type argument the class file records no signature
+    /// at all, and an unchecked list is exactly the case being guarded against.
+    private static boolean returnsListOf(MethodInfo m, String binaryName) {
+        String signature = m.getSignature();
+        if (signature == null) {
+            return false;
+        }
+        return signature.endsWith("Ljava/util/List<L" + binaryName.replace('.', '/') + ";>;");
+    }
+
+    /// The same shape, written the way a developer wrote it.
+    private static String describeQuery(String kind, String binaryName) {
+        String simple = binaryName.substring(binaryName.lastIndexOf('.') + 1).replace('$', '.');
+        if ("BY_ID".equals(kind)) {
+            return "public static " + simple + " <name>(String id)";
+        }
+        if ("SUGGESTED".equals(kind)) {
+            return "public static List<" + simple + "> <name>()";
+        }
+        return "public static List<" + simple + "> <name>(String query)";
+    }
+
+    /// Finds the single member carrying `descriptor`, reporting a clear error
+    /// when more than one does.
+    private Accessor findAccessor(AnnotatedClass cls, String descriptor, ProcessorContext ctx,
+                                   String label) {
+        Accessor found = null;
+        for (MethodInfo m : cls.getMethods()) {
+            if (m.getAnnotation(descriptor) == null) {
+                continue;
+            }
+            if (found != null) {
+                ctx.error(cls, label + " appears more than once on " + cls.getBinaryName());
+                return found;
+            }
+            if (!m.isPublic() || m.isStatic()
+                    || Type.getArgumentTypes(m.getDescriptor()).length != 0) {
+                ctx.error(cls, label + " on " + cls.getBinaryName() + "." + m.getName()
+                        + " must be a public no-argument instance method");
+                continue;
+            }
+            found = new Accessor(m.getName(), true,
+                    Type.getReturnType(m.getDescriptor()).getDescriptor());
+        }
+        for (FieldInfo f : cls.getFields()) {
+            if (f.getAnnotation(descriptor) == null) {
+                continue;
+            }
+            if (found != null) {
+                ctx.error(cls, label + " appears more than once on " + cls.getBinaryName());
+                return found;
+            }
+            if (!f.isPublic() || f.isStatic()) {
+                ctx.error(cls, label + " on " + cls.getBinaryName() + "." + f.getName()
+                        + " must be a public instance field");
+                continue;
+            }
+            found = new Accessor(f.getName(), false, f.getDescriptor());
+        }
+        return found;
+    }
+
+    // ------------------------------------------------------------------
+    // Intents
+    // ------------------------------------------------------------------
+
+    private void processIntent(AnnotatedClass cls, MethodInfo m, AnnotationValues ann,
+                                ProcessorContext ctx) {
+        String id = ann.getString("value");
+        String where = cls.getBinaryName() + "." + m.getName();
+        if (id == null || !ID_PATTERN.matcher(id).matches()) {
+            ctx.error(cls, "@AppIntent id \"" + id + "\" on " + where + " must match "
+                    + ID_PATTERN.pattern());
+            return;
+        }
+        if (intents.containsKey(id)) {
+            ctx.error(cls, "@AppIntent id \"" + id + "\" is already declared by "
+                    + intents.get(id).where);
+            return;
+        }
+        if (!m.isStatic() || !m.isPublic()) {
+            ctx.error(cls, "@AppIntent " + where + " must be public static: the build emits a"
+                    + " direct call to it, and it can be asked to run in a process where no"
+                    + " instance of your class exists");
+            return;
+        }
+
+        Type returnType = Type.getReturnType(m.getDescriptor());
+        boolean returnsResult = INTENT_RESULT_BINARY.equals(returnType.getClassName());
+        if (!returnsResult && returnType.getSort() != Type.VOID) {
+            ctx.error(cls, "@AppIntent " + where + " must return IntentResult or void, not "
+                    + returnType.getClassName());
+            return;
+        }
+
+        IntentDef def = new IntentDef();
+        def.id = id;
+        def.where = where;
+        def.ownerBinary = cls.getBinaryName();
+        def.methodName = m.getName();
+        def.returnsResult = returnsResult;
+        def.title = ann.getStringOrDefault("title", id);
+        if (def.title.trim().length() == 0) {
+            // The title is the only thing a person ever sees for this capability: it names the
+            // action in the Shortcuts app, becomes the iOS LocalizedStringResource, and is the
+            // Android shortcut's label resource. Blank produces an unnamed action, or metadata
+            // the platform rejects -- neither of which points back here.
+            ctx.error(cls, "@AppIntent " + def.where + " has a blank title. It is what names "
+                    + "this action everywhere the user sees it, so it needs visible text.");
+            return;
+        }
+        def.description = ann.getStringOrDefault("description", "");
+        def.headless = ann.getBoolOrDefault("headless", false);
+        def.discoverable = ann.getBoolOrDefault("discoverable", true);
+        def.destructive = ann.getBoolOrDefault("destructive", false);
+        def.opensRoute = ann.getStringOrDefault("opensRoute", "");
+        def.timeoutSeconds = ann.getIntOrDefault("timeoutSeconds", 20);
+        if (def.timeoutSeconds < 1) {
+            // Callers disagree about what a non-positive budget means: platform dispatch
+            // substitutes the default, while Intents.invoke builds an already-expired context
+            // and a model waits on the raw number. One handler would get contradictory
+            // deadlines depending on who called it, which is not a behaviour worth defining.
+            ctx.error(cls, "@AppIntent " + def.where + " declares timeoutSeconds="
+                    + def.timeoutSeconds + ". A budget has to be at least 1 second; leave it "
+                    + "unset for the default.");
+            return;
+        }
+        for (Object o : asList(ann.get("phrases"))) {
+            if (o instanceof String) {
+                def.phrases.add((String) o);
+            }
+        }
+        Object declaredExposure = ann.get("exposure");
+        for (Object o : asList(declaredExposure)) {
+            String e = enumConstant(o);
+            if (e != null) {
+                def.exposure.add(e);
+            }
+        }
+        if (def.exposure.isEmpty() && declaredExposure == null) {
+            // Only when the element was left out. An explicitly written exposure = {} is a
+            // choice -- no platform consumer at all, reachable through Intents.invoke and
+            // nothing else -- and defaulting it to ASSISTANT published a capability to Siri and
+            // to the launcher that had asked for neither. Absent and empty are different
+            // answers, and ASM reports them differently: null against an empty array.
+            def.exposure.add("ASSISTANT");
+        }
+
+
+        readParameters(cls, m, def, ctx);
+
+        for (String phrase : def.phrases) {
+            if (phrase.indexOf(APP_NAME_TOKEN) < 0) {
+                ctx.error(cls, "@AppIntent " + where + " phrase \"" + phrase
+                        + "\" must contain " + APP_NAME_TOKEN
+                        + " -- Apple rejects App Shortcut phrases that omit the app name");
+            }
+            checkPlaceholders(cls, ctx, where, PLACEHOLDER, phrase, def, "phrase");
+            checkPhraseParameters(cls, ctx, where, phrase, def);
+        }
+        if (!def.phrases.isEmpty() && !def.discoverable) {
+            // Apple: "App Intent 'X' must be visible for App Shortcuts use". A phrase on a
+            // non-discoverable intent is a build failure rather than an inert declaration.
+            ctx.error(cls, "@AppIntent " + where + " declares phrases but discoverable=false. "
+                    + "A spoken phrase is only reachable through an App Shortcut, and Apple "
+                    + "rejects a shortcut whose intent is not discoverable. Drop the phrases, "
+                    + "or make it discoverable.");
+        }
+        if (def.opensRoute.length() > 0) {
+            checkRoutePlaceholders(cls, ctx, where, def);
+            if (!routeDeclared(def.opensRoute)) {
+                ctx.error(cls, "@AppIntent " + where + " opensRoute \"" + def.opensRoute
+                        + "\" does not match any @Route in this project");
+            }
+        }
+        intents.put(id, def);
+    }
+
+    private void readParameters(AnnotatedClass cls, MethodInfo m, IntentDef def,
+                                 ProcessorContext ctx) {
+        Type[] args = Type.getArgumentTypes(m.getDescriptor());
+        List<Map<String, AnnotationValues>> paramAnnotations = m.getParameterAnnotations();
+        for (int i = 0; i < args.length; i++) {
+            String desc = args[i].getDescriptor();
+            Map<String, AnnotationValues> onThis = i < paramAnnotations.size()
+                    ? paramAnnotations.get(i)
+                    : Collections.<String, AnnotationValues>emptyMap();
+            AnnotationValues p = onThis.get(INTENT_PARAM_DESC);
+
+            if (p == null) {
+                // A leading IntentContext is the one parameter that carries no
+                // annotation, because it is supplied by the framework rather
+                // than by the caller.
+                if (i == 0 && INTENT_CONTEXT_DESC.equals(desc)) {
+                    def.takesContext = true;
+                    continue;
+                }
+                ctx.error(cls, "@AppIntent " + def.where + " parameter " + i
+                        + " needs @IntentParam (only a leading IntentContext may omit it)");
+                continue;
+            }
+            if (INTENT_CONTEXT_DESC.equals(desc)) {
+                ctx.error(cls, "@AppIntent " + def.where
+                        + " IntentContext must be the first parameter and carry no @IntentParam");
+                continue;
+            }
+
+            ParamDef pd = new ParamDef();
+            pd.name = p.getString("value");
+            // getStringOrDefault fills in only when the element is absent, and an explicitly
+            // written title="" -- or one of spaces -- is present. It reached intents.json and
+            // became an iOS @Parameter(title:) with no visible prompt, while the runtime
+            // IntentParameterInfo fell back to the name: the same declaration described one way
+            // in the simulator and another on the device. Both now normalize the same way.
+            pd.title = p.getStringOrDefault("title", pd.name == null ? "" : pd.name);
+            if (pd.title == null || pd.title.trim().length() == 0) {
+                pd.title = pd.name == null ? "" : pd.name;
+            }
+            pd.required = p.getBoolOrDefault("required", true);
+            pd.defaultValue = p.getStringOrDefault("defaultValue", "");
+            pd.descriptor = desc;
+            boolean duplicateOption = false;
+            for (Object o : asList(p.get("options"))) {
+                if (o instanceof String) {
+                    if (pd.options.contains(o)) {
+                        // The generated iOS AppEnum maps each option to a case with the option
+                        // as its raw value, and Swift rejects two cases sharing one. So a
+                        // vocabulary that lists a value twice does not merely offer it twice:
+                        // it fails to compile the app, in a file the developer never wrote.
+                        // Sanitized collisions are handled in the generator by disambiguating
+                        // the identifier; a repeated raw value has no such repair, because the
+                        // values are what the platform matches on.
+                        ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                                + " lists the option \"" + o + "\" more than once");
+                        duplicateOption = true;
+                        break;
+                    }
+                    pd.options.add((String) o);
+                }
+            }
+            if (duplicateOption) {
+                continue;
+            }
+            if (pd.name == null || pd.name.length() == 0) {
+                ctx.error(cls, "@IntentParam on " + def.where + " parameter " + i
+                        + " needs a name");
+                continue;
+            }
+            pd.kind = kindOf(desc);
+            if (pd.kind == null) {
+                // Not a primitive we know: it has to be a declared entity, and
+                // that is checked in finish() once every class has been seen.
+                pd.kind = "entity";
+                pd.entityBinary = args[i].getClassName();
+            }
+            if (!pd.required && pd.defaultValue.length() == 0 && isBoxed(desc)) {
+                // The wire format has no way to say "absent" for a number or a boolean, so the
+                // generated coercion substitutes the declared default -- and with no default
+                // that is 0 or false, autoboxed. A developer writing Integer reasonably expects
+                // null there, and would have no way to tell an omitted value from a supplied
+                // zero. Both ways out are real, so the message names them rather than picking.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where + " is an "
+                        + "optional " + desc.substring(desc.lastIndexOf('/') + 1, desc.length() - 1)
+                        + " with no default. An omitted value cannot arrive as null -- it becomes "
+                        + "the type's zero, which you could not tell from a supplied one. Declare "
+                        + "a defaultValue, or use the primitive so the substitution is explicit.");
+                continue;
+            }
+            if (pd.required && pd.defaultValue.length() > 0) {
+                // The two halves contradict each other and the platforms resolve the
+                // contradiction differently: the generated coercion treats a defaulted
+                // parameter as optional, so Android publishes a parameterless static shortcut
+                // and runs it with the default, while the generated Swift keeps the parameter
+                // non-optional and prompts for it. @IntentParam defines a default as what an
+                // *omitted optional* value becomes; there is no such thing for a required one.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " is required and also declares defaultValue \"" + pd.defaultValue
+                        + "\". A default is what an omitted optional value becomes, so set "
+                        + "required = false, or drop the default.");
+                continue;
+            }
+            if (!pd.options.isEmpty() && !"string".equals(pd.kind)) {
+                // The manifest would advertise a closed vocabulary that nothing enforces: the
+                // generated coercion only routes strings through oneOf(), and the iOS builder
+                // only generates an AppEnum for them. A caller could pass 999 to
+                // options={"1","2"} and the handler would run.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " declares options on a " + pd.kind + ". A closed vocabulary is only "
+                        + "enforced for String parameters; declare it as a String, or drop the "
+                        + "options rather than publishing a restriction nothing applies.");
+                continue;
+            }
+            if (pd.defaultValue.length() > 0 && !defaultFitsType(pd)) {
+                // numeric() emits 0 for a default it cannot parse, an unparseable boolean
+                // becomes false and an unparseable date becomes null -- so an omitted value
+                // reached the handler as something other than what the declaration said. The
+                // annotation is a constant; there is no reason to discover this at runtime.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " has defaultValue \"" + pd.defaultValue + "\", which is not a valid "
+                        + pd.kind + ". " + defaultHint(pd.kind));
+                continue;
+            }
+            if (!pd.options.isEmpty() && pd.defaultValue.length() > 0
+                    && !pd.options.contains(pd.defaultValue)) {
+                // The generated oneOf() enforces the vocabulary, defaults included, so this
+                // would compile and then throw on every invocation that omitted the value --
+                // the handler never running, for a declaration that looks reasonable.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " has defaultValue \"" + pd.defaultValue + "\", which is not one of "
+                        + "its options " + join(pd.options) + ". An omitted value would be "
+                        + "rejected by the vocabulary the same declaration defines.");
+                continue;
+            }
+            if (def.param(pd.name) != null) {
+                // Both arguments would read the same map key, so the handler runs with the same
+                // value twice, and the tool schema keeps one property -- leaving a model no way
+                // to supply them independently even though the signature says it can.
+                ctx.error(cls, "@AppIntent " + def.where + " declares two parameters named \""
+                        + pd.name + "\". Parameter names are the keys a caller supplies, so they "
+                        + "have to be distinct.");
+                continue;
+            }
+            def.params.add(pd);
+        }
+    }
+
+    /// Enforces the two rules Apple's metadata extractor applies to a spoken phrase, both of
+    /// which it reports as halting errors that produce no metadata at all -- so catching them
+    /// here turns a failed iOS build into a message naming the offending declaration.
+    ///
+    /// A phrase may reference at most one parameter, and that parameter has to be an entity.
+    ///
+    /// Apple accepts `AppEntity` or `AppEnum`, and a closed vocabulary does now generate an
+    /// AppEnum -- so the second rule is this framework's restriction rather than Apple's. It
+    /// stands because the phrase interpolation is only generated for entity-typed parameters,
+    /// and widening it is a feature worth verifying on a device rather than inferring. The
+    /// message says so, so nobody reads a framework limit as a platform one.
+    private void checkPhraseParameters(AnnotatedClass cls, ProcessorContext ctx, String where,
+                                        String phrase, IntentDef def) {
+        // Scanned the way the generator scans, not with PLACEHOLDER. A parameter name is
+        // application text and may hold anything -- "ship-to", "ship to" -- and that pattern
+        // only matches [A-Za-z0-9_], so those placeholders were invisible here while the
+        // generator interpolated them regardless. A phrase could then carry two of them, or a
+        // non-entity one, and pass a check whose whole purpose is that Apple rejects exactly
+        // that: as a *halting* error, producing no metadata at all for the app.
+        //
+        // Only placeholders naming a declared parameter count, which is again what the
+        // generator does: it leaves anything else in the phrase literally, so a literal
+        // ${token} is not a parameter reference and must not be counted as one.
+        List<String> referenced = new ArrayList<String>();
+        int i = 0;
+        while (true) {
+            int open = phrase.indexOf("${", i);
+            if (open < 0) {
+                break;
+            }
+            int close = phrase.indexOf('}', open + 2);
+            if (close < 0) {
+                break;
+            }
+            String name = phrase.substring(open + 2, close);
+            i = close + 1;
+            if ("applicationName".equals(name) || def.param(name) == null) {
+                continue;
+            }
+            if (!referenced.contains(name)) {
+                referenced.add(name);
+            }
+        }
+        if (referenced.size() > 1) {
+            ctx.error(cls, "@AppIntent " + where + " phrase \"" + phrase + "\" references "
+                    + referenced.size() + " parameters (" + join(referenced) + "). Apple allows "
+                    + "at most one parameter per phrase; write one phrase per parameter, or "
+                    + "leave the others out of the spoken form.");
+            return;
+        }
+        for (String name : referenced) {
+            ParamDef p = def.param(name);
+            if (p != null && !"entity".equals(p.kind)) {
+                ctx.error(cls, "@AppIntent " + where + " phrase \"" + phrase + "\" references "
+                        + "${" + name + "}, which is a " + p.kind + ". Only an entity can be a "
+                        + "spoken phrase parameter here, so declare " + name + " with an "
+                        + "@IntentEntity type, or drop it from the phrase -- the platform still "
+                        + "asks for it, using the title on its @IntentParam.");
+            }
+        }
+    }
+
+    /// True when a declared default can actually be represented by the parameter's type.
+    ///
+    /// The generated coercion is the authority on what a value may look like at runtime; this
+    /// mirrors its grammar for the one case that is a compile-time constant. Keep the two in
+    /// step -- a default this accepts and the runtime rejects is worse than either alone.
+    private static boolean defaultFitsType(ParamDef p) {
+        String v = p.defaultValue;
+        if ("string".equals(p.kind) || "entity".equals(p.kind)) {
+            return true;
+        }
+        if ("boolean".equals(p.kind)) {
+            return "true".equalsIgnoreCase(v) || "false".equalsIgnoreCase(v)
+                    || "1".equals(v) || "0".equals(v);
+        }
+        if ("date".equals(p.kind)) {
+            if (isLong(v)) {
+                return true;
+            }
+            return parsesAsIso8601(v);
+        }
+        if ("int".equals(p.kind)) {
+            if (!isLong(v)) {
+                return false;
+            }
+            long parsed = Long.parseLong(v.trim());
+            return parsed >= Integer.MIN_VALUE && parsed <= Integer.MAX_VALUE;
+        }
+        if ("long".equals(p.kind)) {
+            return isLong(v);
+        }
+        // float / double
+        try {
+            double d = Double.parseDouble(v.trim());
+            if (Double.isNaN(d) || Double.isInfinite(d)) {
+                return false;
+            }
+            if (!"float".equals(p.kind)) {
+                // A double holds any finite value, but "1e-400" is not one of them: it parses
+                // to 0.0, which is a different number from the one written, and javac refuses
+                // the literal outright. Refusing it here names the declaration instead.
+                return !underflowsToZero(v.trim(), d);
+            }
+            // Both ends, for the same reason the generated requiredFloat checks both: too large
+            // becomes Infinity and too small becomes zero, and a default of 1e-100 that reaches
+            // the handler as 0.0f is a declaration the build accepted and the app does not
+            // honour. The build is the only place that can still say so.
+            return d >= -Float.MAX_VALUE && d <= Float.MAX_VALUE
+                    && (d == 0.0d || (float) d != 0.0f);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /// A declared boolean default, read the way the generated `requiredBoolean` reads a
+    /// supplied one.
+    ///
+    /// `Boolean.parseBoolean("1")` is false, so emitting it directly gave an intent declaring
+    /// defaultValue="1" the opposite of what it asked for -- and validation accepts "1"
+    /// precisely because the runtime treats it as true. The declaration and the runtime have to
+    /// read the same string the same way.
+    private static boolean booleanDefault(String v) {
+        String trimmed = v == null ? "" : v.trim();
+        return "true".equalsIgnoreCase(trimmed) || "1".equals(trimmed);
+    }
+    /// Whether the runtime would accept this literal as a date.
+    ///
+    /// Shape is not enough: `2026-13-01` and `2026-01-01T25:00` both look like dates and are
+    /// both rejected at runtime, so a default that passed the build became null and the handler
+    /// saw no value at all.
+    ///
+    /// This used to be a second implementation of the grammar, carrying a comment that the two
+    /// had to move together because the generated code could not be called from here. That is
+    /// no longer true of either half: the grammar lives in core now, the plugin already depends
+    /// on core, and the generated coercion calls the same method. One parser, three callers,
+    /// nothing left to keep in agreement.
+    private static boolean parsesAsIso8601(String v) {
+        return com.codename1.intents.IntentDates.parse(v) != null;
+    }
+
+    private static boolean isLong(String v) {
+        try {
+            Long.parseLong(v.trim());
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /// What a valid default for this kind looks like, so the message is actionable.
+    private static String defaultHint(String kind) {
+        if ("boolean".equals(kind)) {
+            return "Use \"true\" or \"false\".";
+        }
+        if ("date".equals(kind)) {
+            return "Use epoch milliseconds, or ISO-8601 such as \"2026-03-14\".";
+        }
+        if ("int".equals(kind) || "long".equals(kind)) {
+            return "Use a whole number the type can hold.";
+        }
+        return "Use a finite number the type can hold.";
+    }
+
+    private static String join(List<String> values) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(values.get(i));
+        }
+        return sb.toString();
+    }
+
+    /// Checks an opensRoute template's placeholders, reading it the way expandRoute reads it.
+    ///
+    /// A pattern of [A-Za-z0-9_] could not see "{ship-to}", and a parameter name is application
+    /// text -- so an undeclared placeholder with a hyphen in it passed here, was accepted by
+    /// routeDeclared as an ordinary route variable, and then failed at runtime where expandRoute
+    /// looks the whole name up and finds nothing. The handler ran, the app came forward, and it
+    /// navigated nowhere: the invocation half-happening, which is the failure opensRoute exists
+    /// to prevent.
+    ///
+    /// Unlike a phrase, an unresolvable placeholder here is always an error. A phrase may carry
+    /// a literal ${token} and the generator leaves it in the spoken text; a route with a name
+    /// nothing supplies simply cannot be built.
+    private void checkRoutePlaceholders(AnnotatedClass cls, ProcessorContext ctx, String where,
+                                         IntentDef def) {
+        String template = def.opensRoute;
+        int open = -1;
+        for (int i = 0; i < template.length(); i++) {
+            char c = template.charAt(i);
+            if (c == '{') {
+                if (open >= 0) {
+                    ctx.error(cls, malformedRoute(where, template,
+                            "a second opening brace inside a placeholder"));
+                    return;
+                }
+                open = i;
+            } else if (c == '}') {
+                if (open < 0) {
+                    // Validating only the well-formed placeholders left this one in the
+                    // literal text: "/orders/{id}}" expands to "/orders/42}", which a wildcard
+                    // route matches happily, so a valid invocation navigated with a corrupted
+                    // parameter.
+                    ctx.error(cls, malformedRoute(where, template,
+                            "a closing brace with no opening one"));
+                    return;
+                }
+                String name = template.substring(open + 1, i);
+                if (def.param(name) == null) {
+                    ctx.error(cls, "@AppIntent " + where + " opensRoute references {" + name
+                            + "} but declares no parameter with that name");
+                }
+                open = -1;
+            }
+        }
+        if (open >= 0) {
+            // An unclosed placeholder is left in the URL as written, so the route opens with
+            // the literal text instead of the value.
+            ctx.error(cls, malformedRoute(where, template,
+                    "an opening brace with no closing one"));
+        }
+    }
+
+    /// One message for every shape of unbalanced braces, which all fail the same way: the
+    /// template stops being a template and the route opens with the text as written.
+    private static String malformedRoute(String where, String template, String what) {
+        return "@AppIntent " + where + " opensRoute \"" + template + "\" has " + what
+                + ". A placeholder that is not exactly {name} is left in the URL as written, so "
+                + "the route opens with the literal text instead of the value.";
+    }
+
+    private void checkPlaceholders(AnnotatedClass cls, ProcessorContext ctx, String where,
+                                    Pattern pattern, String text, IntentDef def, String label) {
+        java.util.regex.Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            if ("applicationName".equals(name)) {
+                continue;
+            }
+            if (def.param(name) == null) {
+                ctx.error(cls, "@AppIntent " + where + " " + label + " references ${" + name
+                        + "} but declares no parameter with that name");
+            }
+        }
+    }
+
+    /// True when some `@Route` pattern could produce this URL. Compared
+    /// structurally by segment count and literal segments, because the route may
+    /// use `:id` where the intent uses `{id}`.
+    private boolean routeDeclared(String opensRoute) {
+        String path = opensRoute;
+        int q = path.indexOf('?');
+        if (q >= 0) {
+            path = path.substring(0, q);
+        }
+        String[] want = split(path);
+        for (String pattern : routePatterns) {
+            if (matches(split(pattern), want)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matches(String[] pattern, String[] want) {
+        for (int i = 0; i < pattern.length; i++) {
+            if ("**".equals(pattern[i])) {
+                return true;
+            }
+            if (i >= want.length) {
+                return false;
+            }
+            String p = pattern[i];
+            boolean wildcard = "*".equals(p) || p.startsWith(":");
+            boolean variable = want[i].startsWith("{") && want[i].endsWith("}");
+            if (variable) {
+                // A variable segment can only be satisfied by a route segment that accepts any
+                // value. Letting it match a literal accepted "/orders/{id}" against a declared
+                // "/orders/recent" -- the build passed, and then every invocation expanded to a
+                // URL that route could never match, so navigation silently did nothing.
+                if (!wildcard) {
+                    return false;
+                }
+                continue;
+            }
+            if (!wildcard && !p.equals(want[i])) {
+                return false;
+            }
+        }
+        return pattern.length == want.length;
+    }
+
+    private static String[] split(String path) {
+        List<String> out = new ArrayList<String>();
+        for (String s : path.split("/")) {
+            if (s.length() > 0) {
+                out.add(s);
+            }
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    // ------------------------------------------------------------------
+    // Emission
+    // ------------------------------------------------------------------
+
+    @Override
+    public void finish(ProcessorContext ctx) throws ProcessingException {
+        resolveEntityParameters(ctx);
+        if (ctx.hasErrors()) {
+            return;
+        }
+        if (intents.isEmpty() && entities.isEmpty()) {
+            // Nothing declared any more. On an incremental build the previous run's output is
+            // still sitting in target/classes and would be packaged again -- publishing removed
+            // shortcuts and calling handlers that no longer exist -- so it has to go.
+            deleteGenerated(ctx);
+            return;
+        }
+
+        List<IntentDef> defs = new ArrayList<IntentDef>(intents.values());
+        List<EntityDef> ents = new ArrayList<EntityDef>(entities.values());
+
+        String registry = generateRegistry(defs, ents);
+        String bootstrap = generateBootstrap();
+        File outDir = ctx.getOutputClassDir();
+        try {
+            Map<String, String> srcs = new LinkedHashMap<String, String>();
+            srcs.put(REGISTRY_PACKAGE + "." + REGISTRY_SIMPLE, registry);
+            srcs.put(BOOTSTRAP_PACKAGE + "." + BOOTSTRAP_SIMPLE, bootstrap);
+            List<File> cp = new ArrayList<File>();
+            cp.add(outDir);
+            JavaSourceCompiler.compile(srcs, outDir, cp);
+        } catch (IOException e) {
+            throw new ProcessingException("Failed to compile the generated intent registry: "
+                    + e.getMessage(), e);
+        }
+
+        try {
+            ctx.emitResource(MANIFEST_RESOURCE, generateManifest(defs, ents).getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new ProcessingException("UTF-8 unavailable", e);
+        }
+
+        ctx.getLog().info("cn1: generated " + REGISTRY_PACKAGE + "." + REGISTRY_SIMPLE
+                + " with " + defs.size() + " intent(s) and " + ents.size() + " entity type(s)");
+    }
+
+    /// Removes a previous run's output. Deleting is the only correct answer for the empty case:
+    /// emitting nothing leaves the stale files in place, and they ship.
+    private void deleteGenerated(ProcessorContext ctx) {
+        File outDir = ctx.getOutputClassDir();
+        if (outDir == null) {
+            return;
+        }
+        String[] paths = {
+                MANIFEST_RESOURCE,
+                REGISTRY_PACKAGE.replace('.', '/') + "/" + REGISTRY_SIMPLE + ".class",
+                BOOTSTRAP_PACKAGE.replace('.', '/') + "/" + BOOTSTRAP_SIMPLE + ".class"
+        };
+        for (String path : paths) {
+            File f = new File(outDir, path);
+            if (f.isFile() && !f.delete()) {
+                ctx.getLog().warn("cn1: could not remove the stale " + f
+                        + "; it would be packaged even though nothing declares an intent");
+            }
+        }
+    }
+
+    /// Binds every entity-typed parameter to a declared entity. Deferred to
+    /// `finish` because an intent may be scanned before the entity it names.
+    private void resolveEntityParameters(ProcessorContext ctx) {
+        for (IntentDef def : intents.values()) {
+            for (ParamDef p : def.params) {
+                if (!"entity".equals(p.kind)) {
+                    continue;
+                }
+                EntityDef match = null;
+                for (EntityDef e : entities.values()) {
+                    if (e.binaryName.equals(p.entityBinary)) {
+                        match = e;
+                        break;
+                    }
+                }
+                if (match == null) {
+                    ctx.error("@AppIntent " + def.where + " parameter \"" + p.name
+                            + "\" has type " + p.entityBinary
+                            + ", which is not annotated @IntentEntity."
+                            + " Supported parameter types are String, int, long, float, double,"
+                            + " boolean, java.util.Date and @IntentEntity classes.");
+                    continue;
+                }
+                p.entityType = match.type;
+            }
+        }
+    }
+
+    private String generateBootstrap() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("package ").append(BOOTSTRAP_PACKAGE).append(";\n\n");
+        sb.append("/** Generated by Codename One. Installs the intent registry at startup. */\n");
+        sb.append("public final class ").append(BOOTSTRAP_SIMPLE).append(" {\n");
+        sb.append("    public ").append(BOOTSTRAP_SIMPLE).append("() {\n");
+        // A direct `new`, not a reflective lookup: this is the reference that
+        // keeps the registry (and through it every handler) alive through the
+        // iOS translator's dead-code elimination, and that lets R8 rename the
+        // call site and the class together.
+        sb.append("        com.codename1.intents.Intents.setDispatcher(new ")
+                .append(REGISTRY_PACKAGE).append(".").append(REGISTRY_SIMPLE).append("());\n");
+        sb.append("    }\n");
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    private String generateRegistry(List<IntentDef> defs, List<EntityDef> ents) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("package ").append(REGISTRY_PACKAGE).append(";\n\n");
+        sb.append("import com.codename1.intents.AppEntity;\n");
+        sb.append("import com.codename1.intents.Exposure;\n");
+        sb.append("import com.codename1.intents.IntentContext;\n");
+        sb.append("import com.codename1.intents.IntentDeclaration;\n");
+        sb.append("import com.codename1.intents.IntentDispatcher;\n");
+        sb.append("import com.codename1.intents.IntentParameterInfo;\n");
+        sb.append("import com.codename1.intents.IntentParameterType;\n");
+        sb.append("import com.codename1.intents.IntentResult;\n");
+        sb.append("import java.util.ArrayList;\n");
+        sb.append("import java.util.Arrays;\n");
+        sb.append("import java.util.Collections;\n");
+        sb.append("import java.util.List;\n");
+        sb.append("import java.util.Map;\n\n");
+        sb.append("/** Generated by Codename One from @AppIntent / @IntentEntity. Do not edit. */\n");
+        sb.append("public final class ").append(REGISTRY_SIMPLE)
+                .append(" implements IntentDispatcher {\n\n");
+
+        generateDescribe(sb, defs);
+        generateInvoke(sb, defs);
+        generateQueryEntities(sb, ents);
+        generateAdapters(sb, ents);
+        generateCoercion(sb);
+
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    private void generateDescribe(StringBuilder sb, List<IntentDef> defs) {
+        sb.append("    private static final List<IntentDeclaration> DECLARATIONS = build();\n\n");
+        sb.append("    public List<IntentDeclaration> describe() {\n");
+        sb.append("        return DECLARATIONS;\n");
+        sb.append("    }\n\n");
+        sb.append("    private static List<IntentDeclaration> build() {\n");
+        sb.append("        List<IntentDeclaration> out = new ArrayList<IntentDeclaration>();\n");
+        for (IntentDef d : defs) {
+            sb.append("        {\n");
+            sb.append("            List<IntentParameterInfo> p = new ArrayList<IntentParameterInfo>();\n");
+            for (ParamDef p : d.params) {
+                sb.append("            p.add(new IntentParameterInfo(")
+                        .append(quote(p.name)).append(", ").append(quote(p.title)).append(", ")
+                        .append("IntentParameterType.").append(parameterTypeConstant(p))
+                        .append(", ").append(p.required).append(", ")
+                        .append(p.entityType == null ? "null" : quote(p.entityType)).append(", ")
+                        .append(p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue))
+                        .append(", ").append(stringListExpr(p.options))
+                        // The width the handler declared. INTEGER covers int and long and
+                        // NUMBER covers float and double, so without this the framework has to
+                        // guess whether a donated 5000000000 is a value this parameter can hold
+                        // -- and both guesses are wrong for half the declarations.
+                        .append(", ").append(numericWidthBits(p)).append("));\n");
+            }
+            sb.append("            out.add(new IntentDeclaration(")
+                    .append(quote(d.id)).append(", ").append(quote(d.title)).append(", ")
+                    .append(quote(d.description)).append(", ")
+                    .append(d.headless).append(", ").append(d.discoverable).append(", ")
+                    .append(d.destructive).append(", ").append(quote(d.opensRoute)).append(", ")
+                    .append(d.timeoutSeconds).append(", ")
+                    .append(stringListExpr(d.phrases)).append(", p, ")
+                    .append(exposureListExpr(d.exposure)).append("));\n");
+            sb.append("        }\n");
+        }
+        sb.append("        return Collections.unmodifiableList(out);\n");
+        sb.append("    }\n\n");
+    }
+
+    private void generateInvoke(StringBuilder sb, List<IntentDef> defs) {
+        sb.append("    public IntentResult invoke(String intentId, Map<String, Object> params,\n");
+        sb.append("                                IntentContext ctx) {\n");
+        for (IntentDef d : defs) {
+            sb.append("        if (").append(quote(d.id)).append(".equals(intentId)) {\n");
+            StringBuilder call = new StringBuilder();
+            call.append(sourceName(d.ownerBinary)).append(".").append(d.methodName).append("(");
+            boolean first = true;
+            if (d.takesContext) {
+                call.append("ctx");
+                first = false;
+            }
+            for (ParamDef p : d.params) {
+                if (!first) {
+                    call.append(", ");
+                }
+                first = false;
+                call.append(argumentExpression(p));
+            }
+            call.append(")");
+            if (d.returnsResult) {
+                sb.append("            return ").append(call).append(";\n");
+            } else {
+                sb.append("            ").append(call).append(";\n");
+                sb.append("            return IntentResult.ok();\n");
+            }
+            sb.append("        }\n");
+        }
+        sb.append("        return null;\n");
+        sb.append("    }\n\n");
+    }
+
+    private String argumentExpression(ParamDef p) {
+        return castFor(p.descriptor) + rawArgumentExpression(p);
+    }
+
+    /// A cast pinning the argument to the type the handler actually declared.
+    ///
+    /// Overload resolution is done by the compiler on the generated call, and the readers do
+    /// not all agree about boxing: asInt returns int while required() is generic and therefore
+    /// returns Integer. So a class carrying both log(int) and log(Integer), only one of them
+    /// annotated, could have the call bind to the other one -- the build succeeds and the wrong
+    /// method runs. Which twin won depended on which reader the parameter happened to use,
+    /// so the two halves of the same feature failed in opposite directions.
+    ///
+    /// Casting to the declared descriptor makes the choice exact in both directions: an
+    /// argument of type int cannot bind to log(Integer) without boxing, and one of type Integer
+    /// cannot bind to log(int) without unboxing, and neither is allowed while an exact match
+    /// exists. A cast to a boxed type is legal on a primitive expression -- casting conversion
+    /// includes boxing -- so this needs nothing else emitted.
+    ///
+    /// Only the primitives and their boxes are cast: nothing else has a twin to be confused
+    /// with, and naming an entity class here would mean carrying its binary name too.
+    private static String castFor(String descriptor) {
+        if ("I".equals(descriptor)) {
+            return "(int) ";
+        }
+        if ("J".equals(descriptor)) {
+            return "(long) ";
+        }
+        if ("F".equals(descriptor)) {
+            return "(float) ";
+        }
+        if ("D".equals(descriptor)) {
+            return "(double) ";
+        }
+        if ("Z".equals(descriptor)) {
+            return "(boolean) ";
+        }
+        if ("Ljava/lang/Integer;".equals(descriptor)) {
+            return "(Integer) ";
+        }
+        if ("Ljava/lang/Long;".equals(descriptor)) {
+            return "(Long) ";
+        }
+        if ("Ljava/lang/Float;".equals(descriptor)) {
+            return "(Float) ";
+        }
+        if ("Ljava/lang/Double;".equals(descriptor)) {
+            return "(Double) ";
+        }
+        if ("Ljava/lang/Boolean;".equals(descriptor)) {
+            return "(Boolean) ";
+        }
+        return "";
+    }
+
+    private String rawArgumentExpression(ParamDef p) {
+        String key = quote(p.name);
+        if (p.required && p.defaultValue.length() == 0) {
+            // A required value that never arrived must stop the invocation, not be silently
+            // turned into null, 0 or false and handed to the handler, which would act on it.
+            return "required(params, " + key + ", " + requiredReader(p) + ")";
+        }
+        if (!p.options.isEmpty() && "string".equals(p.kind)) {
+            // The declaration promises a closed vocabulary, so the framework has to enforce it
+            // rather than trusting whatever the platform or an in-app caller supplied.
+            return "oneOf(params, " + key + ", "
+                    + (p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue)) + ", "
+                    + stringArrayExpr(p.options) + ")";
+        }
+        if ("entity".equals(p.kind)) {
+            return "entity_" + p.entityType + "(params, " + key + ", "
+                    + (p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue))
+                    + ", false)";
+        }
+        String def = p.defaultValue.length() == 0 ? null : p.defaultValue;
+        if ("string".equals(p.kind)) {
+            return "asString(params, " + key + ", " + (def == null ? "null" : quote(def)) + ")";
+        }
+        if ("date".equals(p.kind)) {
+            // A declared default has to apply to a date too. Every other type honoured one, so
+            // an optional date silently arrived as null instead of the documented fallback --
+            // most visibly on iOS, where an absent optional parameter is left out entirely.
+            String fallback = p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue);
+            return "asDate(params, " + key + ", " + fallback + ")";
+        }
+        if ("boolean".equals(p.kind)) {
+            return "asBoolean(params, " + key + ", " + booleanDefault(p.defaultValue) + ")";
+        }
+        String fallback = def == null ? "0" : def;
+        if ("int".equals(p.kind)) {
+            return "asInt(params, " + key + ", " + numeric(fallback, "0", "int") + ")";
+        }
+        if ("long".equals(p.kind)) {
+            return "asLong(params, " + key + ", " + numeric(fallback, "0", "long") + "L)";
+        }
+        if ("float".equals(p.kind)) {
+            return "asFloat(params, " + key + ", " + numeric(fallback, "0", "float") + "f)";
+        }
+        return "asDouble(params, " + key + ", " + numeric(fallback, "0", "double") + "d)";
+    }
+
+    /// The reader used once a required value is known to be present.
+    ///
+    /// The primitives read strictly here, unlike their optional counterparts. An optional
+    /// parameter has a default to fall back to and falling back is the declared behaviour; a
+    /// required one does not, so `{"minutes": "abc"}` reaching the handler as 0 would run it
+    /// on a number nobody supplied -- and for a value the caller marked required, that is a
+    /// side effect committed on a misunderstanding.
+    private String requiredReader(ParamDef p) {
+        String key = quote(p.name);
+        if ("entity".equals(p.kind)) {
+            return "entity_" + p.entityType + "(params, " + key + ", null, true)";
+        }
+        if ("date".equals(p.kind)) {
+            return "requiredDate(params, " + key + ")";
+        }
+        if ("boolean".equals(p.kind)) {
+            return "requiredBoolean(params, " + key + ")";
+        }
+        if (!p.options.isEmpty() && "string".equals(p.kind)) {
+            return "oneOf(params, " + key + ", null, " + stringArrayExpr(p.options) + ")";
+        }
+        if ("string".equals(p.kind)) {
+            return "asString(params, " + key + ", null)";
+        }
+        if ("int".equals(p.kind)) {
+            return "requiredInt(params, " + key + ")";
+        }
+        if ("long".equals(p.kind)) {
+            return "requiredLong(params, " + key + ")";
+        }
+        if ("float".equals(p.kind)) {
+            return "requiredFloat(params, " + key + ")";
+        }
+        return "requiredDouble(params, " + key + ")";
+    }
+
+    private void generateQueryEntities(StringBuilder sb, List<EntityDef> ents) {
+        sb.append("    public List<AppEntity> queryEntities(String entityType, String kind,\n");
+        sb.append("                                       String argument) {\n");
+        for (EntityDef e : ents) {
+            sb.append("        if (").append(quote(e.type)).append(".equals(entityType)) {\n");
+            String byId = e.queries.get("BY_ID");
+            if (byId != null) {
+                sb.append("            if (\"byId\".equals(kind)) {\n");
+                sb.append("                List<AppEntity> out = new ArrayList<AppEntity>();\n");
+                sb.append("                AppEntity one = adapt_").append(e.type).append("(")
+                        .append(sourceName(e.binaryName)).append(".").append(byId)
+                        .append("(argument));\n");
+                sb.append("                if (one != null) { out.add(one); }\n");
+                sb.append("                return out;\n");
+                sb.append("            }\n");
+            }
+            appendListQuery(sb, e, "SUGGESTED", "suggested", false);
+            appendListQuery(sb, e, "SEARCH", "search", true);
+            sb.append("            return Collections.emptyList();\n");
+            sb.append("        }\n");
+        }
+        sb.append("        return Collections.emptyList();\n");
+        sb.append("    }\n\n");
+    }
+
+    private void appendListQuery(StringBuilder sb, EntityDef e, String kindKey, String wireKind,
+                                  boolean takesArgument) {
+        String method = e.queries.get(kindKey);
+        if (method == null) {
+            return;
+        }
+        sb.append("            if (\"").append(wireKind).append("\".equals(kind)) {\n");
+        sb.append("                return adaptAll_").append(e.type).append("(")
+                .append(sourceName(e.binaryName)).append(".").append(method)
+                .append(takesArgument ? "(argument)" : "()").append(");\n");
+        sb.append("            }\n");
+    }
+
+    private void generateAdapters(StringBuilder sb, List<EntityDef> ents) {
+        for (EntityDef e : ents) {
+            sb.append("    private static AppEntity adapt_").append(e.type).append("(")
+                    .append(sourceName(e.binaryName)).append(" o) {\n");
+            sb.append("        if (o == null) { return null; }\n");
+            sb.append("        AppEntity e = new AppEntity(").append(quote(e.type)).append(", ")
+                    .append(read(e.idAccessor)).append(");\n");
+            if (e.titleAccessor != null) {
+                sb.append("        e.setTitle(").append(readAsString(e.titleAccessor)).append(");\n");
+            }
+            if (e.subtitleAccessor != null) {
+                sb.append("        e.setSubtitle(").append(readAsString(e.subtitleAccessor))
+                        .append(");\n");
+            }
+            if (e.imageAccessor != null) {
+                sb.append("        e.setImage(").append(read(e.imageAccessor)).append(");\n");
+            }
+            sb.append("        return e;\n");
+            sb.append("    }\n\n");
+
+            sb.append("    private static List<AppEntity> adaptAll_").append(e.type)
+                    .append("(List<").append(sourceName(e.binaryName)).append("> in) {\n");
+            sb.append("        List<AppEntity> out = new ArrayList<AppEntity>();\n");
+            sb.append("        if (in != null) {\n");
+            sb.append("            for (").append(sourceName(e.binaryName)).append(" o : in) {\n");
+            sb.append("                AppEntity a = adapt_").append(e.type).append("(o);\n");
+            sb.append("                if (a != null) { out.add(a); }\n");
+            sb.append("            }\n");
+            sb.append("        }\n");
+            sb.append("        return out;\n");
+            sb.append("    }\n\n");
+
+            sb.append("    private static ").append(sourceName(e.binaryName)).append(" entity_")
+                    .append(e.type)
+                    .append("(Map<String, Object> params, String key, String def,\n");
+            sb.append("            boolean required) {\n");
+            // The declared default is an id like any other, so it resolves through the same
+            // query. Ignoring it left an optional entity parameter null for a caller that
+            // simply omitted it, which is the case the default exists for.
+            sb.append("        String id = asString(params, key, def);\n");
+            sb.append("        if (id == null) {\n");
+            // Absent is the only thing that may become null, and only for an optional
+            // parameter. A required entity used to arrive null too -- the one reader that did
+            // not hold the line every other required reader holds.
+            sb.append("            if (required) {\n");
+            sb.append("                throw new IllegalArgumentException(\n");
+            sb.append("                        \"Missing required value for \" + key);\n");
+            sb.append("            }\n");
+            sb.append("            return null;\n");
+            sb.append("        }\n");
+            // Entities are never cast out of the payload: they arrive as an id
+            // and become objects only through the declared BY_ID query.
+            sb.append("        ").append(sourceName(e.binaryName)).append(" resolved = ")
+                    .append(sourceName(e.binaryName)).append(".")
+                    .append(e.queries.get("BY_ID")).append("(id);\n");
+            // A supplied id that resolves to nothing is not an omitted parameter, and returning
+            // null made the handler unable to tell the two apart -- so a donated shortcut
+            // replayed after its entity was deleted ran the no-selection path instead of
+            // failing. The caller named something; if it is gone, the invocation is what fails.
+            sb.append("        if (resolved == null) {\n");
+            sb.append("            throw new IllegalArgumentException(\"\\\"\" + id\n");
+            sb.append("                    + \"\\\" is not a known ").append(e.type)
+                    .append(" for \" + key);\n");
+            sb.append("        }\n");
+            sb.append("        return resolved;\n");
+            sb.append("    }\n\n");
+        }
+    }
+
+    private static String read(Accessor a) {
+        return a.method ? "o." + a.name + "()" : "o." + a.name;
+    }
+
+    private static String readAsString(Accessor a) {
+        String expr = read(a);
+        if (STRING_DESC.equals(a.typeDescriptor)) {
+            return expr;
+        }
+        return "String.valueOf(" + expr + ")";
+    }
+
+    /// The conversion helpers every generated call site uses.
+    ///
+    /// Not one of them casts an incoming payload value. ParparVM's `CHECKCAST`
+    /// expands to nothing, so a cast that fails does not throw -- it hands the
+    /// wrong object onward and crashes natively later, somewhere unrelated.
+    /// Every branch here is `instanceof`-guarded with an explicit fallback.
+    private void generateCoercion(StringBuilder sb) {
+        sb.append("    private static String asString(Map<String, Object> p, String k, String def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o instanceof String) { return (String) o; }\n");
+        sb.append("        if (o != null) { return String.valueOf(o); }\n");
+        sb.append("        return def;\n");
+        sb.append("    }\n\n");
+
+        // Absent means fall back to the declared default. Present-but-invalid does not: the
+        // caller supplied something, and quietly turning 1.5 into 1 or an out-of-range value
+        // into a wrapped one hands the handler a number nobody sent. oneOf() has always
+        // rejected a supplied value outside its vocabulary; these now agree with it, so
+        // optionality is about presence and never about validity.
+        sb.append("    private static long asLong(Map<String, Object> p, String k, long def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredLong(p, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static int asInt(Map<String, Object> p, String k, int def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredInt(p, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static double asDouble(Map<String, Object> p, String k, double def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredDouble(p, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static float asFloat(Map<String, Object> p, String k, float def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredFloat(p, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static boolean asBoolean(Map<String, Object> p, String k, boolean def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredBoolean(p, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static String oneOf(Map<String, Object> p, String k, String def,\n");
+        sb.append("                                String[] options) {\n");
+        sb.append("        String v = asString(p, k, def);\n");
+        sb.append("        if (v == null) { return null; }\n");
+        sb.append("        for (int i = 0; i < options.length; i++) {\n");
+        sb.append("            if (options[i].equals(v)) { return v; }\n");
+        sb.append("        }\n");
+        // A value outside the vocabulary is not silently coerced to the default: that would run
+        // the handler with something the caller did not ask for.
+        sb.append("        throw new IllegalArgumentException(\"\\\"\" + v\n");
+        sb.append("                + \"\\\" is not an accepted value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        // The strict counterparts of asLong/asDouble/asBoolean, used only for a required
+        // parameter with no default. They reject a present-but-unconvertible value instead of
+        // substituting a fallback the declaration never offered.
+        sb.append("    private static java.util.Date requiredDate(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return toDate(o, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static long requiredLong(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        // 1.5 is a Number, and longValue() would quietly make it 1. A caller that sent a
+        // fraction meant something this parameter cannot express, so it is a rejection rather
+        // than a rounding decision the framework gets to make on their behalf.
+        // An integral box is already exact: routing Long.MAX_VALUE through double rounds it to
+        // 2^63 and the range check below then rejects a value the declared type holds perfectly.
+        // That also wasted parsePayload's work, which exists to keep whole numbers whole.
+        sb.append("        if (o instanceof Long || o instanceof Integer || o instanceof Short\n");
+        sb.append("                || o instanceof Byte) {\n");
+        sb.append("            return ((Number) o).longValue();\n");
+        sb.append("        }\n");
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            double d = ((Number) o).doubleValue();\n");
+        sb.append("            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)) {\n");
+        sb.append("                throw new IllegalArgumentException(o\n");
+        sb.append("                        + \" is not a whole number for \" + k);\n");
+        sb.append("            }\n");
+        // longValue() saturates rather than failing, so 1e20 would arrive as Long.MAX_VALUE --
+        // a number the caller never sent, and one the handler cannot tell from a real one. The
+        // upper bound is >= because (double) Long.MAX_VALUE rounds up to 2^63 exactly.
+        sb.append("            if (d < -9223372036854775808.0 || d >= 9223372036854775808.0) {\n");
+        sb.append("                throw new IllegalArgumentException(o\n");
+        sb.append("                        + \" is out of range for \" + k);\n");
+        sb.append("            }\n");
+        sb.append("            return ((Number) o).longValue();\n");
+        sb.append("        }\n");
+        sb.append("        if (o instanceof String) {\n");
+        sb.append("            try { return Long.parseLong(((String) o).trim()); }\n");
+        sb.append("            catch (NumberFormatException e) {\n");
+        sb.append("                throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                        + \"\\\" is not a whole number for \" + k);\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+        sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        // A plain (int) cast on the long would wrap: 4294967296 would arrive as 0, which is a
+        // value the caller never sent and the handler cannot tell from one they did.
+        sb.append("    private static int requiredInt(Map<String, Object> p, String k) {\n");
+        sb.append("        long v = requiredLong(p, k);\n");
+        sb.append("        if (v < Integer.MIN_VALUE || v > Integer.MAX_VALUE) {\n");
+        sb.append("            throw new IllegalArgumentException(v\n");
+        sb.append("                    + \" is out of range for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return (int) v;\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static double requiredDouble(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        double d;\n");
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            d = ((Number) o).doubleValue();\n");
+        sb.append("        } else if (o instanceof String) {\n");
+        sb.append("            try { d = Double.parseDouble(((String) o).trim()); }\n");
+        sb.append("            catch (NumberFormatException e) {\n");
+        sb.append("                throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                        + \"\\\" is not a number for \" + k);\n");
+        sb.append("            }\n");
+        sb.append("        } else {\n");
+        sb.append("            throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("        }\n");
+        // One check for both branches. Double.parseDouble accepts "NaN" and "Infinity", so
+        // testing only the Number branch left the string form -- the one a model actually
+        // writes -- to reach the handler as a value no arithmetic on it can recover from.
+        sb.append("        if (Double.isNaN(d) || Double.isInfinite(d)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                    + \"\\\" is not a finite number for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return d;\n");
+        sb.append("    }\n\n");
+
+        // A plain (float) cast on the double silently produces Infinity for anything past
+        // Float.MAX_VALUE, so 1e100 would reach the handler as a non-finite float.
+        sb.append("    private static float requiredFloat(Map<String, Object> p, String k) {\n");
+        sb.append("        double d = requiredDouble(p, k);\n");
+        // Belt and braces: requiredDouble already rejects NaN, and if that ever stops being
+        // true both comparisons below are false for it and it would sail through.
+        sb.append("        if (Double.isNaN(d)\n");
+        sb.append("                || d < -3.4028234663852886E38 || d > 3.4028234663852886E38) {\n");
+        sb.append("            throw new IllegalArgumentException(d\n");
+        sb.append("                    + \" is out of range for \" + k);\n");
+        sb.append("        }\n");
+        // The range check is one-sided: it catches the magnitudes float cannot hold, and misses
+        // the ones it rounds away. 1e-100 is a finite non-zero double that becomes exactly 0.0f,
+        // so a caller who supplied a value would have the handler run on none -- silently, and
+        // indistinguishably from having passed zero. Losing precision to float is expected;
+        // losing the number is not.
+        sb.append("        float f = (float) d;\n");
+        sb.append("        if (f == 0.0f && d != 0.0d) {\n");
+        sb.append("            throw new IllegalArgumentException(d\n");
+        sb.append("                    + \" is too small to represent as a float for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return f;\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static boolean requiredBoolean(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o instanceof Boolean) { return ((Boolean) o).booleanValue(); }\n");
+        // 2, -1 and NaN were all true. The string form accepts only true/false/1/0 and a
+        // declared default only 0 or 1, so numbers were the one place a value nobody defined
+        // became a confident yes.
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            double d = ((Number) o).doubleValue();\n");
+        sb.append("            if (d == 0) { return false; }\n");
+        sb.append("            if (d == 1) { return true; }\n");
+        sb.append("            throw new IllegalArgumentException(o\n");
+        sb.append("                    + \" is not true or false for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        if (o instanceof String) {\n");
+        sb.append("            String v = ((String) o).trim();\n");
+        sb.append("            if (\"true\".equalsIgnoreCase(v) || \"1\".equals(v)) { return true; }\n");
+        sb.append("            if (\"false\".equalsIgnoreCase(v) || \"0\".equals(v)) { return false; }\n");
+        sb.append("            throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                    + \"\\\" is not true or false for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static <T> T required(Map<String, Object> p, String k, T value) {\n");
+        sb.append("        if (p == null || !p.containsKey(k) || p.get(k) == null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("        }\n");
+        // An entity id that resolves to nothing is just as missing as an absent one: the handler
+        // would otherwise receive null for a parameter it declared as required.
+        sb.append("        if (value == null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"Could not resolve \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return value;\n");
+        sb.append("    }\n\n");
+
+        // Absent means the declared default, which the build has already validated. A value
+        // that is present and unreadable is a different thing entirely and is rejected, the
+        // same way every other supplied-but-invalid value now is: optionality is about
+        // presence, never about validity.
+        sb.append("    private static java.util.Date asDate(Map<String, Object> p, String k,\n");
+        sb.append("                                          String def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) {\n");
+        sb.append("            return def == null ? null : toDate(def, k);\n");
+        sb.append("        }\n");
+        sb.append("        return toDate(o, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    /// Reads a supplied date value, or fails saying why.\n");
+        // One grammar, in core, called by both this coercion and the framework's own check of
+        // whether a value could run at all. It lived only here, so that check had to accept any
+        // string or number as a date -- and a donation carrying "not-a-date" was published as a
+        // durable shortcut this then rejected on every replay.
+        sb.append("    private static java.util.Date toDate(Object o, String k) {\n");
+        sb.append("        java.util.Date d = com.codename1.intents.IntentDates.parse(o);\n");
+        sb.append("        if (d != null) {\n");
+        sb.append("            return d;\n");
+        sb.append("        }\n");
+        // The message still depends on what was passed. Telling someone who sent 1.5 to "use
+        // ISO-8601 or epoch milliseconds" buries the actual problem, which is that their number
+        // is not a count of anything; and the ISO hint is what a caller who sent text needs.
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            throw new IllegalArgumentException(o\n");
+        sb.append("                    + \" is not a moment in time for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                + \"\\\" is not a date for \" + k\n");
+        sb.append("                + \"; use ISO-8601 or epoch milliseconds\");\n");
+        sb.append("    }\n\n");
+    }
+
+    // ------------------------------------------------------------------
+    // Manifest
+    // ------------------------------------------------------------------
+
+    /// The document the native builders read. Deliberately the same shape the
+    /// runtime publishes over the bridge, so what the build compiles into the
+    /// app and what the app reports at runtime cannot describe different things.
+    private String generateManifest(List<IntentDef> defs, List<EntityDef> ents) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n  \"schema\": 1,\n  \"intents\": [");
+        for (int i = 0; i < defs.size(); i++) {
+            IntentDef d = defs.get(i);
+            sb.append(i == 0 ? "\n" : ",\n");
+            sb.append("    {\"id\": ").append(json(d.id));
+            sb.append(", \"title\": ").append(json(d.title));
+            sb.append(", \"description\": ").append(json(d.description));
+            sb.append(", \"headless\": ").append(d.headless);
+            sb.append(", \"discoverable\": ").append(d.discoverable);
+            sb.append(", \"destructive\": ").append(d.destructive);
+            sb.append(", \"opensRoute\": ").append(json(d.opensRoute));
+            sb.append(", \"timeoutSeconds\": ").append(d.timeoutSeconds);
+            sb.append(", \"phrases\": ").append(jsonArray(d.phrases));
+            // The native builders need this: without it a MODEL-only intent still becomes an
+            // App Intent and a launcher shortcut, which is the opposite of what it declared.
+            sb.append(", \"exposure\": ").append(jsonArray(d.exposure));
+            sb.append(", \"params\": [");
+            for (int j = 0; j < d.params.size(); j++) {
+                ParamDef p = d.params.get(j);
+                if (j > 0) {
+                    sb.append(", ");
+                }
+                sb.append("{\"name\": ").append(json(p.name));
+                sb.append(", \"title\": ").append(json(p.title));
+                sb.append(", \"type\": ").append(json(p.kind));
+                sb.append(", \"required\": ").append(p.required);
+                if (p.entityType != null) {
+                    sb.append(", \"entityType\": ").append(json(p.entityType));
+                }
+                if (p.defaultValue.length() > 0) {
+                    sb.append(", \"default\": ").append(json(p.defaultValue));
+                }
+                if (!p.options.isEmpty()) {
+                    sb.append(", \"options\": ").append(jsonArray(p.options));
+                }
+                sb.append("}");
+            }
+            sb.append("]}");
+        }
+        sb.append(defs.isEmpty() ? "" : "\n  ").append("],\n  \"entities\": [");
+        for (int i = 0; i < ents.size(); i++) {
+            EntityDef e = ents.get(i);
+            sb.append(i == 0 ? "\n" : ",\n");
+            sb.append("    {\"type\": ").append(json(e.type));
+            sb.append(", \"title\": ").append(json(e.title));
+            sb.append(", \"indexed\": ").append(e.indexed);
+            sb.append(", \"queries\": ").append(jsonArray(new ArrayList<String>(e.queries.keySet())));
+            sb.append("}");
+        }
+        sb.append(ents.isEmpty() ? "" : "\n  ").append("]\n}\n");
+        return sb.toString();
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private static String kindOf(String descriptor) {
+        if (STRING_DESC.equals(descriptor)) return "string";
+        if ("I".equals(descriptor) || "Ljava/lang/Integer;".equals(descriptor)) return "int";
+        if ("J".equals(descriptor) || "Ljava/lang/Long;".equals(descriptor)) return "long";
+        if ("F".equals(descriptor) || "Ljava/lang/Float;".equals(descriptor)) return "float";
+        if ("D".equals(descriptor) || "Ljava/lang/Double;".equals(descriptor)) return "double";
+        if ("Z".equals(descriptor) || "Ljava/lang/Boolean;".equals(descriptor)) return "boolean";
+        if (DATE_DESC.equals(descriptor)) return "date";
+        return null;
+    }
+
+    /// True for the boxed primitives, which look nullable and are not.
+    private static boolean isBoxed(String descriptor) {
+        return "Ljava/lang/Integer;".equals(descriptor) || "Ljava/lang/Long;".equals(descriptor)
+                || "Ljava/lang/Float;".equals(descriptor)
+                || "Ljava/lang/Double;".equals(descriptor)
+                || "Ljava/lang/Boolean;".equals(descriptor);
+    }
+
+    /// 32 for `int` and `float`, 64 for `long` and `double`, 0 for everything else.
+    private static int numericWidthBits(ParamDef p) {
+        if ("int".equals(p.kind) || "float".equals(p.kind)) {
+            return 32;
+        }
+        if ("long".equals(p.kind) || "double".equals(p.kind)) {
+            return 64;
+        }
+        return 0;
+    }
+
+    private static String parameterTypeConstant(ParamDef p) {
+        if ("entity".equals(p.kind)) return "ENTITY";
+        if ("string".equals(p.kind)) return "STRING";
+        if ("date".equals(p.kind)) return "DATE";
+        if ("boolean".equals(p.kind)) return "BOOLEAN";
+        if ("int".equals(p.kind) || "long".equals(p.kind)) return "INTEGER";
+        return "NUMBER";
+    }
+
+    /// A declared numeric default, written as a literal the generated source can compile.
+    ///
+    /// The text was emitted verbatim, and text that parses is not the same as text that is a
+    /// legal Java literal in the position it lands in. "08" parses as eight and is an illegal
+    /// octal literal; "1D" parses as one and becomes `1Dd`; each of those failed the build
+    /// while compiling generated source, which is the worst place to discover a typo in an
+    /// annotation. Emitting the parsed number instead cannot produce any of them.
+    private static String numeric(String value, String fallback, String kind) {
+        String trimmed = value.trim();
+        try {
+            if ("int".equals(kind) || "long".equals(kind)) {
+                return Long.toString(Long.parseLong(trimmed));
+            }
+            return Double.toString(Double.parseDouble(trimmed));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    /// Whether a literal names a non-zero number that the type rounds to zero.
+    ///
+    /// Checked on the text rather than by re-parsing at another width: the parse already
+    /// happened and produced zero, so the only question left is whether zero is what was
+    /// written. Any digit other than zero before the exponent means it was not.
+    private static boolean underflowsToZero(String text, double parsed) {
+        if (parsed != 0.0d) {
+            return false;
+        }
+        int end = text.indexOf('e');
+        if (end < 0) {
+            end = text.indexOf('E');
+        }
+        String mantissa = end < 0 ? text : text.substring(0, end);
+        for (int i = 0; i < mantissa.length(); i++) {
+            char c = mantissa.charAt(i);
+            if (c >= '1' && c <= '9') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Turns a JVM binary name into one that is legal in generated Java source.
+    ///
+    /// A nested class is `Outer$Inner` in binary form and `Outer.Inner` in source, and nested
+    /// handlers and entities are the common case rather than the exception -- an application
+    /// naturally declares its entity as a static nested class next to the code that uses it.
+    /// Emitting the binary form produces source that does not compile.
+    private static String sourceName(String binaryName) {
+        return binaryName == null ? null : binaryName.replace('$', '.');
+    }
+
+    private static String readable(String descriptor) {
+        return Type.getType(descriptor).getClassName();
+    }
+
+    /// ASM hands an enum constant back as `{internalName, constantName}`.
+    private static String enumConstant(Object value) {
+        if (value instanceof String[]) {
+            String[] pair = (String[]) value;
+            return pair.length > 1 ? pair[1] : null;
+        }
+        return null;
+    }
+
+    private static List<Object> asList(Object value) {
+        if (value instanceof List) {
+            return (List<Object>) value;
+        }
+        return Collections.emptyList();
+    }
+
+    private static String stringArrayExpr(List<String> values) {
+        StringBuilder sb = new StringBuilder("new String[]{");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(quote(values.get(i)));
+        }
+        return sb.append("}").toString();
+    }
+
+    private static String stringListExpr(List<String> values) {
+        if (values.isEmpty()) {
+            return "Collections.<String>emptyList()";
+        }
+        StringBuilder sb = new StringBuilder("Arrays.asList(");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(quote(values.get(i)));
+        }
+        return sb.append(")").toString();
+    }
+
+    private static String exposureListExpr(List<String> values) {
+        StringBuilder sb = new StringBuilder("Arrays.asList(");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append("Exposure.").append(values.get(i));
+        }
+        return sb.append(")").toString();
+    }
+
+    private static String quote(String s) {
+        return s == null ? "null" : json(s);
+    }
+
+    private static String json(String s) {
+        if (s == null) {
+            return "null";
+        }
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.append("\"").toString();
+    }
+
+    private static String jsonArray(List<String> values) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(json(values.get(i)));
+        }
+        return sb.append("]").toString();
+    }
+
+    // ------------------------------------------------------------------
+    // Models
+    // ------------------------------------------------------------------
+
+    private static final class IntentDef {
+        private String id;
+        private String where;
+        private String ownerBinary;
+        private String methodName;
+        private String title;
+        private String description;
+        private boolean headless;
+        private boolean discoverable;
+        private boolean destructive;
+        private String opensRoute = "";
+        private int timeoutSeconds = 20;
+        private boolean takesContext;
+        private boolean returnsResult;
+        private final List<String> phrases = new ArrayList<String>();
+        private final List<String> exposure = new ArrayList<String>();
+        private final List<ParamDef> params = new ArrayList<ParamDef>();
+
+        ParamDef param(String name) {
+            for (ParamDef p : params) {
+                if (p.name != null && p.name.equals(name)) {
+                    return p;
+                }
+            }
+            return null;
+        }
+    }
+
+    private static final class ParamDef {
+        private String name;
+        private String title;
+        private String kind;
+        private String descriptor;
+        private String entityBinary;
+        private String entityType;
+        private boolean required = true;
+        private String defaultValue = "";
+        private final List<String> options = new ArrayList<String>();
+    }
+
+    private static final class EntityDef {
+        private String type;
+        private String binaryName;
+        private String title;
+        private boolean indexed;
+        private Accessor idAccessor;
+        private Accessor titleAccessor;
+        private Accessor subtitleAccessor;
+        private Accessor imageAccessor;
+        private final TreeMap<String, String> queries = new TreeMap<String, String>();
+    }
+
+    private static final class Accessor {
+        private final String name;
+        private final boolean method;
+        private final String typeDescriptor;
+
+        Accessor(String name, boolean method, String typeDescriptor) {
+            this.name = name;
+            this.method = method;
+            this.typeDescriptor = typeDescriptor;
+        }
+    }
+}

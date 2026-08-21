@@ -89,7 +89,7 @@ $ jar tvf PropertyCross-1.0.war
 Some things to note in this file listing:
 
 1. The *index.html* file is the entry point to the application.
-2. *CORSProxy.class* is the proxy servlet for making network requests to other domains.
+2. `CORSProxy.class` is the proxy servlet for making network requests to other domains.
 3. The *assets* directory contains all your application's *jar* resources. All resource files in your app will end up in this directory.
 4. The `teavm` directory contains all the generated JavaScript for your application. Notice that there are some debugging files generated (*classes.js.map* and *classes.js.teavmdbg*). These aren't loaded by the browser when your app is run, but they can be used by Chrome when you're doing debugging.
 5. The *jar* files in the *WEB-INF/lib* directory are dependencies of the proxy servlet. They aren't required for your app to run - unless you're using the proxy.

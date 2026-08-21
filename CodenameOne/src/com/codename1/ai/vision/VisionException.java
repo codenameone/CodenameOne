@@ -23,6 +23,29 @@
 package com.codename1.ai.vision;
 
 /// Failure reported by an on-device vision backend.
+///
+/// The code separates "this device will never do this" from "this attempt
+/// failed", which usually calls for different UI:
+///
+/// ```java
+/// recognizer.process(image)
+///     .ready(result -> textArea.setText(result.getText()))
+///     .except(error -> {
+///         if (error instanceof VisionException
+///                 && ((VisionException) error).getCode()
+///                         == VisionException.UNSUPPORTED) {
+///             // Permanent: hide the feature rather than offering a retry.
+///             scanButton.setVisible(false);
+///             return;
+///         }
+///         ToastBar.showErrorMessage("Could not read that image");
+///         Log.e(error);
+///     });
+/// ```
+///
+/// Prefer {@code isSupported()} on the analyzer to reaching this state at all;
+/// {@link #UNSUPPORTED} is the answer to a question that could have been asked
+/// before the screen was shown.
 public class VisionException extends RuntimeException {
     public static final int UNSUPPORTED = 1;
     public static final int INVALID_IMAGE = 2;

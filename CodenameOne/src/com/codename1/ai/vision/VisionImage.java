@@ -24,11 +24,37 @@ package com.codename1.ai.vision;
 
 import com.codename1.camera.CameraFrame;
 import com.codename1.camera.FrameFormat;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+
+import java.io.IOException;
+import java.io.InputStream;
 
 /// Immutable input for encoded still images or raw camera pixels. Factory
 /// methods defensively copy their arrays. In particular,
 /// {@link #fromCameraFrame(CameraFrame)} detaches from callback-owned buffers
 /// that a camera backend may recycle when the callback returns.
+///
+/// Pick the factory that matches where the image came from:
+///
+/// ```java
+/// // A file: the gallery, or CapturedPhoto.getFilePath()
+/// VisionImage.fromFile(photo.getFilePath());
+///
+/// // An image already in memory
+/// VisionImage.fromImage(label.getIcon());
+///
+/// // Bytes you decoded or downloaded yourself
+/// VisionImage.encoded(jpegBytes);
+///
+/// // A live camera frame, which also carries the frame's rotation
+/// VisionImage.fromCameraFrame(frame);
+/// ```
+///
+/// Only {@link #encoded(byte[], int)} needs a rotation argument, and only when
+/// the stored pixels are not already upright -- this class does not read EXIF.
 public final class VisionImage {
     private final byte[] encodedBytes;
     private final byte[] pixels;
@@ -155,6 +181,69 @@ public final class VisionImage {
         return new VisionImage(encoded, pixels,
                 frame.getWidth(), frame.getHeight(), frame.getRotationDegrees(),
                 frame.getTimestampNanos(), format);
+    }
+
+    /// Reads a JPEG or PNG file from {@link FileSystemStorage} and wraps it
+    /// for analysis. This is the usual bridge from the image picker or from
+    /// {@link com.codename1.camera.CapturedPhoto#getFilePath()} to an
+    /// analyzer.
+    ///
+    /// Like {@link #encoded(byte[])} this assumes the stored pixels are
+    /// already upright and does not parse EXIF. Use
+    /// {@link #encoded(byte[], int)} when a rotation has to be applied.
+    ///
+    /// @param path a FileSystemStorage path
+    /// @return immutable image input
+    /// @throws IOException if the file cannot be read
+    /// @throws IllegalArgumentException if the file is empty
+    // Util.cleanup() in the finally block closes the stream; PMD does not
+    // recognize it as a close.
+    @SuppressWarnings("PMD.CloseResource")
+    public static VisionImage fromFile(String path) throws IOException {
+        InputStream input = FileSystemStorage.getInstance().openInputStream(path);
+        try {
+            return encoded(Util.readInputStream(input));
+        } finally {
+            Util.cleanup(input);
+        }
+    }
+
+    /// Wraps an in-memory Codename One image for analysis.
+    ///
+    /// An {@link EncodedImage} passes its original JPEG or PNG bytes straight
+    /// through, which is both cheaper and higher fidelity than re-encoding.
+    /// Any other image is read as RGBA pixels. Either way the caller's image
+    /// is left untouched.
+    ///
+    /// @param image the image to analyze
+    /// @return immutable image input
+    /// @throws NullPointerException if {@code image} is {@code null}
+    /// @throws IllegalArgumentException if the image has no pixels
+    public static VisionImage fromImage(Image image) {
+        if (image == null) {
+            throw new NullPointerException("image");
+        }
+        if (image instanceof EncodedImage) {
+            byte[] data = ((EncodedImage) image).getImageData();
+            if (data != null && data.length > 0) {
+                return encoded(data);
+            }
+        }
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Image has no pixels");
+        }
+        int[] argb = image.getRGB();
+        byte[] rgba = new byte[argb.length * 4];
+        for (int i = 0, offset = 0; i < argb.length; i++, offset += 4) {
+            int pixel = argb[i];
+            rgba[offset] = (byte) (pixel >> 16);
+            rgba[offset + 1] = (byte) (pixel >> 8);
+            rgba[offset + 2] = (byte) pixel;
+            rgba[offset + 3] = (byte) (pixel >> 24);
+        }
+        return pixels(rgba, width, height, FrameFormat.RGBA8888, 0);
     }
 
     /// @return a defensive copy of encoded bytes, or {@code null} for raw input

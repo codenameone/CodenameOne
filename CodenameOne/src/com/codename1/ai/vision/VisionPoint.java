@@ -22,9 +22,29 @@
  */
 package com.codename1.ai.vision;
 
+import com.codename1.ui.Component;
+import com.codename1.ui.geom.Point;
+
 /// Immutable point in a normalized, top-left-origin coordinate space. X grows
 /// right and Y grows down; 0 and 1 correspond to image edges, independent of
 /// source pixel dimensions.
+///
+/// {@link #toPoint(int, int, int, int)} converts one back to pixels for
+/// drawing:
+///
+/// ```java
+/// public void paint(Graphics g) {
+///     super.paint(g);
+///     g.setColor(0xff3b30);
+///     for (Face face : lastFaces) {
+///         VisionPoint eye = face.getLandmark(FaceLandmarks.LEFT_EYE);
+///         if (eye != null) {
+///             Point p = eye.toPoint(this);
+///             g.fillArc(p.getX() - 8, p.getY() - 8, 16, 16, 0, 360);
+///         }
+///     }
+/// }
+/// ```
 public final class VisionPoint {
     private final float x;
     private final float y;
@@ -45,5 +65,39 @@ public final class VisionPoint {
     /// @return downward vertical coordinate normalized to input height
     public float getY() {
         return y;
+    }
+
+    /// Maps this normalized point onto a pixel rectangle.
+    ///
+    /// The mapping stretches the whole 0..1 range across {@code width} and
+    /// {@code height}. That is correct when the destination has the same
+    /// aspect ratio as the analyzed image, which is the usual case for an
+    /// image drawn to fit. A live preview scaled with
+    /// {@link com.codename1.camera.ScaleType#CROP} does not: pass the
+    /// rectangle the frame actually occupies rather than the component's own
+    /// bounds.
+    ///
+    /// @param x left edge of the destination rectangle in pixels
+    /// @param y top edge of the destination rectangle in pixels
+    /// @param width destination width in pixels
+    /// @param height destination height in pixels
+    /// @return the corresponding pixel position, rounded to the nearest pixel
+    public Point toPoint(int x, int y, int width, int height) {
+        return new Point(x + Math.round(this.x * width),
+                y + Math.round(this.y * height));
+    }
+
+    /// Maps this normalized point onto a component's absolute on-screen
+    /// bounds, which is the coordinate space a {@code paint} method draws in.
+    ///
+    /// @param target component the analyzed image is displayed in
+    /// @return the corresponding absolute pixel position
+    /// @throws NullPointerException if {@code target} is {@code null}
+    public Point toPoint(Component target) {
+        if (target == null) {
+            throw new NullPointerException("target");
+        }
+        return toPoint(target.getAbsoluteX(), target.getAbsoluteY(),
+                target.getWidth(), target.getHeight());
     }
 }

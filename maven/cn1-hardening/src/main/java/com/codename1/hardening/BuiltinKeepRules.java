@@ -40,7 +40,8 @@ public final class BuiltinKeepRules {
     /** The seven generated bootstrap classes the builders splice into the app stub. */
     private static final String[] BOOTSTRAPS = {
             "MapperBootstrap", "BinderBootstrap", "DaoBootstrap", "RestClientBootstrap",
-            "ProtoBootstrap", "GrpcClientBootstrap", "GraphQLClientBootstrap"
+            "ProtoBootstrap", "GrpcClientBootstrap", "GraphQLClientBootstrap",
+            "IntentBootstrap"
     };
 
     private BuiltinKeepRules() {
@@ -58,6 +59,9 @@ public final class BuiltinKeepRules {
         }
         // Generated registries the stub instantiates by literal name.
         r.add("-keep class com.codename1.router.generated.Routes { *; }");
+        // The intent registry is instantiated by literal name from cn1app.IntentBootstrap, and the
+        // platform builders read the same name to decide whether the app declares any intents.
+        r.add("-keep class com.codename1.intents.generated.IntentRegistry { *; }");
         // The transcoded-SVG registry: the platform builders probe for this class by its exact name to
         // decide whether to emit its installGlobal() call, so renaming it would make them conclude no
         // SVGs were generated and silently drop SVG rendering from the hardened app.

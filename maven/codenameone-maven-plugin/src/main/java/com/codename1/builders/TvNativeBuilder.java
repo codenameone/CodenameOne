@@ -75,7 +75,22 @@ class TvNativeBuilder {
     private static final String EXCLUDED_TV_SOURCES =
             "CN1ES2compat.m CN1ES1compat.m EAGLView.m "
             + "CodenameOne_GLViewController.xib MainWindow.xib "
-            + "CodenameOne_METALViewController.xib MainWindowMETAL.xib";
+            + "CodenameOne_METALViewController.xib MainWindowMETAL.xib "
+            // App Intents and the snippet renderer are staged into <Main>-src for the iOS
+            // app target, and this builder copies that directory wholesale -- so declaring
+            // an intent made the tvOS slice compile App Intents types that need tvOS 16
+            // against a target whose floor is 13, 48 errors' worth. Excluded rather than
+            // availability-widened because the feature is already compiled out here:
+            // CodenameOne_GLViewController.h undefines CN1_USE_INTENTS for TARGET_OS_TV, so
+            // the natives behind these declarations are unsupported stubs on this slice and
+            // shipping the declarations anyway would advertise actions that cannot run.
+            //
+            // The surfaces renderer travels with them because a snippet reuses it; it is
+            // iOS/widget code (GraphicsContext needs tvOS 15) and the tvOS slice built fine
+            // without it before intents started staging it.
+            + "CN1AppIntents.swift CN1AppEntities.swift "
+            + "CN1IntentBridge.swift CN1IntentSnippetView.swift "
+            + "CN1SurfaceRenderer.swift CN1SurfaceModel.swift CN1SurfaceConfig.swift";
 
     // Frameworks the iOS port links that are unavailable on tvOS; ParparVM
     // weak-links these (see -Doptional.frameworks) so the iOS slice is unchanged
@@ -95,6 +110,22 @@ class TvNativeBuilder {
             // references com.codename1.health, so weak-link it here or the tvOS slice fails
             // to link. CN1Health.m additionally compiles itself out via TARGET_OS_TV.
             + "HealthKit.framework";
+    // CoreSpotlight is deliberately NOT in this list, although the watch list carries it.
+    //
+    // The two platforms differ, and it was measured rather than reasoned about. On the
+    // Xcode 26.3 SDKs, CoreSpotlight.framework is absent from watchOS entirely -- which is why
+    // WatchNativeBuilder must weak-link it -- and present on tvOS, shipping a CoreSpotlight.tbd
+    // that links normally: an arm64-apple-tvos13.0 binary built with -framework CoreSpotlight
+    // links and carries the load command.
+    //
+    // What tvOS does not have is the API. Every CSSearchable* type is marked explicitly
+    // unavailable there, so using one is a compile error rather than a link error. That never
+    // arises: CodenameOne_GLViewController.h undoes CN1_USE_INTENTS for TARGET_OS_TV as well as
+    // TARGET_OS_WATCH, so the intent natives compile to their unsupported stubs on the tvOS
+    // slice and nothing references the framework at all.
+    //
+    // Weak-linking it here would therefore be a change with no effect, made against a failure
+    // that does not occur.
 
     TvNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;

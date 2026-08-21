@@ -22,7 +22,49 @@
  */
 package com.codename1.ai.vision;
 
-/// Creates reusable still-image or live-frame barcode analyzers.
+/// Decodes barcodes and QR codes out of a still image or a camera frame.
+///
+/// Scanning a picture the user already has:
+///
+/// ```java
+/// BarcodeScanner scanner = new BarcodeScanner();
+/// if (!scanner.isSupported()) {
+///     ToastBar.showErrorMessage("This device cannot decode barcodes");
+///     scanner.close();
+///     return;
+/// }
+/// scanner.process(VisionImage.fromFile(photoPath)).ready(codes -> {
+///     for (Barcode code : codes) {
+///         Log.p(code.getFormat() + ": " + code.getValue());
+///     }
+///     scanner.close();
+/// }).except(error -> {
+///     Log.e(error);
+///     scanner.close();
+/// });
+/// ```
+///
+/// For scanning with the camera there is usually no reason to wire this up
+/// yourself. {@link CodeScanner#scan()} is a whole scanner screen in one call,
+/// and {@link VisionCameraView} embeds the live preview in a form of your own:
+///
+/// ```java
+/// VisionCameraView<Barcode[]> view =
+///         new VisionCameraView<Barcode[]>(new BarcodeScanner());
+/// view.setListener(new VisionPipelineListener<Barcode[]>() {
+///     public void result(Barcode[] codes, VisionImage source) {
+///         if (codes.length > 0) {
+///             found(codes[0]);
+///         }
+///     }
+///     public void error(Throwable error) {
+///         Log.e(error);
+///     }
+/// });
+/// ```
+///
+/// Create one analyzer and reuse it for a sequence of images; it keeps the
+/// native detector alive between calls. Close it when you are finished.
 public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions

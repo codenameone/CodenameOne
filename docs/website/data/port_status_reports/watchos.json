@@ -50,7 +50,7 @@
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 166,
+    "pass": 167,
     "skip": 19
   },
   "tests": {
@@ -428,6 +428,10 @@
     },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "IntentsApiTest": {
+      "feature": "intents",
       "status": "pass"
     },
     "Java17Tests": {

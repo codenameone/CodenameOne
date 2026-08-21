@@ -15,6 +15,7 @@ on:
     branches:
       - master
     paths:
+      - 'scripts/ci/retry.sh'
       - 'CodenameOne/src/**/*.java'
       - 'maven/errorprone-checks/**'
       - 'maven/core/pom.xml'
@@ -24,6 +25,7 @@ on:
     branches:
       - master
     paths:
+      - 'scripts/ci/retry.sh'
       - 'CodenameOne/src/**/*.java'
       - 'maven/errorprone-checks/**'
       - 'maven/core/pom.xml'
@@ -53,8 +55,10 @@ jobs:
         # which Maven does not treat as a build-time dependency, so the
         # reactor would otherwise schedule core first and fail to resolve
         # com.codenameone:errorprone-checks:8.0-SNAPSHOT.
-        run: mvn -B -Perrorprone -pl errorprone-checks -am install -DskipTests
+        # Retried: this step resolves plugins from Central cold, and Central has been
+        # answering 502/403 today. Maven treats that as permanent. See bash scripts/ci/retry.sh mvn.
+        run: bash ../scripts/ci/retry.sh mvn -B -Perrorprone -pl errorprone-checks -am install -DskipTests
 
       - name: Run Error Prone over the core module
         working-directory: maven
-        run: mvn -B -Perrorprone -pl core -am install -DskipTests
+        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -Perrorprone -pl core -am install -DskipTests

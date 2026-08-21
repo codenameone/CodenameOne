@@ -414,6 +414,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         return surfaceBridge;
     }
 
+    private IOSIntentBridge intentBridge;
+
+    @Override
+    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        // Only meaningful in builds that linked the intent natives (CN1_USE_INTENTS, flipped by
+        // the builder when the app references com.codename1.intents). Always returned: the
+        // bridge's own is...Supported methods answer honestly through the natives, which stub to
+        // unsupported when the define is off. Going through IOSIntentCallbacks rather than
+        // constructing directly is deliberate -- touching that class is what runs its static
+        // initializer, which is what keeps the native callback targets alive through the iOS
+        // translator's dead-code elimination.
+        if (intentBridge == null) {
+            intentBridge = IOSIntentCallbacks.getBridge(nativeInstance);
+        }
+        return intentBridge;
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {

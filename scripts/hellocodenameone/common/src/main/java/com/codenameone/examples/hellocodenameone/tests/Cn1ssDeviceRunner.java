@@ -446,6 +446,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SurfacesTimelineLogicTest(),
             new SurfacesActionDispatchTest(),
             new SurfacesPublishTest(),
+            // App intents on the device VM: the generated registry, the coercion it wraps
+            // every parameter in, and entity resolution behind an id. The declarations it
+            // exercises are also what make the iOS Swift and the Android shortcut resources
+            // get generated and compiled at all.
+            new IntentsApiTest(),
             new MotionSensorDeviceTest(),
             new CryptoApiTest(),
             new Java17Tests(),

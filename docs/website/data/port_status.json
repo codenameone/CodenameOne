@@ -426,6 +426,15 @@
       ]
     },
     {
+      "id": "intents",
+      "category": "System surfaces",
+      "name": "App intents",
+      "description": "Checks the generated intent registry on the device VM: parameter coercion, declared defaults, closed vocabularies, and entity resolution through the BY_ID query.",
+      "tests": [
+        "IntentsApiTest"
+      ]
+    },
+    {
       "id": "surfaces",
       "category": "System surfaces",
       "name": "System surfaces",

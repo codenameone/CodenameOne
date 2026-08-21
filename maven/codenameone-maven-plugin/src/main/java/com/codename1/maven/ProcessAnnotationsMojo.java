@@ -43,6 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 
 /// PROCESS_CLASSES Mojo. ASM-scans the project's compiled `.class` files,
 /// dispatches each annotated class to the registered `AnnotationProcessor`s,
@@ -117,12 +118,20 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         }
 
         // processClass() — dispatched only when the class carries an annotation
-        // the processor declares interest in.
+        // the processor declares interest in, anywhere in the class.
+        //
+        // The test is against getAllAnnotationDescriptors(), not
+        // getClassAnnotations(): a class whose only annotation sits on a method
+        // has an empty class-annotation map, so gating on that map alone would
+        // silently skip it. That is not hypothetical — it is exactly the shape
+        // of the documented static-factory @Route form and of an @AppIntent
+        // handler, and such a class would be dropped with no error anywhere.
         for (AnnotatedClass cls : index.values()) {
-            if (cls.getClassAnnotations().isEmpty()) continue;
+            Set<String> present = cls.getAllAnnotationDescriptors();
+            if (present.isEmpty()) continue;
             for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
                 AnnotationProcessor p = it.next();
-                if (intersects(p.getAnnotationDescriptors(), cls.getClassAnnotations().keySet())) {
+                if (intersects(p.getAnnotationDescriptors(), present)) {
                     try {
                         p.processClass(cls, ctx);
                     } catch (ProcessingException e) {
@@ -181,9 +190,38 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
             getLog().info("cn1: emitted " + emitted.size() + " generated class(es) under "
                     + outputDirectory);
         }
+
+        // Flush generated resources. These ride the project jar to the native
+        // builders -- including a cloud build server, which receives the whole
+        // artifact -- so they are how build-time metadata reaches the iOS and
+        // Android sides. Written after the error check for the same reason the
+        // classes are: a failed validation must not leave a manifest behind.
+        Map<String, byte[]> resources = ctx.getEmittedResources();
+        for (Map.Entry<String, byte[]> e : resources.entrySet()) {
+            File target = new File(outputDirectory, e.getKey());
+            File parent = target.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw new MojoExecutionException("Could not create " + parent);
+            }
+            try {
+                FileOutputStream fos = new FileOutputStream(target);
+                try {
+                    fos.write(e.getValue());
+                } finally {
+                    fos.close();
+                }
+            } catch (IOException ioe) {
+                throw new MojoExecutionException("Could not write generated resource " + target, ioe);
+            }
+        }
+
+        if (!resources.isEmpty()) {
+            getLog().info("cn1: emitted " + resources.size() + " generated resource(s) under "
+                    + outputDirectory);
+        }
     }
 
-    private static boolean intersects(java.util.Set<String> a, java.util.Set<String> b) {
+    private static boolean intersects(Set<String> a, Set<String> b) {
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) return false;
         if (a.size() > b.size()) {
             for (String s : b) if (a.contains(s)) return true;

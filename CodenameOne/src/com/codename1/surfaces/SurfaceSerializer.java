@@ -206,6 +206,35 @@ public final class SurfaceSerializer {
         return JSONWriter.toJson(doc);
     }
 
+    /// Serializes a bare node tree, with no timeline or activity wrapped around
+    /// it, collecting any imagery it references.
+    ///
+    /// The node catalog is the layout vocabulary for anything the platform
+    /// renders while this app may be off screen. Widgets and live activities are
+    /// two such things; an intent result snippet is a third, and it reuses this
+    /// descriptor and the native renderer that already reads it rather than
+    /// introducing a parallel one. That is the whole reason this method is
+    /// public: `SurfaceNode#toMap` is package-private, and
+    /// `com.codename1.intents` needs the same encoding without being handed the
+    /// node internals.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the node tree to serialize
+    /// - `imagesOut`: receives PNG blobs keyed by the name used in the document
+    ///
+    /// #### Returns
+    ///
+    /// the node descriptor, or null when `node` is null
+    public static Map<String, Object> serializeNodeToMap(SurfaceNode node,
+                                                          Map<String, byte[]> imagesOut) {
+        if (node == null) {
+            return null;
+        }
+        return node.toMap(imagesOut == null
+                ? new LinkedHashMap<String, byte[]>() : imagesOut, 0);
+    }
+
     // --- package-private helpers used by the node model ----------------------
 
     /// Serializes a color to its wire form.

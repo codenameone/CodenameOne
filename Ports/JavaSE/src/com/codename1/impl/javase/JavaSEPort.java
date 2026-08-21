@@ -460,6 +460,25 @@ public class JavaSEPort extends CodenameOneImplementation {
         return surfaceBridge;
     }
 
+    /// Returns the JavaSE app-intents bridge, created lazily on first use. The desktop has no
+    /// assistant and no system search index, so the bridge records what the application publishes
+    /// and the simulator presents it -- which lets an intent be built and debugged with no device,
+    /// against the same generated table a device would read.
+    ///
+    /// Synchronized because the lazy construction is a race otherwise, and losing it is silent:
+    /// two callers arriving together -- startup publishing the declaration table while a
+    /// background thread indexes -- each see a null field and each build a bridge, so one
+    /// records its declarations, donations or indexed entities into the instance that loses the
+    /// assignment, and the simulator then reads the winner and shows nothing of it. Nothing
+    /// throws and nothing is logged; the operation simply is not there.
+    @Override
+    public synchronized com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        if (intentBridge == null) {
+            intentBridge = new JavaSEIntentBridge();
+        }
+        return intentBridge;
+    }
+
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
         if (!isDesktop() || !Display.isInitialized()) {
             return;
@@ -1119,6 +1138,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     // simulator mode and the desktop floating widget windows in desktop mode. Created lazily so
     // apps that never touch the surfaces API pay nothing.
     private JavaSEWidgetBridge surfaceBridge;
+    private JavaSEIntentBridge intentBridge;
     // Phone-to-watch link (com.codename1.wearable). Both halves of a paired pair run their own
     // simulator process and meet through the shared app home; created lazily so apps that never
     // touch the wearable API pay nothing.
@@ -6931,6 +6951,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(arSim);
 
+        JMenuItem intentsSim = new JMenuItem("App Intents");
+        intentsSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                // Hand it the real bridge and let it drive the real dispatch
+                // entry point. A simulator control that shortcuts the framework
+                // would report a state it did not actually cause, which is the
+                // failure this window exists to catch.
+                SimulatorIntents.showWindow(
+                        (JavaSEIntentBridge) getIntentBridge(), window);
+            }
+        });
+        simulateMenu.add(intentsSim);
+
         JMenuItem pushSim = new JMenuItem("Push Simulation");
         pushSim.addActionListener(new ActionListener() {
             @Override
@@ -7030,6 +7064,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         final JMenu nfcMenu = installNfcSimulationMenu(simulateMenu, pref);
 
         final JMenu foldableMenu = installFoldableSimulationMenu(simulateMenu, pref);
+
+        final JMenu visionMenu = installVisionSimulationMenu(simulateMenu, pref);
 
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
@@ -7547,6 +7583,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(shieldMenu);
         simulateMenu.add(nfcMenu);
         simulateMenu.add(foldableMenu);
+        simulateMenu.add(visionMenu);
         simulateMenu.add(statusBarTapDiag);
         simulateMenu.addSeparator();
         simulateMenu.add(darkLightModeMenu);
@@ -9061,6 +9098,182 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// Builds *Simulate &gt; Vision*, which scripts what
+    /// {@link JavaSEVisionImpl} hands back to `com.codename1.ai.vision`
+    /// analyzers. The desktop cannot run the models, so this is what lets a
+    /// scanner screen, an overlay, or a "nothing found" branch be built
+    /// without a device.
+    private JMenu installVisionSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        JMenu visionMenu = new JMenu("Vision");
+        visionMenu.setToolTipText("Script the results the on-device vision "
+                + "analyzers return in the simulator");
+
+        final JCheckBoxMenuItem supported = new JCheckBoxMenuItem(
+                "Vision Supported", pref.getBoolean("VisionSim.supported", true));
+        JavaSEVisionImpl.simSupported = supported.isSelected();
+        supported.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.simSupported = supported.isSelected();
+                pref.putBoolean("VisionSim.supported", supported.isSelected());
+            }
+        });
+        visionMenu.add(supported);
+
+        visionMenu.addSeparator();
+
+        JMenu outcomeMenu = new JMenu("Analysis outcome");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        try {
+            JavaSEVisionImpl.outcome = JavaSEVisionImpl.SimOutcome.valueOf(
+                    pref.get("VisionSim.outcome",
+                            JavaSEVisionImpl.SimOutcome.RESULT.name()));
+        } catch (IllegalArgumentException ex) {
+            JavaSEVisionImpl.outcome = JavaSEVisionImpl.SimOutcome.RESULT;
+        }
+        for (final JavaSEVisionImpl.SimOutcome o
+                : JavaSEVisionImpl.SimOutcome.values()) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(o.name(),
+                    o == JavaSEVisionImpl.outcome);
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.outcome = o;
+                    pref.put("VisionSim.outcome", o.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        visionMenu.add(outcomeMenu);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.barcodeValue = pref.get("VisionSim.barcodeValue",
+                JavaSEVisionImpl.barcodeValue);
+        JMenuItem barcodeValue = new JMenuItem("Set scanned code value...");
+        barcodeValue.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Value the simulated barcode scanner decodes:",
+                        JavaSEVisionImpl.barcodeValue);
+                if (value != null) {
+                    JavaSEVisionImpl.barcodeValue = value;
+                    pref.put("VisionSim.barcodeValue", value);
+                }
+            }
+        });
+        visionMenu.add(barcodeValue);
+
+        JavaSEVisionImpl.barcodeFormat = pref.get("VisionSim.barcodeFormat",
+                JavaSEVisionImpl.barcodeFormat);
+        JMenu formatMenu = new JMenu("Scanned code format");
+        ButtonGroup formatGroup = new ButtonGroup();
+        String[] formats = {"QR_CODE", "EAN_13", "UPC_A", "CODE_128",
+            "DATA_MATRIX", "PDF417", "AZTEC"};
+        for (final String format : formats) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(format,
+                    format.equals(JavaSEVisionImpl.barcodeFormat));
+            formatGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.barcodeFormat = format;
+                    pref.put("VisionSim.barcodeFormat", format);
+                }
+            });
+            formatMenu.add(item);
+        }
+        visionMenu.add(formatMenu);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.recognizedText = pref.get("VisionSim.text",
+                JavaSEVisionImpl.recognizedText);
+        JMenuItem recognizedText = new JMenuItem("Set recognized text...");
+        recognizedText.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Text the simulated recognizer reads "
+                        + "(\\n separates blocks):",
+                        JavaSEVisionImpl.recognizedText.replace("\n", "\\n"));
+                if (value != null) {
+                    JavaSEVisionImpl.recognizedText = value.replace("\\n", "\n");
+                    pref.put("VisionSim.text", JavaSEVisionImpl.recognizedText);
+                }
+            }
+        });
+        visionMenu.add(recognizedText);
+
+        JavaSEVisionImpl.imageLabels = pref.get("VisionSim.labels",
+                JavaSEVisionImpl.imageLabels);
+        JMenuItem imageLabels = new JMenuItem("Set image labels...");
+        imageLabels.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String value = JOptionPane.showInputDialog(canvas,
+                        "Comma separated label:confidence pairs:",
+                        JavaSEVisionImpl.imageLabels);
+                if (value != null) {
+                    JavaSEVisionImpl.imageLabels = value;
+                    pref.put("VisionSim.labels", value);
+                }
+            }
+        });
+        visionMenu.add(imageLabels);
+
+        visionMenu.addSeparator();
+
+        JavaSEVisionImpl.faceCount = pref.getInt("VisionSim.faces",
+                JavaSEVisionImpl.faceCount);
+        JMenu faceMenu = new JMenu("Detected faces");
+        ButtonGroup faceGroup = new ButtonGroup();
+        for (int i = 0; i <= 3; i++) {
+            final int count = i;
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(
+                    String.valueOf(count), count == JavaSEVisionImpl.faceCount);
+            faceGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEVisionImpl.faceCount = count;
+                    pref.putInt("VisionSim.faces", count);
+                }
+            });
+            faceMenu.add(item);
+        }
+        visionMenu.add(faceMenu);
+
+        final JCheckBoxMenuItem smiling = new JCheckBoxMenuItem(
+                "Faces are smiling", pref.getBoolean("VisionSim.smiling", true));
+        JavaSEVisionImpl.smilingProbability = smiling.isSelected() ? .8f : .1f;
+        smiling.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.smilingProbability =
+                        smiling.isSelected() ? .8f : .1f;
+                pref.putBoolean("VisionSim.smiling", smiling.isSelected());
+            }
+        });
+        visionMenu.add(smiling);
+
+        final JCheckBoxMenuItem pose = new JCheckBoxMenuItem(
+                "Body pose detected", pref.getBoolean("VisionSim.pose", true));
+        JavaSEVisionImpl.poseDetected = pose.isSelected();
+        pose.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEVisionImpl.poseDetected = pose.isSelected();
+                pref.putBoolean("VisionSim.pose", pose.isSelected());
+            }
+        });
+        visionMenu.add(pose);
+
+        return visionMenu;
+    }
+
     private JMenu installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
         JMenu nfcMenu = new JMenu("NFC");
 
@@ -10324,7 +10537,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 "cn1app.RestClientBootstrap",
                 "cn1app.ProtoBootstrap",
                 "cn1app.GrpcClientBootstrap",
-                "cn1app.GraphQLClientBootstrap"}) {
+                "cn1app.GraphQLClientBootstrap",
+                "cn1app.IntentBootstrap"}) {
             try {
                 Class.forName(bootstrap).newInstance();
             } catch (ClassNotFoundException ignored) {
@@ -16605,6 +16819,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public com.codename1.impl.ARImpl createARImpl() {
         return new JavaSEARImpl();
+    }
+
+    /// The desktop has no on-device vision models, so the simulator serves the
+    /// results scripted in *Simulate &gt; Vision* instead of reporting every
+    /// analyzer as unsupported. That keeps scanner and overlay code buildable
+    /// without a device.
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        return new JavaSEVisionImpl();
     }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {

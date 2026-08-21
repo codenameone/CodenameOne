@@ -14,6 +14,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/windows-tooling.yml'
       - 'scripts/run-windows-tooling-tests.sh'
       - 'scripts/windows/**'
@@ -27,6 +28,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci/retry.sh'
       - '.github/workflows/windows-tooling.yml'
       - 'scripts/run-windows-tooling-tests.sh'
       - 'scripts/windows/**'
@@ -77,7 +79,10 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME_8_X64 }}
         run: |
           cd maven
-          mvn -B install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+          # Retried: this runner has failed twice on this branch resolving a build plugin from
+          # Central ("Unresolveable build extension: central-publishing-maven-plugin"), which
+          # Maven treats as permanent. Same rationale as setup-workspace.sh's mvn_retry.
+          bash ../scripts/ci/retry.sh mvn -B install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
 
       - name: Build standalone Settings tool (JDK 17)
         shell: bash
@@ -85,7 +90,7 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
         run: |
           cd scripts/settings
-          mvn -B install -Pexecutable-jar -Dcodename1.platform=javase -Dmaven.test.skip=true
+          bash ../../scripts/ci/retry.sh mvn -B install -Pexecutable-jar -Dcodename1.platform=javase -Dmaven.test.skip=true
 
       - name: Run Windows simulator and tooling screenshot tests
         shell: bash
