@@ -891,15 +891,17 @@ public class Picker extends Button {
                 buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
 
-                // Deliberately a Form and not the top level. This popup is an
-                // InteractionDialog, which is documented as unsupported inside a
-                // Window (it shows on the current form's layered pane), so a picker in
-                // a window fails here with a clear message rather than opening its
-                // popup over the wrong surface.
-                Form form = getComponentForm();
+                // Through the top level. This used to insist on a Form, because the
+                // popup is an InteractionDialog and that was unsupported inside a
+                // Window -- so a picker in a window threw rather than opening over the
+                // wrong surface. InteractionDialog now takes an explicit host, so the
+                // reason for refusing is gone and a picker works in a window like any
+                // other component.
+                TopLevelContainer form = getTopLevelContainer();
                 if (form == null) {
                     throw new RuntimeException("Attempt to show interaction dialog while button is not on form.  Illegal state");
                 }
+                dlg.setTopLevelHost(form);
 
                 // The popup is anchored to the very bottom of the screen, so on devices with a
                 // bottom inset (e.g. the iPhone home indicator) its bottom-most row would be drawn
@@ -908,7 +910,13 @@ public class Picker extends Button {
                 // their bar (so the bar's background extends through the inset and the buttons remain
                 // tappable above it); otherwise it goes on the content pane. See issue #5152.
                 Rectangle safeArea = form.getSafeArea();
-                int bottomInset = Display.getInstance().getDisplayHeight() - (safeArea.getY() + safeArea.getHeight());
+                // Measured against the surface the popup sits on, not the display: in
+                // a window those differ, and the inset would be computed from the
+                // wrong height.
+                int hostHeight = form instanceof com.codename1.ui.Window
+                        ? form.asContainer().getHeight()
+                        : Display.getInstance().getDisplayHeight();
+                int bottomInset = hostHeight - (safeArea.getY() + safeArea.getHeight());
                 if (bottomInset > 0) {
                     Container insetTarget = bottomCustomButtons != null ? bottomCustomButtons : dlg.getContentPane();
                     Style insetStyle = insetTarget.getAllStyles();

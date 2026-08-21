@@ -3262,4 +3262,53 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void aPickerInsideAWindowOpensItsPopupThere() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        com.codename1.ui.spinner.Picker picker = new com.codename1.ui.spinner.Picker();
+        picker.setType(com.codename1.ui.Display.PICKER_TYPE_STRINGS);
+        picker.setStrings("one", "two", "three");
+        picker.setSelectedString("one");
+        w.add(BorderLayout.CENTER, picker);
+        w.show();
+        w.revalidate();
+        try {
+            // The lightweight popup is the default wherever the platform has no native
+            // picker, which is every desktop port. This threw "Attempt to show
+            // interaction dialog while button is not on form" because it insisted on a
+            // Form, making a standard component unusable in every secondary window.
+            picker.pressed();
+            picker.released();
+            flushSerialCalls();
+
+            com.codename1.components.InteractionDialog popup = findDialogIn(w);
+            assertNotNull(popup, "the picker's popup must open inside the window");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    /// The first InteractionDialog anywhere under the given container.
+    private static com.codename1.components.InteractionDialog findDialogIn(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof com.codename1.components.InteractionDialog) {
+                return (com.codename1.components.InteractionDialog) cmp;
+            }
+            if (cmp instanceof Container) {
+                com.codename1.components.InteractionDialog inner = findDialogIn((Container) cmp);
+                if (inner != null) {
+                    return inner;
+                }
+            }
+        }
+        return null;
+    }
 }

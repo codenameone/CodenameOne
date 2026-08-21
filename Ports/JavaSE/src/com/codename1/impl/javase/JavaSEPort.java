@@ -3900,11 +3900,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return false;
             }
 
-            Form f = Display.getInstance().getCurrent();
+            // This canvas is shared with secondary windows, so the hit test has to run
+            // against the top level this canvas renders. Resolving the current form
+            // inspected a component of the unrelated main form, and in a window-only
+            // application it showed and consumed the inspection menu while having
+            // nothing to inspect -- which also swallowed the window's own context menu.
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             if (f != null) {
                 int x = scaleCoordinateX(me.getX());
                 int y = scaleCoordinateY(me.getY());
-                Component cmp = f.getComponentAt(x, y);
+                Component cmp = f.asContainer().getComponentAt(x, y);
                 if (cmp == null || cmp instanceof PeerComponent) {
                     return false;
                 }
@@ -3919,11 +3924,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void actionPerformed(ActionEvent e) {
                     ComponentTreeInspector inspector = getOrCreateComponentTreeInspector();
                     if (inspector != null && inspector.isSimulatorRightClickEnabled()) {
-                        Form f = Display.getInstance().getCurrent();
+                        com.codename1.ui.TopLevelContainer f = canvasTopLevel();
                         if (f != null) {
                             int x = scaleCoordinateX(me.getX());
                             int y = scaleCoordinateY(me.getY());
-                            Component cmp = f.getComponentAt(x, y);
+                            Component cmp = f.asContainer().getComponentAt(x, y);
                             inspector.inspectComponent(cmp);
                         }
                     }
