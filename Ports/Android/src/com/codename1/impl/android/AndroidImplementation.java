@@ -7587,10 +7587,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 File dir = storageScratchDir();
                 if (dir.isDirectory() || dir.mkdirs() || dir.isDirectory()) {
-                    RandomAccessFile handle =
+                    // kept before the lock is attempted rather than after it succeeds,
+                    // so that a lock which throws still leaves releaseStorageLock
+                    // something to close. Otherwise a filesystem that refuses to lock
+                    // leaks a descriptor on every storage operation until unrelated
+                    // files stop opening.
+                    storageLockHandle =
                             new RandomAccessFile(new File(dir, STORAGE_LOCK_FILE), "rw");
-                    storageLockAcrossProcesses = handle.getChannel().lock();
-                    storageLockHandle = handle;
+                    storageLockAcrossProcesses = storageLockHandle.getChannel().lock();
                 }
             } catch (Throwable t) {
                 com.codename1.io.Log.e(t);
@@ -7785,7 +7789,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 File[] abandoned = storageScratchDir().listFiles();
                 if (abandoned != null) {
                     for (int iter = 0; iter < abandoned.length; iter++) {
-                        if (isStorageLockFile(abandoned[iter])) {
+                        if (isStorageLockFile(abandoned[iter])
+                                || isOpenStorageWrite(abandoned[iter])) {
                             continue;
                         }
                         long expires = abandoned[iter].lastModified() + STORAGE_SCRATCH_MAX_AGE;
@@ -7842,6 +7847,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private static boolean isStorageLockFile(File file) {
         return STORAGE_LOCK_FILE.equals(file.getName());
+    }
+
+    /**
+     * Whether the given scratch file belongs to a write this process has open.
+     *
+     * <p>Age alone would not tell: {@code lastModified} is a wall clock reading, and
+     * a clock that jumps forward -- an automatic correction, say -- can make a file
+     * being written this moment look like a day old. What this process is doing it
+     * knows exactly, so it never has to guess.</p>
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     *
+     * @param file a file in the scratch directory
+     * @return true if a write in this process is using it
+     */
+    private static boolean isOpenStorageWrite(File file) {
+        for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+            if (openStorageWrites.get(iter).scratch.equals(file)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -8045,6 +8072,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             synchronized (storagePublishLock) {
                 lockStorageAcrossProcesses();
                 try {
+                    // the one case where not publishing is not a failure: this
+                    // process cancelled the write itself, so the caller either asked
+                    // for the entry to go or is already abandoning the write. Failing
+                    // here would only log noise over an outcome that is already known.
                     if (cancelled) {
                         return;
                     }
@@ -8052,12 +8083,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         syncStorageDirectory(target.getParentFile());
                         return;
                     }
-                    if (!scratch.exists()) {
-                        // another process deleted this entry, or cleared the storage,
-                        // while the write was open. Unlinking the scratch file is how
-                        // it says so, and there is nothing left to publish.
-                        return;
-                    }
+                    // A missing scratch file is not reported as a success. Another
+                    // process unlinking it does mean this entry was deleted, and
+                    // failing here reaches the same place -- writeObject deletes the
+                    // entry on a failed write -- while still telling the caller that
+                    // what it wrote did not land. Anything else that removed the file
+                    // gets the same honest answer, where calling it a success would
+                    // leave the caller believing in a value the storage never took.
                     throw new IOException("Could not store " + name);
                 } finally {
                     unlockStorageAcrossProcesses();
