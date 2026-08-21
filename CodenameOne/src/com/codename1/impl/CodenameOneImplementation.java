@@ -6814,11 +6814,16 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `name`: the name of the storage file being written
     ///
+    /// - `writing`: the stream this implementation returned for the write that
+    /// failed, or null if it never opened. The write is named by its stream rather
+    /// than by its entry so that a second write to the same entry, which may be
+    /// perfectly healthy, is not given up along with it
+    ///
     /// #### Returns
     ///
     /// true if the pending write was discarded and the entry left as it was, false if
     /// the caller still has to delete the entry to be rid of a partial write
-    public boolean abandonStorageWrite(String name) {
+    public boolean abandonStorageWrite(String name, OutputStream writing) {
         return false;
     }
 

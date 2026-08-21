@@ -7747,14 +7747,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
-    public boolean abandonStorageWrite(String name) {
-        synchronized (storagePublishLock) {
-            for (int iter = 0; iter < openStorageWrites.size(); iter++) {
-                openStorageWrites.get(iter).cancel(name);
+    public boolean abandonStorageWrite(String name, OutputStream writing) {
+        // this write and no other. Every write to the entry used to be given up
+        // together, so a second thread writing the same entry had its value quietly
+        // discarded and was told the write had succeeded.
+        if (writing instanceof StorageOutputStream) {
+            synchronized (storagePublishLock) {
+                ((StorageOutputStream) writing).cancel();
             }
         }
         // the entry is untouched until a write is published, so a write that never
-        // gets that far leaves whatever was stored exactly as it was
+        // gets that far -- including one whose stream never opened -- leaves whatever
+        // was stored exactly as it was
         return true;
     }
 
@@ -7920,6 +7924,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 storageLiveHandle = new RandomAccessFile(
                         new File(dir, android.os.Process.myPid() + STORAGE_LIVE_SUFFIX), "rw");
                 storageLiveLock = storageLiveHandle.getChannel().lock();
+                discardEarlierIncarnation(dir);
             } catch (Throwable t) {
                 com.codename1.io.Log.e(t);
                 try {
@@ -7971,6 +7976,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private static boolean isStorageLockFile(File file) {
         return STORAGE_LOCK_FILE.equals(file.getName());
+    }
+
+    /**
+     * Removes whatever a previous process left behind under this process's id.
+     *
+     * <p>Android hands out a process id again once the process holding it is gone, so
+     * after a crash or a reboot the files an earlier incarnation abandoned can be
+     * sitting under the id this one has just been given. The sweep passes over
+     * anything bearing its own id, on the grounds that a process knows its own work,
+     * which would leave those files where they are for good. Running this before the
+     * first write, when this process owns nothing yet, makes that assumption true:
+     * anything already here under its id belongs to the incarnation before it.</p>
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     *
+     * @param dir the scratch directory
+     */
+    private static void discardEarlierIncarnation(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        int mine = android.os.Process.myPid();
+        for (int iter = 0; iter < files.length; iter++) {
+            if (!isStorageMarkerFile(files[iter])
+                    && storageScratchOwner(files[iter].getName()) == mine
+                    && !files[iter].delete()) {
+                com.codename1.io.Log.p("Could not remove the abandoned storage scratch "
+                        + "file " + files[iter]);
+            }
+        }
     }
 
     /**

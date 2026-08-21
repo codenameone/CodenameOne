@@ -471,18 +471,24 @@ public class Storage {
     public boolean writeObject(String name, Object o, boolean includeLogging) {
         name = fixFileName(name);
         cache.put(name, o);
+        OutputStream writing = null; //NOPMD CloseResource
         DataOutputStream d = null; //NOPMD CloseResource
         try {
-            d = new DataOutputStream(createOutputStream(name));
+            // the implementation's own stream is kept, because that is what names the
+            // write to be given up if this one fails. Giving up by entry name would
+            // reach every write to that entry, and a second thread writing the same
+            // one would be told its value was stored after it had been discarded.
+            writing = createOutputStream(name);
+            d = new DataOutputStream(writing);
             Util.writeObject(o, d);
             // closed here rather than left to the finally, because closing is where
             // an implementation that writes the entry in one step does the writing.
             // From the finally the failure would reach cleanup(), which logs and
             // swallows it, and this method would report a write that never landed.
             // handed off so the finally does not close it a second time
-            DataOutputStream writing = d; //NOPMD CloseResource
+            DataOutputStream closing = d; //NOPMD CloseResource
             d = null;
-            writing.close();
+            closing.close();
             return true;
             // Errors are caught too, and rethrown. An OutOfMemoryError partway
             // through a large object would otherwise leave the entry to the finally,
@@ -490,10 +496,10 @@ public class Storage {
             // as it closes would put those few bytes in place of a good entry. The
             // error still reaches the caller, it just does not take the entry with it.
         } catch (Error err) {
-            failedWrite(name, err, includeLogging);
+            failedWrite(name, writing, err, includeLogging);
             throw err;
         } catch (Exception err) {
-            failedWrite(name, err, includeLogging);
+            failedWrite(name, writing, err, includeLogging);
             return false;
         } finally {
             Util.getImplementation().cleanup(d);
@@ -507,11 +513,15 @@ public class Storage {
     ///
     /// - `name`: the storage file name, already normalized
     ///
+    /// - `writing`: the implementation's stream for this write, or null if it never
+    /// opened
+    ///
     /// - `err`: what went wrong
     ///
     /// - `includeLogging`: whether the failure may be logged, which is unsafe during
     /// app initialization
-    private void failedWrite(String name, Throwable err, boolean includeLogging) {
+    private void failedWrite(String name, OutputStream writing, Throwable err,
+            boolean includeLogging) {
         // before the logging, which can fail in its own right. Reporting an
         // OutOfMemoryError means building a message and a stack trace, so a second
         // failure there would carry off the rest of this method, and the write left
@@ -529,7 +539,7 @@ public class Storage {
         // deleting it would answer a write that failed by throwing away the value
         // that was already stored -- which is worse than the failure itself, and is
         // what running out of memory partway through a large object used to do.
-        if (Util.getImplementation().abandonStorageWrite(name)) {
+        if (Util.getImplementation().abandonStorageWrite(name, writing)) {
             cache.delete(name);
         } else {
             deleteStorageFile(name);
