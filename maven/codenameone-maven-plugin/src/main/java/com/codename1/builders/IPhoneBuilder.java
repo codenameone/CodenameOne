@@ -4841,10 +4841,12 @@ public class IPhoneBuilder extends Executor {
 
                             String extensionName = appExtension.getName();
                             String codeSignEntitlements = "$(NS_CODE_SIGN_ENTITLEMENTS)";
+                            File extEntitlementsFile = null;
                             if (appExtension.isDirectory()) {
                                 for (File f : appExtension.listFiles()) {
                                     if (f.getName().endsWith(".entitlements")) {
                                         codeSignEntitlements = extensionName + "/" + f.getName();
+                                        extEntitlementsFile = f;
                                     }
                                 }
                             }
@@ -4875,10 +4877,19 @@ public class IPhoneBuilder extends Executor {
 
 
 
+                            // The minimum iOS this extension declares, which App Store validation
+                            // reads out of the built .appex as MinimumOSVersion. Computed after the
+                            // properties are folded in, so an archive that states its own wins.
+                            String extDeploymentTarget = appExtensionDeploymentTarget(
+                                    buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
+                                    extEntitlementsFile,
+                                    request.getArg("ios.deployment_target", null));
+                            buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
+
                             // Guarded so the post-dependency re-run of fix_xcode_schemes.rb
                             // doesn't create duplicate extension targets.
                             sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
-                                    + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
+                                    + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '" + extDeploymentTarget + "')\n"
                                     + "xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|e| \n"
                                     + "  e.build_settings['PROVISIONING_PROFILE']='$(APP_PROVISIONING_PROFILE)'\n"
                                     + "  e.build_settings['CODE_SIGN_ENTITLEMENTS']='$(APP_CODE_SIGN_ENTITLEMENTS)'\n"
@@ -6275,6 +6286,91 @@ public class IPhoneBuilder extends Executor {
     /// the extension folder's parent. A value that still holds a build-setting reference after
     /// the two obvious project-root spellings is not resolvable here, and null says so rather
     /// than guessing at a file to edit.
+    /// The minimum iOS version a brought-in app extension declares.
+    ///
+    /// Xcode writes the target's IPHONEOS_DEPLOYMENT_TARGET into the built .appex as
+    /// MinimumOSVersion, and App Store validation reads it there: an extension below what its own
+    /// APIs require is rejected on upload, after a build that succeeded and an archive that
+    /// exported. The generic path used to hand every extension 10.0, which is below the floor the
+    /// current SDK will even build against, let alone what a Wallet extension needs.
+    ///
+    /// In order: what the archive says, because an extension knows its own APIs; then 14.0 for an
+    /// issuer-provisioning Wallet extension, since PKIssuerProvisioningExtensionHandler arrived in
+    /// iOS 14 and Apple rejects anything lower ("Please ensure the MinimumOSVersion value of your
+    /// extension is 14 or later"); then the app's own target, never below the 12.0 the SDK
+    /// supports. An extension is allowed to require MORE than the app that carries it -- widgets
+    /// have done that since iOS 14 -- so raising it here costs the app nothing.
+    ///
+    /// @param declared the extension's own IPHONEOS_DEPLOYMENT_TARGET, or null
+    /// @param entitlements the extension's .entitlements, or null when it has none
+    /// @param appTarget the ios.deployment_target build hint, or null
+    static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget) {
+        if (declared != null && declared.trim().length() > 0) {
+            return declared.trim();
+        }
+        if (fileContains(entitlements, PAYMENT_PASS_PROVISIONING)) {
+            return "14.0";
+        }
+        String floor = "12.0";
+        return isDeploymentTargetBelow(appTarget, floor) ? floor : normalizeVersion(appTarget.trim());
+    }
+
+    /// A bare major ("12") as the major.minor Apple's plists carry ("12.0"). The app's own hint is
+    /// written either way, and MinimumOSVersion is read by App Store validation -- not the place
+    /// to find out which spellings its parser accepts.
+    private static String normalizeVersion(String version) {
+        return version.indexOf('.') < 0 ? version + ".0" : version;
+    }
+
+    /// Whether {@code target} names an iOS version below {@code floor}. A missing or unreadable
+    /// value counts as below: the floor is then what the extension gets.
+    private static boolean isDeploymentTargetBelow(String target, String floor) {
+        if (target == null || target.trim().length() == 0) {
+            return true;
+        }
+        String[] one = target.trim().split("\\.");
+        String[] two = floor.split("\\.");
+        for (int i = 0; i < Math.max(one.length, two.length); i++) {
+            int a = i < one.length ? parseVersionPart(one[i]) : 0;
+            int b = i < two.length ? parseVersionPart(two[i]) : 0;
+            if (a != b) {
+                return a < b;
+            }
+        }
+        return false;
+    }
+
+    private static int parseVersionPart(String part) {
+        try {
+            return Integer.parseInt(part.trim());
+        } catch (NumberFormatException notANumber) {
+            return -1;
+        }
+    }
+
+    private static final String PAYMENT_PASS_PROVISIONING =
+            "com.apple.developer.payment-pass-provisioning";
+
+    /// Whether a file's text holds a string, for the entitlement keys read out of a plist without
+    /// parsing it. A missing or unreadable file holds nothing.
+    private static boolean fileContains(File file, String needle) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        try {
+            byte[] data = new byte[(int) file.length()];
+            DataInputStream in = new DataInputStream(new FileInputStream(file));
+            try {
+                in.readFully(data);
+            } finally {
+                in.close();
+            }
+            return new String(data, StandardCharsets.UTF_8).contains(needle);
+        } catch (IOException cannotRead) {
+            return false;
+        }
+    }
+
     static File appExtensionInfoPlist(File extensionFolder) {
         String override = appExtensionBuildSetting(extensionFolder, "INFOPLIST_FILE");
         if (override == null) {
