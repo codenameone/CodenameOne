@@ -85,13 +85,9 @@ If you want a distinct watch entry point rather than reusing your phone main cla
 codename1.watchMain=com.mycompany.myapp.MyWatchMain
 ```
 
-On Android, one hint marks the build as a Wear OS app, which injects the watch hardware feature, declares the app standalone, and raises the minimum SDK to the Wear OS standalone baseline:
+On Android the same `codename1.watchMain` declaration drives the build. Adding `codename1.watchStandalone=true` makes the single APK the watch app itself -- injecting the watch hardware feature, declaring the app standalone and raising the minimum SDK to the Wear OS standalone baseline. Leave it unset and you get a phone APK and a companion Wear APK beside it.
 
-```properties
-android.wear=true
-```
-
-A project can target both platforms at once by setting the watch hint and `android.wear=true` together.
+> **Update:** this post originally described an `android.wear=true` hint. That hint is retired: `codename1.watchMain` and `codename1.watchStandalone` now drive both platforms from one declaration. The old hint still works for projects that have not migrated.
 
 ## What runs on the watch, and what does not
 

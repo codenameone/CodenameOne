@@ -32,7 +32,7 @@ The answer is that reuse still happens. Many well known apps skip the watch enti
 
 That is a screenshot from our test framework, which was never designed for a watch: it still has a text field. Because that is a Codename One text field it renders correctly and "just works" right up until you try to edit in it, which on a watch would not give the result you want; a real watch UI would simply leave it out.
 
-Wear OS is simpler: a Wear OS app is an ordinary Android app, so the existing Android port renders it with the same pipeline it uses on phones. You enable each side with one build hint, and with the hints off your phone build is byte-for-byte unchanged. Both wearables are covered in detail in {{< post-link path="/blog/native-apple-watch-and-wear" text="Sunday's post" >}}.
+Wear OS is simpler: a Wear OS app is an ordinary Android app, so the existing Android port renders it with the same pipeline it uses on phones. You enable both sides with one declaration -- `codename1.watchMain` -- and without it your phone build is byte-for-byte unchanged. Both wearables are covered in detail in {{< post-link path="/blog/native-apple-watch-and-wear" text="Sunday's post" >}}.
 
 ## A visual Game Builder
 
