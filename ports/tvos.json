@@ -1,36 +1,36 @@
 {
-  "commit": "b411fb7be7ce7e07f98594922748cd98dd95ab4c",
-  "generated_at": "2026-08-20T20:48:37Z",
+  "commit": "a4a684840af4c14905ca0c0466ddbf2f82b95363",
+  "generated_at": "2026-08-21T04:17:39Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 393653000
+        "duration_ns": 811728000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 151694000
+        "duration_ns": 241130000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 267900000
+        "duration_ns": 215006000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 121341000
+        "duration_ns": 142136000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 450981000
+        "duration_ns": 608145000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 332644000
+        "duration_ns": 392942000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 750044000
+        "duration_ns": 999789000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,11 +44,11 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32394307488",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32441458123",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 0,
+    "fail": 1,
     "not-run": 0,
     "pass": 170,
     "skip": 8
@@ -424,6 +424,10 @@
       "feature": "graphics-shapes-strokes",
       "status": "pass"
     },
+    "IntentsApiTest": {
+      "feature": "intents",
+      "status": "pass"
+    },
     "Java17Tests": {
       "feature": "java-standard-apis",
       "status": "pass"
@@ -521,7 +525,10 @@
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
-      "status": "pass"
+      "reasons": [
+        "failed due to timeout waiting for DONE stage=capture-requested"
+      ],
+      "status": "fail"
     },
     "PaletteOverrideThemeScreenshotTest": {
       "feature": "theme-palette-css",
