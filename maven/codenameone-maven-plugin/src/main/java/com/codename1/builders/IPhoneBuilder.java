@@ -5732,10 +5732,18 @@ public class IPhoneBuilder extends Executor {
      * that is already correct, and one written as a {@code $(...)} reference, are left alone.</p>
      */
     private void stampAppExtensionInfoPlist(File appExtension, BuildRequest request) throws IOException {
-        File infoPlist = new File(appExtension, "Info.plist");
+        File infoPlist = appExtensionInfoPlist(appExtension);
+        if (infoPlist == null) {
+            debug("The " + appExtension.getName() + " app extension points INFOPLIST_FILE at a path "
+                    + "this build cannot resolve, so its bundle identifier and versions were left "
+                    + "as they are. If the archive fails on the embedded binary's bundle "
+                    + "identifier, write the path relative to the project directory.");
+            return;
+        }
         if (!infoPlist.isFile()) {
-            debug("The " + appExtension.getName() + " app extension has no Info.plist. Xcode cannot "
-                    + "build an extension target without one; add it to the .ios.appext archive.");
+            debug("The " + appExtension.getName() + " app extension has no " + infoPlist.getName()
+                    + ". Xcode cannot build an extension target without one; add it to the "
+                    + ".ios.appext archive.");
             return;
         }
         String plist = readFileToString(infoPlist);
@@ -5751,7 +5759,8 @@ public class IPhoneBuilder extends Executor {
             return;
         }
         if (stamped == null) {
-            debug("Could not read " + appExtension.getName() + "/Info.plist as an XML property list, "
+            debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
+                    + " as an XML property list, "
                     + "so its bundle identity was left as it is. If the build fails on the embedded "
                     + "binary's bundle identifier, convert the file with "
                     + "'plutil -convert xml1 Info.plist' and rebuild.");
@@ -5759,7 +5768,7 @@ public class IPhoneBuilder extends Executor {
         }
         createFile(infoPlist, stamped.getBytes("UTF-8"));
         for (String change : changes) {
-            debug("Adjusted " + appExtension.getName() + "/Info.plist: " + change);
+            debug("Adjusted " + appExtension.getName() + "/" + infoPlist.getName() + ": " + change);
         }
     }
 
@@ -5795,9 +5804,14 @@ public class IPhoneBuilder extends Executor {
         if (value == null || value.length() == 0) {
             return plist;
         }
-        String keyTag = "<key>" + key + "</key>";
-        int keyAt = plist.indexOf(keyTag);
-        if (keyAt < 0) {
+        // The key's OWN value, through the watch builder's scanners, which is not the same as the
+        // next <string> after it. A key whose value is <false/>, <integer>1</integer> or the valid
+        // empty form <string/> has no <string> of its own, and scanning forward from the key lands
+        // on an unrelated later one -- CFBundleName, or something inside the NSExtension dict --
+        // which this method would then rewrite with a version number. The same trap the comment on
+        // injectedPlistString records, in a real plist rather than a hint fragment.
+        int afterKey = WatchNativeBuilder.injectedValueAt(plist, key);
+        if (afterKey < 0) {
             int dictEnd = plist.lastIndexOf("</dict>");
             changes.add("added " + key + " = " + value);
             return plist.substring(0, dictEnd)
@@ -5807,18 +5821,80 @@ public class IPhoneBuilder extends Executor {
         if (!overwrite) {
             return plist;
         }
-        int valueStart = plist.indexOf("<string>", keyAt + keyTag.length());
-        int valueEnd = valueStart < 0 ? -1 : plist.indexOf("</string>", valueStart);
-        if (valueStart < 0 || valueEnd < 0) {
-            // Not a string value (an extension is free to use whatever type it likes); leave it.
+        int element = WatchNativeBuilder.nextElementAt(plist, afterKey);
+        if (element < 0 || !"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
+            // Not a string value. An extension is free to use whatever type it likes, and
+            // rewriting a type we did not expect is worse than leaving a version alone.
             return plist;
         }
-        String current = plist.substring(valueStart + "<string>".length(), valueEnd);
+        int openEnd = plist.indexOf('>', element);
+        if (openEnd < 0) {
+            return plist;
+        }
+        if (plist.charAt(openEnd - 1) == '/') {
+            // <string/>: an empty value of the right type, so it is this key's and ours to fill.
+            changes.add("set " + key + " to " + value + " to match the app (was empty)");
+            return plist.substring(0, element) + "<string>" + value + "</string>"
+                    + plist.substring(openEnd + 1);
+        }
+        int valueEnd = WatchNativeBuilder.closeOfElement(plist, openEnd + 1, "</string>");
+        if (valueEnd < 0) {
+            return plist;
+        }
+        String current = plist.substring(openEnd + 1, valueEnd);
         if (current.equals(value) || current.contains("$(")) {
             return plist;
         }
         changes.add("set " + key + " to " + value + " to match the app (was " + current + ")");
-        return plist.substring(0, valueStart + "<string>".length()) + value + plist.substring(valueEnd);
+        return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
+    }
+
+    /// The Info.plist the extension target is actually built with.
+    ///
+    /// {@code <folder>/Info.plist} is only the default: the archive's buildSettings.properties
+    /// may point INFOPLIST_FILE at another file, and that is the one Xcode processes into the
+    /// .appex. Stamping the default in that case leaves the plist that ships without the
+    /// identifier and versions the stamping is there to supply.
+    ///
+    /// The path is written the way Xcode reads it: relative to the project directory, which is
+    /// the extension folder's parent. A value that still holds a build-setting reference after
+    /// the two obvious project-root spellings is not resolvable here, and null says so rather
+    /// than guessing at a file to edit.
+    static File appExtensionInfoPlist(File extensionFolder) {
+        File settings = new File(extensionFolder, "buildSettings.properties");
+        String override = null;
+        if (settings.isFile()) {
+            Properties props = new Properties();
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(settings);
+                props.load(fis);
+                override = props.getProperty("INFOPLIST_FILE");
+            } catch (IOException ex) {
+                override = null;
+            } finally {
+                if (fis != null) {
+                    try { fis.close(); } catch (Throwable t) {}
+                }
+            }
+        }
+        if (override == null || override.trim().length() == 0) {
+            return new File(extensionFolder, "Info.plist");
+        }
+        String path = override.trim();
+        if (path.length() > 1 && path.startsWith("\"") && path.endsWith("\"")) {
+            path = path.substring(1, path.length() - 1).trim();
+        }
+        for (String projectRoot : new String[]{"$(SRCROOT)/", "$(PROJECT_DIR)/"}) {
+            if (path.startsWith(projectRoot)) {
+                path = path.substring(projectRoot.length());
+            }
+        }
+        if (path.contains("$(")) {
+            return null;
+        }
+        File resolved = new File(path);
+        return resolved.isAbsolute() ? resolved : new File(extensionFolder.getParentFile(), path);
     }
 
     /**
