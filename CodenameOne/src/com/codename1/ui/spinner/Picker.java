@@ -640,12 +640,17 @@ public class Picker extends Button {
                     fireActionEvent(-99, -99);
 
                     Component next = null;
-                    Form f = getComponentForm();
+                    // Through the tab iterator rather than Form's getNextComponent /
+                    // getPreviousComponent: those are Form-only, but they are defined
+                    // as exactly this call, and getTabIterator is on TopLevelContainer.
+                    // Resolving a Form here left the Next and Previous buttons visible
+                    // in a window and doing nothing but closing the popup.
+                    TopLevelContainer f = getTopLevelContainer();
                     if (f != null && Picker.this.isTraversable()) {
                         if (command == COMMAND_NEXT) {
-                            next = f.getNextComponent(Picker.this);
+                            next = f.getTabIterator(Picker.this).getNext();
                         } else if (command == COMMAND_PREV) {
-                            next = f.getPreviousComponent(Picker.this);
+                            next = f.getTabIterator(Picker.this).getPrevious();
                         }
                     }
                     final Component nextToEdit = next;
@@ -706,6 +711,9 @@ public class Picker extends Button {
                 final InteractionDialog dlg = new InteractionDialog() {
 
                     ActionListener keyListener;
+                    /// The top level the Tab listener was added to, kept so it is
+                    /// removed from that one rather than from whatever resolves later.
+                    TopLevelContainer keyListenerHost;
 
                     @Override
                     protected void initComponent() {
@@ -727,21 +735,23 @@ public class Picker extends Button {
                             };
                         }
                         {
-                            TopLevelContainer keyTop = getTopLevelContainer();
-                            if (keyTop != null) {
-                                keyTop.addKeyListener(9, keyListener);
+                            keyListenerHost = getTopLevelContainer();
+                            if (keyListenerHost != null) {
+                                keyListenerHost.addKeyListener(9, keyListener);
                             }
                         }
                     }
 
                     @Override
                     protected void deinitialize() {
-                        Form f = getComponentForm();
-                        if (f == null) {
-                            f = Display.getInstance().getCurrent();
-                        }
-                        if (f != null && keyListener != null) {
-                            f.removeKeyListener(9, keyListener);
+                        // Removed from the very top level it was added to. Resolving it
+                        // again here found a Form -- null in a window, then falling back
+                        // to the current form, which never had the listener -- so after
+                        // the picker was dismissed every Tab release still ran
+                        // endEditing() against the stale dialog and spinner.
+                        if (keyListenerHost != null && keyListener != null) {
+                            keyListenerHost.removeKeyListener(9, keyListener);
+                            keyListenerHost = null;
                         }
                         super.deinitialize();
                     }
@@ -1305,7 +1315,10 @@ public class Picker extends Button {
     @Override
     public void stopEditing(Runnable onFinish) {
         stopEditingCallback = onFinish;
-        Form f = this.getComponentForm();
+        // Through the top level, as registerAsInputDevice registers it: resolving a
+        // Form here found nothing in a window, so stopEditing() did not close the
+        // picker and never ran its callback.
+        TopLevelContainer f = this.getTopLevelContainer();
         if (f != null) {
             if (f.getCurrentInputDevice() == currentInput) { //NOPMD CompareObjectsWithEquals
                 try {
@@ -1319,7 +1332,7 @@ public class Picker extends Button {
 
     @Override
     public boolean isEditing() {
-        Form f = this.getComponentForm();
+        TopLevelContainer f = this.getTopLevelContainer();
         return currentInput != null && f != null && f.getCurrentInputDevice() == currentInput; //NOPMD CompareObjectsWithEquals
     }
 
@@ -1650,7 +1663,10 @@ public class Picker extends Button {
 
     private void registerAsInputDevice(final InteractionDialog dlg, final InternalPickerWidget spinner) {
 
-        final Form f = this.getComponentForm();
+        // Through the top level: this skipped every registration in a window, so an
+        // open picker reported isEditing() false, input-device replacement could not
+        // dismiss it, and stopEditing(onFinish) neither closed it nor ran its callback.
+        final TopLevelContainer f = this.getTopLevelContainer();
         if (f != null) {
             final ActionListener sizeChanged;
             if (!Display.getInstance().isTablet()) {

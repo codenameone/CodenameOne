@@ -3311,4 +3311,51 @@ class WindowTest extends UITestBase {
         }
         return null;
     }
+
+    @FormTest
+    void anOpenPickerInAWindowIsEditableAndCanBeStopped() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        com.codename1.ui.spinner.Picker picker = new com.codename1.ui.spinner.Picker();
+        picker.setType(com.codename1.ui.Display.PICKER_TYPE_STRINGS);
+        picker.setStrings("one", "two", "three");
+        picker.setSelectedString("one");
+        w.add(BorderLayout.CENTER, picker);
+        w.show();
+        w.revalidate();
+        try {
+            picker.pressed();
+            picker.released();
+            flushSerialCalls();
+
+            // registerAsInputDevice resolved a Form and so skipped every registration
+            // inside a window: the popup opened but reported isEditing() false, which
+            // is what window-level input-device replacement and stopEditing() both go
+            // through -- so nothing could dismiss it.
+            assertTrue(picker.isEditing(),
+                    "an open picker in a window must report itself as editing");
+            assertNotNull(w.getCurrentInputDevice(),
+                    "and must register as the window's current input device");
+
+            final boolean[] stopped = new boolean[1];
+            picker.stopEditing(new Runnable() {
+                @Override
+                public void run() {
+                    stopped[0] = true;
+                }
+            });
+            flushSerialCalls();
+            // The popup closes with a dispose animation, so the callback is queued
+            // behind it rather than running inline.
+            pumpAnimations(w);
+            assertTrue(stopped[0], "stopEditing must close it and run the callback");
+        } finally {
+            w.dispose();
+        }
+    }
 }
