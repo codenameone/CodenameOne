@@ -5735,9 +5735,11 @@ public class IPhoneBuilder extends Executor {
         File infoPlist = appExtensionInfoPlist(appExtension);
         if (infoPlist == null) {
             debug("The " + appExtension.getName() + " app extension points INFOPLIST_FILE at a path "
-                    + "this build cannot resolve, so its bundle identifier and versions were left "
-                    + "as they are. If the archive fails on the embedded binary's bundle "
-                    + "identifier, write the path relative to the project directory.");
+                    + "this build will not edit -- it either names a build setting that cannot be "
+                    + "resolved here, or it lands outside the project directory -- so its bundle "
+                    + "identifier and versions were left as they are. If the archive fails on the "
+                    + "embedded binary's bundle identifier, write the path relative to the project "
+                    + "directory.");
             return;
         }
         if (!infoPlist.isFile()) {
@@ -6071,7 +6073,10 @@ public class IPhoneBuilder extends Executor {
     static File appExtensionInfoPlist(File extensionFolder) {
         String override = appExtensionBuildSetting(extensionFolder, "INFOPLIST_FILE");
         if (override == null) {
-            return new File(extensionFolder, "Info.plist");
+            // Confined like an overridden path, not trusted for sitting at the default name: a zip
+            // may carry symlinks, so <folder>/Info.plist can still land outside the project.
+            File byDefault = new File(extensionFolder, "Info.plist");
+            return insideProjectDir(byDefault, extensionFolder.getParentFile()) ? byDefault : null;
         }
         String path = override;
         if (path.length() > 1 && path.startsWith("\"") && path.endsWith("\"")) {
@@ -6082,7 +6087,36 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         File resolved = new File(path);
-        return resolved.isAbsolute() ? resolved : new File(extensionFolder.getParentFile(), path);
+        if (!resolved.isAbsolute()) {
+            resolved = new File(extensionFolder.getParentFile(), path);
+        }
+        return insideProjectDir(resolved, extensionFolder.getParentFile()) ? resolved : null;
+    }
+
+    /// Whether a path an uploaded archive chose is one this build is willing to write to.
+    ///
+    /// INFOPLIST_FILE arrives inside a customer's .ios.appext and the stamper WRITES to whatever
+    /// it names, so an absolute path, a {@code ../../} traversal or a symlink planted in the
+    /// archive would have this daemon rewriting a file outside the build -- another build's
+    /// project, or anything else the account can write. The comparison is on canonical paths, so
+    /// a symlink that leaves the project is judged by where it lands rather than by where it sits.
+    ///
+    /// Everything under the project directory is fair game: an extension may legitimately share a
+    /// plist that sits beside its folder rather than inside it.
+    static boolean insideProjectDir(File candidate, File projectDir) {
+        if (candidate == null || projectDir == null) {
+            return false;
+        }
+        try {
+            String root = projectDir.getCanonicalPath();
+            if (!root.endsWith(File.separator)) {
+                root += File.separator;
+            }
+            return candidate.getCanonicalPath().startsWith(root);
+        } catch (IOException cannotResolve) {
+            // A path this process cannot even canonicalize is not one to write to.
+            return false;
+        }
     }
 
     /// One build setting as the extension's own buildSettings.properties overrides it, or null
