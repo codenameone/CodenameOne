@@ -714,24 +714,45 @@ public final class Util {
         if (o instanceof Hashtable) {
             Hashtable v = (Hashtable) o;
             out.writeUTF("java.util.Hashtable");
-            out.writeInt(v.size());
+            // the pairs are collected before the count is written, because the count
+            // and the entries that follow it have to describe the same map. Reading
+            // the size and then walking the map let a change from another thread
+            // produce a file whose count did not match its contents, and readObject
+            // has no way to notice: it reads exactly count entries off a stream that
+            // no longer lines up, and hands back garbage.
+            Object[] keys = new Object[v.size()];
+            Object[] values = new Object[keys.length];
+            int count = 0;
             Enumeration k = v.keys();
-            while (k.hasMoreElements()) {
+            while (k.hasMoreElements() && count < keys.length) {
                 Object key = k.nextElement();
-                writeObject(key, out);
-                writeObject(v.get(key), out);
+                keys[count] = key;
+                values[count] = v.get(key);
+                count++;
             }
+            writePairs(keys, values, count, out);
             return;
         }
         if (o instanceof Map) {
             Map v = (Map) o;
             out.writeUTF("java.util.Map");
-            out.writeInt(v.size());
+            // collected up front for the reason given above the Hashtable case. The
+            // key and the value are copied out of each entry rather than the entry
+            // itself kept, since a Map is free to hand the same mutable entry object
+            // to every step of the iteration.
+            Object[] keys = new Object[v.size()];
+            Object[] values = new Object[keys.length];
+            int count = 0;
             for (Object entryObj : v.entrySet()) {
+                if (count == keys.length) {
+                    break;
+                }
                 Map.Entry entry = (Map.Entry) entryObj;
-                writeObject(entry.getKey(), out);
-                writeObject(entry.getValue(), out);
+                keys[count] = entry.getKey();
+                values[count] = entry.getValue();
+                count++;
             }
+            writePairs(keys, values, count, out);
             return;
         }
 
@@ -880,6 +901,27 @@ public final class Util {
 
         throw new IOException("Object type not supported: " + o.getClass().getName()
                 + " value: " + o);
+    }
+
+    /// Writes a count followed by exactly that many key/value pairs, so the header
+    /// always describes the payload that follows it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keys`: the keys to write
+    ///
+    /// - `values`: the values to write, matched to `keys` by position
+    ///
+    /// - `count`: how many entries of the two arrays to write
+    ///
+    /// - `out`: the destination stream
+    private static void writePairs(Object[] keys, Object[] values, int count,
+            DataOutputStream out) throws IOException {
+        out.writeInt(count);
+        for (int iter = 0; iter < count; iter++) {
+            writeObject(keys[iter], out);
+            writeObject(values[iter], out);
+        }
     }
 
     /// This method allows working around [issue 58](http://code.google.com/p/codenameone/issues/detail?id=58)

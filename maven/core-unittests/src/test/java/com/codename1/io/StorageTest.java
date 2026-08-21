@@ -108,4 +108,18 @@ class StorageTest extends UITestBase {
         implementation.putStorageEntry("needs_normalization", new byte[]{1});
         assertTrue(storage.exists(key));
     }
+
+    @EdtTest
+    void failedWriteLeavesNothingBehindInTheCache() {
+        String key = "unwritable";
+        assertTrue(storage.writeObject(key, "the value that is really stored"));
+
+        // Object is not one of the supported types, so Util.writeObject throws and
+        // the entry is removed. The cached copy has to go with it, otherwise reads
+        // keep answering from memory until the app is restarted.
+        assertFalse(storage.writeObject(key, new Object(), false));
+
+        assertFalse(storage.exists(key));
+        assertNull(storage.readObject(key));
+    }
 }

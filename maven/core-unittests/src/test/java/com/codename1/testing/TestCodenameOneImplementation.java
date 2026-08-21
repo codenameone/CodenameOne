@@ -98,6 +98,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, byte[]> storageEntries = new ConcurrentHashMap<>();
+    private final List<StorageOutput> openStorageWrites = new CopyOnWriteArrayList<>();
     private final Map<String, TestFile> fileSystem = new ConcurrentHashMap<>();
     private final Map<String, TestConnection> connections = new ConcurrentHashMap<>();
     private final Map<String, TestSocket> sockets = new ConcurrentHashMap<>();
@@ -3101,6 +3102,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void deleteStorageFile(String name) {
         storageEntries.remove(name);
+        // a real port publishes an entry by replacing it, so deleting one abandons
+        // any write still open against it rather than being undone by it
+        for (StorageOutput open : openStorageWrites) {
+            open.discard(name);
+        }
     }
 
     public void putStorageEntry(String name, byte[] data) {
@@ -4359,15 +4365,26 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     private final class StorageOutput extends ByteArrayOutputStream {
         private final String name;
+        private volatile boolean discarded;
 
         StorageOutput(String name) {
             this.name = name;
+            openStorageWrites.add(this);
+        }
+
+        void discard(String entry) {
+            if (name.equals(entry)) {
+                discarded = true;
+            }
         }
 
         @Override
         public void close() throws IOException {
             super.close();
-            storageEntries.put(name, toByteArray());
+            openStorageWrites.remove(this);
+            if (!discarded) {
+                storageEntries.put(name, toByteArray());
+            }
         }
     }
 

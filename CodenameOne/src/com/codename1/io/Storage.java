@@ -483,7 +483,11 @@ public class Storage {
                     Log.sendLog();
                 }
             }
-            Util.getImplementation().deleteStorageFile(name);
+            // the entry is gone, so the cached copy has to go with it. Leaving it
+            // behind hid the failure for the rest of the session: every read was
+            // answered from memory with the object that never reached the storage,
+            // and the entry only turned up missing after the app was restarted.
+            deleteStorageFile(name);
             return false;
         } finally {
             Util.getImplementation().cleanup(d);

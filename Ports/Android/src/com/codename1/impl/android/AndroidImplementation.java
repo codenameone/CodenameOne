@@ -7507,17 +7507,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
+     * Marks a file that holds a storage write still in progress. Such a file is
+     * invisible to every storage entry point and is renamed over the real entry
+     * once its bytes are on the device.
+     */
+    private static final String STORAGE_SCRATCH_SUFFIX = ".cn1tmp";
+
+    /**
+     * Distinguishes the scratch files of concurrent writes, so two threads writing
+     * the same entry cannot interleave their bytes into one file.
+     */
+    private static final AtomicLong storageScratchCounter = new AtomicLong();
+
+    /**
+     * Whether the scratch files abandoned by a previous run of this application have
+     * been removed. Guarded by the class monitor.
+     */
+    private static boolean storageScratchSwept;
+
+    /**
      * @inheritDoc
      */
     public void deleteStorageFile(String name) {
         getContext().deleteFile(name);
+        discardStorageScratchFiles(name);
     }
 
     /**
      * @inheritDoc
      */
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        return getContext().openFileOutput(name, 0);
+        sweepStorageScratchFiles();
+        return new StorageOutputStream(name);
     }
 
     /**
@@ -7531,6 +7552,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean storageFileExists(String name) {
+        if (isStorageScratchName(name)) {
+            return false;
+        }
         String[] fileList = getContext().fileList();
         for (int iter = 0; iter < fileList.length; iter++) {
             if (fileList[iter].equals(name)) {
@@ -7544,14 +7568,215 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String[] listStorageEntries() {
-        return getContext().fileList();
+        String[] fileList = getContext().fileList();
+        int keep = 0;
+        for (int iter = 0; iter < fileList.length; iter++) {
+            if (!isStorageScratchName(fileList[iter])) {
+                fileList[keep] = fileList[iter];
+                keep++;
+            }
+        }
+        if (keep == fileList.length) {
+            return fileList;
+        }
+        String[] entries = new String[keep];
+        System.arraycopy(fileList, 0, entries, 0, keep);
+        return entries;
     }
 
     /**
      * @inheritDoc
      */
     public int getStorageEntrySize(String name) {
+        if (isStorageScratchName(name)) {
+            return 0;
+        }
         return (int)new File(getContext().getFilesDir(), name).length();
+    }
+
+    /**
+     * Whether the given file holds a storage write in progress rather than a storage
+     * entry of its own.
+     *
+     * @param name the file name
+     * @return true when the file belongs to a write in progress
+     */
+    private static boolean isStorageScratchName(String name) {
+        int suffix = name.lastIndexOf(STORAGE_SCRATCH_SUFFIX);
+        if (suffix < 0 || suffix + STORAGE_SCRATCH_SUFFIX.length() >= name.length()) {
+            return false;
+        }
+        // the counter that follows the suffix is what keeps an entry whose own name
+        // happens to end in ".cn1tmp" visible
+        for (int iter = suffix + STORAGE_SCRATCH_SUFFIX.length(); iter < name.length(); iter++) {
+            char c = name.charAt(iter);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Abandons any write still in progress against the given entry, so that a caller
+     * that deletes an entry it has just failed to write does not find those failed
+     * bytes renamed over it afterwards.
+     *
+     * @param name the storage entry
+     */
+    private void discardStorageScratchFiles(String name) {
+        String prefix = name + STORAGE_SCRATCH_SUFFIX;
+        String[] fileList = getContext().fileList();
+        for (int iter = 0; iter < fileList.length; iter++) {
+            if (fileList[iter].startsWith(prefix) && isStorageScratchName(fileList[iter])) {
+                getContext().deleteFile(fileList[iter]);
+            }
+        }
+    }
+
+    /**
+     * Removes the scratch files left behind by a previous run that died mid write.
+     * They are already invisible to the storage API, this only stops them
+     * accumulating.
+     *
+     * <p>Runs before the first scratch file of this process exists, and holds the
+     * monitor across the sweep, so it cannot delete a write that is in flight.</p>
+     */
+    private void sweepStorageScratchFiles() {
+        synchronized (AndroidImplementation.class) {
+            if (storageScratchSwept) {
+                return;
+            }
+            storageScratchSwept = true;
+            try {
+                String[] fileList = getContext().fileList();
+                for (int iter = 0; iter < fileList.length; iter++) {
+                    if (isStorageScratchName(fileList[iter])) {
+                        getContext().deleteFile(fileList[iter]);
+                    }
+                }
+            } catch (Throwable t) {
+                // a sweep that fails costs disk space, never correctness
+                com.codename1.io.Log.e(t);
+            }
+        }
+    }
+
+    /**
+     * Writes a storage entry to a scratch file, forces the bytes onto the device and
+     * only then renames that file over the entry.
+     *
+     * <p>{@code openFileOutput} truncates the entry as it opens it, and Android does
+     * not flush a file on close. Writing the entry in place therefore left a window
+     * on every single write in which the entry was empty or half written on disk, and
+     * left the bytes of a completed write sitting in the page cache for as long as
+     * the kernel felt like holding them. An abrupt end to the process or to the
+     * device inside either window -- a low memory kill, a force stop, a battery pull,
+     * a panic -- lost the entry, and on a filesystem that journals the truncation
+     * ahead of the data it came back as a zero length file. How wide those windows
+     * are is a property of the filesystem and of how eagerly the vendor kills
+     * background processes, which is why this only ever showed up on some devices.</p>
+     *
+     * <p>The entry now changes in a single rename, which the filesystem cannot show
+     * half done, and the bytes reach the device before that rename is made.</p>
+     */
+    private final class StorageOutputStream extends OutputStream {
+        private final String name;
+        private final String scratchName;
+        private final FileOutputStream out;
+        private boolean closed;
+
+        StorageOutputStream(String name) throws IOException {
+            this.name = name;
+            this.scratchName = name + STORAGE_SCRATCH_SUFFIX
+                    + storageScratchCounter.incrementAndGet();
+            this.out = getContext().openFileOutput(scratchName, 0);
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            out.write(b, off, len);
+        }
+
+        @Override
+        public void flush() throws IOException {
+            out.flush();
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                out.flush();
+                out.getFD().sync();
+            } finally {
+                out.close();
+            }
+            File dir = getContext().getFilesDir();
+            File scratch = new File(dir, scratchName);
+            if (scratch.renameTo(new File(dir, name))) {
+                syncStorageDirectory(dir);
+                return;
+            }
+            if (!scratch.exists()) {
+                // deleteStorageFile abandoned this write while it was open, which is
+                // how a caller cancels one; there is nothing left to publish
+                return;
+            }
+            getContext().deleteFile(scratchName);
+            throw new IOException("Could not store " + name);
+        }
+    }
+
+    /**
+     * Forces a rename in the given directory onto the device, so that a completed
+     * write does not fall back to its previous contents after an abrupt shutdown.
+     * Best effort: without it a crash can still only cost the newest write, never the
+     * integrity of an entry.
+     *
+     * @param dir the directory holding the storage entries
+     */
+    private static void syncStorageDirectory(File dir) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+        try {
+            DirectorySync.sync(dir);
+        } catch (Throwable t) {
+            // some filesystems refuse to sync a directory handle
+        }
+    }
+
+    /**
+     * Isolates the API 21 syscalls, so that verifying {@code AndroidImplementation}
+     * on an older device never has to resolve them.
+     */
+    private static final class DirectorySync {
+        private DirectorySync() {
+        }
+
+        static void sync(File dir) throws android.system.ErrnoException {
+            java.io.FileDescriptor fd = android.system.Os.open(dir.getPath(),
+                    android.system.OsConstants.O_RDONLY, 0);
+            try {
+                android.system.Os.fsync(fd);
+            } finally {
+                android.system.Os.close(fd);
+            }
+        }
     }
 
     private String addFile(String s) {

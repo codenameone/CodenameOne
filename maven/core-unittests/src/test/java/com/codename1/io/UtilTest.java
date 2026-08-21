@@ -12,9 +12,13 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -147,5 +151,127 @@ class UtilTest extends UITestBase {
         byte[] data = "héllo".getBytes("UTF-16BE");
         String value = Util.readToString(new ByteArrayInputStream(data), "UTF-16BE");
         assertEquals("héllo", value);
+    }
+
+    @EdtTest
+    void mapWritesAsManyEntriesAsItsHeaderPromises() throws IOException {
+        // a map that reports more entries than it hands out stands in for one that
+        // another thread shrank between the size being read and the walk that
+        // follows it. The header and the payload have to agree either way, since a
+        // reader that trusts the header reads straight off the end of the entries.
+        Map<String, Object> shrunk = new LyingSizeMap(3);
+        shrunk.put("kept", "a");
+        shrunk.put("alsoKept", "b");
+
+        Map<String, Object> result = roundTripMap(shrunk);
+
+        assertEquals(2, result.size());
+        assertEquals("a", result.get("kept"));
+        assertEquals("b", result.get("alsoKept"));
+    }
+
+    @EdtTest
+    void mapNeverWritesMoreEntriesThanItsHeaderPromises() throws IOException {
+        // the other direction: a map that grew. The extra entries must not be
+        // written, or everything after this object in the stream reads as garbage.
+        Map<String, Object> grown = new LyingSizeMap(1);
+        grown.put("first", "a");
+        grown.put("second", "b");
+        grown.put("third", "c");
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        DataOutputStream dataOutput = new DataOutputStream(output);
+        Util.writeObject(grown, dataOutput);
+        Util.writeObject("sentinel", dataOutput);
+        dataOutput.close();
+
+        DataInputStream input = new DataInputStream(new ByteArrayInputStream(output.toByteArray()));
+        Object map = Util.readObject(input);
+        Object sentinel = Util.readObject(input);
+        input.close();
+
+        assertTrue(map instanceof Map);
+        assertEquals(1, ((Map<?, ?>) map).size());
+        // the stream is still aligned for whatever was written after the map
+        assertEquals("sentinel", sentinel);
+    }
+
+    @EdtTest
+    void hashtableWritesAsManyEntriesAsItsHeaderPromises() throws IOException {
+        Hashtable<String, Object> shrunk = new LyingSizeHashtable(4);
+        shrunk.put("one", "1");
+        shrunk.put("two", "2");
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        DataOutputStream dataOutput = new DataOutputStream(output);
+        Util.writeObject(shrunk, dataOutput);
+        dataOutput.close();
+
+        DataInputStream input = new DataInputStream(new ByteArrayInputStream(output.toByteArray()));
+        Object result = Util.readObject(input);
+        input.close();
+
+        assertTrue(result instanceof Hashtable);
+        Hashtable<?, ?> roundTrip = (Hashtable<?, ?>) result;
+        assertEquals(2, roundTrip.size());
+        assertEquals("1", roundTrip.get("one"));
+        assertEquals("2", roundTrip.get("two"));
+    }
+
+    private Map<String, Object> roundTripMap(Map<String, Object> value) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        DataOutputStream dataOutput = new DataOutputStream(output);
+        Util.writeObject(value, dataOutput);
+        dataOutput.close();
+
+        DataInputStream input = new DataInputStream(new ByteArrayInputStream(output.toByteArray()));
+        Object result = Util.readObject(input);
+        input.close();
+
+        assertTrue(result instanceof Map);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> typed = (Map<String, Object>) result;
+        return typed;
+    }
+
+    /// A Map whose reported size does not match the entries it iterates, which is
+    /// what a map being changed on another thread looks like from the serializer.
+    private static final class LyingSizeMap extends AbstractMap<String, Object> {
+        private final Map<String, Object> delegate = new LinkedHashMap<String, Object>();
+        private final int reportedSize;
+
+        LyingSizeMap(int reportedSize) {
+            this.reportedSize = reportedSize;
+        }
+
+        @Override
+        public Set<Map.Entry<String, Object>> entrySet() {
+            return delegate.entrySet();
+        }
+
+        @Override
+        public Object put(String key, Object value) {
+            return delegate.put(key, value);
+        }
+
+        @Override
+        public int size() {
+            return reportedSize;
+        }
+    }
+
+    /// The Hashtable equivalent of {@link LyingSizeMap}; Util serializes Hashtable
+    /// through its own branch.
+    private static final class LyingSizeHashtable extends Hashtable<String, Object> {
+        private final int reportedSize;
+
+        LyingSizeHashtable(int reportedSize) {
+            this.reportedSize = reportedSize;
+        }
+
+        @Override
+        public synchronized int size() {
+            return reportedSize;
+        }
     }
 }
