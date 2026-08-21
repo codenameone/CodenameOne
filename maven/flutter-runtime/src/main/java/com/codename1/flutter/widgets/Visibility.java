@@ -6,9 +6,13 @@ import com.codename1.flutter.Widget;
 /**
  * Whether (and how) to include its {@code child} in the tree — Flutter's {@code Visibility}.
  *
- * <p>Structural pass-through for this milestone: the single {@code child}
- * renders unchanged (see {@link PassThroughRenderElement}); the captured
- * parameters are held for a later render pass.</p>
+ * <p>{@code visible: false} shows the {@code replacement} instead — nothing, by
+ * default. It used to draw the child regardless, which is the loudest possible
+ * reading of "do not show this".</p>
+ *
+ * <p>{@code maintainState} is not modelled: a hidden child is rebuilt when it
+ * comes back rather than kept alive. {@code maintainSize} is honoured only in
+ * that a replacement can hold space if one is given.</p>
  */
 public class Visibility extends Widget implements HasChild {
 
@@ -36,7 +40,18 @@ public class Visibility extends Widget implements HasChild {
 
     @Override
     public Widget getChild() {
-        return child;
+        if (visible) {
+            return child;
+        }
+        if (replacement != null) {
+            return replacement;
+        }
+        // Flutter's default replacement is SizedBox.shrink() — an empty box,
+        // not the child it was just told to hide.
+        SizedBox empty = new SizedBox();
+        empty.width(0);
+        empty.height(0);
+        return empty;
     }
 
     @Override

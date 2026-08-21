@@ -7,9 +7,8 @@ import dart.core.DartList;
 
 /**
  * Shows a single child of a stack by {@code index}, keeping the others in the
- * tree — Flutter's {@code IndexedStack}. This pass lays every child out (via
- * {@link SimpleChildrenRenderElement}); showing only the selected index is a
- * later paint-pass refinement, so {@code index} is captured.
+ * tree — Flutter's {@code IndexedStack}. See {@link IndexedStackRenderElement}
+ * for how the unselected children are kept alive without being drawn.
  */
 public class IndexedStack extends Widget {
 
@@ -38,7 +37,7 @@ public class IndexedStack extends Widget {
 
     @Override
     public Element createElement() {
-        return new SimpleChildrenRenderElement(this, new SimpleChildrenRenderElement.Children() {
+        return new IndexedStackRenderElement(this, new SimpleChildrenRenderElement.Children() {
             @Override
             public DartList<Widget> get() {
                 return children;
