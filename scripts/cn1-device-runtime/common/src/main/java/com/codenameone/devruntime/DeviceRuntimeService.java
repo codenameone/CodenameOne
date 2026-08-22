@@ -98,6 +98,25 @@ public class DeviceRuntimeService {
     /** A bundle larger than this is a framing error, not a program. */
     private static final int MAX_BUNDLE = 64 * 1024 * 1024;
 
+    /// Aggregate pre-authentication push memory cap, across all concurrent
+    /// connections. A LAN peer that knows a paired peer id (transmitted in
+    /// cleartext on ordinary pushes) could otherwise open many FRAME_PUSH
+    /// connections, advertise the {@code MAX_BUNDLE} on each, and force the
+    /// device to allocate 64 MiB per connection before proving possession of
+    /// the pairing secret -- enough concurrent connections wedge the device
+    /// heap. This budget caps the total unauthenticated allocation; a push
+    /// that would exceed it is refused with a message the desktop can show
+    /// rather than one that reads like the device is broken. Two full-sized
+    /// bundles simultaneously covers the ordinary "second push before the
+    /// first authenticated" race, and no more.
+    private static final long PRE_AUTH_MEMORY_CAP = 2L * MAX_BUNDLE;
+
+    /// Monitor + counter for {@link #PRE_AUTH_MEMORY_CAP}. Held for a moment
+    /// on reservation and release; the actual body read happens without the
+    /// lock so slow senders do not block a legitimate second connection.
+    private static final Object PRE_AUTH_LOCK = new Object();
+    private static long preAuthAllocated;
+
     private static final DeviceRuntimeService INSTANCE = new DeviceRuntimeService();
 
     private Thread dialer;
@@ -819,6 +838,37 @@ public class DeviceRuntimeService {
     /// How much of a bundle is read between heartbeats.
     private static final int BODY_CHUNK = 64 * 1024;
 
+    /// Reserves {@code length} bytes against the aggregate pre-authentication
+    /// memory budget. Returns false when the reservation would push the
+    /// running total past {@link #PRE_AUTH_MEMORY_CAP}; the caller then
+    /// rejects rather than allocating and holding a heap slot behind an
+    /// unauthenticated peer.
+    private static boolean reservePreAuth(int length) {
+        synchronized (PRE_AUTH_LOCK) {
+            if (preAuthAllocated + length > PRE_AUTH_MEMORY_CAP) {
+                return false;
+            }
+            preAuthAllocated += length;
+            return true;
+        }
+    }
+
+    /// Releases a prior {@link #reservePreAuth} reservation. Called from the
+    /// caller's finally, and also as soon as authentication succeeds so a
+    /// legitimate second push during the approval dialog is not queued
+    /// behind the first.
+    private static void releasePreAuth(int length) {
+        synchronized (PRE_AUTH_LOCK) {
+            preAuthAllocated -= length;
+            if (preAuthAllocated < 0) {
+                // A double release is a caller bug, but do not let the
+                // counter drift negative -- a later legitimate push would
+                // then reserve more than the cap permits.
+                preAuthAllocated = 0;
+            }
+        }
+    }
+
     /**
      * Runs the pairing handshake on an open connection.
      *
@@ -1029,29 +1079,55 @@ public class DeviceRuntimeService {
                             int length = in.readInt();
                             if (length <= 0 || length > MAX_BUNDLE) {
                                 reject = "implausible bundle length " + length;
+                            } else if (!reservePreAuth(length)) {
+                                // Aggregate pre-authentication push memory
+                                // cap. Refusing early with a message the
+                                // desktop can show is better than allocating
+                                // and getting OOM after a slow read.
+                                reject = "this device is busy with another push"
+                                        + " (pre-authentication buffer is full)";
                             } else {
-                                // Read with a heartbeat rather than an
-                                // unbounded wait: nothing has authenticated yet
-                                // -- the answer is checked against the bundle
-                                // itself, so it cannot be until the bytes are
-                                // here -- and a peer that declares a length and
-                                // then stops sending must not hold the waiters.
-                                byte[] body = new byte[length];
-                                readBody(in, body, progress);
-                                if (!InterpPairingSecret.matches(response,
-                                        InterpPairingSecret.respond(secret, challenge, body))) {
-                                    // Covers the bundle as well as the
-                                    // challenge, so this also rejects a program
-                                    // altered in flight behind a valid answer.
-                                    reject = "this connection did not authenticate";
-                                } else if (!approveWhileWaiting(peerId, progress)) {
-                                    // Only now: prompting before authentication
-                                    // would let anyone on the network raise
-                                    // dialogs on this phone until somebody
-                                    // tapped Approve to make them stop.
-                                    reject = "this device did not approve the connection";
-                                } else {
-                                    payload = body;
+                                boolean released = false;
+                                try {
+                                    // Read with a heartbeat rather than an
+                                    // unbounded wait: nothing has authenticated
+                                    // yet -- the answer is checked against the
+                                    // bundle itself, so it cannot be until the
+                                    // bytes are here -- and a peer that
+                                    // declares a length and then stops sending
+                                    // must not hold the waiters.
+                                    byte[] body = new byte[length];
+                                    readBody(in, body, progress);
+                                    if (!InterpPairingSecret.matches(response,
+                                            InterpPairingSecret.respond(secret, challenge, body))) {
+                                        // Covers the bundle as well as the
+                                        // challenge, so this also rejects a program
+                                        // altered in flight behind a valid answer.
+                                        reject = "this connection did not authenticate";
+                                    } else {
+                                        // Reservation was against the pre-auth
+                                        // budget; release it now that this
+                                        // peer has proven possession of the
+                                        // pairing secret, so a second legitimate
+                                        // push during approval does not have
+                                        // to queue behind this one.
+                                        releasePreAuth(length);
+                                        released = true;
+                                        if (!approveWhileWaiting(peerId, progress)) {
+                                            // Only now: prompting before
+                                            // authentication would let anyone
+                                            // on the network raise dialogs on
+                                            // this phone until somebody tapped
+                                            // Approve to make them stop.
+                                            reject = "this device did not approve the connection";
+                                        } else {
+                                            payload = body;
+                                        }
+                                    }
+                                } finally {
+                                    if (!released) {
+                                        releasePreAuth(length);
+                                    }
                                 }
                             }
                         }
