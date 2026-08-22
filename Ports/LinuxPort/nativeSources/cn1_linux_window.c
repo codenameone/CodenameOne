@@ -78,14 +78,62 @@ static int cn1LinuxIsLifecycleEvent(int type) {
             || type == CN1_EVENT_WINDOW_CLOSE;
 }
 
+/* Replaces a queued lifecycle event for the same window with this newer one. The
+ * latest state is the one that matters -- a hide followed by a show leaves the window
+ * shown -- so superseding costs nothing and needs no room. */
+static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
+        int keyCode) {
+    int idx = cn1EventHead;
+    while (idx != cn1EventTail) {
+        if (cn1EventRing[idx].windowId == windowId
+                && cn1LinuxIsLifecycleEvent(cn1EventRing[idx].type)) {
+            cn1EventRing[idx].type = type;
+            cn1EventRing[idx].x = x;
+            cn1EventRing[idx].y = y;
+            cn1EventRing[idx].key = keyCode;
+            return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_RING;
+    }
+    return 0;
+}
+
+/* Removes the oldest input event, closing the gap. Used to make room for a lifecycle
+ * event: advancing the head instead would evict whatever is oldest, and that can be a
+ * lifecycle event itself -- which is the very thing being protected. */
+static int cn1LinuxEvictInputLocked(void) {
+    int idx = cn1EventHead;
+    while (idx != cn1EventTail) {
+        if (!cn1LinuxIsLifecycleEvent(cn1EventRing[idx].type)) {
+            int cur = idx;
+            int follow = (cur + 1) % CN1_EVENT_RING;
+            while (follow != cn1EventTail) {
+                cn1EventRing[cur] = cn1EventRing[follow];
+                cur = follow;
+                follow = (follow + 1) % CN1_EVENT_RING;
+            }
+            cn1EventTail = cur;
+            return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_RING;
+    }
+    return 0;
+}
+
 void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
     if (next == cn1EventHead && cn1LinuxIsLifecycleEvent(type)) {
-        /* Full, and this one must not be the casualty. Drop the oldest entry to make
-         * room: losing an input event that is already a whole ring stale is the better
-         * trade. */
-        cn1EventHead = (cn1EventHead + 1) % CN1_EVENT_RING;
+        /* Full, and this one must not be the casualty. Supersede this window's own
+         * queued transition if it has one, otherwise take the room from an input event
+         * -- never from another window's transition. */
+        if (cn1LinuxCoalesceLifecycleLocked(windowId, type, x, y, keyCode)) {
+            pthread_mutex_unlock(&cn1EventLock);
+            return;
+        }
+        if (cn1LinuxEvictInputLocked()) {
+            next = (cn1EventTail + 1) % CN1_EVENT_RING;
+        }
     }
     if (next != cn1EventHead) {
         cn1EventRing[cn1EventTail].type = type;
