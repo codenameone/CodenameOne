@@ -220,10 +220,16 @@ static void cn1BrowserSetHostOnMain(void* p) {
     }
     /* Moved between overlays rather than recreated: the view keeps its page, its load
      * state and its script message handler, so a browser added to a window after it
-     * was constructed does not lose whatever it had already loaded. */
+     * was constructed does not lose whatever it had already loaded.
+     *
+     * Held across the move. The overlay owns the reference GTK took when the widget
+     * was put in it, and b->view is a raw pointer, so removing it can finalize the
+     * view and the add below would then be reading freed memory. */
+    g_object_ref(b->view);
     cn1LinuxOverlayRemove(b->slot, b->view);
     b->slot = req->slot;
     cn1LinuxOverlayAdd(b->slot, b->view, 0, 0, 1, 1);
+    g_object_unref(b->view);
 }
 
 /* Re-hosts the view in the given window's overlay. The real bounds arrive right

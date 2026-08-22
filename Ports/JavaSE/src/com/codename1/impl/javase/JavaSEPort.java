@@ -20228,6 +20228,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return owner.frame;
                 }
             }
+            // Cleared rather than left alone: a peer moved back out of a window and
+            // into the main form would otherwise keep pointing at the window it used
+            // to be in. addPeerTo would still treat it as a secondary-window peer, and
+            // its bounds, its scale and its eventual removal would all target a canvas
+            // it no longer lives in.
+            owningFrame = null;
+            owningCanvas = null;
             return frm;
         }
 
