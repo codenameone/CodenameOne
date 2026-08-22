@@ -120,19 +120,48 @@ static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
 /* Removes the oldest input event, closing the gap. Used to make room for a lifecycle
  * event: advancing the head instead would evict whatever is oldest, and that can be a
  * lifecycle event itself -- which is the very thing being protected. */
+static void cn1LinuxRemoveAtLocked(int idx) {
+    int cur = idx;
+    int follow = (cur + 1) % CN1_EVENT_RING;
+    while (follow != cn1EventTail) {
+        cn1EventRing[cur] = cn1EventRing[follow];
+        cur = follow;
+        follow = (follow + 1) % CN1_EVENT_RING;
+    }
+    cn1EventTail = cur;
+}
+
 static int cn1LinuxEvictInputLocked(void) {
     int idx = cn1EventHead;
     while (idx != cn1EventTail) {
         if (!cn1LinuxIsLifecycleEvent(cn1EventRing[idx].type)) {
-            int cur = idx;
-            int follow = (cur + 1) % CN1_EVENT_RING;
-            while (follow != cn1EventTail) {
-                cn1EventRing[cur] = cn1EventRing[follow];
-                cur = follow;
-                follow = (follow + 1) % CN1_EVENT_RING;
-            }
-            cn1EventTail = cur;
+            cn1LinuxRemoveAtLocked(idx);
             return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_RING;
+    }
+    return 0;
+}
+
+/* Last resort when the ring holds nothing but lifecycle events and so has no input to
+ * give up. A window that toggled visibility several times before the framework drained
+ * anything has more than one transition queued, and every one but its last is already
+ * superseded, so dropping the oldest of them frees a slot without changing what any
+ * window ends up as. Without this a close arriving for a *different* window has nowhere
+ * to go and is dropped, which is the one outcome this whole path exists to prevent. */
+static int cn1LinuxEvictSupersededVisibilityLocked(void) {
+    int idx = cn1EventHead;
+    while (idx != cn1EventTail) {
+        if (cn1LinuxIsVisibilityEvent(cn1EventRing[idx].type)) {
+            int scan = (idx + 1) % CN1_EVENT_RING;
+            while (scan != cn1EventTail) {
+                if (cn1EventRing[scan].windowId == cn1EventRing[idx].windowId
+                        && cn1LinuxIsVisibilityEvent(cn1EventRing[scan].type)) {
+                    cn1LinuxRemoveAtLocked(idx);
+                    return 1;
+                }
+                scan = (scan + 1) % CN1_EVENT_RING;
+            }
         }
         idx = (idx + 1) % CN1_EVENT_RING;
     }
@@ -144,13 +173,14 @@ void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) 
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
     if (next == cn1EventHead && cn1LinuxIsLifecycleEvent(type)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
-         * queued transition if it has one, otherwise take the room from an input event
-         * -- never from another window's transition. */
+         * queued transition if it has one, otherwise take the room from an input event,
+         * and failing that from a transition that a later one already supersedes. Never
+         * from a transition that is still some window's last word. */
         if (cn1LinuxCoalesceLifecycleLocked(windowId, type, x, y, keyCode)) {
             pthread_mutex_unlock(&cn1EventLock);
             return;
         }
-        if (cn1LinuxEvictInputLocked()) {
+        if (cn1LinuxEvictInputLocked() || cn1LinuxEvictSupersededVisibilityLocked()) {
             next = (cn1EventTail + 1) % CN1_EVENT_RING;
         }
     }

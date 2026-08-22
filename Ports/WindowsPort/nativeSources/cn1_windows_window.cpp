@@ -398,19 +398,50 @@ static int cn1WinCoalesceLifecycleLocked(int windowId, CN1EventType type, int x,
 /* Removes the oldest input event, closing the gap. Used to make room for a lifecycle
  * event: advancing the head instead would evict whatever is oldest, and that can be a
  * lifecycle event itself -- which is the very thing being protected. */
+static void cn1WinRemoveAtLocked(LONG idx) {
+    LONG cur = idx;
+    LONG follow = (cur + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    while (follow != cn1Win.eventTail) {
+        cn1Win.events[cur] = cn1Win.events[follow];
+        cur = follow;
+        follow = (follow + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    cn1Win.eventTail = cur;
+}
+
 static int cn1WinEvictInputLocked(void) {
     LONG idx = cn1Win.eventHead;
     while (idx != cn1Win.eventTail) {
         if (!cn1WinIsLifecycleEvent((CN1EventType) cn1Win.events[idx].type)) {
-            LONG cur = idx;
-            LONG follow = (cur + 1) % CN1_EVENT_QUEUE_CAPACITY;
-            while (follow != cn1Win.eventTail) {
-                cn1Win.events[cur] = cn1Win.events[follow];
-                cur = follow;
-                follow = (follow + 1) % CN1_EVENT_QUEUE_CAPACITY;
-            }
-            cn1Win.eventTail = cur;
+            cn1WinRemoveAtLocked(idx);
             return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    return 0;
+}
+
+/* Last resort when the queue holds nothing but lifecycle events and so has no input to
+ * give up. A window that toggled visibility several times before the framework drained
+ * anything has more than one transition queued, and every one but its last is already
+ * superseded, so dropping the oldest of them frees a slot without changing what any
+ * window ends up as. Without this a close arriving for a *different* window has nowhere
+ * to go and is dropped, which is the one outcome this whole path exists to prevent. */
+static int cn1WinEvictSupersededVisibilityLocked(void) {
+    LONG idx = cn1Win.eventHead;
+    while (idx != cn1Win.eventTail) {
+        CN1Event* e = &cn1Win.events[idx];
+        if (cn1WinIsVisibilityEvent((CN1EventType) e->type)) {
+            LONG scan = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+            while (scan != cn1Win.eventTail) {
+                CN1Event* later = &cn1Win.events[scan];
+                if (later->windowId == e->windowId
+                        && cn1WinIsVisibilityEvent((CN1EventType) later->type)) {
+                    cn1WinRemoveAtLocked(idx);
+                    return 1;
+                }
+                scan = (scan + 1) % CN1_EVENT_QUEUE_CAPACITY;
+            }
         }
         idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
     }
@@ -422,13 +453,14 @@ void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int ke
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
     if (next == cn1Win.eventHead && cn1WinIsLifecycleEvent(type)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
-         * queued transition if it has one, otherwise take the room from an input event
-         * -- never from another window's transition. */
+         * queued transition if it has one, otherwise take the room from an input event,
+         * and failing that from a transition that a later one already supersedes. Never
+         * from a transition that is still some window's last word. */
         if (cn1WinCoalesceLifecycleLocked(windowId, type, x, y, keyCode)) {
             LeaveCriticalSection(&cn1Win.eventLock);
             return;
         }
-        if (cn1WinEvictInputLocked()) {
+        if (cn1WinEvictInputLocked() || cn1WinEvictSupersededVisibilityLocked()) {
             next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
         }
     }
