@@ -20170,7 +20170,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 init = true;
                 cnt.setVisible(true);
                 java.awt.Window target = resolveOwningFrame();
-                target.add(cnt, 0);
+                addPeerTo(target);
                 target.repaint();
             }
             
@@ -20183,6 +20183,37 @@ public class JavaSEPort extends CodenameOneImplementation {
          * because the peer is created before it is added to a hierarchy, so its
          * window is not known yet.
          */
+        /**
+         * Attaches the peer panel to the given window.
+         *
+         * A desktop window's frame lays its content pane out with a BorderLayout and
+         * holds the Codename One canvas in CENTER, and an unconstrained add() takes
+         * that slot -- so the peer replaced the canvas as the managed centre. The
+         * canvas then stopped being resized with the window while the peer was laid
+         * out over the whole frame. The layered pane has no layout manager, which is
+         * what the peer's absolute bounds need anyway, and leaves the canvas alone.
+         *
+         * Only for a secondary window. The main frame's peers have gone through
+         * add(cnt, 0) since long before windows existed, and its content pane is not
+         * arranged the same way, so that path is left exactly as it was.
+         */
+        private void addPeerTo(java.awt.Window target) {
+            if (owningFrame != null && target instanceof javax.swing.RootPaneContainer) {
+                ((javax.swing.RootPaneContainer) target).getLayeredPane()
+                        .add(cnt, javax.swing.JLayeredPane.PALETTE_LAYER);
+                return;
+            }
+            target.add(cnt, 0);
+        }
+
+        private void removePeerFrom(java.awt.Window target) {
+            if (owningFrame != null && target instanceof javax.swing.RootPaneContainer) {
+                ((javax.swing.RootPaneContainer) target).getLayeredPane().remove(cnt);
+                return;
+            }
+            target.remove(cnt);
+        }
+
         private java.awt.Window resolveOwningFrame() {
             Object peer = Display.getInstance().getWindowPeerForComponent(this);
             if (peer instanceof JavaSEWindowManager.Peer) {
@@ -20245,7 +20276,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             init = false;
             java.awt.Window target = owningFrame != null ? owningFrame : frm;
-            target.remove(cnt);
+            removePeerFrom(target);
             target.repaint();
 
         }

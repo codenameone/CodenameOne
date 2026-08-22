@@ -698,4 +698,54 @@ class MultiWindowGraphicsRoutingTest {
             wm.dispose(peer);
         }
     }
+
+    /**
+     * A window frame lays its content pane out with a BorderLayout and holds the
+     * Codename One canvas in CENTER. An unconstrained add() takes that slot, so a
+     * native peer replaced the canvas as the managed centre component: the canvas
+     * stopped being resized with the window while the peer was laid out over all of
+     * it.
+     */
+    @Test
+    void aWindowFrameKeepsItsCanvasAsTheManagedCenter() {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port, "the port should be booted by CodenameOneTest");
+
+        JavaSEWindowManager wm = new JavaSEWindowManager(port);
+        Object peer = wm.createWindow(73, "peers", 0, 0, 320, 240, true, true, null,
+                false, false);
+        assumeTrue(peer != null, "needs a native window");
+        try {
+            JavaSEWindowManager.Peer p = (JavaSEWindowManager.Peer) peer;
+            java.awt.Window frame = p.frame;
+            assumeTrue(frame instanceof javax.swing.RootPaneContainer, "needs a root pane");
+
+            java.awt.Container content = ((javax.swing.RootPaneContainer) frame).getContentPane();
+            java.awt.LayoutManager lm = content.getLayout();
+            assertTrue(lm instanceof java.awt.BorderLayout,
+                    "this test only means something while the frame uses a BorderLayout");
+            java.awt.BorderLayout border = (java.awt.BorderLayout) lm;
+
+            // The hazard, demonstrated rather than asserted from memory: an
+            // unconstrained add to the frame takes the centre slot away from the canvas.
+            javax.swing.JPanel unconstrained = new javax.swing.JPanel();
+            frame.add(unconstrained, 0);
+            assertNotSame(p.canvas, border.getLayoutComponent(java.awt.BorderLayout.CENTER),
+                    "an unconstrained add displaces the canvas -- this is what the peer "
+                            + "attach must not do");
+            frame.remove(unconstrained);
+            content.add(p.canvas, java.awt.BorderLayout.CENTER);
+
+            // And the attachment the peer path uses instead leaves it alone.
+            javax.swing.JPanel layered = new javax.swing.JPanel();
+            ((javax.swing.RootPaneContainer) frame).getLayeredPane()
+                    .add(layered, javax.swing.JLayeredPane.PALETTE_LAYER);
+            assertSame(p.canvas, border.getLayoutComponent(java.awt.BorderLayout.CENTER),
+                    "the canvas has to stay the frame's centre component once a peer is "
+                            + "attached, or it is no longer resized with the window");
+        } finally {
+            wm.dispose(peer);
+        }
+    }
 }
