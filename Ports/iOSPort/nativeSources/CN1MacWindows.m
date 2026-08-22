@@ -370,6 +370,8 @@ static CN1MacWindow g_macWindows[CN1_MAC_MAX_WINDOWS];
 
 /* Defined further down, beside the main-window helpers that first needed it. */
 static void CN1MacRunOnMainSync(void (^block)(void));
+/* Both defined further down, beside the peer attachment they serve. */
+static void CN1MacFlushPendingPeers(int slot);
 extern void CN1MacWindowReattachEditor(UIView* host);
 /* Defined below, beside the editing host lookup. */
 static int g_editingSlot;
@@ -817,6 +819,7 @@ void CN1MacWindowSceneDisconnected(UIWindowScene* scene) {
 }
 
 void CN1MacWindowSceneConnected(UIWindowScene* scene) {
+    int pendingPeersToFlush = -1;
     int slot;
     CN1MacWindow* w;
     pthread_mutex_lock(&g_slotLock);
@@ -877,10 +880,12 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
 
     w->window.rootViewController = w->controller;
     /* An editor that had to start before this scene existed went to the main view;
-     * now that there is a content view for the window it was meant for, move it. */
+     * now that there is a content view for the window it was meant for, move it.
+     * Peers created in that same window get the same treatment. */
     if (g_editingSlot == slot) {
         CN1MacWindowReattachEditor(w->content);
     }
+    pendingPeersToFlush = slot;
     /* As with visibility: honour the input state last asked for. A window opened
      * while an application modal is already up has its blocking requested before the
      * scene exists, and without this the peers inside it stayed interactive. */
@@ -940,6 +945,10 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
                 CGSizeMake(-1, -1), CN1_GEOMETRY_ATTEMPTS);
     }
     pthread_mutex_unlock(&g_slotLock);
+    /* Outside the lock: attaching takes it again, and it is not recursive. */
+    if (pendingPeersToFlush >= 0) {
+        CN1MacFlushPendingPeers(pendingPeersToFlush);
+    }
 }
 
 void CN1MacWindowDestroy(int slot) {
@@ -1350,6 +1359,70 @@ void CN1MacWindowSetState(int slot, int state) {
  * Returns NO when the slot has no content view yet, so the caller can leave the peer
  * where it is rather than lose it.
  */
+/* Peers whose window had no content view yet. A peer can be created in the same
+ * event dispatch turn as Window.show(), and the scene is granted asynchronously, so
+ * "not ready" is the ordinary case rather than an error -- and without replaying
+ * them at adoption they stayed in the main controller's view for good unless some
+ * later position change happened to retry. */
+#define CN1_MAC_MAX_PENDING_PEERS 32
+typedef struct {
+    int slot;
+    UIView* view;
+    int x;
+    int y;
+    int width;
+    int height;
+} CN1MacPendingPeer;
+static CN1MacPendingPeer g_pendingPeers[CN1_MAC_MAX_PENDING_PEERS];
+
+/* Both called with g_slotLock held. */
+static void CN1MacRememberPendingPeerLocked(int slot, UIView* peer, int x, int y, int w, int h) {
+    int iter;
+    for (iter = 0; iter < CN1_MAC_MAX_PENDING_PEERS; iter++) {
+        if (g_pendingPeers[iter].view == peer) {
+            g_pendingPeers[iter].slot = slot;
+            g_pendingPeers[iter].x = x;
+            g_pendingPeers[iter].y = y;
+            g_pendingPeers[iter].width = w;
+            g_pendingPeers[iter].height = h;
+            return;
+        }
+    }
+    for (iter = 0; iter < CN1_MAC_MAX_PENDING_PEERS; iter++) {
+        if (g_pendingPeers[iter].view == nil) {
+            g_pendingPeers[iter].slot = slot;
+            g_pendingPeers[iter].view = [peer retain];
+            g_pendingPeers[iter].x = x;
+            g_pendingPeers[iter].y = y;
+            g_pendingPeers[iter].width = w;
+            g_pendingPeers[iter].height = h;
+            return;
+        }
+    }
+}
+
+BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int height);
+
+/* Attaches everything queued for a slot whose content view has just appeared. */
+static void CN1MacFlushPendingPeers(int slot) {
+    CN1MacPendingPeer claimed[CN1_MAC_MAX_PENDING_PEERS];
+    int count = 0;
+    int iter;
+    pthread_mutex_lock(&g_slotLock);
+    for (iter = 0; iter < CN1_MAC_MAX_PENDING_PEERS; iter++) {
+        if (g_pendingPeers[iter].view != nil && g_pendingPeers[iter].slot == slot) {
+            claimed[count++] = g_pendingPeers[iter];
+            g_pendingPeers[iter].view = nil;
+        }
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    for (iter = 0; iter < count; iter++) {
+        CN1MacWindowAttachPeer(slot, claimed[iter].view, claimed[iter].x, claimed[iter].y,
+                claimed[iter].width, claimed[iter].height);
+        [claimed[iter].view release];
+    }
+}
+
 BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int height) {
     __block BOOL attached = NO;
     if (peer == nil || slot < 0) {
@@ -1366,6 +1439,10 @@ BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int
                 ? w->window.screen.scale : 1.0;
         pthread_mutex_unlock(&g_slotLock);
         if (host == nil) {
+            /* Queued rather than dropped: adoption replays it. */
+            pthread_mutex_lock(&g_slotLock);
+            CN1MacRememberPendingPeerLocked(slot, peer, x, y, width, height);
+            pthread_mutex_unlock(&g_slotLock);
             return;
         }
         if (peer.superview != host) {
@@ -1743,6 +1820,35 @@ void CN1MacWindowSetEditingSlot(int slot) {
 
 /* The view the native editor should be added to. Returns nil for the main surface,
  * which leaves the caller on its existing path. */
+/* The backing scale of the window an edit belongs to, or 0 when the edit is on the
+ * application's own surface. The editor's frame is otherwise converted with the
+ * process-global scaleValue, which is the main scene's -- on a mixed-DPI desktop that
+ * left the native field oversized or undersized and displaced from the lightweight
+ * one, exactly as it did for peers before they were given the owning window's scale. */
+double CN1MacWindowEditingScale(void) {
+    __block double scale = 0;
+    int slot;
+    pthread_mutex_lock(&g_slotLock);
+    slot = g_editingSlot;
+    pthread_mutex_unlock(&g_slotLock);
+    if (slot < 0) {
+        return 0;
+    }
+    CN1MacRunOnMainSync(^{
+        CN1MacWindow* w;
+        UIWindow* window;
+        pthread_mutex_lock(&g_slotLock);
+        w = slotAt(slot);
+        window = w == NULL ? nil : [w->window retain];
+        pthread_mutex_unlock(&g_slotLock);
+        if (window != nil && window.screen != nil) {
+            scale = window.screen.scale;
+        }
+        [window release];
+    });
+    return scale;
+}
+
 UIView* CN1MacWindowEditingHostView(void) {
     if (g_editingSlot < 0) {
         return nil;

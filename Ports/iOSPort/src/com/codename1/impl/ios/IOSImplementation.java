@@ -9543,6 +9543,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         private void attachToOwningWindow() {
             int slot = MacWindowManager.slotForComponent(this);
             if (slot >= 0) {
+                // The result is false when the window's scene has not been granted
+                // yet, which is ordinary rather than an error: a peer can be created
+                // in the same event dispatch turn as show(). The native side queues
+                // it in that case and scene adoption attaches it, so there is nothing
+                // to retry from here.
                 nativeInstance.macWindowAttachPeer(nativePeer, slot,
                         getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }

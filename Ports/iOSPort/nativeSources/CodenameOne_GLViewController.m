@@ -868,6 +868,22 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
         }
         float scale = scaleValue;
+#if TARGET_OS_MACCATALYST
+        {
+            /* The owning window's backing scale when this edit belongs to a Codename
+             * One window, since scaleValue is the *main* scene's. Two Catalyst scenes
+             * can sit on displays of different scale, and converting with the wrong
+             * one left the native field oversized or undersized and displaced from
+             * the lightweight field it replaces -- the same defect peers had before
+             * they were given the owning window's scale. Zero means the main surface,
+             * which keeps scaleValue. */
+            extern double CN1MacWindowEditingScale(void);
+            double windowScale = CN1MacWindowEditingScale();
+            if (windowScale > 0) {
+                scale = (float) windowScale;
+            }
+        }
+#endif
         editCompoentX = (x + padLeft) / scale;
         editCompoentY = (y + padTop) / scale;
         editComponentPadTop = padTop;
