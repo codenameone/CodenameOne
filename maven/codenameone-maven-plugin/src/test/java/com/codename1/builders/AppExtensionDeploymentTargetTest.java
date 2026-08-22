@@ -387,4 +387,69 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals(2, candidates.size());
         assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentFloor(candidates));
     }
+
+    @Test
+    public void anIndirectProductNameKeepsItsChain() throws Exception {
+        File extension = tmp.newFolder("dist13", "WalletUIExtension");
+        java.util.Map<String, String> declared = new java.util.LinkedHashMap<String, String>();
+        declared.put("EXTENSION_NAME", "WalletKit");
+        declared.put("PRODUCT_NAME", "$(EXTENSION_NAME)");
+
+        java.util.Map<String, String> settings = IPhoneBuilder.extensionSettingsWithBuiltIns(
+                extension, declared);
+
+        // Xcode expands the chain; flattening it to the folder name recorded an identifier the
+        // archive does not contain.
+        assertEquals("WalletKit", settings.get("PRODUCT_NAME"));
+        assertEquals("WalletUIExtension", settings.get("TARGET_NAME"));
+    }
+
+    @Test
+    public void anUnresolvableProductNameFallsBackToTheTarget() throws Exception {
+        File extension = tmp.newFolder("dist14", "WalletUIExtension");
+        java.util.Map<String, String> declared = new java.util.LinkedHashMap<String, String>();
+        declared.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        assertEquals("WalletUIExtension", IPhoneBuilder.extensionSettingsWithBuiltIns(
+                extension, declared).get("PRODUCT_NAME"));
+    }
+
+    @Test
+    public void aConditionForAnotherBuildDoesNotRaiseThisFloor() throws Exception {
+        File extension = tmp.newFolder("dist15", "WalletUIExtension");
+        File release = new File(extension, "Release.entitlements");
+        write(release, "<plist><dict/></plist>");
+        File debug = new File(extension, "Debug.entitlements");
+        write(debug, "<plist><dict>\n<key>com.apple.developer.payment-pass-provisioning</key>\n"
+                + "<true/>\n</dict></plist>");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("CODE_SIGN_ENTITLEMENTS", "WalletUIExtension/Release.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[config=Debug]", "WalletUIExtension/Debug.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]",
+                "WalletUIExtension/Debug.entitlements");
+
+        java.util.List<File> forRelease = IPhoneBuilder.appExtensionEntitlementsCandidates(
+                extension, settings, null, "iphoneos", "Release");
+
+        // The release device archive is not signed with either of those, so neither decides its
+        // minimum iOS -- raising it would drop the extension off iOS 12 and 13 for nothing.
+        assertEquals(1, forRelease.size());
+        assertEquals("12.0", IPhoneBuilder.appExtensionDeploymentFloor(forRelease));
+    }
+
+    @Test
+    public void aConditionForThisBuildStillCounts() throws Exception {
+        assertTrue(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]",
+                "iphoneos", "Release"));
+        assertTrue(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[config=Release]",
+                "iphoneos", "Release"));
+        assertFalse(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]",
+                "iphoneos", "Release"));
+        assertFalse(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[config=Debug]",
+                "iphoneos", "Release"));
+        // a condition this build has no answer for, and one it cannot read, both count
+        assertTrue(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[arch=arm64]",
+                "iphoneos", "Release"));
+        assertTrue(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]",
+                null, null));
+    }
 }

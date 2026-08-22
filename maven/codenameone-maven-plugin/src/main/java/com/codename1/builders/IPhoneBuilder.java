@@ -4931,7 +4931,9 @@ public class IPhoneBuilder extends Executor {
                             // CODE_SIGN_ENTITLEMENTS at another file, and it is that file's
                             // payment-pass-provisioning that decides whether iOS 14 is the floor.
                             List<File> signingEntitlements = appExtensionEntitlementsCandidates(
-                                    appExtension, buildSettingsMap, extEntitlementsFile);
+                                    appExtension, buildSettingsMap, extEntitlementsFile, "iphoneos",
+                                    request.getArg("ios.buildType", "debug").equals("debug")
+                                            ? "Debug" : "Release");
                             String extDeploymentTarget = appExtensionDeploymentTarget(
                                     buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
                                     signingEntitlements,
@@ -6663,12 +6665,14 @@ public class IPhoneBuilder extends Executor {
         }
         String targetName = extensionFolder.getName();
         out.put("TARGET_NAME", targetName);
+        // PRODUCT_NAME is $(TARGET_NAME) unless the archive says otherwise -- but "otherwise" may
+        // itself be a reference: PRODUCT_NAME = $(EXTENSION_NAME) with EXTENSION_NAME beside it is
+        // a chain Xcode expands, and flattening it to the folder name here recorded an identifier
+        // the archive does not contain.
         String productName = out.get("PRODUCT_NAME");
-        if (productName == null || productName.indexOf('$') >= 0) {
-            // PRODUCT_NAME is $(TARGET_NAME) unless the archive says otherwise, which is what this
-            // builder writes onto the target.
-            out.put("PRODUCT_NAME", targetName);
-        }
+        String resolvedProductName = productName == null ? ""
+                : resolveSettingsInValue(productName, out);
+        out.put("PRODUCT_NAME", resolvedProductName.length() > 0 ? resolvedProductName : targetName);
         File projectDir = extensionFolder.getParentFile();
         String projectPath = projectDir == null ? "." : projectDir.getAbsolutePath();
         if (!out.containsKey("SRCROOT")) {
@@ -6688,12 +6692,27 @@ public class IPhoneBuilder extends Executor {
     /// entitlements was read as granting nothing and kept the 12.0 floor Apple rejects it for.
     static List<File> appExtensionEntitlementsCandidates(File extensionFolder,
             Map<String, String> settings, File byName) {
+        return appExtensionEntitlementsCandidates(extensionFolder, settings, byName, null, null);
+    }
+
+    /// @param sdk the SDK this build archives against ("iphoneos" or "iphonesimulator"), and
+    /// {@code configuration} its configuration ("Release" or "Debug"); a qualified setting whose
+    /// condition names a different one is not part of THIS archive and does not decide its floor.
+    /// Null for either means "cannot tell", and then every condition counts.
+    static List<File> appExtensionEntitlementsCandidates(File extensionFolder,
+            Map<String, String> settings, File byName, String sdk, String configuration) {
         List<File> out = new ArrayList<File>();
         if (settings != null) {
             for (Map.Entry<String, String> setting : settings.entrySet()) {
                 String key = setting.getKey();
                 if (!"CODE_SIGN_ENTITLEMENTS".equals(key)
                         && !isQualified(key, "CODE_SIGN_ENTITLEMENTS")) {
+                    continue;
+                }
+                if (!conditionApplies(key, sdk, configuration)) {
+                    // A Debug-only or simulator-only entitlement is not signed into the release
+                    // device archive, so raising its minimum iOS for one costs the extension every
+                    // iOS 12 and 13 device for nothing.
                     continue;
                 }
                 File resolved = appExtensionSignedEntitlements(extensionFolder, setting.getValue(),
@@ -6770,6 +6789,43 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return notes;
+    }
+
+    /// Whether a qualified setting's condition can apply to the build being made.
+    ///
+    /// Only the two conditions this build knows its own answer to are judged -- sdk and config.
+    /// Anything else (arch, variant, a spelling not seen here) counts as applicable: guessing that
+    /// a condition does not apply risks signing an extension without an entitlement it needs,
+    /// which fails the upload, while over-counting only costs iOS 12 and 13 availability.
+    static boolean conditionApplies(String key, String sdk, String configuration) {
+        int open = key.indexOf('[');
+        if (open < 0) {
+            return true;
+        }
+        for (String condition : key.substring(open).split("[\\[\\],]")) {
+            int equals = condition.indexOf('=');
+            if (equals < 0) {
+                continue;
+            }
+            String name = condition.substring(0, equals).trim();
+            String value = condition.substring(equals + 1).trim();
+            if ("sdk".equals(name) && sdk != null && !matchesCondition(value, sdk)) {
+                return false;
+            }
+            if ("config".equals(name) && configuration != null
+                    && !matchesCondition(value, configuration)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A condition value against what this build is, with Xcode's trailing {@code *}.
+    private static boolean matchesCondition(String value, String actual) {
+        if (value.endsWith("*")) {
+            return actual.regionMatches(true, 0, value, 0, value.length() - 1);
+        }
+        return value.equalsIgnoreCase(actual);
     }
 
     /// Whether a settings key is the conditional form of {@code name}, as Xcode writes it and as
