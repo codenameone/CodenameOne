@@ -336,25 +336,53 @@ class InterpIOSSymbols {
         if (count == 1) {
             return ((Integer)candidateIds.elementAt(0)).intValue();
         }
+        // Collect all maximally specific candidates, deduplicating by
+        // declaring interface (the same interface's default appears once).
+        java.util.Vector maximalOwners = new java.util.Vector();
+        java.util.Vector maximalIds = new java.util.Vector();
         for (int i = 0; i < count; i++) {
             String candidate = (String)candidateOwners.elementAt(i);
-            boolean maximal = true;
+            if (maximalOwners.contains(candidate)) {
+                continue;
+            }
+            boolean dominated = false;
             for (int j = 0; j < count; j++) {
                 if (i == j) {
                     continue;
                 }
                 // If some other candidate's declaring interface is a proper
-                // subinterface of this one, this one is not maximally specific
-                // -- Java would take the subinterface's method.
+                // subinterface of this one, this one is not maximally
+                // specific -- Java would take the subinterface's method.
                 if (isSubinterfaceOf(
                         (String)candidateOwners.elementAt(j), candidate)) {
-                    maximal = false;
+                    dominated = true;
                     break;
                 }
             }
-            if (maximal) {
-                return ((Integer)candidateIds.elementAt(i)).intValue();
+            if (!dominated) {
+                maximalOwners.addElement(candidate);
+                maximalIds.addElement(candidateIds.elementAt(i));
             }
+        }
+        if (maximalOwners.size() == 1) {
+            return ((Integer)maximalIds.elementAt(0)).intValue();
+        }
+        // Multiple maximally specific non-dominated candidates is
+        // IncompatibleClassChangeError per JVMS 5.4.3.3 -- possible after
+        // binary-compatible interface evolution, and silently picking one
+        // would run an arbitrary body the JVM refuses. Throwing a
+        // RuntimeException here propagates back through the linker to
+        // dispatch, where the interpreter's usual host-exception path picks
+        // it up.
+        if (maximalOwners.size() > 1) {
+            StringBuilder message = new StringBuilder();
+            for (int i = 0; i < maximalOwners.size(); i++) {
+                if (i > 0) {
+                    message.append(", ");
+                }
+                message.append(((String)maximalOwners.elementAt(i)).replace('/', '.'));
+            }
+            throw new IncompatibleClassChangeError("conflicting default methods: " + message);
         }
         return ((Integer)candidateIds.elementAt(0)).intValue();
     }

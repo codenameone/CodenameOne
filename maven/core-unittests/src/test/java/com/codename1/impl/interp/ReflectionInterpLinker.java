@@ -206,9 +206,15 @@ public class ReflectionInterpLinker implements InterpLinker {
         if (count == 1) {
             return candidates.get(0);
         }
+        java.util.ArrayList<Method> maximal = new java.util.ArrayList<Method>();
+        java.util.HashSet<Class> seenDeclaring = new java.util.HashSet<Class>();
         for (int i = 0; i < count; i++) {
-            Class declaringA = candidates.get(i).getDeclaringClass();
-            boolean maximal = true;
+            Method mi = candidates.get(i);
+            Class declaringA = mi.getDeclaringClass();
+            if (!seenDeclaring.add(declaringA)) {
+                continue;
+            }
+            boolean dominated = false;
             for (int j = 0; j < count; j++) {
                 if (i == j) {
                     continue;
@@ -216,13 +222,29 @@ public class ReflectionInterpLinker implements InterpLinker {
                 Class declaringB = candidates.get(j).getDeclaringClass();
                 if (!declaringA.equals(declaringB)
                         && declaringA.isAssignableFrom(declaringB)) {
-                    maximal = false;
+                    dominated = true;
                     break;
                 }
             }
-            if (maximal) {
-                return candidates.get(i);
+            if (!dominated) {
+                maximal.add(mi);
             }
+        }
+        if (maximal.size() == 1) {
+            return maximal.get(0);
+        }
+        if (maximal.size() > 1) {
+            // JVMS 5.4.3.3: multiple non-abstract maximally specific methods
+            // that do not dominate each other is IncompatibleClassChangeError.
+            StringBuilder message = new StringBuilder();
+            for (int i = 0; i < maximal.size(); i++) {
+                if (i > 0) {
+                    message.append(", ");
+                }
+                message.append(maximal.get(i).getDeclaringClass().getName());
+            }
+            throw new IncompatibleClassChangeError("conflicting default methods for "
+                    + name + " on " + c.getName() + ": " + message);
         }
         return candidates.get(0);
     }
@@ -236,10 +258,12 @@ public class ReflectionInterpLinker implements InterpLinker {
         try {
             Method m = iface.getDeclaredMethod(name, types);
             int mods = m.getModifiers();
-            // Static and private declarations are not inherited through an
-            // interface; skip them so an `A.staticM()` cannot be picked over
-            // a same-descriptor default on another superinterface.
-            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
+            // Static, private, and abstract declarations do not compete as
+            // interface defaults: static/private are not inherited through
+            // an interface, and abstract contributes no body. Filtering
+            // here matches JVMS 5.4.3.3 "non-abstract maximally specific".
+            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)
+                    && !Modifier.isAbstract(mods)) {
                 candidates.add(m);
             }
         } catch (NoSuchMethodException ignore) {

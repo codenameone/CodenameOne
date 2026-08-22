@@ -225,29 +225,52 @@ public class InterpJavaSELinker implements InterpLinker {
         if (count == 1) {
             return candidates.get(0);
         }
+        // Collect maximally specific candidates: keep only those that no
+        // other candidate's declaring interface subtypes. Duplicates by
+        // declaring class collapse -- the same interface's default only
+        // needs to appear once in the set.
+        java.util.ArrayList<Method> maximal = new java.util.ArrayList<Method>();
+        java.util.HashSet<Class> seenDeclaring = new java.util.HashSet<Class>();
         for (int i = 0; i < count; i++) {
-            Class declaringA = candidates.get(i).getDeclaringClass();
-            boolean maximal = true;
+            Method mi = candidates.get(i);
+            Class declaringA = mi.getDeclaringClass();
+            if (!seenDeclaring.add(declaringA)) {
+                continue;
+            }
+            boolean dominated = false;
             for (int j = 0; j < count; j++) {
                 if (i == j) {
                     continue;
                 }
                 Class declaringB = candidates.get(j).getDeclaringClass();
-                // Some other candidate is on a proper subinterface of this
-                // one, so it is more specific and this one is not maximal.
                 if (!declaringA.equals(declaringB)
                         && declaringA.isAssignableFrom(declaringB)) {
-                    maximal = false;
+                    dominated = true;
                     break;
                 }
             }
-            if (maximal) {
-                return candidates.get(i);
+            if (!dominated) {
+                maximal.add(mi);
             }
         }
-        // Several maximally specific and none dominates -- JLS leaves the
-        // choice arbitrary. Take the first candidate found so the answer is
-        // deterministic within a run.
+        if (maximal.size() == 1) {
+            return maximal.get(0);
+        }
+        // Multiple non-abstract maximally specific methods that do not
+        // dominate each other is IncompatibleClassChangeError per JVMS
+        // 5.4.3.3 -- possible after binary-compatible interface evolution.
+        // Silently picking one would run an arbitrary body the JVM refuses.
+        if (maximal.size() > 1) {
+            StringBuilder message = new StringBuilder();
+            for (int i = 0; i < maximal.size(); i++) {
+                if (i > 0) {
+                    message.append(", ");
+                }
+                message.append(maximal.get(i).getDeclaringClass().getName());
+            }
+            throw new IncompatibleClassChangeError("conflicting default methods for "
+                    + name + " on " + c.getName() + ": " + message);
+        }
         return candidates.get(0);
     }
 
@@ -260,11 +283,16 @@ public class InterpJavaSELinker implements InterpLinker {
         try {
             Method m = iface.getDeclaredMethod(name, types);
             int mods = m.getModifiers();
-            // Only instance, non-private declarations are inherited through
-            // an interface. Reflection ignores the receiver for a static
-            // invoke, so admitting `A.staticM()` when `B` declares a same-
-            // descriptor default would silently run A's body.
-            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
+            // Only instance, non-private, non-abstract declarations are
+            // eligible interface defaults. Reflection ignores the receiver
+            // for a static invoke, so admitting `A.staticM()` when `B`
+            // declares a same-descriptor default would silently run A's
+            // body. Abstract methods contribute no body, so filtering them
+            // here keeps the maximally-specific check focused on real
+            // defaults and matches the JVMS 5.4.3.3 "non-abstract maximally
+            // specific" rule.
+            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)
+                    && !Modifier.isAbstract(mods)) {
                 candidates.add(m);
             }
         } catch (NoSuchMethodException ignore) {
