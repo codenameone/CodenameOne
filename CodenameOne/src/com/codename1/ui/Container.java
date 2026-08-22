@@ -2625,11 +2625,31 @@ public class Container extends Component implements Iterable<Component> {
         if (safeAreaRoot == null) {
             return false;
         }
-        Rectangle rect = Display.impl.getDisplaySafeArea(new Rectangle());
+        Rectangle rect;
+        int surfaceWidth;
+        int surfaceHeight;
+        TopLevelContainer top = getTopLevelContainer();
+        if (top instanceof Window) {
+            // The enclosing window's safe area and size, not the main surface's. A
+            // desktop window has no notch or rounded corner, so this yields zero
+            // margins and no snapping -- where reading the display's insets applied
+            // the main surface's notch to every secondary window on a device that has
+            // one. Copied rather than used directly, so the arithmetic below cannot
+            // write into whatever the top level handed back.
+            Rectangle windowSafe = top.getSafeArea();
+            rect = new Rectangle(windowSafe.getX(), windowSafe.getY(),
+                    windowSafe.getWidth(), windowSafe.getHeight());
+            surfaceWidth = top.asContainer().getWidth();
+            surfaceHeight = top.asContainer().getHeight();
+        } else {
+            rect = Display.impl.getDisplaySafeArea(new Rectangle());
+            surfaceWidth = CN.getDisplayWidth();
+            surfaceHeight = CN.getDisplayHeight();
+        }
         int safeLeftMargin = rect.getX();
-        int safeRightMargin = CN.getDisplayWidth() - rect.getWidth() - rect.getX();
+        int safeRightMargin = surfaceWidth - rect.getWidth() - rect.getX();
         int safeTopMargin = rect.getY();
-        int safeBottomMargin = CN.getDisplayHeight() - rect.getHeight() - rect.getY();
+        int safeBottomMargin = surfaceHeight - rect.getHeight() - rect.getY();
         if (safeLeftMargin == 0 && safeRightMargin == 0 && safeBottomMargin == 0 && safeTopMargin == 0) {
             return false;
         }

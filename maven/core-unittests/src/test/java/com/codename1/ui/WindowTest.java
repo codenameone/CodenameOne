@@ -320,6 +320,44 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void theMainSurfacesNotchDoesNotPadAWindowsContent() {
+        implementation.setMultiWindowSupported(true);
+        // A device whose main surface has a notch: 40px inset at the top.
+        implementation.setDisplaySafeArea(new Rectangle(0, 40,
+                Display.getInstance().getDisplayWidth(),
+                Display.getInstance().getDisplayHeight() - 40));
+        try {
+            Window w = new Window("safe", new BorderLayout());
+            w.setWindowSize(300, 200);
+            Container inner = new Container(new BorderLayout());
+            inner.getAllStyles().setPadding(0, 0, 0, 0);
+            inner.setSafeArea(true);
+            Label child = new Label("child");
+            child.getAllStyles().setPadding(0, 0, 0, 0);
+            child.getAllStyles().setMargin(0, 0, 0, 0);
+            inner.add(BorderLayout.CENTER, child);
+            w.add(BorderLayout.CENTER, inner);
+            w.show();
+            w.revalidate();
+
+            // Asserted on the laid-out child rather than on the padding: the snap puts
+            // its insets on the style only for the duration of the layout and restores
+            // them straight after, so the padding reads the same either way and only
+            // where the child landed shows what happened.
+            //
+            // A desktop window has no notch and says so through getSafeArea(), but the
+            // snap read the display's insets directly, so the main surface's notch was
+            // applied to content in every window.
+            assertEquals(0, child.getY() - inner.getY(),
+                    "nothing in a window may be pushed down by the main surface's notch");
+
+            w.dispose();
+        } finally {
+            implementation.setDisplaySafeArea(null);
+        }
+    }
+
+    @FormTest
     void scrollSettingsReachTheWindowsContentPane() {
         implementation.setMultiWindowSupported(true);
         // Deliberately not a BorderLayout content pane: setScrollableY forces false
