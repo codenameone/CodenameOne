@@ -326,6 +326,20 @@ class AndroidWatchSurfaceCodegenTest {
         assertEquals("Weather2", AndroidGradleBuilder.surfaceKindClassSuffix("weather2"));
     }
 
+    /// A malformed explicit code is refused rather than silently replaced. Substituting
+    /// intVersion + 1 hid the typo AND recreated the collision this method exists to prevent, with
+    /// the developer looking at a hint that says something else entirely.
+    @Test
+    void aMalformedExplicitVersionCodeIsRefused() {
+        BuildRequest req = request();
+        req.putArgument("android.watchVersionCode", "not a number");
+        assertThrows(BuildException.class, () -> AndroidGradleBuilder.wearVersionCode(req, 100));
+
+        BuildRequest blank = request();
+        blank.putArgument("android.watchVersionCode", "   ");
+        assertThrows(BuildException.class, () -> AndroidGradleBuilder.wearVersionCode(blank, 100));
+    }
+
     // --- tiles ------------------------------------------------------------------
 
     /// Only the rectangular family is roomy enough for a layout rather than a readout, so it is

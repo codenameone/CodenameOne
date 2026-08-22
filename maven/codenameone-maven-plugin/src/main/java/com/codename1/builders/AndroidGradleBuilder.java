@@ -7162,7 +7162,10 @@ public class AndroidGradleBuilder extends Executor {
         StringBuilder kindIds = new StringBuilder();
         for (String[] kind : watchSurfaceKinds) {
             String kindId = kind[0];
-            String label = xmlize(kind[1]);
+            // RAW here: complicationServiceEntry and tileServiceEntry put it in an attribute and
+            // escape it themselves. Escaping first turned "A & B" into "A &amp;amp; B", which the
+            // watch face then shows as "A &amp; B".
+            String label = kind[1];
             String families = kind[2];
             String suffix = surfaceKindClassSuffix(kindId);
             writeWatchService(surfacesDir, implDir, "CN1Complication_" + suffix,
@@ -7672,7 +7675,18 @@ public class AndroidGradleBuilder extends Executor {
         int resolved;
         String setting;
         if (explicit.length() > 0) {
-            resolved = parseIntSafe(explicit, intVersion + 1);
+            // Refused rather than substituted. Falling back to intVersion + 1 hid the typo AND
+            // recreated the collision this method exists to prevent: the Wear artifact would
+            // consume the next phone release's code, and the developer would be looking at a
+            // hint that says something else entirely.
+            try {
+                resolved = Integer.parseInt(explicit.trim());
+            } catch (NumberFormatException malformed) {
+                throw new BuildException("android.watchVersionCode is '" + explicit
+                        + "', which is not a version code. It must be a whole number greater "
+                        + "than the phone's " + intVersion + " and no more than "
+                        + MAX_PLAY_VERSION_CODE + ".");
+            }
             setting = "android.watchVersionCode=" + explicit;
         } else {
             String offset = request.getArg("android.watchVersionCodeOffset",

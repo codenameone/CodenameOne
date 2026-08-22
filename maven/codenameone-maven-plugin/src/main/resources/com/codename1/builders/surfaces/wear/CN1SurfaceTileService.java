@@ -356,9 +356,19 @@ public abstract class CN1SurfaceTileService extends TileService {
             String name = imageId(node);
             LayoutElementBuilders.Image.Builder image = new LayoutElementBuilders.Image.Builder()
                     .setResourceId(name)
-                    .setWidth(DimensionBuilders.dp(Math.max(1, node.optInt("w", 24))))
-                    .setHeight(DimensionBuilders.dp(Math.max(1, node.optInt("h", 24))))
                     .setModifiers(modifiers(node));
+            // Only the axes the node actually declared. setSize documents 0 as "natural", and the
+            // wire omits an axis left at it -- so a default of 24 shrank every unsized image to
+            // 24x24 and turned setSize(100, 0) into 100x24. An axis left unset keeps ProtoLayout's
+            // own sizing, which is the natural one.
+            int iw = node.optInt("w", 0);
+            int ih = node.optInt("h", 0);
+            if (iw > 0) {
+                image.setWidth(DimensionBuilders.dp(iw));
+            }
+            if (ih > 0) {
+                image.setHeight(DimensionBuilders.dp(ih));
+            }
             // The declared scale mode. "fill" crops to the bounds and "center" keeps the natural
             // size, which is what the rasterizer does with the same values -- left unset, every
             // image took ProtoLayout's default and a fill image was fitted instead of cropped.
