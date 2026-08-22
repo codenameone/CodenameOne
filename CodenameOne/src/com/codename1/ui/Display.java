@@ -3053,11 +3053,6 @@ public final class Display extends CN1Constants {
         }
     }
 
-    /// Notifies Codename One that a native window stopped being visible.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
     /// Notifies Codename One that the platform refused to create a window's native
     /// surface, so the window will never appear.
     ///
@@ -3075,6 +3070,11 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Notifies Codename One that a native window stopped being visible.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
     public void windowHideNotify(int windowId) {
         if (windowId > 0) {
             // See windowShowNotify: not droppable.
