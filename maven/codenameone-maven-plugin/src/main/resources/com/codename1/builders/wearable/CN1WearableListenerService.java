@@ -356,6 +356,87 @@ public class CN1WearableListenerService extends WearableListenerService {
         }
     }
 
+    /** The port's surface mirror, or null on a port that predates it. See {@link #surfaceMirror}. */
+    private static Class<?> mirrorClass;
+    private static boolean mirrorLookedUp;
+
+    /**
+     * The mirror class, looked up once, or null when this port has no surfaces implementation.
+     *
+     * <p>Reflective on purpose. This service is injected into EVERY build that references
+     * {@code com.codename1.wearable}, including a versioned build pinned to a Codename One
+     * release older than external surfaces -- and a hard reference to a class that port does not
+     * contain fails javac in a file the developer never wrote, for a feature they never enabled.
+     * The same reason {@code CN1WatchSurfaceNotifier} reaches for the androidx complication
+     * classes this way.</p>
+     *
+     * <p>Safe against R8 because the two conditions coincide: the builder emits
+     * {@code -keep class com.codename1.impl.android.surfaces.**} exactly when the app uses
+     * surfaces, which is exactly when this class is present to be found. A rename would otherwise
+     * turn this into the failure the reflection ban exists for -- working in the simulator and
+     * silently dead in a release build.</p>
+     *
+     * @return the mirror class, or null
+     */
+    private static synchronized Class<?> mirrorClass() {
+        if (!mirrorLookedUp) {
+            mirrorLookedUp = true;
+            try {
+                mirrorClass = Class.forName(
+                        "com.codename1.impl.android.surfaces.CN1SurfaceMirror");
+            } catch (Throwable t) {
+                // A port without surfaces. Mirror traffic cannot arrive for it either, because
+                // nothing on the phone half would have sent any.
+                mirrorClass = null;
+            }
+        }
+        return mirrorClass;
+    }
+
+    /** Whether a path belongs to the surface mirror rather than to the application. */
+    private static boolean surfaceMirrorHandles(String path) {
+        Class<?> mirror = mirrorClass();
+        if (mirror == null || path == null) {
+            return false;
+        }
+        try {
+            return Boolean.TRUE.equals(mirror.getMethod("isMirrorPath", String.class)
+                    .invoke(null, path));
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Hands one piece of mirror traffic to the port.
+     *
+     * @param method {@code receive}, {@code receiveFile} or {@code remove}
+     * @param path the reserved application path
+     * @param payload the payload, or null for {@code remove}
+     */
+    private void surfaceMirror(String method, String path, byte[] payload) {
+        Class<?> mirror = mirrorClass();
+        if (mirror == null) {
+            return;
+        }
+        try {
+            if (payload == null && "remove".equals(method)) {
+                mirror.getMethod(method, android.content.Context.class, String.class)
+                        .invoke(null, this, path);
+                return;
+            }
+            mirror.getMethod(method, android.content.Context.class, String.class, byte[].class)
+                    .invoke(null, this, path, payload);
+        } catch (Throwable t) {
+            // Caught rather than propagated: a listener that throws takes the Data Layer
+            // callback down with it, and mirror traffic is a refresh rather than something the
+            // app is waiting on. Logged under the mirror's own tag so it reads beside the
+            // failures the mirror reports itself.
+            android.util.Log.w("CN1Surfaces",
+                    "Could not hand " + path + " to the surface mirror", t);
+        }
+    }
+
     /**
      * The payload of a mirrored surface item.
      *
@@ -450,17 +531,16 @@ public class CN1WearableListenerService extends WearableListenerService {
             // it would bring a UI forward that the user did not ask for. Delivering it to the
             // app's own listeners would also show it a message it never sent itself.
             if (appPath != null
-                    && com.codename1.impl.android.surfaces.CN1SurfaceMirror.isMirrorPath(appPath)) {
+                    && surfaceMirrorHandles(appPath)) {
                 // Deletions too, and NOT through the ordinary value-removal path below. A mirror
                 // is a replacement rather than a replicated value, so it never entered that
                 // path's cache or its logical clock, and letting a tombstone go there left the
                 // descriptor CN1SurfaceMirror.receive wrote sitting on disk -- the complication
                 // kept showing content the phone had already withdrawn.
                 if (deleted) {
-                    com.codename1.impl.android.surfaces.CN1SurfaceMirror.remove(this, appPath);
+                    surfaceMirror("remove", appPath, null);
                 } else {
-                    com.codename1.impl.android.surfaces.CN1SurfaceMirror.receive(this, appPath,
-                            readMirrorPayload(event));
+                    surfaceMirror("receive", appPath, readMirrorPayload(event));
                 }
                 continue;
             }
@@ -532,12 +612,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // Confirmed from inside the delivery: dispatched is not delivered, and a
                     // claim persisted for a file the app never received suppresses the redelivery
                     // that would have replaced it.
-                    if (com.codename1.impl.android.surfaces.CN1SurfaceMirror
-                            .isMirrorPath(transfer.logicalPath)) {
+                    if (surfaceMirrorHandles(transfer.logicalPath)) {
                         // Mirrored complication artwork. Stored beside the descriptor that names
                         // it, without waking the app: see the data-item branch above.
-                        com.codename1.impl.android.surfaces.CN1SurfaceMirror.receiveFile(this,
-                                transfer.logicalPath, transfer.payload);
+                        surfaceMirror("receiveFile", transfer.logicalPath, transfer.payload);
                         CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq, true);
                         continue;
                     }

@@ -57,8 +57,15 @@ public final class LayoutElementBuilders {
             public Spacer build() { return null; }
         }
     }
+    public static class ColorFilter {
+        public static class Builder {
+            public Builder setTint(ColorBuilders.ColorProp c) { return this; }
+            public ColorFilter build() { return null; }
+        }
+    }
     public static class Image implements LayoutElement {
         public static class Builder {
+            public Builder setColorFilter(ColorFilter f) { return this; }
             public Builder setResourceId(String id) { return this; }
             public Builder setWidth(DimensionBuilders.DpProp d) { return this; }
             public Builder setHeight(DimensionBuilders.DpProp d) { return this; }
@@ -70,6 +77,7 @@ public final class LayoutElementBuilders {
         public static class Builder {
             public Builder setLength(DimensionBuilders.DegreesProp d) { return this; }
             public Builder setThickness(DimensionBuilders.DpProp d) { return this; }
+            public Builder setColor(ColorBuilders.ColorProp c) { return this; }
             public ArcLine build() { return null; }
         }
     }

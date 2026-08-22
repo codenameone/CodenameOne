@@ -79,6 +79,9 @@ public abstract class CN1SurfaceTileService extends TileService {
     private static final long MAX_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L;
     /// How often a Tile showing dynamic text asks to be rebuilt; see freshnessFor.
     private static final long DYNAMIC_FRESHNESS_MILLIS = 60L * 1000L;
+    /// The accent a progress node takes when it declares no colour of its own; the same
+    /// value CN1SurfaceRenderer tints a widget's progress bar with.
+    private static final int ACCENT = 0xff007aff;
 
     /** The widget kind this Tile serves. Supplied by the generated subclass. */
     protected abstract String getKindId();
@@ -268,9 +271,11 @@ public abstract class CN1SurfaceTileService extends TileService {
                     col.addContent(gap(spacing, false));
                 }
                 first = false;
-                col.addContent(weighted(render(child, state, depth + 1, false), child, false));
+                col.addContent(weighted(
+                        aligned(render(child, state, depth + 1, false), child, true, false),
+                        child, false));
             }
-            return col.setModifiers(modifiers(node)).build();
+            return sized(col.setModifiers(modifiers(node)).build(), node);
         }
         if ("row".equals(type)) {
             LayoutElementBuilders.Row.Builder row = new LayoutElementBuilders.Row.Builder();
@@ -281,16 +286,18 @@ public abstract class CN1SurfaceTileService extends TileService {
                     row.addContent(gap(spacing, true));
                 }
                 first = false;
-                row.addContent(weighted(render(child, state, depth + 1, true), child, true));
+                row.addContent(weighted(
+                        aligned(render(child, state, depth + 1, true), child, false, true),
+                        child, true));
             }
-            return row.setModifiers(modifiers(node)).build();
+            return sized(row.setModifiers(modifiers(node)).build(), node);
         }
         if ("box".equals(type)) {
             LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder();
             for (JSONObject child : children(node)) {
-                box.addContent(aligned(render(child, state, depth + 1, inRow), child));
+                box.addContent(aligned(render(child, state, depth + 1, inRow), child, true, true));
             }
-            return box.setModifiers(modifiers(node)).build();
+            return sized(box.setModifiers(modifiers(node)).build(), node);
         }
         if ("spacer".equals(type)) {
             // A spacer carries "min" and never "w"/"h" -- SurfaceSpacer.serializeContent writes
@@ -314,12 +321,24 @@ public abstract class CN1SurfaceTileService extends TileService {
         }
         if ("img".equals(type) || "vec".equals(type)) {
             String name = imageId(node);
-            return new LayoutElementBuilders.Image.Builder()
+            LayoutElementBuilders.Image.Builder image = new LayoutElementBuilders.Image.Builder()
                     .setResourceId(name)
                     .setWidth(DimensionBuilders.dp(Math.max(1, node.optInt("w", 24))))
                     .setHeight(DimensionBuilders.dp(Math.max(1, node.optInt("h", 24))))
-                    .setModifiers(modifiers(node))
-                    .build();
+                    .setModifiers(modifiers(node));
+            // setTint was dropped entirely: the bitmap is produced by the port's decoder, which
+            // does not tint -- CN1SurfaceRenderer applies the tint at the ImageView instead --
+            // so reusing only that decoder left every tinted glyph its original colour.
+            // ProtoLayout has the same separation and its own colour filter, so the tint travels
+            // with the element rather than being baked into the resource.
+            JSONObject tint = node.optJSONObject("tint");
+            if (tint != null) {
+                image.setColorFilter(new LayoutElementBuilders.ColorFilter.Builder()
+                        .setTint(ColorBuilders.argb(CN1SurfaceRenderer.resolveColor(tint, true,
+                                0xFFFFFFFF, 0xFFFFFFFF)))
+                        .build());
+            }
+            return image.build();
         }
         if ("prog".equals(type)) {
             float value = CN1WatchSurface.progressValue(node, state);
@@ -334,28 +353,66 @@ public abstract class CN1SurfaceTileService extends TileService {
             // built -- so a progress node with setAction on it rendered and then ignored the tap,
             // alone among the actionable node types, and lost its padding and background with it.
             // Arc and Row have no setModifiers of their own to use instead.
+            // The node's own colour, resolved the same way text and backgrounds are. Neither
+            // branch read it, so an explicitly or semantically coloured progress changed colour
+            // on a Tile alone; the accent default matches what the RemoteViews path tints with.
+            JSONObject progColor = node.optJSONObject("color");
+            int tint = progColor == null ? ACCENT
+                    : CN1SurfaceRenderer.resolveColor(progColor, true, ACCENT, ACCENT);
             LayoutElementBuilders.LayoutElement bar;
             if (!"circular".equals(node.optString("style", "linear"))) {
-                bar = linearProgress(fraction);
+                bar = linearProgress(fraction, tint);
             } else {
                 bar = new LayoutElementBuilders.Arc.Builder()
                         .addContent(new LayoutElementBuilders.ArcLine.Builder()
                                 .setLength(DimensionBuilders.degrees(360f * fraction))
                                 .setThickness(DimensionBuilders.dp(6))
+                                .setColor(ColorBuilders.argb(tint))
                                 .build())
                         .build();
             }
-            return new LayoutElementBuilders.Box.Builder()
+            return sized(new LayoutElementBuilders.Box.Builder()
                     .addContent(bar)
                     .setModifiers(modifiers(node))
-                    .build();
+                    .build(), node);
         }
         // text, dyn and anything unknown: whatever string the node resolves to. A dyn value is
         // frozen here; see the class comment.
-        return styledText(node, state);
+        return sized(styledText(node, state), node);
     }
 
-    /// A box child placed where its own node asked to be placed.
+    /// A node given the fixed size it declared, if it declared one.
+    ///
+    /// setSize serializes as "w"/"h" on ANY node, and only the image branch read them -- so text,
+    /// dynamic text, progress and containers came out naturally sized while the simulator and the
+    /// other renderers honoured the same descriptor. A built LayoutElement has no size to set
+    /// afterwards, so the sizing goes on a Box around it, exactly as the weight and alignment
+    /// wrappers do.
+    private static LayoutElementBuilders.LayoutElement sized(
+            LayoutElementBuilders.LayoutElement element, JSONObject node) {
+        int w = node == null ? 0 : node.optInt("w", 0);
+        int h = node == null ? 0 : node.optInt("h", 0);
+        if (w <= 0 && h <= 0) {
+            return element;
+        }
+        LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder()
+                .addContent(element);
+        if (w > 0) {
+            box.setWidth(DimensionBuilders.dp(w));
+        }
+        if (h > 0) {
+            box.setHeight(DimensionBuilders.dp(h));
+        }
+        return box.build();
+    }
+
+    /// A child placed where its own node asked to be placed.
+    ///
+    /// Used by every container, not only SurfaceBox. A column child declaring LEADING or TRAILING
+    /// and a row child declaring TOP or BOTTOM are asking about the CROSS axis, which a
+    /// ProtoLayout Column or Row does not take from the child either -- so those documented
+    /// positions rendered centred until this ran for them as well.
+    ///
     ///
     /// SurfaceNode.setAlignment serializes as "align" on the CHILD, and a ProtoLayout Box carries
     /// the alignment of its contents rather than a child carrying its own -- so adding children
@@ -364,8 +421,12 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// SurfaceBox sit in different corners.
     ///
     /// Centre is the default and is what a bare element already gets.
+    /// - `expandWidth`, `expandHeight`: which axes the wrapper may fill. A Box overlay fills
+    ///   both; a column child fills only its width and a row child only its height, because the
+    ///   other one is the container's main axis and expanding it would push every sibling out.
     private static LayoutElementBuilders.LayoutElement aligned(
-            LayoutElementBuilders.LayoutElement element, JSONObject child) {
+            LayoutElementBuilders.LayoutElement element, JSONObject child,
+            boolean expandWidth, boolean expandHeight) {
         String align = child == null ? "" : child.optString("align", "");
         if (align.length() == 0 || "center".equals(align)) {
             return element;
@@ -385,13 +446,17 @@ public abstract class CN1SurfaceTileService extends TileService {
                 || "bottomTrailing".equals(align)) {
             vertical = LayoutElementBuilders.VERTICAL_ALIGN_BOTTOM;
         }
-        return new LayoutElementBuilders.Box.Builder()
+        LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder()
                 .addContent(element)
-                .setWidth(DimensionBuilders.expand())
-                .setHeight(DimensionBuilders.expand())
                 .setHorizontalAlignment(horizontal)
-                .setVerticalAlignment(vertical)
-                .build();
+                .setVerticalAlignment(vertical);
+        if (expandWidth) {
+            box.setWidth(DimensionBuilders.expand());
+        }
+        if (expandHeight) {
+            box.setHeight(DimensionBuilders.expand());
+        }
+        return box.build();
     }
 
     /// A child sized to its share of the parent's leftover space, when it asked for one.
@@ -439,7 +504,11 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// track that fills the width and a filled portion weighted to the fraction. Degrading a
     /// linear bar into a ring would be the reverse of the phone widget's own compromise and
     /// would not look like the surface the app described.
-    private static LayoutElementBuilders.LayoutElement linearProgress(float fraction) {
+    ///
+    /// The track is the fill's own colour at a quarter alpha -- its RGB kept and its alpha
+    /// replaced, so a coloured bar reads as one bar rather than as two unrelated ones.
+    private static LayoutElementBuilders.LayoutElement linearProgress(float fraction,
+            int tint) {
         float filled = Math.max(0f, Math.min(1f, fraction));
         LayoutElementBuilders.Row.Builder bar = new LayoutElementBuilders.Row.Builder();
         if (filled > 0f) {
@@ -448,7 +517,7 @@ public abstract class CN1SurfaceTileService extends TileService {
                     .setHeight(DimensionBuilders.dp(6))
                     .setModifiers(new ModifiersBuilders.Modifiers.Builder()
                             .setBackground(new ModifiersBuilders.Background.Builder()
-                                    .setColor(ColorBuilders.argb(0xFFFFFFFF))
+                                    .setColor(ColorBuilders.argb(tint))
                                     .build())
                             .build())
                     .build());
@@ -459,7 +528,7 @@ public abstract class CN1SurfaceTileService extends TileService {
                     .setHeight(DimensionBuilders.dp(6))
                     .setModifiers(new ModifiersBuilders.Modifiers.Builder()
                             .setBackground(new ModifiersBuilders.Background.Builder()
-                                    .setColor(ColorBuilders.argb(0x40FFFFFF))
+                                    .setColor(ColorBuilders.argb((tint & 0x00FFFFFF) | 0x40000000))
                                     .build())
                             .build())
                     .build());
@@ -520,10 +589,16 @@ public abstract class CN1SurfaceTileService extends TileService {
                     .build());
         }
         JSONObject bg = node.optJSONObject("bg");
-        if (bg != null && bg.has("d")) {
+        if (bg != null) {
+            // Resolved, not read out of "d". A semantic background -- BACKGROUND, ACCENT and the
+            // rest -- serializes as {"role": ...} with no light or dark value, so testing for "d"
+            // dropped the background AND the corner radius that only exists inside it. Same
+            // resolution the text path uses, and the same dark appearance: a watch face
+            // composites over black.
             ModifiersBuilders.Background.Builder background =
                     new ModifiersBuilders.Background.Builder()
-                            .setColor(ColorBuilders.argb(bg.optInt("d")));
+                            .setColor(ColorBuilders.argb(CN1SurfaceRenderer.resolveColor(bg, true,
+                                    0x00000000, 0x00000000)));
             int corner = node.optInt("corner", 0);
             if (corner > 0) {
                 background.setCorner(new ModifiersBuilders.Corner.Builder()
