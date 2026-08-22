@@ -656,6 +656,23 @@ static void cn1WinDesktopDestroyOnPump(CN1DesktopWindowOp* op) {
         w->target = NULL;
     }
     if (w->hwnd != NULL) {
+        /* Peers hosted in this window are the application's own HWNDs, reparented here
+         * by peerInitialized. DestroyWindow destroys a window's children along with
+         * it, so disposing the window would destroy a browser or a peer component the
+         * application still holds, leaving its Java side with a dangling handle.
+         * Detached first, and hidden because SetParent(NULL) makes a window top level
+         * and an unhidden one would appear on screen by itself.
+         *
+         * Re-reading the first child each time rather than walking the sibling chain:
+         * detaching a child removes it from that chain. Bounded so a SetParent that
+         * fails cannot spin here. */
+        int guard = 0;
+        HWND child = GetWindow(w->hwnd, GW_CHILD);
+        while (child != NULL && guard++ < CN1_MAX_DESKTOP_WINDOWS * 64) {
+            ShowWindow(child, SW_HIDE);
+            SetParent(child, NULL);
+            child = GetWindow(w->hwnd, GW_CHILD);
+        }
         DestroyWindow(w->hwnd);
         w->hwnd = NULL;
     }
