@@ -148,8 +148,15 @@ public final class Pack {
                     .accept(cn, org.objectweb.asm.ClassReader.SKIP_CODE);
             for (Object mo : cn.methods) {
                 org.objectweb.asm.tree.MethodNode m = (org.objectweb.asm.tree.MethodNode) mo;
+                // Java's entry-point rule is exactly `public static void
+                // main(String[])`. A package-private or private helper of the
+                // same signature is not an entry point, and picking one up
+                // here preferred an inaccessible method over a valid Lifecycle
+                // subclass -- matches the DevicePush filter for the same
+                // reason.
                 if ("main".equals(m.name) && "([Ljava/lang/String;)V".equals(m.desc)
-                        && (m.access & org.objectweb.asm.Opcodes.ACC_STATIC) != 0) {
+                        && (m.access & org.objectweb.asm.Opcodes.ACC_STATIC) != 0
+                        && (m.access & org.objectweb.asm.Opcodes.ACC_PUBLIC) != 0) {
                     mains.add(cn.name);
                 }
             }

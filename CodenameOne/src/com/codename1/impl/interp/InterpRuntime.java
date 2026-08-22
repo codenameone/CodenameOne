@@ -1071,19 +1071,30 @@ public final class InterpRuntime {
                                 "opcode " + op + " in " + m), snapshotStack());
                 }
             } catch (InterpThrowable it) {
-                int handler = findHandler(m, insn, it.getThrown());
+                Object thrown = it.getThrown();
+                // Cancellation extends Error precisely so a user `catch
+                // (Exception)` cannot swallow it, but a program surrounding
+                // its loop with `catch (Throwable)` or `catch (Error)` would
+                // still match, resume, and defeat the Stop button and the
+                // EDT budget. Only finally-style catch-all handlers (which
+                // javac synthesises for `finally` blocks and synchronized
+                // regions to release monitors and close resources) are
+                // allowed to run for a cancellation, and the finally body
+                // ends by re-throwing so the unwind continues.
+                boolean cancellation = thrown instanceof InterpCancelled;
+                int handler = findHandler(m, insn, thrown, cancellation);
                 if (handler < 0) {
                     throw it;
                 }
                 f.sp = 0;
-                f.pushRef(it.getThrown());
+                f.pushRef(thrown);
                 insn = handler;
                 continue;
             } catch (Throwable hostThrown) {
                 // Something the host raised while we were inside it. It is a
                 // real Java throwable, and interpreted `catch` clauses have to
                 // be able to see it.
-                int handler = findHandler(m, insn, hostThrown);
+                int handler = findHandler(m, insn, hostThrown, false);
                 if (handler < 0) {
                     throw hostThrown;
                 }
@@ -2682,6 +2693,31 @@ public final class InterpRuntime {
             }
             return other.isSubclassOfInterp(c.getName()) ? Boolean.TRUE : Boolean.FALSE;
         }
+        if ("getResourceAsStream".equals(name) && args.length == 1
+                && args[0] instanceof String) {
+            // Java resolves a relative resource name against the *caller's*
+            // package -- `MyApp.class.getResourceAsStream("data.json")` reads
+            // `/com/example/data.json` -- and the bundle carries resources
+            // under exactly that path. Look them up here so the pushed
+            // program's own `theme.res`, JSON blobs and images reach the
+            // ordinary Class.getResourceAsStream idiom; a class-token receiver
+            // never reached the host path that would fall back to
+            // `localResource`, so the resource looked absent.
+            String path = (String) args[0];
+            if (path.length() > 0 && path.charAt(0) != '/') {
+                String owner = c.getName();
+                int slash = owner.lastIndexOf('/');
+                path = slash < 0 ? "/" + path : "/" + owner.substring(0, slash + 1) + path;
+            }
+            byte[] data = (byte[]) bundle.getResources().get(path);
+            if (data == null && path.startsWith("/")) {
+                // Some resources are stored without the leading slash --
+                // published verbatim by the caller. Try that spelling too
+                // rather than answering null for a resource that is present.
+                data = (byte[]) bundle.getResources().get(path.substring(1));
+            }
+            return data == null ? null : new java.io.ByteArrayInputStream(data);
+        }
         if ("getSuperclass".equals(name) && args.length == 0) {
             if (c.isArray()) {
                 // Every array class reports Object, whatever its component is.
@@ -3378,7 +3414,8 @@ public final class InterpRuntime {
         return f != null && f.thrown == t ? f.hostCall : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
     }
 
-    private int findHandler(InterpMethod m, int insn, Object thrown) throws Throwable {
+    private int findHandler(InterpMethod m, int insn, Object thrown, boolean finallyOnly)
+            throws Throwable {
         int[] t = m.exceptionTable;
         for (int i = 0; i < t.length; i += 4) {
             if (insn < t[i] || insn >= t[i + 1]) {
@@ -3387,6 +3424,13 @@ public final class InterpRuntime {
             int typeExtern = t[i + 3];
             if (typeExtern < 0) {
                 return t[i + 2];   // finally / catch-all
+            }
+            // A cancellation only runs finally-style handlers; the caller
+            // gates on it so a `catch (Throwable)` around a runaway loop
+            // cannot resume the loop by matching InterpCancelled through
+            // its Error supertype.
+            if (finallyOnly) {
+                continue;
             }
             if (thrown != null && isInstanceOf(thrown, typeExtern)) {
                 return t[i + 2];
