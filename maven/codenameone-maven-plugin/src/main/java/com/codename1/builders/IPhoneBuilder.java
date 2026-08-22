@@ -44,9 +44,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.Comparator;
+import java.util.Collections;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
+import java.nio.charset.Charset;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.io.DataInputStream;
 import java.util.regex.Pattern;
 
 /**
@@ -128,6 +134,9 @@ public class IPhoneBuilder extends Executor {
     private boolean runSpm=false;
     private boolean photoLibraryUsage;
     private String buildVersion;
+    // Where the .ios.appext archives are parked between being taken out of the resources
+    // directory and being unpacked into dist/. Null when the app brought none.
+    private File appExtensionArchiveDir;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
     private boolean usesAppReview;
@@ -984,6 +993,15 @@ public class IPhoneBuilder extends Executor {
         // We must now go through and extract this tar file into a separate directory so that we can copy them
         // into the project folder after ByteCodeTranslator has created the Xcode project.
         
+        // Before anything walks the resources: an .ios.appext is unpacked much later, once the
+        // Xcode project exists, but it has to leave resDir now. See stageAppExtensionArchives.
+        try {
+            appExtensionArchiveDir = stageAppExtensionArchives(resDir, new File(tmpFile, "appext"));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to stage the app extension archives out of the "
+                    + "resources directory", ex);
+        }
+
         // Look for frameworks and localized strings
         Set<String> variantGroups = new HashSet<String>();
         for (File child : resDir.listFiles()) {
@@ -4730,7 +4748,7 @@ public class IPhoneBuilder extends Executor {
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
-                    || hasAppExtensionArchives(resDir);
+                    || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
                 try {
                     List<File> podSpecFileList = new ArrayList<File>();
@@ -4788,7 +4806,9 @@ public class IPhoneBuilder extends Executor {
 
                     // Let's extract and add app extensions here
 
-                    File[] appExtensions = extractAppExtensions(resDir, new File(tmpFile, "dist"));
+                    File[] appExtensions = appExtensionArchiveDir == null
+                            ? new File[0]
+                            : extractAppExtensions(appExtensionArchiveDir, new File(tmpFile, "dist"));
                     StringBuilder appExtensionsBuilder = new StringBuilder();
                     {
                         StringBuilder sb = appExtensionsBuilder;
@@ -4819,38 +4839,92 @@ public class IPhoneBuilder extends Executor {
                                     + "				CLANG_WARN_UNREACHABLE_CODE = YES;\n"
                                     + "				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;";
 
-                            Map<String, String> buildSettingsMap = new HashMap<String, String>();
-                            String[] lines = buildSettingsStr.split("\n");
-                            for (String line : lines) {
-                                if (line.trim().isEmpty()) {
-                                    continue;
-                                }
-                                String key = line.substring(0, line.indexOf("=")).trim();
-                                String val = line.substring(line.indexOf("=") + 1).trim();
-                                if (val.endsWith(";")) {
-                                    val = val.substring(val.length() - 1);
-                                }
-                                buildSettingsMap.put(key, val);
-
-                            }
+                            Map<String, String> buildSettingsMap = parseXcodeBuildSettings(buildSettingsStr);
 
                             String extensionName = appExtension.getName();
                             String codeSignEntitlements = "$(NS_CODE_SIGN_ENTITLEMENTS)";
-                            if (appExtension.isDirectory()) {
-                                for (File f : appExtension.listFiles()) {
-                                    if (f.getName().endsWith(".entitlements")) {
-                                        codeSignEntitlements = extensionName + "/" + f.getName();
-                                    }
-                                }
+                            // An extension folder exported from Xcode often carries a pair --
+                            // WalletNonUIExtension.entitlements beside
+                            // WalletNonUIExtensionRelease.entitlements -- and this used to take
+                            // whichever listFiles() returned last, which is filesystem order. The
+                            // file picked here is the one the target is SIGNED with, so which of
+                            // them wins must not be luck.
+                            List<File> entitlements = extensionFilesEndingWith(appExtension, ".entitlements");
+                            File extEntitlementsFile = preferredExtensionFile(entitlements, extensionName, ".entitlements");
+                            if (entitlements.size() > 1) {
+                                debug("The " + extensionName + " app extension carries "
+                                        + entitlements.size() + " .entitlements files; signing with "
+                                        + extEntitlementsFile.getName() + ". Name the one you mean "
+                                        + extensionName + ".entitlements.");
+                            }
+                            if (extEntitlementsFile != null) {
+                                codeSignEntitlements = extensionName + "/" + extEntitlementsFile.getName();
                             }
 
 
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
+                            // The identifier as Xcode will see it: an archive may write
+                            // PRODUCT_BUNDLE_IDENTIFIER = $(EXTENSION_ID) with EXTENSION_ID beside
+                            // it, which resolves to a perfectly good identifier. Judging the raw
+                            // reference would refuse a build that works, and a reference this
+                            // build cannot resolve is not judged at all.
+                            // What this archive IS: the SDK name xcodebuild will use (versioned),
+                            // the configuration it builds, and the architecture it builds for.
+                            // Everything below matches conditional settings against these.
+                            String archiveSdk = activeIosSdkName(request);
+                            String archiveConfiguration = "Release";
+                            String archiveArch = "arm64";
+                            Map<String, String> declaredSettings = appExtensionBuildSettings(appExtension);
+                            String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
+                            // The identifier THIS archive gets: a qualified setting overrides the
+                            // plain one, so a stale base beside a right device value is not a
+                            // reason to refuse a build Xcode would have got right.
+                            String governingId = winningSetting(declaredSettings,
+                                    "PRODUCT_BUNDLE_IDENTIFIER", archiveSdk, archiveConfiguration,
+                                    archiveArch);
+                            String declaredIdForArchive = governingId != null
+                                    && governingId.trim().length() > 0
+                                            ? governingId.trim()
+                                            : (declaredId != null ? declaredId
+                                                    : request.getPackageName() + "." + extensionName);
+                            // Fully, or not at all: a partially expanded identifier is a
+                            // truncation, and it would name a bundle the archive does not contain.
+                            String fullyResolvedId = resolveSettingsFully(declaredIdForArchive,
+                                    extensionSettingsWithBuiltIns(appExtension, declaredSettings,
+                                            archiveConfiguration, archiveSdk, archiveArch));
+                            String resolvedBundleId = fullyResolvedId == null ? "" : fullyResolvedId;
+                            String outOfNamespace = resolvedBundleId.length() == 0 ? null
+                                    : outOfNamespaceExtensionIdMessage(extensionName, resolvedBundleId,
+                                            request.getPackageName());
+                            if (outOfNamespace != null) {
+                                // Refused rather than logged: Apple requires an embedded bundle to
+                                // sit under its container's identifier, no profile of this app's
+                                // can sign one that does not, and building on costs a full archive
+                                // and upload to be told the same thing later.
+                                throw new BuildException(outOfNamespace);
+                            }
+                            stampAppExtensionInfoPlist(appExtension, request);
                             buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
                             buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
                             buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", codeSignEntitlements);
                             buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
                             buildSettingsMap.put("INFOPLIST_FILE", extensionName + "/Info.plist");
+                            // Both of these every extension this builder generates sets, and the
+                            // generic path did not. An extension that supports fewer device
+                            // families than the app is an App Store rejection on upload, and
+                            // without SKIP_INSTALL the .appex is installed into the archive's
+                            // Products as a second copy of a bundle already inside the .app.
+                            buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+                            buildSettingsMap.put("SKIP_INSTALL", "YES");
+                            if (containsSwiftSource(appExtension)) {
+                                // The project's Swift settings are applied to the app target
+                                // alone, so a brought-in extension with .swift in it reached the
+                                // compiler with no SWIFT_VERSION and failed on "SWIFT_VERSION ''
+                                // is unsupported" -- after its sources had been added to the
+                                // target. Apple's own Wallet extension templates are Swift.
+                                buildSettingsMap.put("SWIFT_VERSION", request.getArg("ios.swiftVersion", "5.0"));
+                                buildSettingsMap.put("ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES", "YES");
+                            }
 
                             File buildSettingsProps = new File(appExtension, "buildSettings.properties");
                             if (buildSettingsProps.exists()) {
@@ -4869,10 +4943,36 @@ public class IPhoneBuilder extends Executor {
 
 
 
+                            // The minimum iOS this extension declares, which App Store validation
+                            // reads out of the built .appex as MinimumOSVersion. Computed after the
+                            // properties are folded in, so an archive that states its own wins.
+                            // The entitlements the TARGET IS SIGNED WITH, which is not
+                            // necessarily the one picked by name: buildSettings.properties may set
+                            // CODE_SIGN_ENTITLEMENTS at another file, and it is that file's
+                            // payment-pass-provisioning that decides whether iOS 14 is the floor.
+                            // The configuration this build hands to xcodebuild is Release for a
+                            // device archive whatever ios.buildType says, so that is what a
+                            // [config=...] condition must be matched against.
+                            File signingEntitlements = appExtensionSigningEntitlements(appExtension,
+                                    buildSettingsMap, extEntitlementsFile, archiveSdk,
+                                    archiveConfiguration, archiveArch);
+                            String extDeploymentTarget = appExtensionDeploymentTarget(
+                                    winningSetting(buildSettingsMap, "IPHONEOS_DEPLOYMENT_TARGET",
+                                            archiveSdk, archiveConfiguration, archiveArch),
+                                    signingEntitlements,
+                                    request.getArg("ios.deployment_target", null),
+                                    appExtension, buildSettingsMap);
+                            buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
+                            for (String note : repairQualifiedExtensionSettings(buildSettingsMap,
+                                    request.getPackageName(),
+                                    appExtensionDeploymentFloor(signingEntitlements))) {
+                                debug("The " + extensionName + " app extension: " + note + ".");
+                            }
+
                             // Guarded so the post-dependency re-run of fix_xcode_schemes.rb
                             // doesn't create duplicate extension targets.
                             sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
-                                    + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '10.0')\n"
+                                    + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '" + extDeploymentTarget + "')\n"
                                     + "xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|e| \n"
                                     + "  e.build_settings['PROVISIONING_PROFILE']='$(APP_PROVISIONING_PROFILE)'\n"
                                     + "  e.build_settings['CODE_SIGN_ENTITLEMENTS']='$(APP_CODE_SIGN_ENTITLEMENTS)'\n"
@@ -5680,6 +5780,1697 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /**
+     * The marketing version an embedded extension must declare.
+     *
+     * <p>Apple validates an embedded extension's versions against its containing app, so a
+     * hard-coded pair fails archive validation for every release that is not literally 1.0.
+     * Resolved exactly as the watch builder resolves the same two keys, including the
+     * injected-plist override -- which is the whole point: an app that sets
+     * CFBundleShortVersionString through ios.plistInject ships THAT version, and the raw build
+     * version is then the wrong answer for every extension beside it.</p>
+     *
+     * <p>Used by the Matter extension and by every brought-in .ios.appext.</p>
+     */
+    static String embeddedExtensionShortVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request,
+                "CFBundleShortVersionString");
+        return injected != null ? injected : WatchNativeBuilder.shortVersion(request);
+    }
+
+    /**
+     * The build version an embedded extension must declare.
+     *
+     * <p>The fallback is shortVersion, NOT the marketing version resolved above: the two keys
+     * are independent, and deriving one from the other is what produced the watch mismatch.</p>
+     */
+    static String embeddedExtensionBundleVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request, "CFBundleVersion");
+        return injected != null ? injected
+                : request.getArg("ios.bundleVersion", WatchNativeBuilder.shortVersion(request));
+    }
+
+    /**
+     * Fills in the bundle identity a brought-in {@code .ios.appext} usually leaves to Xcode,
+     * because nothing in the archive supplies it here.
+     *
+     * <p>A modern Xcode target keeps CFBundleIdentifier and the two version strings in build
+     * settings and generates them into the plist, so an extension folder exported from such a
+     * project ships an Info.plist with those keys simply absent. The target gets
+     * PRODUCT_BUNDLE_IDENTIFIER, but nothing copies it into the plist:
+     * {@code builtin-infoPlistUtility} expands {@code $(...)} references that are already there,
+     * it does not add the key. The .appex is then built with no identifier and the archive fails
+     * at the very end, in the app's own target, with "Embedded binary's bundle identifier is not
+     * prefixed with the parent app's bundle identifier -- Embedded Binary Bundle Identifier:
+     * (null)".</p>
+     *
+     * <p>Apple also requires an embedded extension to carry the same version strings as the app
+     * containing it, so a stale or absent version is the same failure one step later. Both are
+     * aligned here, and every change is logged: this edits a file the developer supplied. A value
+     * that is already correct, and one written as a {@code $(...)} reference, are left alone.</p>
+     */
+    private void stampAppExtensionInfoPlist(File appExtension, BuildRequest request) throws IOException {
+        Map<String, File> plists = appExtensionInfoPlists(appExtension);
+        Set<String> stamped = new LinkedHashSet<String>();
+        for (Map.Entry<String, File> candidate : plists.entrySet()) {
+            File infoPlist = candidate.getValue();
+            if (infoPlist == null) {
+                debug("The " + appExtension.getName() + " app extension names '" + candidate.getKey()
+                        + "' as an Info.plist this build will not edit -- it either holds a build "
+                        + "setting that cannot be resolved here, or it lands outside the project "
+                        + "directory -- so that plist was left as it is. If the archive fails on "
+                        + "the embedded binary's bundle identifier, write the path relative to the "
+                        + "project directory.");
+                continue;
+            }
+            if (!infoPlist.isFile()) {
+                debug("The " + appExtension.getName() + " app extension names '" + candidate.getKey()
+                        + "' as an Info.plist, and there is no such file. Xcode cannot build an "
+                        + "extension target without the plist its settings point at; add it to the "
+                        + ".ios.appext archive.");
+                continue;
+            }
+            if (!stamped.add(infoPlist.getCanonicalPath())) {
+                // Two settings naming the same file. Stamping is idempotent, but saying so twice
+                // in the log reads like two files were touched.
+                continue;
+            }
+            // Through the shared resolvers rather than buildVersion / the ios.bundleVersion hint
+            // directly: an app that sets either version key through ios.plistInject ships that
+            // value, and stamping the raw hint here would rewrite an extension version that
+            // already matched its app into one that does not -- the very validation failure this
+            // method exists to prevent.
+            // The settings the TARGET will carry, so a $(PRODUCT_BUNDLE_IDENTIFIER) in the plist
+            // is judged by the identifier it will actually resolve to.
+            Map<String, String> settings = appExtensionBuildSettings(appExtension);
+            String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
+            settings.put("PRODUCT_BUNDLE_IDENTIFIER", declaredId != null ? declaredId
+                    : request.getPackageName() + "." + appExtension.getName());
+            List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
+                    embeddedExtensionBundleVersion(request), request.getPackageName(), settings);
+            if (changes == null) {
+                debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
+                        + " as an XML property list, so its bundle identity was left as it is. If "
+                        + "the build fails on the embedded binary's bundle identifier, convert the "
+                        + "file with 'plutil -convert xml1 " + infoPlist.getName() + "' and rebuild.");
+                continue;
+            }
+            for (String change : changes) {
+                debug("Adjusted " + appExtension.getName() + "/" + infoPlist.getName() + ": " + change);
+            }
+        }
+    }
+
+    /// Stamps one Info.plist in place, in the encoding it was written in.
+    ///
+    /// @return what changed, empty when the plist was already right and must not be rewritten, or
+    /// null when this is not an XML plist this build can edit
+    static List<String> stampPlistFile(File infoPlist, String shortVersion, String bundleVersion,
+            Map<String, String> archiveSettings) throws IOException {
+        return stampPlistFile(infoPlist, shortVersion, bundleVersion, null, archiveSettings);
+    }
+
+    static List<String> stampPlistFile(File infoPlist, String shortVersion, String bundleVersion,
+            String hostBundleId, Map<String, String> archiveSettings) throws IOException {
+        PlistText original = readPlistText(infoPlist);
+        List<String> changes = new ArrayList<String>();
+        String result = stampInfoPlistIdentity(original.text, shortVersion, bundleVersion,
+                hostBundleId, archiveSettings, changes);
+        if (changes.isEmpty()) {
+            return changes;
+        }
+        if (result == null) {
+            return null;
+        }
+        writePlistText(infoPlist, original, result);
+        return changes;
+    }
+
+    /// An Info.plist decoded the way its own bytes say it is encoded, so it can be written back
+    /// the same way.
+    private static final class PlistText {
+        final String text;
+        final Charset charset;
+        final byte[] bom;
+
+        PlistText(String text, Charset charset, byte[] bom) {
+            this.text = text;
+            this.charset = charset;
+            this.bom = bom;
+        }
+    }
+
+    /// Reads a plist as text, honouring its byte order mark or its XML declaration.
+    ///
+    /// The default charset is not good enough for a file that arrives from someone else's machine:
+    /// a UTF-16 plist read as UTF-8 is noise, so the stamper would decline to parse it and the
+    /// extension would ship unstamped, and a Latin-1 plist read as UTF-8 loses every accented
+    /// character -- which this method would then write back, corrupting a display name to fix an
+    /// identifier.
+    private static PlistText readPlistText(File infoPlist) throws IOException {
+        byte[] data = readFileBytes(infoPlist);
+        byte[] bom = bomOf(data);
+        Charset charset = charsetOf(data, bom);
+        int from = bom == null ? 0 : bom.length;
+        return new PlistText(new String(data, from, data.length - from, charset), charset, bom);
+    }
+
+    /// Writes the stamped text back in the charset it was read in, byte order mark included, so
+    /// the file's own XML declaration stays true.
+    private static void writePlistText(File infoPlist, PlistText original, String text)
+            throws IOException {
+        byte[] body = text.getBytes(original.charset);
+        byte[] out = body;
+        if (original.bom != null) {
+            out = new byte[original.bom.length + body.length];
+            System.arraycopy(original.bom, 0, out, 0, original.bom.length);
+            System.arraycopy(body, 0, out, original.bom.length, body.length);
+        }
+        FileOutputStream stream = new FileOutputStream(infoPlist);
+        try {
+            stream.write(out);
+        } finally {
+            try { stream.close(); } catch (Throwable t) {}
+        }
+    }
+
+    private static byte[] readFileBytes(File file) throws IOException {
+        byte[] data = new byte[(int) file.length()];
+        DataInputStream in = new DataInputStream(new FileInputStream(file));
+        try {
+            in.readFully(data);
+        } finally {
+            try { in.close(); } catch (Throwable t) {}
+        }
+        return data;
+    }
+
+    private static final byte[] BOM_UTF8 = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    private static final byte[] BOM_UTF16BE = {(byte) 0xFE, (byte) 0xFF};
+    private static final byte[] BOM_UTF16LE = {(byte) 0xFF, (byte) 0xFE};
+
+    private static byte[] bomOf(byte[] data) {
+        for (byte[] bom : new byte[][]{BOM_UTF8, BOM_UTF16BE, BOM_UTF16LE}) {
+            if (data.length >= bom.length) {
+                boolean match = true;
+                for (int i = 0; i < bom.length; i++) {
+                    match &= data[i] == bom[i];
+                }
+                if (match) {
+                    return bom;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// The charset a plist's bytes declare: its byte order mark first, then the encoding named in
+    /// its XML declaration, and UTF-8 when it says neither -- which is what an XML parser does.
+    private static Charset charsetOf(byte[] data, byte[] bom) {
+        if (bom == BOM_UTF16BE) {
+            return StandardCharsets.UTF_16BE;
+        }
+        if (bom == BOM_UTF16LE) {
+            return StandardCharsets.UTF_16LE;
+        }
+        // UTF-16 without a byte order mark: its declaration is NUL-interleaved, so the probe below
+        // reads gibberish and falls through to UTF-8, and the plist then fails to parse and goes
+        // unstamped. The first characters of an XML document are "<?".
+        if (data.length >= 4 && data[0] == 0 && data[1] == '<' && data[2] == 0 && data[3] == '?') {
+            return StandardCharsets.UTF_16BE;
+        }
+        if (data.length >= 4 && data[0] == '<' && data[1] == 0 && data[2] == '?' && data[3] == 0) {
+            return StandardCharsets.UTF_16LE;
+        }
+        // The declaration is ASCII-compatible in every encoding that can carry one, except the
+        // UTF-16 forms, which the marks above have already answered for.
+        String head = new String(data, 0, Math.min(data.length, 512), StandardCharsets.ISO_8859_1);
+        Matcher declared = XML_ENCODING.matcher(head);
+        if (declared.find()) {
+            try {
+                return Charset.forName(declared.group(1));
+            } catch (Exception unsupported) {
+                // An encoding this JVM does not know. UTF-8 is the better guess than the platform
+                // default, and a plist that then fails to parse is left alone rather than rewritten.
+            }
+        }
+        return StandardCharsets.UTF_8;
+    }
+
+    private static final Pattern XML_ENCODING = Pattern.compile(
+            "<\\?xml[^>]*encoding\\s*=\\s*[\"\']([A-Za-z0-9_.:-]+)[\"\']");
+
+    /// Every Info.plist this extension's target might be built with, by the setting that names it.
+    ///
+    /// Not just INFOPLIST_FILE: Xcode honours a qualified setting -- INFOPLIST_FILE[sdk=iphoneos*]
+    /// -- and the archive's buildSettings.properties are copied into the target verbatim, so a
+    /// qualified one takes precedence for the builds it matches while the base value serves the
+    /// rest. Which one applies depends on the sdk, configuration and arch of the build Xcode is
+    /// running, so every one of them is stamped: they are all plists this extension may ship, and
+    /// stamping is idempotent.
+    ///
+    /// (An UNescaped `INFOPLIST_FILE[sdk=iphoneos*] = x` in a .properties file is not one of
+    /// these. Properties splits on that first `=`, leaving the key `INFOPLIST_FILE[sdk`, which
+    /// Xcode does not recognise as a setting at all -- so the base value still decides, and this
+    /// map is right to ignore it.)
+    ///
+    /// @return the raw setting value that named each plist, mapped to the resolved file, or to
+    /// null when that value is unresolvable or lands outside the project directory
+    static Map<String, File> appExtensionInfoPlists(File extensionFolder) {
+        Map<String, String> settings = appExtensionBuildSettings(extensionFolder);
+        Map<String, File> out = new LinkedHashMap<String, File>();
+        String base = settings.get("INFOPLIST_FILE");
+        if (base == null || base.trim().length() == 0) {
+            File byDefault = new File(extensionFolder, "Info.plist");
+            out.put("Info.plist",
+                    insideProjectDir(byDefault, extensionFolder.getParentFile()) ? byDefault : null);
+        } else {
+            out.put(base.trim(), resolveInfoPlistPath(base.trim(), extensionFolder, settings));
+        }
+        for (Map.Entry<String, String> setting : settings.entrySet()) {
+            String key = setting.getKey();
+            // Closing bracket included: an unescaped conditional leaves Properties with the key
+            // INFOPLIST_FILE[sdk and the rest of the line as its value, and that is not a setting
+            // Xcode honours -- picking it up here would send the stamper after a path built out of
+            // the wreckage.
+            if (!key.startsWith("INFOPLIST_FILE[") || !key.endsWith("]")) {
+                continue;
+            }
+            String value = setting.getValue() == null ? "" : setting.getValue().trim();
+            if (value.length() > 0 && !out.containsKey(value)) {
+                out.put(value, resolveInfoPlistPath(value, extensionFolder, settings));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The text half of {@link #stampAppExtensionInfoPlist}, kept separate so it can be tested.
+     *
+     * @param changes collects a human-readable line per edit; empty means the plist was already
+     * right and must not be rewritten
+     * @return the new plist text, or null when this is not an XML plist we can edit -- in which
+     * case {@code changes} carries the reason and the file is left alone
+     */
+    static String stampInfoPlistIdentity(String plist, String shortVersion, String bundleVersion,
+            Map<String, String> archiveSettings, List<String> changes) {
+        return stampInfoPlistIdentity(plist, shortVersion, bundleVersion, null, archiveSettings, changes);
+    }
+
+    /// @param hostBundleId the containing app's bundle identifier, so a literal identifier that
+    /// could never be one of its extensions can be recognised; null skips that check
+    static String stampInfoPlistIdentity(String plist, String shortVersion, String bundleVersion,
+            String hostBundleId, Map<String, String> archiveSettings, List<String> changes) {
+        if (plist == null || rootDictAt(plist) < 0) {
+            changes.add("not an XML property list");
+            return null;
+        }
+        String result = openEmptyRootDict(plist);
+        // A literal left over from another project is not prefixed by the host's bundle id, and
+        // PRODUCT_BUNDLE_IDENTIFIER cannot save it: the literal is what ships. One that could be
+        // this app's extension is kept; one that could not is replaced.
+        result = setPlistString(result, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)",
+                !identifierBelongsToApp(result, hostBundleId, archiveSettings), archiveSettings, changes);
+        result = setPlistString(result, "CFBundleShortVersionString", shortVersion,
+                true, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleVersion", bundleVersion,
+                true, archiveSettings, changes);
+        // The rest of what makes a directory an app-extension BUNDLE rather than a folder with a
+        // program in it. Without CFBundleExecutable the .appex does not claim its own binary, and
+        // App Store validation rejects the upload -- "the ... binary file is not permitted. Your
+        // app cannot contain standalone executables or libraries, other than a valid
+        // CFBundleExecutable of supported bundles" -- after a build that succeeded and an archive
+        // that exported cleanly. Every extension this builder generates itself writes exactly
+        // these; a brought-in one whose plist leaves them to GENERATE_INFOPLIST_FILE arrives
+        // without them, and nothing downstream puts them back.
+        result = setPlistString(result, "CFBundleExecutable", "$(EXECUTABLE_NAME)",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundlePackageType", "XPC!",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleName", "$(PRODUCT_NAME)",
+                false, archiveSettings, changes);
+        result = setPlistString(result, "CFBundleInfoDictionaryVersion", "6.0",
+                false, archiveSettings, changes);
+        // The reference rather than a literal "en", as the generated Wallet and push extensions
+        // both write it: the archive's own DEVELOPMENT_LANGUAGE is copied into this target's build
+        // settings, so an extension whose development language is not English gets its own value
+        // here instead of advertising the wrong fallback localization.
+        result = setPlistString(result, "CFBundleDevelopmentRegion", "$(DEVELOPMENT_LANGUAGE)",
+                false, archiveSettings, changes);
+        return result;
+    }
+
+    /// Whether the identifier the plist already carries can be an extension of this app: absent,
+    /// a build-setting reference, or a literal under the host's own bundle id.
+    static boolean identifierBelongsToApp(String plist, String hostBundleId,
+            Map<String, String> archiveSettings) {
+        if (hostBundleId == null || hostBundleId.length() == 0) {
+            return true;
+        }
+        int afterKey = topLevelKeyEnd(plist, "CFBundleIdentifier");
+        if (afterKey < 0) {
+            return true;
+        }
+        int element = nextMarkupAt(plist, afterKey);
+        if (element < 0 || !"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
+            return true;
+        }
+        int openEnd = plist.indexOf('>', element);
+        if (openEnd < 0 || plist.charAt(openEnd - 1) == '/') {
+            return true;
+        }
+        int valueEnd = WatchNativeBuilder.closeOfElement(plist, openEnd + 1, "</string>");
+        if (valueEnd < 0) {
+            return true;
+        }
+        String current = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, valueEnd));
+        if (current == null || current.length() == 0) {
+            return true;
+        }
+        // Through the settings, because $(PRODUCT_BUNDLE_IDENTIFIER) is not automatically safe:
+        // the archive may override PRODUCT_BUNDLE_IDENTIFIER itself, with the identifier from the
+        // project the extension was exported from, and those overrides are written onto this
+        // target. A reference is only as good as what it lands on.
+        String resolved = resolveSettingsInValue(current, archiveSettings);
+        if (resolved.length() == 0) {
+            // $(EXTENSION_BUNDLE_ID) with nothing defining it does not fall back to the target's
+            // identifier -- Xcode expands it to the empty string and the .appex ships with no
+            // identifier at all. The one reference that IS safe, $(PRODUCT_BUNDLE_IDENTIFIER),
+            // resolves through the settings because the caller puts the target's own there.
+            return false;
+        }
+        return resolved.startsWith(hostBundleId + ".");
+    }
+
+    /**
+     * Sets one string key among the ROOT dict's direct children, adding it when absent.
+     *
+     * <p>Every lookup here is anchored to the top level because a plist is full of nested
+     * dictionaries that carry keys of their own -- NSExtension, CFBundleURLTypes,
+     * CFBundleDocumentTypes -- and a repository-wide text search finds whichever comes first in
+     * the file, not the bundle's identity. Reading a nested one as "already present" leaves the
+     * real key absent, and writing to it stamps a version number into an unrelated value.</p>
+     *
+     * @param overwriteNonEmpty whether a value that is already there and not empty is replaced
+     * when it differs. False fills only what is missing or empty, which is what an identifier
+     * wants: an explicit one is the extension's own business, an empty one is no identifier at
+     * all and fails the same embedded-binary validation as a missing one.
+     */
+    private static String setPlistString(String plist, String key, String value,
+            boolean overwriteNonEmpty, Map<String, String> archiveSettings, List<String> changes) {
+        if (value == null || value.length() == 0) {
+            return plist;
+        }
+        int afterKey = topLevelKeyEnd(plist, key);
+        if (afterKey < 0) {
+            int dictEnd = rootDictCloseAt(plist);
+            if (dictEnd < 0) {
+                return plist;
+            }
+            changes.add("added " + key + " = " + value);
+            return plist.substring(0, dictEnd)
+                    + "\t<key>" + key + "</key>\n\t<string>" + value + "</string>\n"
+                    + plist.substring(dictEnd);
+        }
+        // The key's OWN value, not the next <string> anywhere after it. A key whose value is
+        // <false/> or <integer>1</integer> has no string of its own, and scanning forward lands on
+        // an unrelated later one -- the trap the comment on injectedPlistString records.
+        int element = nextMarkupAt(plist, afterKey);
+        if (element < 0) {
+            return plist;
+        }
+        if (!"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
+            // The key's OWN value, of a type it may not have: every key this stamper manages is a
+            // bundle identity key and Apple requires a string. <integer>7</integer> for
+            // CFBundleVersion is not a version to preserve, it is an invalid bundle -- and leaving
+            // it while reporting success is how the stamper would hand back one that still fails.
+            // (Wandering off to some LATER key's <string> is the different mistake, and the search
+            // above is anchored to this key precisely so that cannot happen.)
+            int valueEnds = endOfElement(plist, element);
+            if (valueEnds < 0) {
+                return plist;
+            }
+            changes.add("set " + key + " to " + value + " (was "
+                    + WatchNativeBuilder.tagAt(plist, element) + ", which is not a string)");
+            return plist.substring(0, element) + "<string>" + value + "</string>"
+                    + plist.substring(valueEnds);
+        }
+        int openEnd = plist.indexOf('>', element);
+        if (openEnd < 0) {
+            return plist;
+        }
+        if (plist.charAt(openEnd - 1) == '/') {
+            // The empty form, <string/> or <string />: XML puts the slash against the '>' whatever
+            // whitespace precedes it, so one test covers both spellings. It is this key's own
+            // value and it is empty, which is never a usable identifier or version -- filled
+            // regardless of overwriteNonEmpty, since there is nothing here to preserve.
+            changes.add("set " + key + " to " + value + " (was empty)");
+            return plist.substring(0, element) + "<string>" + value + "</string>"
+                    + plist.substring(openEnd + 1);
+        }
+        int valueEnd = WatchNativeBuilder.closeOfElement(plist, openEnd + 1, "</string>");
+        if (valueEnd < 0) {
+            return plist;
+        }
+        String current = plist.substring(openEnd + 1, valueEnd);
+        if (current.equals(value)) {
+            return plist;
+        }
+        // What the value IS, not how it is spelled: a CDATA section resolved, a comment stripped,
+        // entities decoded, and TRIMMED -- both of plistStringContent's paths end in .trim().
+        // <string><!-- filled in by CI --></string> is a nonzero run of text and an empty value,
+        // and reading it as "an identifier is already here" leaves the extension with none.
+        //
+        // So every spelling of empty arrives here as "" and needs no test of its own: whitespace
+        // between the tags, a comment, an empty or whitespace-only CDATA section, and any mix.
+        // <string/> and <string /> are handled further up -- XML puts the slash against the '>'
+        // whatever whitespace precedes it, so the character before '>' identifies both. Please do
+        // not add another emptiness special case here without a failing test first; several
+        // proposed ones were already covered, and the daemon's AppExtensionInfoPlistTest pins
+        // each form.
+        String currentText = WatchNativeBuilder.plistStringContent(current);
+        if (currentText == null) {
+            currentText = "";
+        }
+        // And the same content untrimmed, because a plist parser keeps padding wherever it is
+        // written -- <string> 5.4 </string> and <string><![CDATA[ 5.4 ]]></string> both parse as
+        // " 5.4 ", which Apple compares against the app's "5.4" and rejects. Emptiness is judged
+        // on the trimmed text; everything else on the exact one.
+        String currentExact = WatchNativeBuilder.plistStringContentExact(current);
+        if (currentExact == null) {
+            currentExact = "";
+        }
+        if (currentText.length() == 0) {
+            changes.add("set " + key + " to " + value + " (was empty)");
+            return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
+        }
+        if (currentExact.equals(value)) {
+            return plist;
+        }
+        if (!overwriteNonEmpty) {
+            return plist;
+        }
+        // A value written as $(MARKETING_VERSION) is judged by what it RESOLVES to, not by being a
+        // reference. The archive's buildSettings.properties are copied into this target's build
+        // configurations further down, so the reference lands on whatever they say -- a stale 1.0
+        // under an app at 5.4 -- and a setting they do not define resolves to nothing at all,
+        // since the target this build generates has no version settings of its own. Both fail the
+        // embedded-bundle check; only a reference that already lands on the app's own version is
+        // left standing.
+        // Resolved from the exact text, so padding written inside CDATA or as entities counts
+        // exactly as padding written outside it would.
+        String resolved = resolveSettingsInValue(currentExact, archiveSettings);
+        if (value.equals(resolved)) {
+            return plist;
+        }
+        changes.add("set " + key + " to " + value + " to match the app (was " + currentText
+                + (resolved.equals(currentText) ? "" : ", which resolves to '" + resolved + "' here")
+                + ")");
+        return plist.substring(0, openEnd + 1) + value + plist.substring(valueEnd);
+    }
+
+    /// A root written as {@code <dict/>} carries no keys and has nowhere to put one, so it is
+    /// opened into a pair before anything is added to it.
+    private static String openEmptyRootDict(String plist) {
+        int at = rootDictAt(plist);
+        int openEnd = at < 0 ? -1 : plist.indexOf('>', at);
+        if (openEnd < 0 || plist.charAt(openEnd - 1) != '/') {
+            return plist;
+        }
+        return plist.substring(0, at) + "<dict>\n</dict>" + plist.substring(openEnd + 1);
+    }
+
+    /// Index just past the {@code </key>} of {@code key}, when that key is a DIRECT child of the
+    /// root dict; -1 when the root dict has no such child. Nested dictionaries are stepped over
+    /// whole, so a key of the same name inside one is not mistaken for the bundle's own.
+    private static int topLevelKeyEnd(String plist, String key) {
+        int at = rootDictAt(plist);
+        int i = at < 0 ? -1 : plist.indexOf('>', at);
+        if (i < 0 || plist.charAt(i - 1) == '/') {
+            return -1;
+        }
+        i++;
+        while (true) {
+            int element = nextMarkupAt(plist, i);
+            if (element < 0 || plist.startsWith("</", element)) {
+                return -1;
+            }
+            int openEnd = plist.indexOf('>', element);
+            if (openEnd < 0) {
+                return -1;
+            }
+            if (!"key".equals(WatchNativeBuilder.tagAt(plist, element))) {
+                // A value with no key of ours in front of it. Step over it whole.
+                i = endOfElement(plist, element);
+                if (i < 0) {
+                    return -1;
+                }
+                continue;
+            }
+            if (plist.charAt(openEnd - 1) == '/') {
+                i = openEnd + 1;
+                continue;
+            }
+            int close = WatchNativeBuilder.closeOfElement(plist, openEnd + 1, "</key>");
+            int afterKey = close < 0 ? -1 : plist.indexOf('>', close);
+            if (afterKey < 0) {
+                return -1;
+            }
+            afterKey++;
+            // The key's CONTENT resolved, so a name spelled with CDATA or wrapped in a comment
+            // still matches -- an XML parser reads all of those as the same key.
+            String name = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, close));
+            if (key.equals(name)) {
+                return afterKey;
+            }
+            int valueElement = nextMarkupAt(plist, afterKey);
+            if (valueElement < 0) {
+                return -1;
+            }
+            i = endOfElement(plist, valueElement);
+            if (i < 0) {
+                return -1;
+            }
+        }
+    }
+
+    /// The {@code <} of the plist's root dict, or -1 when this is not a dict-rooted XML plist.
+    /// The declaration, the doctype and the {@code <plist>} wrapper are stepped past.
+    private static int rootDictAt(String plist) {
+        int i = 0;
+        while (true) {
+            int element = nextMarkupAt(plist, i);
+            if (element < 0) {
+                return -1;
+            }
+            int gt = plist.indexOf('>', element);
+            if (gt < 0) {
+                return -1;
+            }
+            String tag = WatchNativeBuilder.tagAt(plist, element);
+            if ("dict".equals(tag)) {
+                return element;
+            }
+            if (tag.length() > 0 && !"plist".equals(tag)) {
+                // A plist rooted in an array or a bare value. It has no keys to stamp.
+                return -1;
+            }
+            i = gt + 1;
+        }
+    }
+
+    /// The {@code <} of the tag that closes the root dict, which is where a missing key is added.
+    private static int rootDictCloseAt(String plist) {
+        int at = rootDictAt(plist);
+        int end = at < 0 ? -1 : endOfElement(plist, at);
+        // end - 1, not end: endOfElement returns the index just PAST the closing '>', which in a
+        // compact plist ending "</dict></plist>" is the '<' of </plist>. An inclusive search from
+        // there picked that one and inserted the keys between the two closing tags.
+        return end < 1 ? -1 : plist.lastIndexOf('<', end - 1);
+    }
+
+    /// Index just past the element opening at {@code element}, everything nested inside it
+    /// included. Depth is counted on the element's own name, so a dict inside a dict closes in
+    /// the right place.
+    private static int endOfElement(String plist, int element) {
+        String tag = WatchNativeBuilder.tagAt(plist, element);
+        int openEnd = plist.indexOf('>', element);
+        if (openEnd < 0) {
+            return -1;
+        }
+        if (plist.charAt(openEnd - 1) == '/') {
+            return openEnd + 1;
+        }
+        int depth = 1;
+        int i = openEnd + 1;
+        while (depth > 0) {
+            int at = nextMarkupAt(plist, i);
+            if (at < 0) {
+                return -1;
+            }
+            int gt = plist.indexOf('>', at);
+            if (gt < 0) {
+                return -1;
+            }
+            if (plist.startsWith("</", at)) {
+                if (tag.equals(closeTagAt(plist, at))) {
+                    depth--;
+                }
+            } else if (plist.charAt(gt - 1) != '/'
+                    && tag.equals(WatchNativeBuilder.tagAt(plist, at))) {
+                depth++;
+            }
+            i = gt + 1;
+        }
+        return i;
+    }
+
+    /// The element name of the end tag at {@code at}, lowercased, or empty when that is not one.
+    private static String closeTagAt(String plist, int at) {
+        StringBuilder tag = new StringBuilder();
+        for (int j = at + 2; j < plist.length() && Character.isLetterOrDigit(plist.charAt(j)); j++) {
+            tag.append(plist.charAt(j));
+        }
+        return tag.toString().toLowerCase(java.util.Locale.ENGLISH);
+    }
+
+    /// The {@code <} of the next markup at or after {@code from}, with comments and CDATA stepped
+    /// over whole so a {@code <} inside either is not read as a tag.
+    private static int nextMarkupAt(String plist, int from) {
+        int i = from;
+        while (i < plist.length()) {
+            int at = plist.indexOf('<', i);
+            if (at < 0) {
+                return -1;
+            }
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, i);
+            if (skipped < 0) {
+                return -1;
+            }
+            if (skipped != at) {
+                i = skipped;
+                continue;
+            }
+            return at;
+        }
+        return -1;
+    }
+
+    /// The Info.plist the extension target is actually built with.
+    ///
+    /// {@code <folder>/Info.plist} is only the default: the archive's buildSettings.properties
+    /// may point INFOPLIST_FILE at another file, and that is the one Xcode processes into the
+    /// .appex. Stamping the default in that case leaves the plist that ships without the
+    /// identifier and versions the stamping is there to supply.
+    ///
+    /// The path is written the way Xcode reads it: relative to the project directory, which is
+    /// the extension folder's parent. A value that still holds a build-setting reference after
+    /// the two obvious project-root spellings is not resolvable here, and null says so rather
+    /// than guessing at a file to edit.
+    /// The extension folder's files with the given suffix, in a fixed order.
+    static List<File> extensionFilesEndingWith(File extensionFolder, String suffix) {
+        List<File> out = new ArrayList<File>();
+        File[] entries = extensionFolder == null ? null : extensionFolder.listFiles();
+        if (entries == null) {
+            return out;
+        }
+        for (File f : entries) {
+            if (f.isFile() && f.getName().endsWith(suffix)) {
+                out.add(f);
+            }
+        }
+        Collections.sort(out, new Comparator<File>() {
+            public int compare(File a, File b) {
+                return a.getName().compareTo(b.getName());
+            }
+        });
+        return out;
+    }
+
+    /// Which of them to use: the one named after the extension if it is there, else the first by
+    /// name. Never the accident of directory order, because this file decides how the target is
+    /// signed and what it is signed to allow.
+    static File preferredExtensionFile(List<File> candidates, String extensionName, String suffix) {
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        for (File f : candidates) {
+            if (f.getName().equals(extensionName + suffix)) {
+                return f;
+            }
+        }
+        return candidates.get(0);
+    }
+
+    /// The first symbolic link under {@code dir} that resolves outside {@code root}, or null.
+    ///
+    /// unzip refuses an absolute path or a ../ traversal in an entry NAME, but it happily creates
+    /// a symlink, and the entry that plants one is an ordinary-looking file. Everything under an
+    /// extension folder is then handed to Xcode -- added to the target, copied into the bundle,
+    /// swept into the sources tarball -- so a link pointing at the build machine's provisioning
+    /// profiles or another build's directory would be read through and shipped. The build stops
+    /// rather than following it.
+    static File symlinkEscaping(File dir, File root) throws IOException {
+        File[] entries = dir == null ? null : dir.listFiles();
+        if (entries == null) {
+            return null;
+        }
+        String rootPath = root.getCanonicalPath();
+        if (!rootPath.endsWith(File.separator)) {
+            rootPath += File.separator;
+        }
+        for (File f : entries) {
+            if (!f.getCanonicalPath().startsWith(rootPath)) {
+                return f;
+            }
+            if (Files.isSymbolicLink(f.toPath())) {
+                // Inside the folder, so harmless as a path -- but a link to a directory would let
+                // the walk below leave through it, and it is not something an archive needs.
+                continue;
+            }
+            if (f.isDirectory()) {
+                File escaping = symlinkEscaping(f, root);
+                if (escaping != null) {
+                    return escaping;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Whether an extension folder holds Swift anywhere in it.
+    static boolean containsSwiftSource(File dir) {
+        File[] entries = dir == null ? null : dir.listFiles();
+        if (entries == null) {
+            return false;
+        }
+        for (File f : entries) {
+            if (f.isDirectory()) {
+                if (containsSwiftSource(f)) {
+                    return true;
+                }
+            } else if (f.getName().endsWith(".swift")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The entitlements file the extension target is signed with.
+    ///
+    /// CODE_SIGN_ENTITLEMENTS is a path relative to the project directory, the same shape as
+    /// INFOPLIST_FILE, and the archive may point it at a file other than the one named after the
+    /// extension. What it names is what Xcode signs against, so it is also what decides the
+    /// entitlement-driven deployment floor. Falls back to the named pick when the setting is
+    /// absent, still a placeholder, or points somewhere this build will not read.
+    static File appExtensionSignedEntitlements(File extensionFolder, String configured, File byName,
+            Map<String, String> settings) {
+        if (configured == null || configured.trim().length() == 0 || configured.contains("$(NS_")) {
+            return byName;
+        }
+        // From the settings MAP, not from buildSettings.properties: that file is loaded into the
+        // map and deleted before this runs, so a path holding $(PRODUCT_NAME) would resolve
+        // against an override that is no longer readable and quietly name a different file.
+        File resolved = resolveInfoPlistPath(configured.trim(), extensionFolder, settings);
+        return resolved != null && resolved.isFile() ? resolved : byName;
+    }
+
+    /// Whether an entitlements plist grants a boolean entitlement at its top level.
+    ///
+    /// Read as a property list, not searched as text: entitlements may be UTF-16, in which case a
+    /// byte search for the key finds nothing and a Wallet extension keeps the 12.0 floor it will
+    /// be rejected for; and the same string sitting in a comment, or in some unrelated value, is
+    /// not a granted entitlement -- taking it for one pushes an extension to iOS 14 and drops it
+    /// off the 12 and 13 devices it would have run on.
+    static boolean entitlementIsTrue(File entitlements, String key) {
+        if (entitlements == null || !entitlements.isFile()) {
+            return false;
+        }
+        String text;
+        try {
+            text = readPlistText(entitlements).text;
+        } catch (IOException cannotRead) {
+            return false;
+        }
+        if (rootDictAt(text) < 0) {
+            // Not XML we can walk -- most often a binary plist, which Xcode writes as readily as
+            // it writes XML and which signs exactly the same. Answering "no entitlement" here puts
+            // an issuer-provisioning extension back on the 12.0 floor Apple rejects it for.
+            return binaryEntitlementGrants(entitlements, key);
+        }
+        int afterKey = topLevelKeyEnd(text, key);
+        if (afterKey < 0) {
+            return false;
+        }
+        int element = nextMarkupAt(text, afterKey);
+        return element >= 0 && "true".equals(WatchNativeBuilder.tagAt(text, element));
+    }
+
+    /// A binary entitlements plist, read through plutil where there is one.
+    ///
+    /// The fallback is a search of the bytes, which is what this used to do to every entitlements
+    /// file and which was wrong for XML: there a mention inside a comment or an unrelated value
+    /// reads as a grant. A binary plist has no comments, and these entitlement names do not appear
+    /// as ordinary text, so on the file kind that is left it is a fair answer -- and erring toward
+    /// the 14.0 floor costs iOS 12 and 13 availability, while erring the other way costs the
+    /// upload.
+    private static boolean binaryEntitlementGrants(File entitlements, String key) {
+        String xml = plutilAsXml(entitlements);
+        if (xml != null && rootDictAt(xml) >= 0) {
+            int afterKey = topLevelKeyEnd(xml, key);
+            if (afterKey < 0) {
+                return false;
+            }
+            int element = nextMarkupAt(xml, afterKey);
+            return element >= 0 && "true".equals(WatchNativeBuilder.tagAt(xml, element));
+        }
+        return fileContains(entitlements, key);
+    }
+
+    /// The file as XML through /usr/bin/plutil, or null where that is not available or it refuses.
+    private static String plutilAsXml(File file) {
+        File plutil = new File("/usr/bin/plutil");
+        if (!plutil.canExecute()) {
+            return null;
+        }
+        try {
+            Process p = new ProcessBuilder(plutil.getAbsolutePath(), "-convert", "xml1", "-o", "-",
+                    file.getAbsolutePath()).redirectErrorStream(false).start();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            InputStream in = p.getInputStream();
+            try {
+                byte[] buffer = new byte[4096];
+                int read = in.read(buffer);
+                while (read > 0) {
+                    out.write(buffer, 0, read);
+                    read = in.read(buffer);
+                }
+            } finally {
+                try { in.close(); } catch (Throwable t) {}
+            }
+            return p.waitFor() == 0 ? new String(out.toByteArray(), StandardCharsets.UTF_8) : null;
+        } catch (Exception cannotRun) {
+            return null;
+        }
+    }
+
+    /// Why an extension's identifier cannot ship, or null when it can.
+    ///
+    /// An embedded bundle must sit under the identifier of the app that carries it -- Apple's
+    /// rule, checked on upload -- so an archive whose PRODUCT_BUNDLE_IDENTIFIER points somewhere
+    /// else describes an extension this app can never ship, whatever the rest of the build does.
+    static String outOfNamespaceExtensionIdMessage(String extensionName, String effectiveId,
+            String hostPackage) {
+        if (hostPackage == null || hostPackage.length() == 0 || effectiveId == null
+                || effectiveId.startsWith(hostPackage + ".")) {
+            return null;
+        }
+        return "The " + extensionName + " app extension is set to build as '" + effectiveId
+                + "', which is not under the app's own '" + hostPackage + "'. An embedded "
+                + "extension must be, or Apple refuses the upload and no profile of this app's "
+                + "can sign it. Fix PRODUCT_BUNDLE_IDENTIFIER in " + extensionName
+                + "/buildSettings.properties, or remove it to take the default of " + hostPackage
+                + "." + extensionName + ".";
+    }
+
+    /// The archive's settings plus the ones Xcode defines for this target itself.
+    ///
+    /// A value written through TARGET_NAME or PRODUCT_NAME -- com.example.app.$(TARGET_NAME) is
+    /// an ordinary way to write an extension's identifier -- resolves on the build machine and
+    /// must resolve here too. Without them the reference is simply deleted, and what was recorded
+    /// for the export-options dictionary was "com.example.app.", a key matching nothing in the
+    /// archive.
+    static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
+            Map<String, String> settings) {
+        return extensionSettingsWithBuiltIns(extensionFolder, settings, null, null, null);
+    }
+
+    /// @param configuration, {@code sdk} and {@code arch} the archive's own, since
+    /// $(CONFIGURATION) in a path or an identifier is as ordinary as $(TARGET_NAME) and this
+    /// build knows all three
+    static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
+            Map<String, String> settings, String configuration, String sdk, String arch) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        if (settings != null) {
+            out.putAll(settings);
+        }
+        String targetName = extensionFolder.getName();
+        out.put("TARGET_NAME", targetName);
+        File projectDir = extensionFolder.getParentFile();
+        String projectPath = projectDir == null ? "." : projectDir.getAbsolutePath();
+        if (!out.containsKey("SRCROOT")) {
+            out.put("SRCROOT", projectPath);
+        }
+        if (!out.containsKey("PROJECT_DIR")) {
+            out.put("PROJECT_DIR", projectPath);
+        }
+        if (configuration != null && !out.containsKey("CONFIGURATION")) {
+            out.put("CONFIGURATION", configuration);
+        }
+        if (sdk != null) {
+            if (!out.containsKey("SDK_NAME")) {
+                out.put("SDK_NAME", sdk);
+            }
+            if (!out.containsKey("PLATFORM_NAME")) {
+                out.put("PLATFORM_NAME", platformOf(sdk));
+            }
+        }
+        if (arch != null) {
+            if (!out.containsKey("CURRENT_ARCH")) {
+                out.put("CURRENT_ARCH", arch);
+            }
+            if (!out.containsKey("arch")) {
+                out.put("arch", arch);
+            }
+        }
+        // PRODUCT_NAME last, and only now: it is $(TARGET_NAME) unless the archive says otherwise,
+        // and "otherwise" may be a chain through any of the settings above --
+        // PRODUCT_NAME = $(CONFIGURATION)-Wallet is one. Resolving it before CONFIGURATION,
+        // SDK_NAME and CURRENT_ARCH were in the map deleted the reference and left "-Wallet",
+        // which then went into an identifier and into the export-options key.
+        String productName = out.get("PRODUCT_NAME");
+        String resolvedProductName = productName == null ? ""
+                : resolveSettingsInValue(productName, out);
+        out.put("PRODUCT_NAME", resolvedProductName.length() > 0 ? resolvedProductName : targetName);
+        return out;
+    }
+
+    /// Every entitlements file this target may be signed with: the plain CODE_SIGN_ENTITLEMENTS
+    /// and each qualified one.
+    ///
+    /// Xcode honours CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] over the plain setting for the device
+    /// archive, so an archive that grants payment-pass-provisioning only in its device
+    /// entitlements was read as granting nothing and kept the 12.0 floor Apple rejects it for.
+    static List<File> appExtensionEntitlementsCandidates(File extensionFolder,
+            Map<String, String> settings, File byName) {
+        return appExtensionEntitlementsCandidates(extensionFolder, settings, byName, null, null);
+    }
+
+    /// The one entitlements file this archive is signed with.
+    static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
+            File byName, String sdk, String configuration) {
+        return appExtensionSigningEntitlements(extensionFolder, settings, byName, sdk,
+                configuration, null);
+    }
+
+    static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
+            File byName, String sdk, String configuration, String arch) {
+        String winner = winningSetting(settings, "CODE_SIGN_ENTITLEMENTS", sdk, configuration, arch);
+        if (winner == null || winner.trim().length() == 0) {
+            return byName;
+        }
+        // With the archive's context, because $(CONFIGURATION)/Extension.entitlements is a
+        // standard way to write this path; without it the path did not resolve and a different
+        // file was read for the entitlement that sets the floor.
+        return appExtensionSignedEntitlements(extensionFolder, winner, byName,
+                extensionSettingsWithBuiltIns(extensionFolder, settings, configuration, sdk, arch));
+    }
+
+    /// @param sdk the SDK this build archives against ("iphoneos" or "iphonesimulator"), and
+    /// {@code configuration} its configuration ("Release" or "Debug"); a qualified setting whose
+    /// condition names a different one is not part of THIS archive and does not decide its floor.
+    /// Null for either means "cannot tell", and then every condition counts.
+    static List<File> appExtensionEntitlementsCandidates(File extensionFolder,
+            Map<String, String> settings, File byName, String sdk, String configuration) {
+        List<File> out = new ArrayList<File>();
+        if (settings != null) {
+            for (Map.Entry<String, String> setting : settings.entrySet()) {
+                String key = setting.getKey();
+                if (!"CODE_SIGN_ENTITLEMENTS".equals(key)
+                        && !isQualified(key, "CODE_SIGN_ENTITLEMENTS")) {
+                    continue;
+                }
+                if (!conditionApplies(key, sdk, configuration)) {
+                    // A Debug-only or simulator-only entitlement is not signed into the release
+                    // device archive, so raising its minimum iOS for one costs the extension every
+                    // iOS 12 and 13 device for nothing.
+                    continue;
+                }
+                File resolved = appExtensionSignedEntitlements(extensionFolder, setting.getValue(),
+                        null, settings);
+                if (resolved != null && !out.contains(resolved)) {
+                    out.add(resolved);
+                }
+            }
+        }
+        if (out.isEmpty() && byName != null) {
+            out.add(byName);
+        }
+        return out;
+    }
+
+    /// The floor for an extension that may be signed with any of these: the highest any of them
+    /// asks for. An extension whose DEVICE entitlements need iOS 14 needs iOS 14.
+    static String appExtensionDeploymentFloor(List<File> entitlements) {
+        for (File file : entitlements) {
+            if (entitlementIsTrue(file, PAYMENT_PASS_PROVISIONING)) {
+                return "14.0";
+            }
+        }
+        return "12.0";
+    }
+
+    /// The lowest iOS an extension with these entitlements may declare.
+    static String appExtensionDeploymentFloor(File entitlements) {
+        return entitlementIsTrue(entitlements, PAYMENT_PASS_PROVISIONING) ? "14.0" : "12.0";
+    }
+
+    /// Brings the archive's CONDITIONAL settings in line with the ones computed above, and says
+    /// what it changed.
+    ///
+    /// Xcode honours IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] over the plain setting for the
+    /// build it matches, and every entry in buildSettings.properties is copied onto the target
+    /// verbatim -- so an archive that pins a qualified 10.0, or a qualified identifier from the
+    /// project it was exported from, gets exactly that on the device archive while the values
+    /// computed for the base key sit unused beside them. Clamping the base alone fixed the build
+    /// nobody was shipping.
+    ///
+    /// A qualified deployment target below the floor is raised to it; a qualified identifier that
+    /// cannot be an extension of this app is dropped, which leaves the base value -- the one this
+    /// builder set -- to govern.
+    ///
+    /// @return a note per change, for the log
+    static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
+            String hostPackage, String floor) {
+        List<String> notes = new ArrayList<String>();
+        for (Map.Entry<String, String> setting : new ArrayList<Map.Entry<String, String>>(
+                settings.entrySet())) {
+            String key = setting.getKey();
+            String value = setting.getValue() == null ? "" : setting.getValue().trim();
+            // What the value RESOLVES to, since a qualified setting may be written through another
+            // one -- IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] = $(EXTENSION_MIN) with
+            // EXTENSION_MIN = 16.0 is a perfectly good iOS 16 target. Comparing the raw text made
+            // "$(EXTENSION_MIN)" parse as no version at all, read as below the floor, and be
+            // overwritten with 12.0 -- taking an extension that compiles against iOS 16 APIs down
+            // with it. A reference that resolves to nothing here is left exactly as written: this
+            // build cannot evaluate it, which is not the same as knowing it is wrong.
+            String resolved = resolveSettingsInValue(value, settings);
+            if (resolved.length() == 0) {
+                continue;
+            }
+            if (isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
+                    && isDeploymentTargetBelow(resolved, floor)) {
+                settings.put(key, floor);
+                notes.add(key + " raised from " + value + " to " + floor);
+            } else if (isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER") && hostPackage != null
+                    && !resolved.startsWith(hostPackage + ".")) {
+                settings.remove(key);
+                notes.add(key + " = " + value + " dropped, since an embedded extension must be "
+                        + "under " + hostPackage);
+            }
+        }
+        return notes;
+    }
+
+    /// The iOS SDK this build archives against.
+    ///
+    /// A local device build passes no -sdk at all and lets the destination pick the active one,
+    /// so there is no version to assume -- and assuming a stale one (14.4 was the default in the
+    /// hint) made an exact qualifier like [sdk=iphoneos26.0] read as some other build's. The hint
+    /// answers when it is set; otherwise xcrun is asked, and if that cannot answer either the
+    /// bare platform name is used, which matches any version of it.
+    String activeIosSdkName(BuildRequest request) {
+        String declared = request.getArg("ios.sdk", null);
+        if (declared != null && declared.trim().length() > 0) {
+            return "iphoneos" + declared.trim();
+        }
+        try {
+            // Through the Xcode this build actually uses. resolveXcodebuild honours XCODEBUILD,
+            // DEVELOPER_DIR and XCODE_APP, and asking the system default instead can report a
+            // different installation's SDK -- which then makes an exact [sdk=iphoneosNN] condition
+            // match, or fail to match, on a version this archive never sees.
+            ProcessBuilder builder = new ProcessBuilder(xcrunForSelectedXcode(), "--sdk",
+                    "iphoneos", "--show-sdk-version");
+            String developerDir = selectedDeveloperDir();
+            if (developerDir != null) {
+                builder.environment().put("DEVELOPER_DIR", developerDir);
+            }
+            Process p = builder.redirectErrorStream(false).start();
+            java.io.BufferedReader in = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
+            String version;
+            try {
+                version = in.readLine();
+            } finally {
+                in.close();
+            }
+            if (p.waitFor() == 0 && version != null && version.trim().length() > 0) {
+                return "iphoneos" + version.trim();
+            }
+        } catch (Exception noXcrun) {
+            // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
+        }
+        return "iphoneos";
+    }
+
+    /// The xcrun beside the xcodebuild this build selected, or the system one.
+    private String xcrunForSelectedXcode() {
+        String selected = resolveXcodebuild();
+        if (selected != null) {
+            File beside = new File(new File(selected).getParentFile(), "xcrun");
+            if (beside.canExecute()) {
+                return beside.getAbsolutePath();
+            }
+        }
+        return "/usr/bin/xcrun";
+    }
+
+    /// The developer directory of the selected Xcode -- <Xcode.app>/Contents/Developer -- so a
+    /// tool run through the system xcrun still resolves inside it. Null when it cannot be told.
+    private String selectedDeveloperDir() {
+        String fromEnvironment = System.getenv("DEVELOPER_DIR");
+        if (fromEnvironment != null && fromEnvironment.length() > 0) {
+            return fromEnvironment;
+        }
+        String selected = resolveXcodebuild();
+        if (selected == null) {
+            return null;
+        }
+        // .../Contents/Developer/usr/bin/xcodebuild -> .../Contents/Developer
+        File developer = new File(selected).getParentFile();
+        for (int i = 0; i < 2 && developer != null; i++) {
+            developer = developer.getParentFile();
+        }
+        return developer != null && new File(developer, "usr/bin").isDirectory()
+                ? developer.getAbsolutePath() : null;
+    }
+
+    /// The value of {@code name} that governs THIS archive.
+    ///
+    /// Xcode does not merge a qualified setting with the plain one, it OVERRIDES it: with both
+    /// CODE_SIGN_ENTITLEMENTS and CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] present, the device
+    /// archive is signed with the qualified file alone. Reading both and taking the stricter
+    /// answer raised an extension to iOS 14 for an entitlement in a file it is not signed with;
+    /// reading only the plain one missed the entitlement that is. The most specific applicable
+    /// condition wins, which is Xcode's own rule, and the plain setting is the least specific
+    /// thing there is.
+    ///
+    /// @return the winning value, or null when nothing applicable is declared
+    static String winningSetting(Map<String, String> settings, String name, String sdk,
+            String configuration) {
+        return winningSetting(settings, name, sdk, configuration, null);
+    }
+
+    static String winningSetting(Map<String, String> settings, String name, String sdk,
+            String configuration, String arch) {
+        if (settings == null) {
+            return null;
+        }
+        String winner = null;
+        int winningSpecificity = -1;
+        for (Map.Entry<String, String> setting : settings.entrySet()) {
+            String key = setting.getKey();
+            boolean qualified = isQualified(key, name);
+            if (!qualified && !name.equals(key)) {
+                continue;
+            }
+            if (qualified && !conditionApplies(key, sdk, configuration, arch)) {
+                continue;
+            }
+            int specificity = 0;
+            for (int i = 0; qualified && i < key.length(); i++) {
+                if (key.charAt(i) == '=') {
+                    specificity++;
+                }
+            }
+            if (specificity > winningSpecificity) {
+                winningSpecificity = specificity;
+                winner = setting.getValue();
+            }
+        }
+        return winner;
+    }
+
+    /// Whether a qualified setting's condition can apply to the build being made.
+    ///
+    /// Only the two conditions this build knows its own answer to are judged -- sdk and config.
+    /// Anything else (arch, variant, a spelling not seen here) counts as applicable: guessing that
+    /// a condition does not apply risks signing an extension without an entitlement it needs,
+    /// which fails the upload, while over-counting only costs iOS 12 and 13 availability.
+    static boolean conditionApplies(String key, String sdk, String configuration) {
+        return conditionApplies(key, sdk, configuration, null);
+    }
+
+    /// @param arch the architecture the archive is built for, so [arch=arm64] and [arch=x86_64]
+    /// are not both counted applicable and then decided by map order
+    static boolean conditionApplies(String key, String sdk, String configuration, String arch) {
+        int open = key.indexOf('[');
+        if (open < 0) {
+            return true;
+        }
+        for (String condition : key.substring(open).split("[\\[\\],]")) {
+            int equals = condition.indexOf('=');
+            if (equals < 0) {
+                continue;
+            }
+            String name = condition.substring(0, equals).trim();
+            String value = condition.substring(equals + 1).trim();
+            if ("sdk".equals(name) && sdk != null && !matchesSdkCondition(value, sdk)) {
+                return false;
+            }
+            if ("config".equals(name) && configuration != null
+                    && !matchesCondition(value, configuration)) {
+                return false;
+            }
+            if ("arch".equals(name) && arch != null && !matchesCondition(value, arch)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// An sdk condition against the SDK this build names, which is versioned: xcodebuild is given
+    /// iphoneos14.4, not iphoneos. [sdk=iphoneos*] and [sdk=iphoneos14.4] both mean this archive,
+    /// and so does [sdk=iphoneos] -- a condition and an SDK that name the same platform match,
+    /// and a version is only compared when both carry one. Erring toward applicable, as
+    /// everywhere in this matching: excluding a condition that does apply loses an entitlement.
+    private static boolean matchesSdkCondition(String value, String sdk) {
+        if (value.endsWith("*")) {
+            return matchesCondition(value, sdk);
+        }
+        String conditionPlatform = platformOf(value);
+        String sdkPlatform = platformOf(sdk);
+        if (!conditionPlatform.equalsIgnoreCase(sdkPlatform)) {
+            return false;
+        }
+        String conditionVersion = value.substring(conditionPlatform.length());
+        String sdkVersion = sdk.substring(sdkPlatform.length());
+        if (sdkVersion.length() == 0) {
+            // This build does not know its own SDK version -- a local archive lets the destination
+            // choose it -- so a versioned condition may or may not be this one. Counted, by the
+            // same rule as any condition that cannot be evaluated here.
+            return true;
+        }
+        // Xcode matches an unwildcarded condition against the versioned SDK_NAME exactly, so
+        // [sdk=iphoneos] does NOT apply to an archive built with iphoneos14.4; [sdk=iphoneos*] is
+        // the spelling that does. Treating the bare one as a match picked settings Xcode ignores:
+        // an entitlements file the target is not signed with, or an identifier it is not built
+        // with. Erring toward applicable is for what this build cannot evaluate, not for what it
+        // can evaluate and Xcode says no to.
+        return conditionVersion.equals(sdkVersion);
+    }
+
+    /// The letters an SDK name starts with, which is its platform: "iphoneos" of "iphoneos14.4".
+    private static String platformOf(String sdk) {
+        int i = 0;
+        while (i < sdk.length() && Character.isLetter(sdk.charAt(i))) {
+            i++;
+        }
+        return sdk.substring(0, i);
+    }
+
+    /// A condition value against what this build is, with Xcode's trailing {@code *}.
+    private static boolean matchesCondition(String value, String actual) {
+        if (value.endsWith("*")) {
+            return actual.regionMatches(true, 0, value, 0, value.length() - 1);
+        }
+        return value.equalsIgnoreCase(actual);
+    }
+
+    /// Whether a settings key is the conditional form of {@code name}, as Xcode writes it and as
+    /// Properties preserves it only when the '=' inside the brackets is escaped.
+    private static boolean isQualified(String key, String name) {
+        return key.startsWith(name + "[") && key.endsWith("]");
+    }
+
+    /// The minimum iOS version a brought-in app extension declares.
+    ///
+    /// Xcode writes the target's IPHONEOS_DEPLOYMENT_TARGET into the built .appex as
+    /// MinimumOSVersion, and App Store validation reads it there: an extension below what its own
+    /// APIs require is rejected on upload, after a build that succeeded and an archive that
+    /// exported. The generic path used to hand every extension 10.0, which is below the floor the
+    /// current SDK will even build against, let alone what a Wallet extension needs.
+    ///
+    /// What the archive says wins, because an extension knows which APIs it calls -- but only
+    /// above the floor, which is 14.0 when its entitlements ask for payment-pass-provisioning
+    /// (PKIssuerProvisioningExtensionHandler is an iOS 14 API and Apple rejects anything lower)
+    /// and 12.0 otherwise, the lowest the current SDK builds against. With nothing declared the
+    /// app's own target is used, under the same floor.
+    ///
+    /// @param declared the extension's own IPHONEOS_DEPLOYMENT_TARGET, or null
+    /// @param entitlements the extension's .entitlements, or null when it has none
+    /// @param appTarget the ios.deployment_target build hint, or null
+    static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget) {
+        return appExtensionDeploymentTarget(declared, entitlements, appTarget, null, null);
+    }
+
+    /// @param extensionFolder and {@code settings}, so a declared target written as
+    /// $(EXTENSION_MIN) is judged by the version it resolves to rather than parsed as none
+    static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget,
+            File extensionFolder, Map<String, String> settings) {
+        return appExtensionDeploymentTarget(declared,
+                entitlements == null ? new ArrayList<File>() : Arrays.asList(entitlements),
+                appTarget, extensionFolder, settings);
+    }
+
+    /// @param entitlements every file this target may be signed with, since a qualified
+    /// CODE_SIGN_ENTITLEMENTS can be the one that carries the Wallet entitlement
+    static String appExtensionDeploymentTarget(String declared, List<File> entitlements,
+            String appTarget, File extensionFolder, Map<String, String> settings) {
+        // The floor is a floor, not a default. An archive exported from an old project may carry
+        // IPHONEOS_DEPLOYMENT_TARGET = 10.0 of its own, and honouring that unconditionally would
+        // reproduce the very rejection this exists to prevent -- 10.0 does not even build against
+        // the current SDK, and an issuer-provisioning Wallet extension is refused below 14.
+        String floor = appExtensionDeploymentFloor(entitlements);
+        String chosen = declared != null && declared.trim().length() > 0
+                ? declared.trim()
+                : appTarget;
+        if (chosen != null && chosen.indexOf('$') >= 0) {
+            // Written through another setting. What it resolves to decides whether it clears the
+            // floor; the declared text is what the target keeps, because Xcode resolves it there
+            // and a reference this build cannot evaluate is not one to overwrite with a guess.
+            String resolved = extensionFolder == null ? "" : resolveSettingsInValue(chosen,
+                    extensionSettingsWithBuiltIns(extensionFolder, settings));
+            return resolved.length() > 0 && isDeploymentTargetBelow(resolved, floor)
+                    ? floor : chosen;
+        }
+        return isDeploymentTargetBelow(chosen, floor) ? floor : normalizeVersion(chosen.trim());
+    }
+
+    /// A bare major ("12") as the major.minor Apple's plists carry ("12.0"). The app's own hint is
+    /// written either way, and MinimumOSVersion is read by App Store validation -- not the place
+    /// to find out which spellings its parser accepts.
+    private static String normalizeVersion(String version) {
+        return version.indexOf('.') < 0 ? version + ".0" : version;
+    }
+
+    /// Whether {@code target} names an iOS version below {@code floor}. A missing or unreadable
+    /// value counts as below: the floor is then what the extension gets.
+    private static boolean isDeploymentTargetBelow(String target, String floor) {
+        if (target == null || target.trim().length() == 0) {
+            return true;
+        }
+        String[] one = target.trim().split("\\.");
+        String[] two = floor.split("\\.");
+        for (int i = 0; i < Math.max(one.length, two.length); i++) {
+            int a = i < one.length ? parseVersionPart(one[i]) : 0;
+            int b = i < two.length ? parseVersionPart(two[i]) : 0;
+            if (a != b) {
+                return a < b;
+            }
+        }
+        return false;
+    }
+
+    private static int parseVersionPart(String part) {
+        try {
+            return Integer.parseInt(part.trim());
+        } catch (NumberFormatException notANumber) {
+            return -1;
+        }
+    }
+
+    private static final String PAYMENT_PASS_PROVISIONING =
+            "com.apple.developer.payment-pass-provisioning";
+
+    /// Whether a file's text holds a string, for the entitlement keys read out of a plist without
+    /// parsing it. A missing or unreadable file holds nothing.
+    private static boolean fileContains(File file, String needle) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        try {
+            byte[] data = new byte[(int) file.length()];
+            DataInputStream in = new DataInputStream(new FileInputStream(file));
+            try {
+                in.readFully(data);
+            } finally {
+                in.close();
+            }
+            return new String(data, StandardCharsets.UTF_8).contains(needle);
+        } catch (IOException cannotRead) {
+            return false;
+        }
+    }
+
+    static File appExtensionInfoPlist(File extensionFolder) {
+        String override = appExtensionBuildSetting(extensionFolder, "INFOPLIST_FILE");
+        if (override == null) {
+            // Confined like an overridden path, not trusted for sitting at the default name: a zip
+            // may carry symlinks, so <folder>/Info.plist can still land outside the project.
+            File byDefault = new File(extensionFolder, "Info.plist");
+            return insideProjectDir(byDefault, extensionFolder.getParentFile()) ? byDefault : null;
+        }
+        return resolveInfoPlistPath(override, extensionFolder);
+    }
+
+    /// One INFOPLIST_FILE value as a file this build may write to, or null when it holds a setting
+    /// that cannot be resolved here or lands outside the project directory.
+    private static File resolveInfoPlistPath(String override, File extensionFolder) {
+        return resolveInfoPlistPath(override, extensionFolder, null);
+    }
+
+    private static File resolveInfoPlistPath(String override, File extensionFolder,
+            Map<String, String> settings) {
+        String path = override;
+        if (path.length() > 1 && path.startsWith("\"") && path.endsWith("\"")) {
+            path = path.substring(1, path.length() - 1).trim();
+        }
+        path = resolveXcodeSettingsInPath(path, extensionFolder, settings);
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        File resolved = new File(path);
+        if (!resolved.isAbsolute()) {
+            resolved = new File(extensionFolder.getParentFile(), path);
+        }
+        return insideProjectDir(resolved, extensionFolder.getParentFile()) ? resolved : null;
+    }
+
+    /// Whether a path an uploaded archive chose is one this build is willing to write to.
+    ///
+    /// INFOPLIST_FILE arrives inside a customer's .ios.appext and the stamper WRITES to whatever
+    /// it names, so an absolute path, a {@code ../../} traversal or a symlink planted in the
+    /// archive would have this daemon rewriting a file outside the build -- another build's
+    /// project, or anything else the account can write. The comparison is on canonical paths, so
+    /// a symlink that leaves the project is judged by where it lands rather than by where it sits.
+    ///
+    /// Everything under the project directory is fair game: an extension may legitimately share a
+    /// plist that sits beside its folder rather than inside it.
+    static boolean insideProjectDir(File candidate, File projectDir) {
+        if (candidate == null || projectDir == null) {
+            return false;
+        }
+        try {
+            String root = projectDir.getCanonicalPath();
+            if (!root.endsWith(File.separator)) {
+                root += File.separator;
+            }
+            return candidate.getCanonicalPath().startsWith(root);
+        } catch (IOException cannotResolve) {
+            // A path this process cannot even canonicalize is not one to write to.
+            return false;
+        }
+    }
+
+    /// One build setting as the extension's own buildSettings.properties overrides it, or null
+    /// when the archive carries no such override.
+    ///
+    /// Read from the file rather than from the settings map because the callers run before the
+    /// properties are folded into it -- and a setting that decides which files the build touches
+    /// has to be known before we touch them.
+    static String appExtensionBuildSetting(File extensionFolder, String key) {
+        String value = appExtensionBuildSettings(extensionFolder).get(key);
+        if (value == null || value.trim().length() == 0) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    /// Every build setting the archive overrides, as its buildSettings.properties declares them.
+    ///
+    /// These are not advisory: further down each one is written into the extension target's build
+    /// configurations, so they decide what a {@code $(...)} reference in the extension's own
+    /// Info.plist resolves to when Xcode processes it.
+    static Map<String, String> appExtensionBuildSettings(File extensionFolder) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        File settings = new File(extensionFolder, "buildSettings.properties");
+        if (!settings.isFile()) {
+            return out;
+        }
+        Properties props = new Properties();
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(settings);
+            props.load(fis);
+        } catch (IOException ex) {
+            return out;
+        } finally {
+            if (fis != null) {
+                try { fis.close(); } catch (Throwable t) {}
+            }
+        }
+        for (Object key : props.keySet()) {
+            if (key instanceof String) {
+                out.put((String) key, props.getProperty((String) key));
+            }
+        }
+        return out;
+    }
+
+    /// Substitutes the build settings whose values this build already knows, so that the ordinary
+    /// Xcode spelling of an extension's plist path resolves.
+    ///
+    /// {@code $(SRCROOT)/$(TARGET_NAME)/Info.plist} is what an Xcode project writes for the file
+    /// that sits in the extension's own folder, and every part of it is known here: SRCROOT and
+    /// PROJECT_DIR are the project directory, which is where the extension folders are extracted,
+    /// and TARGET_NAME is the folder's name, because that is the name the target is created with.
+    /// PRODUCT_NAME follows TARGET_NAME unless the archive overrode it with a literal.
+    ///
+    /// Both spellings, {@code $(NAME)} and {@code ${NAME}}. Anything still holding a {@code $}
+    /// afterwards is a setting this build cannot evaluate -- CONFIGURATION, an SDK-dependent
+    /// value -- and null says so, because the alternative is editing whichever file the
+    /// half-resolved path happens to name.
+    private static String resolveXcodeSettingsInPath(String path, File extensionFolder) {
+        return resolveXcodeSettingsInPath(path, extensionFolder, null);
+    }
+
+    /// @param settings the target's settings when they are already gathered, since the properties
+    /// file they came from is deleted once it is loaded
+    private static String resolveXcodeSettingsInPath(String path, File extensionFolder,
+            Map<String, String> settings) {
+        String targetName = extensionFolder.getName();
+        String productName = settings != null && settings.get("PRODUCT_NAME") != null
+                ? settings.get("PRODUCT_NAME").trim()
+                : appExtensionBuildSetting(extensionFolder, "PRODUCT_NAME");
+        if (productName == null || productName.indexOf('$') >= 0) {
+            productName = targetName;
+        }
+        File projectDir = extensionFolder.getParentFile();
+        String projectPath = projectDir == null ? "." : projectDir.getAbsolutePath();
+        String out = path;
+        // The archive's own settings first, and to a fixed point: INFOPLIST_FILE may be written as
+        // $(PLIST_DIR)/Info.plist with PLIST_DIR defined two lines above it in the same properties
+        // file. Both are copied onto the target, so Xcode resolves that path -- and expanding only
+        // the four names below called it unresolvable and left the plist Xcode actually builds
+        // unstamped.
+        Map<String, String> declared = settings != null ? settings
+                : appExtensionBuildSettings(extensionFolder);
+        for (int pass = 0; pass < MAX_SETTING_EXPANSIONS
+                && BUILD_SETTING_REFERENCE.matcher(out).find(); pass++) {
+            String before = out;
+            for (Map.Entry<String, String> setting : declared.entrySet()) {
+                if (setting.getValue() != null) {
+                    out = replaceBuildSetting(out, setting.getKey(), setting.getValue().trim());
+                }
+            }
+            if (out.equals(before)) {
+                break;
+            }
+        }
+        out = replaceBuildSetting(out, "SRCROOT", projectPath);
+        out = replaceBuildSetting(out, "PROJECT_DIR", projectPath);
+        out = replaceBuildSetting(out, "TARGET_NAME", targetName);
+        out = replaceBuildSetting(out, "PRODUCT_NAME", productName);
+        return out.indexOf('$') >= 0 ? null : out;
+    }
+
+    /// The same as {@link #resolveSettingsInValue}, but null when a reference is left over.
+    ///
+    /// resolveSettingsInValue deletes what it cannot expand, which is right when the question is
+    /// "what will this be on the device" -- Xcode deletes it too. It is wrong when the answer is
+    /// about to be RECORDED: com.example.app.$(SOMETHING_UNKNOWN) came out as "com.example.app.",
+    /// and that partial string went into the export-options dictionary as the key for a bundle
+    /// the archive does not contain, so a manual export could not pair the extension with its
+    /// profile. A value this build cannot resolve completely is better left alone than recorded
+    /// as a truncation of itself.
+    static String resolveSettingsFully(String value, Map<String, String> settings) {
+        if (value == null) {
+            return null;
+        }
+        String resolved = resolveSettingsInValue(value, settings);
+        return BUILD_SETTING_REFERENCE.matcher(value).find()
+                && BUILD_SETTING_REFERENCE.matcher(stripResolved(value, settings)).find()
+                ? null : resolved;
+    }
+
+    /// The value with every reference this build CAN expand already expanded, so what remains is
+    /// exactly what it cannot.
+    private static String stripResolved(String value, Map<String, String> settings) {
+        String out = value;
+        if (settings != null) {
+            for (int pass = 0; pass < MAX_SETTING_EXPANSIONS
+                    && BUILD_SETTING_REFERENCE.matcher(out).find(); pass++) {
+                String before = out;
+                for (Map.Entry<String, String> setting : settings.entrySet()) {
+                    if (setting.getValue() != null) {
+                        out = replaceBuildSetting(out, setting.getKey(), setting.getValue());
+                    }
+                }
+                if (out.equals(before)) {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /// A plist value with the archive's own build settings substituted, so a {@code $(...)}
+    /// reference can be compared with the version it will actually resolve to on the device.
+    ///
+    /// A reference to a setting the archive does not define resolves to the empty string, which is
+    /// what Xcode does with it too: the extension target this build generates carries only the
+    /// settings written here, and no version among them.
+    private static String resolveSettingsInValue(String value, Map<String, String> archiveSettings) {
+        String out = value;
+        if (archiveSettings != null) {
+            // To a fixed point, not one pass. A setting's value may name another setting and Xcode
+            // keeps expanding until none is left, while one traversal of the map expands nested
+            // references only when the iteration order happens to be the dependency order -- and
+            // for Properties that is hash order. MARKETING_VERSION = 5.4$(VERSION_SUFFIX) visited
+            // before VERSION_SUFFIX left the inner reference behind, the strip below deleted it as
+            // though nothing defined it, and a version the device resolves to 5.41 was judged to
+            // be the app's own 5.4 and left standing.
+            for (int pass = 0; pass < MAX_SETTING_EXPANSIONS
+                    && BUILD_SETTING_REFERENCE.matcher(out).find(); pass++) {
+                String before = out;
+                for (Map.Entry<String, String> setting : archiveSettings.entrySet()) {
+                    out = replaceBuildSetting(out, setting.getKey(),
+                            setting.getValue() == null ? "" : setting.getValue());
+                }
+                if (out.equals(before)) {
+                    // Nothing left that this archive defines; the strip below handles the rest.
+                    break;
+                }
+            }
+        }
+        // What survives names a setting the archive does not define, or sits in a cycle that never
+        // settles. Xcode resolves those to nothing, and so does this.
+        // Not trimmed: the properties file's own trailing whitespace is written into the Xcode
+        // setting verbatim, so MARKETING_VERSION = "5.4 " really does expand to "5.4 ".
+        return BUILD_SETTING_REFERENCE.matcher(out).replaceAll("");
+    }
+
+    /// A build-setting reference in either spelling Xcode accepts.
+    private static final Pattern BUILD_SETTING_REFERENCE =
+            Pattern.compile("\\$[({][A-Za-z0-9_]+[)}]");
+
+    /// Expansion passes before a value is called unresolvable. Settings nest a level or two in
+    /// practice; the cap is what stops A = $(B), B = $(A) from spinning.
+    private static final int MAX_SETTING_EXPANSIONS = 16;
+
+    /// One build setting, in either of the two spellings Xcode accepts for a reference.
+    private static String replaceBuildSetting(String path, String name, String value) {
+        return path.replace("$(" + name + ")", value).replace("${" + name + "}", value);
+    }
+
+    /**
+     * Parses the pbxproj-shaped block of build settings an app extension target is
+     * seeded with -- one {@code KEY = VALUE;} per line -- into the map that is written
+     * back out as Ruby string literals in the project fixup script.
+     *
+     * Two details the value has to lose, both of which failed silently here. The
+     * trailing semicolon: keeping it (the old code sliced the last character INSTEAD
+     * of dropping it, so every value became ";") left CLANG_ENABLE_MODULES off, which
+     * drops -fmodules, which drops clang's autolinking, which is why an extension that
+     * imports UIKit reached ld with Foundation alone and died on
+     * _OBJC_CLASS_$_UIView. And the quotes Xcode wraps a non-identifier value in:
+     * re-emitted inside the Ruby literal those become ""gnu++14"", a syntax error that
+     * takes the whole fixup script down with it.
+     */
+    static Map<String, String> parseXcodeBuildSettings(String buildSettingsStr) {
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        for (String line : buildSettingsStr.split("\n")) {
+            if (line.trim().isEmpty()) {
+                continue;
+            }
+            int equals = line.indexOf("=");
+            if (equals < 0) {
+                continue;
+            }
+            String key = line.substring(0, equals).trim();
+            String val = line.substring(equals + 1).trim();
+            if (val.endsWith(";")) {
+                val = val.substring(0, val.length() - 1).trim();
+            }
+            if (val.length() > 1 && val.startsWith("\"") && val.endsWith("\"")) {
+                val = val.substring(1, val.length() - 1);
+            }
+            buildSettingsMap.put(key, val);
+        }
+        return buildSettingsMap;
+    }
+
     static void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {
 
         String basePath = baseDir.getAbsolutePath();
@@ -5987,15 +7778,8 @@ public class IPhoneBuilder extends Executor {
         // The host's own versions, through the helpers the watch builder uses
         // for the same rule: an embedded extension whose marketing or build
         // version differs from its containing app fails archive validation.
-        String injectedShort = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleShortVersionString");
-        String extShort = injectedShort != null ? injectedShort
-                : WatchNativeBuilder.shortVersion(request);
-        String injectedBundle = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleVersion");
-        String extBundle = injectedBundle != null ? injectedBundle
-                : request.getArg("ios.bundleVersion",
-                        WatchNativeBuilder.shortVersion(request));
+        String extShort = embeddedExtensionShortVersion(request);
+        String extBundle = embeddedExtensionBundleVersion(request);
         // The hint is an override, not the only way in: an app whose
         // setCommissionToThisApp(true) the scanner saw needs no hint, and one
         // that reaches the API through reflection has no other way to say so.
@@ -6751,6 +8535,40 @@ public class IPhoneBuilder extends Executor {
         sb.append("end\n");
     }
 
+    /**
+     * Moves every {@code .ios.appext} archive out of the resources directory, into a staging
+     * directory the extension wiring reads much later.
+     *
+     * <p>The unpacking cannot happen this early -- it wants the Xcode project that does not
+     * exist yet -- but the move cannot happen any later. The resources directory is handed to
+     * the translator, which copies it into {@code <main>-src}, and every file in there becomes
+     * an app resource: the archive shipped inside the .app, an unbuilt second copy of the
+     * extension sitting next to the .appex it had been unpacked into. Deleting it from resDir
+     * at unpack time is too late to stop that copy. Every other archive kind consumed out of
+     * resDir deletes itself for the same reason.</p>
+     *
+     * @return the staging directory, or null when the app brought no extension archive
+     */
+    static File stageAppExtensionArchives(File resDir, File stagingDir) throws IOException {
+        File[] entries = resDir == null ? null : resDir.listFiles();
+        if (entries == null) {
+            return null;
+        }
+        File staged = null;
+        for (File child : entries) {
+            if (!child.isFile() || !child.getName().endsWith(".ios.appext")) {
+                continue;
+            }
+            if (staged == null) {
+                staged = stagingDir;
+                staged.mkdirs();
+            }
+            Files.move(child.toPath(), new File(staged, child.getName()).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
+        }
+        return staged;
+    }
+
     private File[] extractAppExtensions(File sourceDirectory, File targetDirectory) throws IOException {
         if (sourceDirectory == null || !sourceDirectory.isDirectory()) {
             throw new IllegalArgumentException("extractAppExtensions sourceDirectory must be an existing directory but received "+sourceDirectory);
@@ -6773,6 +8591,14 @@ public class IPhoneBuilder extends Executor {
                     throw new IOException("Failed to unzip appExtension "+appExtension);
                 }
 
+                File escaping = symlinkEscaping(extractedDir, extractedDir);
+                if (escaping != null) {
+                    throw new IOException("The " + extractedDir.getName() + " app extension "
+                            + "contains a symbolic link, " + escaping.getName() + ", that points "
+                            + "outside the extension. Xcode copies what an extension folder holds "
+                            + "into the app, so a link out of it would put a file from the build "
+                            + "machine into your app. Remove the link and rebuild.");
+                }
                 out.add(extractedDir);
             } catch (IOException ex) {
                 throw ex;

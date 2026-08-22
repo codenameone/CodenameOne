@@ -946,7 +946,11 @@ class WatchNativeBuilder {
 
     /// Where the value belonging to {@code key} begins -- just past its {@code </key>} -- or -1
     /// when the fragment does not carry the key.
-    private static int injectedValueAt(String inject, String key) {
+    /// Shared with IPhoneBuilder's app-extension Info.plist stamping, which has to find a
+    /// key's own value in a real plist for the same reason the comment on
+    /// {@link #injectedPlistString} gives: the next `<string>` after a key is very often some
+    /// other key's.
+    static int injectedValueAt(String inject, String key) {
         int at = 0;
         while (true) {
             int content = contentAfterOpenTag(inject, "key", at);
@@ -969,7 +973,7 @@ class WatchNativeBuilder {
     /// The {@code <} of the next real element at or after {@code from}, or -1 when what follows is
     /// text or nothing. Whitespace, comments and CDATA sit between a key and its value in real
     /// fragments and none of them is the value.
-    private static int nextElementAt(String inject, int from) {
+    static int nextElementAt(String inject, int from) {
         int i = from;
         while (i < inject.length()) {
             if (Character.isWhitespace(inject.charAt(i))) {
@@ -990,7 +994,7 @@ class WatchNativeBuilder {
     }
 
     /// The element name at an opening tag, lowercased. Empty for an end tag, which is not one.
-    private static String tagAt(String inject, int element) {
+    static String tagAt(String inject, int element) {
         StringBuilder tag = new StringBuilder();
         for (int j = element + 1; j < inject.length()
                 && Character.isLetterOrDigit(inject.charAt(j)); j++) {
@@ -1074,7 +1078,7 @@ class WatchNativeBuilder {
     ///
     /// Returns `at` when it is already outside both, the position just past the enclosing
     /// construct when it is not, and -1 when that construct never ends.
-    private static int skipMarkupBefore(String inject, int at, int from) {
+    static int skipMarkupBefore(String inject, int at, int from) {
         int cdata = inject.indexOf(CDATA_OPEN, from);
         int comment = inject.indexOf(COMMENT_OPEN, from);
         boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);
@@ -1116,7 +1120,7 @@ class WatchNativeBuilder {
     }
 
     /// The end tag that closes an element, skipping over CDATA sections and comments.
-    private static int closeOfElement(String inject, int from, String closeTag) {
+    static int closeOfElement(String inject, int from, String closeTag) {
         // `</key >` closes the same element as `</key>`, so the tag is matched as a pattern rather
         // than as literal text -- the same reason the opening tags are.
         java.util.regex.Matcher m = java.util.regex.Pattern
@@ -1200,11 +1204,19 @@ class WatchNativeBuilder {
     /// entity decoding applies as before. The assembled value is trimmed, matching what this did
     /// before CDATA was understood at all.
     static String plistStringContent(String raw) {
+        String exact = plistStringContentExact(raw);
+        return exact == null ? null : exact.trim();
+    }
+
+    /// The same content WITHOUT the trim, for a caller that has to see the value a plist parser
+    /// would: <string> 5.4 </string> and <string><![CDATA[ 5.4 ]]></string> both carry padding
+    /// that Apple compares and this method must not throw away.
+    static String plistStringContentExact(String raw) {
         if (raw == null) {
             return null;
         }
         if (raw.indexOf(CDATA_OPEN) < 0) {
-            return decodeXmlEntities(stripComments(raw).trim());
+            return decodeXmlEntities(stripComments(raw));
         }
         StringBuilder out = new StringBuilder(raw.length());
         int i = 0;
@@ -1225,7 +1237,7 @@ class WatchNativeBuilder {
             out.append(raw, body, end);
             i = end + CDATA_CLOSE.length();
         }
-        return out.toString().trim();
+        return out.toString();
     }
 
     /// Turns the five predefined XML entities back into their characters.
