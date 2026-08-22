@@ -97,6 +97,9 @@ public class Window extends Container implements TopLevelContainer {
     private Graphics windowGraphics;
     /// Set as soon as dispose() begins, so re-entering it is a no-op.
     private boolean disposing;
+    /// True while internalPaintImpl is running, so paint() does not repeat the
+    /// background it has already drawn. Mirrors the guard Form carries.
+    private boolean inInternalPaint;
     /// Published under Display.lock once teardown is complete; showModal waits on it,
     /// and isWindowDisposed() reads it under the same monitor rather than relying on
     /// volatile, so the write is visible to a parked caller on any thread.
@@ -2193,6 +2196,20 @@ public class Window extends Container implements TopLevelContainer {
             super.repaint(cmp);
             return;
         }
+        // An elevated component's shadow is drawn by its surface's elevated pane, not
+        // by the component, and the shadow is larger than the component. Queueing the
+        // component alone left the old shadow pixels on screen until something else
+        // happened to repaint the surface. Form.repaint(Component) redirects the same
+        // way; this is the window's copy of it.
+        if (cmp.hasElevation()) {
+            Container surface = cmp.findSurface();
+            if (surface != null) {
+                surface.repaint(cmp.getAbsoluteX() + cmp.calculateShadowOffsetX(24),
+                        cmp.getAbsoluteY() + cmp.calculateShadowOffsetY(24),
+                        cmp.calculateShadowWidth(24), cmp.calculateShadowHeight(24));
+                return;
+            }
+        }
         // nativeVisible as well as isVisible(): a minimized window keeps its
         // hierarchy visible on purpose, so a model update or explicit repaint would
         // otherwise queue paint work that can never drain -- paintOpenWindows skips
@@ -2207,8 +2224,21 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
-        paintComponentBackground(g);
+        // internalPaintImpl has already painted the background by the time it invokes
+        // this, so painting it again ran a custom background painter twice per frame
+        // and composited a translucent one on top of itself. Form carries the same
+        // guard for the same reason.
+        if (!inInternalPaint) {
+            paintComponentBackground(g);
+        }
         super.paint(g);
+    }
+
+    @Override
+    void internalPaintImpl(Graphics g, boolean paintIntersects) {
+        inInternalPaint = true;
+        super.internalPaintImpl(g, paintIntersects);
+        inInternalPaint = false;
     }
 
     /// {@inheritDoc}

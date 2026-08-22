@@ -320,6 +320,31 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aWindowPaintsItsBackgroundOncePerPaint() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("bg", new BorderLayout());
+        w.setWindowSize(120, 90);
+        w.show();
+        final int[] painted = new int[1];
+        w.getAllStyles().setBgPainter(new Painter() {
+            @Override
+            public void paint(Graphics g, Rectangle rect) {
+                painted[0]++;
+            }
+        });
+
+        w.internalPaintImpl(Image.createImage(120, 90).getGraphics(), true);
+
+        // internalPaintImpl paints the background before it invokes paint(), so
+        // without the guard a custom painter runs twice per frame and a translucent
+        // one is composited on top of itself.
+        assertEquals(1, painted[0],
+                "the window's background painter must run once per paint");
+
+        w.dispose();
+    }
+
+    @FormTest
     void closeListenersFireOnceForOneClose() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("closes");
