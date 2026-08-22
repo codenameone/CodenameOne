@@ -70,20 +70,34 @@ import static org.junit.jupiter.api.Assertions.fail;
  * footprint number, because overflow is a property of the code while a peak is largely a
  * property of the runner.</p>
  *
- * <p>The run is made under a simulated per-process ceiling
- * ({@code CN1_SIMULATE_PROC_MEMORY_LIMIT}), which is both the situation the bug was
- * reported from and the only shape that is safe to run unattended. Off a ceiling the
- * pacing cap is a fraction of the HOST's free RAM, so on a developer Mac with tens of
- * gigabytes spare this workload is licensed to build up more than ten gigabytes of
- * garbage before anything stalls it -- with or without the fix, since that is the pacing
- * policy rather than the defect under test. (On Linux and Windows the same run is bounded
- * by the 72MB static cap, because cn1_available_memory has no host reading there.)</p>
+ * <p>The main run is made under a simulated per-process ceiling
+ * ({@code CN1_SIMULATE_PROC_MEMORY_LIMIT}), which is the situation the bug was reported
+ * from. A second run of the same binary with NO ceiling covers the reporter's other
+ * observation -- the simulator, where nothing kills the process and its footprint simply
+ * climbed. That used to be out of scope here: off a ceiling the pacing cap is a fraction
+ * of the HOST's free RAM, so on a roomy developer machine this workload was licensed to
+ * accumulate more than ten gigabytes before anything stalled it. It is now bounded by a
+ * multiple of the collection trigger once the process is already large, and the run pins
+ * the free-memory reading ({@code CN1_SIMULATE_FREE_MEMORY}) so the guard means the same
+ * thing on an idle machine and a busy one.</p>
  *
  * <p>Measured on this workload with the interleaved drain ablated out and everything else
  * in place, under the same ceiling: 77 of 150 cycles overflowed, the mutator parked 72
  * times, the run took 10.2s and rode 64MB from the ceiling. With the fix: 0 of 440 cycles
  * overflowed, zero parks, 6.8s, 174MB of headroom left. Both finish -- what a regression
  * costs here is the collector, not the result.</p>
+ *
+ * <p>The same workload later exposed the other half of the same failure, and this class
+ * guards that too. With the worklist no longer overflowing, three quarters of the
+ * collector's wall time turned out to be {@code cn1ConservativeResolve}: the guard on
+ * gcMarkObject runs once per reference field the drain follows, and it answered by
+ * binary-searching the page and extent snapshots. Marking therefore cost O(log heap) per
+ * field -- the collector got slower as the heap grew, which is the reporter's "GC pauses
+ * become more and more frequent and take longer, until they are effectively continuous".
+ * The mutator allocated 4.8 collection triggers' worth during every cycle the collector
+ * managed to finish, and the process settled at 447MB against a live set of a few hundred
+ * bytes, 64MB below the ceiling that kills it. Both indices are now hash tables, and the
+ * ratio asserted below is 1.04.</p>
  *
  * <p>Tagged {@code benchmark}: it needs a translate-and-build and churns several GB.</p>
  */
@@ -107,6 +121,24 @@ class GcOverflowSpiralIntegrationTest {
      * run falls back to the 72MB static volume cap, which bounds it just as well.
      */
     private static final long SIMULATED_LIMIT_BYTES = 512L * 1024 * 1024;
+
+    /**
+     * Bound on the no-ceiling run's peak footprint. Deliberately far above what the
+     * workload needs (measured 163-321MB on a Mac with the cap bounded, and 72-200MB on
+     * hosts where cn1_available_memory has no reading and the static cap applies) and far
+     * below what an unbounded cap produces (15.6GB). A run between those is not a
+     * borderline result, it is the cap keying off the wrong quantity again.
+     */
+    private static final long UNBOUNDED_PEAK_LIMIT_KB = 2L * 1024 * 1024;
+
+    /**
+     * Host free-memory reading pinned for the no-ceiling run. 32GB: a roomy developer
+     * machine, which is the condition under which the unbounded cap does its worst
+     * (measured with it: 13.8-15.7GB peak and 12.2-13.4s, against 819-861MB and 8.1-8.6s
+     * with the bound -- the runaway is slower as well as larger, since a process
+     * thrashing fifteen gigabytes pays for them).
+     */
+    private static final long SIMULATED_FREE_MEMORY_BYTES = 32L * 1024 * 1024 * 1024;
 
     @Test
     void aChurningWorkerNeverOverflowsTheMarkWorklist() throws Exception {
@@ -257,6 +289,87 @@ class GcOverflowSpiralIntegrationTest {
                         + (SIMULATED_LIMIT_BYTES / (1024 * 1024)) + "MB process budget,"
                         + " so on a device this process would have been killed.\n--- run ---\n"
                         + output);
+
+        // AND THAT THE COLLECTOR ACTUALLY KEEPS UP, which is the property underneath
+        // every number above. A collection is scheduled once the mutator has allocated a
+        // trigger's worth, so a collector that finishes before the next trigger crossing
+        // completes one cycle per trigger. One that does not simply coalesces the
+        // crossings it missed into the cycle it did manage -- so bytes-allocated divided
+        // by cycles-completed measures exactly how far behind it is, in units of the
+        // trigger.
+        //
+        // That ratio is what this issue was about. Before the resolver index was made
+        // O(1) the collector spent three quarters of its time inside
+        // cn1ConservativeResolve, walking a binary search over the page and extent
+        // snapshots once per reference field the drain followed. Its cost therefore grew
+        // with the SIZE OF THE HEAP rather than with the live set: cycles stretched, the
+        // mutator produced proportionally more garbage during each one, and the footprint
+        // settled wherever the pacing let it -- on this workload 4.8 triggers per cycle
+        // and a peak of 447MB against a live set of a few hundred bytes, riding the
+        // ceiling with 64MB to spare. With the fix it is 1.04 and 116-165MB. (Both
+        // measured on this workload, same host, same 512MB simulated ceiling: 130
+        // cycles for 14.9GB allocated against 583 for the same 14.9GB.)
+        //
+        // Asserted rather than the footprint because the ratio is a property of the two
+        // SPEEDS and not of either: on a machine that starves the collector the mutator
+        // is starved with it, and the ratio holds where a peak does not. (Measured: the
+        // same run inside a fully loaded parallel test suite reported the same cycle
+        // count and a peak of 447MB.)
+        long allocatedKb = parseTrace(output, "allocatedKb=");
+        long triggerKb = parseTrace(output, "triggerKb=");
+        assertTrue(cycles > 0 && triggerKb > 0,
+                "The tracer reported no cycles or no trigger, so the ratio below cannot be"
+                        + " computed.\n--- run ---\n" + output);
+        double triggersPerCycle = (double) allocatedKb / (double) cycles / (double) triggerKb;
+        assertTrue(triggersPerCycle <= 2.0,
+                "The mutator allocated " + String.format("%.2f", triggersPerCycle)
+                        + " collection triggers per completed GC cycle (" + allocatedKb
+                        + "KB over " + cycles + " cycles against a " + triggerKb
+                        + "KB trigger). Above 1 the collector is not keeping up, and every"
+                        + " multiple of it is another trigger's worth of garbage the"
+                        + " process is carrying: at 4.8 this workload rode the iOS"
+                        + " per-process ceiling and was killed (issue #5537). Check that"
+                        + " the mark phase still scales with the LIVE SET and not with the"
+                        + " heap -- the usual regression is a per-reference lookup that is"
+                        + " O(log heap) again.\n--- run ---\n" + output);
+
+        // AND THE SAME WORKLOAD WITH NO CEILING AT ALL, which is the reporter's other
+        // observation: in the simulator nothing kills the process, so instead of dying it
+        // just grew. Nothing here fails an app the way a jetsam kill does, which is why
+        // this half went unguarded, but a collector that lets a four-megabyte live set
+        // reach fifteen gigabytes is broken wherever it runs -- and it is what a developer
+        // sees first, before ever reaching a device.
+        //
+        // WHAT THIS DOES AND DOES NOT PROVE. It is a BOUND, not a reproduction. Off a
+        // ceiling the runaway is bistable: it needs the collector to lose the race early
+        // and never be pulled back, which on a 12-core host took EIGHT concurrent copies
+        // of this workload to provoke (two, three and four did not). A single process on
+        // an idle machine stays under 350MB with the growth bound ablated out, so a green
+        // run here is not evidence that the bound works -- what it catches is the gross
+        // regression, a collector that has stopped keeping up at all. The bound itself was
+        // measured under that eight-way contention: 13.8-15.7GB without it, 819-861MB with.
+        //
+        // Reuses the binary the run above already built; only the environment differs.
+        // CN1_SIMULATE_FREE_MEMORY pins the host reading the pacing cap is a fraction of.
+        // Without it this assertion is worthless in both directions: the cap is free RAM
+        // over eight (or over two for a thread allocating hard), so the same binary on the
+        // same machine reaches 15.7GB when the machine is idle-and-roomy and stays under
+        // 300MB an hour later when it is not. Pinning it high is the hostile case.
+        Map<String, String> unboundedEnv = new HashMap<String, String>();
+        unboundedEnv.put("CN1_SIMULATE_FREE_MEMORY", Long.toString(SIMULATED_FREE_MEMORY_BYTES));
+        String unbounded = runVm(executable, buildDir, unboundedEnv);
+        assertTrue(unbounded.contains("GC_OVERFLOW_SPIRAL_DONE"),
+                "The unbounded search must finish too. Output: " + unbounded);
+        long unboundedPeakKb = parseValue(unbounded, "PEAK_FOOTPRINT_KB=");
+        System.err.println("[GcOverflowSpiralIntegrationTest] noCeilingPeakKb=" + unboundedPeakKb);
+        assertTrue(unboundedPeakKb < UNBOUNDED_PEAK_LIMIT_KB,
+                "With no process ceiling the workload peaked at " + unboundedPeakKb
+                        + "KB against a live set of a few hundred bytes. The pacing cap is"
+                        + " meant to be bounded by a multiple of the collection trigger"
+                        + " (CN1_BIBOP_GC_MAX_CAP_MULTIPLIER), which tracks the heap; a"
+                        + " number this size means it is tracking the HOST's free RAM"
+                        + " again, and the app grows until the machine complains."
+                        + "\n--- run ---\n" + unbounded);
     }
 
     private long parseTrace(String output, String key) {
