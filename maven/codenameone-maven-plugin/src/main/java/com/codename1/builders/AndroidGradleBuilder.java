@@ -4931,7 +4931,7 @@ public class AndroidGradleBuilder extends Executor {
         String localNotificationCode = "";
 
         localNotificationCode = ""
-                + "        if(i instanceof com.codename1.notifications.LocalNotificationCallback){\n"
+                + "        if(((Object)i) instanceof com.codename1.notifications.LocalNotificationCallback){\n"
                 + "            Intent intent = getIntent();\n"
                 + "            if(intent != null && intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationID\")){\n"
                 + "                String id = intent.getExtras().getString(\"LocalNotificationID\");\n"
@@ -4951,7 +4951,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "                        }\n"
                 + "                    }\n"
                 + "                }\n"
-                + "                ((com.codename1.notifications.LocalNotificationCallback)i).localNotificationReceived(id);\n"
+                + "                ((com.codename1.notifications.LocalNotificationCallback)(Object)i).localNotificationReceived(id);\n"
                 + "            }\n"
                 + "        }\n"
                 + "        com.codename1.impl.android.AndroidImplementation.setCurrentApplicationInstance(i);\n"
@@ -5436,13 +5436,13 @@ public class AndroidGradleBuilder extends Executor {
                     + "        }\n"
                     + "        if (i == null) {\n"
                     + "          i = new " + appLifecycleClass(request) + "();\n"
-                    + "          if(i instanceof PushCallback) {\n"
-                    + "                com.codename1.impl.CodenameOneImplementation.setPushCallback((PushCallback)i);\n"
+                    + "          if(((Object)i) instanceof PushCallback) {\n"
+                    + "                com.codename1.impl.CodenameOneImplementation.setPushCallback((PushCallback)(Object)i);\n"
                     + "          }\n";
 
             stubSourceCode +=
-                    "           if (i instanceof com.codename1.push.PushActionsProvider) {\n"
-                            + "                try{AndroidImplementation.installNotificationActionCategories((com.codename1.push.PushActionsProvider)i);}catch(java.io.IOException ex){ex.printStackTrace();}\n"
+                    "           if (((Object)i) instanceof com.codename1.push.PushActionsProvider) {\n"
+                            + "                try{AndroidImplementation.installNotificationActionCategories((com.codename1.push.PushActionsProvider)(Object)i);}catch(java.io.IOException ex){ex.printStackTrace();}\n"
                             + "           }\n";
 
         } catch (Exception ex) {
@@ -7299,6 +7299,11 @@ public class AndroidGradleBuilder extends Executor {
                 .replace(phoneStub + "()", stubName + "()")
                 .replace(phoneStub + " stubInstance", stubName + " stubInstance")
                 .replace(phoneStub + " getInstance", stubName + " getInstance")
+                // The qualified-this the run() hand-off uses. Renaming the class without this
+                // leaves "<PhoneStub>.this" naming a class that is no longer an enclosing one,
+                // and javac says exactly that.
+                .replace(phoneStub + ".this", stubName + ".this")
+                .replace(phoneStub + ".headphones", stubName + ".headphones")
                 .replace("new " + phoneMain + "(", "new " + watchSimpleName + "(")
                 .replace(" " + phoneMain + " i;", " " + watchSimpleName + " i;")
                 .replace(" " + phoneMain + " getAppInstance", " " + watchSimpleName
@@ -7306,6 +7311,20 @@ public class AndroidGradleBuilder extends Executor {
         if (watchMain.indexOf('.') > 0) {
             stub = stub.replace("import com.codename1.ui.*;",
                     "import com.codename1.ui.*;\nimport " + watchMain + ";");
+        }
+        // Re-rooting the phone stub is a set of textual substitutions over generated code, and
+        // the failure mode when one is missing is not subtle but it IS remote: the watch module
+        // fails to compile, minutes later, naming a file the developer never wrote. Anything the
+        // list above did not catch still says the phone stub's name, so say so here instead --
+        // at generation time, naming the construct, in the build that produced it.
+        int leftover = stub.indexOf(phoneStub);
+        if (leftover >= 0) {
+            int from = Math.max(0, leftover - 60);
+            int to = Math.min(stub.length(), leftover + 60);
+            throw new BuildException("The Wear stub still refers to the phone stub "
+                    + phoneStub + ", so re-rooting it missed a construct and the wear module "
+                    + "would not compile. Near: ..." + stub.substring(from, to).replace('\n', ' ')
+                    + "... Add a substitution for it in generateWearModule.");
         }
         File stubDir = new File(wearSrc, request.getPackageName().replace('.', '/'));
         stubDir.mkdirs();
@@ -7482,21 +7501,10 @@ public class AndroidGradleBuilder extends Executor {
      */
     static String deriveWearGradle(String appGradle, int intVersion, int wearVersion,
             String wearDependencies) {
-        return appGradle
+        String gradle = appGradle
                 // Same namespace and applicationId; see the method comment.
                 .replace("versionCode " + intVersion, "versionCode " + wearVersion)
                 .replaceFirst("minSdkVersion \\d+", "minSdkVersion 26")
-                // Share the app module's tree instead of duplicating it, and add this module's
-                // own generated sources on top.
-                .replace("android {\n",
-                        "android {\n"
-                        + "    sourceSets.main {\n"
-                        + "        java.srcDirs = ['../app/src/main/java', 'src/main/java']\n"
-                        + "        res.srcDirs = ['../app/src/main/res', 'src/main/res']\n"
-                        + "        assets.srcDirs = ['../app/src/main/assets']\n"
-                        + "        aidl.srcDirs = ['../app/src/main/aidl']\n"
-                        + "        manifest.srcFile 'src/main/AndroidManifest.xml'\n"
-                        + "    }\n")
                 // Libraries are shared from the app module rather than copied.
                 .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
                 .replace("dirs 'libs'", "dirs '../app/libs'")
@@ -7505,16 +7513,91 @@ public class AndroidGradleBuilder extends Executor {
                 // sent the wear module looking for a keystore beside itself. A release build then
                 // failed to CONFIGURE, taking the phone artifact down with it: this is not the
                 // watch half degrading, it is the whole multi-module build not starting.
-                .replace("storeFile file(\"keyStore\")", "storeFile file(\"../app/keyStore\")")
-                // The androidx.wear libraries, HERE and not in the shared dependency hint. They
-                // declare minSdk 26, and this is the only module raised to it -- putting them in
-                // the hint failed the phone module's manifest merge against libraries it never
-                // uses.
-                // "\ndependencies {" and not "dependencies {": the buildscript block is indented
-                // and comes FIRST, and String.replace hits every occurrence -- so the plain form
-                // put an implementation() call inside buildscript's dependency handler, where the
-                // method does not exist and the whole :wear project failed to evaluate.
-                .replace("\ndependencies {\n", "\ndependencies {\n" + wearDependencies);
+                .replace("storeFile file(\"keyStore\")", "storeFile file(\"../app/keyStore\")");
+        // Share the app module's tree instead of duplicating it, and add this module's own
+        // generated sources on top. insertAfterFirst and not replace: an "android {" block can
+        // appear more than once -- a coverage harness appends a second one to add a build type --
+        // and only the module's own block wants a source set.
+        gradle = insertAfterFirst(gradle, "android {\n",
+                "    sourceSets.main {\n"
+                + "        java.srcDirs = ['../app/src/main/java', 'src/main/java']\n"
+                + "        res.srcDirs = ['../app/src/main/res', 'src/main/res']\n"
+                + "        assets.srcDirs = ['../app/src/main/assets']\n"
+                + "        aidl.srcDirs = ['../app/src/main/aidl']\n"
+                + "        manifest.srcFile 'src/main/AndroidManifest.xml'\n"
+                + "    }\n");
+        // The androidx.wear libraries, HERE and not in the shared dependency hint. They declare
+        // minSdk 26, and this is the only module raised to it -- putting them in the hint failed
+        // the phone module's manifest merge against libraries it never uses.
+        //
+        // "\ndependencies {" and not "dependencies {": the buildscript block is indented and
+        // comes FIRST, and a plain replace put an implementation() call inside buildscript's
+        // dependency handler, where the method does not exist and the whole :wear project failed
+        // to evaluate. insertAfterFirst for the same reason one level up -- the generated file
+        // also carries an androidTest dependency block, which has no use for these.
+        gradle = insertAfterFirst(gradle, "\ndependencies {\n", wearDependencies);
+        return gradle + listenableFutureFix(appGradle, wearDependencies);
+    }
+
+    /**
+     * Inserts text directly after the FIRST occurrence of an anchor, or returns the input when
+     * the anchor is absent.
+     *
+     * <p>{@code String.replace} rewrites every occurrence, which in a generated build.gradle is
+     * almost never what is wanted: the anchors here name block openings that legitimately repeat.
+     * Two separate CI failures came from that, so the intent is spelled out rather than encoded
+     * in a longer anchor string.</p>
+     *
+     * @param text the text to insert into
+     * @param anchor the opening to insert after
+     * @param insertion the text to insert
+     * @return the text with the insertion applied at most once
+     */
+    private static String insertAfterFirst(String text, String anchor, String insertion) {
+        int at = text.indexOf(anchor);
+        if (at < 0) {
+            return text;
+        }
+        int after = at + anchor.length();
+        return text.substring(0, after) + insertion + text.substring(after);
+    }
+
+    /**
+     * Puts a real {@code ListenableFuture} back on the Wear module's compile classpath.
+     *
+     * <p>{@code TileService.onTileRequest} returns a {@code ListenableFuture}, and the tiles and
+     * concurrent-futures libraries both ask for {@code com.google.guava:listenablefuture:1.0} --
+     * a jar holding that one class. Guava publishes a second version of the same coordinate,
+     * {@code 9999.0-empty-to-avoid-conflict-with-guava}, which contains NO classes at all: it
+     * exists so that a build carrying full Guava does not end up with the class twice. Any
+     * dependency that pulls the marker wins the version comparison, the real jar is dropped, and
+     * the import stops resolving -- which is what CameraX's transitive graph does to a Codename
+     * One app, with the compile error landing in a generated Tile service the developer never
+     * wrote.</p>
+     *
+     * <p>Forcing 1.0 is right only while nothing supplies the class already. When the app really
+     * does carry full Guava the marker is doing its job, and forcing would put
+     * {@code ListenableFuture} in two jars and fail at dex time instead -- so this is emitted
+     * only when the phone module declares no Guava, which is a question about generated text and
+     * can be answered here.</p>
+     *
+     * @param appGradle the phone module's build.gradle, scanned for a full Guava dependency
+     * @param wearDependencies the Wear dependency block; empty when no Tile is generated
+     * @return the Gradle snippet to append, or an empty string when it is not needed
+     */
+    private static String listenableFutureFix(String appGradle, String wearDependencies) {
+        if (wearDependencies == null
+                || wearDependencies.indexOf("androidx.concurrent:concurrent-futures") < 0) {
+            return "";
+        }
+        if (appGradle.indexOf("com.google.guava:guava:") >= 0) {
+            return "";
+        }
+        return "\n// See listenableFutureFix: the empty 9999.0 marker artifact would otherwise\n"
+                + "// win over the 1.0 jar that actually holds ListenableFuture.\n"
+                + "configurations.all {\n"
+                + "    resolutionStrategy.force 'com.google.guava:listenablefuture:1.0'\n"
+                + "}\n";
     }
 
     /** Joins declared families for the codegen tables, normalized to the portable spelling. */
