@@ -10807,7 +10807,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
         } else {
-            tf.setBounds(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+            // As in the path above: device pixels converted to Swing's logical ones.
+            double legacyScale = editorCanvas.canvasScale();
+            tf.setBounds((int) (cmp.getAbsoluteX() / legacyScale), (int) (cmp.getAbsoluteY() / legacyScale),
+                    (int) (cmp.getWidth() / legacyScale), (int) (cmp.getHeight() / legacyScale));
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         setCaretPosition(tf, getText(tf).length());
@@ -11251,7 +11254,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
-            textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+            // Divided by the owning canvas's backing scale, exactly as a native peer
+            // divides by peerScale(). Codename One coordinates are device pixels --
+            // getDisplayWidthImpl multiplies the canvas size by this same scale -- while
+            // Swing bounds are logical, so assigning one to the other left the editor
+            // oversized and offset from its field by the scale factor on any canvas
+            // whose monitor is not 1x.
+            double editorScale = editorCanvasFor(cmp).canvasScale();
+            textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft) / editorScale),
+                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + marginTop) / editorScale),
+                    (int) ((cmp.getWidth() - marginRight - marginLeft) / editorScale),
+                    (int) ((cmp.getHeight() - marginTop - marginBottom) / editorScale));
             //System.out.println("Set bounds to "+textCmp.getBounds());
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
