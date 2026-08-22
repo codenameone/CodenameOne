@@ -60,6 +60,8 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
         BOOL decorated, BOOL resizable, BOOL positionSet);
 void CN1MacWindowDestroy(int slot);
 void CN1MacWindowShow(int slot, BOOL visible);
+/* The token of the scene request currently outstanding for this slot, or 0. */
+int CN1MacWindowRequestSeq(int slot);
 void CN1MacWindowSetTitle(int slot, NSString* title);
 void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height);
 void CN1MacWindowGetBounds(int slot, int* out);

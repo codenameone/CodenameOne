@@ -2106,8 +2106,8 @@ void CN1MacWindowDeliverContentReady(int windowId) {
     com_codename1_impl_ios_IOSImplementation_windowContentReadyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }
 
-void CN1MacWindowDeliverActivationFailed(int windowId) {
-    com_codename1_impl_ios_IOSImplementation_windowActivationFailedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+void CN1MacWindowDeliverActivationFailed(int windowId, int requestSeq) {
+    com_codename1_impl_ios_IOSImplementation_windowActivationFailedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, requestSeq);
 }
 
 void CN1MacWindowDeliverVisibility(int windowId, BOOL shown) {
@@ -2427,6 +2427,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String
 void com_codename1_impl_ios_IOSNative_macWindowDestroy___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowDestroy(slot);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowRequestSeq___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowRequestSeq(slot);
+#else
+    return 0;
 #endif
 }
 

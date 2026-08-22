@@ -1891,17 +1891,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked when the platform refuses to give a window a scene, so it will never
     /// appear. Reported separately from a minimize because a modal window that never
     /// appeared has to release its blocker.
-    public static void windowActivationFailedCallback(final int windowId) {
-        // Sampled before anything is queued: a show() running after this point bumps
-        // the sequence, and the check below then discards this failure rather than
-        // hiding a window that request may be about to bring up.
-        final int sequence = MacWindowManager.showSequence(windowId);
+    public static void windowActivationFailedCallback(final int windowId, final int requestSeq) {
+        // The token identifies the request that failed and arrives with the failure.
+        // Sampling the current one here instead would sample a retry that started after
+        // the port released the slot, and the stale failure would then be applied to it.
+        //
         // Both halves in one EDT unit. Updating the peer here on UIKit's thread while
         // the framework half waited in the queue let a concurrent show() slip between
         // them and be undone by a failure that no longer applied to it.
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                if (!MacWindowManager.activationFailed(windowId, sequence)) {
+                if (!MacWindowManager.activationFailed(windowId, requestSeq)) {
                     return;
                 }
                 Display.getInstance().windowActivationFailed(windowId);

@@ -40,7 +40,7 @@ extern void CN1MacWindowDeliverClosed(int windowId);
 extern void CN1MacWindowDeliverMonitorsChanged(void);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
-extern void CN1MacWindowDeliverActivationFailed(int windowId);
+extern void CN1MacWindowDeliverActivationFailed(int windowId, int requestSeq);
 extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
@@ -716,7 +716,10 @@ static void CN1MacWindowActivationFailed(int slot, int generation, int requestSe
     /* No request outstanding any more, so a later show() may ask again. */
     w->scenePending = 0;
     pthread_mutex_unlock(&g_slotLock);
-    CN1MacWindowDeliverActivationFailed(windowId);
+    /* The token travels with the failure so the Java side can tell whether a retry has
+     * replaced this request in the window between here and the event dispatch thread
+     * running the notification. Sampling it over there instead would sample the retry. */
+    CN1MacWindowDeliverActivationFailed(windowId, requestSeq);
 }
 
 /*
@@ -1194,6 +1197,18 @@ void CN1MacWindowWatchScreens(void) {
                name:UIScreenDidDisconnectNotification object:nil];
     [nc addObserver:g_screenWatch selector:@selector(screensChanged:)
                name:UIScreenModeDidChangeNotification object:nil];
+}
+
+int CN1MacWindowRequestSeq(int slot) {
+    int seq = 0;
+    CN1MacWindow* w;
+    pthread_mutex_lock(&g_slotLock);
+    w = slotAt(slot);
+    if (w != NULL) {
+        seq = w->requestSeq;
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    return seq;
 }
 
 void CN1MacWindowShow(int slot, BOOL visible) {

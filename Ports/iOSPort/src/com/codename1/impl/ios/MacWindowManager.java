@@ -95,9 +95,11 @@ public class MacWindowManager extends WindowManager {
         /// True while this window is hidden only because its owner is.
         boolean hiddenByOwner;
         boolean visible;
-        /// Bumped by every show request, so an activation failure a later show has
-        /// already superseded can be recognised and discarded.
-        int showSequence;
+        /// The port's token for the scene request currently outstanding for this
+        /// window. An activation failure carries the token of the request it belongs
+        /// to, so one that a later request has already replaced is discarded instead
+        /// of taking down the window that request is bringing up.
+        int requestSeq;
 
         Peer(int slot, int windowId) {
             this.slot = slot;
@@ -150,6 +152,9 @@ public class MacWindowManager extends WindowManager {
             return null;
         }
         Peer created = new Peer(s, windowId);
+        // Creation asks for the first scene, so the window already has a request
+        // outstanding before anything calls show().
+        created.requestSeq = IOSImplementation.nativeInstance.macWindowRequestSeq(s);
         created.owner = ownedByMainWindow ? MAIN_WINDOW : parentPeer;
         synchronized (peers) {
             peers.add(created);
@@ -170,8 +175,10 @@ public class MacWindowManager extends WindowManager {
         // up and there is deliberately no second mechanism doing it again.
         w.visible = true;
         w.hiddenByOwner = false;
-        w.showSequence++;
         IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
+        // Read back rather than counted here: the port bumps its own token when the
+        // call above actually asks for a scene, and only it knows whether it did.
+        w.requestSeq = IOSImplementation.nativeInstance.macWindowRequestSeq(w.slot);
         // Only the ones this owner took down. A child hidden by the application stays
         // hidden, exactly as AWT and GTK behave when an owner is shown again.
         cascadeFrom(w, true);
@@ -230,17 +237,14 @@ public class MacWindowManager extends WindowManager {
     /// restoring its owner makes the cascade treat it as a window the owner took down
     /// and map it again, reporting it shown without going through `Window#show()` --
     /// so it would come back unpainted, taking no input and no longer modal.
-    static int showSequence(int windowId) {
+    static boolean activationFailed(int windowId, int requestSeq) {
         Peer w = peerForWindowId(windowId);
-        return w == null ? -1 : w.showSequence;
-    }
-
-    static boolean activationFailed(int windowId, int sequence) {
-        Peer w = peerForWindowId(windowId);
-        if (w == null || w.showSequence != sequence) {
-            // A show() has asked for another scene since this failure was raised. That
-            // request owns the window's state now, and applying the older failure would
-            // hide a window it may be about to bring up.
+        if (w == null || w.requestSeq != requestSeq) {
+            // The failure belongs to a request a later one has already replaced. That
+            // request owns the window's state now, and applying this failure would take
+            // down a window it may be about to bring up. The token comes from the port
+            // with the failure, so this compares the request that failed rather than
+            // whatever is outstanding at the moment the notification is handled.
             return false;
         }
         w.visible = false;

@@ -224,6 +224,9 @@ public final class IOSNative {
 
     native void macWindowShow(int slot, boolean visible);
 
+    /** The token of the scene request currently outstanding for this window, or 0. */
+    native int macWindowRequestSeq(int slot);
+
     native void macWindowSetTitle(int slot, String title);
 
     native void macWindowSetBounds(int slot, int x, int y, int width, int height);
