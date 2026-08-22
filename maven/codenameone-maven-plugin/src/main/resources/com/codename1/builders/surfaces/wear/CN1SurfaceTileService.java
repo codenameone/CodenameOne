@@ -291,13 +291,16 @@ public abstract class CN1SurfaceTileService extends TileService {
 
     private ModifiersBuilders.Modifiers modifiers(JSONObject node) {
         ModifiersBuilders.Modifiers.Builder mods = new ModifiersBuilders.Modifiers.Builder();
-        JSONObject pad = node.optJSONObject("pad");
-        if (pad != null) {
+        // SurfaceNode serializes padding as the array [top, right, bottom, left], which is what
+        // the RemoteViews renderer reads too. Asking for an object returned null for every valid
+        // descriptor, so all declared padding was silently dropped from a Tile.
+        JSONArray pad = node.optJSONArray("pad");
+        if (pad != null && pad.length() == 4) {
             mods.setPadding(new ModifiersBuilders.Padding.Builder()
-                    .setStart(DimensionBuilders.dp(pad.optInt("l", 0)))
-                    .setEnd(DimensionBuilders.dp(pad.optInt("r", 0)))
-                    .setTop(DimensionBuilders.dp(pad.optInt("t", 0)))
-                    .setBottom(DimensionBuilders.dp(pad.optInt("b", 0)))
+                    .setTop(DimensionBuilders.dp(pad.optInt(0)))
+                    .setEnd(DimensionBuilders.dp(pad.optInt(1)))
+                    .setBottom(DimensionBuilders.dp(pad.optInt(2)))
+                    .setStart(DimensionBuilders.dp(pad.optInt(3)))
                     .build());
         }
         JSONObject bg = node.optJSONObject("bg");
@@ -380,14 +383,24 @@ public abstract class CN1SurfaceTileService extends TileService {
     }
 
     /**
-     * The resource id an image node maps to.
+     * The resource id an image node maps to, derived from its CONTENT.
      *
-     * <p>Published names are content hashes, which is what lets the resources version be a
-     * hash of the name list: unchanged art is never re-sent.</p>
+     * <p>An {@code img} node already names a content hash, which is what lets the resources
+     * version be a hash of the name list: unchanged art is never re-sent. A {@code vec} node
+     * carries no name at all, so its serialized form is hashed instead.</p>
+     *
+     * <p>Content rather than object identity, because the layout request and the resources
+     * request are two separate calls that each re-read and re-parse the timeline. An id taken
+     * from a JSONObject's identity therefore differed between them: the layout referenced a
+     * resource the returned map did not contain, and every vector rendered as a missing image.
+     * Two identical vectors sharing one resource is correct -- they draw the same thing.</p>
      */
     private static String imageId(JSONObject node) {
         String name = node.optString("name", "");
-        return name.length() > 0 ? name : (ROOT_ID + "_" + System.identityHashCode(node));
+        if (name.length() > 0) {
+            return name;
+        }
+        return ROOT_ID + "_vec" + Integer.toHexString(node.toString().hashCode());
     }
 
     private static Map<String, JSONObject> imageNodes(JSONObject root) {

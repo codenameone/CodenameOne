@@ -82,6 +82,37 @@ class SurfaceWatchWireFormatTest {
         assertNotNull(serializeRoot(new SurfaceColumn().add(new SurfaceText("x"))).get("ch"));
     }
 
+    /// Padding is a four-element array in wire order `[top, right, bottom, left]`, not an object
+    /// keyed by side. A reader asking for an object gets null for every valid descriptor and
+    /// silently drops all declared padding.
+    @Test
+    @SuppressWarnings("unchecked")
+    void paddingSerializesAsAnArrayInTopRightBottomLeftOrder() throws Exception {
+        Map<String, Object> root = serializeRoot(
+                new SurfaceBox().setPadding(1, 2, 3, 4).add(new SurfaceText("x")));
+
+        Object pad = root.get("pad");
+        assertTrue(pad instanceof List, "padding belongs in an array: " + root);
+        List<Object> values = (List<Object>) pad;
+        assertEquals(4, values.size());
+        assertEquals(1, ((Number) values.get(0)).intValue(), "top");
+        assertEquals(2, ((Number) values.get(1)).intValue(), "right");
+        assertEquals(3, ((Number) values.get(2)).intValue(), "bottom");
+        assertEquals(4, ((Number) values.get(3)).intValue(), "left");
+    }
+
+    /// A vector node names no image, which is why a surface that has to key one needs something
+    /// other than the absent name -- and something stable across two separate parses of the same
+    /// timeline, since a Tile requests its layout and its resources in different calls.
+    @Test
+    void aVectorNodeCarriesNoImageName() throws Exception {
+        Map<String, Object> root = serializeRoot(new SurfaceVector(100, 100)
+                .fillRect(0, 0, 10, 10, SurfaceColor.rgb(0xff0000)));
+
+        assertEquals("vec", root.get("t"));
+        assertTrue(root.get("name") == null, "a vector publishes no image name: " + root);
+    }
+
     /// A dynamic node carries a style and a date, never a `text` field. A reader interpolating
     /// `text` gets an empty string and the countdown silently disappears.
     @Test

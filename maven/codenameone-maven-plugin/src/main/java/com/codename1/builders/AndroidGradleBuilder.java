@@ -6672,7 +6672,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         generateWearModule(request, studioProjectDir, gradleProps, watchSurfacesManifestEntries,
-                permissions + xPermissions, intVersion);
+                permissions + xPermissions, intVersion, wearableListenerService);
 
         String rootGradleProps = "// Top-level build file where you can add configuration options common to all sub-projects/modules.\n" +
                 "buildscript {\n" +
@@ -7226,10 +7226,12 @@ public class AndroidGradleBuilder extends Executor {
      * @param watchServices the complication and Tile manifest entries
      * @param sharedPermissions the permissions the phone manifest declares
      * @param intVersion the phone's version code, which the watch's must exceed
+     * @param wearableListenerService the Data Layer listener declaration, which the watch needs
+     *     as much as the phone does -- it is the half that RECEIVES a mirrored complication
      */
     private void generateWearModule(BuildRequest request, File studioProjectDir, String appGradle,
-            String watchServices, String sharedPermissions, int intVersion)
-            throws BuildException {
+            String watchServices, String sharedPermissions, int intVersion,
+            String wearableListenerService) throws BuildException {
         if (!"wear".equals(watchModuleName(request))) {
             return;
         }
@@ -7321,6 +7323,12 @@ public class AndroidGradleBuilder extends Executor {
                 + "                <category android:name=\"android.intent.category.LAUNCHER\" />\n"
                 + "            </intent-filter>\n"
                 + "        </activity>\n"
+                // The Data Layer listener. This manifest is selected outright by the module's
+                // sourceSets rather than merged with the phone's, so anything the watch needs has
+                // to be declared here -- and the watch needs this one MORE than the phone does:
+                // it is the half that RECEIVES a mirrored complication. Without it Play services
+                // has nothing to bind in the watch APK, and every mirrored descriptor is dropped.
+                + wearableListenerService
                 // A complication or Tile tap still needs the trampoline.
                 + "        <activity android:name=\"com.codename1.impl.android.surfaces."
                 + "CN1SurfaceActionActivity\"\n"

@@ -2999,7 +2999,12 @@ public class IPhoneBuilder extends Executor {
             // the shared CodenameOne_GLViewController.h so it is visible to every surfaces
             // translation unit (IOSNative.m and CodenameOne_GLAppDelegate.m), mirroring
             // CN1_USE_CARPLAY. Skipped when ios.surfaces.extension=false.
-            if (surfacesExtensionEnabled) {
+            // The watch half counts too, and independently: a manifest whose every kind is a
+            // complication produces no iOS extension, and the WATCH slice still needs these
+            // natives. Without the define its own Surfaces.publish() is a no-op AND
+            // cn1_watch_apply_mirrored_surface -- which the WatchConnectivity delegate calls -- is
+            // compiled out, so the watch slice fails to link rather than merely doing nothing.
+            if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WIDGETS", "#define CN1_USE_WIDGETS");
             }
 
