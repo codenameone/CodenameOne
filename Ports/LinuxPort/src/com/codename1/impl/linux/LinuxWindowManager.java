@@ -131,6 +131,39 @@ public class LinuxWindowManager extends WindowManager {
         }
     }
 
+    /// Records a visibility change the platform made on its own, so that the owner
+    /// cascade does not later act on stale state.
+    ///
+    /// Without this, a window the user minimized himself still looked visible here, so
+    /// a later owner hide marked it hidden-by-owner and the owner's restore brought
+    /// back a window the user had put away.
+    ///
+    /// Unlike the Catalyst port this deliberately does not cascade. GTK iconifies and
+    /// de-iconifies a transient child along with its owner, and each of those windows
+    /// reports its own state through here, so cascading would be a second opinion on
+    /// something already handled. What GTK does not propagate is an explicit map or
+    /// unmap, which is why `#show(Object)` and `#hide(Object)` cascade and this does
+    /// not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window whose visibility the platform changed
+    ///
+    /// - `shown`: true when it became visible, false when it went away
+    static void windowVisibilityChanged(int windowId, boolean shown) {
+        synchronized (peers) {
+            for (Peer each : peers) {
+                if (each.windowId == windowId) {
+                    each.visible = shown;
+                    // The change came from the platform rather than from an owner, so
+                    // no owner may undo it.
+                    each.hiddenByOwner = false;
+                    return;
+                }
+            }
+        }
+    }
+
     private static int slot(Object p) {
         return p instanceof Peer ? ((Peer) p).slot : -1;
     }

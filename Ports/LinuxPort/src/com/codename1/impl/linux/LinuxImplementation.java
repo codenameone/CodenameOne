@@ -774,9 +774,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     break;
                 case EVENT_WINDOW_SHOWN:
                     Display.getInstance().windowShowNotify(windowId);
+                    // The window manager keeps its own record of what is on screen to
+                    // decide what an owner may take down and bring back. This change
+                    // did not go through it, so it has to be told.
+                    LinuxWindowManager.windowVisibilityChanged(windowId, true);
                     break;
                 case EVENT_WINDOW_HIDDEN:
                     Display.getInstance().windowHideNotify(windowId);
+                    LinuxWindowManager.windowVisibilityChanged(windowId, false);
                     break;
                 case EVENT_WINDOW_MOVED:
                     Display.getInstance().windowMoved(windowId);
