@@ -1996,7 +1996,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         for (int iter = 0; iter < count; iter++) {
             com.codename1.ui.Component cmp = c.getComponentAt(iter);
             if (cmp instanceof NativeIPhoneView) {
-                ((NativeIPhoneView) cmp).attachToOwningWindow();
+                // Only the heavyweight ones. peerSetVisible(false) removed the native
+                // view on purpose, and re-adding it here would put a lightweight
+                // component's live view back over its own snapshot, taking native
+                // input with it.
+                NativeIPhoneView peer = (NativeIPhoneView) cmp;
+                if (!peer.lightweightMode) {
+                    peer.attachToOwningWindow();
+                }
             } else if (cmp instanceof com.codename1.ui.Container) {
                 reattachPeers((com.codename1.ui.Container) cmp);
             }
@@ -2004,6 +2011,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void windowVisibilityCallback(int windowId, boolean shown) {
+        // The other desktop platforms take a window's owned windows down with it and
+        // report each one; Catalyst scenes have no owner relation, so the cascade is
+        // emulated here. Doing it for the user-driven minimize as well as for hide()
+        // is what makes the two paths agree -- an owner becomes hidden both ways.
+        MacWindowManager.cascadeOwnerVisibility(windowId, shown);
         if (shown) {
             Display.getInstance().windowShowNotify(windowId);
         } else {

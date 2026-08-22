@@ -2980,10 +2980,61 @@ public final class Display extends CN1Constants {
     ///
     /// - `h`: the new drawable height
     public void windowSizeChanged(int windowId, int w, int h) {
-        if (windowId > 0) {
-            addSizeChangeEvent(SIZE_CHANGED | (windowId << 8), w, h);
+        if (windowId <= 0) {
+            return;
         }
+        // Coalesced onto the event dispatch thread rather than queued as a packet.
+        // The packed stack drops when it is full, which live resizing does easily, and
+        // the dropped packet can be the *final* size -- the native surface has already
+        // adopted it, so the hierarchy stays laid out for an earlier one with nothing
+        // guaranteed to correct it, leaving painting and hit testing misaligned.
+        //
+        // Coalescing is what makes a non-droppable path affordable here: only one
+        // notification per window is ever outstanding, and it carries whatever the
+        // latest dimensions are when it runs, so a drag that produces hundreds of
+        // resizes still costs one queued runnable at a time.
+        final Integer key = Integer.valueOf(windowId);
+        boolean queue;
+        synchronized (pendingWindowSizes) {
+            int[] latest = (int[]) pendingWindowSizes.get(key);
+            if (latest == null) {
+                latest = new int[2];
+                pendingWindowSizes.put(key, latest);
+                queue = true;
+            } else {
+                queue = false;
+            }
+            latest[0] = w;
+            latest[1] = h;
+        }
+        if (!queue) {
+            return;
+        }
+        final int id = windowId;
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                int width;
+                int height;
+                synchronized (pendingWindowSizes) {
+                    int[] latest = (int[]) pendingWindowSizes.remove(key);
+                    if (latest == null) {
+                        return;
+                    }
+                    width = latest[0];
+                    height = latest[1];
+                }
+                Window w = Desktop.getInstance().windowById(id);
+                if (w != null) {
+                    w.sizeChangedInternal(width, height);
+                }
+            }
+        });
     }
+
+    /// The most recent size reported for each open window that has not been delivered
+    /// yet. See `#windowSizeChanged(int, int, int)`.
+    private final java.util.Hashtable pendingWindowSizes = new java.util.Hashtable();
 
     /// Notifies Codename One that a native window became visible.
     ///

@@ -3567,4 +3567,27 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void aBurstOfResizesDeliversTheFinalSize() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("resized", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        assertNotNull(wm.getLastWindow());
+        try {
+            // Live resizing produces far more notifications than the packed stack
+            // holds, and the one it drops can be the last -- leaving the hierarchy
+            // laid out for a size the native surface has already moved past.
+            for (int iter = 0; iter < 500; iter++) {
+                Display.getInstance().windowSizeChanged(w.getWindowId(), 500 + iter, 400 + iter);
+            }
+            flushSerialCalls();
+
+            assertEquals(999, w.getWidth(), "the final size must survive the burst");
+            assertEquals(899, w.getHeight());
+        } finally {
+            w.dispose();
+        }
+    }
 }

@@ -86,12 +86,24 @@ public class MacWindowManager extends WindowManager {
         /// 2GB/s at 60fps -- which is enough garbage to stall an animating window or
         /// have the system kill the app. Reallocated only when the raster resizes.
         int[] frameBuffer;
+        /// The peer of the window that owns this one, or null.
+        ///
+        /// Catalyst scenes have no owner relation of their own, so the promise that an
+        /// owned window follows its owner -- which the other three desktop ports get
+        /// from the platform -- has to be kept here instead.
+        Object owner;
+        /// True while this window is hidden only because its owner is.
+        boolean hiddenByOwner;
+        boolean visible;
 
         Peer(int slot, int windowId) {
             this.slot = slot;
             this.windowId = windowId;
         }
     }
+
+    /// Every live window, so an owner can find the windows it owns.
+    private static final java.util.List<Peer> peers = new java.util.ArrayList<Peer>();
 
     private static Peer peer(Object p) {
         return p instanceof Peer ? (Peer) p : null;
@@ -125,28 +137,113 @@ public class MacWindowManager extends WindowManager {
         if (s < 0) {
             return null;
         }
-        return new Peer(s, windowId);
+        Peer created = new Peer(s, windowId);
+        created.owner = parentPeer;
+        synchronized (peers) {
+            peers.add(created);
+        }
+        return created;
     }
 
     @Override
     public void show(Object p) {
-        int s = slot(p);
-        if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowShow(s, true);
+        Peer w = peer(p);
+        if (w == null) {
+            return;
+        }
+        w.visible = true;
+        w.hiddenByOwner = false;
+        IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
+        // Only the ones this owner took down. A child hidden by the application stays
+        // hidden, exactly as AWT and GTK behave when an owner is shown again.
+        for (Peer child : ownedBy(p)) {
+            if (child.hiddenByOwner) {
+                child.hiddenByOwner = false;
+                child.visible = true;
+                IOSImplementation.nativeInstance.macWindowShow(child.slot, true);
+            }
+        }
+    }
+
+    /// The live windows owned by the given peer.
+    private static java.util.List<Peer> ownedBy(Object ownerPeer) {
+        java.util.List<Peer> out = new java.util.ArrayList<Peer>();
+        synchronized (peers) {
+            for (Peer each : peers) {
+                if (each.owner == ownerPeer) { //NOPMD CompareObjectsWithEquals
+                    out.add(each);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Hides or restores the windows owned by the window with the given id, which is
+    /// how a Catalyst window follows its owner being minimized by the user -- there is
+    /// no scene-level owner relation to do it for us.
+    static void cascadeOwnerVisibility(int ownerWindowId, boolean shown) {
+        Peer owner = null;
+        synchronized (peers) {
+            for (Peer each : peers) {
+                if (each.windowId == ownerWindowId) {
+                    owner = each;
+                    break;
+                }
+            }
+        }
+        if (owner == null) {
+            return;
+        }
+        for (Peer child : ownedBy(owner)) {
+            if (shown) {
+                if (child.hiddenByOwner) {
+                    child.hiddenByOwner = false;
+                    child.visible = true;
+                    IOSImplementation.nativeInstance.macWindowShow(child.slot, true);
+                }
+            } else if (child.visible) {
+                child.hiddenByOwner = true;
+                child.visible = false;
+                IOSImplementation.nativeInstance.macWindowShow(child.slot, false);
+            }
         }
     }
 
     @Override
     public void hide(Object p) {
-        int s = slot(p);
-        if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowShow(s, false);
+        Peer w = peer(p);
+        if (w == null) {
+            return;
+        }
+        w.visible = false;
+        IOSImplementation.nativeInstance.macWindowShow(w.slot, false);
+        // An owned window cannot stay on screen without its owner. Recorded as
+        // hidden-by-owner so showing the owner again brings back exactly the children
+        // it took down, and not ones the application hid itself.
+        for (Peer child : ownedBy(p)) {
+            if (child.visible) {
+                child.hiddenByOwner = true;
+                child.visible = false;
+                IOSImplementation.nativeInstance.macWindowShow(child.slot, false);
+            }
         }
     }
 
     @Override
     public void dispose(Object p) {
         Peer w = peer(p);
+        if (w != null) {
+            synchronized (peers) {
+                peers.remove(w);
+                // An owned window outliving its owner would keep a dangling reference
+                // and could be matched against a later peer at the same address.
+                for (Peer each : peers) {
+                    if (each.owner == w) { //NOPMD CompareObjectsWithEquals
+                        each.owner = null;
+                    }
+                }
+            }
+        }
         if (w == null) {
             return;
         }
