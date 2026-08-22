@@ -10,21 +10,21 @@ import gen_catalog as G
 
 ROOT = "/Users/shai/dev/cn6/CodenameOne"
 OUT = os.path.join(ROOT, "maven/build-hint-catalog/src/main/java/com/codename1/build/shared")
-with open(os.path.join(SC, "license.txt"), encoding="utf-8") as _fh:
-    LICENSE = _fh.read()
+LICENSE = G.load_license()
 
 with open(SC + "/mined.json", encoding="utf-8") as _fh:
     mined = set(json.load(_fh))
+DOCS = G.load_docs()
 PLACEHOLDER = re.compile(r'PERMISSION_NAME|[A-Z_]{4,}$|[<>]')
 
-names = sorted(k for k in G.DOCS
+names = sorted(k for k in DOCS
                if k not in mined and not PLACEHOLDER.search(k) and "." in k or
                   (k not in mined and not PLACEHOLDER.search(k) and k.islower()))
 names = sorted(set(n for n in names if not PLACEHOLDER.search(n)))
 
 body = []
 for n in names:
-    doc = G.clean_doc(G.DOCS[n])
+    doc = G.clean_doc(DOCS[n])
     htype, lit, sep = G.infer(n, [], doc)
     parts = ['        h.add(new Hint("%s")' % G.jesc(n)]
     parts.append('                .group(HintGroup.%s)' % G.group_of(n))

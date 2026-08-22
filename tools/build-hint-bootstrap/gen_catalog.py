@@ -5,11 +5,13 @@ import json, re, os, sys, collections
 ROOT = "/Users/shai/dev/cn6/CodenameOne"
 SC = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(ROOT, "maven/build-hint-catalog/src/main/java/com/codename1/build/shared")
-with open(os.path.join(SC, "license.txt"), encoding="utf-8") as _fh:
-    LICENSE = _fh.read()
+def load_license():
+    with open(os.path.join(SC, "license.txt"), encoding="utf-8") as fh:
+        return fh.read()
 
-with open(os.path.join(SC, "mined.json"), encoding="utf-8") as _fh:
-    mined = json.load(_fh)
+def load_mined():
+    with open(os.path.join(SC, "mined.json"), encoding="utf-8") as fh:
+        return json.load(fh)
 
 sys.path.insert(0, SC)
 from curation import CURATED, ENUMS, PRIVACY_PREFIX, DEFAULT_NOTES, DOC_OVERRIDES, TYPE_OVERRIDES
@@ -48,8 +50,6 @@ def load_docs():
             i += 1
     return docs
 
-DOCS = load_docs()
-print(f"doc rows parsed: {len(DOCS)}", file=sys.stderr)
 
 def clean_doc(t):
     t = re.sub(r'<<[^,>]*,\s*([^>]*)>>', r'\1', t)   # <<anchor,text>> -> text
@@ -184,62 +184,72 @@ BLURB = {
  "BuildHintsGeneral": "Hints with no platform prefix, plus hardening and on-device debugging.",
 }
 
-# A mined key ending in a dot is the constant half of a concatenation --
-# getArg("android.permission." + name) -- not a hint anyone can set. Cataloguing
-# it would put a phantom row in the guide and a phantom entry in the Settings
-# tool. Each one is covered by a dynamic family instead.
-mined = {k: v for k, v in mined.items() if not k.endswith(".")}
+def main():
+    """Emit the BuildHints* registration classes.
 
-counts = collections.Counter()
-for fname, pred in FILES.items():
-    names = sorted(n for n in mined if pred(n))
-    counts[fname] = len(names)
-    body = []
-    for n in names:
-        defaults = [d for d, _, _ in mined[n]]
-        sites = sorted({os.path.basename(f)[:-5] for _, f, _ in mined[n]})
-        doc = clean_doc(DOCS.get(n, ""))
-        if not doc and n in DOC_OVERRIDES:
-            doc = DOC_OVERRIDES[n]
-        if n in DEFAULT_NOTES:
-            if doc and not doc.rstrip().endswith((".", "!", "?")):
-                doc = doc.rstrip() + "."
-            doc = (doc + " " + DEFAULT_NOTES[n]).strip()
-        htype, lit, sep = infer(n, defaults, doc)
-        parts = ['        h.add(new Hint("%s")' % jesc(n)]
-        g = group_of(n)
-        cur = CURATED.get(n)
-        enum_name = None
-        if g == "IOS_PRIVACY":
-            parts.append('                .annotatedAs(HintGroup.IOS_PRIVACY, "%s")' % privacy_attr(n))
-            htype = "STRING"
-        elif cur:
-            cg, attr, enum_name, forced_type, forced_def = cur
-            parts.append('                .annotatedAs(HintGroup.%s, "%s")' % (cg, attr))
-            if forced_type:
-                htype = forced_type
-            if forced_def is not None:
-                lit = forced_def
-        else:
-            parts.append('                .group(HintGroup.%s)' % g)
-        if enum_name:
-            vals = ", ".join('"%s"' % v for v in ENUMS[enum_name])
-            parts.append('                .values("%s", %s)' % (enum_name, vals))
-            if lit is not None and lit not in ENUMS[enum_name]:
-                lit = None
-        else:
-            parts.append('                .type(HintType.%s)' % htype)
-        if lit is not None and lit != "":
-            parts.append('                .def("%s")' % jesc(lit))
-        if sep is not None:
-            parts.append('                .separator("%s")' % jesc(sep))
-        parts.append('                .platform("%s")' % platform_of(n))
-        parts.append('                .consumedBy(%s)' % ", ".join('"%s"' % s for s in sites))
-        if doc:
-            parts.append('                .doc(%s)' % wrap(doc, 24))
-        body.append("\n".join(parts) + ");")
+    Guarded rather than run at import: gen_external.py imports this module for
+    load_docs/clean_doc/infer, and without the guard that import would rewrite
+    every catalog source as a side effect.
+    """
+    LICENSE = load_license()
+    DOCS = load_docs()
+    print(f"doc rows parsed: {len(DOCS)}", file=sys.stderr)
+    # A mined key ending in a dot is the constant half of a concatenation --
+    # getArg("android.permission." + name) -- not a hint anyone can set.
+    # Cataloguing it would put a phantom row in the guide and a phantom entry in
+    # the Settings tool. Each one is covered by a dynamic family instead.
+    mined = {k: v for k, v in load_mined().items() if not k.endswith(".")}
 
-    src = LICENSE + f'''package com.codename1.build.shared;
+    counts = collections.Counter()
+    for fname, pred in FILES.items():
+        names = sorted(n for n in mined if pred(n))
+        counts[fname] = len(names)
+        body = []
+        for n in names:
+            defaults = [d for d, _, _ in mined[n]]
+            sites = sorted({os.path.basename(f)[:-5] for _, f, _ in mined[n]})
+            doc = clean_doc(DOCS.get(n, ""))
+            if not doc and n in DOC_OVERRIDES:
+                doc = DOC_OVERRIDES[n]
+            if n in DEFAULT_NOTES:
+                if doc and not doc.rstrip().endswith((".", "!", "?")):
+                    doc = doc.rstrip() + "."
+                doc = (doc + " " + DEFAULT_NOTES[n]).strip()
+            htype, lit, sep = infer(n, defaults, doc)
+            parts = ['        h.add(new Hint("%s")' % jesc(n)]
+            g = group_of(n)
+            cur = CURATED.get(n)
+            enum_name = None
+            if g == "IOS_PRIVACY":
+                parts.append('                .annotatedAs(HintGroup.IOS_PRIVACY, "%s")' % privacy_attr(n))
+                htype = "STRING"
+            elif cur:
+                cg, attr, enum_name, forced_type, forced_def = cur
+                parts.append('                .annotatedAs(HintGroup.%s, "%s")' % (cg, attr))
+                if forced_type:
+                    htype = forced_type
+                if forced_def is not None:
+                    lit = forced_def
+            else:
+                parts.append('                .group(HintGroup.%s)' % g)
+            if enum_name:
+                vals = ", ".join('"%s"' % v for v in ENUMS[enum_name])
+                parts.append('                .values("%s", %s)' % (enum_name, vals))
+                if lit is not None and lit not in ENUMS[enum_name]:
+                    lit = None
+            else:
+                parts.append('                .type(HintType.%s)' % htype)
+            if lit is not None and lit != "":
+                parts.append('                .def("%s")' % jesc(lit))
+            if sep is not None:
+                parts.append('                .separator("%s")' % jesc(sep))
+            parts.append('                .platform("%s")' % platform_of(n))
+            parts.append('                .consumedBy(%s)' % ", ".join('"%s"' % s for s in sites))
+            if doc:
+                parts.append('                .doc(%s)' % wrap(doc, 24))
+            body.append("\n".join(parts) + ");")
+
+        src = LICENSE + f'''package com.codename1.build.shared;
 
 import com.codename1.build.shared.BuildHints.Hint;
 
@@ -264,8 +274,12 @@ final class {fname} {{
 
     static void register(List<Hint> h) {{
 ''' + "\n\n".join(body) + "\n    }\n}\n"
-    with open(os.path.join(OUT, fname + ".java"), "w", encoding="utf-8") as fh:
-        fh.write(src)
+        with open(os.path.join(OUT, fname + ".java"), "w", encoding="utf-8") as fh:
+            fh.write(src)
 
-print("entries per file:", dict(counts), file=sys.stderr)
-print("total:", sum(counts.values()), file=sys.stderr)
+    print("entries per file:", dict(counts), file=sys.stderr)
+    print("total:", sum(counts.values()), file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

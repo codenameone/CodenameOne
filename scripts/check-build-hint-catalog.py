@@ -10,7 +10,7 @@ green build, no effect, nobody noticed.
 Held against a baseline rather than failing outright: a large tail of hints
 predates the catalog. The point is that *new* code cannot add another one.
 """
-import fnmatch, json, os, re, subprocess, sys
+import fnmatch, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
