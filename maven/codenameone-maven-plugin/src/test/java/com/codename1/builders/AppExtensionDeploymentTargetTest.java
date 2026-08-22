@@ -596,4 +596,20 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Ext", IPhoneBuilder.resolveSettingsFully(
                 "com.example.app.Ext", settings));
     }
+
+    @Test
+    public void aProductNameThroughTheConfigurationResolvesToo() throws Exception {
+        File extension = tmp.newFolder("dist20", "WalletUIExtension");
+        java.util.Map<String, String> declared = new java.util.LinkedHashMap<String, String>();
+        declared.put("PRODUCT_NAME", "$(CONFIGURATION)-Wallet");
+
+        java.util.Map<String, String> settings = IPhoneBuilder.extensionSettingsWithBuiltIns(
+                extension, declared, "Release", "iphoneos14.4", "arm64");
+
+        // Resolving PRODUCT_NAME before the context was in the map left "-Wallet", and that went
+        // into the identifier and into the export-options key.
+        assertEquals("Release-Wallet", settings.get("PRODUCT_NAME"));
+        assertEquals("com.example.app.Release-Wallet", IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.$(PRODUCT_NAME)", settings));
+    }
 }

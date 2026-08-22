@@ -6696,14 +6696,6 @@ public class IPhoneBuilder extends Executor {
         }
         String targetName = extensionFolder.getName();
         out.put("TARGET_NAME", targetName);
-        // PRODUCT_NAME is $(TARGET_NAME) unless the archive says otherwise -- but "otherwise" may
-        // itself be a reference: PRODUCT_NAME = $(EXTENSION_NAME) with EXTENSION_NAME beside it is
-        // a chain Xcode expands, and flattening it to the folder name here recorded an identifier
-        // the archive does not contain.
-        String productName = out.get("PRODUCT_NAME");
-        String resolvedProductName = productName == null ? ""
-                : resolveSettingsInValue(productName, out);
-        out.put("PRODUCT_NAME", resolvedProductName.length() > 0 ? resolvedProductName : targetName);
         File projectDir = extensionFolder.getParentFile();
         String projectPath = projectDir == null ? "." : projectDir.getAbsolutePath();
         if (!out.containsKey("SRCROOT")) {
@@ -6731,6 +6723,15 @@ public class IPhoneBuilder extends Executor {
                 out.put("arch", arch);
             }
         }
+        // PRODUCT_NAME last, and only now: it is $(TARGET_NAME) unless the archive says otherwise,
+        // and "otherwise" may be a chain through any of the settings above --
+        // PRODUCT_NAME = $(CONFIGURATION)-Wallet is one. Resolving it before CONFIGURATION,
+        // SDK_NAME and CURRENT_ARCH were in the map deleted the reference and left "-Wallet",
+        // which then went into an identifier and into the export-options key.
+        String productName = out.get("PRODUCT_NAME");
+        String resolvedProductName = productName == null ? ""
+                : resolveSettingsInValue(productName, out);
+        out.put("PRODUCT_NAME", resolvedProductName.length() > 0 ? resolvedProductName : targetName);
         return out;
     }
 
@@ -6868,14 +6869,23 @@ public class IPhoneBuilder extends Executor {
     /// hint) made an exact qualifier like [sdk=iphoneos26.0] read as some other build's. The hint
     /// answers when it is set; otherwise xcrun is asked, and if that cannot answer either the
     /// bare platform name is used, which matches any version of it.
-    static String activeIosSdkName(BuildRequest request) {
+    String activeIosSdkName(BuildRequest request) {
         String declared = request.getArg("ios.sdk", null);
         if (declared != null && declared.trim().length() > 0) {
             return "iphoneos" + declared.trim();
         }
         try {
-            Process p = new ProcessBuilder("/usr/bin/xcrun", "--sdk", "iphoneos",
-                    "--show-sdk-version").redirectErrorStream(false).start();
+            // Through the Xcode this build actually uses. resolveXcodebuild honours XCODEBUILD,
+            // DEVELOPER_DIR and XCODE_APP, and asking the system default instead can report a
+            // different installation's SDK -- which then makes an exact [sdk=iphoneosNN] condition
+            // match, or fail to match, on a version this archive never sees.
+            ProcessBuilder builder = new ProcessBuilder(xcrunForSelectedXcode(), "--sdk",
+                    "iphoneos", "--show-sdk-version");
+            String developerDir = selectedDeveloperDir();
+            if (developerDir != null) {
+                builder.environment().put("DEVELOPER_DIR", developerDir);
+            }
+            Process p = builder.redirectErrorStream(false).start();
             java.io.BufferedReader in = new java.io.BufferedReader(
                     new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
             String version;
@@ -6891,6 +6901,38 @@ public class IPhoneBuilder extends Executor {
             // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
         }
         return "iphoneos";
+    }
+
+    /// The xcrun beside the xcodebuild this build selected, or the system one.
+    private String xcrunForSelectedXcode() {
+        String selected = resolveXcodebuild();
+        if (selected != null) {
+            File beside = new File(new File(selected).getParentFile(), "xcrun");
+            if (beside.canExecute()) {
+                return beside.getAbsolutePath();
+            }
+        }
+        return "/usr/bin/xcrun";
+    }
+
+    /// The developer directory of the selected Xcode -- <Xcode.app>/Contents/Developer -- so a
+    /// tool run through the system xcrun still resolves inside it. Null when it cannot be told.
+    private String selectedDeveloperDir() {
+        String fromEnvironment = System.getenv("DEVELOPER_DIR");
+        if (fromEnvironment != null && fromEnvironment.length() > 0) {
+            return fromEnvironment;
+        }
+        String selected = resolveXcodebuild();
+        if (selected == null) {
+            return null;
+        }
+        // .../Contents/Developer/usr/bin/xcodebuild -> .../Contents/Developer
+        File developer = new File(selected).getParentFile();
+        for (int i = 0; i < 2 && developer != null; i++) {
+            developer = developer.getParentFile();
+        }
+        return developer != null && new File(developer, "usr/bin").isDirectory()
+                ? developer.getAbsolutePath() : null;
     }
 
     /// The value of {@code name} that governs THIS archive.
