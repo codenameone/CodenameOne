@@ -6016,8 +6016,8 @@ public class IPhoneBuilder extends Executor {
         // The host's own versions, through the helpers the watch builder uses
         // for the same rule: an embedded extension whose marketing or build
         // version differs from its containing app fails archive validation.
-        String extShort = embeddedShortVersion(request);
-        String extBundle = embeddedBundleVersion(request);
+        String extShort = embeddedExtensionShortVersion(request);
+        String extBundle = embeddedExtensionBundleVersion(request);
         // The hint is an override, not the only way in: an app whose
         // setCommissionToThisApp(true) the scanner saw needs no hint, and one
         // that reaches the API through reflection has no other way to say so.
@@ -6702,7 +6702,7 @@ public class IPhoneBuilder extends Executor {
      * @param request the build being generated
      * @return the CFBundleShortVersionString the app itself will declare
      */
-    private static String embeddedShortVersion(BuildRequest request) {
+    private static String embeddedExtensionShortVersion(BuildRequest request) {
         String injected = WatchNativeBuilder.injectedPlistString(request,
                 "CFBundleShortVersionString");
         return injected != null ? injected : WatchNativeBuilder.shortVersion(request);
@@ -6712,7 +6712,7 @@ public class IPhoneBuilder extends Executor {
      * The build version an embedded bundle must declare to match this app.
      *
      * <p>The fallback is {@code shortVersion(request)} and deliberately NOT
-     * {@link #embeddedShortVersion}: the two keys are independent, the app's CFBundleVersion is
+     * {@link #embeddedExtensionShortVersion}: the two keys are independent, the app's CFBundleVersion is
      * {@code ios.bundleVersion} defaulting to the build version, and it does not follow an
      * injected marketing version. Deriving one from the other produces the very mismatch this
      * exists to prevent.</p>
@@ -6720,7 +6720,7 @@ public class IPhoneBuilder extends Executor {
      * @param request the build being generated
      * @return the CFBundleVersion the app itself will declare
      */
-    private static String embeddedBundleVersion(BuildRequest request) {
+    private static String embeddedExtensionBundleVersion(BuildRequest request) {
         String injected = WatchNativeBuilder.injectedPlistString(request, "CFBundleVersion");
         return injected != null ? injected
                 : request.getArg("ios.bundleVersion", WatchNativeBuilder.shortVersion(request));
@@ -6732,8 +6732,8 @@ public class IPhoneBuilder extends Executor {
             return;
         }
         IOSWidgetExtensionBuilder watchBuilder = new IOSWidgetExtensionBuilder()
-                .setVersions(embeddedShortVersion(request),
-                        embeddedBundleVersion(request))
+                .setVersions(embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request))
                 .setWatchTarget(true)
                 .setExtensionName(SURFACES_WATCH_EXTENSION_NAME)
                 // The extension is nested in the watch app, so its bundle id extends the WATCH
@@ -6775,8 +6775,8 @@ public class IPhoneBuilder extends Executor {
      */
     private void appendWidgetExtensionTargets(StringBuilder sb, BuildRequest request, File distDir) throws IOException {
         IOSWidgetExtensionBuilder widgetBuilder = new IOSWidgetExtensionBuilder()
-                .setVersions(embeddedShortVersion(request),
-                        embeddedBundleVersion(request))
+                .setVersions(embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request))
                 .setExtensionName(SURFACES_EXTENSION_NAME)
                 .setHostBundleId(request.getPackageName())
                 .setAppGroupId(surfacesAppGroup)
