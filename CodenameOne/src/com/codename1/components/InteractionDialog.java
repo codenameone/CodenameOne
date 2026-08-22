@@ -345,6 +345,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `host`: the top level to show on, or null for the current form
     public void setTopLevelHost(TopLevelContainer host) {
         this.hostTopLevel = host;
+        // An explicit choice replaces an inferred one outright, and there is no longer
+        // an earlier host worth restoring.
+        this.hostTopLevelInferred = false;
+        this.hostTopLevelBeforeInference = null;
     }
 
     /// Returns the top level set with `#setTopLevelHost(TopLevelContainer)`.
@@ -374,6 +378,31 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
     private TopLevelContainer hostTopLevel;
+
+    /// True while `#hostTopLevel` holds a host worked out from a popup's anchor rather
+    /// than one the application asked for. Such a host belongs to that one showing: it
+    /// is the anchor's top level, and the next showing may well be somewhere else.
+    private boolean hostTopLevelInferred;
+
+    /// The host that was in force before a popup inferred one, put back when the popup
+    /// goes away.
+    private TopLevelContainer hostTopLevelBeforeInference;
+
+    /// Drops a host inferred from a popup's anchor and restores whatever was set before
+    /// it.
+    ///
+    /// Without this the inferred host outlived the popup in the same field the explicit
+    /// API writes to, so showing the same dialog again through `#show(int, int, int,
+    /// int)` put it back on the window the popup happened to be anchored in. If that
+    /// window had since been disposed the dialog went into a hierarchy attached to
+    /// nothing and simply never appeared.
+    private void releaseInferredHost() {
+        if (hostTopLevelInferred) {
+            hostTopLevel = hostTopLevelBeforeInference;
+            hostTopLevelBeforeInference = null;
+            hostTopLevelInferred = false;
+        }
+    }
 
     private void cleanupLayer(TopLevelContainer f) {
         if (stackable) {
@@ -559,6 +588,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     @Override
     public void dispose() {
         disposed = true;
+        releaseInferredHost();
         Container p = getParent();
         if (p != null) {
             TopLevelContainer f = p.getTopLevelContainer();
@@ -663,6 +693,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     private void disposeTo(int direction, final Runnable onFinish) {
         disposed = true;
+        releaseInferredHost();
         final Container p = getParent();
         if (p != null) {
             final TopLevelContainer f = p.getTopLevelContainer();
@@ -964,7 +995,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // component in a window opened over the main window instead, at coordinates
         // that mean nothing there.
         if (f != null) {
-            setTopLevelHost(f);
+            if (!hostTopLevelInferred) {
+                hostTopLevelBeforeInference = hostTopLevel;
+            }
+            hostTopLevel = f;
+            hostTopLevelInferred = true;
         }
         disposed = false;
         getUnselectedStyle().setOpacity(255);

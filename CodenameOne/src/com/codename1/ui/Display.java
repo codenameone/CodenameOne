@@ -34,6 +34,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.VirtualKeyboardInterface;
+import com.codename1.impl.WindowManager;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.io.Util;
@@ -4416,7 +4417,7 @@ public final class Display extends CN1Constants {
     /// outside the framework's input filter: its close button still reaches the
     /// application.
     void syncNativeModalBlocking() {
-        com.codename1.impl.WindowManager wm = impl.getWindowManager();
+        WindowManager wm = impl.getWindowManager();
         if (wm == null) {
             return;
         }
@@ -4583,10 +4584,17 @@ public final class Display extends CN1Constants {
             }
             Graphics g = w.getWindowGraphics();
             Object peer = w.getNativePeer();
-            if (g == null || peer == null) {
+            // The manager as well as the graphics and the peer. A window stays
+            // registered until it is disposed, so one can outlive the platform's
+            // window manager -- and dereferencing it here throws on the event dispatch
+            // thread, which catches the exception, comes straight back round the loop
+            // and throws again. That spins forever rather than losing a frame, so the
+            // one thing this must not do is assume the manager is still there.
+            WindowManager wm = impl.getWindowManager();
+            if (g == null || peer == null || wm == null) {
                 continue;
             }
-            g.setGraphics(impl.getWindowManager().getNativeGraphics(peer));
+            g.setGraphics(wm.getNativeGraphics(peer));
             w.flushRevalidateQueue();
             impl.paintDirtyWindow(w.getPaintSurface(), w.getWidth(), w.getHeight());
             w.repaintAnimations();

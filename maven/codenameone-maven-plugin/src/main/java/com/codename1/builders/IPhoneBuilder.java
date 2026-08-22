@@ -6786,7 +6786,8 @@ public class IPhoneBuilder extends Executor {
         return out.toArray(new File[out.size()]);
     }
 
-    private void injectToPlist(File tmpFile, File resDir, BuildRequest request) throws IOException {
+    private void injectToPlist(File tmpFile, File resDir, BuildRequest request)
+            throws IOException, BuildException {
         File buildinRes = new File(tmpFile, "btres");
         File mat = new File(buildinRes, "material-design-font.ttf");
         if(mat.exists()) {
@@ -6979,6 +6980,31 @@ public class IPhoneBuilder extends Executor {
         // and getWindowManager() reads that key back out of the bundle, so windows were
         // reported unsupported and constructing one threw, in the very build that had
         // just asked for them.
+        if (multiWindow && inject.contains("UIApplicationSceneManifest")) {
+            // The application supplied its own manifest, so this build must not write a
+            // second one -- but a Catalyst build that asked for windows and whose own
+            // manifest does not support them fails at run time, not here: the bundle is
+            // what getWindowManager() reads, so windows come back unsupported and the
+            // first "new Window(...)" throws in a build that had just asked for them.
+            // Rather than merge into a fragment we did not write, and risk producing a
+            // plist neither side intended, say plainly what is missing.
+            boolean supportsMultiple = inject.contains("UIApplicationSupportsMultipleScenes");
+            boolean hasWindowRole = inject.contains("UIWindowSceneSessionRoleApplication");
+            if (!supportsMultiple || !hasWindowRole) {
+                throw new BuildException(
+                        "macNative.enabled=true asks for com.codename1.ui.Window support, but "
+                        + "ios.plistInject already supplies its own UIApplicationSceneManifest "
+                        + "which is missing "
+                        + (!supportsMultiple
+                                ? "<key>UIApplicationSupportsMultipleScenes</key><true/>" : "")
+                        + (!supportsMultiple && !hasWindowRole ? " and " : "")
+                        + (!hasWindowRole
+                                ? "a UIWindowSceneSessionRoleApplication configuration naming "
+                                + "CodenameOne_GLSceneDelegate" : "")
+                        + ". Add it to your injected manifest, or drop the manifest from "
+                        + "ios.plistInject and let the build emit one.");
+            }
+        }
         if ((useUISceneManifest || usesCar || multiWindow) && !inject.contains("UIApplicationSceneManifest")) {
             String carPlayScene = usesCar
                     ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
