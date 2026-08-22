@@ -449,10 +449,19 @@ public class CN1WearableListenerService extends WearableListenerService {
             // the watch face to re-read; there is nothing for the application to do, and starting
             // it would bring a UI forward that the user did not ask for. Delivering it to the
             // app's own listeners would also show it a message it never sent itself.
-            if (appPath != null && !deleted
+            if (appPath != null
                     && com.codename1.impl.android.surfaces.CN1SurfaceMirror.isMirrorPath(appPath)) {
-                com.codename1.impl.android.surfaces.CN1SurfaceMirror.receive(this, appPath,
-                        readMirrorPayload(event));
+                // Deletions too, and NOT through the ordinary value-removal path below. A mirror
+                // is a replacement rather than a replicated value, so it never entered that
+                // path's cache or its logical clock, and letting a tombstone go there left the
+                // descriptor CN1SurfaceMirror.receive wrote sitting on disk -- the complication
+                // kept showing content the phone had already withdrawn.
+                if (deleted) {
+                    com.codename1.impl.android.surfaces.CN1SurfaceMirror.remove(this, appPath);
+                } else {
+                    com.codename1.impl.android.surfaces.CN1SurfaceMirror.receive(this, appPath,
+                            readMirrorPayload(event));
+                }
                 continue;
             }
             // Read before anything is cleared, so the reset below can tell this device's own

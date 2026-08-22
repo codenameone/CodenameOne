@@ -77,6 +77,8 @@ public abstract class CN1SurfaceTileService extends TileService {
     /** A Tile refresh is rate-limited by the system, so asking more often than this is waste. */
     private static final long MIN_FRESHNESS_MILLIS = 60L * 1000L;
     private static final long MAX_FRESHNESS_MILLIS = 24L * 60L * 60L * 1000L;
+    /// How often a Tile showing dynamic text asks to be rebuilt; see freshnessFor.
+    private static final long DYNAMIC_FRESHNESS_MILLIS = 60L * 1000L;
 
     /** The widget kind this Tile serves. Supplied by the generated subclass. */
     protected abstract String getKindId();
@@ -121,7 +123,8 @@ public abstract class CN1SurfaceTileService extends TileService {
                 root = text("No data yet");
             } else {
                 root = render(reading.getLayout(), reading.getState(), 0, false);
-                freshness = freshnessFor(reading.getNextFlipDate());
+                freshness = freshnessFor(reading.getNextFlipDate(),
+                        hasDynamicText(reading.getLayout()));
                 version = resourcesVersion(reading);
             }
         } catch (Throwable t) {
@@ -151,15 +154,35 @@ public abstract class CN1SurfaceTileService extends TileService {
      * is the same deal the phone platforms give a widget. Zero when the timeline is exhausted --
      * there is nothing further to show until the app publishes again.</p>
      */
-    private static long freshnessFor(long nextFlipDate) {
-        if (nextFlipDate <= 0) {
+    private static long freshnessFor(long nextFlipDate, boolean hasDynamicText) {
+        long delta = nextFlipDate > 0 ? nextFlipDate - System.currentTimeMillis() : Long.MAX_VALUE;
+        if (nextFlipDate <= 0 && !hasDynamicText) {
+            // Nothing further to show until the app publishes again.
             return 0;
         }
-        long delta = nextFlipDate - System.currentTimeMillis();
+        if (hasDynamicText) {
+            // A clock, a countdown or a relative date. This is the fidelity gap the guide
+            // records: ProtoLayout has no ticking text this can lower onto, so the value is
+            // frozen at render time -- and with no flip date to ask about, nothing would ever
+            // ask again and "in 5 minutes" would still say that tomorrow. A bounded refresh is
+            // the honest compromise: minute-accurate rather than second-accurate, which is what
+            // a Tile's refresh rate limit allows anyway.
+            delta = Math.min(delta, DYNAMIC_FRESHNESS_MILLIS);
+        }
         if (delta < MIN_FRESHNESS_MILLIS) {
             return MIN_FRESHNESS_MILLIS;
         }
         return Math.min(delta, MAX_FRESHNESS_MILLIS);
+    }
+
+    /// Whether the active layout shows anything that changes on its own.
+    private static boolean hasDynamicText(JSONObject root) {
+        for (JSONObject node : CN1WatchSurface.flatten(root)) {
+            if ("dyn".equals(node.optString("t", ""))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

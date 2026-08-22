@@ -107,7 +107,38 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // The gallery shows this before the app has ever published, so a placeholder that names
         // the kind beats an empty slot the user cannot identify. No validity: a placeholder does
         // not go stale, and expiring it would ask the system to come back for the same answer.
-        return shortText(getKindId(), null, null, null);
+        //
+        // Of the REQUESTED type, which is the part that matters. Wear takes preview data as an
+        // answer about the type it asked about, and a ShortText handed to a slot advertising
+        // LONG_TEXT or RANGED_VALUE is rejected or drawn empty -- so the kind would be missing
+        // from exactly the pickers where its layout is roomiest.
+        return placeholder(type);
+    }
+
+    /**
+     * A named but empty stand-in for a kind that has published nothing yet.
+     *
+     * @param type the type the picker asked about
+     * @return placeholder data of that type, or null when there is no sensible one
+     */
+    private ComplicationData placeholder(ComplicationType type) {
+        String label = getKindId();
+        if (ComplicationType.LONG_TEXT.equals(type)) {
+            return new LongTextComplicationData.Builder(plain(label), plain(label)).build();
+        }
+        if (ComplicationType.RANGED_VALUE.equals(type)) {
+            // Empty rather than arbitrary: an invented fraction in a picker is a claim about a
+            // value the app has never published.
+            return new RangedValueComplicationData.Builder(0f, 0f, 1f, plain(label))
+                    .setText(plain(shorten(label)))
+                    .build();
+        }
+        if (ComplicationType.MONOCHROMATIC_IMAGE.equals(type)) {
+            // No icon exists before a publish, and this type is nothing but its icon, so there is
+            // no honest placeholder to give. Null lets the picker fall back to another type.
+            return null;
+        }
+        return shortText(shorten(label), null, null, null);
     }
 
     /**

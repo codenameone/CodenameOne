@@ -4805,10 +4805,7 @@ public class AndroidGradleBuilder extends Executor {
         if (!xActivity.contains("android:exported")) {
             xActivity += " android:exported=\"true\"";
         }
-        String activityTheme = "@style/CustomTheme";
-        if (extendAppCompatActivity) {
-            activityTheme = "@@style/Theme.AppCompat.NoActionBar";
-        }
+        String activityTheme = launcherTheme();
         String manifestSource
                 = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                 + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
@@ -7194,6 +7191,29 @@ public class AndroidGradleBuilder extends Executor {
      * Java-only route.</p>
      */
     /**
+     * The theme the app's launcher activity declares.
+     *
+     * <p>One resolution, because the companion Wear manifest is written independently of the
+     * phone's and needs the same answer: the generated stub extends {@code AppCompatActivity}
+     * when {@code android.extendAppCompatActivity} is set, and AppCompat refuses to start under
+     * a theme that is not a {@code Theme.AppCompat} descendant. A Wear launcher left on the
+     * platform default crashed on the first frame.</p>
+     *
+     * <p>The AppCompat value used to be written as {@code @@style/...}. In an Android resource
+     * attribute a leading {@code @@} is the escape for a literal {@code @}, so that was the
+     * eight-character string "@style/Theme.AppCompat.NoActionBar" and not a reference to
+     * anything -- the theme was never applied. Corrected here rather than copied into a second
+     * manifest, since the branch only runs when a project has asked for AppCompat and the
+     * intent is not in doubt.</p>
+     *
+     * @return the theme reference for the launcher activity
+     */
+    private String launcherTheme() {
+        return extendAppCompatActivity
+                ? "@style/Theme.AppCompat.NoActionBar" : "@style/CustomTheme";
+    }
+
+    /**
      * Whether any declared kind earns a Tile, and so whether the tap trampoline has to be
      * reachable from outside this app.
      *
@@ -7443,7 +7463,12 @@ public class AndroidGradleBuilder extends Executor {
                 // standalone build says the opposite, in the phone manifest.
                 + "        <meta-data android:name=\"com.google.android.wearable.standalone\" "
                 + "android:value=\"false\" />\n"
+                // Same theme the phone launcher gets. The shared stub extends AppCompatActivity
+                // when the project asks for it, and AppCompat refuses to start under a theme that
+                // is not one of its own -- so a Wear launcher on the platform default crashed on
+                // the first frame.
                 + "        <activity android:name=\"." + stubName + "\" "
+                + "android:theme=\"" + launcherTheme() + "\" "
                 + "android:exported=\"true\">\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"android.intent.action.MAIN\" />\n"
@@ -7643,8 +7668,6 @@ public class AndroidGradleBuilder extends Executor {
     static String deriveWearGradle(String appGradle, int intVersion, int wearVersion,
             String wearDependencies) {
         String gradle = appGradle
-                // Same namespace and applicationId; see the method comment.
-                .replace("versionCode " + intVersion, "versionCode " + wearVersion)
                 // Libraries are shared from the app module rather than copied.
                 .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
                 .replace("dirs 'libs'", "dirs '../app/libs'")
@@ -7676,15 +7699,31 @@ public class AndroidGradleBuilder extends Executor {
         // to evaluate. insertAfterFirst for the same reason one level up -- the generated file
         // also carries an androidTest dependency block, which has no use for these.
         gradle = insertAfterFirst(gradle, "\ndependencies {\n", wearDependencies);
+        // Appended, and not substituted into the generated declarations. android.xgradle_default_config
+        // lets a project add its OWN minSdkVersion and versionCode inside defaultConfig, and those
+        // come after the builder's -- so rewriting the builder's left the project's value
+        // effective and this module quietly kept the phone's version code, or a floor below the
+        // one the Wear libraries need. A trailing block is evaluated last, whatever the file
+        // above it says, which is the only form that cannot be overridden by a hint.
+        //
         // The floor rises only for the libraries that demand it. Wear OS 3 is where the
-        // complication and Tile APIs start, so a module carrying them cannot support less --
-        // but a companion watch app that only uses the lifecycle or the Data Layer has always
-        // run on the Wear OS 2 baseline, and raising it unconditionally took API 23 to 25
+        // complication and Tile APIs start, so a module carrying them cannot support less -- but
+        // a companion watch app that only uses the lifecycle or the Data Layer has always run on
+        // the Wear OS 2 baseline, and raising it for every watchMain build took API 23 to 25
         // watches away from projects that declared no surface at all.
+        StringBuilder wins = new StringBuilder();
+        wins.append("\n// Last word on the two values the Wear artifact cannot get wrong. See\n")
+                .append("// deriveWearGradle: a defaultConfig fragment from android.xgradle_default_config\n")
+                .append("// appears after the generated declarations and would otherwise win.\n")
+                .append("android {\n")
+                .append("    defaultConfig {\n")
+                .append("        versionCode ").append(wearVersion).append("\n");
         if (wearDependencies != null && wearDependencies.length() > 0) {
-            gradle = gradle.replaceFirst("minSdkVersion \\d+", "minSdkVersion 26");
+            wins.append("        minSdkVersion 26\n");
         }
-        return gradle;
+        wins.append("    }\n")
+                .append("}\n");
+        return gradle + wins;
     }
 
     /**

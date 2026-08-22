@@ -237,6 +237,48 @@ public final class CN1SurfaceMirror {
         }
     }
 
+    /**
+     * Withdraws a mirrored surface the phone has removed.
+     *
+     * <p>The Data Layer announces an unpublish as a deletion of the item, and a mirror never
+     * entered the replication cache that ordinarily handles one -- so without this the descriptor
+     * stayed on disk and the complication went on showing content the phone had already taken
+     * down. Deleting the whole kind directory rather than the descriptor alone: its images exist
+     * only to serve it, and the reference set that would tell them apart has just gone away.</p>
+     *
+     * <p>The watch face is asked to re-read afterwards, which is what makes the slot go back to
+     * whatever it shows for a source with no data.</p>
+     *
+     * @param ctx any context
+     * @param path the reserved application path that was deleted
+     */
+    public static void remove(Context ctx, String path) {
+        try {
+            String kindId = kindOf(path);
+            if (kindId == null) {
+                return;
+            }
+            // kindDir always answers a File -- it composes a path and never looks at the disk --
+            // so listFiles() returning null is how "there is nothing here" arrives, and there is
+            // no directory to guard against.
+            File kindDir = CN1SurfaceStore.kindDir(ctx, kindId);
+            File[] files = kindDir.listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    if (!f.delete()) {
+                        Log.w(TAG, "Could not delete " + f + " while withdrawing a mirror");
+                    }
+                }
+            }
+            if (kindDir.exists() && !kindDir.delete()) {
+                Log.w(TAG, "Could not delete " + kindDir + " while withdrawing a mirror");
+            }
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not withdraw a mirrored surface from " + path, t);
+        }
+    }
+
     /** True when a Data Layer path belongs to this framework rather than to the app. */
     public static boolean isMirrorPath(String path) {
         return path != null && path.startsWith(PATH_PREFIX);

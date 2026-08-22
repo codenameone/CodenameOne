@@ -131,6 +131,53 @@ class WearModuleGradleTest {
                 "the instrumentation block must still follow, untouched:\n" + wear);
     }
 
+    /// android.xgradle_default_config lets a project add its own declarations inside
+    /// defaultConfig, and they land AFTER the generated ones -- so rewriting the generated
+    /// versionCode left the project's value effective and the Wear artifact quietly kept the
+    /// phone's. A trailing block is evaluated last whatever the file above it says.
+    @Test
+    void theWearVersionCodeSurvivesADefaultConfigHint() {
+        String withHint = PHONE_GRADLE.replace(
+                "        versionCode 100\n",
+                "        versionCode 100\n        versionCode 777\n");
+
+        String wear = AndroidGradleBuilder.deriveWearGradle(withHint, 100, 101, WEAR_DEPS);
+
+        int hint = wear.lastIndexOf("versionCode 777");
+        int ours = wear.lastIndexOf("versionCode 101");
+        assertTrue(hint >= 0, "the fixture must still carry the hint:\n" + wear);
+        assertTrue(ours > hint,
+                "the Wear version code must be declared after the hint's:\n" + wear);
+    }
+
+    /// Same reasoning for the floor: a hint declaring minSdkVersion 21 would otherwise build the
+    /// Wear module below the API level the complication and Tile libraries require.
+    @Test
+    void theWearFloorSurvivesADefaultConfigHint() {
+        String withHint = PHONE_GRADLE.replace(
+                "        minSdkVersion 24\n",
+                "        minSdkVersion 24\n        minSdkVersion 21\n");
+
+        String wear = AndroidGradleBuilder.deriveWearGradle(withHint, 100, 101, WEAR_DEPS);
+
+        int hint = wear.lastIndexOf("minSdkVersion 21");
+        int ours = wear.lastIndexOf("minSdkVersion 26");
+        assertTrue(hint >= 0, wear);
+        assertTrue(ours > hint, "the Wear floor must be declared after the hint's:\n" + wear);
+    }
+
+    /// ...but only for the libraries that need it. A companion watch app using just the
+    /// lifecycle or the Data Layer has always run on the Wear OS 2 baseline.
+    @Test
+    void aWatchWithNoSurfacesKeepsTheWearOsTwoBaseline() {
+        String wear = AndroidGradleBuilder.deriveWearGradle(PHONE_GRADLE, 100, 101, "");
+
+        assertFalse(wear.contains("minSdkVersion 26"),
+                "nothing here needs API 26:\n" + wear);
+        assertTrue(wear.contains("versionCode 101"),
+                "the version code still has to outrank the phone:\n" + wear);
+    }
+
     /// TileService.onTileRequest returns a ListenableFuture, whose class ships in
     /// com.google.guava:listenablefuture:1.0. Guava publishes the SAME coordinate at
     /// 9999.0-empty-to-avoid-conflict-with-guava holding NO classes, for builds that carry full
