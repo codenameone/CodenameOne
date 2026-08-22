@@ -400,6 +400,49 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aPickerInAWindowUsesItsLightweightPopup() {
+        implementation.setMultiWindowSupported(true);
+        // A platform that does have a native picker: without the window check the
+        // native path would be taken, and every native picker attaches to the main
+        // surface rather than to the window the component is in.
+        implementation.setNativePickerTypeSupported(Boolean.TRUE, Boolean.TRUE, Boolean.TRUE);
+        Window w = new Window("picks", new BorderLayout());
+        com.codename1.ui.spinner.Picker p = new com.codename1.ui.spinner.Picker();
+        p.setType(Display.PICKER_TYPE_STRINGS);
+        p.setStrings("A", "B", "C");
+        w.add(BorderLayout.CENTER, p);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.revalidate();
+
+        p.pressed();
+        p.released();
+        DisplayTest.flushEdt();
+
+        // The lightweight popup is an InteractionDialog, which resolves its host from
+        // the component, so it lands in this window's own hierarchy. The native path
+        // would have put nothing here.
+        assertTrue(containsInteractionDialog(w.asContainer()),
+                "a picker in a window has to open its popup in that window");
+
+        w.dispose();
+    }
+
+    private static boolean containsInteractionDialog(Container c) {
+        int count = c.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof com.codename1.components.InteractionDialog) {
+                return true;
+            }
+            if (cmp instanceof Container && containsInteractionDialog((Container) cmp)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @FormTest
     void aWindowsContentPaneScrollsVerticallyByDefault() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("default");

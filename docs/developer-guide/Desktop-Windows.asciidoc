@@ -340,6 +340,9 @@ layered pane, as above, until those components gain a top-level-aware attachment
 * `ComboBox`. Its popup is a `Dialog`, so it inherits that limitation: clicking one
   inside a window has no effect at all rather than opening the list. Use a
   `Picker`, or a button that opens your own overlay on the window's layered pane.
+  A `Picker` in a window always uses its lightweight popup, even on a platform with
+  a native one, because every native picker attaches to the main surface and would
+  open over the wrong window.
 * `FloatingActionButton` with sub-buttons, for the same reason - the submenu is a
   `Dialog` too. A plain floating action button with no submenu works normally;
   only the submenu form is affected, and releasing one in a window opens nothing

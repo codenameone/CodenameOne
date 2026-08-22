@@ -299,7 +299,17 @@ public class Picker extends Button {
                 // still lets the next open re-resolve the default (useful when the
                 // getter returns a moving target like "due date - 1 hour").
                 applyDefaultDateIfNeeded();
-                if ((useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type)) && isLightweightModeSupportedForType(type)) {
+                // A picker inside a desktop window uses the lightweight popup even
+                // where a native one exists. Every native picker is attached to the
+                // application's main surface -- the Catalyst one sizes itself against
+                // the main scene's view -- so from a window it would open over the
+                // wrong window entirely. The lightweight popup is an InteractionDialog,
+                // which resolves its host from the component and lands in the right
+                // one.
+                boolean inWindow = getTopLevelContainer() instanceof com.codename1.ui.Window;
+                if ((useLightweightPopup || inWindow
+                        || !Display.getInstance().isNativePickerTypeSupported(type))
+                        && isLightweightModeSupportedForType(type)) {
                     showInteractionDialog();
                     evt.consume();
                     return;
