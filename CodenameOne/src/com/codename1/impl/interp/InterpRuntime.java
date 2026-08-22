@@ -2482,6 +2482,24 @@ public final class InterpRuntime {
         InterpClass named = bundle.findClass(owner);
         InterpMethod declared = named == null ? null : named.declaredMethod(name, desc);
         if (declared == null) {
+            // JVMS 5.4.3.3: superclass class methods win over interface
+            // defaults, and if the superclass method is inaccessible from the
+            // receiver (a package-private method in a different package) the
+            // resolution is an IllegalAccessError -- not a silent fallback to
+            // the interface default. The vtable filter earlier drops the
+            // inaccessible entry so subsequent virtual dispatch cannot land
+            // on it, but that filter would also let this path pick the
+            // interface's default and execute a method the JVM refuses.
+            // Walk the superclass chain here and raise the linkage error
+            // when appropriate.
+            InterpMethod superMethod = findClassMethodInSuperchain(receiver, name, desc);
+            if (superMethod != null && isPackagePrivate(superMethod)
+                    && !samePackage(receiver.getName(), superMethod.owner.getName())) {
+                throw new InterpThrowable(new IllegalAccessError(
+                        superMethod.owner.getName().replace('/', '.') + "." + name + desc
+                        + " is package-private and " + receiver.getName().replace('/', '.')
+                        + " is in a different package"), snapshotStack());
+            }
             return receiver.resolve(name, desc);
         }
         if (declared.isPrivate()) {
@@ -2500,6 +2518,24 @@ public final class InterpRuntime {
             }
         }
         return declared;
+    }
+
+    /// The nearest class-declared method up {@code receiver}'s interpreted
+    /// superclass chain (skipping the receiver itself), regardless of
+    /// visibility. Used to detect an inaccessible superclass method during
+    /// virtual resolution -- JVMS 5.4.3.3 makes that an IllegalAccessError,
+    /// not a fallback to an interface default.
+    private static InterpMethod findClassMethodInSuperchain(InterpClass receiver,
+                                                             String name, String desc) {
+        InterpClass k = receiver.superInterp;
+        while (k != null) {
+            InterpMethod m = k.declaredMethod(name, desc);
+            if (m != null && !m.isStatic()) {
+                return m;
+            }
+            k = k.superInterp;
+        }
+        return null;
     }
 
     /// Whether a method is package-private: none of public, protected, private.

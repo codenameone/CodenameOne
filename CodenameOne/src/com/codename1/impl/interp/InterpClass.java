@@ -239,12 +239,18 @@ public final class InterpClass {
 
     /// The interfaces ordered so a supertype is copied before its subtype.
     ///
+    /// Topological order: supertypes before subtypes, so
+    /// {@code copyDeclaredMethods} lets a subinterface's override land on top
+    /// of the superinterface's default at the same key. On a three-level
+    /// chain `C -> B -> A` (with B overriding A.m), the picker takes A first,
+    /// then B, then C -- so B.m ends up on top and calls through C reach the
+    /// more-specific method the JVM would pick.
+    ///
     /// A selection sort rather than an insertion sort: "extends" is a partial
-    /// order, so an unrelated interface sitting between two related ones is not
-    /// a barrier and an insertion sort that stops at the first non-swap leaves
-    /// `C implements B, X, A` (with `B extends A`) in exactly the wrong order.
-    /// This repeatedly takes an interface that nothing remaining is a supertype
-    /// of, which is well defined however the interfaces are interleaved.
+    /// order, so an unrelated interface sitting between two related ones is
+    /// not a barrier and an insertion sort that stops at the first non-swap
+    /// leaves `C implements B, X, A` (with `B extends A`) in exactly the
+    /// wrong order.
     private static InterpClass[] sortBySpecificity(InterpClass[] ifaces) {
         InterpClass[] remaining = new InterpClass[ifaces.length];
         System.arraycopy(ifaces, 0, remaining, 0, ifaces.length);
@@ -255,22 +261,20 @@ public final class InterpClass {
                 if (remaining[i] == null) {
                     continue;
                 }
-                boolean anyBelow = false;
+                boolean hasUnpickedSupertype = false;
                 for (int j = 0; j < remaining.length; j++) {
                     if (j != i && remaining[j] != null
-                            && extendsInterface(remaining[j], remaining[i])) {
-                        // remaining[i] is a supertype of something still here,
-                        // so it has to be copied first.
-                        anyBelow = true;
+                            && extendsInterface(remaining[i], remaining[j])) {
+                        // remaining[j] is a proper superinterface of
+                        // remaining[i] that has not been picked yet, so i's
+                        // ancestor has to come first -- topological order.
+                        hasUnpickedSupertype = true;
                         break;
                     }
                 }
-                if (anyBelow) {
+                if (!hasUnpickedSupertype) {
                     pick = i;
                     break;
-                }
-                if (pick < 0) {
-                    pick = i;
                 }
             }
             if (pick < 0) {
