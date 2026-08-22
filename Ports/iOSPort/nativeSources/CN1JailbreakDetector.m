@@ -25,9 +25,7 @@
 #import <TargetConditionals.h>
 #import <dlfcn.h>
 #import <errno.h>
-#import <mach/mach.h>
 #import <mach-o/dyld.h>
-#import <mach-o/dyld_images.h>
 #import <stdlib.h>
 #import <string.h>
 #import <sys/mount.h>
@@ -241,53 +239,61 @@ static BOOL cn1ImagePathIsHooking(const char *imagePath, NSArray *needles) {
 }
 
 /**
- * The loaded-image scan, run twice.
+ * The loaded-image scan, asked two ways.
  *
- * The public form walks _dyld_get_image_name(), which is the documented API and
- * therefore the one a bypass tweak hooks. The second walk reads the same table
- * out of dyld_all_image_infos, reached through task_info(TASK_DYLD_INFO), so a
- * tweak has to hook both to stay hidden. When the raw walk sees an injected
- * library that the public walk does not, that gap is reported as hookedApi in
- * addition to hookLib: it says not only that something is injected but that
+ * The first way is _dyld_get_image_name(), the documented API and therefore the
+ * one a bypass tweak hooks. The second is dladdr() on the same image's header,
+ * which reaches the path through an entirely different entry point, so a tweak
+ * that only intercepts the documented route still answers honestly here. When
+ * dladdr sees an injected library that _dyld_get_image_name denies, that gap is
+ * reported as hookedApi in addition to hookLib: not only is something injected,
  * something is actively lying about it.
  *
- * Counts are deliberately not compared. The two tables legitimately differ by an
- * entry or two across OS versions -- dyld itself is in one and not always the
- * other -- so a count check is a false positive waiting for the next iOS release.
+ * Only that direction. dladdr is allowed to fail -- it answers for an address,
+ * not an index -- and reading a failure as a contradiction would let a quirk in
+ * one API terminate the app through a signal the launch gate treats as fatal.
+ *
+ * This deliberately does NOT read dyld_all_image_infos through
+ * task_info(TASK_DYLD_INFO), which is the obvious way to get a second opinion and
+ * was how this was first written. That table is dyld's live one, and the null
+ * check that guards the in-flux window does nothing about the real hazard: a
+ * dlopen on another thread between the check and the walk can move infoArray or
+ * change infoArrayCount underneath the loop. getCompromiseReasons() is called
+ * from the EDT while the rest of the app runs, which is exactly when that can
+ * happen. Crashing a clean device is a worse failure than missing a hook, and
+ * the debugger-facing table is meant to be read with the process suspended.
+ *
+ * Counts are deliberately not compared either. Two enumerations legitimately
+ * differ by an entry or two across OS versions, so a count check is a false
+ * positive waiting for the next iOS release.
  */
 static void cn1ScanLoadedImages(NSMutableArray *signals) {
     NSArray *needles = cn1HookingImageNames();
-    BOOL publicFound = NO;
-    for (uint32_t i = 0; i < _dyld_image_count(); i++) {
-        if (cn1ImagePathIsHooking(_dyld_get_image_name(i), needles)) {
-            publicFound = YES;
+    BOOL namedFound = NO;
+    BOOL addressFound = NO;
+
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; i++) {
+        if (!namedFound && cn1ImagePathIsHooking(_dyld_get_image_name(i), needles)) {
+            namedFound = YES;
+        }
+        if (!addressFound) {
+            const struct mach_header *header = _dyld_get_image_header(i);
+            Dl_info info;
+            if (header != NULL && dladdr(header, &info) != 0
+                    && cn1ImagePathIsHooking(info.dli_fname, needles)) {
+                addressFound = YES;
+            }
+        }
+        if (namedFound && addressFound) {
             break;
         }
     }
 
-    BOOL rawFound = NO;
-    struct task_dyld_info dyldInfo;
-    mach_msg_type_number_t infoCount = TASK_DYLD_INFO_COUNT;
-    if (task_info(mach_task_self(), TASK_DYLD_INFO,
-                  (task_info_t) &dyldInfo, &infoCount) == KERN_SUCCESS) {
-        const struct dyld_all_image_infos *all =
-                (const struct dyld_all_image_infos *) (uintptr_t) dyldInfo.all_image_info_addr;
-        // infoArray is briefly NULL while dyld rewrites the table, which is a
-        // normal transient state and not a signal.
-        if (all != NULL && all->infoArray != NULL) {
-            for (uint32_t i = 0; i < all->infoArrayCount; i++) {
-                if (cn1ImagePathIsHooking(all->infoArray[i].imageFilePath, needles)) {
-                    rawFound = YES;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (publicFound || rawFound) {
+    if (namedFound || addressFound) {
         cn1AddSignal(signals, @"hookLib");
     }
-    if (rawFound && !publicFound) {
+    if (addressFound && !namedFound) {
         cn1AddSignal(signals, @"hookedApi");
     }
 }
