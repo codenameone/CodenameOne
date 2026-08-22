@@ -130,6 +130,37 @@ class SurfaceKindFamiliesTest {
         assertTrue(SurfaceKindFamilies.hasPhoneFamily(none));
     }
 
+    /// The four names exactly. A prefix test made a mistyped "watchCircle" a watch family here
+    /// while every mapping downstream recognised only the real four -- so the kind lost its phone
+    /// widget, gained watch codegen, and produced no usable surface anywhere, in a build that
+    /// went green.
+    @Test
+    void aMistypedWatchNameIsNotAWatchFamily() {
+        assertTrue(SurfaceKindFamilies.isWatch("watchCircular"));
+        assertTrue(SurfaceKindFamilies.isWatch("watchRectangular"));
+        assertTrue(SurfaceKindFamilies.isWatch("watchInline"));
+        assertTrue(SurfaceKindFamilies.isWatch("watchCorner"));
+
+        assertFalse(SurfaceKindFamilies.isWatch("watchCircle"));
+        assertFalse(SurfaceKindFamilies.isWatch("watch"));
+        assertFalse(SurfaceKindFamilies.isWatch("watchSquare"));
+        assertFalse(SurfaceKindFamilies.isWatch("watchcircular"));
+    }
+
+    /// And a typo is not a phone family either, so the builder can tell the author which of the
+    /// two answers it has rather than quietly rendering a widget nobody asked for.
+    @Test
+    void anUnknownNameIsNeitherWatchNorPhone() {
+        assertTrue(SurfaceKindFamilies.isKnown("small"));
+        assertTrue(SurfaceKindFamilies.isKnown("lockscreen"));
+        assertTrue(SurfaceKindFamilies.isKnown("accessoryCorner"));
+        assertTrue(SurfaceKindFamilies.isKnown("watchCircular"));
+
+        assertFalse(SurfaceKindFamilies.isKnown("watchCircle"));
+        assertFalse(SurfaceKindFamilies.isKnown("enormous"));
+        assertFalse(SurfaceKindFamilies.isKnown(null));
+    }
+
     @Test
     void nullsAreTolerated() {
         assertEquals(0, SurfaceKindFamilies.read(null).size());

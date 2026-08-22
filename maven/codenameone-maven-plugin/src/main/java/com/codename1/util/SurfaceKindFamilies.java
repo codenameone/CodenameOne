@@ -114,13 +114,56 @@ public final class SurfaceKindFamilies {
     }
 
     /**
+     * Every family name that is not a watch one, in both spellings.
+     *
+     * <p>The WidgetKit spellings sit beside the portable ones because {@code normalize} folds only
+     * {@code accessoryCorner} across -- the other accessory names are the iPhone LOCK-SCREEN
+     * families as well as watch ones, and the iOS renderer draws all three.</p>
+     */
+    private static final java.util.Set<String> PHONE_FAMILIES =
+            java.util.Collections.unmodifiableSet(new java.util.LinkedHashSet<String>(
+                    java.util.Arrays.asList("small", "systemSmall", "medium", "systemMedium",
+                            "large", "systemLarge", "lockscreen", "accessoryRectangular",
+                            "accessoryCircular", "accessoryInline")));
+
+    /** The complete set of watch families, which is what {@link #isWatch} answers about. */
+    private static final java.util.Set<String> WATCH_FAMILIES =
+            java.util.Collections.unmodifiableSet(new java.util.LinkedHashSet<String>(
+                    java.util.Arrays.asList("watchCircular", "watchRectangular",
+                            "watchInline", "watchCorner")));
+
+    /**
      * Whether one declared family is a watch complication.
+     *
+     * <p>The four names exactly, not anything beginning with "watch". A prefix test made a
+     * mistyped {@code watchCircle} a watch family here while every mapping downstream -- the
+     * layout picker, the complication types, the Tile decision -- recognises only the real four,
+     * so the kind lost its phone widget, gained watch codegen, and produced no usable surface
+     * anywhere. The build succeeded, which is the worst part.</p>
      *
      * @param family a declared family name in either spelling
      * @return true for the four {@code watch*} families
      */
     public static boolean isWatch(String family) {
-        return family != null && normalize(family).startsWith("watch");
+        return family != null && WATCH_FAMILIES.contains(normalize(family));
+    }
+
+    /**
+     * Whether a declared family name is one this framework knows at all.
+     *
+     * <p>Separate from {@link #isWatch} because the answer "not a watch family" is given both to
+     * a phone family and to a typo, and only the caller writing the diagnostics can tell the
+     * reader which one it has.</p>
+     *
+     * @param family a declared family name in either spelling
+     * @return true when the name maps onto a real surface family
+     */
+    public static boolean isKnown(String family) {
+        if (family == null) {
+            return false;
+        }
+        String normalized = normalize(family);
+        return WATCH_FAMILIES.contains(normalized) || PHONE_FAMILIES.contains(normalized);
     }
 
     /**

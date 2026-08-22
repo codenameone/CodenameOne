@@ -222,6 +222,15 @@ public abstract class CN1SurfaceTileService extends TileService {
                     if (bitmap == null) {
                         continue;
                     }
+                    // PNG bytes with IMAGE_FORMAT_UNDEFINED, which is the documented pairing and
+                    // not an omission: the library says of the format that it "may be left
+                    // unspecified or set to IMAGE_FORMAT_UNDEFINED in which case the platform
+                    // will attempt to extract this from the raw image data", and of widthPx and
+                    // heightPx that they are "only required for formats (e.g.
+                    // IMAGE_FORMAT_RGB_565) where the image data does not include size". A PNG
+                    // carries its own header, so it decodes; the named formats describe a raw
+                    // pixel buffer, which this is not. They are supplied anyway because they cost
+                    // nothing and a renderer that wants them has them.
                     ByteArrayOutputStream out = new ByteArrayOutputStream();
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
                     builder.addIdToImageMapping(e.getKey(),

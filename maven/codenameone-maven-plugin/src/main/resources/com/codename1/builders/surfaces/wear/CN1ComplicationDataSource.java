@@ -206,6 +206,14 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
      * long text wants the roomy layout, one asking for a ranged value or a glyph wants the round
      * one, and short text is the readout every family can produce.</p>
      */
+    ///
+    /// A PREFERENCE, not a requirement, and that is why a kind declaring only watchCircular is
+    /// still right to advertise SHORT_TEXT. The name returned here is the first thing
+    /// CN1WatchSurface.pickLayout tries; when the published document has no layout under it the
+    /// picker falls back through the kind's other watch layouts, and only families the kind
+    /// actually declared are in the document at all -- so the fallback lands on one of its own,
+    /// never on unrelated content. Selecting here among the declared families would move that
+    /// decision to a place that cannot see the document.
     private static String familyFor(ComplicationType type) {
         if (ComplicationType.LONG_TEXT.equals(type)) {
             return "watchRectangular";

@@ -3497,6 +3497,23 @@ public class AndroidGradleBuilder extends Executor {
                 }
                 java.util.List<String> kindFamilies =
                         com.codename1.util.SurfaceKindFamilies.read(surfaceKind);
+                // A name this framework does not know is a typo, and it used to be a silent one:
+                // isWatch tested for a "watch" prefix, so "watchCircle" suppressed the kind's
+                // phone widget and turned on watch codegen while every mapping downstream
+                // recognised only the real four -- leaving the kind with no surface on any
+                // platform and a build that went green. isWatch is now exact, which turns the
+                // typo into a plain phone family instead; say so rather than quietly rendering
+                // a home-screen widget the author did not ask for.
+                for (String declared : kindFamilies) {
+                    if (!com.codename1.util.SurfaceKindFamilies.isKnown(declared)) {
+                        throw new BuildException("Widget kind '" + kindId
+                                + "' in surfaces.json declares the family '" + declared
+                                + "', which is not one this framework knows. The watch families "
+                                + "are watchCircular, watchRectangular, watchInline and "
+                                + "watchCorner; the phone families are small, medium, large and "
+                                + "lockscreen.");
+                    }
+                }
                 boolean watchBearing =
                         com.codename1.util.SurfaceKindFamilies.hasWatchFamily(kindFamilies);
                 if (watchBearing) {
@@ -7794,6 +7811,15 @@ public class AndroidGradleBuilder extends Executor {
      * @param familiesCsv the kind's declared families, comma separated
      * @return the SUPPORTED_TYPES value, never empty when any watch family was declared
      */
+    ///
+    /// Advertised from the DECLARED FAMILY, which is all this build can see. Whether a given
+    /// layout will contain a progress node or an image is a property of what the app publishes at
+    /// runtime, and it can differ between one publish and the next -- so narrowing the advertised
+    /// set here would be guessing about a document that does not exist yet, and guessing low
+    /// makes the kind unselectable in a slot it will later be able to fill. When a face asks for
+    /// a type the current layout cannot produce, the data source answers with no data, which is
+    /// the defined way to say so; the slot then falls back to another type or shows its empty
+    /// state, and the next publish can change the answer.
     static String complicationTypes(String familiesCsv) {
         LinkedHashSet<String> types = new LinkedHashSet<String>();
         for (String family : familiesCsv.split(",")) {
