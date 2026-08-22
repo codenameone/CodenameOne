@@ -546,4 +546,47 @@ public class AppExtensionDeploymentTargetTest {
         assertTrue(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[arch=x86_64]",
                 "iphoneos14.4", "Release", null));
     }
+
+    @Test
+    public void theArchivesConfigurationSdkAndArchResolve() throws Exception {
+        File extension = tmp.newFolder("dist18", "WalletUIExtension");
+        java.util.Map<String, String> settings = IPhoneBuilder.extensionSettingsWithBuiltIns(
+                extension, new java.util.LinkedHashMap<String, String>(), "Release",
+                "iphoneos14.4", "arm64");
+        assertEquals("Release", settings.get("CONFIGURATION"));
+        assertEquals("iphoneos14.4", settings.get("SDK_NAME"));
+        assertEquals("iphoneos", settings.get("PLATFORM_NAME"));
+        assertEquals("arm64", settings.get("CURRENT_ARCH"));
+    }
+
+    @Test
+    public void anEntitlementsPathThroughTheConfigurationResolves() throws Exception {
+        File extension = tmp.newFolder("dist19", "WalletUIExtension");
+        File release = new File(extension, "Release.entitlements");
+        write(release, "<plist><dict>\n<key>com.apple.developer.payment-pass-provisioning</key>\n"
+                + "<true/>\n</dict></plist>");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("CODE_SIGN_ENTITLEMENTS", "WalletUIExtension/$(CONFIGURATION).entitlements");
+
+        File signing = IPhoneBuilder.appExtensionSigningEntitlements(extension, settings, null,
+                "iphoneos14.4", "Release", "arm64");
+
+        // Falling back to a by-name file here left a payment-pass extension on the 12.0 floor.
+        assertEquals(release, signing);
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentFloor(signing));
+    }
+
+    @Test
+    public void aPartiallyResolvableValueIsNotRecordedAsATruncation() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("CONFIGURATION", "Release");
+        // Known: expands. Unknown: the whole answer is withheld rather than truncated, because
+        // "com.example.app." as an export-options key names no bundle in the archive.
+        assertEquals("com.example.app.Release", IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.$(CONFIGURATION)", settings));
+        assertNull(IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.$(SOMETHING_UNKNOWN)", settings));
+        assertEquals("com.example.app.Ext", IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.Ext", settings));
+    }
 }

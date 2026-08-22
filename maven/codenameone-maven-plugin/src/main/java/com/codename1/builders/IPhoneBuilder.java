@@ -4868,21 +4868,31 @@ public class IPhoneBuilder extends Executor {
                             // it, which resolves to a perfectly good identifier. Judging the raw
                             // reference would refuse a build that works, and a reference this
                             // build cannot resolve is not judged at all.
+                            // What this archive IS: the SDK name xcodebuild will use (versioned),
+                            // the configuration it builds, and the architecture it builds for.
+                            // Everything below matches conditional settings against these.
+                            String archiveSdk = activeIosSdkName(request);
+                            String archiveConfiguration = "Release";
+                            String archiveArch = "arm64";
                             Map<String, String> declaredSettings = appExtensionBuildSettings(appExtension);
                             String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
                             // The identifier THIS archive gets: a qualified setting overrides the
                             // plain one, so a stale base beside a right device value is not a
                             // reason to refuse a build Xcode would have got right.
                             String governingId = winningSetting(declaredSettings,
-                                    "PRODUCT_BUNDLE_IDENTIFIER",
-                                    "iphoneos" + request.getArg("ios.sdk", "14.4"), "Release",
-                                    "arm64");
-                            String resolvedBundleId = resolveSettingsInValue(
-                                    governingId != null && governingId.trim().length() > 0
+                                    "PRODUCT_BUNDLE_IDENTIFIER", archiveSdk, archiveConfiguration,
+                                    archiveArch);
+                            String declaredIdForArchive = governingId != null
+                                    && governingId.trim().length() > 0
                                             ? governingId.trim()
                                             : (declaredId != null ? declaredId
-                                                    : request.getPackageName() + "." + extensionName),
-                                    extensionSettingsWithBuiltIns(appExtension, declaredSettings));
+                                                    : request.getPackageName() + "." + extensionName);
+                            // Fully, or not at all: a partially expanded identifier is a
+                            // truncation, and it would name a bundle the archive does not contain.
+                            String fullyResolvedId = resolveSettingsFully(declaredIdForArchive,
+                                    extensionSettingsWithBuiltIns(appExtension, declaredSettings,
+                                            archiveConfiguration, archiveSdk, archiveArch));
+                            String resolvedBundleId = fullyResolvedId == null ? "" : fullyResolvedId;
                             String outOfNamespace = resolvedBundleId.length() == 0 ? null
                                     : outOfNamespaceExtensionIdMessage(extensionName, resolvedBundleId,
                                             request.getPackageName());
@@ -4943,12 +4953,6 @@ public class IPhoneBuilder extends Executor {
                             // The configuration this build hands to xcodebuild is Release for a
                             // device archive whatever ios.buildType says, so that is what a
                             // [config=...] condition must be matched against.
-                            // The same SDK name xcodebuild is given -- versioned -- and the
-                            // architecture the archive is built for, so [arch=arm64] beside
-                            // [arch=x86_64] is decided by what this build is, not by map order.
-                            String archiveSdk = "iphoneos" + request.getArg("ios.sdk", "14.4");
-                            String archiveConfiguration = "Release";
-                            String archiveArch = "arm64";
                             File signingEntitlements = appExtensionSigningEntitlements(appExtension,
                                     buildSettingsMap, extEntitlementsFile, archiveSdk,
                                     archiveConfiguration, archiveArch);
@@ -6678,6 +6682,14 @@ public class IPhoneBuilder extends Executor {
     /// archive.
     static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
             Map<String, String> settings) {
+        return extensionSettingsWithBuiltIns(extensionFolder, settings, null, null, null);
+    }
+
+    /// @param configuration, {@code sdk} and {@code arch} the archive's own, since
+    /// $(CONFIGURATION) in a path or an identifier is as ordinary as $(TARGET_NAME) and this
+    /// build knows all three
+    static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
+            Map<String, String> settings, String configuration, String sdk, String arch) {
         Map<String, String> out = new LinkedHashMap<String, String>();
         if (settings != null) {
             out.putAll(settings);
@@ -6699,6 +6711,25 @@ public class IPhoneBuilder extends Executor {
         }
         if (!out.containsKey("PROJECT_DIR")) {
             out.put("PROJECT_DIR", projectPath);
+        }
+        if (configuration != null && !out.containsKey("CONFIGURATION")) {
+            out.put("CONFIGURATION", configuration);
+        }
+        if (sdk != null) {
+            if (!out.containsKey("SDK_NAME")) {
+                out.put("SDK_NAME", sdk);
+            }
+            if (!out.containsKey("PLATFORM_NAME")) {
+                out.put("PLATFORM_NAME", platformOf(sdk));
+            }
+        }
+        if (arch != null) {
+            if (!out.containsKey("CURRENT_ARCH")) {
+                out.put("CURRENT_ARCH", arch);
+            }
+            if (!out.containsKey("arch")) {
+                out.put("arch", arch);
+            }
         }
         return out;
     }
@@ -6727,7 +6758,11 @@ public class IPhoneBuilder extends Executor {
         if (winner == null || winner.trim().length() == 0) {
             return byName;
         }
-        return appExtensionSignedEntitlements(extensionFolder, winner, byName, settings);
+        // With the archive's context, because $(CONFIGURATION)/Extension.entitlements is a
+        // standard way to write this path; without it the path did not resolve and a different
+        // file was read for the entitlement that sets the floor.
+        return appExtensionSignedEntitlements(extensionFolder, winner, byName,
+                extensionSettingsWithBuiltIns(extensionFolder, settings, configuration, sdk, arch));
     }
 
     /// @param sdk the SDK this build archives against ("iphoneos" or "iphonesimulator"), and
@@ -6824,6 +6859,38 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return notes;
+    }
+
+    /// The iOS SDK this build archives against.
+    ///
+    /// A local device build passes no -sdk at all and lets the destination pick the active one,
+    /// so there is no version to assume -- and assuming a stale one (14.4 was the default in the
+    /// hint) made an exact qualifier like [sdk=iphoneos26.0] read as some other build's. The hint
+    /// answers when it is set; otherwise xcrun is asked, and if that cannot answer either the
+    /// bare platform name is used, which matches any version of it.
+    static String activeIosSdkName(BuildRequest request) {
+        String declared = request.getArg("ios.sdk", null);
+        if (declared != null && declared.trim().length() > 0) {
+            return "iphoneos" + declared.trim();
+        }
+        try {
+            Process p = new ProcessBuilder("/usr/bin/xcrun", "--sdk", "iphoneos",
+                    "--show-sdk-version").redirectErrorStream(false).start();
+            java.io.BufferedReader in = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
+            String version;
+            try {
+                version = in.readLine();
+            } finally {
+                in.close();
+            }
+            if (p.waitFor() == 0 && version != null && version.trim().length() > 0) {
+                return "iphoneos" + version.trim();
+            }
+        } catch (Exception noXcrun) {
+            // Not a Mac, or no Xcode: the bare platform name still matches every version of it.
+        }
+        return "iphoneos";
     }
 
     /// The value of {@code name} that governs THIS archive.
@@ -7223,6 +7290,46 @@ public class IPhoneBuilder extends Executor {
         out = replaceBuildSetting(out, "TARGET_NAME", targetName);
         out = replaceBuildSetting(out, "PRODUCT_NAME", productName);
         return out.indexOf('$') >= 0 ? null : out;
+    }
+
+    /// The same as {@link #resolveSettingsInValue}, but null when a reference is left over.
+    ///
+    /// resolveSettingsInValue deletes what it cannot expand, which is right when the question is
+    /// "what will this be on the device" -- Xcode deletes it too. It is wrong when the answer is
+    /// about to be RECORDED: com.example.app.$(SOMETHING_UNKNOWN) came out as "com.example.app.",
+    /// and that partial string went into the export-options dictionary as the key for a bundle
+    /// the archive does not contain, so a manual export could not pair the extension with its
+    /// profile. A value this build cannot resolve completely is better left alone than recorded
+    /// as a truncation of itself.
+    static String resolveSettingsFully(String value, Map<String, String> settings) {
+        if (value == null) {
+            return null;
+        }
+        String resolved = resolveSettingsInValue(value, settings);
+        return BUILD_SETTING_REFERENCE.matcher(value).find()
+                && BUILD_SETTING_REFERENCE.matcher(stripResolved(value, settings)).find()
+                ? null : resolved;
+    }
+
+    /// The value with every reference this build CAN expand already expanded, so what remains is
+    /// exactly what it cannot.
+    private static String stripResolved(String value, Map<String, String> settings) {
+        String out = value;
+        if (settings != null) {
+            for (int pass = 0; pass < MAX_SETTING_EXPANSIONS
+                    && BUILD_SETTING_REFERENCE.matcher(out).find(); pass++) {
+                String before = out;
+                for (Map.Entry<String, String> setting : settings.entrySet()) {
+                    if (setting.getValue() != null) {
+                        out = replaceBuildSetting(out, setting.getKey(), setting.getValue());
+                    }
+                }
+                if (out.equals(before)) {
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     /// A plist value with the archive's own build settings substituted, so a {@code $(...)}
