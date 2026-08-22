@@ -3030,4 +3030,87 @@ public class Window extends Container implements TopLevelContainer {
     public void setScrollable(boolean scrollable) {
         contentPane.setScrollable(scrollable);
     }
+
+    // The rest of the scrolling surface, delegated for the same reason isScrollable is:
+    // the content pane scrolls, not the window root, which is a fixed BorderLayout
+    // holding the title area and the content. Without these, window.setScrollableY(true)
+    // set the flag on the root -- where nothing reads it -- while the identical call on
+    // a Form reached the content pane, so code moved from a Form to a Window silently
+    // stopped scrolling.
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isScrollableX() {
+        return contentPane.isScrollableX();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setScrollableX(boolean scrollableX) {
+        contentPane.setScrollableX(scrollableX);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isScrollableY() {
+        return contentPane.isScrollableY();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setScrollableY(boolean scrollableY) {
+        contentPane.setScrollableY(scrollableY);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isScrollVisible() {
+        return contentPane.isScrollVisible();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setScrollVisible(boolean scrollVisible) {
+        contentPane.setScrollVisible(scrollVisible);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isSmoothScrolling() {
+        return contentPane.isSmoothScrolling();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setSmoothScrolling(boolean smoothScrolling) {
+        // Null-checked as Form does: Component's constructor reaches this before the
+        // content pane exists.
+        if (contentPane != null) {
+            contentPane.setSmoothScrolling(smoothScrolling);
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getScrollAnimationSpeed() {
+        return contentPane.getScrollAnimationSpeed();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setScrollAnimationSpeed(int animationSpeed) {
+        contentPane.setScrollAnimationSpeed(animationSpeed);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isAlwaysTensile() {
+        return contentPane.isAlwaysTensile();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setAlwaysTensile(boolean alwaysTensile) {
+        contentPane.setAlwaysTensile(alwaysTensile);
+    }
 }

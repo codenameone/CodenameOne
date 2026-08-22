@@ -320,6 +320,33 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void scrollSettingsReachTheWindowsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        // Deliberately not a BorderLayout content pane: setScrollableY forces false
+        // for one, on a Form just the same, so a BorderLayout would make this pass or
+        // fail for a reason that has nothing to do with the delegation.
+        Window w = new Window("scrolls", new com.codename1.ui.layouts.FlowLayout());
+
+        w.setScrollableY(true);
+        w.setScrollableX(false);
+        w.setAlwaysTensile(true);
+        w.setScrollAnimationSpeed(123);
+
+        // The content pane scrolls, not the window root, which is a fixed BorderLayout
+        // holding the title area and the content. Set on the root these reach nothing,
+        // while the same calls on a Form reach its content pane -- so code moved from a
+        // Form to a Window would silently stop scrolling.
+        assertTrue(w.getContentPane().isScrollableY(),
+                "setScrollableY has to reach the content pane, as it does on a Form");
+        assertFalse(w.getContentPane().isScrollableX());
+        assertTrue(w.getContentPane().isAlwaysTensile());
+        assertEquals(123, w.getContentPane().getScrollAnimationSpeed());
+        // And the getters read back from the same place.
+        assertTrue(w.isScrollableY());
+        assertFalse(w.isScrollableX());
+    }
+
+    @FormTest
     void aWindowPaintsItsBackgroundOncePerPaint() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("bg", new BorderLayout());
