@@ -3481,4 +3481,48 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void windowsCreatedConcurrentlyGetDistinctIds() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final int threads = 8;
+        final int perThread = 25;
+        final java.util.List<Integer> ids =
+                java.util.Collections.synchronizedList(new ArrayList<Integer>());
+        final java.util.List<Window> made =
+                java.util.Collections.synchronizedList(new ArrayList<Window>());
+        Thread[] workers = new Thread[threads];
+        for (int iter = 0; iter < threads; iter++) {
+            workers[iter] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < perThread; i++) {
+                        Window w = new Window("concurrent");
+                        made.add(w);
+                        ids.add(Integer.valueOf(w.getWindowId()));
+                    }
+                }
+            });
+        }
+        try {
+            for (Thread t : workers) {
+                t.start();
+            }
+            for (Thread t : workers) {
+                t.join(10000);
+            }
+
+            // A constructor cannot be marshalled, so two background threads really do
+            // allocate ids concurrently. A collision gives two native windows one id,
+            // and windowById() returns the first match -- so every input and lifecycle
+            // callback for the second would land on the first.
+            assertEquals(threads * perThread, ids.size(), "every window must be built");
+            java.util.Set<Integer> unique = new java.util.HashSet<Integer>(ids);
+            assertEquals(ids.size(), unique.size(), "window ids must be unique");
+        } finally {
+            for (Window w : made) {
+                w.dispose();
+            }
+        }
+    }
 }

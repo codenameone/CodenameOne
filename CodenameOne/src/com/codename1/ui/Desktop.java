@@ -295,8 +295,23 @@ public final class Desktop {
 
     // ---- framework internals -------------------------------------------------------
 
+    /// Hands out the next window id.
+    ///
+    /// Synchronized on the same monitor as the registry. A window is constructed on
+    /// whatever thread calls `new Window(...)` -- a constructor cannot be marshalled,
+    /// since it has to return the object -- so two background threads creating
+    /// windows at once could take the same id from an unsynchronized post-increment.
+    /// Both native windows would then answer to one id, and `#windowById(int)`
+    /// returns the first match, so every input and lifecycle callback meant for the
+    /// second would have been delivered to the first.
+    ///
+    /// #### Returns
+    ///
+    /// an id no other window has been given
     int nextWindowId() {
-        return nextWindowId++;
+        synchronized (windows) {
+            return nextWindowId++;
+        }
     }
 
     void registerWindow(Window w) {

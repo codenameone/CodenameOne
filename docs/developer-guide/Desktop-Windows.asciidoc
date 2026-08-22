@@ -389,9 +389,14 @@ while a destruction is still in flight is refused by the system.
 
 === Threading
 
-Everything runs on the event dispatch thread, as usual. Creating, showing, moving and
-disposing a window are all EDT operations; calling them from a background thread is
-marshalled for you the same way `Form.show()` is.
+Everything runs on the event dispatch thread, as usual. Showing, moving and disposing
+a window are all EDT operations; calling them from a background thread is marshalled
+for you the same way `Form.show()` is.
+
+Constructing one is the exception, because a constructor has to return its object and
+so can't be deferred. `new Window(...)` runs on the thread that calls it, and that's
+safe from any thread -- but the window doesn't exist for the framework until it's
+shown.
 
 There is one event dispatch thread for the whole application no matter how many windows
 are open. A window that animates keeps the thread awake; a minimized or hidden window
