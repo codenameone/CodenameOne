@@ -128,6 +128,28 @@ static int cn1MacCodenameOneWindowScene(UIScene *scene) {
  */
 static BOOL cn1MacApplicationActive = NO;
 
+/*
+ * Whether the application as a whole has been put in the background. Minimizing one
+ * window is not the application backgrounding, so the global path is gated on every
+ * scene being backgrounded -- and the matching foreground has to be gated the same
+ * way, or the application would be resumed from a suspension it never entered.
+ * Starts YES so the first scene entering the foreground at launch still runs the
+ * global path exactly as it did before any of this existed.
+ */
+static BOOL cn1MacApplicationBackgrounded = YES;
+
+/* YES while any of the application's scenes is still in the foreground at all. */
+static BOOL cn1MacAnySceneForeground(void) {
+    for (UIScene *each in [UIApplication sharedApplication].connectedScenes) {
+        UISceneActivationState state = each.activationState;
+        if (state == UISceneActivationStateForegroundActive
+                || state == UISceneActivationStateForegroundInactive) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 /* YES while any of the application's scenes is foreground-active. */
 static BOOL cn1MacAnySceneActive(void) {
     for (UIScene *each in [UIApplication sharedApplication].connectedScenes) {
@@ -232,11 +254,17 @@ static void cn1MacResignActiveIfApplicationInactive(void) {
     // still reported, as the matching background branch reports the minimize.
     {
         int windowId = cn1MacCodenameOneWindowScene(scene);
-        if (windowId >= 0) {
-            CN1MacWindowDeliverVisibility(windowId, YES);
-            return;
-        }
+        // Window id 0 is the main window: reporting it is what cascades the windows
+        // it owns back, and core ignores the id-0 lifecycle notification itself.
+        CN1MacWindowDeliverVisibility(windowId >= 0 ? windowId : 0, YES);
     }
+    // Restoring any window resumes an application that really was backgrounded, but
+    // one that never was has nothing to resume. This cannot ask the scenes, because
+    // the scene entering the foreground has not got there yet when this fires.
+    if (!cn1MacApplicationBackgrounded) {
+        return;
+    }
+    cn1MacApplicationBackgrounded = NO;
 #endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationWillEnterForeground];
@@ -256,11 +284,20 @@ static void cn1MacResignActiveIfApplicationInactive(void) {
     // painting it and running its animations while it was minimized.
     {
         int windowId = cn1MacCodenameOneWindowScene(scene);
-        if (windowId >= 0) {
-            CN1MacWindowDeliverVisibility(windowId, NO);
-            return;
-        }
+        // Window id 0 is the main window. The main scene minimizing is no more the
+        // application backgrounding than one of ours is, and reporting it is also
+        // what takes the windows it owns down with it.
+        CN1MacWindowDeliverVisibility(windowId >= 0 ? windowId : 0, NO);
     }
+    // Only once nothing of ours is left in the foreground is the application really
+    // backgrounding. Reaching the global path early sets isAppSuspended, stops the
+    // garbage collector and fires the suspend callback while another window is still
+    // perfectly usable -- and a scene that is then disconnected never comes back to
+    // undo any of it.
+    if (cn1MacAnySceneForeground() || cn1MacApplicationBackgrounded) {
+        return;
+    }
+    cn1MacApplicationBackgrounded = YES;
 #endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationDidEnterBackground];
