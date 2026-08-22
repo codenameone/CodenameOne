@@ -176,6 +176,24 @@ public class IPhoneBuilder extends Executor {
         return xcodeVersion >= 27 ? 25 : 50;
     }
 
+    /// Entries the Info.plist renderer appends to this array on its own, after every
+    /// caller here has had its say.
+    ///
+    /// Counted rather than ignored because a ceiling that the renderer then walks past is
+    /// not a ceiling. The renderer adds `fbauth2` and `gplus` off exactly these two hints,
+    /// so an app within two of the cap and using Facebook or Google sign-in would have
+    /// been told its schemes fit and then shipped a plist where they did not.
+    private int reservedApplicationQueriesSchemes(BuildRequest request) {
+        int reserved = 0;
+        if (request.getArg("facebook.appId", null) != null) {
+            reserved++;
+        }
+        if (request.getArg("ios.gplus.clientId", null) != null) {
+            reserved++;
+        }
+        return reserved;
+    }
+
     /// Adds `schemes` to ios.applicationQueriesSchemes, entry by entry.
     ///
     /// Entry by entry rather than as a substring, because a project that already queries
@@ -206,7 +224,7 @@ public class IPhoneBuilder extends Executor {
         }
         java.util.List<String> missing = new ArrayList<String>();
         java.util.List<String> overCap = new ArrayList<String>();
-        int cap = applicationQueriesSchemeCap();
+        int cap = applicationQueriesSchemeCap() - reservedApplicationQueriesSchemes(request);
         for (String scheme : schemes) {
             if (declared.contains(scheme)) {
                 continue;
@@ -229,8 +247,9 @@ public class IPhoneBuilder extends Executor {
         }
         if (!overCap.isEmpty()) {
             log("ios.applicationQueriesSchemes already holds " + declared.size()
-                    + " entries and iOS honours at most " + cap + " for this SDK, so "
-                    + overCap + " was not added. " + why);
+                    + " entries and this build has room for " + cap
+                    + " (iOS honours at most " + applicationQueriesSchemeCap()
+                    + " for this SDK), so " + overCap + " was not added. " + why);
         }
         if (alreadyInjected != null) {
             if (!missing.isEmpty()) {

@@ -203,4 +203,25 @@ class IPhoneBuilderJailbreakSchemesTest {
         BuildRequest r = request("ios.applicationQueriesSchemes", ownSchemes(60));
         assertEquals(60, declare(r, 26).size());
     }
+
+    /// The plist renderer appends fbauth2 and gplus off these two hints AFTER this
+    /// merge runs, so a ceiling that ignores them is one the renderer walks straight
+    /// past -- and the app is told its schemes fit while shipping a plist where they
+    /// do not.
+    @Test
+    void roomIsLeftForTheSchemesTheRendererAppends() throws Exception {
+        List<String> plain = declare(request("ios.applicationQueriesSchemes", ownSchemes(48)), 26);
+        assertEquals(50, plain.size());
+
+        List<String> withFacebook = declare(request(
+                "ios.applicationQueriesSchemes", ownSchemes(48),
+                "facebook.appId", "12345"), 26);
+        assertEquals(49, withFacebook.size());
+
+        List<String> withBoth = declare(request(
+                "ios.applicationQueriesSchemes", ownSchemes(48),
+                "facebook.appId", "12345",
+                "ios.gplus.clientId", "abc.apps.googleusercontent.com"), 26);
+        assertEquals(48, withBoth.size());
+    }
 }
