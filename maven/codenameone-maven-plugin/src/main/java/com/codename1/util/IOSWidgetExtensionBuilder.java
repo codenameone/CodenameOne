@@ -174,6 +174,40 @@ public class IOSWidgetExtensionBuilder {
      * Sets the extension target name (Xcode target, .appex bundle and bundle-id suffix).
      * Must be an ASCII identifier. Defaults to {@code CN1Widgets}.
      */
+    /**
+     * The extension's marketing version. Defaults to the historical constant so a caller that
+     * says nothing keeps its current output.
+     */
+    private String shortVersion = "1.0";
+
+    /** The extension's build version; see {@link #shortVersion}. */
+    private String bundleVersion = "1";
+
+    /**
+     * Sets the versions this extension declares.
+     *
+     * <p>Apple validates an embedded bundle's versions against the app that contains it, and an
+     * extension pinned to 1.0/1 inside an app at any other version is rejected at submission --
+     * a failure that appears only when the archive is uploaded, long after every build has gone
+     * green. The container's resolved values are the ones to pass; they are not simply the
+     * project version, because {@code ios.plistInject} and {@code ios.bundleVersion} both get a
+     * say in what the app itself ends up declaring.</p>
+     *
+     * @param shortVersionValue the containing app's CFBundleShortVersionString
+     * @param bundleVersionValue the containing app's CFBundleVersion
+     * @return this builder
+     */
+    public IOSWidgetExtensionBuilder setVersions(String shortVersionValue,
+            String bundleVersionValue) {
+        if (shortVersionValue != null && shortVersionValue.length() > 0) {
+            this.shortVersion = shortVersionValue;
+        }
+        if (bundleVersionValue != null && bundleVersionValue.length() > 0) {
+            this.bundleVersion = bundleVersionValue;
+        }
+        return this;
+    }
+
     public IOSWidgetExtensionBuilder setExtensionName(String name) {
         this.extensionName = name;
         return this;
@@ -405,8 +439,8 @@ public class IOSWidgetExtensionBuilder {
         plistKeyString(sb, "CFBundleInfoDictionaryVersion", "6.0");
         plistKeyString(sb, "CFBundleName", "$(PRODUCT_NAME)");
         plistKeyString(sb, "CFBundlePackageType", "$(PRODUCT_BUNDLE_PACKAGE_TYPE)");
-        plistKeyString(sb, "CFBundleShortVersionString", "1.0");
-        plistKeyString(sb, "CFBundleVersion", "1");
+        plistKeyString(sb, "CFBundleShortVersionString", shortVersion);
+        plistKeyString(sb, "CFBundleVersion", bundleVersion);
         plistKeyString(sb, APP_GROUP_PLIST_KEY, appGroupId);
         // No NSExtensionPrincipalClass: the @main CN1WidgetBundle is the entry point.
         // (NSSupportsLiveActivities belongs in the HOST APP's Info.plist, injected by

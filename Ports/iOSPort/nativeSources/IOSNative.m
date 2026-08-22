@@ -555,6 +555,13 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
     //
     // Safe this early because the transition forwarders serial-dispatch onto the EDT, so a phase
     // released now queues BEHIND the app start this callback just scheduled.
+#if defined(CN1_USE_WIDGETS) && defined(CN1_USE_WATCHCONNECTIVITY)
+    // Before the app starts, so a mirrored complication that arrives while the watch app is
+    // launching is not dropped. See cn1_watch_activate_connectivity: a surfaces-only watch app
+    // never calls a wearable native, so nothing else would ever activate the session.
+    extern void cn1_watch_activate_connectivity(void);
+    cn1_watch_activate_connectivity();
+#endif
     extern void cn1_watch_runtime_markJavaReady(void);
     cn1_watch_runtime_markJavaReady();
     while (1) {
@@ -15694,6 +15701,37 @@ void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
         NSLog(@"[CN1Surfaces] could not write the mirrored timeline for \"%@\"", kind);
         return;
     }
+    // AFTER the replacement document is in place, so an extension rendering concurrently re-reads
+    // the new timeline before its art can disappear -- the same order IOSSurfaceBridge uses for a
+    // local publish. Without this the mirror had no collection at all: blob names are content
+    // hashes, so every changed image left its predecessor in the App Group container for ever,
+    // and a container that only grows is a watch app that eventually cannot write.
+    //
+    // The reference set is the document's own "images" list, not the blobs that arrived in this
+    // message. A mirror only ships art the watch has not seen, so the transferred names are a
+    // subset and collecting against them would delete the images being kept.
+    NSError *parseErr = nil;
+    id doc = [NSJSONSerialization JSONObjectWithData:json options:0 error:&parseErr];
+    if ([doc isKindOfClass:[NSDictionary class]]) {
+        id names = [(NSDictionary *)doc objectForKey:@"images"];
+        NSMutableSet *referenced = [NSMutableSet set];
+        if ([names isKindOfClass:[NSArray class]]) {
+            for (id name in (NSArray *)names) {
+                [referenced addObject:[NSString stringWithFormat:@"%@", name]];
+            }
+        }
+        for (NSString *entry in [fm contentsOfDirectoryAtPath:kindDir error:NULL]) {
+            if (![[entry pathExtension] isEqualToString:@"png"]) {
+                continue;
+            }
+            if (![referenced containsObject:[entry stringByDeletingPathExtension]]) {
+                [fm removeItemAtPath:[kindDir stringByAppendingPathComponent:entry] error:NULL];
+            }
+        }
+    } else {
+        NSLog(@"[CN1Surfaces] could not read the mirrored timeline of \"%@\" to collect its "
+                "images: %@", kind, parseErr);
+    }
     Class bridge = cn1SurfacesBridgeClass();
     if (bridge != nil) {
         ((void (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
@@ -16314,6 +16352,22 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boole
 #if defined(CN1_USE_WATCHCONNECTIVITY) && !TARGET_OS_TV && !TARGET_OS_MACCATALYST
 
 #import "CN1WatchConnectivity.h"
+
+#if TARGET_OS_WATCH
+// Brings the session up on the watch without anyone asking for it.
+//
+// Every other route into CN1WatchConnectivity is a wearable native, so the session is activated
+// lazily the first time the app touches com.codename1.wearable. An app that declares watch
+// surfaces and never touches that API takes no such route: the delegate is never installed, the
+// WCSession is never activated, and didReceiveUserInfo: therefore cannot fire -- which is exactly
+// the surfaces-only configuration the phone-to-watch mirror exists to serve. Nothing reports it,
+// because the phone half sends successfully into a session that has no listener.
+//
+// The accessor activates on first use, so asking for it is the whole job.
+void cn1_watch_activate_connectivity(void) {
+    [CN1WatchConnectivity shared];
+}
+#endif
 
 // Callbacks the delegate calls when the peer sends something. Each hops into the Java callback
 // surface, which owns EDT dispatch and the cold-start queue.

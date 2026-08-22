@@ -62,6 +62,44 @@ class IOSWidgetExtensionWatchTargetTest {
         return new String(b.buildFileMap().get("buildSettings.properties"), StandardCharsets.UTF_8);
     }
 
+    private static String plistOf(IOSWidgetExtensionBuilder b) throws IOException {
+        return new String(b.buildFileMap().get("Info.plist"), StandardCharsets.UTF_8);
+    }
+
+    /// Apple validates an embedded bundle's versions against the app containing it, and this
+    /// extension is nested two deep -- inside the watch app, inside the phone app. Pinned to
+    /// 1.0/1 it was rejected at submission for every project on any other version, which is the
+    /// one failure that appears after every build has already gone green.
+    @Test
+    void theExtensionDeclaresTheVersionsItIsToldTo() throws IOException {
+        String plist = plistOf(watchBuilder("watchCircular").setVersions("3.7", "412"));
+
+        assertTrue(plist.contains("<string>3.7</string>"), plist);
+        assertTrue(plist.contains("<string>412</string>"), plist);
+        assertFalse(plist.contains("<key>CFBundleShortVersionString</key>\n    <string>1.0</string>"),
+                plist);
+    }
+
+    /// A caller that says nothing keeps the historical output, so this cannot change what an
+    /// existing build emits on its own.
+    @Test
+    void theVersionsFallBackToWhatWasAlwaysEmitted() throws IOException {
+        String plist = plistOf(watchBuilder("watchCircular"));
+
+        assertTrue(plist.contains("<string>1.0</string>"), plist);
+        assertTrue(plist.contains("<string>1</string>"), plist);
+    }
+
+    /// An empty resolution must not blank the key -- a plist with an empty version string is
+    /// worse than one with the default.
+    @Test
+    void anEmptyVersionIsIgnoredRatherThanWritten() throws IOException {
+        String plist = plistOf(watchBuilder("watchCircular").setVersions("", null));
+
+        assertTrue(plist.contains("<string>1.0</string>"), plist);
+        assertTrue(plist.contains("<string>1</string>"), plist);
+    }
+
     /// The regression test for the hole this flavour was built around. WidgetFamily.systemSmall
     /// and its siblings are @available(watchOS, unavailable) -- unnameable, not merely absent --
     /// so a phone family reaching the watch bundle fails the build outright.

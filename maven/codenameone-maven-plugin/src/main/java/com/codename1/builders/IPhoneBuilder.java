@@ -6016,15 +6016,8 @@ public class IPhoneBuilder extends Executor {
         // The host's own versions, through the helpers the watch builder uses
         // for the same rule: an embedded extension whose marketing or build
         // version differs from its containing app fails archive validation.
-        String injectedShort = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleShortVersionString");
-        String extShort = injectedShort != null ? injectedShort
-                : WatchNativeBuilder.shortVersion(request);
-        String injectedBundle = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleVersion");
-        String extBundle = injectedBundle != null ? injectedBundle
-                : request.getArg("ios.bundleVersion",
-                        WatchNativeBuilder.shortVersion(request));
+        String extShort = embeddedShortVersion(request);
+        String extBundle = embeddedBundleVersion(request);
         // The hint is an override, not the only way in: an app whose
         // setCommissionToThisApp(true) the scanner saw needs no hint, and one
         // that reaches the API through reflection has no other way to say so.
@@ -6697,12 +6690,50 @@ public class IPhoneBuilder extends Executor {
      * @param distDir the generated project's dist folder
      * @param appSrcDir the {@code <MainClass>-src} folder
      */
+    /**
+     * The marketing version an embedded bundle must declare to match this app.
+     *
+     * <p>Not simply the project version: {@code ios.plistInject} REPLACES the phone's default
+     * version injection where it sets the key, so a project that overrides the version there
+     * ships an app whose version is not {@code shortVersion(request)} at all. An embedded bundle
+     * whose versions differ from its container is rejected by App Store validation, which is the
+     * one failure that shows up only at submission.</p>
+     *
+     * @param request the build being generated
+     * @return the CFBundleShortVersionString the app itself will declare
+     */
+    private static String embeddedShortVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request,
+                "CFBundleShortVersionString");
+        return injected != null ? injected : WatchNativeBuilder.shortVersion(request);
+    }
+
+    /**
+     * The build version an embedded bundle must declare to match this app.
+     *
+     * <p>The fallback is {@code shortVersion(request)} and deliberately NOT
+     * {@link #embeddedShortVersion}: the two keys are independent, the app's CFBundleVersion is
+     * {@code ios.bundleVersion} defaulting to the build version, and it does not follow an
+     * injected marketing version. Deriving one from the other produces the very mismatch this
+     * exists to prevent.</p>
+     *
+     * @param request the build being generated
+     * @return the CFBundleVersion the app itself will declare
+     */
+    private static String embeddedBundleVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request, "CFBundleVersion");
+        return injected != null ? injected
+                : request.getArg("ios.bundleVersion", WatchNativeBuilder.shortVersion(request));
+    }
+
     private void writeWatchWidgetExtension(BuildRequest request, File distDir, File appSrcDir)
             throws IOException {
         if (!surfacesWatchEnabled) {
             return;
         }
         IOSWidgetExtensionBuilder watchBuilder = new IOSWidgetExtensionBuilder()
+                .setVersions(embeddedShortVersion(request),
+                        embeddedBundleVersion(request))
                 .setWatchTarget(true)
                 .setExtensionName(SURFACES_WATCH_EXTENSION_NAME)
                 // The extension is nested in the watch app, so its bundle id extends the WATCH
@@ -6744,6 +6775,8 @@ public class IPhoneBuilder extends Executor {
      */
     private void appendWidgetExtensionTargets(StringBuilder sb, BuildRequest request, File distDir) throws IOException {
         IOSWidgetExtensionBuilder widgetBuilder = new IOSWidgetExtensionBuilder()
+                .setVersions(embeddedShortVersion(request),
+                        embeddedBundleVersion(request))
                 .setExtensionName(SURFACES_EXTENSION_NAME)
                 .setHostBundleId(request.getPackageName())
                 .setAppGroupId(surfacesAppGroup)
