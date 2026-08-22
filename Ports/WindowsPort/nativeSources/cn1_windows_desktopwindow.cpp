@@ -398,6 +398,28 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
         case WM_SYSKEYUP:
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
             return DefWindowProcW(hwnd, msg, wParam, lParam);
+        case WM_SHOWWINDOW:
+            /* Windows hides and shows a window's owned windows along with it and
+             * reports it here with SW_PARENTCLOSING / SW_PARENTOPENING. There is no
+             * WM_SIZE for that, so without this an owned window kept nativeVisible
+             * true with no window on screen: the framework went on painting and
+             * animating it, which also keeps the event dispatch thread awake.
+             *
+             * Only the owner-driven case is forwarded. lParam is zero when the call
+             * came from ShowWindow, which is the framework's own show()/hide() -- it
+             * already knows about those, and reporting them would be redundant. */
+            if (lParam == SW_PARENTCLOSING) {
+                if (!w->minimized) {
+                    w->minimized = 1;
+                    cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_HIDDEN, 0, 0, 0);
+                }
+            } else if (lParam == SW_PARENTOPENING) {
+                if (w->minimized) {
+                    w->minimized = 0;
+                    cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_SHOWN, 0, 0, 0);
+                }
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_SIZE:
             /* A minimize arrives as a resize to zero. Reporting only that leaves the
              * framework thinking the window is still on screen: it keeps painting it

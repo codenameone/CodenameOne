@@ -368,6 +368,9 @@ typedef struct {
 
 static CN1MacWindow g_macWindows[CN1_MAC_MAX_WINDOWS];
 
+/* Defined further down, beside the main-window helpers that first needed it. */
+static void CN1MacRunOnMainSync(void (^block)(void));
+
 static CN1MacWindow* slotAt(int slot) {
     if (slot < 0 || slot >= CN1_MAC_MAX_WINDOWS) {
         return NULL;
@@ -1197,14 +1200,27 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
 
 void CN1MacWindowGetBounds(int slot, int* out) {
     CN1MacWindow* w = slotAt(slot);
+    UIWindow* window;
     if (w == NULL || out == NULL) {
         return;
     }
-    if (w->window != nil) {
-        /* Reported in pixels, matching CN1MacWindowGetWidth/Height and the pixel
-         * geometry Codename One passes in; UIKit frames are in points. */
-        CGFloat scale = w->window.screen != nil ? w->window.screen.scale : 1.0;
-        CGRect f = w->window.frame;
+    /* Snapshotted and retained under the lock, then read on the main queue. This
+     * runs on the event dispatch thread while CN1MacWindowSceneConnected can be
+     * replacing and releasing this very window under the lock, and UIKit geometry
+     * must not be read off the main thread anyway. */
+    pthread_mutex_lock(&g_slotLock);
+    window = [w->window retain];
+    pthread_mutex_unlock(&g_slotLock);
+    if (window != nil) {
+        __block CGFloat scale = 1.0;
+        __block CGRect f = CGRectZero;
+        CN1MacRunOnMainSync(^{
+            /* Reported in pixels, matching CN1MacWindowGetWidth/Height and the pixel
+             * geometry Codename One passes in; UIKit frames are in points. */
+            scale = window.screen != nil ? window.screen.scale : 1.0;
+            f = window.frame;
+        });
+        [window release];
         out[0] = (int) (f.origin.x * scale);
         out[1] = (int) (f.origin.y * scale);
         out[2] = (int) (f.size.width * scale);
@@ -1230,30 +1246,50 @@ void CN1MacWindowGetBounds(int slot, int* out) {
  * out and render meanwhile. Once a scene attaches, viewDidLayoutSubviews delivers
  * the real size and the framework re-lays out against it.
  */
-int CN1MacWindowGetWidth(int slot) {
+/*
+ * One axis of the laid-out size, synchronized the same way the bounds read is: the
+ * controller, its view and the window are snapshotted and retained under the slot
+ * lock, and their UIKit geometry is read on the main queue. Adoption replaces all
+ * three, so reading them here unsynchronized could message a deallocated object or
+ * mix a new view's bounds with an old window's scale.
+ */
+static int CN1MacWindowLayoutExtent(int slot, int wantWidth) {
     CN1MacWindow* w = slotAt(slot);
+    CN1MacWindowController* controller;
+    UIWindow* window;
+    int pending;
+    __block CGFloat extent = 0;
+    __block CGFloat scale = 1.0;
     if (w == NULL) {
         return 0;
     }
-    if (w->controller == nil) {
-        return w->pendingWidth;
+    pthread_mutex_lock(&g_slotLock);
+    controller = [w->controller retain];
+    window = [w->window retain];
+    pending = wantWidth ? w->pendingWidth : w->pendingHeight;
+    pthread_mutex_unlock(&g_slotLock);
+    if (controller == nil) {
+        [window release];
+        return pending;
     }
-    /* The controller's view, not the content subview: that is what the window
-     * manager lays out and what viewDidLayoutSubviews reports back. */
-    CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
-    return (int) (w->controller.view.bounds.size.width * scale);
+    CN1MacRunOnMainSync(^{
+        /* The controller's view, not the content subview: that is what the window
+         * manager lays out and what viewDidLayoutSubviews reports back. */
+        CGSize size = controller.view.bounds.size;
+        extent = wantWidth ? size.width : size.height;
+        scale = window != nil ? window.screen.scale : 1.0;
+    });
+    [controller release];
+    [window release];
+    return (int) (extent * scale);
+}
+
+int CN1MacWindowGetWidth(int slot) {
+    return CN1MacWindowLayoutExtent(slot, 1);
 }
 
 int CN1MacWindowGetHeight(int slot) {
-    CN1MacWindow* w = slotAt(slot);
-    if (w == NULL) {
-        return 0;
-    }
-    if (w->controller == nil) {
-        return w->pendingHeight;
-    }
-    CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
-    return (int) (w->controller.view.bounds.size.height * scale);
+    return CN1MacWindowLayoutExtent(slot, 0);
 }
 
 void CN1MacWindowFocus(int slot) {
