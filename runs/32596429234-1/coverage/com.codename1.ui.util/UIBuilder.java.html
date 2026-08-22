@@ -1,0 +1,3021 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UIBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">UIBuilder.java</span></div><h1>UIBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.util;
+
+import com.codename1.analytics.AnalyticsService;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.ComboBox;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.SideMenuBar;
+import com.codename1.ui.Slider;
+import com.codename1.ui.Tabs;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.list.CellRenderer;
+import com.codename1.ui.list.ContainerList;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.GenericListCellRenderer;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.table.TableLayout;
+import com.codename1.util.LazyValue;
+
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/// The UI builder can create a user interface based on the UI designed in the
+/// resource editor and allows us to bind to said UI. Notice that if a Component
+/// was used in the GUI that is not a part of the com.codename1.ui package (even a
+/// Component from sub packages such as table or tree) it MUST be registered
+/// before loading a GUI!
+///
+/// @author Shai Almog
+<span class="fc" id="L83">public class UIBuilder { //implements Externalizable {</span>
+    /// A key in the form state hashtable used in the back command navigation
+    public static final String FORM_STATE_KEY_NAME = &quot;$name&quot;;
+
+    /// A key in the form state hashtable used in the back command navigation
+    public static final String FORM_STATE_KEY_TITLE = &quot;$title&quot;;
+
+    /// A key in the form state hashtable used in the back command navigation
+    public static final String FORM_STATE_KEY_FOCUS = &quot;$focus&quot;;
+
+    /// A key in the form state hashtable used in the back command navigation
+    public static final String FORM_STATE_KEY_SELECTION = &quot;$sel&quot;;
+    public static final int BACK_COMMAND_ID = 99999999;
+    static final String COMMAND_ACTION = &quot;$COMMAND_ACTION$&quot;;
+    static final String COMMAND_ARGUMENTS = &quot;$COMMAND_ARGUMENTS$&quot;;
+    static final String TYPE_KEY = &quot;$TYPE_NAME$&quot;;
+    static final String EMBEDDED_FORM_FLAG = &quot;$EMBED$&quot;;
+    static final int PROPERTY_CUSTOM = 1000;
+    static final int PROPERTY_TEXT = 1;
+    static final int PROPERTY_ALIGNMENT = 2;
+    static final int PROPERTY_LAYOUT = 3;
+    static final int PROPERTY_LABEL_FOR = 4;
+    static final int PROPERTY_PREFERRED_WIDTH = 5;
+    static final int PROPERTY_PREFERRED_HEIGHT = 6;
+    static final int PROPERTY_NEXT_FOCUS_UP = 7;
+    static final int PROPERTY_NEXT_FOCUS_DOWN = 8;
+    static final int PROPERTY_NEXT_FOCUS_LEFT = 9;
+    static final int PROPERTY_NEXT_FOCUS_RIGHT = 10;
+    static final int PROPERTY_UIID = 11;
+    static final int PROPERTY_FOCUSABLE = 14;
+    static final int PROPERTY_ENABLED = 15;
+    static final int PROPERTY_SCROLL_VISIBLE = 16;
+    static final int PROPERTY_ICON = 17;
+    static final int PROPERTY_GAP = 18;
+    static final int PROPERTY_VERTICAL_ALIGNMENT = 19;
+    static final int PROPERTY_TEXT_POSITION = 20;
+    static final int PROPERTY_NAME = 21;
+    static final int PROPERTY_LAYOUT_CONSTRAINT = 22;
+    static final int PROPERTY_TITLE = 23;
+    static final int PROPERTY_COMPONENTS = 24;
+    static final int PROPERTY_COLUMNS = 25;
+    static final int PROPERTY_ROWS = 26;
+    static final int PROPERTY_HINT = 27;
+    static final int PROPERTY_ITEM_GAP = 28;
+    static final int PROPERTY_CYCLIC_FOCUS = 32;
+    static final int PROPERTY_SCROLLABLE_X = 33;
+    static final int PROPERTY_SCROLLABLE_Y = 34;
+    static final int PROPERTY_NEXT_FORM = 35;
+    static final int PROPERTY_RADIO_GROUP = 36;
+    static final int PROPERTY_SELECTED = 37;
+    static final int PROPERTY_LIST_ITEMS_LEGACY = 29;
+    static final int PROPERTY_LIST_ITEMS = 38;
+    static final int PROPERTY_LIST_RENDERER = 39;
+    static final int PROPERTY_BASE_FORM = 40;
+    static final int PROPERTY_ROLLOVER_ICON = 41;
+    static final int PROPERTY_PRESSED_ICON = 42;
+    static final int PROPERTY_RTL = 43;
+    static final int PROPERTY_INFINITE = 44;
+    static final int PROPERTY_PROGRESS = 45;
+    static final int PROPERTY_VERTICAL = 46;
+    static final int PROPERTY_EDITABLE = 47;
+    static final int PROPERTY_INCREMENTS = 48;
+    static final int PROPERTY_RENDER_PERCENTAGE_ON_TOP = 49;
+    static final int PROPERTY_MAX_VALUE = 50;
+    static final int PROPERTY_MIN_VALUE = 51;
+    static final int PROPERTY_DIALOG_UIID = 52;
+    static final int PROPERTY_LIST_FIXED = 53;
+    static final int PROPERTY_LIST_ORIENTATION = 54;
+    static final int PROPERTY_LEAD_COMPONENT = 55;
+    static final int PROPERTY_TAB_PLACEMENT = 56;
+    static final int PROPERTY_TAB_TEXT_POSITION = 57;
+    static final int PROPERTY_TOGGLE_BUTTON = 58;
+    static final int PROPERTY_DISABLED_ICON = 60;
+    static final int PROPERTY_EMBED = 61;
+    static final int PROPERTY_HINT_ICON = 62;
+    static final int PROPERTY_SLIDER_THUMB = 63;
+    static final int PROPERTY_DIALOG_POSITION = 64;
+    static final int PROPERTY_TEXT_AREA_GROW = 65;
+    static final int PROPERTY_COMMANDS_LEGACY = 30;
+    static final int PROPERTY_COMMAND_LEGACY = 31;
+    static final int PROPERTY_COMMANDS = 67;
+    static final int PROPERTY_COMMAND = 66;
+    static final int PROPERTY_TEXT_CONSTRAINT = 68;
+    static final int PROPERTY_TEXT_MAX_LENGTH = 69;
+    static final int PROPERTY_TENSILE_DRAG_ENABLED = 70;
+    static final int PROPERTY_TACTILE_TOUCH = 71;
+    static final int PROPERTY_SNAP_TO_GRID = 72;
+    static final int PROPERTY_FLATTEN = 73;
+    static final int PROPERTY_DISPOSE_WHEN_POINTER_OUT = 74;
+    static final int PROPERTY_CLOUD_BOUND_PROPERTY = 75;
+    static final int PROPERTY_CLOUD_DESTINATION_PROPERTY = 76;
+    static final int PROPERTY_CLIENT_PROPERTIES = 77;
+    static final int LAYOUT_BOX_X = 5002;
+    static final int LAYOUT_BOX_Y = 5003;
+    static final int LAYOUT_GRID = 5006;
+    static final int LAYOUT_TABLE = 5007;
+    static final int LAYOUT_BORDER_LEGACY = 5001;
+    static final int LAYOUT_BORDER_ANOTHER_LEGACY = 5008;
+    static final int LAYOUT_BORDER = 5010;
+    static final int LAYOUT_FLOW_LEGACY = 5004;
+    static final int LAYOUT_FLOW = 5009;
+    static final int LAYOUT_LAYERED = 5011;
+    /// A key in the form state hashtable used in the back command navigation
+    private static final String FORM_STATE_KEY_CONTAINER = &quot;$cnt&quot;;
+    // used by the resource editor
+<span class="fc" id="L188">    static boolean ignorBaseForm = false;</span>
+    private static Hashtable componentRegistry;
+    private static boolean blockAnalytics;
+<span class="fc" id="L191">    Vector baseFormNavigationStack = new Vector();</span>
+    private String resourceFilePath;
+    private Resources resourceFile;
+    private Hashtable localCommandListeners;
+    private EventDispatcher globalCommandListeners;
+    private Hashtable localComponentListeners;
+<span class="fc" id="L197">    private boolean keepResourcesInRam = &quot;true&quot;.equals(Display.getInstance().getProperty(&quot;cacheResFile&quot;, &quot;false&quot;));</span>
+    private Vector backCommands;
+    /// When reaching the home form the navigation stack is cleared
+    private String homeForm;
+
+    /// Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+    ///
+    /// #### Returns
+    ///
+    /// the blockAnalytics
+    public static boolean isBlockAnalytics() {
+<span class="fc" id="L208">        return blockAnalytics;</span>
+    }
+
+    /// Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aBlockAnalytics`: the blockAnalytics to set
+    public static void setBlockAnalytics(boolean aBlockAnalytics) {
+<span class="fc" id="L217">        blockAnalytics = aBlockAnalytics;</span>
+<span class="fc" id="L218">    }</span>
+
+    static synchronized Hashtable getComponentRegistry() {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (componentRegistry == null) {</span>
+<span class="fc" id="L222">            componentRegistry = new Hashtable();</span>
+<span class="fc" id="L223">            componentRegistry.put(&quot;Button&quot;, Button.class);</span>
+<span class="fc" id="L224">            componentRegistry.put(&quot;Calendar&quot;, com.codename1.ui.Calendar.class);</span>
+<span class="fc" id="L225">            componentRegistry.put(&quot;CheckBox&quot;, CheckBox.class);</span>
+<span class="fc" id="L226">            componentRegistry.put(&quot;ComboBox&quot;, ComboBox.class);</span>
+<span class="fc" id="L227">            componentRegistry.put(&quot;Container&quot;, Container.class);</span>
+<span class="fc" id="L228">            componentRegistry.put(&quot;Dialog&quot;, Dialog.class);</span>
+<span class="fc" id="L229">            componentRegistry.put(&quot;Form&quot;, Form.class);</span>
+<span class="fc" id="L230">            componentRegistry.put(&quot;Label&quot;, Label.class);</span>
+<span class="fc" id="L231">            componentRegistry.put(&quot;List&quot;, List.class);</span>
+<span class="fc" id="L232">            componentRegistry.put(&quot;RadioButton&quot;, RadioButton.class);</span>
+<span class="fc" id="L233">            componentRegistry.put(&quot;Slider&quot;, Slider.class);</span>
+<span class="fc" id="L234">            componentRegistry.put(&quot;Tabs&quot;, Tabs.class);</span>
+<span class="fc" id="L235">            componentRegistry.put(&quot;TextArea&quot;, TextArea.class);</span>
+<span class="fc" id="L236">            componentRegistry.put(&quot;TextField&quot;, TextField.class);</span>
+<span class="fc" id="L237">            componentRegistry.put(&quot;EmbeddedContainer&quot;, EmbeddedContainer.class);</span>
+        }
+<span class="fc" id="L239">        return componentRegistry;</span>
+    }
+
+    /// This method  allows the UIBuilder to package a smaller portion of Codename One into the JAR
+    /// and add support for additional 3rd party components to the GUI builder. Components
+    /// must be registered using their UIID name, by default all the content of com.codename1.ui is
+    /// registered however subpackages and 3rd party components are not.
+    /// Registration is essential for obfuscation to work properly!
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the component (UIID)
+    ///
+    /// - `cmp`: the class for the given component
+    public static void registerCustomComponent(String name, Class cmp) {
+<span class="fc" id="L254">        getComponentRegistry().put(name, cmp);</span>
+<span class="fc" id="L255">    }</span>
+
+    /// Removes a navigation frame from the stack, this is useful in case you
+    /// want to go back to a form in the middle of the navigation stack.
+    protected void popNavigationStack() {
+<span class="pc bpc" id="L260" title="2 of 4 branches missed.">        if (baseFormNavigationStack != null &amp;&amp; !baseFormNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L261">            baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);</span>
+        }
+<span class="fc" id="L263">    }</span>
+
+    /// Pops the navigation stack until it finds form name and the back button will match form name
+    /// if form name isn't in the stack this method will fail
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form to navigate back to.
+    protected void setBackDestination(String formName) {
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (baseFormNavigationStack != null) {</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            while (!baseFormNavigationStack.isEmpty()) {</span>
+<span class="fc" id="L274">                Hashtable h = (Hashtable) baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                if (formName.equalsIgnoreCase((String) h.get(FORM_STATE_KEY_NAME))) {</span>
+<span class="fc" id="L276">                    break;</span>
+                }
+<span class="nc" id="L278">                baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);</span>
+<span class="nc" id="L279">            }</span>
+        }
+<span class="fc" id="L281">    }</span>
+
+    /// Useful method for logging form navigation, it returns a string representing the navigation state which
+    /// can be used to analyze crash reports
+    ///
+    /// #### Returns
+    ///
+    /// A string representing form states
+    protected String formNavigationStackDebug() {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (baseFormNavigationStack != null) {</span>
+<span class="fc" id="L291">            return baseFormNavigationStack.toString();</span>
+        }
+<span class="nc" id="L293">        return &quot;Null navigation stack&quot;;</span>
+    }
+
+    private Vector getFormNavigationStackForComponent(Component c) {
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (baseFormNavigationStack == null) {</span>
+<span class="nc" id="L298">            return null;</span>
+        }
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L301">            return baseFormNavigationStack;</span>
+        }
+<span class="fc" id="L303">        Component root = getRootAncestor(c);</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (root.getParent() instanceof EmbeddedContainer) {</span>
+<span class="nc" id="L305">            Vector nav = (Vector) root.getParent().getClientProperty(&quot;$baseNav&quot;);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            if (nav == null) {</span>
+<span class="nc" id="L307">                nav = new Vector();</span>
+<span class="nc" id="L308">                root.getParent().putClientProperty(&quot;$baseNav&quot;, nav);</span>
+            }
+<span class="nc" id="L310">            return nav;</span>
+        }
+<span class="fc" id="L312">        return baseFormNavigationStack;</span>
+    }
+
+    /// Seamlessly inserts a back command to all the forms
+    ///
+    /// #### Returns
+    ///
+    /// true if a back command is automatically added
+    public boolean isBackCommandEnabled() {
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        return baseFormNavigationStack != null;</span>
+    }
+
+    /// Seamlessly inserts a back command to all the forms
+    ///
+    /// #### Parameters
+    ///
+    /// - `back`: true to automatically add a back command
+    public void setBackCommandEnabled(boolean back) {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (back) {</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            if (baseFormNavigationStack == null) {</span>
+<span class="fc" id="L332">                baseFormNavigationStack = new Vector();</span>
+            }
+        } else {
+<span class="fc" id="L335">            baseFormNavigationStack = null;</span>
+        }
+<span class="fc" id="L337">    }</span>
+
+    /// Invokes the analytics service if it is enabled and if
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the page visited
+    ///
+    /// - `referrer`: the source page
+    protected void analyticsCallback(String page, String referrer) {
+<span class="nc bnc" id="L347" title="All 4 branches missed.">        if (!isBlockAnalytics() &amp;&amp; AnalyticsService.isEnabled()) {</span>
+<span class="nc" id="L348">            AnalyticsService.visit(page, referrer);</span>
+        }
+<span class="nc" id="L350">    }</span>
+
+    /// Creates the container defined under the given name in the res file
+    ///
+    /// #### Parameters
+    ///
+    /// - `resPath`: the path to the res file containing the UI widget
+    ///
+    /// - `resourceName`: the name of the widget in the res file
+    ///
+    /// #### Returns
+    ///
+    /// a Codename One container instance
+    public Container createContainer(String resPath, String resourceName) {
+<span class="nc bnc" id="L364" title="All 4 branches missed.">        if (this.resourceFilePath == null || (!this.resourceFilePath.equals(resPath))) {</span>
+<span class="nc" id="L365">            resourceFile = null;</span>
+        }
+<span class="nc" id="L367">        setResourceFilePath(resPath);</span>
+<span class="nc" id="L368">        return createContainer(fetchResourceFile(), resourceName);</span>
+    }
+
+    /// Creates the container defined under the given name in the res file
+    ///
+    /// #### Parameters
+    ///
+    /// - `res`: the res file containing the UI widget
+    ///
+    /// - `resourceName`: the name of the widget in the res file
+    ///
+    /// #### Returns
+    ///
+    /// a Codename One container instance
+    public Container createContainer(Resources res, String resourceName) {
+<span class="nc" id="L383">        return createContainer(res, resourceName, null);</span>
+    }
+
+    Container createContainer(Resources res, String resourceName, EmbeddedContainer parentContainer) {
+<span class="nc" id="L387">        onCreateRoot(resourceName);</span>
+<span class="nc" id="L388">        InputStream source = res.getUi(resourceName); //NOPMD CloseResource</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L390">            throw new RuntimeException(&quot;Resource doesn't exist within the current resource object: &quot; + resourceName);</span>
+        }
+<span class="nc" id="L392">        DataInputStream in = new DataInputStream(source); //NOPMD CloseResource</span>
+        try {
+<span class="nc" id="L394">            Hashtable h = null;</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">            if (localComponentListeners != null) {</span>
+<span class="nc" id="L396">                h = (Hashtable) localComponentListeners.get(resourceName);</span>
+            }
+<span class="nc" id="L398">            Container c = (Container) createComponent(in, null, null, res, h, parentContainer);</span>
+<span class="nc" id="L399">            c.setName(resourceName);</span>
+<span class="nc" id="L400">            postCreateComponents(in, c, res);</span>
+
+            // try to be smart about initializing the home form
+<span class="nc bnc" id="L403" title="All 2 branches missed.">            if (homeForm == null) {</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                if (c instanceof Form) {</span>
+<span class="nc" id="L405">                    String nextForm = (String) c.getClientProperty(&quot;%next_form%&quot;);</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                    if (nextForm != null) {</span>
+<span class="nc" id="L407">                        homeForm = nextForm;</span>
+                    } else {
+<span class="nc" id="L409">                        homeForm = resourceName;</span>
+                    }
+                }
+            }
+
+<span class="nc" id="L414">            return c;</span>
+<span class="nc" id="L415">        } catch (Exception ex) {</span>
+            // If this happens its probably a serious bug
+<span class="nc" id="L417">            ex.printStackTrace();</span>
+<span class="nc" id="L418">            return null;</span>
+        } finally {
+<span class="nc" id="L420">            Util.cleanup(in);</span>
+        }
+    }
+
+    private void readCommand(DataInputStream in, Component c, Container parent, Resources res, boolean legacy) throws IOException {
+<span class="nc" id="L425">        String commandName = in.readUTF();</span>
+<span class="nc" id="L426">        String commandImageName = in.readUTF();</span>
+<span class="nc" id="L427">        String rollover = null;</span>
+<span class="nc" id="L428">        String pressed = null;</span>
+<span class="nc" id="L429">        String disabled = null;</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        if (!legacy) {</span>
+<span class="nc" id="L431">            rollover = in.readUTF();</span>
+<span class="nc" id="L432">            pressed = in.readUTF();</span>
+<span class="nc" id="L433">            disabled = in.readUTF();</span>
+        }
+<span class="nc" id="L435">        int commandId = in.readInt();</span>
+<span class="nc" id="L436">        String commandAction = in.readUTF();</span>
+<span class="nc" id="L437">        String commandArgument = &quot;&quot;;</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (&quot;$Execute&quot;.equals(commandAction)) {</span>
+<span class="nc" id="L439">            commandArgument = in.readUTF();</span>
+        }
+<span class="nc" id="L441">        boolean isBack = in.readBoolean();</span>
+<span class="nc" id="L442">        Command cmd = createCommandImpl(commandName, res.getImage(commandImageName), commandId, commandAction, isBack, commandArgument);</span>
+<span class="nc bnc" id="L443" title="All 4 branches missed.">        if (rollover != null &amp;&amp; rollover.length() &gt; 0) {</span>
+<span class="nc" id="L444">            cmd.setRolloverIcon(res.getImage(rollover));</span>
+        }
+<span class="nc bnc" id="L446" title="All 4 branches missed.">        if (pressed != null &amp;&amp; pressed.length() &gt; 0) {</span>
+<span class="nc" id="L447">            cmd.setPressedIcon(res.getImage(pressed));</span>
+        }
+<span class="nc bnc" id="L449" title="All 4 branches missed.">        if (disabled != null &amp;&amp; disabled.length() &gt; 0) {</span>
+<span class="nc" id="L450">            cmd.setPressedIcon(res.getImage(pressed));</span>
+        }
+<span class="nc bnc" id="L452" title="All 2 branches missed.">        if (isBack) {</span>
+<span class="nc" id="L453">            Form f = c.getComponentForm();</span>
+<span class="nc bnc" id="L454" title="All 2 branches missed.">            if (f != null) {</span>
+<span class="nc" id="L455">                setBackCommand(f, cmd);</span>
+            } else {
+<span class="nc bnc" id="L457" title="All 2 branches missed.">                if (backCommands == null) {</span>
+<span class="nc" id="L458">                    backCommands = new Vector();</span>
+                }
+<span class="nc" id="L460">                backCommands.addElement(cmd);</span>
+            }
+        }
+        Button btn;
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        if (c instanceof Container) {</span>
+<span class="nc" id="L465">            btn = (Button) ((Container) c).getLeadComponent();</span>
+        } else {
+<span class="nc" id="L467">            btn = ((Button) c);</span>
+        }
+<span class="nc" id="L469">        boolean e = btn.isEnabled();</span>
+<span class="nc" id="L470">        btn.setCommand(cmd);</span>
+
+        // special case since setting the command implicitly gets the enabled state from the command
+<span class="nc bnc" id="L473" title="All 2 branches missed.">        if (!e) {</span>
+<span class="nc" id="L474">            btn.setEnabled(false);</span>
+        }
+
+        // prevent duplicate action handling only in the case of a component form
+        // the embeded component doesn't have a global command listener since it has
+        // no menu
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        if (c.getComponentForm() != null) {</span>
+<span class="nc" id="L481">            btn.removeActionListener(getFormListenerInstance(parent, null));</span>
+        }
+<span class="nc" id="L483">        cmd.putClientProperty(COMMAND_ARGUMENTS, commandArgument);</span>
+<span class="nc" id="L484">        cmd.putClientProperty(COMMAND_ACTION, commandAction);</span>
+<span class="nc bnc" id="L485" title="All 6 branches missed.">        if (commandAction.length() &gt; 0 &amp;&amp; resourceFilePath == null || isKeepResourcesInRam()) {</span>
+<span class="nc" id="L486">            resourceFile = res;</span>
+        }
+<span class="nc" id="L488">    }</span>
+
+    /// Invoked after the components were created to allow properties that require the entire
+    /// tree to exist to update the component. This is useful for properties that point
+    /// at other components.
+    private void postCreateComponents(DataInputStream in, Container parent, Resources res) throws Exception {
+        // finds the component whose properties need to update
+<span class="nc" id="L495">        String name = in.readUTF();</span>
+<span class="nc" id="L496">        Component lastComponent = null;</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        while (name.length() &gt; 0) {</span>
+<span class="nc bnc" id="L498" title="All 4 branches missed.">            if (lastComponent == null || !lastComponent.getName().equals(name)) {</span>
+<span class="nc" id="L499">                lastComponent = findByName(name, parent);</span>
+            }
+<span class="nc" id="L501">            Component c = lastComponent;</span>
+<span class="nc" id="L502">            int property = in.readInt();</span>
+<span class="nc" id="L503">            modifyingProperty(c, property);</span>
+
+<span class="nc bnc" id="L505" title="All 9 branches missed.">            switch (property) {</span>
+                case PROPERTY_COMMAND_LEGACY: {
+<span class="nc" id="L507">                    readCommand(in, c, parent, res, true);</span>
+<span class="nc" id="L508">                    break;</span>
+                }
+                case PROPERTY_COMMAND: {
+<span class="nc" id="L511">                    readCommand(in, c, parent, res, false);</span>
+<span class="nc" id="L512">                    break;</span>
+                }
+                case PROPERTY_LABEL_FOR:
+<span class="nc" id="L515">                    c.setLabelForComponent((Label) findByName(in.readUTF(), parent));</span>
+<span class="nc" id="L516">                    break;</span>
+                case PROPERTY_LEAD_COMPONENT:
+<span class="nc" id="L518">                    ((Container) c).setLeadComponent(findByName(in.readUTF(), parent));</span>
+<span class="nc" id="L519">                    break;</span>
+                case PROPERTY_NEXT_FOCUS_UP:
+<span class="nc" id="L521">                    c.setNextFocusUp(findByName(in.readUTF(), parent));</span>
+<span class="nc" id="L522">                    break;</span>
+                case PROPERTY_NEXT_FOCUS_DOWN:
+<span class="nc" id="L524">                    c.setNextFocusDown(findByName(in.readUTF(), parent));</span>
+<span class="nc" id="L525">                    break;</span>
+                case PROPERTY_NEXT_FOCUS_LEFT:
+<span class="nc" id="L527">                    c.setNextFocusLeft(findByName(in.readUTF(), parent));</span>
+<span class="nc" id="L528">                    break;</span>
+                case PROPERTY_NEXT_FOCUS_RIGHT:
+<span class="nc" id="L530">                    c.setNextFocusRight(findByName(in.readUTF(), parent));</span>
+<span class="nc" id="L531">                    break;</span>
+                default:
+                    break;
+            }
+
+<span class="nc" id="L536">            name = in.readUTF();</span>
+<span class="nc" id="L537">        }</span>
+<span class="nc" id="L538">    }</span>
+
+    /// Finds the given component by its name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the component as defined in the resource editor
+    ///
+    /// - `rootComponent`: the root container
+    ///
+    /// #### Returns
+    ///
+    /// the component matching the given name or null if its not found
+    public Component findByName(String name, Component rootComponent) {
+<span class="nc" id="L552">        Component c = (Component) rootComponent.getClientProperty(&quot;%&quot; + name + &quot;%&quot;);</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L554">            Container newRoot = getRootAncestor(rootComponent);</span>
+<span class="nc bnc" id="L555" title="All 4 branches missed.">            if (newRoot != null &amp;&amp; rootComponent != newRoot) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L556">                return findByName(name, newRoot);</span>
+            }
+        }
+<span class="nc" id="L559">        return c;</span>
+    }
+
+    /// Finds the given component by its name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the component as defined in the resource editor
+    ///
+    /// - `rootComponent`: the root container
+    ///
+    /// #### Returns
+    ///
+    /// the component matching the given name or null if its not found
+    public Component findByName(String name, Container rootComponent) {
+<span class="fc" id="L574">        Component c = (Component) rootComponent.getClientProperty(&quot;%&quot; + name + &quot;%&quot;);</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L576">            Container newRoot = getRootAncestor(rootComponent);</span>
+<span class="nc bnc" id="L577" title="All 4 branches missed.">            if (newRoot != null &amp;&amp; rootComponent != newRoot) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L578">                return findByName(name, newRoot);</span>
+            }
+        }
+<span class="fc" id="L581">        return c;</span>
+    }
+
+    /// This method can be overriden to create custom components in a custom way, the component
+    /// type is a shorthand for the component name and not the full name of the class.
+    /// By default this method returns null which indicates Codename One should try to reolve the component
+    /// on its own.
+    ///
+    /// #### Parameters
+    ///
+    /// - `componentType`: the type of the component from the UI builder
+    ///
+    /// - `cls`: assumed component class based on the component registry
+    ///
+    /// #### Returns
+    ///
+    /// a new component instance or null
+    protected Component createComponentInstance(String componentType, Class cls) {
+<span class="fc" id="L599">        return null;</span>
+    }
+
+    /// Callback to allow binding custom logic/listeners to a component after its major properties were set
+    /// (notice that not all properties or the full hierarchy will be available at this stage). This
+    /// is the perfect place to bind models/renderers etc. to components.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component
+    protected void postCreateComponent(Component cmp) {
+<span class="nc" id="L610">    }</span>
+
+    /// Binds the given listener object to the component, this works seamlessly for
+    /// common Codename One events but might be an issue with custom components and custom
+    /// listener types so this method can be overloaded to add support for such cases.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to bind the listener to
+    ///
+    /// - `listener`: the listener object
+    protected void bindListenerToComponent(Component cmp, Object listener) {
+<span class="nc bnc" id="L622" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L623">            cmp = ((Container) cmp).getLeadComponent();</span>
+        }
+<span class="nc bnc" id="L625" title="All 2 branches missed.">        if (listener instanceof FocusListener) {</span>
+<span class="nc" id="L626">            cmp.addFocusListener((FocusListener) listener);</span>
+<span class="nc" id="L627">            return;</span>
+        }
+<span class="nc bnc" id="L629" title="All 2 branches missed.">        if (listener instanceof ActionListener) {</span>
+<span class="nc bnc" id="L630" title="All 2 branches missed.">            if (cmp instanceof Button) {</span>
+<span class="nc" id="L631">                ((Button) cmp).addActionListener((ActionListener) listener);</span>
+<span class="nc" id="L632">                return;</span>
+            }
+<span class="nc bnc" id="L634" title="All 2 branches missed.">            if (cmp instanceof List) {</span>
+<span class="nc" id="L635">                ((List) cmp).addActionListener((ActionListener) listener);</span>
+<span class="nc" id="L636">                return;</span>
+            }
+<span class="nc bnc" id="L638" title="All 2 branches missed.">            if (cmp instanceof ContainerList) {</span>
+<span class="nc" id="L639">                ((ContainerList) cmp).addActionListener((ActionListener) listener);</span>
+<span class="nc" id="L640">                return;</span>
+            }
+<span class="nc bnc" id="L642" title="All 2 branches missed.">            if (cmp instanceof com.codename1.ui.Calendar) {</span>
+<span class="nc" id="L643">                ((com.codename1.ui.Calendar) cmp).addActionListener((ActionListener) listener);</span>
+<span class="nc" id="L644">                return;</span>
+            }
+<span class="nc" id="L646">            ((TextArea) cmp).addActionListener((ActionListener) listener);</span>
+<span class="nc" id="L647">            return;</span>
+        }
+<span class="nc bnc" id="L649" title="All 2 branches missed.">        if (listener instanceof DataChangedListener) {</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">            if (cmp instanceof TextField) {</span>
+<span class="nc" id="L651">                ((TextField) cmp).addDataChangedListener((DataChangedListener) listener);</span>
+<span class="nc" id="L652">                return;</span>
+            }
+<span class="nc" id="L654">            ((Slider) cmp).addDataChangedListener((DataChangedListener) listener);</span>
+<span class="nc" id="L655">            return;</span>
+        }
+<span class="nc bnc" id="L657" title="All 2 branches missed.">        if (listener instanceof SelectionListener) {</span>
+<span class="nc bnc" id="L658" title="All 2 branches missed.">            if (cmp instanceof List) {</span>
+<span class="nc" id="L659">                ((List) cmp).addSelectionListener((SelectionListener) listener);</span>
+<span class="nc" id="L660">                return;</span>
+            }
+<span class="nc" id="L662">            ((Slider) cmp).addDataChangedListener((DataChangedListener) listener);</span>
+        }
+<span class="nc" id="L664">    }</span>
+
+    void initBaseForm(String formName) {
+<span class="nc" id="L667">    }</span>
+
+    private Container findEmptyContainer(Container c) {
+<span class="nc" id="L670">        int count = c.getComponentCount();</span>
+<span class="nc bnc" id="L671" title="All 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L672">            return c;</span>
+        }
+<span class="nc bnc" id="L674" title="All 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L675">            Component x = c.getComponentAt(iter);</span>
+<span class="nc bnc" id="L676" title="All 2 branches missed.">            if (x instanceof Container) {</span>
+<span class="nc" id="L677">                Container current = findEmptyContainer((Container) x);</span>
+<span class="nc bnc" id="L678" title="All 2 branches missed.">                if (current != null) {</span>
+<span class="nc" id="L679">                    return current;</span>
+                }
+            }
+        }
+<span class="nc" id="L683">        return null;</span>
+    }
+
+    /// Allows a subclass to set the list model for the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the list whose model may be set
+    ///
+    /// #### Returns
+    ///
+    /// true if a model was set by this method
+    protected boolean setListModel(List cmp) {
+<span class="nc" id="L696">        return false;</span>
+    }
+
+    /// Allows a subclass to set the list model for the given component
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the list whose model may be set
+    ///
+    /// #### Returns
+    ///
+    /// true if a model was set by this method
+    protected boolean setListModel(ContainerList cmp) {
+<span class="nc" id="L709">        return false;</span>
+    }
+
+    private void readCommands(DataInputStream in, Component cmp, Resources res, boolean legacy) throws IOException {
+<span class="nc" id="L713">        int commandCount = in.readInt();</span>
+<span class="nc" id="L714">        final String[] commandActions = new String[commandCount];</span>
+<span class="nc" id="L715">        final Command[] commands = new Command[commandCount];</span>
+<span class="nc" id="L716">        final String[] commandArguments = new String[commandCount];</span>
+<span class="nc" id="L717">        boolean hasAction = false;</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">        for (int iter = 0; iter &lt; commandCount; iter++) {</span>
+<span class="nc" id="L719">            String commandName = in.readUTF();</span>
+<span class="nc" id="L720">            String commandImageName = in.readUTF();</span>
+<span class="nc" id="L721">            String rollover = null;</span>
+<span class="nc" id="L722">            String pressed = null;</span>
+<span class="nc" id="L723">            String disabled = null;</span>
+<span class="nc bnc" id="L724" title="All 2 branches missed.">            if (!legacy) {</span>
+<span class="nc" id="L725">                rollover = in.readUTF();</span>
+<span class="nc" id="L726">                pressed = in.readUTF();</span>
+<span class="nc" id="L727">                disabled = in.readUTF();</span>
+            }
+<span class="nc" id="L729">            int commandId = in.readInt();</span>
+<span class="nc" id="L730">            commandActions[iter] = in.readUTF();</span>
+<span class="nc bnc" id="L731" title="All 2 branches missed.">            if (commandActions[iter].length() &gt; 0) {</span>
+<span class="nc" id="L732">                hasAction = true;</span>
+            }
+<span class="nc" id="L734">            boolean isBack = in.readBoolean();</span>
+<span class="nc" id="L735">            commandArguments[iter] = &quot;&quot;;</span>
+<span class="nc bnc" id="L736" title="All 2 branches missed.">            if (&quot;$Execute&quot;.equals(commandActions[iter])) {</span>
+<span class="nc" id="L737">                commandArguments[iter] = in.readUTF();</span>
+            }
+<span class="nc" id="L739">            commands[iter] = createCommandImpl(commandName, res.getImage(commandImageName), commandId, commandActions[iter], isBack, commandArguments[iter]);</span>
+<span class="nc bnc" id="L740" title="All 4 branches missed.">            if (rollover != null &amp;&amp; rollover.length() &gt; 0) {</span>
+<span class="nc" id="L741">                commands[iter].setRolloverIcon(res.getImage(rollover));</span>
+            }
+<span class="nc bnc" id="L743" title="All 4 branches missed.">            if (pressed != null &amp;&amp; pressed.length() &gt; 0) {</span>
+<span class="nc" id="L744">                commands[iter].setPressedIcon(res.getImage(pressed));</span>
+            }
+<span class="nc bnc" id="L746" title="All 4 branches missed.">            if (disabled != null &amp;&amp; disabled.length() &gt; 0) {</span>
+<span class="nc" id="L747">                commands[iter].setPressedIcon(res.getImage(pressed));</span>
+            }
+<span class="nc bnc" id="L749" title="All 2 branches missed.">            if (isBack) {</span>
+<span class="nc" id="L750">                setBackCommand(((Form) cmp), commands[iter]);</span>
+            }
+            // trigger listener creation if this is the only command in the form
+<span class="nc" id="L753">            getFormListenerInstance(cmp, null);</span>
+
+<span class="nc" id="L755">            ((Form) cmp).addCommand(commands[iter]);</span>
+        }
+<span class="nc bnc" id="L757" title="All 2 branches missed.">        if (hasAction) {</span>
+<span class="nc bnc" id="L758" title="All 2 branches missed.">            for (int iter = 0; iter &lt; commands.length; iter++) {</span>
+<span class="nc" id="L759">                commands[iter].putClientProperty(COMMAND_ARGUMENTS, commandArguments[iter]);</span>
+<span class="nc" id="L760">                commands[iter].putClientProperty(COMMAND_ACTION, commandActions[iter]);</span>
+            }
+<span class="nc bnc" id="L762" title="All 4 branches missed.">            if (resourceFilePath == null || isKeepResourcesInRam()) {</span>
+<span class="nc" id="L763">                resourceFile = res;</span>
+            }
+        }
+<span class="nc" id="L766">    }</span>
+
+    private Object[] readObjectArrayForListModel(DataInputStream in, Resources res) throws IOException {
+<span class="nc" id="L769">        Object[] elements = new Object[in.readInt()];</span>
+<span class="nc" id="L770">        int elen = elements.length;</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">        for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="nc bnc" id="L772" title="All 3 branches missed.">            switch (in.readByte()) {</span>
+                case 1: // String
+<span class="nc" id="L774">                    elements[iter] = in.readUTF();</span>
+<span class="nc" id="L775">                    break;</span>
+                case 2: // hashtable of Strings
+<span class="nc" id="L777">                    int hashSize = in.readInt();</span>
+<span class="nc" id="L778">                    Hashtable val = new Hashtable();</span>
+<span class="nc" id="L779">                    elements[iter] = val;</span>
+<span class="nc bnc" id="L780" title="All 2 branches missed.">                    for (int i = 0; i &lt; hashSize; i++) {</span>
+<span class="nc" id="L781">                        int type = in.readInt();</span>
+<span class="nc bnc" id="L782" title="All 2 branches missed.">                        if (type == 1) { // String</span>
+<span class="nc" id="L783">                            String key = in.readUTF();</span>
+<span class="nc" id="L784">                            Object value = in.readUTF();</span>
+<span class="nc bnc" id="L785" title="All 2 branches missed.">                            if (&quot;$navigation&quot;.equals(key)) {</span>
+<span class="nc" id="L786">                                Command cmd = createCommandImpl((String) value, null, -1, (String) value, false, &quot;&quot;);</span>
+<span class="nc" id="L787">                                cmd.putClientProperty(COMMAND_ACTION, value);</span>
+<span class="nc" id="L788">                                value = cmd;</span>
+                            }
+<span class="nc" id="L790">                            val.put(key, value);</span>
+<span class="nc" id="L791">                        } else {</span>
+<span class="nc" id="L792">                            val.put(in.readUTF(), res.getImage(in.readUTF()));</span>
+                        }
+                    }
+<span class="nc" id="L795">                    break;</span>
+                default:
+                    break;
+            }
+        }
+<span class="nc" id="L800">        return elements;</span>
+    }
+
+    private GenericListCellRenderer readRendererer(Resources res, DataInputStream in) throws IOException {
+<span class="nc" id="L804">        int rendererComponentCount = in.readByte();</span>
+<span class="nc" id="L805">        String f = in.readUTF();</span>
+<span class="nc" id="L806">        String s = in.readUTF();</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">        if (rendererComponentCount == 2) {</span>
+<span class="nc" id="L808">            Component selected = createContainer(res, f);</span>
+<span class="nc" id="L809">            Component unselected = createContainer(res, s);</span>
+<span class="nc" id="L810">            GenericListCellRenderer g = new GenericListCellRenderer(selected, unselected);</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">            g.setFisheye(!f.equals(s));</span>
+<span class="nc" id="L812">            return g;</span>
+        } else {
+<span class="nc" id="L814">            Component selected = createContainer(res, f);</span>
+<span class="nc" id="L815">            Component unselected = createContainer(res, s);</span>
+<span class="nc" id="L816">            Component even = createContainer(res, in.readUTF());</span>
+<span class="nc" id="L817">            Component evenU = createContainer(res, in.readUTF());</span>
+<span class="nc" id="L818">            GenericListCellRenderer g = new GenericListCellRenderer(selected, unselected, even, evenU);</span>
+<span class="nc bnc" id="L819" title="All 2 branches missed.">            g.setFisheye(!f.equals(s));</span>
+<span class="nc" id="L820">            return g;</span>
+        }
+    }
+
+    private Object readCustomPropertyValue(DataInputStream in, Class type, String typeName, Resources res) throws IOException {
+<span class="nc bnc" id="L825" title="All 2 branches missed.">        if (type == String.class) {</span>
+<span class="nc" id="L826">            return in.readUTF();</span>
+        }
+
+<span class="nc bnc" id="L829" title="All 2 branches missed.">        if (typeName != null) {</span>
+<span class="nc bnc" id="L830" title="All 2 branches missed.">            if (&quot;String[]&quot;.equals(typeName)) {</span>
+<span class="nc" id="L831">                String[] result = new String[in.readInt()];</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">                for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="nc" id="L833">                    result[i] = in.readUTF();</span>
+                }
+<span class="nc" id="L835">                return result;</span>
+            }
+        } else {
+<span class="nc bnc" id="L838" title="All 2 branches missed.">            if (type == com.codename1.impl.CodenameOneImplementation.getStringArrayClass()) {</span>
+<span class="nc" id="L839">                String[] result = new String[in.readInt()];</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">                for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="nc" id="L841">                    result[i] = in.readUTF();</span>
+                }
+<span class="nc" id="L843">                return result;</span>
+            }
+        }
+
+<span class="nc bnc" id="L847" title="All 2 branches missed.">        if (typeName != null) {</span>
+<span class="nc bnc" id="L848" title="All 2 branches missed.">            if (&quot;String[][]&quot;.equals(typeName)) {</span>
+<span class="nc" id="L849">                String[][] result = new String[in.readInt()][];</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">                for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="nc" id="L851">                    result[i] = new String[in.readInt()];</span>
+<span class="nc bnc" id="L852" title="All 2 branches missed.">                    for (int j = 0; j &lt; result[i].length; j++) {</span>
+<span class="nc" id="L853">                        result[i][j] = in.readUTF();</span>
+                    }
+                }
+<span class="nc" id="L856">                return result;</span>
+            }
+        } else {
+<span class="nc bnc" id="L859" title="All 2 branches missed.">            if (type == com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()) {</span>
+<span class="nc" id="L860">                String[][] result = new String[in.readInt()][];</span>
+<span class="nc bnc" id="L861" title="All 2 branches missed.">                for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="nc" id="L862">                    result[i] = new String[in.readInt()];</span>
+<span class="nc bnc" id="L863" title="All 2 branches missed.">                    for (int j = 0; j &lt; result[i].length; j++) {</span>
+<span class="nc" id="L864">                        result[i][j] = in.readUTF();</span>
+                    }
+                }
+<span class="nc" id="L867">                return result;</span>
+            }
+        }
+
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        if (type == Integer.class) {</span>
+<span class="nc" id="L872">            return Integer.valueOf(in.readInt());</span>
+        }
+
+<span class="nc bnc" id="L875" title="All 2 branches missed.">        if (type == Long.class) {</span>
+<span class="nc" id="L876">            return Long.valueOf(in.readLong());</span>
+        }
+
+<span class="nc bnc" id="L879" title="All 2 branches missed.">        if (type == Double.class) {</span>
+<span class="nc" id="L880">            return Double.valueOf(in.readDouble());</span>
+        }
+
+<span class="nc bnc" id="L883" title="All 2 branches missed.">        if (type == Float.class) {</span>
+<span class="nc" id="L884">            return Float.valueOf(in.readFloat());</span>
+        }
+
+<span class="nc bnc" id="L887" title="All 2 branches missed.">        if (type == Byte.class) {</span>
+<span class="nc" id="L888">            return Byte.valueOf(in.readByte());</span>
+        }
+
+<span class="nc bnc" id="L891" title="All 2 branches missed.">        if (type == Boolean.class) {</span>
+<span class="nc bnc" id="L892" title="All 2 branches missed.">            if (in.readBoolean()) {</span>
+<span class="nc" id="L893">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L895">            return Boolean.FALSE;</span>
+        }
+
+<span class="nc bnc" id="L898" title="All 2 branches missed.">        if (typeName != null) {</span>
+<span class="nc bnc" id="L899" title="All 2 branches missed.">            if (&quot;Image[]&quot;.equals(typeName)) {</span>
+<span class="nc" id="L900">                Image[] result = new Image[in.readInt()];</span>
+<span class="nc bnc" id="L901" title="All 2 branches missed.">                for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="nc" id="L902">                    result[i] = res.getImage(in.readUTF());</span>
+                }
+<span class="nc" id="L904">                return result;</span>
+            }
+        } else {
+<span class="nc bnc" id="L907" title="All 2 branches missed.">            if (type == com.codename1.impl.CodenameOneImplementation.getImageArrayClass()) {</span>
+<span class="nc" id="L908">                Image[] result = new Image[in.readInt()];</span>
+<span class="nc bnc" id="L909" title="All 2 branches missed.">                for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="nc" id="L910">                    result[i] = res.getImage(in.readUTF());</span>
+                }
+<span class="nc" id="L912">                return result;</span>
+            }
+        }
+
+<span class="nc bnc" id="L916" title="All 2 branches missed.">        if (type == Image.class) {</span>
+<span class="nc" id="L917">            return res.getImage(in.readUTF());</span>
+        }
+
+<span class="nc bnc" id="L920" title="All 2 branches missed.">        if (type == Container.class) {</span>
+            // resource might have been removed we need to fail gracefully
+<span class="nc" id="L922">            String[] uiNames = res.getUIResourceNames();</span>
+<span class="nc" id="L923">            String currentName = in.readUTF();</span>
+<span class="nc bnc" id="L924" title="All 2 branches missed.">            for (String uiName : uiNames) {</span>
+<span class="nc bnc" id="L925" title="All 2 branches missed.">                if (uiName.equals(currentName)) {</span>
+<span class="nc" id="L926">                    return createContainer(res, currentName);</span>
+                }
+            }
+<span class="nc" id="L929">            return null;</span>
+        }
+
+<span class="nc bnc" id="L932" title="All 2 branches missed.">        if (type == CellRenderer.class) {</span>
+<span class="nc" id="L933">            return readRendererer(res, in);</span>
+        }
+
+<span class="nc bnc" id="L936" title="All 2 branches missed.">        if (type.isArray()) {</span>
+<span class="nc" id="L937">            return readObjectArrayForListModel(in, res);</span>
+        }
+
+<span class="nc bnc" id="L940" title="All 2 branches missed.">        if (type == Date.class) {</span>
+<span class="nc" id="L941">            boolean b = in.readBoolean();</span>
+<span class="nc bnc" id="L942" title="All 2 branches missed.">            if (b) {</span>
+<span class="nc" id="L943">                return new Date(in.readLong());</span>
+            }
+        }
+
+<span class="nc" id="L947">        return in.readChar();</span>
+    }
+
+    private Component createComponent(DataInputStream in, Container parent, Container root, Resources res, Hashtable componentListeners, EmbeddedContainer embedded) throws Exception {
+<span class="nc" id="L951">        String name = in.readUTF();</span>
+<span class="nc" id="L952">        int property = in.readInt();</span>
+
+        // special case for the base form
+<span class="nc bnc" id="L955" title="All 2 branches missed.">        if (property == PROPERTY_BASE_FORM) {</span>
+<span class="nc" id="L956">            String baseFormName = name;</span>
+<span class="nc" id="L957">            initBaseForm(baseFormName);</span>
+<span class="nc bnc" id="L958" title="All 2 branches missed.">            if (!ignorBaseForm) {</span>
+<span class="nc" id="L959">                Form base = (Form) createContainer(res, baseFormName);</span>
+<span class="nc" id="L960">                Container destination = (Container) findByName(&quot;destination&quot;, base);</span>
+
+                // try finding an appropriate empty container if no &quot;fixed&quot; destination is defined
+<span class="nc bnc" id="L963" title="All 2 branches missed.">                if (destination == null) {</span>
+<span class="nc" id="L964">                    destination = findEmptyContainer(base.getContentPane());</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">                    if (destination == null) {</span>
+<span class="nc" id="L966">                        Log.p(&quot;Couldn't find appropriate 'destination' container in base form: &quot; + baseFormName);</span>
+<span class="nc" id="L967">                        return null;</span>
+                    }
+                }
+<span class="nc" id="L970">                root = base;</span>
+<span class="nc" id="L971">                Component cmp = createComponent(in, destination, root, res, componentListeners, embedded);</span>
+<span class="nc bnc" id="L972" title="All 2 branches missed.">                if (destination.getLayout() instanceof BorderLayout) {</span>
+<span class="nc" id="L973">                    destination.addComponent(BorderLayout.CENTER, cmp);</span>
+                } else {
+<span class="nc" id="L975">                    destination.addComponent(cmp);</span>
+                }
+<span class="nc" id="L977">                return root;</span>
+            } else {
+<span class="nc" id="L979">                name = in.readUTF();</span>
+<span class="nc" id="L980">                property = in.readInt();</span>
+            }
+        }
+<span class="nc" id="L983">        Component cmp = createComponentType(name);</span>
+
+<span class="nc bnc" id="L985" title="All 2 branches missed.">        if (componentListeners != null) {</span>
+<span class="nc" id="L986">            Object listeners = componentListeners.get(name);</span>
+<span class="nc bnc" id="L987" title="All 2 branches missed.">            if (listeners != null) {</span>
+<span class="nc bnc" id="L988" title="All 2 branches missed.">                if (listeners instanceof Vector) {</span>
+<span class="nc" id="L989">                    Vector v = (Vector) listeners;</span>
+<span class="nc bnc" id="L990" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; v.size(); iter++) {</span>
+<span class="nc" id="L991">                        bindListenerToComponent(cmp, v.elementAt(iter));</span>
+                    }
+<span class="nc" id="L993">                } else {</span>
+<span class="nc" id="L994">                    bindListenerToComponent(cmp, listeners);</span>
+                }
+            }
+        }
+
+<span class="nc" id="L999">        Component actualLead = cmp;</span>
+<span class="nc bnc" id="L1000" title="All 2 branches missed.">        if (actualLead instanceof Container) {</span>
+<span class="nc" id="L1001">            Container cnt = (Container) actualLead;</span>
+<span class="nc" id="L1002">            actualLead = cnt.getLeadComponent();</span>
+<span class="nc bnc" id="L1003" title="All 2 branches missed.">            if (actualLead == null) {</span>
+<span class="nc" id="L1004">                actualLead = cmp;</span>
+            }
+        }
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">        if (actualLead instanceof Button) {</span>
+<span class="nc" id="L1008">            ActionListener l = getFormListenerInstance(root, embedded);</span>
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">            if (l != null) {</span>
+<span class="nc" id="L1010">                ((Button) actualLead).addActionListener(l);</span>
+            }
+<span class="nc" id="L1012">        } else {</span>
+<span class="nc bnc" id="L1013" title="All 2 branches missed.">            if (actualLead instanceof TextArea) {</span>
+<span class="nc" id="L1014">                ActionListener l = getFormListenerInstance(root, embedded);</span>
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">                if (l != null) {</span>
+<span class="nc" id="L1016">                    ((TextArea) actualLead).addActionListener(l);</span>
+                }
+<span class="nc" id="L1018">            } else {</span>
+<span class="nc bnc" id="L1019" title="All 2 branches missed.">                if (actualLead instanceof List) {</span>
+<span class="nc" id="L1020">                    ActionListener l = getFormListenerInstance(root, embedded);</span>
+<span class="nc bnc" id="L1021" title="All 2 branches missed.">                    if (l != null) {</span>
+<span class="nc" id="L1022">                        ((List) actualLead).addActionListener(l);</span>
+                    }
+<span class="nc" id="L1024">                } else {</span>
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">                    if (actualLead instanceof ContainerList) {</span>
+<span class="nc" id="L1026">                        ActionListener l = getFormListenerInstance(root, embedded);</span>
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">                        if (l != null) {</span>
+<span class="nc" id="L1028">                            ((ContainerList) actualLead).addActionListener(l);</span>
+                        }
+<span class="nc" id="L1030">                    } else {</span>
+<span class="nc bnc" id="L1031" title="All 2 branches missed.">                        if (actualLead instanceof com.codename1.ui.Calendar) {</span>
+<span class="nc" id="L1032">                            ActionListener l = getFormListenerInstance(root, embedded);</span>
+<span class="nc bnc" id="L1033" title="All 2 branches missed.">                            if (l != null) {</span>
+<span class="nc" id="L1034">                                ((com.codename1.ui.Calendar) actualLead).addActionListener(l);</span>
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L1042">        cmp.putClientProperty(TYPE_KEY, name);</span>
+<span class="nc bnc" id="L1043" title="All 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L1044">            root = (Container) cmp;</span>
+        }
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">        while (property != -1) {</span>
+<span class="nc" id="L1047">            modifyingProperty(cmp, property);</span>
+<span class="nc bnc" id="L1048" title="All 67 branches missed.">            switch (property) {</span>
+                case PROPERTY_CUSTOM:
+<span class="nc" id="L1050">                    String customPropertyName = in.readUTF();</span>
+<span class="nc" id="L1051">                    modifyingCustomProperty(cmp, customPropertyName);</span>
+<span class="nc" id="L1052">                    boolean isNull = in.readBoolean();</span>
+<span class="nc bnc" id="L1053" title="All 2 branches missed.">                    if (isNull) {</span>
+<span class="nc" id="L1054">                        cmp.setPropertyValue(customPropertyName, null);</span>
+<span class="nc" id="L1055">                        break;</span>
+                    }
+<span class="nc" id="L1057">                    boolean cl = cmp instanceof ContainerList;</span>
+<span class="nc" id="L1058">                    String[] propertyNames = cmp.getPropertyNames();</span>
+<span class="nc bnc" id="L1059" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; propertyNames.length; iter++) {</span>
+<span class="nc bnc" id="L1060" title="All 2 branches missed.">                        if (propertyNames[iter].equals(customPropertyName)) {</span>
+<span class="nc" id="L1061">                            Class type = cmp.getPropertyTypes()[iter];</span>
+<span class="nc" id="L1062">                            String[] typeNames = cmp.getPropertyTypeNames();</span>
+<span class="nc" id="L1063">                            String typeName = null;</span>
+<span class="nc bnc" id="L1064" title="All 4 branches missed.">                            if (typeNames != null &amp;&amp; typeNames.length &gt; iter) {</span>
+<span class="nc" id="L1065">                                typeName = typeNames[iter];</span>
+                            }
+<span class="nc" id="L1067">                            Object value = readCustomPropertyValue(in, type, typeName, res);</span>
+<span class="nc bnc" id="L1068" title="All 6 branches missed.">                            if (cl &amp;&amp; &quot;ListItems&quot;.equals(customPropertyName) &amp;&amp; setListModel((ContainerList) cmp)) {</span>
+<span class="nc" id="L1069">                                break;</span>
+                            }
+<span class="nc" id="L1071">                            cmp.setPropertyValue(customPropertyName, value);</span>
+<span class="nc" id="L1072">                            break;</span>
+                        }
+                    }
+<span class="nc" id="L1075">                    break;</span>
+
+                case PROPERTY_EMBED:
+<span class="nc" id="L1078">                    root.putClientProperty(EMBEDDED_FORM_FLAG, &quot;&quot;);</span>
+<span class="nc" id="L1079">                    ((EmbeddedContainer) cmp).setEmbed(in.readUTF());</span>
+<span class="nc" id="L1080">                    Container embed = createContainer(res, ((EmbeddedContainer) cmp).getEmbed(), (EmbeddedContainer) cmp);</span>
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">                    if (embed != null) {</span>
+<span class="nc bnc" id="L1082" title="All 2 branches missed.">                        if (embed instanceof Form) {</span>
+<span class="nc" id="L1083">                            embed = formToContainer((Form) embed);</span>
+                        }
+<span class="nc" id="L1085">                        ((EmbeddedContainer) cmp).addComponent(BorderLayout.CENTER, embed);</span>
+
+                        // this isn't exactly the &quot;right thing&quot; but its the best we can do to make all
+                        // use cases work
+<span class="nc" id="L1089">                        beforeShowContainer(embed);</span>
+<span class="nc" id="L1090">                        postShowContainer(embed);</span>
+                    }
+                    break;
+
+                case PROPERTY_TOGGLE_BUTTON:
+<span class="nc" id="L1095">                    ((Button) cmp).setToggle(in.readBoolean());</span>
+<span class="nc" id="L1096">                    break;</span>
+
+                case PROPERTY_RADIO_GROUP:
+<span class="nc" id="L1099">                    ((RadioButton) cmp).setGroup(in.readUTF());</span>
+<span class="nc" id="L1100">                    break;</span>
+
+                case PROPERTY_SELECTED:
+<span class="nc" id="L1103">                    boolean isSelected = in.readBoolean();</span>
+<span class="nc bnc" id="L1104" title="All 2 branches missed.">                    if (cmp instanceof RadioButton) {</span>
+<span class="nc" id="L1105">                        ((RadioButton) cmp).setSelected(isSelected);</span>
+                    } else {
+<span class="nc" id="L1107">                        ((CheckBox) cmp).setSelected(isSelected);</span>
+                    }
+<span class="nc" id="L1109">                    break;</span>
+
+                case PROPERTY_SCROLLABLE_X:
+<span class="nc" id="L1112">                    ((Container) cmp).setScrollableX(in.readBoolean());</span>
+<span class="nc" id="L1113">                    break;</span>
+
+                case PROPERTY_SCROLLABLE_Y:
+<span class="nc" id="L1116">                    ((Container) cmp).setScrollableY(in.readBoolean());</span>
+<span class="nc" id="L1117">                    break;</span>
+
+                case PROPERTY_TENSILE_DRAG_ENABLED:
+<span class="nc" id="L1120">                    cmp.setTensileDragEnabled(in.readBoolean());</span>
+<span class="nc" id="L1121">                    break;</span>
+
+                case PROPERTY_TACTILE_TOUCH:
+<span class="nc" id="L1124">                    cmp.setTactileTouch(in.readBoolean());</span>
+<span class="nc" id="L1125">                    break;</span>
+
+                case PROPERTY_SNAP_TO_GRID:
+<span class="nc" id="L1128">                    cmp.setSnapToGrid(in.readBoolean());</span>
+<span class="nc" id="L1129">                    break;</span>
+
+                case PROPERTY_FLATTEN:
+<span class="nc" id="L1132">                    cmp.setFlatten(in.readBoolean());</span>
+<span class="nc" id="L1133">                    break;</span>
+
+                case PROPERTY_TEXT:
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">                    if (cmp instanceof Label) {</span>
+<span class="nc" id="L1137">                        ((Label) cmp).setText(in.readUTF());</span>
+                    } else {
+<span class="nc" id="L1139">                        ((TextArea) cmp).setText(in.readUTF());</span>
+                    }
+<span class="nc" id="L1141">                    break;</span>
+
+                case PROPERTY_TEXT_MAX_LENGTH:
+<span class="nc" id="L1144">                    ((TextArea) cmp).setMaxSize(in.readInt());</span>
+<span class="nc" id="L1145">                    break;</span>
+
+                case PROPERTY_TEXT_CONSTRAINT:
+<span class="nc" id="L1148">                    ((TextArea) cmp).setConstraint(in.readInt());</span>
+<span class="nc bnc" id="L1149" title="All 2 branches missed.">                    if (cmp instanceof TextField) {</span>
+<span class="nc" id="L1150">                        int cons = ((TextArea) cmp).getConstraint();</span>
+<span class="nc bnc" id="L1151" title="All 2 branches missed.">                        if ((cons &amp; TextArea.NUMERIC) == TextArea.NUMERIC) {</span>
+<span class="nc" id="L1152">                            ((TextField) cmp).setInputModeOrder(new String[]{&quot;123&quot;});</span>
+                        }
+<span class="nc" id="L1154">                    }</span>
+                    break;
+
+                case PROPERTY_ALIGNMENT:
+<span class="nc bnc" id="L1158" title="All 2 branches missed.">                    if (cmp instanceof Label) {</span>
+<span class="nc" id="L1159">                        ((Label) cmp).setAlignment(in.readInt());</span>
+                    } else {
+<span class="nc" id="L1161">                        ((TextArea) cmp).setAlignment(in.readInt());</span>
+                    }
+<span class="nc" id="L1163">                    break;</span>
+
+                case PROPERTY_TEXT_AREA_GROW:
+<span class="nc" id="L1166">                    ((TextArea) cmp).setGrowByContent(in.readBoolean());</span>
+<span class="nc" id="L1167">                    break;</span>
+
+                case PROPERTY_LAYOUT:
+<span class="nc" id="L1170">                    Layout layout = null;</span>
+<span class="nc bnc" id="L1171" title="All 11 branches missed.">                    switch (in.readShort()) {</span>
+                        case LAYOUT_BORDER_LEGACY:
+<span class="nc" id="L1173">                            layout = new BorderLayout();</span>
+<span class="nc" id="L1174">                            break;</span>
+                        case LAYOUT_BORDER_ANOTHER_LEGACY: {
+<span class="nc" id="L1176">                            BorderLayout b = new BorderLayout();</span>
+<span class="nc bnc" id="L1177" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1178">                                b.defineLandscapeSwap(BorderLayout.NORTH, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1180" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1181">                                b.defineLandscapeSwap(BorderLayout.EAST, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1183" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1184">                                b.defineLandscapeSwap(BorderLayout.WEST, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1186" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1187">                                b.defineLandscapeSwap(BorderLayout.SOUTH, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1189" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1190">                                b.defineLandscapeSwap(BorderLayout.CENTER, in.readUTF());</span>
+                            }
+<span class="nc" id="L1192">                            layout = b;</span>
+<span class="nc" id="L1193">                            break;</span>
+                        }
+
+                        case LAYOUT_BORDER: {
+<span class="nc" id="L1197">                            BorderLayout b = new BorderLayout();</span>
+<span class="nc bnc" id="L1198" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1199">                                b.defineLandscapeSwap(BorderLayout.NORTH, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1201" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1202">                                b.defineLandscapeSwap(BorderLayout.EAST, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1205">                                b.defineLandscapeSwap(BorderLayout.WEST, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1207" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1208">                                b.defineLandscapeSwap(BorderLayout.SOUTH, in.readUTF());</span>
+                            }
+<span class="nc bnc" id="L1210" title="All 2 branches missed.">                            if (in.readBoolean()) {</span>
+<span class="nc" id="L1211">                                b.defineLandscapeSwap(BorderLayout.CENTER, in.readUTF());</span>
+                            }
+<span class="nc" id="L1213">                            b.setAbsoluteCenter(in.readBoolean());</span>
+<span class="nc" id="L1214">                            layout = b;</span>
+<span class="nc" id="L1215">                            break;</span>
+                        }
+                        case LAYOUT_BOX_X:
+<span class="nc" id="L1218">                            layout = new BoxLayout(BoxLayout.X_AXIS);</span>
+<span class="nc" id="L1219">                            break;</span>
+                        case LAYOUT_BOX_Y:
+<span class="nc" id="L1221">                            layout = new BoxLayout(BoxLayout.Y_AXIS);</span>
+<span class="nc" id="L1222">                            break;</span>
+                        case LAYOUT_FLOW_LEGACY:
+<span class="nc" id="L1224">                            layout = new FlowLayout();</span>
+<span class="nc" id="L1225">                            break;</span>
+                        case LAYOUT_FLOW:
+<span class="nc" id="L1227">                            FlowLayout f = new FlowLayout();</span>
+<span class="nc" id="L1228">                            f.setFillRows(in.readBoolean());</span>
+<span class="nc" id="L1229">                            f.setAlign(in.readInt());</span>
+<span class="nc" id="L1230">                            f.setValign(in.readInt());</span>
+<span class="nc" id="L1231">                            layout = f;</span>
+<span class="nc" id="L1232">                            break;</span>
+                        case LAYOUT_LAYERED:
+<span class="nc" id="L1234">                            layout = new LayeredLayout();</span>
+<span class="nc" id="L1235">                            break;</span>
+                        case LAYOUT_GRID:
+<span class="nc" id="L1237">                            layout = new GridLayout(in.readInt(), in.readInt());</span>
+<span class="nc" id="L1238">                            break;</span>
+                        case LAYOUT_TABLE:
+<span class="nc" id="L1240">                            layout = new TableLayout(in.readInt(), in.readInt());</span>
+<span class="nc" id="L1241">                            break;</span>
+
+                        default:
+                            break;
+                    }
+<span class="nc" id="L1246">                    ((Container) cmp).setLayout(layout);</span>
+<span class="nc" id="L1247">                    break;</span>
+
+                case PROPERTY_TAB_PLACEMENT:
+<span class="nc" id="L1250">                    ((Tabs) cmp).setTabPlacement(in.readInt());</span>
+<span class="nc" id="L1251">                    break;</span>
+
+                case PROPERTY_TAB_TEXT_POSITION:
+<span class="nc" id="L1254">                    ((Tabs) cmp).setTabTextPosition(in.readInt());</span>
+<span class="nc" id="L1255">                    break;</span>
+
+                case PROPERTY_PREFERRED_WIDTH:
+<span class="nc" id="L1258">                    cmp.setPreferredW(in.readInt());</span>
+<span class="nc" id="L1259">                    break;</span>
+
+                case PROPERTY_PREFERRED_HEIGHT:
+<span class="nc" id="L1262">                    cmp.setPreferredH(in.readInt());</span>
+<span class="nc" id="L1263">                    break;</span>
+
+                case PROPERTY_UIID:
+<span class="nc" id="L1266">                    cmp.setUIID(in.readUTF());</span>
+<span class="nc" id="L1267">                    break;</span>
+
+                case PROPERTY_DIALOG_UIID:
+<span class="nc" id="L1270">                    ((Dialog) cmp).setDialogUIID(in.readUTF());</span>
+<span class="nc" id="L1271">                    break;</span>
+
+                case PROPERTY_DISPOSE_WHEN_POINTER_OUT:
+<span class="nc" id="L1274">                    ((Dialog) cmp).setDisposeWhenPointerOutOfBounds(in.readBoolean());</span>
+<span class="nc" id="L1275">                    break;</span>
+
+                case PROPERTY_CLOUD_BOUND_PROPERTY:
+<span class="nc" id="L1278">                    cmp.setCloudBoundProperty(in.readUTF());</span>
+<span class="nc" id="L1279">                    break;</span>
+
+                case PROPERTY_CLOUD_DESTINATION_PROPERTY:
+<span class="nc" id="L1282">                    cmp.setCloudDestinationProperty(in.readUTF());</span>
+<span class="nc" id="L1283">                    break;</span>
+
+                case PROPERTY_DIALOG_POSITION:
+<span class="nc" id="L1286">                    String pos = in.readUTF();</span>
+<span class="nc bnc" id="L1287" title="All 2 branches missed.">                    if (pos.length() &gt; 0) {</span>
+<span class="nc" id="L1288">                        ((Dialog) cmp).setDialogPosition(pos);</span>
+                    }
+                    break;
+
+                case PROPERTY_FOCUSABLE:
+<span class="nc" id="L1293">                    cmp.setFocusable(in.readBoolean());</span>
+<span class="nc" id="L1294">                    break;</span>
+
+                case PROPERTY_ENABLED:
+<span class="nc" id="L1297">                    cmp.setEnabled(in.readBoolean());</span>
+<span class="nc" id="L1298">                    break;</span>
+
+                case PROPERTY_SCROLL_VISIBLE:
+<span class="nc" id="L1301">                    cmp.setScrollVisible(in.readBoolean());</span>
+<span class="nc" id="L1302">                    break;</span>
+
+                case PROPERTY_ICON:
+<span class="nc" id="L1305">                    ((Label) cmp).setIcon(res.getImage(in.readUTF()));</span>
+<span class="nc" id="L1306">                    break;</span>
+
+                case PROPERTY_ROLLOVER_ICON:
+<span class="nc" id="L1309">                    ((Button) cmp).setRolloverIcon(res.getImage(in.readUTF()));</span>
+<span class="nc" id="L1310">                    break;</span>
+
+                case PROPERTY_PRESSED_ICON:
+<span class="nc" id="L1313">                    ((Button) cmp).setPressedIcon(res.getImage(in.readUTF()));</span>
+<span class="nc" id="L1314">                    break;</span>
+
+                case PROPERTY_DISABLED_ICON:
+<span class="nc" id="L1317">                    ((Button) cmp).setDisabledIcon(res.getImage(in.readUTF()));</span>
+<span class="nc" id="L1318">                    break;</span>
+
+                case PROPERTY_GAP:
+<span class="nc" id="L1321">                    ((Label) cmp).setGap(in.readInt());</span>
+<span class="nc" id="L1322">                    break;</span>
+
+                case PROPERTY_VERTICAL_ALIGNMENT:
+<span class="nc bnc" id="L1325" title="All 2 branches missed.">                    if (cmp instanceof TextArea) {</span>
+<span class="nc" id="L1326">                        ((TextArea) cmp).setVerticalAlignment(in.readInt());</span>
+                    } else {
+<span class="nc" id="L1328">                        ((Label) cmp).setVerticalAlignment(in.readInt());</span>
+                    }
+<span class="nc" id="L1330">                    break;</span>
+
+                case PROPERTY_TEXT_POSITION:
+<span class="nc" id="L1333">                    ((Label) cmp).setTextPosition(in.readInt());</span>
+<span class="nc" id="L1334">                    break;</span>
+
+                case PROPERTY_CLIENT_PROPERTIES:
+<span class="nc" id="L1337">                    int count = in.readInt();</span>
+<span class="nc" id="L1338">                    StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L1339" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L1340">                        String k = in.readUTF();</span>
+<span class="nc" id="L1341">                        String v = in.readUTF();</span>
+<span class="nc" id="L1342">                        cmp.putClientProperty(k, v);</span>
+<span class="nc" id="L1343">                        sb.append(k);</span>
+<span class="nc bnc" id="L1344" title="All 2 branches missed.">                        if (iter &lt; count - 1) {</span>
+<span class="nc" id="L1345">                            sb.append(&quot;,&quot;);</span>
+                        }
+                    }
+<span class="nc" id="L1348">                    cmp.putClientProperty(&quot;cn1$Properties&quot;, sb.toString());</span>
+<span class="nc" id="L1349">                    break;</span>
+
+                case PROPERTY_NAME:
+<span class="nc" id="L1352">                    String componentName = in.readUTF();</span>
+<span class="nc" id="L1353">                    cmp.setName(componentName);</span>
+<span class="nc" id="L1354">                    root.putClientProperty(&quot;%&quot; + componentName + &quot;%&quot;, cmp);</span>
+<span class="nc" id="L1355">                    break;</span>
+
+                case PROPERTY_LAYOUT_CONSTRAINT:
+<span class="nc bnc" id="L1358" title="All 2 branches missed.">                    if (parent.getLayout() instanceof BorderLayout) {</span>
+<span class="nc" id="L1359">                        cmp.putClientProperty(&quot;layoutConstraint&quot;, in.readUTF());</span>
+                    } else {
+<span class="nc" id="L1361">                        TableLayout tl = (TableLayout) parent.getLayout();</span>
+<span class="nc" id="L1362">                        TableLayout.Constraint con = tl.createConstraint(in.readInt(), in.readInt());</span>
+<span class="nc" id="L1363">                        con.setHeightPercentage(in.readInt());</span>
+<span class="nc" id="L1364">                        con.setWidthPercentage(in.readInt());</span>
+<span class="nc" id="L1365">                        con.setHorizontalAlign(in.readInt());</span>
+<span class="nc" id="L1366">                        con.setHorizontalSpan(in.readInt());</span>
+<span class="nc" id="L1367">                        con.setVerticalAlign(in.readInt());</span>
+<span class="nc" id="L1368">                        con.setVerticalSpan(in.readInt());</span>
+<span class="nc" id="L1369">                        cmp.putClientProperty(&quot;layoutConstraint&quot;, con);</span>
+                    }
+<span class="nc" id="L1371">                    break;</span>
+
+                case PROPERTY_TITLE:
+<span class="nc" id="L1374">                    ((Form) cmp).setTitle(in.readUTF());</span>
+<span class="nc" id="L1375">                    break;</span>
+
+                case PROPERTY_COMPONENTS:
+<span class="nc" id="L1378">                    int componentCount = in.readInt();</span>
+<span class="nc bnc" id="L1379" title="All 2 branches missed.">                    if (cmp instanceof Tabs) {</span>
+<span class="nc bnc" id="L1380" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; componentCount; iter++) {</span>
+<span class="nc" id="L1381">                            String tab = in.readUTF();</span>
+<span class="nc" id="L1382">                            Component child = createComponent(in, (Container) cmp, root, res, componentListeners, embedded);</span>
+<span class="nc" id="L1383">                            ((Tabs) cmp).addTab(tab, child);</span>
+                        }
+                    } else {
+<span class="nc bnc" id="L1386" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; componentCount; iter++) {</span>
+<span class="nc" id="L1387">                            Component child = createComponent(in, (Container) cmp, root, res, componentListeners, embedded);</span>
+<span class="nc" id="L1388">                            Object con = child.getClientProperty(&quot;layoutConstraint&quot;);</span>
+<span class="nc bnc" id="L1389" title="All 2 branches missed.">                            if (con != null) {</span>
+<span class="nc" id="L1390">                                ((Container) cmp).addComponent(con, child);</span>
+                            } else {
+<span class="nc" id="L1392">                                ((Container) cmp).addComponent(child);</span>
+                            }
+                        }
+                    }
+<span class="nc" id="L1396">                    break;</span>
+
+                case PROPERTY_COLUMNS:
+<span class="nc" id="L1399">                    ((TextArea) cmp).setColumns(in.readInt());</span>
+<span class="nc" id="L1400">                    break;</span>
+
+                case PROPERTY_ROWS:
+<span class="nc" id="L1403">                    ((TextArea) cmp).setRows(in.readInt());</span>
+<span class="nc" id="L1404">                    break;</span>
+
+                case PROPERTY_HINT:
+<span class="nc bnc" id="L1407" title="All 2 branches missed.">                    if (cmp instanceof List) {</span>
+<span class="nc" id="L1408">                        ((List) cmp).setHint(in.readUTF());</span>
+                    } else {
+<span class="nc" id="L1410">                        ((TextArea) cmp).setHint(in.readUTF());</span>
+                    }
+<span class="nc" id="L1412">                    break;</span>
+
+                case PROPERTY_HINT_ICON:
+<span class="nc bnc" id="L1415" title="All 2 branches missed.">                    if (cmp instanceof List) {</span>
+<span class="nc" id="L1416">                        ((List) cmp).setHintIcon(res.getImage(in.readUTF()));</span>
+                    } else {
+<span class="nc" id="L1418">                        ((TextArea) cmp).setHintIcon(res.getImage(in.readUTF()));</span>
+                    }
+<span class="nc" id="L1420">                    break;</span>
+
+                case PROPERTY_ITEM_GAP:
+<span class="nc" id="L1423">                    ((List) cmp).setItemGap(in.readInt());</span>
+<span class="nc" id="L1424">                    break;</span>
+
+                case PROPERTY_LIST_FIXED:
+<span class="nc" id="L1427">                    ((List) cmp).setFixedSelection(in.readInt());</span>
+<span class="nc" id="L1428">                    break;</span>
+
+                case PROPERTY_LIST_ORIENTATION:
+<span class="nc" id="L1431">                    ((List) cmp).setOrientation(in.readInt());</span>
+<span class="nc" id="L1432">                    break;</span>
+
+                case PROPERTY_LIST_ITEMS_LEGACY:
+<span class="nc" id="L1435">                    String[] items = new String[in.readInt()];</span>
+<span class="nc bnc" id="L1436" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; items.length; iter++) {</span>
+<span class="nc" id="L1437">                        items[iter] = in.readUTF();</span>
+                    }
+<span class="nc bnc" id="L1439" title="All 2 branches missed.">                    if (!setListModel(((List) cmp))) {</span>
+<span class="nc" id="L1440">                        ((List) cmp).setModel(new DefaultListModel((Object[]) items));</span>
+                    }
+                    break;
+
+                case PROPERTY_LIST_ITEMS:
+<span class="nc" id="L1445">                    Object[] elements = readObjectArrayForListModel(in, res);</span>
+<span class="nc bnc" id="L1446" title="All 2 branches missed.">                    if (!setListModel(((List) cmp))) {</span>
+<span class="nc" id="L1447">                        ((List) cmp).setModel(new DefaultListModel(elements));</span>
+                    }
+                    break;
+
+                case PROPERTY_LIST_RENDERER:
+<span class="nc bnc" id="L1452" title="All 2 branches missed.">                    if (cmp instanceof ContainerList) {</span>
+<span class="nc" id="L1453">                        ((ContainerList) cmp).setRenderer(readRendererer(res, in));</span>
+                    } else {
+<span class="nc" id="L1455">                        ((List) cmp).setRenderer(readRendererer(res, in));</span>
+                    }
+<span class="nc" id="L1457">                    break;</span>
+
+                case PROPERTY_NEXT_FORM:
+<span class="nc" id="L1460">                    String nextForm = in.readUTF();</span>
+<span class="nc" id="L1461">                    setNextForm(cmp, nextForm, res, root);</span>
+<span class="nc" id="L1462">                    break;</span>
+
+                case PROPERTY_COMMANDS:
+<span class="nc" id="L1465">                    readCommands(in, cmp, res, false);</span>
+<span class="nc" id="L1466">                    break;</span>
+
+                case PROPERTY_COMMANDS_LEGACY:
+<span class="nc" id="L1469">                    readCommands(in, cmp, res, true);</span>
+<span class="nc" id="L1470">                    break;</span>
+
+                case PROPERTY_CYCLIC_FOCUS:
+<span class="nc" id="L1473">                    ((Form) cmp).setCyclicFocus(in.readBoolean());</span>
+<span class="nc" id="L1474">                    break;</span>
+
+                case PROPERTY_RTL:
+<span class="nc" id="L1477">                    cmp.setRTL(in.readBoolean());</span>
+<span class="nc" id="L1478">                    break;</span>
+
+                case PROPERTY_SLIDER_THUMB:
+<span class="nc" id="L1481">                    ((Slider) cmp).setThumbImage(res.getImage(in.readUTF()));</span>
+<span class="nc" id="L1482">                    break;</span>
+
+                case PROPERTY_INFINITE:
+<span class="nc" id="L1485">                    ((Slider) cmp).setInfinite(in.readBoolean());</span>
+<span class="nc" id="L1486">                    break;</span>
+
+                case PROPERTY_PROGRESS:
+<span class="nc" id="L1489">                    ((Slider) cmp).setProgress(in.readInt());</span>
+<span class="nc" id="L1490">                    break;</span>
+
+                case PROPERTY_VERTICAL:
+<span class="nc" id="L1493">                    ((Slider) cmp).setVertical(in.readBoolean());</span>
+<span class="nc" id="L1494">                    break;</span>
+
+                case PROPERTY_EDITABLE:
+<span class="nc bnc" id="L1497" title="All 2 branches missed.">                    if (cmp instanceof TextArea) {</span>
+<span class="nc" id="L1498">                        ((TextArea) cmp).setEditable(in.readBoolean());</span>
+                    } else {
+<span class="nc" id="L1500">                        ((Slider) cmp).setEditable(in.readBoolean());</span>
+                    }
+<span class="nc" id="L1502">                    break;</span>
+
+                case PROPERTY_INCREMENTS:
+<span class="nc" id="L1505">                    ((Slider) cmp).setIncrements(in.readInt());</span>
+<span class="nc" id="L1506">                    break;</span>
+
+                case PROPERTY_RENDER_PERCENTAGE_ON_TOP:
+<span class="nc" id="L1509">                    ((Slider) cmp).setRenderPercentageOnTop(in.readBoolean());</span>
+<span class="nc" id="L1510">                    break;</span>
+
+                case PROPERTY_MAX_VALUE:
+<span class="nc" id="L1513">                    ((Slider) cmp).setMaxValue(in.readInt());</span>
+<span class="nc" id="L1514">                    break;</span>
+
+                case PROPERTY_MIN_VALUE:
+<span class="nc" id="L1517">                    ((Slider) cmp).setMinValue(in.readInt());</span>
+<span class="nc" id="L1518">                    break;</span>
+
+                default:
+                    break;
+            }
+
+<span class="nc" id="L1524">            property = in.readInt();</span>
+        }
+<span class="nc" id="L1526">        postCreateComponent(cmp);</span>
+<span class="nc" id="L1527">        return cmp;</span>
+    }
+
+    void setNextForm(Component cmp, String nextForm, Resources res, Container root) {
+<span class="fc" id="L1531">        cmp.putClientProperty(&quot;%next_form%&quot;, nextForm);</span>
+<span class="pc bpc" id="L1532" title="3 of 4 branches missed.">        if (resourceFilePath == null || isKeepResourcesInRam()) {</span>
+<span class="fc" id="L1533">            resourceFile = res;</span>
+        }
+<span class="fc" id="L1535">        ((Form) root).addShowListener(new FormListener((Form) root, nextForm));</span>
+<span class="fc" id="L1536">    }</span>
+
+    Component createComponentType(String name) throws IllegalAccessException, InstantiationException, RuntimeException {
+<span class="fc" id="L1539">        Class c = (Class) getComponentRegistry().get(name);</span>
+<span class="fc" id="L1540">        Component cmp = createComponentInstance(name, c);</span>
+<span class="pc bpc" id="L1541" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="pc bpc" id="L1542" title="1 of 2 branches missed.">            if (c == null) {</span>
+<span class="nc" id="L1543">                throw new RuntimeException(&quot;Component not found use UIBuilder.registerCustomComponent(&quot; + name + &quot;, class);&quot;);</span>
+            }
+<span class="fc" id="L1545">            cmp = (Component) c.newInstance();</span>
+        }
+<span class="fc" id="L1547">        return cmp;</span>
+    }
+
+    // for internal use in the resource editor
+    void modifyingProperty(Component c, int p) {
+<span class="nc" id="L1552">    }</span>
+
+    // for internal use in the resource editor
+    void modifyingCustomProperty(Component c, String name) {
+<span class="nc" id="L1556">    }</span>
+
+    /// Creates a command instance. This method is invoked by the loading code and
+    /// can be overriden to create a subclass of the Command class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commandName`: the label on the command
+    ///
+    /// - `icon`: the icon for the command
+    ///
+    /// - `commandId`: the id of the command
+    ///
+    /// - `action`: the action assigned to the command if such an action is defined
+    ///
+    /// #### Returns
+    ///
+    /// a new command instance
+    protected Command createCommand(String commandName, Image icon, int commandId, String action) {
+<span class="fc" id="L1575">        return new Command(commandName, icon, commandId);</span>
+    }
+
+    Command createCommandImpl(String commandName, Image icon, int commandId, String action, boolean isBack, String argument) {
+<span class="nc" id="L1579">        return createCommand(commandName, icon, commandId, action);</span>
+    }
+
+    /// This method may be overriden by subclasses to provide a way to dynamically load
+    /// a resource file. Normally the navigation feature of the UIBuilder requires the resource
+    /// file present in RAM. However, that might be expensive to maintain.
+    /// By implementing this method and replacing the storeResourceFile() with an empty
+    /// implementation the resource file storage can be done strictly in RAM.
+    ///
+    /// #### Returns
+    ///
+    /// the instance of the resource file
+    protected Resources fetchResourceFile() {
+        try {
+<span class="fc bfc" id="L1593" title="All 2 branches covered.">            if (resourceFile != null) {</span>
+<span class="fc" id="L1594">                return resourceFile;</span>
+            }
+<span class="fc" id="L1596">            String p = getResourceFilePath();</span>
+<span class="nc bnc" id="L1597" title="All 2 branches missed.">            if (p.indexOf('.') &gt; -1) {</span>
+<span class="nc" id="L1598">                return Resources.open(p);</span>
+            }
+<span class="nc" id="L1600">            Resources res = Resources.openLayered(p);</span>
+<span class="nc bnc" id="L1601" title="All 2 branches missed.">            if (isKeepResourcesInRam()) {</span>
+<span class="nc" id="L1602">                resourceFile = res;</span>
+            }
+<span class="nc" id="L1604">            return res;</span>
+<span class="nc" id="L1605">        } catch (IOException ex) {</span>
+<span class="nc" id="L1606">            ex.printStackTrace();</span>
+<span class="nc" id="L1607">            return null;</span>
+        }
+    }
+
+    /// Allows the navigation code to avoid storing the resource file and lets the GC
+    /// remove it from memory when its not in use
+    ///
+    /// #### Returns
+    ///
+    /// the resourceFilePath
+    public String getResourceFilePath() {
+<span class="fc" id="L1618">        return resourceFilePath;</span>
+    }
+
+    /// Allows the navigation code to avoid storing the resource file and lets the GC
+    /// remove it from memory when its not in use
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceFilePath`: the resourceFilePath to set
+    public void setResourceFilePath(String resourceFilePath) {
+<span class="fc" id="L1628">        this.resourceFilePath = resourceFilePath;</span>
+<span class="pc bpc" id="L1629" title="1 of 2 branches missed.">        if (resourceFilePath != null) {</span>
+<span class="fc" id="L1630">            resourceFile = null;</span>
+        }
+<span class="fc" id="L1632">    }</span>
+
+    /// Sets the resource file if keep in rum or no path is defined
+    ///
+    /// #### Parameters
+    ///
+    /// - `res`: the resource file
+    protected void setResourceFile(Resources res) {
+<span class="pc bpc" id="L1640" title="3 of 4 branches missed.">        if (keepResourcesInRam || resourceFilePath == null) {</span>
+<span class="fc" id="L1641">            this.resourceFile = res;</span>
+        }
+<span class="fc" id="L1643">    }</span>
+
+    /// Invoked to process a given command before naviation or any other internal
+    /// processing occurs. The event can be consumed to prevent further processing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the action event source of the command
+    ///
+    /// - `cmd`: the command to process
+    protected void processCommand(ActionEvent ev, Command cmd) {
+<span class="fc" id="L1654">    }</span>
+
+    private void processCommandImpl(ActionEvent ev, Command cmd) {
+<span class="fc" id="L1657">        processCommand(ev, cmd);</span>
+<span class="pc bpc" id="L1658" title="1 of 2 branches missed.">        if (ev.isConsumed()) {</span>
+<span class="nc" id="L1659">            return;</span>
+        }
+<span class="pc bpc" id="L1661" title="1 of 2 branches missed.">        if (globalCommandListeners != null) {</span>
+<span class="fc" id="L1662">            globalCommandListeners.fireActionEvent(ev);</span>
+<span class="pc bpc" id="L1663" title="1 of 2 branches missed.">            if (ev.isConsumed()) {</span>
+<span class="nc" id="L1664">                return;</span>
+            }
+        }
+
+<span class="pc bpc" id="L1668" title="1 of 2 branches missed.">        if (localCommandListeners != null) {</span>
+<span class="fc" id="L1669">            Form f = Display.getInstance().getCurrent();</span>
+<span class="fc" id="L1670">            EventDispatcher e = (EventDispatcher) localCommandListeners.get(f.getName());</span>
+<span class="pc bpc" id="L1671" title="1 of 2 branches missed.">            if (e != null) {</span>
+<span class="fc" id="L1672">                e.fireActionEvent(ev);</span>
+            }
+        }
+<span class="fc" id="L1675">    }</span>
+
+    /// Adds a command listener that would be bound to all forms in the GUI seamlessly
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to bind
+    public void addCommandListener(ActionListener l) {
+<span class="pc bpc" id="L1683" title="1 of 2 branches missed.">        if (globalCommandListeners == null) {</span>
+<span class="fc" id="L1684">            globalCommandListeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L1686">        globalCommandListeners.addListener(l);</span>
+<span class="fc" id="L1687">    }</span>
+
+    /// Removes a command listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public void removeCommandListener(ActionListener l) {
+<span class="pc bpc" id="L1695" title="1 of 2 branches missed.">        if (globalCommandListeners == null) {</span>
+<span class="nc" id="L1696">            return;</span>
+        }
+<span class="fc" id="L1698">        globalCommandListeners.removeListener(l);</span>
+<span class="fc" id="L1699">    }</span>
+
+    /// Adds a component listener that would be bound when a UI for this form is created.
+    /// Notice that this method is only effective before the form was created and would do
+    /// nothing for an existing form
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form to which the listener should be bound
+    ///
+    /// - `componentName`: the name of the component to bind to
+    ///
+    /// - `listener`: the listener to bind, common listener types are supported
+    public void addComponentListener(String formName, String componentName, Object listener) {
+<span class="nc bnc" id="L1713" title="All 2 branches missed.">        if (localComponentListeners == null) {</span>
+<span class="nc" id="L1714">            localComponentListeners = new Hashtable();</span>
+<span class="nc" id="L1715">            Hashtable formListeners = new Hashtable();</span>
+<span class="nc" id="L1716">            formListeners.put(componentName, listener);</span>
+<span class="nc" id="L1717">            localComponentListeners.put(formName, formListeners);</span>
+<span class="nc" id="L1718">            return;</span>
+        }
+<span class="nc" id="L1720">        Hashtable formListeners = (Hashtable) localComponentListeners.get(formName);</span>
+<span class="nc bnc" id="L1721" title="All 2 branches missed.">        if (formListeners == null) {</span>
+<span class="nc" id="L1722">            formListeners = new Hashtable();</span>
+<span class="nc" id="L1723">            formListeners.put(componentName, listener);</span>
+<span class="nc" id="L1724">            localComponentListeners.put(formName, formListeners);</span>
+<span class="nc" id="L1725">            return;</span>
+        }
+<span class="nc" id="L1727">        Object currentListeners = formListeners.get(componentName);</span>
+<span class="nc bnc" id="L1728" title="All 2 branches missed.">        if (currentListeners == null) {</span>
+<span class="nc" id="L1729">            formListeners.put(componentName, listener);</span>
+        } else {
+<span class="nc bnc" id="L1731" title="All 2 branches missed.">            if (currentListeners instanceof Vector) {</span>
+<span class="nc" id="L1732">                ((Vector) currentListeners).addElement(listener);</span>
+            } else {
+<span class="nc" id="L1734">                Vector v = new Vector();</span>
+<span class="nc" id="L1735">                v.addElement(currentListeners);</span>
+<span class="nc" id="L1736">                v.addElement(listener);</span>
+<span class="nc" id="L1737">                formListeners.put(componentName, v);</span>
+            }
+        }
+<span class="nc" id="L1740">    }</span>
+
+    /// Removes a component listener bound to a specific component
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form
+    ///
+    /// - `componentName`: the name of the component
+    ///
+    /// - `listener`: the listener instance
+    public void removeComponentListener(String formName, String componentName, Object listener) {
+<span class="nc bnc" id="L1752" title="All 2 branches missed.">        if (localComponentListeners == null) {</span>
+<span class="nc" id="L1753">            return;</span>
+        }
+<span class="nc" id="L1755">        Hashtable formListeners = (Hashtable) localComponentListeners.get(formName);</span>
+<span class="nc bnc" id="L1756" title="All 2 branches missed.">        if (formListeners == null) {</span>
+<span class="nc" id="L1757">            return;</span>
+        }
+<span class="nc" id="L1759">        Object currentListeners = formListeners.get(componentName);</span>
+<span class="nc bnc" id="L1760" title="All 2 branches missed.">        if (currentListeners == null) {</span>
+<span class="nc" id="L1761">            return;</span>
+        }
+<span class="nc bnc" id="L1763" title="All 2 branches missed.">        if (currentListeners instanceof Vector) {</span>
+<span class="nc" id="L1764">            ((Vector) currentListeners).removeElement(listener);</span>
+<span class="nc bnc" id="L1765" title="All 2 branches missed.">            if (((Vector) currentListeners).isEmpty()) {</span>
+<span class="nc" id="L1766">                formListeners.remove(componentName);</span>
+            }
+        } else {
+<span class="nc" id="L1769">            formListeners.remove(componentName);</span>
+        }
+<span class="nc" id="L1771">    }</span>
+
+    /// Adds a command listener to be invoked for commands on a specific form
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form to which the listener should be bound
+    ///
+    /// - `l`: the listener to bind
+    public void addCommandListener(String formName, ActionListener l) {
+<span class="pc bpc" id="L1781" title="1 of 2 branches missed.">        if (localCommandListeners == null) {</span>
+<span class="fc" id="L1782">            localCommandListeners = new Hashtable();</span>
+        }
+<span class="fc" id="L1784">        EventDispatcher d = (EventDispatcher) localCommandListeners.get(formName);</span>
+<span class="pc bpc" id="L1785" title="1 of 2 branches missed.">        if (d == null) {</span>
+<span class="fc" id="L1786">            d = new EventDispatcher();</span>
+<span class="fc" id="L1787">            localCommandListeners.put(formName, d);</span>
+        }
+<span class="fc" id="L1789">        d.addListener(l);</span>
+<span class="fc" id="L1790">    }</span>
+
+    /// Removes a command listener on a specific form
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form
+    ///
+    /// - `l`: the listener to remove
+    public void removeCommandListener(String formName, ActionListener l) {
+<span class="pc bpc" id="L1800" title="1 of 2 branches missed.">        if (localCommandListeners == null) {</span>
+<span class="nc" id="L1801">            return;</span>
+        }
+<span class="fc" id="L1803">        EventDispatcher d = (EventDispatcher) localCommandListeners.get(formName);</span>
+<span class="pc bpc" id="L1804" title="1 of 2 branches missed.">        if (d == null) {</span>
+<span class="nc" id="L1805">            return;</span>
+        }
+<span class="fc" id="L1807">        d.removeListener(l);</span>
+<span class="fc" id="L1808">    }</span>
+
+    /// This method is invoked for every component to which an action event listener can be bound
+    /// and delivers the event data for the given component seamlessly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component broadcasting the event
+    ///
+    /// - `event`: the event meta data
+    protected void handleComponentAction(Component c, ActionEvent event) {
+<span class="nc" id="L1819">    }</span>
+
+    private FormListener getFormListenerInstance(Component cmp, EmbeddedContainer embedded) {
+<span class="nc bnc" id="L1822" title="All 2 branches missed.">        if (embedded != null) {</span>
+<span class="nc" id="L1823">            FormListener fc = (FormListener) embedded.getClientProperty(&quot;!FormListener!&quot;);</span>
+<span class="nc bnc" id="L1824" title="All 2 branches missed.">            if (fc != null) {</span>
+<span class="nc" id="L1825">                return fc;</span>
+            }
+<span class="nc" id="L1827">            fc = new FormListener();</span>
+<span class="nc" id="L1828">            embedded.putClientProperty(&quot;!FormListener!&quot;, fc);</span>
+<span class="nc" id="L1829">            return fc;</span>
+        }
+<span class="nc" id="L1831">        Form f = cmp.getComponentForm();</span>
+<span class="nc bnc" id="L1832" title="All 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L1833">            return null;</span>
+        }
+<span class="nc" id="L1835">        FormListener fc = (FormListener) f.getClientProperty(&quot;!FormListener!&quot;);</span>
+<span class="nc bnc" id="L1836" title="All 2 branches missed.">        if (fc != null) {</span>
+<span class="nc" id="L1837">            return fc;</span>
+        }
+<span class="nc" id="L1839">        fc = new FormListener();</span>
+<span class="nc" id="L1840">        f.putClientProperty(&quot;!FormListener!&quot;, fc);</span>
+<span class="nc" id="L1841">        f.addCommandListener(fc);</span>
+<span class="nc" id="L1842">        return fc;</span>
+    }
+
+    /// Warning: This method is invoked OFF the EDT and is intended for usage with asynchronous
+    /// command processing. This method is invoked when the UI indicates that an operation
+    /// should occur in the background. To finish the processing of the operation within the
+    /// EDT one should override the postAsyncCommand() method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command requiring background processing
+    ///
+    /// - `sourceEvent`: the triggering event
+    protected void asyncCommandProcess(Command cmd, ActionEvent sourceEvent) {
+<span class="nc" id="L1856">    }</span>
+
+    /// This method is invoked in conjunction with asyncCommandProcess after the
+    /// command was handled asynchronously on the separate thread. Here Codename One
+    /// code can be execute to update the UI with the results from the separate thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command
+    ///
+    /// - `sourceEvent`: the source event
+    protected void postAsyncCommand(Command cmd, ActionEvent sourceEvent) {
+<span class="nc" id="L1868">    }</span>
+
+    /// **Warning:** this method is invoked on a separate thread.
+    /// This method is invoked when a next form property is defined, this property
+    /// indicates a background process for a form of a transitional nature should
+    /// take place (e.g. splash screen, IO etc.) after which the next form should be shown.
+    /// After this method completes the next form is shown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: @param f the form for which the background thread was constructed, notice
+    /// that most methods are not threadsafe and one should use callSerially* in this
+    /// method when mutating the form.
+    ///
+    /// #### Returns
+    ///
+    /// @return if false is returned from this method navigation should not proceed
+    /// to that given form
+    protected boolean processBackground(Form f) {
+        try {
+<span class="nc" id="L1888">            Thread.sleep(3000);</span>
+<span class="nc" id="L1889">        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1890">            ex.printStackTrace();</span>
+<span class="nc" id="L1891">        }</span>
+<span class="nc" id="L1892">        return true;</span>
+    }
+
+    /// Returns the state of the current form which we are about to leave as part
+    /// of the navigation logic. When a back command will return to this form the
+    /// state would be restored using setFormState.
+    /// The default implementation of this method restores focus and list selection.
+    /// You can add arbitrary keys to the form state, keys starting with a $ sign
+    /// are reserved for the UIBuilder base class use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form whose state should be preserved
+    ///
+    /// #### Returns
+    ///
+    /// arbitrary state object
+    protected Hashtable getFormState(Form f) {
+<span class="nc" id="L1910">        Component c = f.getFocused();</span>
+<span class="nc" id="L1911">        Hashtable h = new Hashtable();</span>
+        // can happen if we navigate away from a form that was shown without the GUI builder
+<span class="nc bnc" id="L1913" title="All 2 branches missed.">        if (f.getName() != null) {</span>
+<span class="nc" id="L1914">            h.put(FORM_STATE_KEY_NAME, f.getName());</span>
+        }
+<span class="nc bnc" id="L1916" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc bnc" id="L1917" title="All 2 branches missed.">            if (c instanceof List) {</span>
+<span class="nc" id="L1918">                h.put(FORM_STATE_KEY_SELECTION, Integer.valueOf(((List) c).getSelectedIndex()));</span>
+            }
+<span class="nc bnc" id="L1920" title="All 2 branches missed.">            if (c.getName() != null) {</span>
+<span class="nc" id="L1921">                h.put(FORM_STATE_KEY_FOCUS, c.getName());</span>
+            }
+<span class="nc bnc" id="L1923" title="All 2 branches missed.">            if (f.getTitle() != null) {</span>
+<span class="nc" id="L1924">                h.put(FORM_STATE_KEY_TITLE, f.getTitle());</span>
+            }
+        }
+<span class="nc" id="L1927">        storeComponentState(f, h);</span>
+<span class="nc" id="L1928">        return h;</span>
+    }
+
+    /// By default Codename One stores the states of components in the navigation graph
+    /// as it moves between forms. However, some components aren't recognized by Codename One
+    /// by default to enable smaller executable size. This method can be overriden to enable
+    /// storing the state of custom components
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose state should be restored
+    ///
+    /// - `destination`: the hashtable containing the state
+    protected void restoreComponentState(Component c, Hashtable destination) {
+<span class="nc bnc" id="L1942" title="All 2 branches missed.">        if (shouldAutoStoreState()) {</span>
+<span class="nc" id="L1943">            Enumeration e = destination.keys();</span>
+<span class="nc bnc" id="L1944" title="All 2 branches missed.">            while (e.hasMoreElements()) {</span>
+<span class="nc" id="L1945">                String currentKey = (String) e.nextElement();</span>
+<span class="nc" id="L1946">                Component cmp = findByName(currentKey, c);</span>
+<span class="nc bnc" id="L1947" title="All 2 branches missed.">                if (cmp != null) {</span>
+<span class="nc" id="L1948">                    Object value = destination.get(currentKey);</span>
+<span class="nc bnc" id="L1949" title="All 2 branches missed.">                    if (value instanceof Integer) {</span>
+<span class="nc bnc" id="L1950" title="All 2 branches missed.">                        if (cmp instanceof List) {</span>
+<span class="nc" id="L1951">                            ((List) cmp).setSelectedIndex(((Integer) value).intValue());</span>
+<span class="nc" id="L1952">                            continue;</span>
+                        }
+<span class="nc bnc" id="L1954" title="All 2 branches missed.">                        if (cmp instanceof Tabs) {</span>
+<span class="nc" id="L1955">                            int val = ((Integer) value).intValue();</span>
+<span class="nc" id="L1956">                            Tabs t = (Tabs) cmp;</span>
+<span class="nc bnc" id="L1957" title="All 2 branches missed.">                            if (t.getTabCount() &gt; val) {</span>
+<span class="nc" id="L1958">                                t.setSelectedIndex(val);</span>
+                            }
+                            continue;
+                        }
+                    }
+<span class="nc" id="L1963">                    cmp.setComponentState(value);</span>
+                }
+<span class="nc" id="L1965">            }</span>
+        }
+<span class="nc" id="L1967">    }</span>
+
+    /// By default Codename One stores the states of components in the navigation graph
+    /// as it moves between forms. However, some components aren't recognized by Codename One
+    /// by default to enable smaller executable size. This method can be overriden to enable
+    /// storing the state of custom components
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose state should be stored
+    ///
+    /// - `destination`: the destination hashtable
+    protected void storeComponentState(Component c, Hashtable destination) {
+<span class="nc bnc" id="L1980" title="All 2 branches missed.">        if (shouldAutoStoreState()) {</span>
+<span class="nc" id="L1981">            storeComponentStateImpl(c, destination);</span>
+        }
+<span class="nc" id="L1983">    }</span>
+
+    private void storeComponentStateImpl(Component c, Hashtable destination) {
+<span class="nc bnc" id="L1986" title="All 6 branches missed.">        if (c.getName() == null || destination.containsKey(c.getName()) || c.getClientProperty(&quot;CN1IgnoreStore&quot;) != null) {</span>
+<span class="nc" id="L1987">            return;</span>
+        }
+<span class="nc bnc" id="L1989" title="All 2 branches missed.">        if (c instanceof Tabs) {</span>
+<span class="nc" id="L1990">            destination.put(c.getName(), Integer.valueOf(((Tabs) c).getSelectedIndex()));</span>
+        }
+<span class="nc bnc" id="L1992" title="All 2 branches missed.">        if (c instanceof Container) {</span>
+<span class="nc" id="L1993">            Container cnt = (Container) c;</span>
+<span class="nc" id="L1994">            int count = cnt.getComponentCount();</span>
+<span class="nc bnc" id="L1995" title="All 2 branches missed.">            for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L1996">                storeComponentStateImpl(cnt.getComponentAt(iter), destination);</span>
+            }
+<span class="nc" id="L1998">            return;</span>
+        }
+<span class="nc bnc" id="L2000" title="All 2 branches missed.">        if (c instanceof List) {</span>
+<span class="nc" id="L2001">            destination.put(c.getName(), Integer.valueOf(((List) c).getSelectedIndex()));</span>
+<span class="nc" id="L2002">            return;</span>
+        }
+<span class="nc" id="L2004">        Object o = c.getComponentState();</span>
+<span class="nc bnc" id="L2005" title="All 2 branches missed.">        if (o != null) {</span>
+<span class="nc" id="L2006">            destination.put(c.getName(), o);</span>
+        }
+<span class="nc" id="L2008">    }</span>
+
+    /// Indicates whether the UIBuilder should try storing states for forms on its own
+    /// by seeking lists, tabs and other statefull elements and keeping their selection
+    ///
+    /// #### Returns
+    ///
+    /// true to handle state automatically, false otherwise
+    protected boolean shouldAutoStoreState() {
+<span class="nc" id="L2017">        return true;</span>
+    }
+
+    /// Sets the state of the current form to which we are returing as part
+    /// of the navigation logic. When a back command is pressed this form
+    /// state should be restored, it was obtained via getFormState.
+    /// The default implementation of this method restores focus and list selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form whose state should be preserved
+    ///
+    /// - `state`: arbitrary state object
+    protected void setFormState(Form f, Hashtable state) {
+<span class="nc" id="L2031">        setContainerStateImpl(f, state);</span>
+<span class="nc" id="L2032">    }</span>
+
+    private boolean isParentOf(Container cnt, Component c) {
+<span class="nc bnc" id="L2035" title="All 2 branches missed.">        while (c != null) {</span>
+<span class="nc bnc" id="L2036" title="All 2 branches missed.">            if (c == cnt) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L2037">                return true;</span>
+            }
+<span class="nc" id="L2039">            c = c.getParent();</span>
+        }
+<span class="nc" id="L2041">        return false;</span>
+    }
+
+    /// This method is the container navigation equivalent of getFormState() see
+    /// that method for details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container
+    ///
+    /// #### Returns
+    ///
+    /// the state
+    protected Hashtable getContainerState(Container cnt) {
+<span class="nc" id="L2055">        Component c = null;</span>
+<span class="nc" id="L2056">        Form parentForm = cnt.getComponentForm();</span>
+<span class="nc bnc" id="L2057" title="All 2 branches missed.">        if (parentForm != null) {</span>
+<span class="nc" id="L2058">            c = parentForm.getFocused();</span>
+        }
+<span class="nc" id="L2060">        Hashtable h = new Hashtable();</span>
+<span class="nc" id="L2061">        h.put(FORM_STATE_KEY_NAME, cnt.getName());</span>
+<span class="nc" id="L2062">        h.put(FORM_STATE_KEY_CONTAINER, &quot;&quot;);</span>
+<span class="nc bnc" id="L2063" title="All 2 branches missed.">        if (isParentOf(cnt, c)) {</span>
+<span class="nc bnc" id="L2064" title="All 2 branches missed.">            if (c instanceof List) {</span>
+<span class="nc" id="L2065">                h.put(FORM_STATE_KEY_SELECTION, Integer.valueOf(((List) c).getSelectedIndex()));</span>
+            }
+<span class="nc bnc" id="L2067" title="All 2 branches missed.">            if (c.getName() != null) {</span>
+<span class="nc" id="L2068">                h.put(FORM_STATE_KEY_FOCUS, c.getName());</span>
+            }
+<span class="nc" id="L2070">            return h;</span>
+        }
+<span class="nc" id="L2072">        storeComponentState(cnt, h);</span>
+<span class="nc" id="L2073">        return h;</span>
+    }
+
+    private void setContainerStateImpl(Container cnt, Hashtable state) {
+<span class="nc bnc" id="L2077" title="All 2 branches missed.">        if (state != null) {</span>
+<span class="nc" id="L2078">            restoreComponentState(cnt, state);</span>
+<span class="nc" id="L2079">            String cmpName = (String) state.get(FORM_STATE_KEY_FOCUS);</span>
+<span class="nc bnc" id="L2080" title="All 2 branches missed.">            if (cmpName == null) {</span>
+<span class="nc" id="L2081">                return;</span>
+            }
+<span class="nc" id="L2083">            Component c = findByName(cmpName, cnt);</span>
+<span class="nc bnc" id="L2084" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L2085">                c.requestFocus();</span>
+<span class="nc bnc" id="L2086" title="All 2 branches missed.">                if (c instanceof List) {</span>
+<span class="nc" id="L2087">                    Integer i = (Integer) state.get(FORM_STATE_KEY_SELECTION);</span>
+<span class="nc bnc" id="L2088" title="All 2 branches missed.">                    if (i != null) {</span>
+<span class="nc" id="L2089">                        ((List) c).setSelectedIndex(i.intValue());</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L2094">    }</span>
+
+    /// This method is the container navigation equivalent of setFormState() see
+    /// that method for details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container
+    ///
+    /// - `state`: the state
+    protected void setContainerState(Container cnt, Hashtable state) {
+<span class="nc" id="L2105">        setContainerStateImpl(cnt, state);</span>
+<span class="nc" id="L2106">    }</span>
+
+    /// When reaching the home form the navigation stack is cleared
+    ///
+    /// #### Returns
+    ///
+    /// the homeForm
+    public String getHomeForm() {
+<span class="fc" id="L2114">        return homeForm;</span>
+    }
+
+    /// When reaching the home form the navigation stack is cleared
+    ///
+    /// #### Parameters
+    ///
+    /// - `homeForm`: the homeForm to set
+    public void setHomeForm(String homeForm) {
+<span class="fc" id="L2123">        this.homeForm = homeForm;</span>
+<span class="fc" id="L2124">    }</span>
+
+    /// This method effectively pops the form navigation stack and goes back
+    /// to the previous form if back navigation is enabled and there is
+    /// a previous form.
+    public void back() {
+<span class="nc" id="L2130">        back(null);</span>
+<span class="nc" id="L2131">    }</span>
+
+    /// This method effectively pops the form navigation stack and goes back
+    /// to the previous form if back navigation is enabled and there is
+    /// a previous form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceComponent`: @param sourceComponent the component that triggered the back command which effectively
+    /// allows us to find the EmbeddedContainer for a case of container navigation. Null
+    /// can be used if not applicable.
+    public void back(Component sourceComponent) {
+<span class="nc" id="L2143">        Vector formNavigationStack = getFormNavigationStackForComponent(sourceComponent);</span>
+<span class="nc bnc" id="L2144" title="All 4 branches missed.">        if (formNavigationStack != null &amp;&amp; !formNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L2145">            Hashtable h = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);</span>
+<span class="nc bnc" id="L2146" title="All 2 branches missed.">            if (h.containsKey(FORM_STATE_KEY_CONTAINER)) {</span>
+<span class="nc" id="L2147">                Form currentForm = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L2148" title="All 2 branches missed.">                if (currentForm != null) {</span>
+<span class="nc" id="L2149">                    exitForm(currentForm);</span>
+                }
+            }
+<span class="nc" id="L2152">            String formName = (String) h.get(FORM_STATE_KEY_NAME);</span>
+<span class="nc bnc" id="L2153" title="All 2 branches missed.">            if (!h.containsKey(FORM_STATE_KEY_CONTAINER)) {</span>
+<span class="nc" id="L2154">                Form f = (Form) createContainer(fetchResourceFile(), formName);</span>
+<span class="nc" id="L2155">                initBackForm(f);</span>
+<span class="nc" id="L2156">                onBackNavigation();</span>
+<span class="nc" id="L2157">                beforeShow(f);</span>
+<span class="nc" id="L2158">                f.showBack();</span>
+<span class="nc" id="L2159">                postShowImpl(f);</span>
+<span class="nc" id="L2160">            } else {</span>
+<span class="nc" id="L2161">                showContainerImpl(formName, null, sourceComponent, true);</span>
+            }
+        }
+<span class="nc" id="L2164">    }</span>
+
+    /// Returns the name of the previous form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the current form
+    ///
+    /// #### Returns
+    ///
+    /// the name of the previous form
+    String getPreviousFormName(Form f) {
+<span class="fc" id="L2176">        Vector formNavigationStack = getFormNavigationStackForComponent(f);</span>
+<span class="pc bpc" id="L2177" title="2 of 4 branches missed.">        if (formNavigationStack != null &amp;&amp; !formNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L2178">            Hashtable h = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);</span>
+<span class="nc" id="L2179">            return (String) h.get(FORM_STATE_KEY_NAME);</span>
+        }
+<span class="fc" id="L2181">        return null;</span>
+    }
+
+    /// Returns the text for the back command string. This can be controlled in the theme by the &quot;backUsesTitleBool&quot; constant
+    ///
+    /// #### Parameters
+    ///
+    /// - `previousFormTitle`: the title of the previous form
+    ///
+    /// #### Returns
+    ///
+    /// the string for the back command inserted implicitly
+    protected String getBackCommandText(String previousFormTitle) {
+<span class="nc bnc" id="L2194" title="All 2 branches missed.">        if (UIManager.getInstance().isThemeConstant(&quot;backUsesTitleBool&quot;, false)) {</span>
+<span class="nc bnc" id="L2195" title="All 6 branches missed.">            if (previousFormTitle == null || &quot;&quot;.equals(previousFormTitle) || &quot; &quot;.equals(previousFormTitle)) {</span>
+<span class="nc" id="L2196">                return &quot;Back&quot;;</span>
+            }
+<span class="nc" id="L2198">            return previousFormTitle;</span>
+        }
+<span class="nc" id="L2200">        return &quot;Back&quot;;</span>
+    }
+
+    /// Invoked internally to set the back command on the form, this method allows subclasses
+    /// to change the behavior of back command adding or disable it
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form
+    ///
+    /// - `backCommand`: the back command
+    protected void setBackCommand(Form f, Command backCommand) {
+<span class="nc bnc" id="L2212" title="All 2 branches missed.">        if (f.getToolbar() != null) {</span>
+<span class="nc" id="L2213">            f.getToolbar().setBackCommand(backCommand);</span>
+        } else {
+<span class="nc bnc" id="L2215" title="All 2 branches missed.">            if (shouldAddBackCommandToMenu()) {</span>
+<span class="nc" id="L2216">                f.addCommand(backCommand, f.getCommandCount());</span>
+            }
+<span class="nc" id="L2218">            f.setBackCommand(backCommand);</span>
+        }
+<span class="nc" id="L2220">    }</span>
+
+    private void initBackForm(Form f) {
+<span class="nc" id="L2223">        Vector formNavigationStack = baseFormNavigationStack;</span>
+<span class="nc bnc" id="L2224" title="All 4 branches missed.">        if (formNavigationStack != null &amp;&amp; !formNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L2225">            setFormState(f, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));</span>
+<span class="nc" id="L2226">            formNavigationStack.removeElementAt(formNavigationStack.size() - 1);</span>
+<span class="nc bnc" id="L2227" title="All 2 branches missed.">            if (!formNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L2228">                Hashtable previous = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);</span>
+<span class="nc" id="L2229">                String commandAction = (String) previous.get(FORM_STATE_KEY_NAME);</span>
+<span class="nc" id="L2230">                Command backCommand = createCommandImpl(getBackCommandText((String) previous.get(FORM_STATE_KEY_TITLE)), null,</span>
+                        BACK_COMMAND_ID, commandAction, true, &quot;&quot;);
+<span class="nc" id="L2232">                setBackCommand(f, backCommand);</span>
+
+                // trigger listener creation if this is the only command in the form
+<span class="nc" id="L2235">                getFormListenerInstance(f, null);</span>
+
+<span class="nc" id="L2237">                backCommand.putClientProperty(COMMAND_ARGUMENTS, &quot;&quot;);</span>
+<span class="nc" id="L2238">                backCommand.putClientProperty(COMMAND_ACTION, commandAction);</span>
+            }
+        }
+<span class="nc" id="L2241">    }</span>
+
+    private void initBackContainer(Container cnt, Form destForm, Vector formNavigationStack) {
+<span class="nc" id="L2244">        setContainerState(cnt, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));</span>
+<span class="nc" id="L2245">        formNavigationStack.removeElementAt(formNavigationStack.size() - 1);</span>
+<span class="nc bnc" id="L2246" title="All 2 branches missed.">        if (!formNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L2247">            Hashtable previous = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);</span>
+<span class="nc" id="L2248">            String commandAction = (String) previous.get(FORM_STATE_KEY_NAME);</span>
+<span class="nc" id="L2249">            Command backCommand = createCommandImpl(getBackCommandText((String) previous.get(FORM_STATE_KEY_TITLE)), null,</span>
+                    BACK_COMMAND_ID, commandAction, true, &quot;&quot;);
+<span class="nc" id="L2251">            setBackCommand(destForm, backCommand);</span>
+<span class="nc" id="L2252">            backCommand.putClientProperty(COMMAND_ARGUMENTS, &quot;&quot;);</span>
+<span class="nc" id="L2253">            backCommand.putClientProperty(COMMAND_ACTION, commandAction);</span>
+        }
+<span class="nc" id="L2255">    }</span>
+
+    /// This method is equivalent to the internal navigation behavior, it adds
+    /// functionality such as the back command into the given form resource and
+    /// shows it. If the source command is the back command the showBack() method
+    /// will run.
+    /// Notice that container navigation (none-form) doesn't support the back() method
+    /// or the form stack. However a command marked as back command will be respected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceName`: the name of the resource for the form to show
+    ///
+    /// - `sourceCommand`: the command of the resource (may be null)
+    ///
+    /// - `sourceComponent`: the component that activated the show (may be null)
+    ///
+    /// #### Returns
+    ///
+    /// @return the container thats being shown, notice that you can still manipulate
+    /// some states of the container before it actually appears
+    public Container showContainer(String resourceName, Command sourceCommand, Component sourceComponent) {
+<span class="nc" id="L2277">        return showContainerImpl(resourceName, sourceCommand, sourceComponent, false);</span>
+    }
+
+
+    /// Useful tool to refresh the current state of a container shown using show container
+    /// without pushing another instance to the back stack
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container thats embedded into the application
+    public void reloadContainer(Component cnt) {
+<span class="nc" id="L2288">        Container newCnt = createContainer(fetchResourceFile(), cnt.getName(), (EmbeddedContainer) cnt.getParent());</span>
+<span class="nc" id="L2289">        beforeShowContainer(newCnt);</span>
+<span class="nc" id="L2290">        cnt.getParent().replace(cnt, newCnt, null);</span>
+<span class="nc" id="L2291">        postShowContainer(newCnt);</span>
+<span class="nc" id="L2292">    }</span>
+
+
+    /// Useful tool to refresh the current state of a form shown using show form
+    /// without pushing another instance to the back stack
+    public void reloadForm() {
+<span class="nc" id="L2298">        Form currentForm = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L2299">        Command backCommand = currentForm.getBackCommand();</span>
+<span class="nc" id="L2300">        Form newForm = (Form) createContainer(fetchResourceFile(), currentForm.getName());</span>
+<span class="nc" id="L2301">        newForm.setSourceCommand(currentForm.getSourceCommand());</span>
+<span class="nc bnc" id="L2302" title="All 2 branches missed.">        if (backCommand != null) {</span>
+<span class="nc" id="L2303">            setBackCommand(newForm, backCommand);</span>
+
+            // trigger listener creation if this is the only command in the form
+<span class="nc" id="L2306">            getFormListenerInstance(newForm, null);</span>
+
+<span class="nc bnc" id="L2308" title="All 2 branches missed.">            for (int iter = 0; iter &lt; currentForm.getCommandCount(); iter++) {</span>
+<span class="nc bnc" id="L2309" title="All 2 branches missed.">                if (backCommand == currentForm.getCommand(iter)) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L2310">                    newForm.addCommand(backCommand, newForm.getCommandCount());</span>
+<span class="nc" id="L2311">                    break;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L2316">        beforeShow(newForm);</span>
+<span class="nc" id="L2317">        Transition tin = newForm.getTransitionInAnimator();</span>
+<span class="nc" id="L2318">        Transition tout = newForm.getTransitionOutAnimator();</span>
+<span class="nc" id="L2319">        currentForm.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L2320">        currentForm.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L2321">        newForm.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L2322">        newForm.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L2323">        newForm.layoutContainer();</span>
+<span class="nc" id="L2324">        newForm.show();</span>
+<span class="nc" id="L2325">        postShowImpl(newForm);</span>
+<span class="nc" id="L2326">        newForm.setTransitionInAnimator(tin);</span>
+<span class="nc" id="L2327">        newForm.setTransitionOutAnimator(tout);</span>
+<span class="nc" id="L2328">    }</span>
+
+    private Container showContainerImpl(String resourceName, Command sourceCommand, Component sourceComponent, boolean forceBack) {
+<span class="nc bnc" id="L2331" title="All 2 branches missed.">        if (sourceComponent != null) {</span>
+<span class="nc" id="L2332">            Form currentForm = sourceComponent.getComponentForm();</span>
+
+            // avoid the overhead of searching if no embedding is used
+<span class="nc bnc" id="L2335" title="All 2 branches missed.">            if (currentForm.getClientProperty(EMBEDDED_FORM_FLAG) != null) {</span>
+<span class="nc" id="L2336">                Container destContainer = sourceComponent.getParent();</span>
+<span class="nc bnc" id="L2337" title="All 4 branches missed.">                while (!(destContainer instanceof EmbeddedContainer || destContainer instanceof Form)) {</span>
+                    // race condition, container was already removed by someone else
+<span class="nc bnc" id="L2339" title="All 2 branches missed.">                    if (destContainer == null) {</span>
+<span class="nc" id="L2340">                        return null;</span>
+                    }
+<span class="nc" id="L2342">                    destContainer = destContainer.getParent();</span>
+                }
+<span class="nc bnc" id="L2344" title="All 2 branches missed.">                if (destContainer instanceof EmbeddedContainer) {</span>
+<span class="nc" id="L2345">                    Container cnt = createContainer(fetchResourceFile(), resourceName, (EmbeddedContainer) destContainer);</span>
+<span class="nc bnc" id="L2346" title="All 2 branches missed.">                    if (cnt instanceof Form) {</span>
+                        //Form f = (Form)cnt;
+                        //cnt = formToContainer(f);
+<span class="nc" id="L2349">                        showForm((Form) cnt, sourceCommand, sourceComponent);</span>
+<span class="nc" id="L2350">                        return cnt;</span>
+                    }
+
+<span class="nc" id="L2353">                    Component fromCmp = destContainer.getComponentAt(0);</span>
+
+                    // This seems to be no longer necessary now that we have the replaceAndWait version that drops events
+                    // block the user from the ability to press the button twice by mistake
+                    //fromCmp.setEnabled(false);
+
+<span class="nc" id="L2359">                    boolean isBack = forceBack;</span>
+<span class="nc" id="L2360">                    Transition t = fromCmp.getUIManager().getLookAndFeel().getDefaultFormTransitionOut();</span>
+<span class="nc bnc" id="L2361" title="All 2 branches missed.">                    if (forceBack) {</span>
+<span class="nc" id="L2362">                        initBackContainer(cnt, destContainer.getComponentForm(), getFormNavigationStackForComponent(sourceComponent));</span>
+<span class="nc" id="L2363">                        t = t.copy(true);</span>
+                    } else {
+<span class="nc bnc" id="L2365" title="All 2 branches missed.">                        if (sourceCommand != null) {</span>
+<span class="nc bnc" id="L2366" title="All 8 branches missed.">                            if (t != null &amp;&amp; backCommands != null &amp;&amp; backCommands.contains(sourceCommand) || Display.getInstance().getCurrent().getBackCommand() == sourceCommand) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L2367">                                isBack = true;</span>
+<span class="nc" id="L2368">                                t = t.copy(true);</span>
+                            }
+                        }
+                    }
+
+                    // create a back command if supported
+<span class="nc" id="L2374">                    String commandAction = cnt.getName();</span>
+<span class="nc" id="L2375">                    Vector formNavigationStack = getFormNavigationStackForComponent(fromCmp);</span>
+<span class="nc bnc" id="L2376" title="All 8 branches missed.">                    if (formNavigationStack != null &amp;&amp; !isBack &amp;&amp; allowBackTo(commandAction) &amp;&amp; !isSameBackDestination((Container) fromCmp, cnt)) {</span>
+                        // trigger listener creation if this is the only command in the form
+<span class="nc" id="L2378">                        getFormListenerInstance(destContainer.getComponentForm(), null);</span>
+<span class="nc" id="L2379">                        formNavigationStack.addElement(getContainerState((Container) fromCmp));</span>
+                    }
+
+<span class="nc" id="L2382">                    beforeShowContainer(cnt);</span>
+<span class="nc" id="L2383">                    destContainer.replaceAndWait(fromCmp, cnt, t, true);</span>
+<span class="nc" id="L2384">                    postShowContainer(cnt);</span>
+<span class="nc" id="L2385">                    return cnt;</span>
+                } else {
+<span class="nc" id="L2387">                    Container cnt = createContainer(fetchResourceFile(), resourceName);</span>
+<span class="nc" id="L2388">                    showForm((Form) cnt, sourceCommand, sourceComponent);</span>
+<span class="nc" id="L2389">                    return cnt;</span>
+                }
+            }
+        }
+<span class="nc" id="L2393">        Container cnt = createContainer(fetchResourceFile(), resourceName);</span>
+<span class="nc bnc" id="L2394" title="All 2 branches missed.">        if (cnt instanceof Form) {</span>
+<span class="nc" id="L2395">            showForm((Form) cnt, sourceCommand, sourceComponent);</span>
+        } else {
+<span class="nc" id="L2397">            Form f = new Form();</span>
+<span class="nc" id="L2398">            f.setLayout(new BorderLayout());</span>
+<span class="nc" id="L2399">            f.addComponent(BorderLayout.CENTER, cnt);</span>
+<span class="nc" id="L2400">            f.setName(&quot;Form&quot; + cnt.getName());</span>
+<span class="nc" id="L2401">            showForm(f, sourceCommand, sourceComponent);</span>
+        }
+<span class="nc" id="L2403">        return cnt;</span>
+    }
+
+    Container formToContainer(Form f) {
+<span class="nc" id="L2407">        Container cnt = new Container(f.getContentPane().getLayout());</span>
+<span class="nc bnc" id="L2408" title="All 2 branches missed.">        if (f.getContentPane().getLayout() instanceof BorderLayout ||</span>
+<span class="nc bnc" id="L2409" title="All 2 branches missed.">                f.getContentPane().getLayout() instanceof TableLayout) {</span>
+<span class="nc bnc" id="L2410" title="All 2 branches missed.">            while (f.getContentPane().getComponentCount() &gt; 0) {</span>
+<span class="nc" id="L2411">                Component src = f.getContentPane().getComponentAt(0);</span>
+<span class="nc" id="L2412">                Object o = f.getContentPane().getLayout().getComponentConstraint(src);</span>
+<span class="nc" id="L2413">                f.getContentPane().removeComponent(src);</span>
+<span class="nc" id="L2414">                cnt.addComponent(o, src);</span>
+<span class="nc" id="L2415">            }</span>
+        } else {
+<span class="nc bnc" id="L2417" title="All 2 branches missed.">            while (f.getContentPane().getComponentCount() &gt; 0) {</span>
+<span class="nc" id="L2418">                Component src = f.getContentPane().getComponentAt(0);</span>
+<span class="nc" id="L2419">                f.getContentPane().removeComponent(src);</span>
+<span class="nc" id="L2420">                cnt.addComponent(src);</span>
+<span class="nc" id="L2421">            }</span>
+        }
+<span class="nc" id="L2423">        return cnt;</span>
+    }
+
+
+    /// This is useful for swipe back navigation behavior
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form from which we should go back
+    ///
+    /// #### Returns
+    ///
+    /// a lazy value that will return the back form
+    public LazyValue&lt;Form&gt; createBackLazyValue(final Form f) {
+<span class="nc" id="L2437">        Vector formNavigationStack = baseFormNavigationStack;</span>
+<span class="nc" id="L2438">        Hashtable p = null;</span>
+<span class="nc" id="L2439">        Command cmd = null;</span>
+<span class="nc bnc" id="L2440" title="All 2 branches missed.">        if (formNavigationStack.size() &gt; 1) {</span>
+<span class="nc" id="L2441">            p = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 2);</span>
+<span class="nc" id="L2442">            String backTitle = getBackCommandText((String) p.get(FORM_STATE_KEY_TITLE));</span>
+<span class="nc" id="L2443">            String commandAction = (String) p.get(FORM_STATE_KEY_NAME);</span>
+<span class="nc" id="L2444">            cmd = createCommandImpl(backTitle, null,</span>
+                    BACK_COMMAND_ID, commandAction, true, &quot;&quot;);
+<span class="nc" id="L2446">            cmd.putClientProperty(COMMAND_ARGUMENTS, &quot;&quot;);</span>
+<span class="nc" id="L2447">            cmd.putClientProperty(COMMAND_ACTION, commandAction);</span>
+        }
+
+<span class="nc" id="L2450">        return new LazyValueC(f, p, cmd, this);</span>
+    }
+
+    Form createForm(Form f) {
+<span class="nc" id="L2454">        Form currentForm = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L2455" title="All 2 branches missed.">        if (currentForm instanceof Dialog) {</span>
+<span class="nc" id="L2456">            ((Dialog) Display.getInstance().getCurrent()).dispose();</span>
+<span class="nc" id="L2457">            currentForm = Display.getInstance().getCurrent();</span>
+        }
+<span class="nc" id="L2459">        Vector formNavigationStack = baseFormNavigationStack;</span>
+<span class="nc bnc" id="L2460" title="All 6 branches missed.">        if (formNavigationStack != null &amp;&amp; !(f instanceof Dialog) &amp;&amp; !f.getName().equals(homeForm)) {</span>
+<span class="nc bnc" id="L2461" title="All 2 branches missed.">            if (currentForm != null) {</span>
+<span class="nc" id="L2462">                String nextForm = (String) f.getClientProperty(&quot;%next_form%&quot;);</span>
+
+                // we are in the sidemenu view we should really be using the parent form
+<span class="nc" id="L2465">                SideMenuBar b = (SideMenuBar) currentForm.getClientProperty(&quot;cn1$sideMenuParent&quot;);</span>
+<span class="nc bnc" id="L2466" title="All 2 branches missed.">                if (b != null) {</span>
+<span class="nc" id="L2467">                    currentForm = b.getParentForm();</span>
+                }
+
+                // don't add back commands to transitional forms
+<span class="nc bnc" id="L2471" title="All 2 branches missed.">                if (nextForm == null) {</span>
+<span class="nc" id="L2472">                    String commandAction = currentForm.getName();</span>
+<span class="nc bnc" id="L2473" title="All 4 branches missed.">                    if (allowBackTo(commandAction) &amp;&amp; f.getBackCommand() == null) {</span>
+                        Command backCommand;
+<span class="nc bnc" id="L2475" title="All 2 branches missed.">                        if (isSameBackDestination(currentForm, f)) {</span>
+<span class="nc" id="L2476">                            backCommand = currentForm.getBackCommand();</span>
+                        } else {
+<span class="nc" id="L2478">                            backCommand = createCommandImpl(getBackCommandText(currentForm.getTitle()), null,</span>
+                                    BACK_COMMAND_ID, commandAction, true, &quot;&quot;);
+<span class="nc" id="L2480">                            backCommand.putClientProperty(COMMAND_ARGUMENTS, &quot;&quot;);</span>
+<span class="nc" id="L2481">                            backCommand.putClientProperty(COMMAND_ACTION, commandAction);</span>
+                        }
+<span class="nc bnc" id="L2483" title="All 2 branches missed.">                        if (backCommand != null) {</span>
+<span class="nc" id="L2484">                            setBackCommand(f, backCommand);</span>
+                        }
+
+                        // trigger listener creation if this is the only command in the form
+<span class="nc" id="L2488">                        getFormListenerInstance(f, null);</span>
+<span class="nc" id="L2489">                        formNavigationStack.addElement(getFormState(currentForm));</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L2494">        return f;</span>
+    }
+
+    private void showForm(Form f, Command sourceCommand, Component sourceComponent) {
+<span class="nc" id="L2498">        Form currentForm = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L2499" title="All 2 branches missed.">        if (currentForm instanceof Dialog) {</span>
+<span class="nc" id="L2500">            ((Dialog) Display.getInstance().getCurrent()).dispose();</span>
+<span class="nc" id="L2501">            currentForm = Display.getInstance().getCurrent();</span>
+        }
+<span class="nc" id="L2503">        Vector formNavigationStack = baseFormNavigationStack;</span>
+<span class="nc bnc" id="L2504" title="All 6 branches missed.">        if (sourceCommand != null &amp;&amp; currentForm != null &amp;&amp; currentForm.getBackCommand() == sourceCommand) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L2505">            exitForm(currentForm);</span>
+<span class="nc bnc" id="L2506" title="All 4 branches missed.">            if (formNavigationStack != null &amp;&amp; !formNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L2507">                String name = f.getName();</span>
+<span class="nc bnc" id="L2508" title="All 4 branches missed.">                if (name != null &amp;&amp; name.equals(homeForm)) {</span>
+<span class="nc bnc" id="L2509" title="All 2 branches missed.">                    if (!formNavigationStack.isEmpty()) {</span>
+<span class="nc" id="L2510">                        setFormState(f, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));</span>
+                    }
+<span class="nc" id="L2512">                    formNavigationStack.clear();</span>
+                } else {
+<span class="nc" id="L2514">                    initBackForm(f);</span>
+                }
+            }
+<span class="nc" id="L2517">            onBackNavigation();</span>
+<span class="nc" id="L2518">            beforeShow(f, sourceCommand);</span>
+<span class="nc" id="L2519">            f.showBack();</span>
+<span class="nc" id="L2520">            postShowImpl(f);</span>
+        } else {
+<span class="nc bnc" id="L2522" title="All 2 branches missed.">            if (currentForm != null) {</span>
+<span class="nc" id="L2523">                exitForm(currentForm);</span>
+            }
+<span class="nc bnc" id="L2525" title="All 6 branches missed.">            if (formNavigationStack != null &amp;&amp; !(f instanceof Dialog) &amp;&amp; !f.getName().equals(homeForm)) {</span>
+<span class="nc bnc" id="L2526" title="All 2 branches missed.">                if (currentForm != null) {</span>
+<span class="nc" id="L2527">                    String nextForm = (String) f.getClientProperty(&quot;%next_form%&quot;);</span>
+
+                    // we are in the sidemenu view we should really be using the parent form
+<span class="nc" id="L2530">                    SideMenuBar b = (SideMenuBar) currentForm.getClientProperty(&quot;cn1$sideMenuParent&quot;);</span>
+<span class="nc bnc" id="L2531" title="All 2 branches missed.">                    if (b != null) {</span>
+<span class="nc" id="L2532">                        currentForm = b.getParentForm();</span>
+                    }
+
+                    // don't add back commands to transitional forms
+<span class="nc bnc" id="L2536" title="All 2 branches missed.">                    if (nextForm == null) {</span>
+<span class="nc" id="L2537">                        String commandAction = currentForm.getName();</span>
+<span class="nc bnc" id="L2538" title="All 4 branches missed.">                        if (allowBackTo(commandAction) &amp;&amp; f.getBackCommand() == null) {</span>
+                            Command backCommand;
+<span class="nc bnc" id="L2540" title="All 2 branches missed.">                            if (isSameBackDestination(currentForm, f)) {</span>
+<span class="nc" id="L2541">                                backCommand = currentForm.getBackCommand();</span>
+                            } else {
+<span class="nc" id="L2543">                                backCommand = createCommandImpl(getBackCommandText(currentForm.getTitle()), null,</span>
+                                        BACK_COMMAND_ID, commandAction, true, &quot;&quot;);
+<span class="nc" id="L2545">                                backCommand.putClientProperty(COMMAND_ARGUMENTS, &quot;&quot;);</span>
+<span class="nc" id="L2546">                                backCommand.putClientProperty(COMMAND_ACTION, commandAction);</span>
+                            }
+<span class="nc bnc" id="L2548" title="All 2 branches missed.">                            if (backCommand != null) {</span>
+<span class="nc" id="L2549">                                setBackCommand(f, backCommand);</span>
+                            }
+
+                            // trigger listener creation if this is the only command in the form
+<span class="nc" id="L2553">                            getFormListenerInstance(f, null);</span>
+<span class="nc" id="L2554">                            formNavigationStack.addElement(getFormState(currentForm));</span>
+                        }
+                    }
+                }
+            }
+<span class="nc bnc" id="L2559" title="All 2 branches missed.">            if (f instanceof Dialog) {</span>
+<span class="nc" id="L2560">                beforeShow(f, sourceCommand);</span>
+<span class="nc bnc" id="L2561" title="All 2 branches missed.">                if (sourceComponent != null) {</span>
+                    // we are cheating with the post show here since we are using a modal
+                    // dialog to prevent the &quot;double clicking button&quot; problem by using
+                    // a modal dialog
+<span class="nc" id="L2565">                    sourceComponent.setEnabled(false);</span>
+<span class="nc" id="L2566">                    postShowImpl(f);</span>
+<span class="nc" id="L2567">                    f.show();</span>
+<span class="nc" id="L2568">                    sourceComponent.setEnabled(true);</span>
+<span class="nc" id="L2569">                    exitForm(f);</span>
+                } else {
+<span class="nc" id="L2571">                    ((Dialog) f).showModeless();</span>
+<span class="nc" id="L2572">                    postShowImpl(f);</span>
+                }
+            } else {
+<span class="nc" id="L2575">                beforeShow(f, sourceCommand);</span>
+<span class="nc" id="L2576">                f.show();</span>
+<span class="nc" id="L2577">                postShowImpl(f);</span>
+            }
+        }
+<span class="nc" id="L2580">    }</span>
+
+    /// Indicates whether a back command to this form should be generated automatically when
+    /// leaving said form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `formName`: the name of the form
+    ///
+    /// #### Returns
+    ///
+    /// true to autogenerate and add a back command to the destination form
+    protected boolean allowBackTo(String formName) {
+<span class="fc" id="L2593">        return true;</span>
+    }
+
+    /// When navigating from one form/container to another we sometimes might not want the
+    /// back command to return to the previous container/form but rather to the one before
+    /// source. A good example would be a &quot;refresh&quot; command or a toggle button that changes
+    /// the form state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the form or container we are leaving
+    ///
+    /// - `destination`: the container or form we are navigating to
+    ///
+    /// #### Returns
+    ///
+    /// @return false if we want a standard back button to source, true if we want to use
+    /// the same back button as the one in source
+    protected boolean isSameBackDestination(Container source, Container destination) {
+<span class="pc bpc" id="L2612" title="2 of 4 branches missed.">        return source.getName() == null || destination.getName() == null ||</span>
+<span class="pc bpc" id="L2613" title="1 of 2 branches missed.">                source.getName().equals(destination.getName());</span>
+    }
+
+    /// This method is equivalent to the internal navigation behavior, it adds
+    /// functionality such as the back command into the given form resource and
+    /// shows it. If the source command is the back command the showBack() method
+    /// will run.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceName`: the name of the resource for the form to show
+    ///
+    /// - `sourceCommand`: the command of the resource (may be null)
+    ///
+    /// #### Returns
+    ///
+    /// @return the form thats being shown, notice that you can still manipulate
+    /// some states of the form before it actually appears
+    public Form showForm(String resourceName, Command sourceCommand) {
+<span class="nc" id="L2632">        Form f = (Form) createContainer(fetchResourceFile(), resourceName);</span>
+<span class="nc" id="L2633">        showForm(f, sourceCommand, null);</span>
+<span class="nc" id="L2634">        return f;</span>
+    }
+
+    /// This method allows binding an action that should occur before leaving the given
+    /// form, e.g. memory cleanup
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form being left
+    protected void exitForm(Form f) {
+<span class="nc" id="L2644">    }</span>
+
+    /// This method allows binding an action that should occur before showing the given
+    /// form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form about to be shown
+    protected void beforeShow(Form f) {
+<span class="nc" id="L2653">    }</span>
+
+
+    private void beforeShow(Form f, Command sourceCommand) {
+<span class="nc bnc" id="L2657" title="All 2 branches missed.">        if (sourceCommand != null) {</span>
+<span class="nc" id="L2658">            f.setSourceCommand(sourceCommand);</span>
+        }
+<span class="nc" id="L2660">        beforeShow(f);</span>
+<span class="nc" id="L2661">    }</span>
+
+    /// This callback is invoked to indicate that the upcoming form is shown as part of a &quot;back&quot; navigation.
+    /// This is useful for the case of a breadcrumb UI where the navigation stack is shown at the top of the
+    /// UI, in that case this method can be used to pop out the breadcrumb stack.
+    protected void onBackNavigation() {
+<span class="nc" id="L2667">    }</span>
+
+    /// This method allows binding an action that should occur immediately after showing the given
+    /// form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form that was just shown
+    private void postShowImpl(Form f) {
+<span class="nc" id="L2676">        postShow(f);</span>
+<span class="nc" id="L2677">        analyticsCallback(f.getName(), getPreviousFormName(f));</span>
+<span class="nc" id="L2678">    }</span>
+
+    /// Back commands are set implicitly (see allowBackTo to disable that), this method allows subclasses
+    /// to disable the behavior where the back command is also added to the menu (not just set to the back button).
+    protected boolean shouldAddBackCommandToMenu() {
+<span class="nc" id="L2683">        return true;</span>
+    }
+
+    /// This method allows binding an action that should occur immediately after showing the given
+    /// form
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the form that was just shown
+    protected void postShow(Form f) {
+<span class="nc" id="L2693">    }</span>
+
+    /// This method allows binding an action that should occur before showing the given
+    /// container
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the container about to be shown
+    protected void beforeShowContainer(Container c) {
+<span class="nc" id="L2702">    }</span>
+
+    /// This method allows binding an action that should occur immediately after showing the given
+    /// container
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the container that was just shown
+    protected void postShowContainer(Container c) {
+<span class="nc" id="L2711">    }</span>
+
+    /// This method allows binding logic that should occur before creating the root object
+    /// e.g. a case where a created form needs data fetched for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rootName`: the name of the root to be created from the resource file
+    protected void onCreateRoot(String rootName) {
+<span class="nc" id="L2720">    }</span>
+
+    /// Indicates that the UIBuilder should cache resources in memory and never release them.
+    /// This is useful with small resource files or high RAM devices since it saves the cost
+    /// of constantly fetching the res file from the jar whenever moving between forms.
+    /// This can be toggled in the properties (e.g. jad) using the flag: cacheResFile (true/false)
+    /// which defaults to false.
+    ///
+    /// #### Returns
+    ///
+    /// the keepResourcesInRam
+    public boolean isKeepResourcesInRam() {
+<span class="fc" id="L2732">        return keepResourcesInRam;</span>
+    }
+
+    /// Indicates that the UIBuilder should cache resources in memory and never release them.
+    /// This is useful with small resource files or high RAM devices since it saves the cost
+    /// of constantly fetching the res file from the jar whenever moving between forms.
+    /// This can be toggled in the properties (e.g. jad) using the flag: cacheResFile (true/false)
+    /// which defaults to false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keepResourcesInRam`: the keepResourcesInRam to set
+    public void setKeepResourcesInRam(boolean keepResourcesInRam) {
+<span class="fc" id="L2745">        this.keepResourcesInRam = keepResourcesInRam;</span>
+<span class="fc" id="L2746">    }</span>
+
+    /// Returns either the parent form or the component below the embedded container
+    /// above c.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose root ancestor we should find
+    ///
+    /// #### Returns
+    ///
+    /// the root
+    protected Container getRootAncestor(Component c) {
+<span class="pc bpc" id="L2759" title="1 of 4 branches missed.">        while (c.getParent() != null &amp;&amp; !(c.getParent() instanceof EmbeddedContainer)) {</span>
+<span class="fc" id="L2760">            c = c.getParent();</span>
+        }
+<span class="pc bpc" id="L2762" title="1 of 2 branches missed.">        if (!(c instanceof Container)) {</span>
+<span class="nc" id="L2763">            return null;</span>
+        }
+<span class="fc" id="L2765">        return (Container) c;</span>
+    }
+
+    /// {@inheritDoc}
+    /*public final int getVersion() {
+        return 1;
+    }*/
+
+    /// Restores state of the previously running application
+    ///
+    /// #### Returns
+    ///
+    /// true if there is a state to restore
+    /*protected boolean restoreRunningApp() {
+        if(baseFormNavigationStack != null &amp;&amp; !baseFormNavigationStack.isEmpty()) {
+            Hashtable h = (Hashtable)baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
+            String formName = (String)h.get(FORM_STATE_KEY_NAME);
+            if(!h.containsKey(FORM_STATE_KEY_CONTAINER)) {
+                Form f = (Form)createContainer(fetchResourceFile(), formName);
+                initBackForm(f);
+                beforeShow(f);
+                f.show();
+                postShowImpl(f);
+                return true;
+            } 
+        }
+        return false;
+    }*/
+
+    /// {@inheritDoc}
+    /*public final void externalize(DataOutputStream out) throws IOException {
+        Util.writeObject(baseFormNavigationStack, out);
+        Util.writeObject(backCommands, out);
+        externalizeUserState(out);
+    }*/
+
+    /// This method is called on externalization of the state machine and allows developers to persist their own data
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: output stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an error occurred
+    //protected void externalizeUserState(DataOutputStream out) throws IOException {
+    //}
+
+    /// This method is called on loading of a state machine and allows the developers to load custom state machine data,
+    /// notice that the version isn't passed into this method since the version of the UIBuilder persistence logic
+    /// might differ from the version used by user code hence you should use a personal versioning system.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the input stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an error occurred
+    //protected void internalizeUserState(DataInputStream in) throws IOException {
+    //}
+
+    /// {@inheritDoc}
+    /*public final void internalize(int version, DataInputStream in) throws IOException {
+        baseFormNavigationStack = (Vector)Util.readObject(in);
+        backCommands = (Vector)Util.readObject(in);
+        internalizeUserState(in);
+    }*/
+
+    /// {@inheritDoc}
+    /*public String getObjectId() {
+        return &quot;StateMachine&quot;;
+    }*/
+
+    class FormListener implements ActionListener, Runnable {
+        private Command currentAction;
+        private ActionEvent currentActionEvent;
+        private Form destForm;
+        private String nextForm;
+
+<span class="fc" id="L2845">        public FormListener() {</span>
+<span class="fc" id="L2846">        }</span>
+
+<span class="fc" id="L2848">        public FormListener(Form destForm, String nextForm) {</span>
+<span class="fc" id="L2849">            this.destForm = destForm;</span>
+<span class="fc" id="L2850">            this.nextForm = nextForm;</span>
+<span class="fc" id="L2851">        }</span>
+
+<span class="nc" id="L2853">        public FormListener(Command currentAction, ActionEvent currentActionEvent, Form destForm) {</span>
+<span class="nc" id="L2854">            this.currentAction = currentAction;</span>
+<span class="nc" id="L2855">            this.currentActionEvent = currentActionEvent;</span>
+<span class="nc" id="L2856">            this.destForm = destForm;</span>
+<span class="nc" id="L2857">        }</span>
+
+        private void waitForForm(Form f) {
+<span class="nc bnc" id="L2860" title="All 2 branches missed.">            while (Display.getInstance().getCurrent() != f) { //NOPMD CompareObjectsWithEquals</span>
+                try {
+<span class="nc" id="L2862">                    Thread.sleep(5);</span>
+<span class="nc" id="L2863">                } catch (InterruptedException ex) {</span>
+<span class="nc" id="L2864">                    ex.printStackTrace();</span>
+<span class="nc" id="L2865">                }</span>
+            }
+
+<span class="nc" id="L2868">            Display.getInstance().callSerially(this);</span>
+<span class="nc" id="L2869">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L2873" title="All 2 branches missed.">            if (currentAction != null) {</span>
+<span class="nc bnc" id="L2874" title="All 2 branches missed.">                if (Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L2875">                    postAsyncCommand(currentAction, currentActionEvent);</span>
+                } else {
+<span class="nc" id="L2877">                    asyncCommandProcess(currentAction, currentActionEvent);</span>
+
+                    // wait for the destination form to appear before moving back into the Codename One thread
+<span class="nc" id="L2880">                    waitForForm(destForm);</span>
+                }
+            } else {
+<span class="nc bnc" id="L2883" title="All 2 branches missed.">                if (Display.getInstance().isEdt()) {</span>
+<span class="nc bnc" id="L2884" title="All 2 branches missed.">                    if (Display.getInstance().getCurrent() != null) {</span>
+<span class="nc" id="L2885">                        exitForm(Display.getInstance().getCurrent());</span>
+                    }
+<span class="nc" id="L2887">                    Form f = (Form) createContainer(fetchResourceFile(), nextForm);</span>
+<span class="nc" id="L2888">                    beforeShow(f, currentAction);</span>
+<span class="nc" id="L2889">                    f.show();</span>
+<span class="nc" id="L2890">                    postShowImpl(f);</span>
+<span class="nc" id="L2891">                } else {</span>
+<span class="nc bnc" id="L2892" title="All 2 branches missed.">                    if (processBackground(destForm)) {</span>
+<span class="nc" id="L2893">                        waitForForm(destForm);</span>
+                    }
+                }
+            }
+<span class="nc" id="L2897">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L2901">            Command cmd = evt.getCommand();</span>
+<span class="pc bpc" id="L2902" title="1 of 2 branches missed.">            if (cmd == null) {</span>
+                // this is a show listener we should spawn the background thread
+<span class="nc bnc" id="L2904" title="All 2 branches missed.">                if (evt.getSource() instanceof Form) {</span>
+                    // prevent a dialog from triggerring the background processing again
+<span class="nc" id="L2906">                    ((Form) evt.getSource()).removeShowListener(this);</span>
+<span class="nc" id="L2907">                    Display.getInstance().startThread(this, &quot;UIBuilder Async&quot;).start();</span>
+<span class="nc" id="L2908">                    return;</span>
+                }
+
+<span class="nc" id="L2911">                handleComponentAction((Component) evt.getSource(), evt);</span>
+<span class="nc" id="L2912">                return;</span>
+            }
+
+<span class="fc" id="L2915">            processCommandImpl(evt, cmd);</span>
+<span class="pc bpc" id="L2916" title="1 of 2 branches missed.">            if (evt.isConsumed()) {</span>
+<span class="nc" id="L2917">                return;</span>
+            }
+<span class="fc" id="L2919">            String action = (String) cmd.getClientProperty(COMMAND_ACTION);</span>
+<span class="pc bpc" id="L2920" title="3 of 4 branches missed.">            if (action != null &amp;&amp; action.length() &gt; 0) {</span>
+<span class="nc bnc" id="L2921" title="All 2 branches missed.">                if (&quot;$Minimize&quot;.equals(action)) {</span>
+<span class="nc" id="L2922">                    Display.getInstance().minimizeApplication();</span>
+<span class="nc" id="L2923">                    return;</span>
+                }
+<span class="nc bnc" id="L2925" title="All 2 branches missed.">                if (&quot;$Exit&quot;.equals(action)) {</span>
+<span class="nc" id="L2926">                    Display.getInstance().exitApplication();</span>
+<span class="nc" id="L2927">                    return;</span>
+                }
+<span class="nc bnc" id="L2929" title="All 2 branches missed.">                if (&quot;$Execute&quot;.equals(action)) {</span>
+<span class="nc" id="L2930">                    Display.getInstance().execute((String) cmd.getClientProperty(COMMAND_ARGUMENTS));</span>
+<span class="nc" id="L2931">                    return;</span>
+                }
+<span class="nc bnc" id="L2933" title="All 2 branches missed.">                if (&quot;$Back&quot;.equals(action)) {</span>
+<span class="nc" id="L2934">                    back(evt.getComponent());</span>
+<span class="nc" id="L2935">                    return;</span>
+                }
+
+<span class="nc bnc" id="L2938" title="All 2 branches missed.">                if (action.startsWith(&quot;!&quot;)) {</span>
+<span class="nc" id="L2939">                    action = action.substring(1);</span>
+<span class="nc" id="L2940">                    Form currentForm = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L2941" title="All 2 branches missed.">                    if (currentForm != null) {</span>
+<span class="nc" id="L2942">                        exitForm(currentForm);</span>
+                    }
+<span class="nc" id="L2944">                    int pos = action.indexOf(';');</span>
+<span class="nc" id="L2945">                    String firstScreen = action.substring(0, pos);</span>
+<span class="nc" id="L2946">                    String nextScreen = action.substring(pos + 1);</span>
+<span class="nc" id="L2947">                    Form f = (Form) createContainer(fetchResourceFile(), firstScreen);</span>
+<span class="nc bnc" id="L2948" title="All 2 branches missed.">                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L2949">                        onBackNavigation();</span>
+<span class="nc" id="L2950">                        beforeShow(f);</span>
+<span class="nc" id="L2951">                        f.showBack();</span>
+                    } else {
+<span class="nc" id="L2953">                        beforeShow(f, cmd);</span>
+<span class="nc" id="L2954">                        f.show();</span>
+                    }
+<span class="nc" id="L2956">                    postShowImpl(f);</span>
+<span class="nc" id="L2957">                    Display.getInstance().startThread(new FormListener(f, nextScreen), &quot;UIBuilder Next Form&quot;).start();</span>
+<span class="nc" id="L2958">                    return;</span>
+                }
+
+<span class="nc bnc" id="L2961" title="All 2 branches missed.">                if (action.startsWith(&quot;@&quot;)) {</span>
+<span class="nc" id="L2962">                    action = action.substring(1);</span>
+<span class="nc" id="L2963">                    Form currentForm = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L2964" title="All 2 branches missed.">                    if (currentForm != null) {</span>
+<span class="nc" id="L2965">                        exitForm(currentForm);</span>
+                    }
+<span class="nc" id="L2967">                    Form f = (Form) createContainer(fetchResourceFile(), action);</span>
+<span class="nc bnc" id="L2968" title="All 2 branches missed.">                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L2969">                        onBackNavigation();</span>
+<span class="nc" id="L2970">                        beforeShow(f);</span>
+<span class="nc" id="L2971">                        f.showBack();</span>
+                    } else {
+<span class="nc" id="L2973">                        beforeShow(f, cmd);</span>
+<span class="nc" id="L2974">                        f.show();</span>
+                    }
+<span class="nc" id="L2976">                    postShowImpl(f);</span>
+<span class="nc" id="L2977">                    Display.getInstance().startThread(new FormListener(cmd, evt, f), &quot;UIBuilder @&quot;).start();</span>
+<span class="nc" id="L2978">                    return;</span>
+                }
+
+<span class="nc" id="L2981">                evt.consume();</span>
+<span class="nc" id="L2982">                showContainer(action, cmd, evt.getComponent());</span>
+            }
+<span class="fc" id="L2984">        }</span>
+    }
+}
+
+class LazyValueC implements LazyValue&lt;Form&gt; {
+    private final Hashtable h;
+    private final Form f;
+    private final Command backCommand;
+    private final UIBuilder parent;
+
+<span class="fc" id="L2994">    public LazyValueC(Form f, Hashtable h, Command backCommand, UIBuilder parent) {</span>
+<span class="fc" id="L2995">        this.h = h;</span>
+<span class="fc" id="L2996">        this.f = f;</span>
+<span class="fc" id="L2997">        this.backCommand = backCommand;</span>
+<span class="fc" id="L2998">        this.parent = parent;</span>
+<span class="fc" id="L2999">    }</span>
+
+    @Override
+    public Form get(Object... args) {
+<span class="fc" id="L3003">        String n = parent.getPreviousFormName(f);</span>
+<span class="nc" id="L3004">        final Form f = parent.createForm((Form) parent.createContainer(parent.fetchResourceFile(), n));</span>
+<span class="nc bnc" id="L3005" title="All 2 branches missed.">        if (h != null) {</span>
+<span class="nc" id="L3006">            parent.setFormState(f, h);</span>
+<span class="nc" id="L3007">            parent.setBackCommand(f, backCommand);</span>
+        }
+<span class="nc" id="L3009">        f.addShowListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L3012">                parent.postShow(f);</span>
+<span class="nc" id="L3013">            }</span>
+        });
+<span class="nc" id="L3015">        Vector formNavigationStack = parent.baseFormNavigationStack;</span>
+<span class="nc" id="L3016">        formNavigationStack.remove(formNavigationStack.size() - 1);</span>
+<span class="nc" id="L3017">        parent.beforeShow(f);</span>
+<span class="nc" id="L3018">        return f;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

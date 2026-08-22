@@ -1,0 +1,1160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Table.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">Table.java</span></div><h1>Table.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.table;
+
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.validation.Constraint;
+import com.codename1.ui.validation.Validator;
+import com.codename1.util.CaseInsensitiveOrder;
+
+import java.util.Comparator;
+import java.util.Date;
+
+/// The `Table` class represents a grid of data that can be used for rendering a grid
+/// of components/labels. The table reflects and updates the underlying model data.
+/// `Table` relies heavily on the `com.codename1.ui.table.TableLayout` class and
+/// `com.codename1.ui.table.TableModel` interface to present its UI. Unlike a
+/// `com.codename1.ui.List` a `Table` doesn't feature a separate renderer
+/// and instead allows developers to derive the class.
+///
+/// ```java
+/// Form hi = new Form(&quot;Table&quot;, new BorderLayout());
+/// TableModel model = new DefaultTableModel(new String[] {&quot;Col 1&quot;, &quot;Col 2&quot;, &quot;Col 3&quot;}, new Object[][] {
+///     {&quot;Row 1&quot;, &quot;Row A&quot;, &quot;Row X&quot;},
+///     {&quot;Row 2&quot;, &quot;Row B can now stretch&quot;, null},
+///     {&quot;Row 3&quot;, &quot;Row C&quot;, &quot;Row Z&quot;},
+///     {&quot;Row 4&quot;, &quot;Row D&quot;, &quot;Row K&quot;},
+///     }) {
+///         public boolean isCellEditable(int row, int col) {
+///             return col != 0;
+///         }
+///     };
+/// Table table = new Table(model) {
+/// @Override
+///     protected Component createCell(Object value, int row, int column, boolean editable) { // (1)
+///         Component cell;
+///         if(row == 1 &amp;&amp; column == 1) { // (2)
+///             Picker p = new Picker();
+///             p.setType(Display.PICKER_TYPE_STRINGS);
+///             p.setStrings(&quot;Row B can now stretch&quot;, &quot;This is a good value&quot;, &quot;So Is This&quot;, &quot;Better than text field&quot;);
+///             p.setSelectedString((String)value); // (3)
+///             p.setUIID(&quot;TableCell&quot;);
+///             p.addActionListener((e) -&gt; getModel().setValueAt(row, column, p.getSelectedString())); // (4)
+///             cell = p;
+///         } else {
+///             cell = super.createCell(value, row, column, editable);
+///         }
+///         if(row &gt; -1 &amp;&amp; row % 2 == 0) { // (5)
+///             // pinstripe effect
+///             cell.getAllStyles().setBgColor(0xeeeeee);
+///             cell.getAllStyles().setBgTransparency(255);
+///         }
+///         return cell;
+///     }
+/// @Override
+///     protected TableLayout.Constraint createCellConstraint(Object value, int row, int column) {
+///         TableLayout.Constraint con =  super.createCellConstraint(value, row, column);
+///         if(row == 1 &amp;&amp; column == 1) {
+///             con.setHorizontalSpan(2);
+///         }
+///         con.setWidthPercentage(33);
+///         return con;
+///     }
+/// };
+/// hi.add(BorderLayout.CENTER, table);
+/// hi.show();
+/// ```
+/// @author Shai Almog
+public class Table extends Container {
+
+    /// Constant denoting that inner borders should not be drawn at all
+    public static final int INNER_BORDERS_NONE = 0;
+
+    /// Constant denoting that only inner borders rows should be drawn
+    public static final int INNER_BORDERS_ROWS = 1;
+
+    /// Constant denoting that only inner borders columns should be drawn
+    public static final int INNER_BORDERS_COLS = 2;
+
+    /// Constant denoting that inner borders should be drawn fully
+    public static final int INNER_BORDERS_ALL = 3;
+<span class="pc" id="L119">    private final Listener listener = new Listener();</span>
+    private TableModel model;
+<span class="pc" id="L121">    private boolean drawBorder = true;</span>
+<span class="pc" id="L122">    private boolean collapseBorder = true;</span>
+<span class="pc" id="L123">    private boolean drawEmptyCellsBorder = true;</span>
+<span class="pc" id="L124">    private int horizontalBorderSpacing = 0;</span>
+<span class="pc" id="L125">    private int verticalBorderSpacing = 0;</span>
+<span class="pc" id="L126">    private boolean includeHeader = true;</span>
+<span class="pc" id="L127">    private int innerBorder = INNER_BORDERS_ALL;</span>
+
+    /// Indicates the alignment of the title see label alignment for details
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
+<span class="pc" id="L134">    private int titleAlignment = Label.CENTER;</span>
+
+    /// Indicates the alignment of the cells see label alignment for details
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
+<span class="pc" id="L141">    private int cellAlignment = Label.LEFT;</span>
+
+    /// This flag allows us to workaround issue 275 without incurring too many updateModel calls
+    private boolean potentiallyDirtyModel;
+
+    /// Sort support can be toggled with this flag
+    private boolean sortSupported;
+
+<span class="pc" id="L149">    private int sortedColumn = -1;</span>
+    private boolean ascending;
+
+    /// Constructor for usage by GUI builder and automated tools, normally one
+    /// should use the version that accepts the model
+    public Table() {
+<span class="nc" id="L155">        this(new DefaultTableModel(new String[]{&quot;Col1&quot;, &quot;Col2&quot;}, new String[][]{</span>
+                {&quot;1&quot;, &quot;2&quot;},
+                {&quot;3&quot;, &quot;4&quot;}}));
+<span class="nc" id="L158">    }</span>
+
+
+    /// Create a table with a new model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model underlying this table
+<span class="fc" id="L166">    public Table(TableModel model) {</span>
+<span class="fc" id="L167">        setUIIDFinal(&quot;Table&quot;);</span>
+<span class="fc" id="L168">        this.model = model;</span>
+<span class="fc" id="L169">        updateModel();</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Create a table with a new model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model underlying this table
+    ///
+    /// - `includeHeader`: Indicates whether the table should render a table header as the first row
+<span class="nc" id="L179">    public Table(TableModel model, boolean includeHeader) {</span>
+<span class="nc" id="L180">        setUIIDFinal(&quot;Table&quot;);</span>
+<span class="nc" id="L181">        this.includeHeader = includeHeader;</span>
+<span class="nc" id="L182">        this.model = model;</span>
+<span class="nc" id="L183">        updateModel();</span>
+<span class="nc" id="L184">    }</span>
+
+    /// Returns the selected row in the table
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the selected row in the table if a selection exists
+    public int getSelectedRow() {
+<span class="nc" id="L192">        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L194">            Component c = f.getFocused();</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L196">                return getCellRow(c);</span>
+            }
+        }
+<span class="nc" id="L199">        return -1;</span>
+    }
+
+    /// By default createCell/constraint won't be invoked for null values by overriding this method to return true
+    /// you can replace this behavior
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    protected boolean includeNullValues() {
+<span class="nc" id="L209">        return false;</span>
+    }
+
+    /// Returns the selected column in the table
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the selected column in the table if a selection exists
+    public int getSelectedColumn() {
+<span class="nc" id="L218">        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L220">            Component c = f.getFocused();</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L222">                return getCellColumn(c);</span>
+            }
+        }
+<span class="nc" id="L225">        return -1;</span>
+    }
+
+    private void updateModel() {
+<span class="fc" id="L229">        int selectionRow = -1;</span>
+<span class="fc" id="L230">        int selectionColumn = -1;</span>
+<span class="fc" id="L231">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L233">            Component c = f.getFocused();</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L235">                selectionRow = getCellRow(c);</span>
+<span class="nc" id="L236">                selectionColumn = getCellColumn(c);</span>
+            }
+        }
+<span class="fc" id="L239">        removeAll();</span>
+<span class="fc" id="L240">        int columnCount = model.getColumnCount();</span>
+
+        // another row for the table header
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (includeHeader) {</span>
+<span class="fc" id="L244">            setLayout(new TableLayout(model.getRowCount() + 1, columnCount));</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            for (int iter = 0; iter &lt; columnCount; iter++) {</span>
+<span class="fc" id="L246">                String name = model.getColumnName(iter);</span>
+<span class="fc" id="L247">                Component header = createCellImpl(name, -1, iter, false);</span>
+<span class="fc" id="L248">                TableLayout.Constraint con = createCellConstraint(name, -1, iter);</span>
+<span class="fc" id="L249">                addComponent(con, header);</span>
+            }
+        } else {
+<span class="nc" id="L252">            setLayout(new TableLayout(model.getRowCount(), columnCount));</span>
+        }
+
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int r = 0; r &lt; model.getRowCount(); r++) {</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            for (int c = 0; c &lt; columnCount; c++) {</span>
+<span class="fc" id="L257">                Object value = model.getValueAt(r, c);</span>
+
+                // null should be returned for spanned over values
+<span class="pc bpc" id="L260" title="3 of 4 branches missed.">                if (value != null || includeNullValues()) {</span>
+<span class="fc" id="L261">                    boolean e = model.isCellEditable(r, c);</span>
+<span class="fc" id="L262">                    Component cell = createCellImpl(value, r, c, e);</span>
+<span class="fc" id="L263">                    TableLayout.Constraint con = createCellConstraint(value, r, c);</span>
+
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    if (r &gt; model.getRowCount()) {</span>
+<span class="nc" id="L266">                        return;</span>
+                    }
+<span class="fc" id="L268">                    addComponent(con, cell);</span>
+<span class="pc bpc" id="L269" title="3 of 4 branches missed.">                    if (r == selectionRow &amp;&amp; c == selectionColumn) {</span>
+<span class="nc" id="L270">                        cell.requestFocus();</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L275">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void paintGlass(Graphics g) {
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        if ((drawBorder) &amp;&amp; (innerBorder != INNER_BORDERS_NONE)) {</span>
+<span class="fc" id="L281">            int xPos = getAbsoluteX();</span>
+<span class="fc" id="L282">            int yPos = getAbsoluteY();</span>
+<span class="fc" id="L283">            g.translate(xPos, yPos);</span>
+<span class="fc" id="L284">            int rows = model.getRowCount();</span>
+<span class="fc" id="L285">            int cols = model.getColumnCount();</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">            if (includeHeader) {</span>
+<span class="fc" id="L287">                rows++;</span>
+            }
+<span class="fc" id="L289">            g.setColor(getStyle().getFgColor());</span>
+<span class="fc" id="L290">            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());</span>
+<span class="fc" id="L291">            TableLayout t = (TableLayout) getLayout();</span>
+<span class="fc" id="L292">            int actualWidth = Math.max(getWidth(), getScrollDimension().getWidth());</span>
+<span class="fc" id="L293">            int actualHeight = Math.max(getHeight(), getScrollDimension().getHeight());</span>
+
+<span class="pc bpc" id="L295" title="3 of 4 branches missed.">            if ((collapseBorder) || (innerBorder != INNER_BORDERS_ALL) || // inner borders cols/rows are supported only in collapsed mode</span>
+<span class="nc bnc" id="L296" title="All 4 branches missed.">                    (t.hasHorizontalSpanning()) || (t.hasVerticalSpanning())) { // TODO - We currently don't support separate borders for tables with spanned cells</span>
+<span class="pc bpc" id="L297" title="3 of 4 branches missed.">                if ((innerBorder == INNER_BORDERS_ALL) || (innerBorder == INNER_BORDERS_ROWS)) {</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                    if (t.hasVerticalSpanning()) {</span>
+                        // iterate over the components and draw a line on the side of all
+                        // the components other than the ones that are at the last column.
+<span class="nc bnc" id="L301" title="All 2 branches missed.">                        for (int cellRow = 0; cellRow &lt; rows - 1; cellRow++) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                            for (int cellColumn = 0; cellColumn &lt; cols; cellColumn++) {</span>
+                                // if this isn't the last row
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                                if (cellRow + t.getCellVerticalSpan(cellRow, cellColumn) - 1 != rows - 1) {</span>
+                                    // if this is a spanned through cell we don't want to draw a line here
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                                    if (t.isCellSpannedThroughHorizontally(cellRow, cellColumn)) {</span>
+<span class="nc" id="L307">                                        continue;</span>
+                                    }
+
+<span class="nc" id="L310">                                    int x = t.getColumnPosition(cellColumn);</span>
+<span class="nc" id="L311">                                    int y = t.getRowPosition(cellRow);</span>
+<span class="nc" id="L312">                                    int rowHeight = t.getRowPosition(cellRow + t.getCellVerticalSpan(cellRow, cellColumn)) - y;</span>
+                                    int columnWidth;
+<span class="nc bnc" id="L314" title="All 2 branches missed.">                                    if (cellColumn &lt; getModel().getColumnCount() - 1) {</span>
+<span class="nc" id="L315">                                        columnWidth = t.getColumnPosition(cellColumn + 1) - x;</span>
+                                    } else {
+<span class="nc" id="L317">                                        columnWidth = getWidth() - y;</span>
+                                    }
+
+<span class="nc bnc" id="L320" title="All 4 branches missed.">                                    if ((innerBorder != INNER_BORDERS_ROWS) || (shouldDrawInnerBorderAfterRow(cellRow))) {</span>
+<span class="nc" id="L321">                                        g.drawLine(x, y + rowHeight, x + columnWidth, y + rowHeight);</span>
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // this is much faster since we don't need to check spanning
+<span class="fc bfc" id="L328" title="All 2 branches covered.">                        for (int row = 1; row &lt; rows; row++) {</span>
+<span class="fc" id="L329">                            int y = t.getRowPosition(row);</span>
+<span class="pc bpc" id="L330" title="3 of 4 branches missed.">                            if ((innerBorder != INNER_BORDERS_ROWS) || (shouldDrawInnerBorderAfterRow(row - 1))) {</span>
+<span class="fc" id="L331">                                g.drawLine(0, y, actualWidth, y);</span>
+                            }
+                            //g.drawLine(0+2, y+2, actualWidth-2, y+2);
+
+                        }
+                    }
+                }
+
+<span class="pc bpc" id="L339" title="3 of 4 branches missed.">                if ((innerBorder == INNER_BORDERS_ALL) || (innerBorder == INNER_BORDERS_COLS)) {</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                    if (t.hasHorizontalSpanning()) {</span>
+                        // iterate over the components and draw a line on the side of all
+                        // the components other than the ones that are at the last column.
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                        for (int cellRow = 0; cellRow &lt; rows; cellRow++) {</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                            for (int cellColumn = 0; cellColumn &lt; cols - 1; cellColumn++) {</span>
+                                // if this isn't the last column
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                                if (cellColumn + t.getCellHorizontalSpan(cellRow, cellColumn) - 1 != cols - 1) {</span>
+                                    // if this is a spanned through cell we don't want to draw a line here
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                                    if (t.isCellSpannedThroughVertically(cellRow, cellColumn)) {</span>
+<span class="nc" id="L349">                                        continue;</span>
+                                    }
+
+<span class="nc" id="L352">                                    int x = t.getColumnPosition(cellColumn);</span>
+<span class="nc" id="L353">                                    int y = t.getRowPosition(cellRow);</span>
+                                    int rowHeight;
+<span class="nc" id="L355">                                    int columnWidth = t.getColumnPosition(cellColumn + t.getCellHorizontalSpan(cellRow, cellColumn)) - x;</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                                    if (cellRow &lt; getModel().getRowCount() - 1) {</span>
+<span class="nc" id="L357">                                        rowHeight = t.getRowPosition(cellRow + 1) - y;</span>
+                                    } else {
+<span class="nc" id="L359">                                        rowHeight = getHeight() - y;</span>
+                                    }
+
+<span class="nc" id="L362">                                    g.drawLine(x + columnWidth, y, x + columnWidth, y + rowHeight);</span>
+                                }
+<span class="nc bnc" id="L364" title="All 2 branches missed.">                                if (t.getCellHorizontalSpan(cellRow, cellColumn) &gt; 1) {</span>
+<span class="nc" id="L365">                                    cellColumn += t.getCellHorizontalSpan(cellRow, cellColumn) - 1;</span>
+                                }
+                            }
+                        }
+                    } else {
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                        for (int col = 1; col &lt; cols; col++) {</span>
+<span class="fc" id="L371">                            int x = t.getColumnPosition(col);</span>
+<span class="fc" id="L372">                            g.drawLine(x, 0, x, actualHeight);</span>
+                            //g.drawLine(x+2, 0+2, x+2, actualHeight-2);
+                        }
+                    }
+                }
+            } else { // separate border
+                //if ((!t.hasHorizontalSpanning()) &amp;&amp; (!t.hasVerticalSpanning())) {
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                for (int row = 0; row &lt; rows; row++) {</span>
+<span class="nc" id="L380">                    int y = t.getRowPosition(row);</span>
+                    int h;
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                    if (row + 1 &lt; rows) {</span>
+<span class="nc" id="L383">                        h = t.getRowPosition(row + 1) - y;</span>
+                    } else {
+<span class="nc" id="L385">                        h = getY() + actualHeight - y - 2;</span>
+                    }
+<span class="nc bnc" id="L387" title="All 2 branches missed.">                    for (int col = 0; col &lt; cols; col++) {</span>
+<span class="nc" id="L388">                        int x = t.getColumnPosition(col);</span>
+                        int w;
+<span class="nc bnc" id="L390" title="All 2 branches missed.">                        if (col + 1 &lt; cols) {</span>
+<span class="nc" id="L391">                            w = t.getColumnPosition(col + 1) - x;</span>
+                        } else {
+<span class="nc" id="L393">                            w = getX() + actualWidth - x - 2;</span>
+                        }
+<span class="nc" id="L395">                        Component comp = t.getComponentAt(row, col);</span>
+<span class="nc bnc" id="L396" title="All 6 branches missed.">                        if (comp != null &amp;&amp; (comp.isVisible()) &amp;&amp;</span>
+                                ((drawEmptyCellsBorder) ||
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                                        ((comp.getWidth() - comp.getStyle().getPaddingRightNoRTL() - comp.getStyle().getPaddingLeftNoRTL() &gt; 0) &amp;&amp;</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                                                (comp.getHeight() - comp.getStyle().getPaddingTop() - comp.getStyle().getPaddingBottom() &gt; 0)))) {</span>
+<span class="nc" id="L400">                            int rightMargin = comp.getStyle().getMarginRightNoRTL();</span>
+<span class="nc" id="L401">                            int bottomMargin = comp.getStyle().getMarginBottom();</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">                            if (col == 0) {</span>
+<span class="nc" id="L403">                                rightMargin *= 2; // Since the first cell includes margins from both sides (left/right) so the next cell location is farther away - but we don't want to paint the border up to it</span>
+                            }
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                            if (row == 0) {</span>
+<span class="nc" id="L406">                                bottomMargin *= 2;</span>
+                            }
+<span class="nc" id="L408">                            g.drawRect(x + comp.getStyle().getMarginLeftNoRTL(), y + comp.getStyle().getMarginTop(), w - 2 - rightMargin, h - 2 - bottomMargin);</span>
+                        }
+                    }
+                }
+            }
+
+<span class="fc" id="L414">            g.translate(-xPos, -yPos);</span>
+<span class="fc" id="L415">            g.setAlpha(alpha);</span>
+        }
+<span class="fc" id="L417">    }</span>
+
+    private Component createCellImpl(Object value, final int row, final int column, boolean editable) {
+<span class="fc" id="L420">        Component c = createCell(value, row, column, editable);</span>
+<span class="fc" id="L421">        c.putClientProperty(&quot;row&quot;, Integer.valueOf(row));</span>
+<span class="fc" id="L422">        c.putClientProperty(&quot;column&quot;, Integer.valueOf(column));</span>
+
+        // we do this here to allow subclasses to return a text area or its subclass
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (c instanceof TextArea) {</span>
+<span class="fc" id="L426">            ((TextArea) c).addActionListener(listener);</span>
+        } else {
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            if (c instanceof Button) {</span>
+<span class="fc" id="L429">                ((Button) c).addActionListener(listener);</span>
+            }
+        }
+
+<span class="fc" id="L433">        Style s = c.getSelectedStyle();</span>
+        //s.setMargin(0, 0, 0, 0);
+<span class="fc" id="L435">        s.setMargin(verticalBorderSpacing, verticalBorderSpacing, horizontalBorderSpacing, horizontalBorderSpacing);</span>
+<span class="pc bpc" id="L436" title="2 of 4 branches missed.">        if ((drawBorder) &amp;&amp; (innerBorder != INNER_BORDERS_NONE)) {</span>
+<span class="fc" id="L437">            s.setBorder(null);</span>
+<span class="fc" id="L438">            s = c.getUnselectedStyle();</span>
+<span class="fc" id="L439">            s.setBorder(null);</span>
+        } else {
+<span class="nc" id="L441">            s = c.getUnselectedStyle();</span>
+        }
+        //s.setBgTransparency(0);
+        //s.setMargin(0, 0, 0, 0);
+<span class="fc" id="L445">        s.setMargin(verticalBorderSpacing, verticalBorderSpacing, horizontalBorderSpacing, horizontalBorderSpacing);</span>
+<span class="fc" id="L446">        return c;</span>
+    }
+
+    /// Returns a generic comparator that tries to work in a way that will sort columns with similar object types.
+    /// This method can be overridden to create custom sort orders or return null and thus disable sorting for a
+    /// specific column
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column that's sorted
+    ///
+    /// #### Returns
+    ///
+    /// the comparator instance
+    protected Comparator&lt;Object&gt; createColumnSortComparator(int column) {
+<span class="fc" id="L461">        return new ColumnSortComparator(new CaseInsensitiveOrder());</span>
+    }
+
+    /// Sorts the given column programmatically
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column to sort
+    ///
+    /// - `ascending`: true to sort in ascending order
+    public void sort(int column, boolean ascending) {
+<span class="nc" id="L472">        sortedColumn = column;</span>
+<span class="nc" id="L473">        Comparator&lt;Object&gt; cmp = createColumnSortComparator(column);</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        if (model instanceof SortableTableModel) {</span>
+<span class="nc" id="L475">            model = ((SortableTableModel) model).getUnderlying();</span>
+        }
+<span class="nc" id="L477">        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));</span>
+<span class="nc" id="L478">    }</span>
+
+    /// Creates a cell based on the given value
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the new value object
+    ///
+    /// - `row`: row number, -1 for the header rows
+    ///
+    /// - `column`: column number
+    ///
+    /// - `editable`: true if the cell is editable
+    ///
+    /// #### Returns
+    ///
+    /// cell component instance
+    protected Component createCell(Object value, int row, final int column, boolean editable) {
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        if (row == -1) {</span>
+<span class="fc" id="L497">            Button header = new Button((String) value, getUIID() + &quot;Header&quot;);</span>
+<span class="fc" id="L498">            header.getAllStyles().setAlignment(titleAlignment);</span>
+<span class="fc" id="L499">            header.setTextPosition(LEFT);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            if (isSortSupported()) {</span>
+<span class="fc" id="L501">                header.addActionListener(new ActionListener&lt;ActionEvent&gt;() {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L504">                        Comparator&lt;Object&gt; cmp = createColumnSortComparator(column);</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">                        if (column == sortedColumn) {</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">                            ascending = !ascending;</span>
+                        } else {
+<span class="fc" id="L508">                            sortedColumn = column;</span>
+<span class="fc" id="L509">                            ascending = false;</span>
+                        }
+<span class="fc bfc" id="L511" title="All 2 branches covered.">                        if (model instanceof SortableTableModel) {</span>
+<span class="fc" id="L512">                            model = ((SortableTableModel) model).getUnderlying();</span>
+                        }
+<span class="fc" id="L514">                        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));</span>
+<span class="fc" id="L515">                    }</span>
+                });
+<span class="fc bfc" id="L517" title="All 2 branches covered.">                if (sortedColumn == column) {</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">                    if (ascending) {</span>
+<span class="fc" id="L519">                        FontImage.setMaterialIcon(header, FontImage.MATERIAL_ARROW_DROP_UP);</span>
+                    } else {
+<span class="fc" id="L521">                        FontImage.setMaterialIcon(header, FontImage.MATERIAL_ARROW_DROP_DOWN);</span>
+                    }
+                }
+            }
+<span class="fc" id="L525">            return header;</span>
+        }
+<span class="fc" id="L527">        int constraint = TextArea.ANY;</span>
+<span class="fc" id="L528">        Constraint validation = null;</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        if (isAbstractTableModel()) {</span>
+<span class="fc" id="L530">            Class type = ((AbstractTableModel) model).getCellType(row, column);</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">            if (type == Boolean.class) {</span>
+<span class="nc" id="L532">                CheckBox cell = new CheckBox();</span>
+<span class="nc" id="L533">                cell.setSelected(Util.toBooleanValue(value));</span>
+<span class="nc" id="L534">                cell.setUIID(getUIID() + &quot;Cell&quot;);</span>
+<span class="nc" id="L535">                cell.setEnabled(editable);</span>
+<span class="nc" id="L536">                return cell;</span>
+            }
+<span class="pc bpc" id="L538" title="2 of 6 branches missed.">            if (editable &amp;&amp; (type == null || type == String.class)) {</span>
+<span class="fc" id="L539">                String[] multiChoice = ((AbstractTableModel) model).getMultipleChoiceOptions(row, column);</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">                if (multiChoice != null) {</span>
+<span class="nc" id="L541">                    Picker cell = new Picker();</span>
+<span class="nc" id="L542">                    cell.setStrings(multiChoice);</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">                    if (value != null) {</span>
+<span class="nc" id="L544">                        cell.setSelectedString((String) value);</span>
+                    }
+<span class="nc" id="L546">                    cell.setUIID(getUIID() + &quot;Cell&quot;);</span>
+<span class="nc" id="L547">                    return cell;</span>
+                }
+            }
+<span class="pc bpc" id="L550" title="1 of 4 branches missed.">            if (editable &amp;&amp; type == Date.class) {</span>
+<span class="nc" id="L551">                Picker cell = new Picker();</span>
+<span class="nc" id="L552">                cell.setType(Display.PICKER_TYPE_DATE);</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                if (value != null) {</span>
+<span class="nc" id="L554">                    cell.setDate((Date) value);</span>
+                }
+<span class="nc" id="L556">                cell.setUIID(getUIID() + &quot;Cell&quot;);</span>
+<span class="nc" id="L557">                return cell;</span>
+            }
+<span class="pc bpc" id="L559" title="3 of 8 branches missed.">            if (type == Integer.class || type == Long.class || type == Short.class ||</span>
+                    type == Byte.class) {
+<span class="fc" id="L561">                constraint = TextArea.NUMERIC;</span>
+            } else {
+<span class="pc bpc" id="L563" title="2 of 4 branches missed.">                if (type == Float.class || type == Double.class) {</span>
+<span class="nc" id="L564">                    constraint = TextArea.DECIMAL;</span>
+                }
+            }
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">            if (((AbstractTableModel) model).getValidator() != null) {</span>
+<span class="nc" id="L568">                validation = ((AbstractTableModel) model).getValidationConstraint(row, column);</span>
+            }
+        }
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        if (editable) {</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">            TextField cell = new TextField(value == null ? &quot;&quot; : &quot;&quot; + value, -1);</span>
+<span class="fc" id="L573">            cell.setConstraint(constraint);</span>
+<span class="fc" id="L574">            cell.setLeftAndRightEditingTrigger(false);</span>
+<span class="fc" id="L575">            cell.setUIID(getUIID() + &quot;Cell&quot;);</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">            if (validation != null) {</span>
+<span class="nc" id="L577">                Validator v = ((AbstractTableModel) model).getValidator();</span>
+<span class="nc" id="L578">                v.addConstraint(cell, validation);</span>
+            }
+<span class="fc" id="L580">            return cell;</span>
+        }
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">        Label cell = new Label(value == null ? &quot;&quot; : &quot;&quot; + value);</span>
+<span class="fc" id="L583">        cell.setUIID(getUIID() + &quot;Cell&quot;);</span>
+<span class="fc" id="L584">        cell.getUnselectedStyle().setAlignment(cellAlignment);</span>
+<span class="fc" id="L585">        cell.getSelectedStyle().setAlignment(cellAlignment);</span>
+<span class="fc" id="L586">        cell.setFocusable(true);</span>
+<span class="fc" id="L587">        return cell;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void initComponent() {
+        // this can happen if deinitialize is invoked due to a menu command which modifies
+        // the content of the table while the listener wasn't bound
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        if (potentiallyDirtyModel) {</span>
+<span class="nc" id="L596">            updateModel();</span>
+<span class="nc" id="L597">            potentiallyDirtyModel = false;</span>
+        }
+<span class="fc" id="L599">        model.addDataChangeListener(listener);</span>
+<span class="fc" id="L600">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void deinitialize() {
+        // we unbind the listener to prevent a memory leak for the use case of keeping
+        // the model while discarding the component
+        // Prevent the model listener from being removed when the VKB is shown
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">        if (!Display.getInstance().isVirtualKeyboardShowing()) {</span>
+<span class="fc" id="L609">            potentiallyDirtyModel = true;</span>
+<span class="fc" id="L610">            model.removeDataChangeListener(listener);</span>
+        } else {
+<span class="nc" id="L612">            potentiallyDirtyModel = false;</span>
+        }
+<span class="fc" id="L614">    }</span>
+
+    /// Returns the model instance
+    ///
+    /// #### Returns
+    ///
+    /// the model instance
+    public TableModel getModel() {
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">        if (sortedColumn &gt; -1) {</span>
+<span class="nc" id="L623">            return ((SortableTableModel) model).getUnderlying();</span>
+        }
+<span class="fc" id="L625">        return model;</span>
+    }
+
+    /// Replaces the underlying model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the new model
+    public void setModel(TableModel model) {
+<span class="fc" id="L634">        this.model = model;</span>
+<span class="fc" id="L635">        updateModel();</span>
+<span class="fc" id="L636">        revalidate();</span>
+<span class="fc" id="L637">    }</span>
+
+    /// Indicates whether the table border should be drawn
+    ///
+    /// #### Returns
+    ///
+    /// the drawBorder
+    public boolean isDrawBorder() {
+<span class="fc" id="L645">        return drawBorder;</span>
+    }
+
+    /// Indicates whether the table border should be drawn
+    ///
+    /// #### Parameters
+    ///
+    /// - `drawBorder`: the drawBorder to set
+    public void setDrawBorder(boolean drawBorder) {
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">        if (this.drawBorder != drawBorder) {</span>
+<span class="nc" id="L655">            this.drawBorder = drawBorder;</span>
+<span class="nc" id="L656">            updateModel();</span>
+<span class="nc" id="L657">            revalidate();</span>
+        }
+<span class="fc" id="L659">    }</span>
+
+    /// Returns the current inner border mode
+    ///
+    /// #### Returns
+    ///
+    /// the current inner border mode (one of the INNER_BORDER_* constants)
+    public int getInnerBorderMode() {
+<span class="nc" id="L667">        return innerBorder;</span>
+    }
+
+    /// Sets how to draw the inner border (All of it, only rows/columns, none, groups)
+    /// Note that setting to any mode other than NONE/ALL will result in the border drawing as collapsed whether this is a collpased border or not
+    ///
+    /// #### Parameters
+    ///
+    /// - `innerBorder`: one of the INNER_BORDER_* constants
+    public void setInnerBorderMode(int innerBorder) {
+<span class="nc bnc" id="L677" title="All 4 branches missed.">        if ((innerBorder &lt; INNER_BORDERS_NONE) || (innerBorder &gt; INNER_BORDERS_ALL)) {</span>
+<span class="nc" id="L678">            throw new IllegalArgumentException(&quot;Inner border mode must be one of the INNER_BORDER_* constants&quot;);</span>
+        }
+
+<span class="nc bnc" id="L681" title="All 2 branches missed.">        if (this.innerBorder != innerBorder) {</span>
+<span class="nc" id="L682">            this.innerBorder = innerBorder;</span>
+<span class="nc" id="L683">            updateModel();</span>
+<span class="nc" id="L684">            revalidate();</span>
+        }
+<span class="nc" id="L686">    }</span>
+
+    /// Returns whether an inner border should be drawn after the specified row.
+    /// This allows customization in subclasses to create for example the effects of segments in atable, i.e. instead of a line after each row - lines after &quot;chunks&quot; of rows.
+    /// Note that this is queried only when the inner border mode is set to INNER_BORDER_ROWS
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: The row in question
+    ///
+    /// #### Returns
+    ///
+    /// true to draw inner border, false otherwise
+    protected boolean shouldDrawInnerBorderAfterRow(int row) {
+<span class="nc" id="L700">        return true;</span>
+    }
+
+    /// Indicates whether the borders of the cells should collapse to form a one line border
+    ///
+    /// #### Parameters
+    ///
+    /// - `collapseBorder`: true to collapse (default), false for separate borders
+    public void setCollapseBorder(boolean collapseBorder) {
+<span class="nc bnc" id="L709" title="All 2 branches missed.">        if (this.collapseBorder != collapseBorder) {</span>
+<span class="nc" id="L710">            this.collapseBorder = collapseBorder;</span>
+<span class="nc bnc" id="L711" title="All 4 branches missed.">            if ((horizontalBorderSpacing != 0) || (verticalBorderSpacing != 0)) { // Only if one of the spacing was not 0, then we need to update, since otherwise the margin is 0 for both collapse and separate modes</span>
+<span class="nc" id="L712">                updateMargins();</span>
+            }
+<span class="nc" id="L714">            repaint();</span>
+        }
+<span class="nc" id="L716">    }</span>
+
+    /// Indicates whether empty cells should have borders (relevant only for separate borders and not for collapsed)
+    ///
+    /// #### Parameters
+    ///
+    /// - `drawEmptyCellsBorder`: - true to draw (default), false otherwise
+    public void setDrawEmptyCellsBorder(boolean drawEmptyCellsBorder) {
+<span class="nc" id="L724">        this.drawEmptyCellsBorder = drawEmptyCellsBorder;</span>
+<span class="nc" id="L725">        repaint();</span>
+<span class="nc" id="L726">    }</span>
+
+    /// Sets the spacing of cells border (relevant only for separate borders and not for collapsed)
+    ///
+    /// #### Parameters
+    ///
+    /// - `horizontal`: - The horizontal spacing
+    ///
+    /// - `vertical`: - The vertical spacing
+    public void setBorderSpacing(int horizontal, int vertical) {
+<span class="nc" id="L736">        horizontalBorderSpacing = horizontal;</span>
+<span class="nc" id="L737">        verticalBorderSpacing = vertical;</span>
+<span class="nc" id="L738">        updateMargins();</span>
+<span class="nc" id="L739">    }</span>
+
+    private void updateMargins() {
+<span class="nc" id="L742">        TableLayout t = (TableLayout) getLayout();</span>
+<span class="nc" id="L743">        int hSpace = horizontalBorderSpacing;</span>
+<span class="nc" id="L744">        int vSpace = verticalBorderSpacing;</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">        if (collapseBorder) { // not relevant for collapse border</span>
+<span class="nc" id="L746">            hSpace = 0;</span>
+<span class="nc" id="L747">            vSpace = 0;</span>
+        }
+<span class="nc bnc" id="L749" title="All 4 branches missed.">        if ((!t.hasHorizontalSpanning()) &amp;&amp; (!t.hasVerticalSpanning())) {</span>
+<span class="nc bnc" id="L750" title="All 2 branches missed.">            for (int row = 0; row &lt; t.getRows(); row++) {</span>
+<span class="nc bnc" id="L751" title="All 2 branches missed.">                for (int col = 0; col &lt; t.getColumns(); col++) {</span>
+<span class="nc" id="L752">                    Component cmp = null;</span>
+                    try {
+<span class="nc" id="L754">                        cmp = t.getComponentAt(row, col);</span>
+<span class="nc" id="L755">                    } catch (Exception e) {</span>
+<span class="nc" id="L756">                        Log.e(e);</span>
+<span class="nc" id="L757">                    }</span>
+<span class="nc bnc" id="L758" title="All 2 branches missed.">                    if (cmp != null) {</span>
+<span class="nc bnc" id="L759" title="All 2 branches missed.">                        int leftMargin = (col == 0) ? hSpace : 0;</span>
+<span class="nc bnc" id="L760" title="All 2 branches missed.">                        int topMargin = (row == 0) ? vSpace : 0;</span>
+<span class="nc" id="L761">                        cmp.getUnselectedStyle().setMargin(topMargin, vSpace, leftMargin, hSpace);</span>
+<span class="nc" id="L762">                        cmp.getSelectedStyle().setMargin(topMargin, vSpace, leftMargin, hSpace);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L767">        repaint();</span>
+<span class="nc" id="L768">    }</span>
+
+
+    /// Indicates the alignment of the title see label alignment for details
+    ///
+    /// #### Returns
+    ///
+    /// the title alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
+    public int getTitleAlignment() {
+<span class="nc" id="L781">        return titleAlignment;</span>
+    }
+
+    /// Indicates the alignment of the title see label alignment for details
+    ///
+    /// #### Parameters
+    ///
+    /// - `titleAlignment`: the title alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
+    public void setTitleAlignment(int titleAlignment) {
+<span class="nc" id="L794">        this.titleAlignment = titleAlignment;</span>
+<span class="nc bnc" id="L795" title="All 2 branches missed.">        for (int iter = 0; iter &lt; model.getColumnCount(); iter++) {</span>
+<span class="nc" id="L796">            listener.dataChanged(-1, iter);</span>
+        }
+<span class="nc" id="L798">    }</span>
+
+
+    /// Returns the column in which the given cell is placed
+    ///
+    /// #### Parameters
+    ///
+    /// - `cell`: the component representing the cell placed in the table
+    ///
+    /// #### Returns
+    ///
+    /// the column in which the cell was placed in the table
+    public int getCellColumn(Component cell) {
+<span class="fc" id="L811">        Integer i = ((Integer) cell.getClientProperty(&quot;column&quot;));</span>
+<span class="pc bpc" id="L812" title="1 of 2 branches missed.">        if (i != null) {</span>
+<span class="fc" id="L813">            return i.intValue();</span>
+        }
+<span class="nc" id="L815">        return -1;</span>
+    }
+
+    /// Returns the row in which the given cell is placed
+    ///
+    /// #### Parameters
+    ///
+    /// - `cell`: the component representing the cell placed in the table
+    ///
+    /// #### Returns
+    ///
+    /// the row in which the cell was placed in the table
+    public int getCellRow(Component cell) {
+<span class="fc" id="L828">        Integer i = ((Integer) cell.getClientProperty(&quot;row&quot;));</span>
+<span class="pc bpc" id="L829" title="1 of 2 branches missed.">        if (i != null) {</span>
+<span class="fc" id="L830">            return i.intValue();</span>
+        }
+<span class="nc" id="L832">        return -1;</span>
+    }
+
+    /// Indicates the alignment of the cells see label alignment for details
+    ///
+    /// #### Returns
+    ///
+    /// the cell alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
+    public int getCellAlignment() {
+<span class="nc" id="L845">        return cellAlignment;</span>
+    }
+
+    /// Indicates the alignment of the cells see label alignment for details
+    ///
+    /// #### Parameters
+    ///
+    /// - `cellAlignment`: the table cell alignment
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Label#setAlignment(int)
+    public void setCellAlignment(int cellAlignment) {
+<span class="nc" id="L858">        this.cellAlignment = cellAlignment;</span>
+<span class="nc" id="L859">        repaint();</span>
+<span class="nc" id="L860">    }</span>
+
+    /// Indicates whether the table should render a table header as the first row
+    ///
+    /// #### Returns
+    ///
+    /// the includeHeader
+    public boolean isIncludeHeader() {
+<span class="fc" id="L868">        return includeHeader;</span>
+    }
+
+    /// Indicates whether the table should render a table header as the first row
+    ///
+    /// #### Parameters
+    ///
+    /// - `includeHeader`: the includeHeader to set
+    public void setIncludeHeader(boolean includeHeader) {
+<span class="nc" id="L877">        this.includeHeader = includeHeader;</span>
+<span class="nc" id="L878">        updateModel();</span>
+<span class="nc" id="L879">    }</span>
+
+    /// Creates the table cell constraint for the given cell, this method can be overriden for
+    /// the purposes of modifying the table constraints.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value of the cell
+    ///
+    /// - `row`: the table row
+    ///
+    /// - `column`: the table column
+    ///
+    /// #### Returns
+    ///
+    /// the table constraint
+    protected TableLayout.Constraint createCellConstraint(Object value, int row, int column) {
+<span class="pc bpc" id="L896" title="1 of 2 branches missed.">        if (includeHeader) {</span>
+<span class="fc" id="L897">            row++;</span>
+        }
+<span class="fc" id="L899">        TableLayout t = (TableLayout) getLayout();</span>
+<span class="fc" id="L900">        return t.createConstraint(row, column);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L906">        return new String[]{&quot;data&quot;, &quot;header&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L912">        return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArray2DClass(),</span>
+<span class="nc" id="L913">                com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L919">        return new String[]{&quot;String[][]&quot;, &quot;String[]&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L925" title="All 2 branches missed.">        if (&quot;data&quot;.equals(name)) {</span>
+<span class="nc" id="L926">            String[][] result = new String[((DefaultTableModel) model).data.size()][];</span>
+<span class="nc bnc" id="L927" title="All 2 branches missed.">            for (int iter = 0; iter &lt; result.length; iter++) {</span>
+<span class="nc" id="L928">                Object[] o = ((DefaultTableModel) model).data.get(iter);</span>
+<span class="nc" id="L929">                String[] arr = new String[o.length];</span>
+<span class="nc" id="L930">                result[iter] = arr;</span>
+<span class="nc bnc" id="L931" title="All 2 branches missed.">                for (int ai = 0; ai &lt; arr.length; ai++) {</span>
+<span class="nc" id="L932">                    Object current = o[ai];</span>
+<span class="nc bnc" id="L933" title="All 2 branches missed.">                    if (current instanceof String) {</span>
+<span class="nc" id="L934">                        arr[ai] = (String) current;</span>
+                    } else {
+<span class="nc bnc" id="L936" title="All 2 branches missed.">                        if (current != null) {</span>
+<span class="nc" id="L937">                            arr[iter] = current.toString();</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L942">            return result;</span>
+        }
+<span class="nc bnc" id="L944" title="All 2 branches missed.">        if (&quot;header&quot;.equals(name)) {</span>
+<span class="nc" id="L945">            return ((DefaultTableModel) model).columnNames;</span>
+        }
+<span class="nc" id="L947">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L953" title="All 2 branches missed.">        if (&quot;data&quot;.equals(name)) {</span>
+<span class="nc" id="L954">            setModel(new DefaultTableModel(((DefaultTableModel) model).columnNames, (Object[][]) value));</span>
+<span class="nc" id="L955">            return null;</span>
+        }
+<span class="nc bnc" id="L957" title="All 2 branches missed.">        if (&quot;header&quot;.equals(name)) {</span>
+<span class="nc" id="L958">            setModel(new DefaultTableModel((String[]) value, ((DefaultTableModel) model).data, ((DefaultTableModel) model).editable));</span>
+<span class="nc" id="L959">            return null;</span>
+        }
+<span class="nc" id="L961">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// If the table is sorted returns the position of the row in the actual
+    /// underlying model
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: @param row the row as it visually appears in the table or in the
+    /// `createCell` method
+    ///
+    /// #### Returns
+    ///
+    /// @return the position of the row in the physical model, this will be
+    /// the same value if the table isn't sorted
+    public int translateSortedRowToModelRow(int row) {
+<span class="nc bnc" id="L977" title="All 2 branches missed.">        if (model instanceof SortableTableModel) {</span>
+<span class="nc" id="L978">            return ((SortableTableModel) model).getSortedPosition(row);</span>
+        }
+<span class="nc" id="L980">        return row;</span>
+    }
+
+    /// Sort support can be toggled with this flag
+    ///
+    /// #### Returns
+    ///
+    /// the sortSupported
+    public boolean isSortSupported() {
+<span class="fc" id="L989">        return sortSupported;</span>
+    }
+
+    /// Sort support can be toggled with this flag
+    ///
+    /// #### Parameters
+    ///
+    /// - `sortSupported`: the sortSupported to set
+    public void setSortSupported(boolean sortSupported) {
+<span class="pc bpc" id="L998" title="1 of 2 branches missed.">        if (this.sortSupported != sortSupported) {</span>
+<span class="fc" id="L999">            this.sortSupported = sortSupported;</span>
+<span class="fc" id="L1000">            setModel(getModel());</span>
+        }
+<span class="fc" id="L1002">    }</span>
+
+    private boolean isAbstractTableModel() {
+<span class="fc bfc" id="L1005" title="All 2 branches covered.">        if (model instanceof SortableTableModel) {</span>
+<span class="fc" id="L1006">            return ((SortableTableModel) model).getUnderlying() instanceof AbstractTableModel;</span>
+        }
+<span class="fc" id="L1008">        return model instanceof AbstractTableModel;</span>
+    }
+
+    private static class ColumnSortComparator implements Comparator&lt;Object&gt; {
+        private final CaseInsensitiveOrder ccmp;
+
+<span class="fc" id="L1014">        public ColumnSortComparator(CaseInsensitiveOrder ccmp) {</span>
+<span class="fc" id="L1015">            this.ccmp = ccmp;</span>
+<span class="fc" id="L1016">        }</span>
+
+        @Override
+        public int compare(Object o1, Object o2) {
+<span class="fc bfc" id="L1020" title="All 2 branches covered.">            if (o1 == null) {</span>
+<span class="fc bfc" id="L1021" title="All 2 branches covered.">                if (o2 == null) {</span>
+<span class="fc" id="L1022">                    return 0;</span>
+                }
+<span class="fc" id="L1024">                return -1;</span>
+            } else {
+<span class="fc bfc" id="L1026" title="All 2 branches covered.">                if (o2 == null) {</span>
+<span class="fc" id="L1027">                    return 1;</span>
+                }
+            }
+<span class="pc bpc" id="L1030" title="1 of 4 branches missed.">            if (o1 instanceof String &amp;&amp; o2 instanceof String) {</span>
+<span class="fc" id="L1031">                return ccmp.compare((String) o1, (String) o2);</span>
+            }
+            try {
+<span class="fc" id="L1034">                double d1 = Util.toDoubleValue(o1);</span>
+<span class="fc" id="L1035">                double d2 = Util.toDoubleValue(o2);</span>
+<span class="fc" id="L1036">                return Double.compare(d1, d2);</span>
+<span class="nc" id="L1037">            } catch (IllegalArgumentException err) {</span>
+<span class="nc" id="L1038">                return (int) (Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime());</span>
+            }
+        }
+    }
+
+<span class="fc" id="L1043">    class Listener implements DataChangedListener, ActionListener {</span>
+<span class="fc" id="L1044">        private int editingColumn = -1;</span>
+<span class="fc" id="L1045">        private int editingRow = -1;</span>
+
+        /// {@inheritDoc}
+        @Override
+        public final void dataChanged(int row, int column) {
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">            if (row == Integer.MIN_VALUE) {</span>
+                // special case... Rebuild the table
+<span class="nc" id="L1052">                updateModel();</span>
+<span class="nc" id="L1053">                revalidate();</span>
+<span class="nc" id="L1054">                return;</span>
+            }
+            // prevents the table from rebuilding on every text field edit which makes the table
+            // more usable on iOS devices with the VKB/Native editing
+<span class="nc bnc" id="L1058" title="All 4 branches missed.">            if (editingColumn == column &amp;&amp; editingRow == row) {</span>
+<span class="nc" id="L1059">                editingColumn = -1;</span>
+<span class="nc" id="L1060">                editingRow = -1;</span>
+<span class="nc" id="L1061">                return;</span>
+            }
+            Object value;
+            boolean e;
+<span class="nc bnc" id="L1065" title="All 2 branches missed.">            if (row &lt; 0) {</span>
+<span class="nc" id="L1066">                e = false;</span>
+<span class="nc" id="L1067">                value = model.getColumnName(column);</span>
+            } else {
+<span class="nc" id="L1069">                value = model.getValueAt(row, column);</span>
+<span class="nc" id="L1070">                e = model.isCellEditable(row, column);</span>
+            }
+<span class="nc" id="L1072">            Component cell = createCellImpl(value, row, column, e);</span>
+
+<span class="nc" id="L1074">            TableLayout t = (TableLayout) getLayout();</span>
+<span class="nc" id="L1075">            TableLayout.Constraint con = createCellConstraint(value, row, column);</span>
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">            if (includeHeader) {</span>
+<span class="nc" id="L1077">                row++;</span>
+            }
+
+<span class="nc" id="L1080">            Component c = t.getComponentAt(row, column);</span>
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L1082">                removeComponent(c);</span>
+
+                // a repaint sent right before this might result in an artifact for some use cases so
+                // removing visibility essentially cancels repaints
+<span class="nc" id="L1086">                c.setVisible(false);</span>
+            }
+
+<span class="nc" id="L1089">            addComponent(con, cell);</span>
+<span class="nc" id="L1090">            layoutContainer();</span>
+<span class="nc" id="L1091">            cell.requestFocus();</span>
+<span class="nc" id="L1092">            revalidate();</span>
+<span class="nc" id="L1093">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L1097">            Component c = (Component) evt.getSource();</span>
+<span class="fc" id="L1098">            int row = getCellRow(c);</span>
+<span class="fc" id="L1099">            int column = getCellColumn(c);</span>
+<span class="fc bfc" id="L1100" title="All 2 branches covered.">            if (c instanceof TextArea) {</span>
+<span class="fc" id="L1101">                TextArea t = (TextArea) c;</span>
+<span class="fc" id="L1102">                editingColumn = column;</span>
+<span class="fc" id="L1103">                editingRow = row;</span>
+<span class="pc bpc" id="L1104" title="1 of 2 branches missed.">                if (isAbstractTableModel()) {</span>
+<span class="fc" id="L1105">                    Class type = ((AbstractTableModel) model).getCellType(row, column);</span>
+<span class="pc bpc" id="L1106" title="1 of 2 branches missed.">                    if (type == Integer.class) {</span>
+<span class="nc" id="L1107">                        model.setValueAt(row, column, t.getAsInt(0));</span>
+<span class="nc" id="L1108">                        return;</span>
+                    }
+<span class="pc bpc" id="L1110" title="1 of 2 branches missed.">                    if (type == Long.class) {</span>
+<span class="nc" id="L1111">                        model.setValueAt(row, column, t.getAsLong(0));</span>
+<span class="nc" id="L1112">                        return;</span>
+                    }
+<span class="pc bpc" id="L1114" title="1 of 2 branches missed.">                    if (type == Short.class) {</span>
+<span class="nc" id="L1115">                        model.setValueAt(row, column, (short) t.getAsInt(0));</span>
+<span class="nc" id="L1116">                        return;</span>
+                    }
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">                    if (type == Byte.class) {</span>
+<span class="nc" id="L1119">                        model.setValueAt(row, column, (byte) t.getAsInt(0));</span>
+<span class="nc" id="L1120">                        return;</span>
+                    }
+<span class="pc bpc" id="L1122" title="1 of 2 branches missed.">                    if (type == Float.class) {</span>
+<span class="nc" id="L1123">                        model.setValueAt(row, column, (float) t.getAsDouble(0));</span>
+<span class="nc" id="L1124">                        return;</span>
+                    }
+<span class="pc bpc" id="L1126" title="1 of 2 branches missed.">                    if (type == Double.class) {</span>
+<span class="nc" id="L1127">                        model.setValueAt(row, column, t.getAsDouble(0));</span>
+<span class="nc" id="L1128">                        return;</span>
+                    }
+<span class="pc bpc" id="L1130" title="1 of 2 branches missed.">                    if (type == Character.class) {</span>
+<span class="nc bnc" id="L1131" title="All 2 branches missed.">                        if (t.getText().length() &gt; 0) {</span>
+<span class="nc" id="L1132">                            model.setValueAt(row, column, t.getText().charAt(0));</span>
+                        }
+<span class="nc" id="L1134">                        return;</span>
+                    }
+                }
+<span class="fc" id="L1137">                model.setValueAt(row, column, t.getText());</span>
+<span class="fc" id="L1138">            } else {</span>
+<span class="pc bpc" id="L1139" title="1 of 2 branches missed.">                if (c instanceof Picker) {</span>
+<span class="nc bnc" id="L1140" title="All 3 branches missed.">                    switch (((Picker) c).getType()) {</span>
+                        case Display.PICKER_TYPE_DATE:
+<span class="nc" id="L1142">                            model.setValueAt(row, column, ((Picker) c).getDate());</span>
+<span class="nc" id="L1143">                            break;</span>
+
+                        case Display.PICKER_TYPE_STRINGS:
+<span class="nc" id="L1146">                            model.setValueAt(row, column, ((Picker) c).getSelectedString());</span>
+<span class="nc" id="L1147">                            break;</span>
+                        default:
+<span class="nc" id="L1149">                            break;</span>
+                    }
+                } else {
+<span class="pc bpc" id="L1152" title="1 of 2 branches missed.">                    if (c instanceof CheckBox) {</span>
+<span class="nc" id="L1153">                        model.setValueAt(row, column, ((CheckBox) c).isSelected());</span>
+                    }
+                }
+            }
+<span class="fc" id="L1157">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

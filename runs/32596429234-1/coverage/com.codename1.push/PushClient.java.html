@@ -1,0 +1,615 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.push</a> &gt; <span class="el_source">PushClient.java</span></div><h1>PushClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.push;
+
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Preferences;
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
+import com.codename1.surfaces.Surfaces;
+import com.codename1.surfaces.LiveActivity;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+
+///
+/// Owns push registration and delivers typed push events to an application.
+///
+/// Create exactly one client from the application's {@code init()} method,
+/// keep it in a field on the main application class, and call {@link #register()}
+/// from {@code start()}. Registration is idempotent, so it is safe for
+/// {@code start()} to call it again when Codename One resumes the application.
+/// Do not call {@link #unregister()} from {@code stop()}; unregistering removes
+/// the device subscription and is intended for an explicit user opt-out.
+///
+/// The listener is mandatory and is installed before native registration
+/// starts. Messages that reach the runtime before {@code register()} are kept in
+/// a bounded process-local queue and replayed when the client becomes active.
+/// Native cold-start implementations also persist messages until the Codename
+/// One runtime starts. All listener and registration-sink callbacks run on the
+/// Codename One EDT.
+///
+/// Codename One does not discover a listener with reflection or
+/// {@code Class.forName()}. Calling {@code build()} without a listener fails
+/// immediately, but the application is responsible for retaining the client and
+/// calling {@code register()}. Only one client can be active in a process.
+///
+/// @see PushListener
+/// @see PushTransport
+/// @see PushRegistrationSink
+public final class PushClient {
+    private static final int MAX_PENDING_MESSAGES = 100;
+<span class="fc" id="L71">    private static final List&lt;String&gt; pendingMessages = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L72">    private static final AtomicReference&lt;PushClient&gt; active =</span>
+            new AtomicReference&lt;PushClient&gt;();
+
+    private final String appId;
+    private final PushListener listener;
+    private final PushRegistrationSink registrationSink;
+    private final PushTransport transport;
+    private PushSubscription subscription;
+    private boolean registrationRequested;
+<span class="fc" id="L81">    private final PushCallback compatibilityCallback = new CompatibilityCallback();</span>
+
+<span class="fc" id="L83">    private PushClient(Builder builder) {</span>
+<span class="fc" id="L84">        appId = builder.appId;</span>
+<span class="fc" id="L85">        listener = builder.listener;</span>
+<span class="fc" id="L86">        registrationSink = builder.registrationSink;</span>
+<span class="fc" id="L87">        transport = builder.transport;</span>
+<span class="fc" id="L88">    }</span>
+
+    ///
+    /// Starts a client builder for a managed BuildCloud push application.
+    ///
+    /// The application key is displayed in the Push section of the Codename
+    /// One Console. It identifies the application during client registration; it
+    /// is not a server API key. Install a {@link PushTransport} on the returned
+    /// builder to bypass BuildCloud and use an application-owned push server.
+    ///
+    /// @param appId the non-empty Push application key, or an application-owned
+    ///              identifier when using a custom transport
+    /// @return a new builder
+    /// @throws IllegalArgumentException if {@code appId} is null or empty
+    public static Builder builder(String appId) {
+<span class="fc" id="L103">        return new Builder(appId);</span>
+    }
+
+    ///
+    /// Activates this client and requests native push registration.
+    ///
+    /// This method is idempotent. Calling it from each invocation of the
+    /// application's {@code start()} method requests registration only once.
+    /// A native token persisted before this client becomes active is replayed
+    /// immediately, then the platform is asked to refresh it. Registration
+    /// otherwise completes asynchronously through
+    /// {@link PushListener#onRegistration(PushSubscription)} or
+    /// {@link PushListener#onError(PushError)}. Messages queued before activation
+    /// are replayed before this method requests a new native token.
+    ///
+    /// If another {@code PushClient} is already active, this client reports an
+    /// {@code active_client} error and remains inactive.
+    public void register() {
+<span class="fc" id="L121">        synchronized (this) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (registrationRequested) {</span>
+<span class="fc" id="L123">                return;</span>
+            }
+<span class="fc" id="L125">            registrationRequested = true;</span>
+<span class="fc" id="L126">        }</span>
+<span class="fc bfc" id="L127" title="All 4 branches covered.">        if (transport != null &amp;&amp; !transport.isSupported()) {</span>
+<span class="fc" id="L128">            registrationFailed();</span>
+<span class="fc" id="L129">            fireError(new PushError(&quot;unsupported_transport&quot;,</span>
+<span class="fc" id="L130">                    transport.getId() + &quot; is unavailable&quot;, false));</span>
+<span class="fc" id="L131">            return;</span>
+        }
+        List&lt;String&gt; replay;
+<span class="fc" id="L134">        synchronized (pendingMessages) {</span>
+<span class="fc" id="L135">            PushClient current = active.get();</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">            if (current != null &amp;&amp; !current.equals(this)) {</span>
+<span class="fc" id="L137">                registrationFailed();</span>
+<span class="fc" id="L138">                fireError(new PushError(&quot;active_client&quot;,</span>
+                        &quot;Another PushClient is already active&quot;, false));
+<span class="fc" id="L140">                return;</span>
+            }
+<span class="pc bpc" id="L142" title="2 of 4 branches missed.">            if (current == null &amp;&amp; !active.compareAndSet(null, this)) {</span>
+<span class="nc" id="L143">                registrationFailed();</span>
+<span class="nc" id="L144">                fireError(new PushError(&quot;active_client&quot;,</span>
+                        &quot;Another PushClient became active during registration&quot;, false));
+<span class="nc" id="L146">                return;</span>
+            }
+<span class="fc" id="L148">            CodenameOneImplementation.setPushCallback(compatibilityCallback);</span>
+<span class="fc" id="L149">            replay = new ArrayList&lt;String&gt;(pendingMessages);</span>
+<span class="fc" id="L150">            pendingMessages.clear();</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (String message : replay) {</span>
+<span class="fc" id="L153">            receive(message);</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (transport == null) {</span>
+<span class="fc" id="L156">            String persistedDeviceId = Preferences.get(&quot;push_key&quot;, null);</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            if (persistedDeviceId != null &amp;&amp; persistedDeviceId.trim().length() &gt; 0) {</span>
+<span class="fc" id="L158">                compatibilityCallback.registeredForPush(persistedDeviceId);</span>
+            }
+<span class="fc" id="L160">            Display.getInstance().registerPush();</span>
+<span class="fc" id="L161">        } else {</span>
+<span class="fc" id="L162">            transport.register(new TransportCallback());</span>
+        }
+<span class="fc" id="L164">    }</span>
+
+    ///
+    /// Removes this device's subscription.
+    ///
+    /// Use this for an explicit notification opt-out or account-removal
+    /// workflow, not as part of the normal {@code stop()} lifecycle. A later call
+    /// to {@link #register()} may subscribe again after unregistration completes.
+    /// Custom transports report completion through
+    /// {@link PushTransport.Callback#unregistered()}.
+    public void unregister() {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (transport == null) {</span>
+<span class="fc" id="L176">            Display.getInstance().deregisterPush();</span>
+<span class="fc" id="L177">            notifyUnregistered();</span>
+        } else {
+<span class="fc" id="L179">            transport.unregister(new TransportCallback());</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    ///
+    /// Returns the application key supplied to {@link #builder(String)}.
+    ///
+    /// @return the application key
+    public String getAppId() {
+<span class="nc" id="L188">        return appId;</span>
+    }
+
+    ///
+    /// Returns the latest native subscription reported by the transport.
+    ///
+    /// @return the current subscription, or {@code null} before registration or
+    ///         after unregistration
+    public PushSubscription getSubscription() {
+<span class="fc" id="L197">        return subscription;</span>
+    }
+
+    ///
+    /// Returns the compatibility callback used by generated native bootstraps.
+    ///
+    /// Application code should use {@link PushListener}; this method exists
+    /// for generated platform code and native transport integrations.
+    ///
+    /// @return the active native callback, or {@code null} before a client is
+    ///         registered
+    public static PushCallback getActiveCallback() {
+<span class="fc" id="L209">        PushClient client = active.get();</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        return client == null ? null : client.compatibilityCallback;</span>
+    }
+
+    ///
+    /// Indicates whether an active client can receive a native message now.
+    ///
+    /// @return {@code true} after {@link #register()} activates a client and
+    ///         before unregistration completes
+    public static boolean hasActiveClient() {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        return active.get() != null;</span>
+    }
+
+    ///
+    /// Delivers an encoded schema-3 envelope from generated native code.
+    ///
+    /// If no client is active yet, the message is queued and replayed on the
+    /// next successful {@link #register()}. Application code normally does not
+    /// call this method; a custom {@link PushTransport} should use its callback's
+    /// {@link PushTransport.Callback#message(String)} method.
+    ///
+    /// @param envelopeJson the complete schema-3 JSON envelope
+    public static void dispatch(String envelopeJson) {
+<span class="fc" id="L232">        PushClient client = active.get();</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (client == null) {</span>
+<span class="fc" id="L234">            synchronized (pendingMessages) {</span>
+<span class="fc" id="L235">                client = active.get();</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                if (client == null) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">                    if (pendingMessages.size() == MAX_PENDING_MESSAGES) {</span>
+<span class="nc" id="L238">                        pendingMessages.remove(0);</span>
+                    }
+<span class="fc" id="L240">                    pendingMessages.add(envelopeJson);</span>
+<span class="fc" id="L241">                    return;</span>
+                }
+<span class="nc" id="L243">            }</span>
+        }
+<span class="fc" id="L245">        client.receive(envelopeJson);</span>
+<span class="fc" id="L246">    }</span>
+
+    private void registered(final PushSubscription value) {
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L250">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L253">                    registered(value);</span>
+<span class="nc" id="L254">                }</span>
+            });
+<span class="nc" id="L256">            return;</span>
+        }
+<span class="fc" id="L258">        subscription = value;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (registrationSink != null) {</span>
+<span class="fc" id="L260">            registrationSink.registered(value);</span>
+        }
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (transport == null) {</span>
+<span class="fc" id="L263">            registerManaged(value);</span>
+        }
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (listener != null) {</span>
+<span class="fc" id="L266">            listener.onRegistration(value);</span>
+        }
+<span class="fc" id="L268">    }</span>
+
+    private void receive(final String json) {
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L272">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L275">                    receive(json);</span>
+<span class="nc" id="L276">                }</span>
+            });
+<span class="nc" id="L278">            return;</span>
+        }
+        try {
+<span class="fc" id="L281">            PushMessage message = PushMessage.parse(json);</span>
+<span class="fc" id="L282">            applySurface(message);</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">            if (listener != null) {</span>
+<span class="fc" id="L284">                listener.onMessage(message);</span>
+            }
+<span class="nc" id="L286">        } catch (IOException ex) {</span>
+<span class="nc" id="L287">            Log.e(ex);</span>
+<span class="nc" id="L288">            fireError(new PushError(&quot;invalid_envelope&quot;, ex.getMessage(), false));</span>
+<span class="fc" id="L289">        }</span>
+<span class="fc" id="L290">    }</span>
+
+    private static void applySurface(PushMessage message) {
+<span class="fc" id="L293">        Map&lt;String, Object&gt; surface = message.getSurface();</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (surface.isEmpty()) {</span>
+<span class="fc" id="L295">            return;</span>
+        }
+<span class="fc" id="L297">        String operation = value(surface.get(&quot;operation&quot;));</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (&quot;widget&quot;.equals(operation)) {</span>
+<span class="fc" id="L299">            Surfaces.publishRemote(value(surface.get(&quot;kind&quot;)), value(surface.get(&quot;timeline&quot;)));</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        } else if (&quot;live-update&quot;.equals(operation)) {</span>
+<span class="nc" id="L301">            LiveActivity.updateRemote(value(surface.get(&quot;id&quot;)), value(surface.get(&quot;state&quot;)));</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        } else if (&quot;live-end&quot;.equals(operation)) {</span>
+<span class="nc" id="L303">            LiveActivity.endRemote(value(surface.get(&quot;id&quot;)), value(surface.get(&quot;state&quot;)),</span>
+<span class="nc" id="L304">                    Boolean.TRUE.equals(surface.get(&quot;dismissImmediately&quot;)));</span>
+        }
+<span class="fc" id="L306">    }</span>
+
+    private static String value(Object value) {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        return value == null ? null : String.valueOf(value);</span>
+    }
+
+    private void notifyUnregistered() {
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L314">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L317">                    notifyUnregistered();</span>
+<span class="nc" id="L318">                }</span>
+            });
+<span class="nc" id="L320">            return;</span>
+        }
+<span class="fc bfc" id="L322" title="All 4 branches covered.">        if (subscription != null &amp;&amp; registrationSink != null) {</span>
+<span class="fc" id="L323">            registrationSink.unregistered(subscription);</span>
+        }
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        if (transport == null) {</span>
+<span class="fc" id="L326">            unregisterManaged();</span>
+        }
+<span class="fc" id="L328">        subscription = null;</span>
+<span class="fc" id="L329">        synchronized (this) {</span>
+<span class="fc" id="L330">            registrationRequested = false;</span>
+<span class="fc" id="L331">        }</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (active.compareAndSet(this, null)) {</span>
+<span class="fc" id="L333">            CodenameOneImplementation.setPushCallback(null);</span>
+        }
+<span class="fc" id="L335">    }</span>
+
+    private synchronized void registrationFailed() {
+<span class="fc" id="L338">        registrationRequested = false;</span>
+<span class="fc" id="L339">    }</span>
+
+    private void registerManaged(PushSubscription value) {
+<span class="fc" id="L342">        final Map&lt;String, Object&gt; body = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L343">        body.put(&quot;provider&quot;, value.getTransportId());</span>
+<span class="fc" id="L344">        body.put(&quot;token&quot;, value.getToken());</span>
+<span class="fc" id="L345">        String subscriptionInstallationId = value.getInstallationId();</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        body.put(&quot;installationId&quot;, subscriptionInstallationId == null</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                || subscriptionInstallationId.length() == 0</span>
+<span class="pc" id="L348">                ? installationId() : subscriptionInstallationId);</span>
+<span class="fc" id="L349">        ConnectionRequest request = new ConnectionRequest() {</span>
+            @Override
+            protected void postResponse() {
+                try {
+<span class="pc" id="L353">                    Preferences.set(&quot;push_v3_subscription&quot;,</span>
+<span class="nc" id="L354">                            managedRegistrationId(getResponseData()));</span>
+<span class="fc" id="L355">                } catch (IOException ex) {</span>
+<span class="fc" id="L356">                    fireError(new PushError(&quot;registration_response&quot;, ex.getMessage(), false));</span>
+<span class="nc" id="L357">                }</span>
+<span class="fc" id="L358">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+<span class="nc bnc" id="L362" title="All 6 branches missed.">                fireError(new PushError(code == 402 ? &quot;upgrade_required&quot; : &quot;managed_registration&quot;,</span>
+                        message == null ? &quot;BuildCloud registration failed&quot; : message, code &gt;= 500));
+<span class="nc" id="L364">            }</span>
+        };
+<span class="fc" id="L366">        request.setUrl(endpoint(&quot;/subscriptions&quot;));</span>
+<span class="fc" id="L367">        request.setPost(true);</span>
+<span class="fc" id="L368">        request.setContentType(&quot;application/json&quot;);</span>
+<span class="fc" id="L369">        request.addRequestHeader(&quot;X-CN1-Push-App&quot;, appId);</span>
+<span class="fc" id="L370">        request.setRequestBody(JSONParser.mapToJson(body));</span>
+<span class="fc" id="L371">        NetworkManager.getInstance().addToQueue(request);</span>
+<span class="fc" id="L372">    }</span>
+
+    static String managedRegistrationId(byte[] responseData) throws IOException {
+<span class="fc bfc" id="L375" title="All 4 branches covered.">        if (responseData == null || responseData.length == 0) {</span>
+<span class="fc" id="L376">            throw new IOException(&quot;BuildCloud registration returned an empty response&quot;);</span>
+        }
+<span class="fc" id="L378">        Map&lt;String, Object&gt; response = JSONParser.parseJSON(responseData);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (response == null) {</span>
+<span class="nc" id="L380">            throw new IOException(&quot;BuildCloud registration returned an empty response&quot;);</span>
+        }
+<span class="fc" id="L382">        Object id = response.get(&quot;id&quot;);</span>
+<span class="pc bpc" id="L383" title="1 of 4 branches missed.">        if (id == null || String.valueOf(id).trim().length() == 0) {</span>
+<span class="fc" id="L384">            throw new IOException(&quot;BuildCloud registration response is missing an id&quot;);</span>
+        }
+<span class="fc" id="L386">        return String.valueOf(id);</span>
+    }
+
+    private void unregisterManaged() {
+<span class="fc" id="L390">        String id = Preferences.get(&quot;push_v3_subscription&quot;, null);</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L392">            return;</span>
+        }
+<span class="fc" id="L394">        NetworkManager.getInstance().addToQueue(new ManagedUnregisterRequest(appId, id));</span>
+<span class="fc" id="L395">    }</span>
+
+    private static String endpoint(String suffix) {
+<span class="fc" id="L398">        return Display.getInstance().getProperty(&quot;push.v3.serverUrl&quot;,</span>
+                &quot;https://cloud.codenameone.com/api/v3/push/client&quot;) + suffix;
+    }
+
+    private static String installationId() {
+<span class="fc" id="L403">        String value = Preferences.get(&quot;push_v3_installation&quot;, null);</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L405">            value = Util.getUUID();</span>
+<span class="fc" id="L406">            Preferences.set(&quot;push_v3_installation&quot;, value);</span>
+        }
+<span class="fc" id="L408">        return value;</span>
+    }
+
+    private void fireError(final PushError error) {
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L413">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L416">                    fireError(error);</span>
+<span class="nc" id="L417">                }</span>
+            });
+<span class="nc" id="L419">            return;</span>
+        }
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        if (listener != null) {</span>
+<span class="fc" id="L422">            listener.onError(error);</span>
+        }
+<span class="fc" id="L424">    }</span>
+
+    private static final class ManagedUnregisterRequest extends ConnectionRequest {
+<span class="fc" id="L427">        ManagedUnregisterRequest(String appId, String subscriptionId) {</span>
+<span class="fc" id="L428">            setUrl(endpoint(&quot;/subscriptions/&quot;) + subscriptionId);</span>
+<span class="fc" id="L429">            setHttpMethod(&quot;DELETE&quot;);</span>
+<span class="fc" id="L430">            addRequestHeader(&quot;X-CN1-Push-App&quot;, appId);</span>
+<span class="fc" id="L431">            setFailSilently(true);</span>
+<span class="fc" id="L432">        }</span>
+
+        private void removePersistedId() {
+<span class="fc" id="L435">            String persistedId = Preferences.get(&quot;push_v3_subscription&quot;, null);</span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">            if (persistedId != null</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                    &amp;&amp; getUrl().endsWith(&quot;/subscriptions/&quot; + persistedId)) {</span>
+<span class="nc" id="L438">                Preferences.delete(&quot;push_v3_subscription&quot;);</span>
+            }
+<span class="fc" id="L440">        }</span>
+
+        @Override
+        protected void postResponse() {
+<span class="fc" id="L444">            removePersistedId();</span>
+<span class="fc" id="L445">        }</span>
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            if (code == 404) {</span>
+<span class="nc" id="L450">                removePersistedId();</span>
+            }
+<span class="nc" id="L452">        }</span>
+    }
+
+<span class="fc" id="L455">    private final class CompatibilityCallback implements PushCallback {</span>
+        @Override
+        public void push(String value) {
+<span class="nc" id="L458">            receive(value);</span>
+<span class="nc" id="L459">        }</span>
+
+        @Override
+        public void registeredForPush(String deviceId) {
+<span class="fc" id="L463">            String transportId = transportId(deviceId);</span>
+<span class="fc" id="L464">            registered(new PushSubscription(transportId, nativeToken(deviceId),</span>
+<span class="fc" id="L465">                    Display.getInstance().getPlatformName(),</span>
+<span class="fc" id="L466">                    installationId(), 0, Collections.&lt;String&gt;emptyList()));</span>
+<span class="fc" id="L467">        }</span>
+
+        @Override
+        public void pushRegistrationError(String error, int errorCode) {
+<span class="nc" id="L471">            registrationFailed();</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">            String code = errorCode == 1 ? &quot;registration_server&quot; : &quot;registration_native&quot;;</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">            fireError(new PushError(code, error, errorCode == 1));</span>
+<span class="nc" id="L474">        }</span>
+    }
+
+    private static String transportId(String deviceId) {
+<span class="pc bpc" id="L478" title="2 of 4 branches missed.">        if (deviceId != null &amp;&amp; deviceId.startsWith(&quot;cn1-&quot;)) {</span>
+<span class="fc" id="L479">            int end = deviceId.indexOf('-', 4);</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            String value = deviceId.substring(4, end &lt; 0 ? deviceId.length() : end);</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            return &quot;hms&quot;.equals(value) ? &quot;huawei&quot; : value;</span>
+        }
+<span class="nc" id="L483">        String platform = Display.getInstance().getPlatformName();</span>
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        if (&quot;ios&quot;.equals(platform)) {</span>
+<span class="nc" id="L485">            return &quot;apns&quot;;</span>
+        }
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        if (&quot;win&quot;.equals(platform)) {</span>
+<span class="nc" id="L488">            return &quot;wns&quot;;</span>
+        }
+<span class="nc bnc" id="L490" title="All 2 branches missed.">        if (&quot;and&quot;.equals(platform)) {</span>
+<span class="nc" id="L491">            return &quot;fcm&quot;;</span>
+        }
+<span class="nc bnc" id="L493" title="All 2 branches missed.">        if (&quot;js&quot;.equals(platform)) {</span>
+<span class="nc" id="L494">            return &quot;web&quot;;</span>
+        }
+<span class="nc" id="L496">        return &quot;native&quot;;</span>
+    }
+
+    private static String nativeToken(String deviceId) {
+<span class="pc bpc" id="L500" title="1 of 4 branches missed.">        if (deviceId != null &amp;&amp; deviceId.startsWith(&quot;cn1-web-&quot;)) {</span>
+            try {
+<span class="fc" id="L502">                return new String(com.codename1.util.Base64.decodeUrlSafe(deviceId.substring(8)),</span>
+                        &quot;UTF-8&quot;);
+<span class="nc" id="L504">            } catch (Exception error) {</span>
+<span class="nc" id="L505">                return deviceId;</span>
+            }
+        }
+<span class="pc bpc" id="L508" title="2 of 4 branches missed.">        if (deviceId != null &amp;&amp; deviceId.startsWith(&quot;cn1-&quot;)) {</span>
+<span class="fc" id="L509">            int separator = deviceId.indexOf('-', 4);</span>
+<span class="pc bpc" id="L510" title="2 of 4 branches missed.">            if (separator &gt;= 0 &amp;&amp; separator + 1 &lt; deviceId.length()) {</span>
+<span class="fc" id="L511">                return deviceId.substring(separator + 1);</span>
+            }
+        }
+<span class="nc" id="L514">        return deviceId;</span>
+    }
+
+<span class="fc" id="L517">    private final class TransportCallback implements PushTransport.Callback {</span>
+        @Override
+        public void registered(PushSubscription value) {
+<span class="fc" id="L520">            PushClient.this.registered(value);</span>
+<span class="fc" id="L521">        }</span>
+
+        @Override
+        public void unregistered() {
+<span class="fc" id="L525">            notifyUnregistered();</span>
+<span class="fc" id="L526">        }</span>
+
+        @Override
+        public void message(String envelopeJson) {
+<span class="nc" id="L530">            receive(envelopeJson);</span>
+<span class="nc" id="L531">        }</span>
+
+        @Override
+        public void failed(PushError error) {
+<span class="nc" id="L535">            registrationFailed();</span>
+<span class="nc" id="L536">            fireError(error);</span>
+<span class="nc" id="L537">        }</span>
+    }
+
+    ///
+    /// Configures a {@link PushClient}.
+    ///
+    /// A {@link PushListener} is required. Without a custom
+    /// {@link PushTransport}, the client uses the platform transport and
+    /// BuildCloud registration. Supplying a custom transport bypasses BuildCloud
+    /// and also requires a {@link PushRegistrationSink} so the application can
+    /// maintain its own server-side subscription.
+    public static final class Builder {
+        private final String appId;
+        private PushListener listener;
+        private PushRegistrationSink registrationSink;
+        private PushTransport transport;
+
+<span class="fc" id="L554">        private Builder(String appId) {</span>
+<span class="pc bpc" id="L555" title="2 of 4 branches missed.">            if (appId == null || appId.length() == 0) {</span>
+<span class="nc" id="L556">                throw new IllegalArgumentException(&quot;appId is required&quot;);</span>
+            }
+<span class="fc" id="L558">            this.appId = appId;</span>
+<span class="fc" id="L559">        }</span>
+        ///
+        /// Sets the application listener.
+        ///
+        /// @param value the non-null listener retained for the life of the client
+        /// @return this builder
+        public Builder listener(PushListener value) {
+<span class="fc" id="L566">            listener = value;</span>
+<span class="fc" id="L567">            return this;</span>
+        }
+
+        ///
+        /// Mirrors subscription changes to application-owned code.
+        ///
+        /// For managed push this is optional and runs in addition to
+        /// BuildCloud registration. For a custom transport it is required.
+        ///
+        /// @param value the registration sink, or {@code null} for managed push
+        /// @return this builder
+        public Builder registrationSink(PushRegistrationSink value) {
+<span class="fc" id="L579">            registrationSink = value;</span>
+<span class="fc" id="L580">            return this;</span>
+        }
+
+        ///
+        /// Replaces the managed native transport.
+        ///
+        /// Setting this option prevents {@code PushClient} from contacting
+        /// BuildCloud. The transport must emit schema-3 envelopes and the builder
+        /// must also receive a {@link #registrationSink(PushRegistrationSink)}.
+        ///
+        /// @param value a custom native transport, or {@code null} to use managed
+        ///              platform push
+        /// @return this builder
+        public Builder transport(PushTransport value) {
+<span class="fc" id="L594">            transport = value;</span>
+<span class="fc" id="L595">            return this;</span>
+        }
+        ///
+        /// Creates the client.
+        ///
+        /// @return a client that must be retained and registered by the
+        ///         application
+        /// @throws IllegalStateException if no listener is configured, or if a
+        ///         custom transport has no registration sink
+        public PushClient build() {
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">            if (listener == null) {</span>
+<span class="nc" id="L606">                throw new IllegalStateException(&quot;listener is required&quot;);</span>
+            }
+<span class="fc bfc" id="L608" title="All 4 branches covered.">            if (transport != null &amp;&amp; registrationSink == null) {</span>
+<span class="fc" id="L609">                throw new IllegalStateException(&quot;custom transports require a registrationSink&quot;);</span>
+            }
+<span class="fc" id="L611">            return new PushClient(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

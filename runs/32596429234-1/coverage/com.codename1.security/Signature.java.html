@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Signature.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Signature.java</span></div><h1>Signature.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.io.Util;
+
+/// Digital signature creation and verification. Backed by the platform's
+/// native crypto provider -- works with [PublicKey] / [PrivateKey] objects
+/// from this package.
+///
+/// #### Example: sign with RSA-SHA-256 and verify
+///
+/// ```java
+/// KeyPair kp = KeyGenerator.rsa(2048);
+/// byte[] sig = Signature.sign(Signature.SHA256_WITH_RSA, kp.getPrivateKey(), data);
+/// boolean ok = Signature.verify(Signature.SHA256_WITH_RSA, kp.getPublicKey(), data, sig);
+/// ```
+public final class Signature {
+
+    /// `SHA256withRSA` -- RSA PKCS#1 v1.5 with SHA-256.
+    public static final String SHA256_WITH_RSA = &quot;SHA256withRSA&quot;;
+    /// `SHA384withRSA` -- RSA PKCS#1 v1.5 with SHA-384.
+    public static final String SHA384_WITH_RSA = &quot;SHA384withRSA&quot;;
+    /// `SHA512withRSA` -- RSA PKCS#1 v1.5 with SHA-512.
+    public static final String SHA512_WITH_RSA = &quot;SHA512withRSA&quot;;
+
+    /// `SHA256withECDSA` -- ECDSA with SHA-256 (P-256 curve).
+    public static final String SHA256_WITH_ECDSA = &quot;SHA256withECDSA&quot;;
+    /// `SHA384withECDSA` -- ECDSA with SHA-384 (P-384 curve).
+    public static final String SHA384_WITH_ECDSA = &quot;SHA384withECDSA&quot;;
+    /// `SHA512withECDSA` -- ECDSA with SHA-512 (P-521 curve).
+    public static final String SHA512_WITH_ECDSA = &quot;SHA512withECDSA&quot;;
+
+    private Signature() {}
+
+    /// Signs `data` with the given algorithm and private key.
+    public static byte[] sign(String algorithm, PrivateKey key, byte[] data) {
+        try {
+<span class="fc" id="L59">            return Util.cryptoSign(algorithm, key.getAlgorithm(), key.getEncoded(), data);</span>
+<span class="nc" id="L60">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L61">            throw new CryptoException(re.getMessage(), re);</span>
+        }
+    }
+
+    /// Verifies `signature` against `data` using the given algorithm and
+    /// public key.
+    public static boolean verify(String algorithm, PublicKey key, byte[] data, byte[] signature) {
+        try {
+<span class="fc" id="L69">            return Util.cryptoVerify(algorithm, key.getAlgorithm(), key.getEncoded(), data, signature);</span>
+<span class="nc" id="L70">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L71">            throw new CryptoException(re.getMessage(), re);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

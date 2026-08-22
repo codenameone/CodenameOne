@@ -1,0 +1,1202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SplitPane.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">SplitPane.java</span></div><h1>SplitPane.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector.ComponentClosure;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint;
+import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint.Inset;
+import com.codename1.ui.plaf.Border;
+
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/// A Split Pane component.
+///
+/// A split pane can either be horizontal or vertical, and provides a draggable divider
+/// between two components.  If the `#orientation` is `#HORIZONTAL_SPLIT`, then the
+/// child components will be laid out horizontally (side by side with a vertical bar as a divider).
+/// If the `#orientation` is `#VERTICAL_SPLIT`, then the components are laid out vertically (one above
+/// the other.
+///
+/// The bar divider bar includes arrows to collapse and expand the divider also.
+///
+/// **Splitpane UI**
+///
+/// The following is an example of a UI that is built around a split pane.  This has an outer &quot;horizontal&quot; split pane,
+/// and the left side has a vertical split pane.
+///
+/// Collapsed:
+///
+/// Expanded:
+///
+/// @author Steve Hannah
+public class SplitPane extends Container {
+
+    /// Constant used for orientation.
+    public static final int HORIZONTAL_SPLIT = 0;
+    /// Constant used for orientation.
+    public static final int VERTICAL_SPLIT = 1;
+    /// The orientation.  One of `#HORIZONTAL_SPLIT` or `#VERTICAL_SPLIT`
+    private final int orientation;
+    /// Container for the top or left component.
+    private final Container topOrLeft;
+    /// Container for the bottom or right component.
+    private final Container bottomOrRight;
+    /// The draggable divider.
+    private final Divider divider;
+    /// The minimum allowable inset for the divider.
+    private final LayeredLayoutConstraint minInset;
+    /// The maximum allowable inset for the divider.
+    private final LayeredLayoutConstraint maxInset;
+    /// The starting preferred inset for the divider.  This will be changed over the life of the
+    /// split pane.  Any time the user explicitly drags the divider to a new location, that location
+    /// will become the new preferred inset.
+    private final LayeredLayoutConstraint preferredInset;
+    /// UIID to use for the expand button
+<span class="fc" id="L94">    private String expandButtonUIID = &quot;Label&quot;;</span>
+    /// UIID to use for the collapse button
+<span class="fc" id="L96">    private String collapseButtonUIID = &quot;Label&quot;;</span>
+    /// UIID to use for the drag handle on the divider
+<span class="fc" id="L98">    private String dragHandleUIID = &quot;Label&quot;;</span>
+    /// Material icon for expand button.
+    private char expandMaterialIcon;
+
+    /// Material icon for collapse button.
+    private char collapseMaterialIcon;
+
+    /// Material icon for drag handle.
+    private char dragHandleMaterialIcon;
+
+    /// Icon for expand button.
+    private Image expandIcon;
+
+    /// Icon for collapse button.
+    private Image collapseIcon;
+
+    /// Icon or drag handle
+    private Image dragHandleIcon;
+
+    /// The UIID for the divider.  Default is null so that we can generate the style and border
+    /// manually.
+<span class="fc" id="L119">    private String dividerUIID = null;</span>
+    /// The preferred divider thickness in millimetres
+<span class="fc" id="L121">    private float dividerThicknessMM = 3;</span>
+    /// Whether to show the expand/collapse buttons.
+<span class="fc" id="L123">    private boolean showExpandCollapseButtons = true;</span>
+    /// Whether to show the drag handle.
+<span class="fc" id="L125">    private boolean showDragHandle = true;</span>
+    /// Flag to indicate that the split pane is expanded.
+    private boolean isExpanded;
+    /// Flag to indicate that the split pane is collapsed.
+    private boolean isCollapsed;
+
+    /// Creates a new SplitPane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `settings`: The settings for the split pane (e.g. insets, styles, etc...).
+    ///
+    /// - `topOrLeft`: The component to place in the &quot;top&quot; (for vertical), or &quot;left&quot; (for horizontal).
+    ///
+    /// - `bottomOrRight`: The component to place in the &quot;bottom&quot; (for vertical) or &quot;right&quot; (for horizontal).
+    public SplitPane(Settings settings, Component topOrLeft, Component bottomOrRight) {
+<span class="fc" id="L141">        super(new LayeredLayout());</span>
+<span class="fc" id="L142">        int orientation = settings.orientation;</span>
+<span class="fc" id="L143">        String minInset = settings.minInset;</span>
+<span class="fc" id="L144">        String preferredInset = settings.preferredInset;</span>
+<span class="fc" id="L145">        String maxInset = settings.maxInset;</span>
+
+<span class="fc" id="L147">        this.orientation = orientation;</span>
+<span class="fc" id="L148">        this.topOrLeft = BorderLayout.center(topOrLeft);</span>
+<span class="fc" id="L149">        this.bottomOrRight = BorderLayout.center(bottomOrRight);</span>
+<span class="fc" id="L150">        this.expandButtonUIID = settings.expandButtonUIID;</span>
+<span class="fc" id="L151">        this.collapseButtonUIID = settings.collapseButtonUIID;</span>
+<span class="fc" id="L152">        this.dragHandleUIID = settings.dragHandleUIID;</span>
+<span class="fc" id="L153">        this.dividerThicknessMM = settings.dividerThicknessMM;</span>
+<span class="fc" id="L154">        this.showDragHandle = settings.showDragHandle;</span>
+<span class="fc" id="L155">        this.showExpandCollapseButtons = settings.showExpandCollapseButtons;</span>
+<span class="fc" id="L156">        this.dividerUIID = settings.dividerUIID;</span>
+<span class="fc" id="L157">        this.expandMaterialIcon = settings.expandMaterialIcon;</span>
+<span class="fc" id="L158">        this.collapseMaterialIcon = settings.collapseMaterialIcon;</span>
+<span class="fc" id="L159">        this.dragHandleMaterialIcon = settings.dragHandleMaterialIcon;</span>
+<span class="fc" id="L160">        this.expandIcon = settings.expandIcon;</span>
+<span class="fc" id="L161">        this.collapseIcon = settings.collapseIcon;</span>
+<span class="fc" id="L162">        this.dragHandleIcon = settings.dragHandleIcon;</span>
+
+<span class="fc" id="L164">        divider = new Divider();</span>
+<span class="fc" id="L165">        add(this.topOrLeft).add(this.bottomOrRight).add(divider);</span>
+
+<span class="fc" id="L167">        LayeredLayout l = (LayeredLayout) super.getLayout();</span>
+<span class="fc" id="L168">        this.preferredInset = initDividerInset(l.createConstraint(), preferredInset);</span>
+<span class="fc" id="L169">        this.minInset = initDividerInset(l.createConstraint(), minInset);</span>
+<span class="fc" id="L170">        this.maxInset = initDividerInset(l.createConstraint(), maxInset);</span>
+
+<span class="fc" id="L172">        l.setInsets(this.topOrLeft, &quot;0 0 0 0&quot;)</span>
+<span class="fc" id="L173">                .setInsets(this.topOrLeft, &quot;0 0 0 0&quot;);</span>
+<span class="fc" id="L174">        this.preferredInset.copyTo(l.getOrCreateConstraint(divider));</span>
+
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (orientation == HORIZONTAL_SPLIT) {</span>
+<span class="fc" id="L177">            l.setReferenceComponentRight(this.topOrLeft, divider, 1f);</span>
+<span class="fc" id="L178">            l.setReferenceComponentLeft(this.bottomOrRight, divider, 1f);</span>
+        } else {
+<span class="fc" id="L180">            l.setReferenceComponentBottom(this.topOrLeft, divider, 1f);</span>
+<span class="fc" id="L181">            l.setReferenceComponentTop(this.bottomOrRight, divider, 1f);</span>
+        }
+<span class="fc" id="L183">    }</span>
+
+    /// Creates a new SplitPane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: Either `#HORIZONTAL_SPLIT` or `#VERTICAL_SPLIT`
+    ///
+    /// - `topOrLeft`: The component to place in the &quot;top&quot; (for vertical), or &quot;left&quot; (for horizontal).
+    ///
+    /// - `bottomOrRight`: The component to place in the &quot;bottom&quot; (for vertical) or &quot;right&quot; (for horizontal).
+    ///
+    /// - `minInset`: The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;200px&quot;.
+    ///
+    /// - `preferredInset`: The default preferred inset for the divider.  The inset should be expressed as a string with both value and unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;20px&quot;.
+    ///
+    /// - `maxInset`: The maximum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;20px&quot;.
+    public SplitPane(int orientation, Component topOrLeft, Component bottomOrRight, String minInset, String preferredInset, String maxInset) {
+<span class="fc" id="L201">        this(new Settings(orientation, minInset, preferredInset, maxInset), topOrLeft, bottomOrRight);</span>
+<span class="fc" id="L202">    }</span>
+
+    /// Changes the minimum, preferred, and maximum insets of the split pane.  This will also
+    /// update the current divider position to the supplied preferred inset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minInset`: The minimum inset.  Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. &quot;25%&quot;
+    ///
+    /// - `preferredInset`: The preferred inset. Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. &quot;25%&quot;
+    ///
+    /// - `maxInset`: Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. &quot;25%&quot;
+    public void changeInsets(String minInset, String preferredInset, String maxInset) {
+<span class="nc" id="L215">        LayeredLayout l = (LayeredLayout) getLayout();</span>
+<span class="nc" id="L216">        initDividerInset(l.createConstraint(), preferredInset).copyTo(this.preferredInset);</span>
+<span class="nc" id="L217">        initDividerInset(l.createConstraint(), minInset).copyTo(this.minInset);</span>
+<span class="nc" id="L218">        initDividerInset(l.createConstraint(), maxInset).copyTo(this.maxInset);</span>
+
+<span class="nc" id="L220">        l.setInsets(this.topOrLeft, &quot;0 0 0 0&quot;)</span>
+<span class="nc" id="L221">                .setInsets(this.topOrLeft, &quot;0 0 0 0&quot;);</span>
+<span class="nc" id="L222">        this.preferredInset.copyTo(l.getOrCreateConstraint(divider));</span>
+<span class="nc" id="L223">    }</span>
+
+    /// The active inset of the divider.
+    private Inset getDividerInset() {
+<span class="fc" id="L227">        LayeredLayoutConstraint cnst = ((LayeredLayout) getLayout()).getOrCreateConstraint(divider);</span>
+<span class="fc" id="L228">        return getFixedInset(cnst);</span>
+    }
+
+    /// Gets the inset of the divider that is flexible.
+    private Inset getAutoInset() {
+<span class="fc" id="L233">        LayeredLayoutConstraint cnst = ((LayeredLayout) getLayout()).getOrCreateConstraint(divider);</span>
+<span class="fc" id="L234">        return getAutoInset(cnst);</span>
+    }
+
+    /// Gets the inset of the provided constraint that is fixed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnst`
+    private Inset getFixedInset(LayeredLayoutConstraint cnst) {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        switch (orientation) {</span>
+            case VERTICAL_SPLIT:
+<span class="fc" id="L245">                return cnst.top();</span>
+            default:
+<span class="fc" id="L247">                return cnst.left();</span>
+        }
+    }
+
+    private Inset getMinDividerInset() {
+<span class="fc" id="L252">        return getFixedInset(minInset);</span>
+    }
+
+    private Inset getMaxDividerInset() {
+<span class="fc" id="L256">        return getFixedInset(maxInset);</span>
+    }
+
+    private Inset getAutoInset(LayeredLayoutConstraint cnst) {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        switch (orientation) {</span>
+            case VERTICAL_SPLIT:
+<span class="fc" id="L262">                return cnst.bottom();</span>
+            default:
+<span class="fc" id="L264">                return cnst.right();</span>
+        }
+    }
+
+    private Set&lt;Inset&gt; getZeroInsets(LayeredLayoutConstraint cnst) {
+<span class="fc" id="L269">        Set&lt;Inset&gt; out = new HashSet&lt;Inset&gt;();</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        switch (orientation) {</span>
+            case VERTICAL_SPLIT:
+<span class="fc" id="L272">                out.add(cnst.left());</span>
+<span class="fc" id="L273">                out.add(cnst.right());</span>
+<span class="fc" id="L274">                break;</span>
+            default:
+<span class="fc" id="L276">                out.add(cnst.top());</span>
+<span class="fc" id="L277">                out.add(cnst.bottom());</span>
+
+        }
+<span class="fc" id="L280">        return out;</span>
+    }
+
+    private LayeredLayoutConstraint initDividerInset(LayeredLayoutConstraint cnst, String insetVal) {
+<span class="fc" id="L284">        getFixedInset(cnst).setValueAsString(insetVal);</span>
+<span class="fc" id="L285">        getAutoInset(cnst).setValueAsString(&quot;auto&quot;);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        for (Inset i : getZeroInsets(cnst)) {</span>
+<span class="fc" id="L287">            i.setValueAsString(&quot;0&quot;);</span>
+<span class="fc" id="L288">        }</span>
+<span class="fc" id="L289">        return cnst;</span>
+    }
+
+    // PMD Fix (UnusedPrivateMethod): Removed unused setDividerInset helper.
+    private void clampInset() {
+
+<span class="fc" id="L295">        int px = getDividerInset().getAbsolutePixels(divider);</span>
+<span class="fc" id="L296">        isCollapsed = false;</span>
+<span class="fc" id="L297">        isExpanded = false;</span>
+<span class="fc" id="L298">        Inset minInset = getMinDividerInset();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (minInset.getAbsolutePixels(divider) &gt;= px) {</span>
+<span class="fc" id="L300">            minInset.copyTo(getDividerInset());</span>
+<span class="fc" id="L301">            isCollapsed = true;</span>
+<span class="fc" id="L302">            isExpanded = false;</span>
+        }
+<span class="fc" id="L304">        Inset maxInset = getMaxDividerInset();</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (maxInset.getAbsolutePixels(divider) &lt;= px) {</span>
+<span class="fc" id="L306">            maxInset.copyTo(getDividerInset());</span>
+<span class="fc" id="L307">            isExpanded = true;</span>
+<span class="fc" id="L308">            isCollapsed = false;</span>
+        }
+
+<span class="fc" id="L311">        px = getAutoInset().getAbsolutePixels(divider);</span>
+
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (px &lt; 0) {</span>
+            // Make sure that the divider is fully visible
+<span class="nc" id="L315">            getDividerInset().translatePixels(px, true, divider.getParent());</span>
+<span class="nc" id="L316">            isExpanded = true;</span>
+<span class="nc" id="L317">            isCollapsed = false;</span>
+
+        }
+<span class="fc" id="L320">    }</span>
+
+    /// Gets the component that is currently placed in the bottom or right of the split pane.
+    public Component getBottomOrRightComponent() {
+<span class="fc" id="L324">        Iterator&lt;Component&gt; iterator = bottomOrRight.iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (iterator.hasNext()) {</span>
+<span class="fc" id="L326">            return iterator.next();</span>
+        }
+<span class="nc" id="L328">        return null;</span>
+    }
+
+    private void setBottomOrRightComponent(Component cmp) {
+<span class="fc" id="L332">        bottomOrRight.removeAll();</span>
+<span class="fc" id="L333">        bottomOrRight.add(BorderLayout.CENTER, cmp);</span>
+<span class="fc" id="L334">    }</span>
+
+    /// Gets the component that is currently placed in the bottom of the split pane.
+    public Component getBottom() {
+<span class="fc" id="L338">        return getBottomOrRightComponent();</span>
+    }
+
+    /// Sets the component to be placed on the bottom of the split pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to place on the bottom.
+    public void setBottom(Component cmp) {
+<span class="fc" id="L347">        setBottomOrRightComponent(cmp);</span>
+<span class="fc" id="L348">    }</span>
+
+    /// Gets the component that is currently placed in the right of the split pane.
+    public Component getRight() {
+<span class="fc" id="L352">        return getBottomOrRightComponent();</span>
+    }
+
+    /// Sets the component to be placed on the right of the split pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to place on the right.
+    public void setRight(Component cmp) {
+<span class="nc" id="L361">        setBottomOrRightComponent(cmp);</span>
+<span class="nc" id="L362">    }</span>
+
+    /// Gets the component that is currently placed in the top or left of the split pane.
+    public Component getTopOrLeftComponent() {
+<span class="fc" id="L366">        Iterator&lt;Component&gt; iterator = topOrLeft.iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (iterator.hasNext()) {</span>
+<span class="fc" id="L368">            return iterator.next();</span>
+        }
+<span class="nc" id="L370">        return null;</span>
+    }
+
+    private void setTopOrLeftComponent(Component cmp) {
+<span class="fc" id="L374">        topOrLeft.removeAll();</span>
+<span class="fc" id="L375">        topOrLeft.add(BorderLayout.CENTER, cmp);</span>
+<span class="fc" id="L376">    }</span>
+
+    /// Gets the component that is currently placed in the top of the split pane.
+    public Component getTop() {
+<span class="fc" id="L380">        return getTopOrLeftComponent();</span>
+    }
+
+    /// Sets the component that should be placed in the top section of the split pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to place on top.
+    public void setTop(Component cmp) {
+<span class="fc" id="L389">        setTopOrLeftComponent(cmp);</span>
+<span class="fc" id="L390">    }</span>
+
+    /// Gets the component that is currently placed in the left of the split pane.
+    public Component getLeft() {
+<span class="fc" id="L394">        return getTopOrLeftComponent();</span>
+    }
+
+    /// Sets the component that should be placed in the left section of the split pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to place on the left.
+    public void setLeft(Component cmp) {
+<span class="nc" id="L403">        setTopOrLeftComponent(cmp);</span>
+<span class="nc" id="L404">    }</span>
+
+    /// Toggles the split pane between collapsed state and preferred state.  E.g. If the inset is currently
+    /// not collapsed, it will collapse it.  If it is collapsed, it will open to the last position that the user
+    /// selected.
+    public void toggleCollapsePreferred() {
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        if (isCollapsed) {</span>
+<span class="fc" id="L411">            expand();</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        } else if (isExpanded) {</span>
+<span class="nc" id="L413">            collapse(true);</span>
+        } else {
+<span class="nc" id="L415">            collapse();</span>
+        }
+<span class="fc" id="L417">    }</span>
+
+    /// Toggles the split pane between expanded state and preferred state.  E.g. If the inset is currently expanded,
+    /// then it will be moved to the last position that the user selected.  If it is not expanded, it will expand it all the way.
+    public void toggleExpandPreferred() {
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (isExpanded) {</span>
+<span class="nc" id="L423">            collapse();</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        } else if (isCollapsed) {</span>
+<span class="nc" id="L425">            expand(true);</span>
+        } else {
+<span class="fc" id="L427">            expand();</span>
+        }
+<span class="fc" id="L429">    }</span>
+
+    /// Expands the split pane.  If it is currently completely collapsed, it will transition to the preferred
+    /// position.  If it is in the preferred position, it will expand all the way.
+    public void expand() {
+<span class="fc" id="L434">        expand(false);</span>
+<span class="fc" id="L435">    }</span>
+
+    /// Expands the split pane. It will either expand it to the preferred position, or the maximum position
+    /// depending on the value of the force parameter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `force`: @param force If this is true, then it will only expand &quot;all the way&quot;.  It will skip the preferred position if it is
+    /// currently in collapsed state.
+    public void expand(boolean force) {
+<span class="pc bpc" id="L445" title="1 of 4 branches missed.">        if (isCollapsed &amp;&amp; !force) {</span>
+<span class="fc" id="L446">            getFixedInset(preferredInset).copyTo(getDividerInset());</span>
+<span class="fc" id="L447">            clampInset();</span>
+<span class="fc" id="L448">            isCollapsed = false;</span>
+            // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+<span class="fc" id="L450">            animateLayout(300);</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        } else if (!isExpanded) {</span>
+<span class="fc" id="L452">            getFixedInset(maxInset).copyTo(getDividerInset());</span>
+<span class="fc" id="L453">            clampInset();</span>
+<span class="fc" id="L454">            isExpanded = true;</span>
+            // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+<span class="fc" id="L456">            animateLayout(300);</span>
+        }
+<span class="fc" id="L458">    }</span>
+
+    /// Collapses the aplit pane.  If it is currently expanded, then it will shift to the preferred posiiton.  If it is
+    /// already in the preferred position, it will collapse all the way to the minimum position.
+    public void collapse() {
+<span class="fc" id="L463">        collapse(false);</span>
+<span class="fc" id="L464">    }</span>
+
+    /// Collapses the split pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `force`: True to force it to collapse to minimum position (skipping preferred position if it is in expanded state).
+    public void collapse(boolean force) {
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        if (!isCollapsed) {</span>
+<span class="pc bpc" id="L473" title="1 of 4 branches missed.">            if (isExpanded &amp;&amp; !force) {</span>
+<span class="fc" id="L474">                getFixedInset(preferredInset).copyTo(getDividerInset());</span>
+<span class="fc" id="L475">                clampInset();</span>
+<span class="fc" id="L476">                isExpanded = false;</span>
+                // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+<span class="fc" id="L478">                animateLayout(300);</span>
+            } else {
+<span class="fc" id="L480">                getFixedInset(minInset).copyTo(getDividerInset());</span>
+<span class="fc" id="L481">                clampInset();</span>
+<span class="fc" id="L482">                isCollapsed = true;</span>
+                // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+<span class="fc" id="L484">                animateLayout(300);</span>
+            }
+        }
+
+<span class="fc" id="L488">    }</span>
+
+    /// Sets the inset of the divider explicitly.  This The inset is measured from the top for
+    /// vertical split panes and the left for horizontal split panes.  Setting this to &quot;50%&quot; will
+    /// move the divider to the middle point.  Setting it to &quot;0&quot; would set it all the way to the
+    /// left/top.  This will clamp the value at the minimum and maximum offsets if clamp is true.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inset`
+    ///
+    /// - `clamp`: True to clamp the inset to prevent it from running off the page.
+    public void setInset(String inset, boolean clamp) {
+<span class="fc" id="L501">        getDividerInset().setValueAsString(inset);</span>
+<span class="fc" id="L502">        isExpanded = false;</span>
+<span class="fc" id="L503">        isCollapsed = false;</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">        if (clamp) {</span>
+<span class="nc" id="L505">            clampInset();</span>
+        }
+<span class="fc" id="L507">    }</span>
+
+    /// Sets the inset of the divider explicitly.  This The inset is measured from the top for
+    /// vertical split panes and the left for horizontal split panes.  Setting this to &quot;50%&quot; will
+    /// move the divider to the middle point.  Setting it to &quot;0&quot; would set it all the way to the
+    /// left/top.  This will clamp the value at the minimum and maximum offsets.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inset`
+    public void setInset(String inset) {
+<span class="nc" id="L518">        setInset(inset, true);</span>
+<span class="nc" id="L519">    }</span>
+
+    /// Gets the string value of the preferred inset.  E.g. &quot;25mm&quot;, or &quot;50%&quot;.  Note:  The preferred
+    /// inset is changed automatically when the user drags it to a new location so the value returned here
+    /// may be different than the inset supplied in the constructor.
+    ///
+    /// #### Returns
+    ///
+    /// The current preferred inset of the divider.
+    public String getPreferredInset() {
+<span class="fc" id="L529">        return getFixedInset(preferredInset).getValueAsString();</span>
+    }
+
+    /// Sets the preferred inset of this split pane.  The preferred inset will be automatically
+    /// changed whenever the user explicitly moves the divider to a new position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inset`: The inset.  E.g. &quot;2mm&quot;, &quot;25%&quot;, &quot;200px&quot;.
+    public void setPreferredInset(String inset) {
+<span class="nc" id="L539">        getFixedInset(preferredInset).setValueAsString(inset);</span>
+<span class="nc" id="L540">    }</span>
+
+    /// Gets the string value of the minimum inset of the divider.  E.g. &quot;25mm&quot;, or &quot;50%&quot;.
+    public String getMinInset() {
+<span class="fc" id="L544">        return getFixedInset(minInset).getValueAsString();</span>
+    }
+
+    /// Sets the minimum inset allowed for the divider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inset`: The inset.  E.g. &quot;2mm&quot;, &quot;10%&quot;, &quot;200px&quot;
+    public void setMinInset(String inset) {
+<span class="nc" id="L553">        getFixedInset(minInset).setValueAsString(inset);</span>
+<span class="nc" id="L554">    }</span>
+
+    /// Gets the string value of the maximum inset of the divider.  E.g. &quot;25mm&quot;, or &quot;50%&quot;
+    public String getMaxInset() {
+<span class="fc" id="L558">        return getFixedInset(maxInset).getValueAsString();</span>
+    }
+
+    /// Sets the maximum inset allowed for the divider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inset`: The inset.  E.g. &quot;2mm&quot;, &quot;10%&quot;, &quot;200px&quot;
+    public void setMaxInset(String inset) {
+<span class="nc" id="L567">        getFixedInset(maxInset).setValueAsString(inset);</span>
+<span class="nc" id="L568">    }</span>
+
+    /// An object to configure settings for a SplitPane.  Build an instance of this
+    /// class to define such things as the divider thickness, the insets, and the
+    /// UIIDs to use for the various icons (collapse/expand/drag) on the divider.
+    /// Once you have set all of the settings, you can pass this to `com.codename1.ui.Component, com.codename1.ui.Component)`
+    /// to create the corresponding SplitPane instance.
+    public static class Settings {
+<span class="fc" id="L576">        private int orientation = HORIZONTAL_SPLIT;</span>
+
+        // leave dividerUIID null so that we create the compound border by default.
+        // If the dev wants to override the UIID then they're on their own for the border.
+<span class="fc" id="L580">        private String dividerUIID = null;</span>
+<span class="fc" id="L581">        private String expandButtonUIID = &quot;Label&quot;;</span>
+<span class="fc" id="L582">        private String collapseButtonUIID = &quot;Label&quot;;</span>
+<span class="fc" id="L583">        private String dragHandleUIID = &quot;Label&quot;;</span>
+<span class="fc" id="L584">        private float dividerThicknessMM = 3;</span>
+<span class="fc" id="L585">        private boolean showExpandCollapseButtons = true;</span>
+<span class="fc" id="L586">        private boolean showDragHandle = true;</span>
+<span class="fc" id="L587">        private String minInset = &quot;0&quot;;</span>
+<span class="fc" id="L588">        private String preferredInset = &quot;50%&quot;;</span>
+<span class="fc" id="L589">        private String maxInset = &quot;100%&quot;;</span>
+
+        private char expandMaterialIcon;
+        private char collapseMaterialIcon;
+        private char dragHandleMaterialIcon;
+        private Image expandIcon;
+        private Image collapseIcon;
+        private Image dragHandleIcon;
+
+        /// Creates a new Settings with default values.
+<span class="fc" id="L599">        public Settings() {</span>
+
+<span class="fc" id="L601">        }</span>
+
+        /// Creates a new Settings with the provided orientation, and insets.
+        ///
+        /// #### Parameters
+        ///
+        /// - `orientation`: The orientation.  One of `#HORIZONTAL_SPLIT` or `#VERTICAL_SPLIT`.
+        ///
+        /// - `minInset`: The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;200px&quot;.
+        ///
+        /// - `preferredInset`: The default preferred inset for the divider.  The inset should be expressed as a string with both value and unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;20px&quot;.
+        ///
+        /// - `maxInset`: The maximum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;20px&quot;.
+<span class="fc" id="L614">        public Settings(int orientation, String minInset, String preferredInset, String maxInset) {</span>
+<span class="fc" id="L615">            this.orientation = orientation;</span>
+<span class="fc" id="L616">            this.minInset = minInset;</span>
+<span class="fc" id="L617">            this.preferredInset = preferredInset;</span>
+<span class="fc" id="L618">            this.maxInset = maxInset;</span>
+<span class="fc" id="L619">        }</span>
+
+
+        /// Sets the orientation.
+        ///
+        /// #### Parameters
+        ///
+        /// - `orientation`: The orientation.  One of `#HORIZONTAL_SPLIT` or `#VERTICAL_SPLIT`.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings orientation(int orientation) {
+<span class="fc" id="L632">            this.orientation = orientation;</span>
+<span class="fc" id="L633">            return this;</span>
+        }
+
+        /// Sets the UIID to use for the expand button.  Default is &quot;Label&quot;
+        ///
+        /// #### Parameters
+        ///
+        /// - `expandButtonUIID`: The UIID to use for the expand button.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        ///
+        /// #### See also
+        ///
+        /// - #collapseButtonUIID(java.lang.String)
+        ///
+        /// - #dragHandleUIID(java.lang.String)
+        ///
+        /// - #buttonUIIDs(java.lang.String)
+        public Settings expandButtonUIID(String expandButtonUIID) {
+<span class="nc" id="L654">            this.expandButtonUIID = expandButtonUIID;</span>
+<span class="nc" id="L655">            return this;</span>
+        }
+
+        /// Sets the UIID to use for the collapse button.  Default is &quot;Label&quot;
+        ///
+        /// #### Parameters
+        ///
+        /// - `collapseButtonUIID`: The UIID to use for the collapse button.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        ///
+        /// #### See also
+        ///
+        /// - #dragHandleUIID(java.lang.String)
+        ///
+        /// - #buttonUIIDs(java.lang.String)
+        ///
+        /// - #expandButtonUIID(java.lang.String)
+        public Settings collapseButtonUIID(String collapseButtonUIID) {
+<span class="nc" id="L676">            this.collapseButtonUIID = collapseButtonUIID;</span>
+<span class="nc" id="L677">            return this;</span>
+        }
+
+        /// Sets the UIID to use for the drag handle on the divider.  Default is &quot;Label&quot;
+        ///
+        /// #### Parameters
+        ///
+        /// - `dragHandleUIID`: The UIID to use for the drag handle of the divider.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        ///
+        /// #### See also
+        ///
+        /// - #buttonUIIDs(java.lang.String)
+        ///
+        /// - #expandButtonUIID(java.lang.String)
+        ///
+        /// - #collapseButtonUIID(java.lang.String)
+        public Settings dragHandleUIID(String dragHandleUIID) {
+<span class="nc" id="L698">            this.dragHandleUIID = dragHandleUIID;</span>
+<span class="nc" id="L699">            return this;</span>
+        }
+
+        /// Sets the UIID to use for all of the buttons on the divider.  This includes the drag handle,
+        /// the collapse button, and the expand button.  This is a convenience method that is equivalent of
+        /// calling `#expandButtonUIID(java.lang.String)`, `#collapseButtonUIID(java.lang.String)`,
+        /// and `#dragHandleUIID(java.lang.String)` all with the same value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `uiid`: The UIID to use for the buttons on the divider.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings buttonUIIDs(String uiid) {
+<span class="fc" id="L715">            this.dragHandleUIID = uiid;</span>
+<span class="fc" id="L716">            this.collapseButtonUIID = uiid;</span>
+<span class="fc" id="L717">            this.expandButtonUIID = uiid;</span>
+<span class="fc" id="L718">            return this;</span>
+        }
+
+        /// Sets the icon to use for the collapse button.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`
+        public Settings collapseIcon(Image icon) {
+<span class="fc" id="L727">            this.collapseIcon = icon;</span>
+<span class="fc" id="L728">            return this;</span>
+        }
+
+        /// Sets the icon to use for the expand button.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`
+        public Settings expandIcon(Image icon) {
+<span class="fc" id="L737">            this.expandIcon = icon;</span>
+<span class="fc" id="L738">            return this;</span>
+        }
+
+        /// Sets the icon to use for the drag handle.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`
+        public Settings dragHandleIcon(Image icon) {
+<span class="fc" id="L747">            this.dragHandleIcon = icon;</span>
+<span class="fc" id="L748">            return this;</span>
+        }
+
+        /// Sets the material icon to use for the collapse button.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`
+        public Settings collapseMaterialIcon(char icon) {
+<span class="fc" id="L757">            this.collapseMaterialIcon = icon;</span>
+<span class="fc" id="L758">            return this;</span>
+        }
+
+        /// Sets the material icon to use for the expand button.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`
+        public Settings expandMaterialIcon(char icon) {
+<span class="fc" id="L767">            this.expandMaterialIcon = icon;</span>
+<span class="fc" id="L768">            return this;</span>
+        }
+
+        /// Sets the material icon to use for the drag handle.
+        ///
+        /// #### Parameters
+        ///
+        /// - `icon`
+        public Settings dragHandleMaterialIcon(char icon) {
+<span class="fc" id="L777">            this.dragHandleMaterialIcon = icon;</span>
+<span class="fc" id="L778">            return this;</span>
+        }
+
+        /// Sets the preferred divider thickness in Millimetres.
+        ///
+        /// #### Parameters
+        ///
+        /// - `dividerThicknessMM`: The divider thickness in Millimetres.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings dividerThicknessMM(float dividerThicknessMM) {
+<span class="fc" id="L791">            this.dividerThicknessMM = dividerThicknessMM;</span>
+<span class="fc" id="L792">            return this;</span>
+        }
+
+        /// A custom UIID to use for the divider.  Leave null to use default.
+        ///
+        /// #### Parameters
+        ///
+        /// - `uiid`: The custom UIID
+        ///
+        /// #### Returns
+        ///
+        /// self for chaining.
+        public Settings dividerUIID(String uiid) {
+<span class="fc" id="L805">            dividerUIID = uiid;</span>
+<span class="fc" id="L806">            return this;</span>
+        }
+
+        /// Sets the minimum inset for the divider.
+        ///
+        /// #### Parameters
+        ///
+        /// - `minInset`: The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;200px&quot;.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings minInset(String minInset) {
+<span class="nc" id="L819">            this.minInset = minInset;</span>
+<span class="nc" id="L820">            return this;</span>
+        }
+
+        /// Sets the preferred inset for the divider.
+        ///
+        /// #### Parameters
+        ///
+        /// - `preferredInset`: The preferred inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;200px&quot;.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings preferredInset(String preferredInset) {
+<span class="nc" id="L833">            this.preferredInset = preferredInset;</span>
+<span class="nc" id="L834">            return this;</span>
+        }
+
+        /// Sets the max inset for the divider.
+        ///
+        /// #### Parameters
+        ///
+        /// - `maxInset`: The max inset for the divider. The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;200px&quot;.
+        public Settings maxInset(String maxInset) {
+<span class="nc" id="L843">            this.maxInset = maxInset;</span>
+<span class="nc" id="L844">            return this;</span>
+        }
+
+        /// Sets the min, preferred, and max insets in a single method.  This is equivalent of calling `#minInset(java.lang.String)`,
+        /// `#maxInset(java.lang.String)`, and `#preferredInset(java.lang.String)` separately.
+        ///
+        /// #### Parameters
+        ///
+        /// - `min`: The min inset for the divider. The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;200px&quot;.
+        ///
+        /// - `preferred`: The preferred inset for the divider. The inset should be expressed as a string with both a value and a unit.  E.g. &quot;75%&quot;, &quot;50mm&quot;, &quot;200px&quot;.
+        ///
+        /// - `max`: The max inset for the divider.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings insets(String min, String preferred, String max) {
+<span class="fc" id="L862">            this.minInset = min;</span>
+<span class="fc" id="L863">            this.preferredInset = preferred;</span>
+<span class="fc" id="L864">            this.maxInset = max;</span>
+<span class="fc" id="L865">            return this;</span>
+        }
+
+        /// Set whether to show the expand/collapse buttons on the divider. Default is true.
+        ///
+        /// #### Parameters
+        ///
+        /// - `show`: true to show the expand/collapse buttons.  false to hide them.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings showExpandCollapseButtons(boolean show) {
+<span class="fc" id="L878">            this.showExpandCollapseButtons = show;</span>
+<span class="fc" id="L879">            return this;</span>
+        }
+
+        /// Set whether to show the drag handle on the divider.  Default is true.
+        ///
+        /// #### Parameters
+        ///
+        /// - `show`: true to show the expand/collapse buttons.  false to hide them.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public Settings showDragHandle(boolean show) {
+<span class="fc" id="L892">            this.showDragHandle = show;</span>
+<span class="fc" id="L893">            return this;</span>
+        }
+
+    }
+
+    /// Internal component used as the divider.  This responds to drag events and
+    /// updates its own insets.  The parent layout is layerd layout, and the left and
+    /// right containers are anchored to the divider so they are automatically resized
+    /// according to the divider's location.
+    private class Divider extends Container {
+        private final Button btnCollapse;
+        private final Button btnExpand;
+        private final Label dragHandle;
+        int pressedX;
+        int pressedY;
+        int draggedX;
+        int draggedY;
+        LayeredLayoutConstraint pressedConstraint;
+        private boolean inDrag;
+
+
+<span class="fc" id="L914">        Divider() {</span>
+<span class="fc" id="L915">            super(new LayeredLayout());</span>
+<span class="fc bfc" id="L916" title="All 2 branches covered.">            if (dividerUIID != null) {</span>
+<span class="fc" id="L917">                setUIIDFinal(dividerUIID);</span>
+            }
+<span class="fc" id="L919">            btnCollapse = $(new Button())</span>
+<span class="fc" id="L920">                    .setUIID(collapseButtonUIID)</span>
+<span class="fc" id="L921">                    .setCursor(Component.HAND_CURSOR)</span>
+<span class="fc" id="L922">                    .each(new ComponentClosure() {</span>
+                        @Override
+                        public void call(Component c) {
+<span class="pc bpc" id="L925" title="1 of 2 branches missed.">                            if (c instanceof Label) {</span>
+<span class="fc bfc" id="L926" title="All 2 branches covered.">                                if (collapseIcon != null) {</span>
+<span class="fc" id="L927">                                    ((Label) c).setIcon(collapseIcon);</span>
+                                } else {
+<span class="fc" id="L929">                                    ((Label) c).setMaterialIcon(getCollapseMaterialIcon());</span>
+                                }
+                            }
+<span class="fc" id="L932">                        }</span>
+
+                    })
+<span class="fc" id="L935">                    .addActionListener(new ActionListener() {</span>
+                        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L937">                            collapse();</span>
+<span class="nc" id="L938">                        }</span>
+                    })
+<span class="fc" id="L940">                    .selectAllStyles()</span>
+<span class="fc" id="L941">                    .setMargin(0)</span>
+<span class="fc" id="L942">                    .setPadding(0)</span>
+<span class="fc" id="L943">                    .asComponent(Button.class);</span>
+<span class="fc" id="L944">            btnExpand = $(new Button())</span>
+<span class="fc" id="L945">                    .setCursor(Component.HAND_CURSOR)</span>
+<span class="fc" id="L946">                    .setUIID(expandButtonUIID)</span>
+<span class="fc" id="L947">                    .each(new ComponentClosure() {</span>
+                        @Override
+                        public void call(Component c) {
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">                            if (c instanceof Label) {</span>
+<span class="fc bfc" id="L951" title="All 2 branches covered.">                                if (expandIcon != null) {</span>
+<span class="fc" id="L952">                                    ((Label) c).setIcon(expandIcon);</span>
+                                } else {
+<span class="fc" id="L954">                                    ((Label) c).setMaterialIcon(getExpandMaterialIcon());</span>
+                                }
+                            }
+<span class="fc" id="L957">                        }</span>
+                    })
+<span class="fc" id="L959">                    .addActionListener(new ActionListener() {</span>
+                        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L961">                            expand();</span>
+<span class="nc" id="L962">                        }</span>
+                    })
+<span class="fc" id="L964">                    .selectAllStyles()</span>
+<span class="fc" id="L965">                    .setMargin(0)</span>
+<span class="fc" id="L966">                    .setPadding(0)</span>
+<span class="fc" id="L967">                    .asComponent(Button.class);</span>
+
+<span class="fc" id="L969">            dragHandle = $(new Label())</span>
+<span class="fc" id="L970">                    .setUIID(dragHandleUIID)</span>
+<span class="fc" id="L971">                    .setIcon(getDragIconImage())</span>
+<span class="fc" id="L972">                    .setMargin(0)</span>
+<span class="fc" id="L973">                    .setIgnorePointerEvents(true)</span>
+<span class="fc" id="L974">                    .setPadding(0)</span>
+<span class="fc" id="L975">                    .setDraggable(true)</span>
+<span class="fc" id="L976">                    .setCursor(getDragCursor())</span>
+<span class="fc" id="L977">                    .asComponent(Label.class);</span>
+<span class="fc bfc" id="L978" title="All 2 branches covered.">            if (showExpandCollapseButtons) {</span>
+<span class="fc" id="L979">                add(btnCollapse).add(btnExpand);</span>
+            }
+<span class="fc bfc" id="L981" title="All 2 branches covered.">            if (showDragHandle) {</span>
+<span class="fc" id="L982">                add(dragHandle);</span>
+            }
+
+<span class="fc" id="L985">            boolean isDesktop = CN.isDesktop();</span>
+
+<span class="fc" id="L987">            LayeredLayout l = (LayeredLayout) super.getLayout();</span>
+<span class="fc bfc" id="L988" title="All 2 branches covered.">            if (orientation == HORIZONTAL_SPLIT) {</span>
+<span class="fc" id="L989">                l.setInsets(btnCollapse, &quot;0 0 auto 0&quot;)</span>
+<span class="fc" id="L990">                        .setInsets(btnExpand, &quot;0 0 auto 0&quot;)</span>
+<span class="fc" id="L991">                        .setInsets(dragHandle, &quot;auto auto auto auto&quot;)</span>
+<span class="fc" id="L992">                        .setReferenceComponentTop(btnExpand, btnCollapse, 1f);</span>
+<span class="pc bpc" id="L993" title="1 of 2 branches missed.">                if (!isDesktop) {</span>
+                    // On tablets and phones it is difficult to use the collapse
+                    // expand buttons when they are adjacent.
+                    // On these devices we'll place them at opposite ends of the divider
+<span class="fc" id="L997">                    l.setInsets(btnExpand, &quot;auto 0 0 0&quot;)</span>
+<span class="fc" id="L998">                            .setReferenceComponentTop(btnExpand, null, 1f);</span>
+                }
+            } else {
+<span class="fc" id="L1001">                l.setInsets(btnCollapse, &quot;0 auto 0 0&quot;)</span>
+<span class="fc" id="L1002">                        .setInsets(btnExpand, &quot;0 auto 0 0&quot;)</span>
+<span class="fc" id="L1003">                        .setInsets(dragHandle, &quot;auto auto auto auto&quot;)</span>
+<span class="fc" id="L1004">                        .setReferenceComponentLeft(btnExpand, btnCollapse, 1f);</span>
+<span class="pc bpc" id="L1005" title="1 of 2 branches missed.">                if (!isDesktop) {</span>
+                    // On tablets and phones it is difficult to use the collapse
+                    // expand buttons when they are adjacent.
+                    // On these devices we'll place them at opposite ends of the divider
+<span class="fc" id="L1009">                    l.setInsets(btnExpand, &quot;0 0 0 auto&quot;)</span>
+<span class="fc" id="L1010">                            .setReferenceComponentLeft(btnExpand, null, 1f);</span>
+                }
+            }
+
+<span class="fc bfc" id="L1014" title="All 2 branches covered.">            if (dividerUIID == null) {</span>
+<span class="fc" id="L1015">                $(this)</span>
+<span class="fc" id="L1016">                        .setBorder(createBorder())</span>
+<span class="fc" id="L1017">                        .setCursor(getDragCursor())</span>
+<span class="fc" id="L1018">                        .setDraggable(true);</span>
+            } else {
+<span class="fc" id="L1020">                $(this)</span>
+<span class="fc" id="L1021">                        .setCursor(getDragCursor())</span>
+<span class="fc" id="L1022">                        .setDraggable(true);</span>
+            }
+<span class="fc" id="L1024">        }</span>
+
+        private char getCollapseMaterialIcon() {
+<span class="pc bpc" id="L1027" title="1 of 2 branches missed.">            if (collapseMaterialIcon != 0) {</span>
+<span class="nc" id="L1028">                return collapseMaterialIcon;</span>
+            }
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">            switch (orientation) {</span>
+                case HORIZONTAL_SPLIT:
+<span class="fc" id="L1032">                    return 0xe314;</span>
+                default:
+<span class="nc" id="L1034">                    return 0xe316;</span>
+            }
+        }
+
+        private char getExpandMaterialIcon() {
+<span class="pc bpc" id="L1039" title="1 of 2 branches missed.">            if (expandMaterialIcon != 0) {</span>
+<span class="nc" id="L1040">                return expandMaterialIcon;</span>
+            }
+<span class="pc bpc" id="L1042" title="1 of 2 branches missed.">            switch (orientation) {</span>
+                case HORIZONTAL_SPLIT:
+<span class="fc" id="L1044">                    return 0xe315;</span>
+                default:
+<span class="nc" id="L1046">                    return 0xe313;</span>
+            }
+        }
+
+        private Image getDragIconImage() {
+<span class="fc" id="L1051">            Image img = null;</span>
+<span class="fc bfc" id="L1052" title="All 2 branches covered.">            if (dragHandleIcon != null) {</span>
+<span class="fc" id="L1053">                img = dragHandleIcon;</span>
+            } else {
+<span class="fc" id="L1055">                char materialIcon = FontImage.MATERIAL_DRAG_HANDLE;</span>
+<span class="pc bpc" id="L1056" title="1 of 2 branches missed.">                if (dragHandleMaterialIcon != 0) {</span>
+<span class="nc" id="L1057">                    materialIcon = dragHandleMaterialIcon;</span>
+                }
+<span class="fc" id="L1059">                img = FontImage.createMaterial(materialIcon, getStyle(), 3);</span>
+            }
+<span class="fc bfc" id="L1061" title="All 2 branches covered.">            switch (orientation) {</span>
+                case HORIZONTAL_SPLIT:
+<span class="fc" id="L1063">                    return img.rotate90Degrees(true);</span>
+                default:
+<span class="fc" id="L1065">                    return img;</span>
+            }
+
+        }
+
+        private int getDragCursor() {
+<span class="fc bfc" id="L1071" title="All 2 branches covered.">            return orientation == HORIZONTAL_SPLIT ? Component.E_RESIZE_CURSOR : Component.N_RESIZE_CURSOR;</span>
+        }
+
+        private Border createBorder() {
+<span class="pc bpc" id="L1075" title="1 of 2 branches missed.">            return orientation == HORIZONTAL_SPLIT ? Border.createCompoundBorder(</span>
+<span class="fc" id="L1076">                    Border.createEmpty(),</span>
+<span class="fc" id="L1077">                    Border.createEmpty(),</span>
+<span class="fc" id="L1078">                    Border.createBevelRaised(),</span>
+<span class="fc" id="L1079">                    Border.createBevelRaised()) :</span>
+<span class="nc" id="L1080">                    Border.createCompoundBorder(</span>
+<span class="nc" id="L1081">                            Border.createBevelRaised(),</span>
+<span class="nc" id="L1082">                            Border.createBevelRaised(),</span>
+<span class="nc" id="L1083">                            Border.createEmpty(),</span>
+<span class="nc" id="L1084">                            Border.createEmpty()</span>
+                    );
+
+        }
+
+        @Override
+        protected boolean isStickyDrag() {
+<span class="nc" id="L1091">            return true;</span>
+        }
+
+
+        @Override
+        protected void initComponent() {
+<span class="nc" id="L1097">            super.initComponent();</span>
+<span class="nc" id="L1098">            Form form = getComponentForm();</span>
+<span class="nc bnc" id="L1099" title="All 2 branches missed.">            if (form != null) {</span>
+<span class="nc" id="L1100">                form.setEnableCursors(true);</span>
+            }
+<span class="nc" id="L1102">        }</span>
+
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L1107">            Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L1108" title="1 of 2 branches missed.">            switch (orientation) {</span>
+                case VERTICAL_SPLIT:
+<span class="nc" id="L1110">                    return new Dimension(d.getDisplayWidth(), d.convertToPixels(dividerThicknessMM));</span>
+                default:
+<span class="fc" id="L1112">                    return new Dimension(d.convertToPixels(dividerThicknessMM), d.getDisplayHeight());</span>
+            }
+        }
+
+
+        @Override
+        public void pointerPressed(int x, int y) {
+
+
+<span class="nc" id="L1121">            super.pointerPressed(x, y);</span>
+
+<span class="nc" id="L1123">            pressedX = x;</span>
+<span class="nc" id="L1124">            pressedY = y;</span>
+<span class="nc" id="L1125">            pressedConstraint = ((LayeredLayout) getLayout()).getOrCreateConstraint(this).copy();</span>
+<span class="nc" id="L1126">            inDrag = true;</span>
+<span class="nc" id="L1127">            pointerDragged(x, y);</span>
+<span class="nc" id="L1128">        }</span>
+
+        @Override
+        public void pointerDragged(int x, int y) {
+
+<span class="nc" id="L1133">            super.pointerDragged(x, y);</span>
+<span class="nc bnc" id="L1134" title="All 2 branches missed.">            if (!inDrag) {</span>
+<span class="nc" id="L1135">                return;</span>
+            }
+<span class="nc" id="L1137">            setVisible(true);</span>
+<span class="nc" id="L1138">            draggedX = x;</span>
+<span class="nc" id="L1139">            draggedY = y;</span>
+<span class="nc" id="L1140">            updateInsets();</span>
+<span class="nc" id="L1141">            SplitPane.this.revalidate();</span>
+<span class="nc" id="L1142">        }</span>
+
+        @Override
+        public void pointerReleased(int x, int y) {
+<span class="nc" id="L1146">            super.pointerReleased(x, y);</span>
+<span class="nc" id="L1147">            inDrag = false;</span>
+<span class="nc" id="L1148">        }</span>
+
+        @Override
+        protected void dragFinished(int x, int y) {
+<span class="nc" id="L1152">            super.dragFinished(x, y);</span>
+<span class="nc bnc" id="L1153" title="All 4 branches missed.">            if (!isExpanded &amp;&amp; !isCollapsed) {</span>
+<span class="nc" id="L1154">                getDividerInset().constraint().copyTo(preferredInset);</span>
+            }
+<span class="nc" id="L1156">            inDrag = false;</span>
+<span class="nc" id="L1157">        }</span>
+
+
+        private void updateInsets() {
+<span class="nc" id="L1161">            LayeredLayout ll = (LayeredLayout) SplitPane.this.getLayout();</span>
+<span class="nc" id="L1162">            LayeredLayoutConstraint cnst = pressedConstraint.copy();</span>
+<span class="nc" id="L1163">            int diff = 0;</span>
+<span class="nc bnc" id="L1164" title="All 2 branches missed.">            if (orientation == HORIZONTAL_SPLIT) {</span>
+<span class="nc" id="L1165">                diff = draggedX - pressedX;</span>
+<span class="nc" id="L1166">                cnst.left().translatePixels(diff, false, getParent());</span>
+
+            } else {
+<span class="nc" id="L1169">                diff = draggedY - pressedY;</span>
+<span class="nc" id="L1170">                cnst.top().translatePixels(diff, false, getParent());</span>
+            }
+<span class="nc" id="L1172">            cnst.copyTo(ll.getOrCreateConstraint(this));</span>
+<span class="nc" id="L1173">            clampInset();</span>
+
+
+<span class="nc" id="L1176">        }</span>
+
+        @Override
+        protected Image getDragImage() {
+<span class="nc" id="L1180">            return null;</span>
+        }
+
+        @Override
+        protected void drawDraggedImage(Graphics g, Image img, int x, int y) {
+
+<span class="nc" id="L1186">        }</span>
+
+        @Override
+        protected int getDragRegionStatus(int x, int y) {
+<span class="nc bnc" id="L1190" title="All 2 branches missed.">            switch (orientation) {</span>
+                case HORIZONTAL_SPLIT:
+<span class="nc" id="L1192">                    return Component.DRAG_REGION_IMMEDIATELY_DRAG_X;</span>
+                default:
+<span class="nc" id="L1194">                    return Component.DRAG_REGION_IMMEDIATELY_DRAG_Y;</span>
+            }
+        }
+
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

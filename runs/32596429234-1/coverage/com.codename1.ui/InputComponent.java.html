@@ -1,0 +1,590 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InputComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">InputComponent.java</span></div><h1>InputComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Border;
+
+import java.util.ArrayList;
+
+/// A base class for `com.codename1.ui.TextComponent`, `com.codename1.ui.PickerComponent`
+/// and potentially other components that wish to accept input in a dynamic way that matches iOS and
+/// Android native input guidelines.
+///
+/// It is highly recommended to use input components in the context of a
+/// `com.codename1.ui.layouts.TextModeLayout`. This allows the layout to implicitly adapt to the on-top
+/// mode and use a box layout Y mode for iOS and other platforms.
+///
+/// This class supports several theme constants:
+///
+/// - `textComponentErrorColor` a hex RGB color which defaults to null in which case this has no effect.
+/// When defined this will change the color of the border and label to the given color to match the material design
+/// styling.
+///
+/// - `textComponentErrorLineBorderBool` when set to `false`, this will prevent the text component from
+/// applying an underline border when there is a validation error. Defaults to `true`.
+///
+/// - `textComponentOnTopBool` toggles the on top mode see `#onTopMode(boolean)`
+///
+/// - `textComponentFieldUIID` sets the UIID of the text field to something other than `TextField`
+/// which is useful for platforms such as iOS where the look of the text field is different within the text component
+///
+/// - `inputComponentErrorMultilineBool` sets the error label to multiline when activated
+///
+/// The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
+/// validation errors
+///
+/// ```java
+/// TextModeLayout tl = new TextModeLayout(3, 2);
+/// Form f = new Form(&quot;Pixel Perfect&quot;, tl);
+///
+/// TextComponent title = new TextComponent().label(&quot;Title&quot;);
+/// TextComponent price = new TextComponent().label(&quot;Price&quot;);
+/// TextComponent location = new TextComponent().label(&quot;Location&quot;);
+/// PickerComponent date = PickerComponent.createDate(new Date()).label(&quot;Date&quot;);
+/// TextComponent description = new TextComponent().label(&quot;Description&quot;).multiline(true);
+///
+/// Validator val = new Validator();
+/// val.addConstraint(title, new LengthConstraint(2));
+/// val.addConstraint(price, new NumericConstraint(true));
+///
+/// f.add(tl.createConstraint().widthPercentage(60), title);
+/// f.add(tl.createConstraint().widthPercentage(40), date);
+/// f.add(location);
+/// f.add(price);
+/// f.add(tl.createConstraint().horizontalSpan(2), description);
+/// f.setEditOnShow(title.getField());
+///
+/// f.show();
+/// ```
+///
+/// @author Shai Almog
+public abstract class InputComponent extends Container {
+    static Boolean guiBuilderMode;
+    private static boolean multiLineErrorMessage;
+<span class="fc" id="L90">    private final Button lbl = new LabelButton();</span>
+<span class="fc" id="L91">    private final Label descriptionMessage = new Label(&quot;&quot;, &quot;DescriptionLabel&quot;);</span>
+    Button action;
+    private Boolean onTopMode;
+<span class="fc" id="L94">    private final TextHolder errorMessageImpl = createErrorLabel();</span>
+    private boolean actionAsButton;
+
+    /// Protected constructor for subclasses to override
+<span class="fc" id="L98">    protected InputComponent() {</span>
+<span class="fc" id="L99">        isGuiBuilderMode();</span>
+<span class="fc" id="L100">    }</span>
+
+    // varags calls are significantly slower in java
+    private static int max(int a, int b, int c, int d) {
+<span class="fc" id="L104">        return Math.max(Math.max(Math.max(a, b), c), d);</span>
+    }
+
+    private static boolean isGuiBuilderMode() {
+<span class="fc" id="L108">        synchronized (InputComponent.class) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (guiBuilderMode == null) {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                guiBuilderMode = Display.getInstance().getProperty(&quot;GUIBuilderDesignMode&quot;, null) != null;</span>
+            }
+<span class="fc" id="L112">            return guiBuilderMode.booleanValue();</span>
+        }
+    }
+
+    /// Groups together multiple text components and labels so they align properly, this is implicitly invoked
+    /// by `com.codename1.ui.layouts.TextModeLayout` so this method is unnecessary when using that
+    /// layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmps`: @param cmps a list of components if it's a text component that is not in the on top mode the width of the labels
+    /// will be aligned
+    public static void group(Component... cmps) {
+<span class="fc" id="L125">        ArrayList&lt;Component&gt; al = new ArrayList&lt;Component&gt;();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (Component c : cmps) {</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (c instanceof InputComponent) {</span>
+<span class="fc" id="L128">                InputComponent t = (InputComponent) c;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                if (!t.isOnTopMode()) {</span>
+<span class="fc" id="L130">                    al.add(t.lbl);</span>
+<span class="fc" id="L131">                    t.lbl.setPreferredSize(null);</span>
+                }
+<span class="fc" id="L133">            } else {</span>
+<span class="nc" id="L134">                al.add(c);</span>
+            }
+        }
+<span class="fc" id="L137">        Component[] cc = new Component[al.size()];</span>
+<span class="fc" id="L138">        al.toArray(cc);</span>
+<span class="fc" id="L139">        Component.setSameWidth(cc);</span>
+<span class="fc" id="L140">    }</span>
+
+    /// True if error messages should be multiline by default. This can be
+    /// set via the theme constant `inputComponentErrorMultilineBool`
+    ///
+    /// #### Returns
+    ///
+    /// the multiLineErrorMessage
+    public static boolean isMultiLineErrorMessage() {
+<span class="fc" id="L149">        return multiLineErrorMessage;</span>
+    }
+
+    /// True if error messages should be multiline by default. This can be
+    /// set via the theme constant `inputComponentErrorMultilineBool`
+    ///
+    /// #### Parameters
+    ///
+    /// - `aMultiLineErrorMessage`: the multiLineErrorMessage to set
+    public static void setMultiLineErrorMessage(
+            boolean aMultiLineErrorMessage) {
+<span class="fc" id="L160">        multiLineErrorMessage = aMultiLineErrorMessage;</span>
+<span class="fc" id="L161">    }</span>
+
+    /// This method must be invoked by the constructor of the subclasses to initialize the UI
+    protected final void initInput() {
+        // this can happen for base class constructors
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (getEditor() != null) {</span>
+<span class="fc" id="L167">            setUIID(&quot;TextComponent&quot;);</span>
+<span class="fc" id="L168">            getEditor().setLabelForComponent(lbl);</span>
+<span class="fc" id="L169">            lbl.setFocusable(false);</span>
+<span class="fc" id="L170">            String tuid = getUIManager().getThemeConstant(&quot;textComponentFieldUIID&quot;, null);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (tuid != null) {</span>
+<span class="nc" id="L172">                getEditor().setUIID(tuid);</span>
+            }
+<span class="fc" id="L174">            refreshForGuiBuilder();</span>
+        }
+<span class="fc" id="L176">    }</span>
+
+    /// Returns the internal label implementation
+    ///
+    /// #### Returns
+    ///
+    /// the label
+    Label getLabel() {
+<span class="fc" id="L184">        return lbl;</span>
+    }
+
+    /// Can be overriden by subclasses to support custom error label components
+    ///
+    /// #### Returns
+    ///
+    /// @return Component instance such as JLabel, TextArea etc. usually with the
+    /// `ErrorLabel` UIID
+    protected TextHolder createErrorLabel() {
+<span class="pc bpc" id="L194" title="3 of 4 branches missed.">        if (multiLineErrorMessage &amp;&amp; isOnTopMode()) {</span>
+<span class="nc" id="L195">            TextArea errorLabel = new ErrorLabelTextArea();</span>
+<span class="nc" id="L196">            errorLabel.setRows(1);</span>
+<span class="nc" id="L197">            errorLabel.setActAsLabel(true);</span>
+<span class="nc" id="L198">            errorLabel.setGrowByContent(true);</span>
+<span class="nc" id="L199">            errorLabel.setFocusable(false);</span>
+<span class="nc" id="L200">            errorLabel.setEditable(false);</span>
+<span class="nc" id="L201">            errorLabel.setUIID(&quot;ErrorLabel&quot;);</span>
+<span class="nc" id="L202">            return errorLabel;</span>
+        }
+<span class="fc" id="L204">        return new Label(&quot;&quot;, &quot;ErrorLabel&quot;);</span>
+    }
+
+    /// Returns the internal error message implementation
+    ///
+    /// #### Returns
+    ///
+    /// the label
+    Component getErrorMessage() {
+<span class="fc" id="L213">        return (Component) errorMessageImpl;</span>
+    }
+
+    /// Returns the internal description message implementation
+    ///
+    /// #### Returns
+    ///
+    /// the label
+    Label getDescriptionMessage() {
+<span class="fc" id="L222">        return descriptionMessage;</span>
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (getComponentCount() == 0) {</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (isOnTopMode()) {</span>
+<span class="fc" id="L230">                lbl.setUIID(&quot;FloatingHint&quot;);</span>
+<span class="fc" id="L231">                int w = max(getEditor().getOuterPreferredW(), lbl.getOuterPreferredW(), getErrorMessage().getOuterPreferredW(), descriptionMessage.getOuterPreferredW());</span>
+<span class="fc" id="L232">                int h = getEditor().getOuterPreferredH() + lbl.getOuterPreferredH() +</span>
+<span class="fc" id="L233">                        Math.max(getErrorMessage().getOuterPreferredH(), descriptionMessage.getOuterPreferredH());</span>
+<span class="fc" id="L234">                return new Dimension(w + getStyle().getHorizontalPadding(),</span>
+<span class="fc" id="L235">                        h + getStyle().getVerticalPadding()</span>
+                );
+            } else {
+<span class="fc" id="L238">                return new Dimension(</span>
+<span class="fc" id="L239">                        Math.max(getEditor().getOuterPreferredW() + lbl.getOuterPreferredW(), getErrorMessage().getOuterPreferredW()) + getStyle().getHorizontalPadding(),</span>
+<span class="fc" id="L240">                        getErrorMessage().getOuterPreferredH() + Math.max(getEditor().getOuterPreferredH(), lbl.getOuterPreferredH()) + getStyle().getVerticalPadding()</span>
+                );
+            }
+        }
+<span class="fc" id="L244">        return super.calcPreferredSize();</span>
+    }
+
+    private void addEditorAction() {
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (action != null) {</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            if (actionAsButton) {</span>
+<span class="nc" id="L250">                add(BorderLayout.CENTER, BorderLayout.centerEastWest(</span>
+<span class="nc" id="L251">                        getEditor(),</span>
+                        action, null));
+            } else {
+<span class="fc" id="L254">                add(BorderLayout.CENTER, LayeredLayout.encloseIn(</span>
+<span class="fc" id="L255">                        getEditor(),</span>
+<span class="fc" id="L256">                        FlowLayout.encloseRightMiddle(action)</span>
+                ));
+            }
+        } else {
+<span class="fc" id="L260">            add(BorderLayout.CENTER, getEditor());</span>
+        }
+<span class="fc" id="L262">    }</span>
+
+    void constructUI() {
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (getComponentCount() == 0) {</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (isOnTopMode()) {</span>
+<span class="fc" id="L267">                lbl.setUIID(&quot;FloatingHint&quot;);</span>
+<span class="fc" id="L268">                setLayout(new BorderLayout());</span>
+<span class="fc" id="L269">                add(BorderLayout.NORTH, lbl);</span>
+<span class="fc" id="L270">                addEditorAction();</span>
+<span class="fc" id="L271">                add(BorderLayout.SOUTH,</span>
+<span class="fc" id="L272">                        LayeredLayout.encloseIn(getErrorMessage(), descriptionMessage));</span>
+            } else {
+<span class="fc" id="L274">                setLayout(new BorderLayout());</span>
+<span class="fc" id="L275">                addEditorAction();</span>
+<span class="fc" id="L276">                add(BorderLayout.WEST, lbl);</span>
+<span class="fc" id="L277">                add(BorderLayout.SOUTH, getErrorMessage());</span>
+            }
+        }
+<span class="fc" id="L280">    }</span>
+
+    /// Returns the editor component e.g. text field picker etc.
+    ///
+    /// #### Returns
+    ///
+    /// the editor component
+    public abstract Component getEditor();
+
+    void refreshForGuiBuilder() {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (isGuiBuilderMode()) {</span>
+<span class="nc" id="L291">            removeAll();</span>
+<span class="nc" id="L292">            getEditor().remove();</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            if (action != null) {</span>
+<span class="nc" id="L294">                action.remove();</span>
+            }
+<span class="nc" id="L296">            lbl.remove();</span>
+<span class="nc" id="L297">            descriptionMessage.remove();</span>
+<span class="nc" id="L298">            getErrorMessage().remove();</span>
+<span class="nc" id="L299">            constructUI();</span>
+        }
+<span class="fc" id="L301">    }</span>
+
+    /// Sets the on top mode which places the label above the text when true. It's to the left of the text otherwise
+    /// (right in bidi languages). This is determined by the platform theme using the `textComponentOnTopBool`
+    /// theme constant which defaults to false
+    ///
+    /// #### Parameters
+    ///
+    /// - `onTopMode`: true for the label to be above the text
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent onTopMode(boolean onTopMode) {
+<span class="fc" id="L315">        this.onTopMode = Boolean.valueOf(onTopMode);</span>
+<span class="fc" id="L316">        refreshForGuiBuilder();</span>
+<span class="fc" id="L317">        return this;</span>
+    }
+
+    @Override
+    void initComponentImpl() {
+<span class="fc" id="L322">        constructUI();</span>
+<span class="fc" id="L323">        super.initComponentImpl();</span>
+<span class="fc" id="L324">    }</span>
+
+    /// Indicates the on top mode which places the label above the text when true. It's to the left of the text otherwise
+    /// (right in bidi languages). This is determined by the platform theme using the `textComponentOnTopBool`
+    /// theme constant which defaults to false
+    ///
+    /// #### Returns
+    ///
+    /// true if the text should be on top
+    public boolean isOnTopMode() {
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (onTopMode != null) {</span>
+<span class="fc" id="L335">            return onTopMode.booleanValue();</span>
+        }
+<span class="fc" id="L337">        return getUIManager().isThemeConstant(&quot;textComponentOnTopBool&quot;, false);</span>
+    }
+
+    /// Sets the text of the error label
+    ///
+    /// #### Parameters
+    ///
+    /// - `errorMessage`: the text
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent errorMessage(String errorMessage) {
+<span class="fc" id="L350">        String col = getUIManager().getThemeConstant(&quot;textComponentErrorColor&quot;, null);</span>
+<span class="fc" id="L351">        boolean line = getUIManager().isThemeConstant(&quot;textComponentErrorLineBorderBool&quot;, true);</span>
+<span class="pc bpc" id="L352" title="1 of 4 branches missed.">        if (errorMessage == null || errorMessage.length() == 0) {</span>
+            // no need for double showing of error
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            if (this.errorMessageImpl.getText().length() == 0) {</span>
+<span class="nc" id="L355">                return this;</span>
+            }
+            // clear the error mode
+<span class="fc" id="L358">            this.errorMessageImpl.setText(&quot;&quot;);</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            if (col != null) {</span>
+<span class="nc" id="L360">                lbl.setUIID(lbl.getUIID());</span>
+<span class="nc" id="L361">                getEditor().setUIID(getEditor().getUIID());</span>
+            }
+<span class="fc" id="L363">            descriptionMessage.setVisible(true);</span>
+        } else {
+<span class="fc" id="L365">            descriptionMessage.setVisible(false);</span>
+<span class="fc" id="L366">            this.errorMessageImpl.setText(errorMessage);</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            if (col != null) {</span>
+<span class="nc" id="L368">                int val = Integer.parseInt(col, 16);</span>
+<span class="nc" id="L369">                lbl.getAllStyles().setFgColor(val);</span>
+
+                // only show the line border error if the component is designed to allow it
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                if (line) {</span>
+<span class="nc" id="L373">                    Border b = Border.createUnderlineBorder(2, val);</span>
+<span class="nc" id="L374">                    getEditor().getAllStyles().setBorder(b);</span>
+                }
+            }
+        }
+<span class="fc" id="L378">        refreshForGuiBuilder();</span>
+<span class="fc" id="L379">        return this;</span>
+    }
+
+    /// Sets the text of the description label which currently only applies in the onTop mode.
+    /// This text occupies the same space as the error message and thus hides
+    /// when there's an error
+    ///
+    /// #### Parameters
+    ///
+    /// - `descriptionMessage`: the text
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent descriptionMessage(String descriptionMessage) {
+<span class="pc bpc" id="L394" title="2 of 4 branches missed.">        if (descriptionMessage == null || descriptionMessage.length() == 0) {</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">            if (this.descriptionMessage.getText().length() == 0) {</span>
+<span class="nc" id="L396">                return this;</span>
+            }
+            // clear the error mode
+<span class="nc" id="L399">            this.descriptionMessage.setText(&quot;&quot;);</span>
+        } else {
+<span class="fc" id="L401">            this.descriptionMessage.setText(descriptionMessage);</span>
+        }
+<span class="fc" id="L403">        refreshForGuiBuilder();</span>
+<span class="fc" id="L404">        return this;</span>
+    }
+
+    /// Sets the text of the label
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent label(String text) {
+<span class="fc" id="L417">        lbl.setText(text);</span>
+<span class="fc" id="L418">        refreshForGuiBuilder();</span>
+<span class="fc" id="L419">        return this;</span>
+    }
+
+    private void initAction() {
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (action == null) {</span>
+<span class="fc" id="L424">            action = new Button(&quot;&quot;, &quot;InputComponentAction&quot;);</span>
+        }
+<span class="fc" id="L426">    }</span>
+
+    /// Sets the UIID for the action button
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: a custom UIID for the action
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent actionUIID(String uiid) {
+<span class="fc" id="L438">        initAction();</span>
+<span class="fc" id="L439">        action.setUIID(uiid);</span>
+<span class="fc" id="L440">        return this;</span>
+    }
+
+    /// UIID for the action button
+    ///
+    /// #### Returns
+    ///
+    /// the UIID
+    public String getActionUIID() {
+<span class="fc" id="L449">        initAction();</span>
+<span class="fc" id="L450">        return action.getUIID();</span>
+    }
+
+    /// Indicates the action should behave as a button next to the component
+    /// and not layered on top of the text component. This is useful for UI
+    /// in the style of a browse button next to a text field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `asButton`: true so the action will act like a button
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent actionAsButton(boolean asButton) {
+<span class="fc" id="L465">        initAction();</span>
+<span class="fc" id="L466">        this.actionAsButton = asButton;</span>
+<span class="fc" id="L467">        return this;</span>
+    }
+
+    /// Indicates the action should behave as a button next to the component
+    /// and not layered on top of the text component. This is useful for UI
+    /// in the style of a browse button next to a text field.
+    ///
+    /// #### Returns
+    ///
+    /// true if the action acts as a button
+    public boolean isActionAsButton() {
+<span class="fc" id="L478">        return actionAsButton;</span>
+    }
+
+    /// Provides the text of the action button
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text that should appear on the action button
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent actionText(String text) {
+<span class="fc" id="L491">        initAction();</span>
+<span class="fc" id="L492">        action.setText(text);</span>
+<span class="fc" id="L493">        return this;</span>
+    }
+
+    /// Provides the text of the action button
+    ///
+    /// #### Returns
+    ///
+    /// the text of the action
+    public String getActionText() {
+<span class="fc" id="L502">        initAction();</span>
+<span class="fc" id="L503">        return action.getText();</span>
+    }
+
+    /// Sets the icon for the action button
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon constant from `com.codename1.ui.FontImage`
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent action(char icon) {
+<span class="fc" id="L516">        initAction();</span>
+<span class="fc" id="L517">        action.setMaterialIcon(icon);</span>
+<span class="fc" id="L518">        refreshForGuiBuilder();</span>
+<span class="fc" id="L519">        return this;</span>
+    }
+
+    /// Binds an event for the action button
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: action listener callback
+    ///
+    /// #### Returns
+    ///
+    /// this for chaining calls E.g. `TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);`
+    public InputComponent actionClick(ActionListener c) {
+<span class="fc" id="L532">        initAction();</span>
+<span class="fc" id="L533">        action.addActionListener(c);</span>
+<span class="fc" id="L534">        refreshForGuiBuilder();</span>
+<span class="fc" id="L535">        return this;</span>
+    }
+
+    /// Returns the button underlying the action button that is placed on
+    /// the right of the field on top of it
+    ///
+    /// #### Returns
+    ///
+    /// a button for manual customization
+    public Button getAction() {
+<span class="fc" id="L545">        initAction();</span>
+<span class="fc" id="L546">        return action;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">        if (&quot;label&quot;.equals(name)) {</span>
+<span class="fc" id="L553">            return lbl.getText();</span>
+        }
+<span class="nc" id="L555">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L561" title="All 2 branches missed.">        if (&quot;label&quot;.equals(name)) {</span>
+<span class="nc" id="L562">            label((String) value);</span>
+<span class="nc" id="L563">            return null;</span>
+        }
+<span class="nc" id="L565">        return super.setPropertyValue(name, value);</span>
+    }
+
+    private static class ErrorLabelTextArea extends TextArea {
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="nc bnc" id="L571" title="All 4 branches missed.">            if (getText() == null || getText().length() == 0) {</span>
+<span class="nc" id="L572">                return new Dimension();</span>
+            }
+<span class="nc" id="L574">            return super.calcPreferredSize();</span>
+        }
+
+    }
+
+    private static class LabelButton extends Button {
+        public LabelButton() {
+<span class="fc" id="L581">            super(&quot;&quot;, &quot;Label&quot;);</span>
+<span class="fc" id="L582">        }</span>
+
+        @Override
+        protected boolean shouldRenderComponentSelection() {
+<span class="nc" id="L586">            return true;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

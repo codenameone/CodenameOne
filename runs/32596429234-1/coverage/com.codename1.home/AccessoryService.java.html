@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessoryService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">AccessoryService.java</span></div><h1>AccessoryService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// One functional endpoint of an [Accessory]: HomeKit's `HMService`, one
+/// Matter endpoint.
+///
+/// The distinction matters more than it looks. A two-gang wall switch is
+/// **one** accessory with **two** services, and writing [Trait#ON_OFF] to the
+/// accessory without saying which service is ambiguous. Everything in this API
+/// that reads or writes a trait names a service.
+///
+/// An immutable snapshot. Nothing here calls into the platform.
+public final class AccessoryService {
+
+    private final String id;
+    private final String name;
+    private final ServiceType type;
+    private final boolean primary;
+    private final List&lt;TraitConstraint&gt; constraints;
+
+    /// Creates a service snapshot. Called by the ports and by the local home;
+    /// application code receives these rather than building them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the service identifier, unique within its accessory
+    ///
+    /// - `name`: the user-visible name, or `null` for none
+    ///
+    /// - `type`: what the service is; `null` becomes [ServiceType#OTHER]
+    ///
+    /// - `primary`: whether this is the accessory's main service
+    ///
+    /// - `constraints`: what each trait on this service will accept; `null`
+    ///   becomes empty
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `id` is `null` or empty
+    public AccessoryService(String id, String name, ServiceType type,
+<span class="fc" id="L66">            boolean primary, List&lt;TraitConstraint&gt; constraints) {</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(&quot;service id is required&quot;);</span>
+        }
+<span class="fc" id="L70">        this.id = id;</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        this.name = name == null ? &quot;&quot; : name;</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        this.type = type == null ? ServiceType.OTHER : type;</span>
+<span class="fc" id="L73">        this.primary = primary;</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        if (constraints == null || constraints.isEmpty()) {</span>
+<span class="fc" id="L75">            this.constraints = Collections.&lt;TraitConstraint&gt;emptyList();</span>
+        } else {
+<span class="fc" id="L77">            this.constraints = Collections.unmodifiableList(</span>
+                    new ArrayList&lt;TraitConstraint&gt;(constraints));
+        }
+<span class="fc" id="L80">    }</span>
+
+    /// The identifier this service is addressed by, unique within its
+    /// accessory.
+    ///
+    /// #### Returns
+    ///
+    /// the identifier, never `null`
+    public String getId() {
+<span class="fc" id="L89">        return id;</span>
+    }
+
+    /// The user-visible name, empty when the accessory gave none.
+    ///
+    /// #### Returns
+    ///
+    /// the name, never `null`
+    public String getName() {
+<span class="nc" id="L98">        return name;</span>
+    }
+
+    /// What this service is.
+    ///
+    /// #### Returns
+    ///
+    /// the type, never `null`
+    public ServiceType getType() {
+<span class="nc" id="L107">        return type;</span>
+    }
+
+    /// Whether this is the accessory's main service -- the one a UI showing a
+    /// single control for the whole device should use.
+    ///
+    /// #### Returns
+    ///
+    /// `true` for the primary service
+    public boolean isPrimary() {
+<span class="fc" id="L117">        return primary;</span>
+    }
+
+    /// Every trait this service exposes, with what each will accept.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list, possibly empty
+    public List&lt;TraitConstraint&gt; getConstraints() {
+<span class="nc" id="L126">        return constraints;</span>
+    }
+
+    /// What this service will accept for one trait.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait to look up, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// the constraint, or `null` when this service does not expose the trait
+    public TraitConstraint getConstraint(Trait trait) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (trait == null) {</span>
+<span class="nc" id="L140">            return null;</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        for (TraitConstraint c : constraints) {</span>
+            // Reference equality on purpose: Trait instances are interned
+            // constants, so == is the identity test the class documents and
+            // is what every lookup here relies on. Trait does not override
+            // equals, so .equals() would be the same comparison spelled
+            // longer and would suggest a value comparison that does not
+            // exist.
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (c.getTrait() == trait) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L150">                return c;</span>
+            }
+<span class="fc" id="L152">        }</span>
+<span class="nc" id="L153">        return null;</span>
+    }
+
+    /// Whether this service exposes a trait at all.
+    ///
+    /// This is the question to ask instead of switching on [#getType()] or on
+    /// [SmartHome#getBackend()]. A service exposes what it exposes, and two
+    /// accessories of the same type routinely differ.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait to test, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the trait is present here
+    public boolean supports(Trait trait) {
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        return getConstraint(trait) != null;</span>
+    }
+
+    /// Every trait this service exposes.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list, possibly empty
+    public List&lt;Trait&gt; getTraits() {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (constraints.isEmpty()) {</span>
+<span class="nc" id="L180">            return Collections.&lt;Trait&gt;emptyList();</span>
+        }
+<span class="nc" id="L182">        List&lt;Trait&gt; out = new ArrayList&lt;Trait&gt;(constraints.size());</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        for (TraitConstraint c : constraints) {</span>
+<span class="nc" id="L184">            out.add(c.getTrait());</span>
+<span class="nc" id="L185">        }</span>
+<span class="nc" id="L186">        return Collections.unmodifiableList(out);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        return type.name() + &quot;[&quot; + id + (name.length() &gt; 0 ? &quot; &quot; + name : &quot;&quot;)</span>
+                + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

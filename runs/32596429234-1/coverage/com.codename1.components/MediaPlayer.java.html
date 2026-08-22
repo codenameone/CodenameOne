@@ -1,0 +1,942 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MediaPlayer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">MediaPlayer.java</span></div><h1>MediaPlayer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.io.Log;
+import com.codename1.media.AsyncMedia;
+import com.codename1.media.Media;
+import com.codename1.media.MediaManager;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.Slider;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.UITimer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Timer;
+import java.util.TimerTask;
+
+/// Video playback component with control buttons for back, play/pause and
+/// forward buttons. In the simulator those controls are implemented locally but on the
+/// device the native playback controls are used.
+///
+/// ```java
+/// final Form hi = new Form(&quot;MediaPlayer&quot;, new BorderLayout());
+/// hi.setToolbar(new Toolbar());
+/// Style s = UIManager.getInstance().getComponentStyle(&quot;Title&quot;);
+/// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_VIDEO_LIBRARY, s);
+/// hi.getToolbar().addCommandToRightBar(new Command(&quot;&quot;, icon) {
+/// @Override
+///     public void actionPerformed(ActionEvent evt) {
+///         Display.getInstance().openGallery((e) -&gt; {
+///             if(e != null &amp;&amp; e.getSource() != null) {
+///                 String file = (String)e.getSource();
+///                 try {
+///                     Media video = MediaManager.createMedia(file, true);
+///                     hi.removeAll();
+///                     hi.add(BorderLayout.CENTER, new MediaPlayer(video));
+///                     hi.revalidate();
+///                 } catch(IOException err) {
+///                     Log.e(err);
+///                 }
+///             }
+///         }, Display.GALLERY_VIDEO);
+///     }
+/// });
+/// hi.show();
+/// ```
+public class MediaPlayer extends Container {
+    private Image playIcon;
+    private Image pauseIcon;
+    private Image backIcon;
+    private Image fwdIcon;
+    private Image maxIcon;
+    private Container buttonsBar;
+    private boolean hideNativeVideoControls;
+<span class="fc" id="L87">    private boolean showControls = true;</span>
+    private Runnable loopOnCompletion;
+    private Slider progress;
+    private UITimer progressUpdater;
+
+    /// Shows the buttons on top of the video
+<span class="fc" id="L93">    private boolean onTopMode = true;</span>
+
+    /// Shows video position bar as a slider
+<span class="fc" id="L96">    private boolean seekBar = true;</span>
+
+    /// UIID for the seekBar slider
+<span class="fc" id="L99">    private String seekBarUIID = null;</span>
+
+    /// Includes a maximize icon in the bar to show the native player
+<span class="fc" id="L102">    private boolean maximize = true;</span>
+
+<span class="fc" id="L104">    private boolean userSetIcons = false;</span>
+    private Media video;
+    private String dataSource;
+
+    private String pendingDataURI;
+    private boolean autoplay;
+    private boolean loop;
+    //private Runnable onCompletion;
+
+    /// Empty constructor
+<span class="fc" id="L114">    public MediaPlayer() {</span>
+<span class="fc" id="L115">        playIcon = FontImage.createMaterial(FontImage.MATERIAL_PLAY_ARROW, &quot;Button&quot;, 3);</span>
+<span class="fc" id="L116">        pauseIcon = FontImage.createMaterial(FontImage.MATERIAL_PAUSE, &quot;Button&quot;, 3);</span>
+<span class="fc" id="L117">        fwdIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_FORWARD, &quot;Button&quot;, 3);</span>
+<span class="fc" id="L118">        backIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_REWIND, &quot;Button&quot;, 3);</span>
+<span class="fc" id="L119">        maxIcon = FontImage.createMaterial(FontImage.MATERIAL_FULLSCREEN, &quot;Button&quot;, 3);</span>
+<span class="fc" id="L120">    }</span>
+
+    /// Empty constructor
+    public MediaPlayer(Media video) {
+<span class="fc" id="L124">        this();</span>
+<span class="fc" id="L125">        this.video = video;</span>
+<span class="fc" id="L126">        updateLoopOnCompletionHandler();</span>
+        //initUI();
+<span class="fc" id="L128">    }</span>
+
+    /// On platforms that include native video player controls (Android and iOS), this indicates whether
+    /// these controls should be hidden for this media player.
+    ///
+    /// #### Returns
+    ///
+    /// true if native video player controls should be hidden.
+    ///
+    /// #### See also
+    ///
+    /// - Display#isNativeVideoPlayerControlsIncluded()
+    ///
+    /// - #setHideNativeVideoControls(boolean)
+    ///
+    /// - #usesNativeVideoControls()
+    public boolean isHideNativeVideoControls() {
+<span class="fc" id="L145">        return hideNativeVideoControls;</span>
+    }
+
+    /// On platforms that include native video player controls (Android and iOS), this allows you
+    /// to hide those controls.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hideNativeControls`: Set true to hide the native video controls for this player.
+    ///
+    /// #### See also
+    ///
+    /// - Display#isNativeVideoPlayerControlsIncluded()
+    ///
+    /// - #setHideNativeVideoControls(boolean)
+    ///
+    /// - #usesNativeVideoControls()
+    public void setHideNativeVideoControls(boolean hideNativeControls) {
+<span class="fc" id="L163">        this.hideNativeVideoControls = hideNativeControls;</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (video != null) {</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">            video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, !hideNativeControls &amp;&amp; showControls);</span>
+        }
+<span class="fc" id="L167">    }</span>
+
+    /// Checks to see if this player uses native video controls.  For this to be true,
+    /// the platform must support native video controls (iOS and Android) (See `Display#isNativeVideoPlayerControlsIncluded()`
+    /// to find out if current platform supports this; **AND** `#isHideNativeVideoControls()`
+    /// must be false.
+    ///
+    /// Note: on IOS, the controls won't display until the video's `Media#prepare()`
+    /// is called.  This will happen automatically if `#isAutoplay()` is true, or if `Media#play()`
+    /// is called.
+    ///
+    /// #### Returns
+    ///
+    /// True if this player uses native video controls.
+    ///
+    /// #### See also
+    ///
+    /// - #isHideNativeVideoControls()
+    ///
+    /// - #setHideNativeVideoControls(boolean)
+    ///
+    /// - Display#isNativeVideoPlayerControlsIncluded()
+    public boolean usesNativeVideoControls() {
+<span class="pc bpc" id="L190" title="3 of 4 branches missed.">        return Display.getInstance().isNativeVideoPlayerControlsIncluded() &amp;&amp; !hideNativeVideoControls;</span>
+    }
+
+    /// Shows the controls for this media player.  If the player is set to use
+    /// native controls, then this will show the native controls.  Otherwise it
+    /// shows the lightweight controls.
+    ///
+    /// Note: on IOS, the controls won't display until the video's `Media#prepare()`
+    /// is called.  This will happen automatically if `#isAutoplay()` is true, or if `Media#play()`
+    /// is called.
+    public void showControls() {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (!showControls) {</span>
+<span class="nc" id="L202">            showControls = true;</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            if (isInitialized()) {</span>
+<span class="nc" id="L204">                buttonsBar.setVisible(true);</span>
+<span class="nc" id="L205">                buttonsBar.setHidden(false);</span>
+<span class="nc" id="L206">                animateLayoutFade(300, 0);</span>
+            }
+        }
+<span class="nc bnc" id="L209" title="All 4 branches missed.">        if (video != null &amp;&amp; usesNativeVideoControls()) { // PMD Fix: CollapsibleIfStatements merged nested native control check</span>
+<span class="nc" id="L210">            video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, true);</span>
+        }
+<span class="nc" id="L212">    }</span>
+
+    /// Hides the controls for this media player.  If the player is set to use native
+    /// controls, then this will hide the native controls.  Otherwise it hides the
+    /// lightweight controls.
+    public void hideControls() {
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (showControls) {</span>
+<span class="nc" id="L219">            showControls = false;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (isInitialized()) {</span>
+<span class="nc" id="L221">                buttonsBar.setVisible(false);</span>
+<span class="nc" id="L222">                buttonsBar.setHidden(true);</span>
+<span class="nc" id="L223">                animateLayoutFade(300, 0);</span>
+            }
+        }
+<span class="nc bnc" id="L226" title="All 4 branches missed.">        if (video != null &amp;&amp; usesNativeVideoControls()) { // PMD Fix: CollapsibleIfStatements merged nested native control check</span>
+<span class="nc" id="L227">            video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, false);</span>
+        }
+<span class="nc" id="L229">    }</span>
+
+    /// Returns the Media Object of this MediaPlayer
+    public Media getMedia() {
+<span class="fc" id="L233">        return video;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void initComponent() {
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (userSetIcons) {</span>
+<span class="nc" id="L240">            Image play = UIManager.getInstance().getThemeImageConstant(&quot;mediaPlayImage&quot;);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (play != null) {</span>
+<span class="nc" id="L242">                playIcon = play;</span>
+            }
+<span class="nc" id="L244">            Image pause = UIManager.getInstance().getThemeImageConstant(&quot;mediaPauseImage&quot;);</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (pause != null) {</span>
+<span class="nc" id="L246">                pauseIcon = pause;</span>
+            }
+<span class="nc" id="L248">            Image back = UIManager.getInstance().getThemeImageConstant(&quot;mediaBackImage&quot;);</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            if (back != null) {</span>
+<span class="nc" id="L250">                backIcon = back;</span>
+            }
+<span class="nc" id="L252">            Image fwd = UIManager.getInstance().getThemeImageConstant(&quot;mediaFwdImage&quot;);</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            if (fwd != null) {</span>
+<span class="nc" id="L254">                fwdIcon = fwd;</span>
+            }
+<span class="nc" id="L256">            Image max = UIManager.getInstance().getThemeImageConstant(&quot;mediaMaxImage&quot;);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            if (max != null) {</span>
+<span class="nc" id="L258">                maxIcon = max;</span>
+            }
+
+        }
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (pendingDataURI != null) {</span>
+<span class="nc" id="L263">            setDataSource(pendingDataURI);</span>
+<span class="nc" id="L264">            pendingDataURI = null;</span>
+        }
+<span class="fc" id="L266">        initUI();</span>
+<span class="fc" id="L267">    }</span>
+
+    private void checkProgressSlider() {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        if (progressUpdater == null) {</span>
+<span class="nc" id="L271">            progressUpdater = UITimer.timer(50, true, getComponentForm(),</span>
+<span class="nc" id="L272">                    new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L275">                            float dur = video.getDuration();</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                            if (dur &gt; 0) {</span>
+<span class="nc" id="L277">                                float pos = video.getTime();</span>
+<span class="nc" id="L278">                                int offset = (int) (pos / dur * 100.0f);</span>
+<span class="nc bnc" id="L279" title="All 6 branches missed.">                                if (offset &gt; -1 &amp;&amp; offset &lt; 101 &amp;&amp; progress != null) {</span>
+<span class="nc" id="L280">                                    progress.setProgress(offset);</span>
+                                }
+                            }
+<span class="nc" id="L283">                        }</span>
+                    });
+        }
+<span class="nc" id="L286">    }</span>
+
+    private void stopProgressSlider() {
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (progressUpdater != null) {</span>
+<span class="nc" id="L290">            progressUpdater.cancel();</span>
+<span class="nc" id="L291">            progressUpdater = null;</span>
+        }
+<span class="nc" id="L293">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L298">        super.deinitialize();</span>
+<span class="pc bpc" id="L299" title="1 of 4 branches missed.">        if (video != null &amp;&amp; video.isPlaying()) {</span>
+<span class="nc" id="L300">            video.pause();</span>
+<span class="nc" id="L301">            stopProgressSlider();</span>
+        }
+<span class="fc" id="L303">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="nc bnc" id="L308" title="All 4 branches missed.">        if (video == null &amp;&amp; dataSource == null) {</span>
+<span class="nc" id="L309">            return new Dimension(240, 320);</span>
+        }
+<span class="nc" id="L311">        return super.calcPreferredSize();</span>
+    }
+
+    /// Sets the maximize Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxIcon`
+    public void setMaxIcon(Image maxIcon) {
+<span class="nc" id="L320">        this.maxIcon = maxIcon;</span>
+<span class="nc" id="L321">        userSetIcons = true;</span>
+<span class="nc" id="L322">    }</span>
+
+    /// Sets the data source of this video player
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: @param uri the uri of the media can start with file://, http:// (can also
+    /// use rtsp:// although may not be supported on all target platforms)
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if creation of media from the given URI has failed
+    public void setDataSource(String uri, Runnable onCompletion) throws IOException {
+<span class="nc" id="L335">        dataSource = uri;</span>
+<span class="nc" id="L336">        video = MediaManager.createMedia(uri, true, onCompletion);</span>
+<span class="nc" id="L337">        updateLoopOnCompletionHandler();</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L339">            initUI();</span>
+        }
+<span class="nc" id="L341">    }</span>
+
+    /// Convenience JavaBean method, see other version of this method
+    ///
+    /// #### Returns
+    ///
+    /// the data source uri
+    public String getDataSource() {
+<span class="pc bpc" id="L349" title="2 of 4 branches missed.">        if (!isInitialized() &amp;&amp; dataSource == null) {</span>
+<span class="fc" id="L350">            return pendingDataURI;</span>
+        }
+<span class="nc" id="L352">        return dataSource;</span>
+    }
+
+    /// Convenience JavaBean method, see other version of this method
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: the URL for the media
+    public void setDataSource(final String uri) {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (!isInitialized()) {</span>
+<span class="fc" id="L362">            pendingDataURI = uri;</span>
+<span class="fc" id="L363">            return;</span>
+        }
+<span class="nc bnc" id="L365" title="All 4 branches missed.">        if (dataSource == null || !dataSource.equals(uri)) {</span>
+<span class="nc" id="L366">            Display.getInstance().startThread(new Runnable() {</span>
+                @Override
+                public void run() {
+                    try {
+<span class="nc" id="L370">                        setDataSource(uri, null);</span>
+<span class="nc" id="L371">                    } catch (Throwable t) {</span>
+<span class="nc" id="L372">                        Log.e(t);</span>
+<span class="nc" id="L373">                    }</span>
+<span class="nc" id="L374">                }</span>
+<span class="nc" id="L375">            }, &quot;Media Thread&quot;).start();</span>
+        }
+<span class="nc" id="L377">    }</span>
+
+    /// Sets the data source of this video player
+    ///
+    /// #### Parameters
+    ///
+    /// - `is`: the stream containing the media data
+    ///
+    /// - `mimeType`: the type of the data in the stream
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the creation of the Media has failed
+    public void setDataSource(InputStream is, String mimeType, Runnable onCompletion) throws IOException {
+
+<span class="nc" id="L392">        video = MediaManager.createMedia(is, mimeType, onCompletion);</span>
+
+<span class="nc" id="L394">        updateLoopOnCompletionHandler();</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L396">            initUI();</span>
+        }
+<span class="nc" id="L398">    }</span>
+
+    private void initUI() {
+<span class="fc" id="L401">        removeAll();</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        if (onTopMode) {</span>
+<span class="fc" id="L403">            setLayout(new LayeredLayout());</span>
+        } else {
+<span class="nc" id="L405">            setLayout(new BorderLayout());</span>
+        }
+
+<span class="pc bpc" id="L408" title="1 of 4 branches missed.">        if (video != null &amp;&amp; video.getVideoComponent() != null) {</span>
+<span class="nc" id="L409">            Component videoComponent = video.getVideoComponent();</span>
+<span class="nc bnc" id="L410" title="All 2 branches missed.">            if (videoComponent != null) {</span>
+<span class="nc" id="L411">                videoComponent.setUIID(&quot;Container&quot;);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                if (onTopMode) {</span>
+<span class="nc" id="L413">                    addComponent(videoComponent);</span>
+                } else {
+<span class="nc" id="L415">                    addComponent(BorderLayout.CENTER, videoComponent);</span>
+                }
+            }
+        }
+
+
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        if (seekBar) {</span>
+<span class="fc" id="L422">            buttonsBar = new Container(new BorderLayout());</span>
+<span class="fc" id="L423">            progress = new Slider();</span>
+<span class="fc" id="L424">            progress.setEditable(true);</span>
+<span class="fc" id="L425">            buttonsBar.addComponent(BorderLayout.CENTER,</span>
+<span class="fc" id="L426">                    FlowLayout.encloseCenterMiddle(progress));</span>
+<span class="fc" id="L427">            progress.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L430">                    float dur = video.getDuration();</span>
+<span class="nc bnc" id="L431" title="All 4 branches missed.">                    if (dur &gt; 0 &amp;&amp; progress != null) {</span>
+<span class="nc" id="L432">                        float pos = progress.getProgress(evt);</span>
+<span class="nc" id="L433">                        int t = (int) (pos / 100.0f * dur);</span>
+<span class="nc" id="L434">                        video.setTime(t);</span>
+                    }
+<span class="nc" id="L436">                }</span>
+            });
+        } else {
+<span class="nc" id="L439">            buttonsBar = new Container(new FlowLayout(Container.CENTER));</span>
+        }
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        if (onTopMode) {</span>
+<span class="fc" id="L442">            addComponent(BorderLayout.south(buttonsBar));</span>
+        } else {
+<span class="nc" id="L444">            addComponent(BorderLayout.SOUTH, buttonsBar);</span>
+        }
+<span class="pc bpc" id="L446" title="2 of 4 branches missed.">        if (usesNativeVideoControls() || !showControls) {</span>
+<span class="nc" id="L447">            buttonsBar.setVisible(false);</span>
+<span class="nc" id="L448">            buttonsBar.setHidden(true);</span>
+        }
+
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        if (!seekBar) {</span>
+<span class="nc" id="L452">            Button back = new Button();</span>
+<span class="nc" id="L453">            back.setUIID(&quot;MediaPlayerBack&quot;);</span>
+<span class="nc bnc" id="L454" title="All 2 branches missed.">            if (backIcon != null) {</span>
+<span class="nc" id="L455">                back.setIcon(backIcon);</span>
+            } else {
+<span class="nc" id="L457">                back.setText(&quot;Back&quot;);</span>
+            }
+<span class="nc" id="L459">            buttonsBar.addComponent(back);</span>
+<span class="nc" id="L460">            back.addActionListener(new ActionListener() {</span>
+
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L464" title="All 2 branches missed.">                    if (video == null) {</span>
+<span class="nc" id="L465">                        return;</span>
+                    }
+<span class="nc" id="L467">                    int t = video.getTime();</span>
+<span class="nc" id="L468">                    video.setTime(t - 2);</span>
+<span class="nc" id="L469">                }</span>
+            });
+        }
+
+<span class="fc" id="L473">        final Button play = new Button() {</span>
+
+<span class="fc" id="L475">            private final ActionListener&lt;AsyncMedia.MediaStateChangeEvent&gt; stateChangeListener = new ActionListener&lt;AsyncMedia.MediaStateChangeEvent&gt;() {</span>
+                @Override
+                public void actionPerformed(AsyncMedia.MediaStateChangeEvent evt) {
+<span class="nc" id="L478">                    updateIconAndText();</span>
+<span class="nc" id="L479">                }</span>
+            };
+
+
+            private void updateIconAndText() {
+<span class="pc bpc" id="L484" title="1 of 4 branches missed.">                if (video != null &amp;&amp; video.isPlaying()) { // PMD Fix: CollapsibleIfStatements merged null/playing checks</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                    if (getPauseIcon() != null) {</span>
+<span class="nc" id="L486">                        this.setIcon(getPauseIcon());</span>
+                    } else {
+<span class="nc" id="L488">                        this.setText(&quot;pause&quot;);</span>
+                    }
+                } else {
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">                    if (playIcon != null) {</span>
+<span class="fc" id="L492">                        this.setIcon(playIcon);</span>
+                    } else {
+<span class="nc" id="L494">                        this.setText(&quot;play&quot;);</span>
+                    }
+                }
+<span class="fc" id="L497">            }</span>
+
+            @Override
+            protected void initComponent() {
+<span class="fc" id="L501">                super.initComponent();</span>
+<span class="fc" id="L502">                updateIconAndText();</span>
+
+<span class="fc bfc" id="L504" title="All 2 branches covered.">                if (video != null) {</span>
+<span class="fc" id="L505">                    MediaManager.getAsyncMedia(video).addMediaStateChangeListener(stateChangeListener);</span>
+                }
+<span class="fc" id="L507">            }</span>
+
+            @Override
+            protected void deinitialize() {
+<span class="fc bfc" id="L511" title="All 2 branches covered.">                if (video != null) {</span>
+<span class="fc" id="L512">                    MediaManager.getAsyncMedia(video).removeMediaStateChangeListener(stateChangeListener);</span>
+                }
+<span class="fc" id="L514">                super.deinitialize();</span>
+<span class="fc" id="L515">            }</span>
+
+
+        };
+<span class="fc" id="L519">        play.setUIID(&quot;MediaPlayerPlay&quot;);</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">        if (playIcon != null) {</span>
+<span class="fc" id="L521">            play.setIcon(playIcon);</span>
+        } else {
+<span class="nc" id="L523">            play.setText(&quot;play&quot;);</span>
+        }
+<span class="pc bpc" id="L525" title="5 of 6 branches missed.">        if (autoplay &amp;&amp; video != null &amp;&amp; !video.isPlaying()) {</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">            if (getPauseIcon() != null) {</span>
+<span class="nc" id="L527">                play.setIcon(getPauseIcon());</span>
+            } else {
+<span class="nc" id="L529">                play.setText(&quot;pause&quot;);</span>
+            }
+<span class="nc" id="L531">            Timer t = new Timer();</span>
+<span class="nc" id="L532">            t.schedule(new TimerTask() {</span>
+                @Override
+                public void run() {
+<span class="nc bnc" id="L535" title="All 2 branches missed.">                    if (isInitialized()) {</span>
+<span class="nc" id="L536">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="nc bnc" id="L539" title="All 6 branches missed.">                                if (video != null &amp;&amp; !video.isPlaying() &amp;&amp; isInitialized()) {</span>
+<span class="nc" id="L540">                                    video.play();</span>
+<span class="nc" id="L541">                                    checkProgressSlider();</span>
+                                }
+<span class="nc" id="L543">                            }</span>
+                        });
+                    }
+<span class="nc" id="L546">                }</span>
+
+            }, 300L);
+
+            //video.play();
+        }
+<span class="fc" id="L552">        play.addActionListener(new ActionListener() {</span>
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L556" title="All 2 branches missed.">                if (video == null) {</span>
+<span class="nc" id="L557">                    return;</span>
+                }
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                if (!video.isPlaying()) {</span>
+<span class="nc" id="L560">                    video.play();</span>
+<span class="nc" id="L561">                    checkProgressSlider();</span>
+<span class="nc" id="L562">                    play.setUIID(&quot;MediaPlayerPause&quot;);</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                    if (getPauseIcon() != null) {</span>
+<span class="nc" id="L564">                        play.setIcon(getPauseIcon());</span>
+                    } else {
+<span class="nc" id="L566">                        play.setText(&quot;pause&quot;);</span>
+                    }
+<span class="nc" id="L568">                    play.repaint();</span>
+                } else {
+<span class="nc" id="L570">                    video.pause();</span>
+<span class="nc" id="L571">                    stopProgressSlider();</span>
+<span class="nc" id="L572">                    play.setUIID(&quot;MediaPlayerPlay&quot;);</span>
+<span class="nc bnc" id="L573" title="All 2 branches missed.">                    if (getPlayIcon() != null) {</span>
+<span class="nc" id="L574">                        play.setIcon(getPlayIcon());</span>
+                    } else {
+<span class="nc" id="L576">                        play.setText(&quot;play&quot;);</span>
+                    }
+<span class="nc" id="L578">                    play.repaint();</span>
+                }
+<span class="nc" id="L580">            }</span>
+        });
+<span class="fc" id="L582">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="pc bpc" id="L585" title="1 of 4 branches missed.">                if (video != null &amp;&amp; video.isPlaying()) {</span>
+<span class="nc" id="L586">                    play.setUIID(&quot;MediaPlayerPause&quot;);</span>
+<span class="nc bnc" id="L587" title="All 2 branches missed.">                    if (getPauseIcon() != null) {</span>
+<span class="nc" id="L588">                        play.setIcon(getPauseIcon());</span>
+                    } else {
+<span class="nc" id="L590">                        play.setText(&quot;pause&quot;);</span>
+                    }
+<span class="pc bpc" id="L592" title="1 of 4 branches missed.">                } else if (video != null &amp;&amp; !video.isPlaying()) {</span>
+<span class="fc" id="L593">                    play.setUIID(&quot;MediaPlayerPlay&quot;);</span>
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                    if (getPlayIcon() != null) {</span>
+<span class="fc" id="L595">                        play.setIcon(getPlayIcon());</span>
+                    } else {
+<span class="nc" id="L597">                        play.setText(&quot;play&quot;);</span>
+                    }
+                }
+<span class="fc" id="L600">            }</span>
+        });
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">        if (seekBar) {</span>
+<span class="fc" id="L603">            buttonsBar.addComponent(BorderLayout.WEST, play);</span>
+        } else {
+<span class="nc" id="L605">            buttonsBar.addComponent(play);</span>
+        }
+
+        //if(video == null || !video.isNativePlayerMode()){
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">        if (!seekBar) {</span>
+<span class="nc" id="L610">            Button fwd = new Button();</span>
+<span class="nc" id="L611">            fwd.addActionListener(new ActionListener() {</span>
+
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                    if (video == null) {</span>
+<span class="nc" id="L616">                        return;</span>
+                    }
+<span class="nc" id="L618">                    int t = video.getTime();</span>
+<span class="nc" id="L619">                    video.setTime(t + 1);</span>
+<span class="nc" id="L620">                }</span>
+            });
+<span class="nc" id="L622">            fwd.setUIID(&quot;MediaPlayerFwd&quot;);</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">            if (fwdIcon != null) {</span>
+<span class="nc" id="L624">                fwd.setIcon(fwdIcon);</span>
+            } else {
+<span class="nc" id="L626">                fwd.setText(&quot;fwd&quot;);</span>
+            }
+<span class="nc" id="L628">            buttonsBar.addComponent(fwd);</span>
+        }
+
+<span class="pc bpc" id="L631" title="2 of 6 branches missed.">        if (maximize &amp;&amp; video != null &amp;&amp; video.isVideo()) {</span>
+<span class="fc" id="L632">            Button max = new Button();</span>
+<span class="fc" id="L633">            max.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L636" title="All 2 branches missed.">                    if (video == null) {</span>
+<span class="nc" id="L637">                        return;</span>
+                    }
+<span class="nc" id="L639">                    video.setNativePlayerMode(true);</span>
+<span class="nc" id="L640">                }</span>
+            });
+<span class="fc" id="L642">            max.setUIID(&quot;MediaPlayerMax&quot;);</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">            if (maxIcon != null) {</span>
+<span class="fc" id="L644">                max.setIcon(maxIcon);</span>
+            } else {
+<span class="nc" id="L646">                max.setText(&quot;max&quot;);</span>
+            }
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">            if (seekBar) {</span>
+<span class="fc" id="L649">                buttonsBar.addComponent(BorderLayout.EAST, max);</span>
+            } else {
+<span class="nc" id="L651">                buttonsBar.addComponent(max);</span>
+            }
+        }
+        //}
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">        if (isInitialized()) {</span>
+<span class="fc" id="L656">            revalidate();</span>
+        }
+<span class="fc" id="L658">    }</span>
+
+    public void run() {
+<span class="nc" id="L661">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L666">        return new String[]{&quot;backIcon&quot;, &quot;forwardIcon&quot;, &quot;pauseIcon&quot;, &quot;playIcon&quot;, &quot;dataSource&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L672">        return new Class[]{Image.class, Image.class, Image.class, Image.class, String.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L678" title="All 2 branches missed.">        if (&quot;backIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L679">            return getBackIcon();</span>
+        }
+<span class="nc bnc" id="L681" title="All 2 branches missed.">        if (&quot;forwardIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L682">            return getFwdIcon();</span>
+        }
+<span class="nc bnc" id="L684" title="All 2 branches missed.">        if (&quot;playIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L685">            return getPlayIcon();</span>
+        }
+<span class="nc bnc" id="L687" title="All 2 branches missed.">        if (&quot;pauseIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L688">            return getPauseIcon();</span>
+        }
+<span class="nc bnc" id="L690" title="All 2 branches missed.">        if (&quot;dataSource&quot;.equals(name)) {</span>
+<span class="nc" id="L691">            return getDataSource();</span>
+        }
+<span class="nc" id="L693">        return super.getPropertyValue(name);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L699" title="All 2 branches missed.">        if (&quot;backIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L700">            this.backIcon = (Image) value;</span>
+<span class="nc" id="L701">            return null;</span>
+        }
+<span class="nc bnc" id="L703" title="All 2 branches missed.">        if (&quot;forwardIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L704">            this.fwdIcon = (Image) value;</span>
+<span class="nc" id="L705">            return null;</span>
+        }
+<span class="nc bnc" id="L707" title="All 2 branches missed.">        if (&quot;playIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L708">            this.playIcon = (Image) value;</span>
+<span class="nc" id="L709">            return null;</span>
+        }
+<span class="nc bnc" id="L711" title="All 2 branches missed.">        if (&quot;pauseIcon&quot;.equals(name)) {</span>
+<span class="nc" id="L712">            this.pauseIcon = (Image) value;</span>
+<span class="nc" id="L713">            return null;</span>
+        }
+<span class="nc bnc" id="L715" title="All 2 branches missed.">        if (&quot;dataSource&quot;.equals(name)) {</span>
+<span class="nc" id="L716">            setDataSource((String) value);</span>
+<span class="nc" id="L717">            return null;</span>
+        }
+<span class="nc" id="L719">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the playIcon
+    public Image getPlayIcon() {
+<span class="fc" id="L726">        return playIcon;</span>
+    }
+
+    /// Sets the play Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `playIcon`
+    public void setPlayIcon(Image playIcon) {
+<span class="nc" id="L735">        this.playIcon = playIcon;</span>
+<span class="nc" id="L736">        userSetIcons = true;</span>
+<span class="nc" id="L737">    }</span>
+
+    /// #### Returns
+    ///
+    /// the pauseIcon
+    public Image getPauseIcon() {
+<span class="nc" id="L743">        return pauseIcon;</span>
+    }
+
+    /// Sets the pause Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `pauseIcon`
+    public void setPauseIcon(Image pauseIcon) {
+<span class="nc" id="L752">        this.pauseIcon = pauseIcon;</span>
+<span class="nc" id="L753">        userSetIcons = true;</span>
+<span class="nc" id="L754">    }</span>
+
+    /// #### Returns
+    ///
+    /// the backIcon
+    public Image getBackIcon() {
+<span class="nc" id="L760">        return backIcon;</span>
+    }
+
+    /// Sets the back Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `backIcon`
+    public void setBackIcon(Image backIcon) {
+<span class="nc" id="L769">        this.backIcon = backIcon;</span>
+<span class="nc" id="L770">        userSetIcons = true;</span>
+<span class="nc" id="L771">    }</span>
+
+    /// #### Returns
+    ///
+    /// the fwdIcon
+    public Image getFwdIcon() {
+<span class="nc" id="L777">        return fwdIcon;</span>
+    }
+
+    /// Sets the forward Button Icon
+    ///
+    /// #### Parameters
+    ///
+    /// - `fwdIcon`
+    public void setFwdIcon(Image fwdIcon) {
+<span class="nc" id="L786">        this.fwdIcon = fwdIcon;</span>
+<span class="nc" id="L787">        userSetIcons = true;</span>
+<span class="nc" id="L788">    }</span>
+
+    /// Sets playback to start automatically
+    ///
+    /// #### Returns
+    ///
+    /// the autoplay
+    public boolean isAutoplay() {
+<span class="fc" id="L796">        return autoplay;</span>
+    }
+
+    /// Sets playback to start automatically
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoplay`: the autoplay to set
+    public void setAutoplay(boolean autoplay) {
+<span class="fc" id="L805">        this.autoplay = autoplay;</span>
+<span class="fc" id="L806">    }</span>
+
+    /// Sets playback to loop
+    ///
+    /// #### Returns
+    ///
+    /// the loop
+    public boolean isLoop() {
+<span class="fc" id="L814">        return loop;</span>
+    }
+
+    /// Sets playback to loop
+    ///
+    /// #### Parameters
+    ///
+    /// - `loop`: the loop to set
+    public void setLoop(boolean loop) {
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">        if (loop != this.loop) {</span>
+<span class="fc" id="L824">            this.loop = loop;</span>
+<span class="fc" id="L825">            updateLoopOnCompletionHandler();</span>
+        }
+<span class="fc" id="L827">    }</span>
+
+    private void updateLoopOnCompletionHandler() {
+<span class="pc bpc" id="L830" title="1 of 4 branches missed.">        if (isLoop() &amp;&amp; loopOnCompletion == null) {</span>
+<span class="fc" id="L831">            loopOnCompletion = new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="nc bnc" id="L835" title="All 2 branches missed.">                    if (video != null) {</span>
+<span class="nc" id="L836">                        video.setTime(0);</span>
+<span class="nc" id="L837">                        video.play();</span>
+<span class="nc" id="L838">                        checkProgressSlider();</span>
+                    }
+<span class="nc" id="L840">                }</span>
+
+            };
+        }
+<span class="fc bfc" id="L844" title="All 2 branches covered.">        if (isLoop()) {</span>
+<span class="fc" id="L845">            Display.getInstance().addCompletionHandler(video, loopOnCompletion);</span>
+        } else {
+<span class="fc bfc" id="L847" title="All 2 branches covered.">            if (loopOnCompletion != null) {</span>
+<span class="fc" id="L848">                Display.getInstance().removeCompletionHandler(video, loopOnCompletion);</span>
+            }
+        }
+<span class="fc" id="L851">    }</span>
+
+    /*
+    class CompletionWrapper implements Runnable {
+        public void run() {
+            if(onCompletion != null) {
+                onCompletion.run();
+            }
+            if(isLoop()) {
+                try {
+                    setDataSource(dataSource, this);
+                } catch(IOException err) {
+                    Log.e(err);
+                }
+            }
+        }
+    }
+    */
+
+    /// Shows the buttons on top of the video
+    ///
+    /// #### Returns
+    ///
+    /// the onTopMode
+    public boolean isOnTopMode() {
+<span class="nc" id="L876">        return onTopMode;</span>
+    }
+
+    /// Shows the buttons on top of the video
+    ///
+    /// #### Parameters
+    ///
+    /// - `onTopMode`: the onTopMode to set
+    public void setOnTopMode(boolean onTopMode) {
+<span class="nc" id="L885">        this.onTopMode = onTopMode;</span>
+<span class="nc" id="L886">    }</span>
+
+    /// Shows video position bar as a slider
+    ///
+    /// #### Returns
+    ///
+    /// the seekBar
+    public boolean isSeekBar() {
+<span class="nc" id="L894">        return seekBar;</span>
+    }
+
+    /// Shows video position bar as a slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `seekBar`: the seekBar to set
+    public void setSeekBar(boolean seekBar) {
+<span class="nc" id="L903">        this.seekBar = seekBar;</span>
+<span class="nc" id="L904">    }</span>
+
+    /// UIID for the seekBar slider
+    ///
+    /// #### Returns
+    ///
+    /// the seekBarUIID
+    public String getSeekBarUIID() {
+<span class="nc" id="L912">        return seekBarUIID;</span>
+    }
+
+    /// UIID for the seekBar slider
+    ///
+    /// #### Parameters
+    ///
+    /// - `seekBarUIID`: the seekBarUIID to set
+    public void setSeekBarUIID(String seekBarUIID) {
+<span class="nc" id="L921">        this.seekBarUIID = seekBarUIID;</span>
+<span class="nc" id="L922">    }</span>
+
+    /// Includes a maximize icon in the bar to show the native player
+    ///
+    /// #### Returns
+    ///
+    /// the maximize
+    public boolean isMaximize() {
+<span class="nc" id="L930">        return maximize;</span>
+    }
+
+    /// Includes a maximize icon in the bar to show the native player
+    ///
+    /// #### Parameters
+    ///
+    /// - `maximize`: the maximize to set
+    public void setMaximize(boolean maximize) {
+<span class="nc" id="L939">        this.maximize = maximize;</span>
+<span class="nc" id="L940">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

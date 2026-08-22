@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WifiPlatform.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.wifi</a> &gt; <span class="el_source">WifiPlatform.java</span></div><h1>WifiPlatform.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ */
+package com.codename1.io.wifi;
+
+/// Platform-supplied implementation of the WiFi APIs.
+///
+/// Application code talks to the static facade in `WiFi`; that facade
+/// fetches the active platform via `Display.getInstance().getWifiPlatform()`
+/// and dispatches each call here. Codename One platform ports
+/// (Android / iOS / JavaSE / future) supply a subclass; the no-op default
+/// returned by `CodenameOneImplementation` keeps stub builds compiling.
+///
+/// This is part of the framework's service-provider interface and not
+/// intended for application use.
+<span class="fc" id="L22">public class WifiPlatform {</span>
+    public boolean isInfoSupported() {
+<span class="fc" id="L24">        return false;</span>
+    }
+
+    public boolean isManagementSupported() {
+<span class="fc" id="L28">        return false;</span>
+    }
+
+    public String getCurrentSSID() {
+<span class="fc" id="L32">        return null;</span>
+    }
+
+    public String getBSSID() {
+<span class="fc" id="L36">        return null;</span>
+    }
+
+    public String getGateway() {
+<span class="fc" id="L40">        return null;</span>
+    }
+
+    public String getIp() {
+<span class="fc" id="L44">        return null;</span>
+    }
+
+    public void scan(WiFiScanCallback callback) {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (callback != null) {</span>
+<span class="fc" id="L49">            callback.onScanComplete(null,</span>
+                    new UnsupportedOperationException(
+                            &quot;WiFi scan is not supported on this platform&quot;));
+        }
+<span class="fc" id="L53">    }</span>
+
+    public void connect(String ssid, String password, WiFiSecurity security,
+                        WiFiConnectCallback callback) {
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (callback != null) {</span>
+<span class="fc" id="L58">            callback.onConnectResult(false,</span>
+                    new UnsupportedOperationException(
+                            &quot;WiFi connect is not supported on this platform&quot;));
+        }
+<span class="fc" id="L62">    }</span>
+
+    public void disconnect(String ssid) {
+<span class="fc" id="L65">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

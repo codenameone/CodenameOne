@@ -1,0 +1,629 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Analytics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics</a> &gt; <span class="el_source">Analytics.java</span></div><h1>Analytics.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics;
+
+import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Random;
+
+/// The application-facing entry point for analytics. {@code Analytics} holds the
+/// set of registered {@link AnalyticsProvider providers}, the user's consent
+/// state and the pseudonymous client id, and fans every reporting call out to
+/// all providers -- but only once the relevant consent has been satisfied.
+///
+/// ### Typical setup
+///
+/// ```java
+/// // register one or more providers (no reflection -- explicit instances)
+/// Analytics.addProvider(new CodenameOneAnalyticsProvider());
+/// Analytics.addProvider(new GoogleAnalyticsProvider(&quot;G-XXXX&quot;, &quot;api-secret&quot;));
+///
+/// // GDPR: nothing is sent until the user grants consent (opt-in is the default)
+/// Analytics.setConsent(AnalyticsConsent.granted());
+///
+/// Analytics.screen(&quot;Home&quot;, null);
+/// Analytics.event(AnalyticsEvent.create(&quot;purchase&quot;).param(&quot;value&quot;, 9.99).build());
+/// ```
+///
+/// ### Consent and privacy
+///
+/// The {@link ConsentMode} governs behaviour before an explicit choice is
+/// recorded. In the default {@link ConsentMode#OPT_IN} mode reporting calls are
+/// silently dropped until {@link #setConsent(AnalyticsConsent)} grants the
+/// matching category. The consent choice and the client id are persisted in
+/// {@link Preferences} so they survive restarts. The client id is not derived
+/// from any hardware identifier and can be cleared with {@link #resetClientId()}
+/// to honour an erasure request.
+public final class Analytics {
+    private static final String PREF_CLIENT_ID = &quot;cn1$analyticsClientId&quot;;
+    private static final String PREF_CONSENT_SET = &quot;cn1$analyticsConsentSet&quot;;
+    private static final String PREF_CONSENT_ANALYTICS = &quot;cn1$analyticsConsentAnalytics&quot;;
+    private static final String PREF_CONSENT_CRASH = &quot;cn1$analyticsConsentCrash&quot;;
+    private static final String PREF_CONSENT_PERSONALIZATION = &quot;cn1$analyticsConsentPersonalization&quot;;
+    private static final String PREF_CONSENT_AD = &quot;cn1$analyticsConsentAdStorage&quot;;
+    private static final String PREF_DIMENSIONS = &quot;cn1$analyticsDimensions&quot;;
+
+<span class="fc" id="L73">    private static final Object LOCK = new Object();</span>
+<span class="fc" id="L74">    private static final List&lt;AnalyticsProvider&gt; PROVIDERS = new ArrayList&lt;AnalyticsProvider&gt;();</span>
+    // App-scoped segmentation dimensions (&quot;plan&quot;, &quot;role&quot;, ...) that the cloud
+    // console segments by. Insertion-ordered, guarded by LOCK, loaded lazily
+    // from Preferences and persisted on every mutation so they survive restarts.
+<span class="fc" id="L78">    private static final Map&lt;String, String&gt; DIMENSIONS = new LinkedHashMap&lt;String, String&gt;();</span>
+    private static boolean dimensionsLoaded;
+<span class="fc" id="L80">    private static ConsentMode consentMode = ConsentMode.OPT_IN;</span>
+    private static AnalyticsConsent consent;
+    private static boolean consentLoaded;
+    private static String clientId;
+
+    private Analytics() {
+    }
+
+    /// Registers a provider and immediately supplies it with the current
+    /// {@link AnalyticsContext} and consent state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: the provider to add, ignored if null
+    public static void addProvider(AnalyticsProvider provider) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (provider == null) {</span>
+<span class="nc" id="L96">            return;</span>
+        }
+<span class="fc" id="L98">        AnalyticsContext ctx = context();</span>
+<span class="fc" id="L99">        synchronized (LOCK) {</span>
+<span class="fc" id="L100">            PROVIDERS.add(provider);</span>
+<span class="fc" id="L101">        }</span>
+<span class="fc" id="L102">        AnalyticsConsent c = currentConsent();</span>
+        try {
+<span class="fc" id="L104">            provider.init(ctx);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            provider.onConsentChanged(c == null ? AnalyticsConsent.denied() : c);</span>
+<span class="nc" id="L106">        } catch (Throwable t) {</span>
+<span class="nc" id="L107">            Log.e(t);</span>
+<span class="fc" id="L108">        }</span>
+<span class="fc" id="L109">    }</span>
+
+    /// Removes a previously registered provider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: the provider to remove
+    public static void removeProvider(AnalyticsProvider provider) {
+<span class="fc" id="L117">        synchronized (LOCK) {</span>
+<span class="fc" id="L118">            PROVIDERS.remove(provider);</span>
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">    }</span>
+
+    /// Removes every registered provider.
+    public static void clearProviders() {
+<span class="fc" id="L124">        synchronized (LOCK) {</span>
+<span class="fc" id="L125">            PROVIDERS.clear();</span>
+<span class="fc" id="L126">        }</span>
+<span class="fc" id="L127">    }</span>
+
+    /// The currently registered providers.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable copy of the provider list
+    public static List&lt;AnalyticsProvider&gt; getProviders() {
+<span class="fc" id="L135">        synchronized (LOCK) {</span>
+<span class="fc" id="L136">            return new ArrayList&lt;AnalyticsProvider&gt;(PROVIDERS);</span>
+        }
+    }
+
+    /// Sets the consent mode that governs behaviour before an explicit consent
+    /// choice is recorded. Defaults to {@link ConsentMode#OPT_IN}.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mode`: the consent mode, ignored if null
+    public static void setConsentMode(ConsentMode mode) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (mode == null) {</span>
+<span class="nc" id="L148">            return;</span>
+        }
+<span class="fc" id="L150">        synchronized (LOCK) {</span>
+<span class="fc" id="L151">            consentMode = mode;</span>
+<span class="fc" id="L152">        }</span>
+<span class="fc" id="L153">    }</span>
+
+    /// The active consent mode.
+    ///
+    /// #### Returns
+    ///
+    /// the consent mode
+    public static ConsentMode getConsentMode() {
+<span class="fc" id="L161">        synchronized (LOCK) {</span>
+<span class="fc" id="L162">            return consentMode;</span>
+        }
+    }
+
+    /// Records the user's consent choice, persists it and notifies every
+    /// provider. Passing null clears the stored choice (reverting to the
+    /// implicit behaviour of the current {@link ConsentMode}).
+    ///
+    /// #### Parameters
+    ///
+    /// - `newConsent`: the consent state, or null to clear
+    public static void setConsent(AnalyticsConsent newConsent) {
+        List&lt;AnalyticsProvider&gt; snapshot;
+<span class="fc" id="L175">        synchronized (LOCK) {</span>
+<span class="fc" id="L176">            consent = newConsent;</span>
+<span class="fc" id="L177">            consentLoaded = true;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (newConsent == null) {</span>
+<span class="fc" id="L179">                Preferences.set(PREF_CONSENT_SET, false);</span>
+            } else {
+<span class="fc" id="L181">                Preferences.set(PREF_CONSENT_SET, true);</span>
+<span class="fc" id="L182">                Preferences.set(PREF_CONSENT_ANALYTICS, newConsent.isAnalytics());</span>
+<span class="fc" id="L183">                Preferences.set(PREF_CONSENT_CRASH, newConsent.isCrashReporting());</span>
+<span class="fc" id="L184">                Preferences.set(PREF_CONSENT_PERSONALIZATION, newConsent.isPersonalization());</span>
+<span class="fc" id="L185">                Preferences.set(PREF_CONSENT_AD, newConsent.isAdStorage());</span>
+            }
+<span class="fc" id="L187">            snapshot = new ArrayList&lt;AnalyticsProvider&gt;(PROVIDERS);</span>
+<span class="fc" id="L188">        }</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        AnalyticsConsent effective = newConsent == null ? AnalyticsConsent.denied() : newConsent;</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (AnalyticsProvider p : snapshot) {</span>
+            try {
+<span class="fc" id="L192">                p.onConsentChanged(effective);</span>
+<span class="nc" id="L193">            } catch (Throwable t) {</span>
+<span class="nc" id="L194">                Log.e(t);</span>
+<span class="fc" id="L195">            }</span>
+<span class="fc" id="L196">        }</span>
+<span class="fc" id="L197">    }</span>
+
+    /// The currently recorded consent, loading it from {@link Preferences} on
+    /// first access. Returns null if the user has not made an explicit choice.
+    ///
+    /// #### Returns
+    ///
+    /// the consent state or null
+    public static AnalyticsConsent getConsent() {
+<span class="fc" id="L206">        return currentConsent();</span>
+    }
+
+    /// Records a screen / page view across all providers. No-op unless the
+    /// analytics consent category is satisfied.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the screen name
+    ///
+    /// - `referrer`: the previous screen, may be null
+    public static void screen(String name, String referrer) {
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (!analyticsAllowed()) {</span>
+<span class="fc" id="L219">            return;</span>
+        }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (AnalyticsProvider p : snapshot()) {</span>
+            try {
+<span class="fc" id="L223">                p.trackScreen(name, referrer);</span>
+<span class="nc" id="L224">            } catch (Throwable t) {</span>
+<span class="nc" id="L225">                Log.e(t);</span>
+<span class="fc" id="L226">            }</span>
+<span class="fc" id="L227">        }</span>
+<span class="fc" id="L228">    }</span>
+
+    /// Records a named event across all providers. No-op unless the analytics
+    /// consent category is satisfied.
+    ///
+    /// #### Parameters
+    ///
+    /// - `event`: the event
+    public static void event(AnalyticsEvent event) {
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">        if (event == null || !analyticsAllowed()) {</span>
+<span class="fc" id="L238">            return;</span>
+        }
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (AnalyticsProvider p : snapshot()) {</span>
+            try {
+<span class="fc" id="L242">                p.trackEvent(event);</span>
+<span class="nc" id="L243">            } catch (Throwable t) {</span>
+<span class="nc" id="L244">                Log.e(t);</span>
+<span class="fc" id="L245">            }</span>
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">    }</span>
+
+    /// Internal hook used by the framework to auto-instrument built-in APIs
+    /// (purchases, sharing, ...). It builds an {@link AnalyticsEvent} and routes
+    /// it through the normal consent-gated {@link #event(AnalyticsEvent)} path,
+    /// so it is automatically a no-op when consent has not been granted. As a
+    /// fast path it does nothing at all when no provider is registered, which
+    /// keeps the cost of the framework call sites negligible when analytics is
+    /// not in use. Never throws into the caller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the event name
+    ///
+    /// - `category`: the event category, may be null
+    ///
+    /// - `params`: optional event parameters, may be null
+    ///
+    /// #### Deprecated
+    ///
+    /// Internal framework auto-instrumentation hook; not intended for app use.
+    public static void autoEvent(String name, String category, Map&lt;String, Object&gt; params) {
+        try {
+<span class="fc" id="L270">            synchronized (LOCK) {</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                if (PROVIDERS.isEmpty()) {</span>
+<span class="fc" id="L272">                    return;</span>
+                }
+<span class="fc" id="L274">            }</span>
+<span class="fc" id="L275">            AnalyticsEvent.Builder builder = AnalyticsEvent.create(name);</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (category != null) {</span>
+<span class="fc" id="L277">                builder.category(category);</span>
+            }
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            if (params != null) {</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">                for (Map.Entry&lt;String, Object&gt; e : params.entrySet()) {</span>
+<span class="fc" id="L281">                    builder.param(e.getKey(), e.getValue());</span>
+<span class="fc" id="L282">                }</span>
+            }
+<span class="fc" id="L284">            event(builder.build());</span>
+<span class="nc" id="L285">        } catch (Throwable t) {</span>
+<span class="nc" id="L286">            Log.e(t);</span>
+<span class="fc" id="L287">        }</span>
+<span class="fc" id="L288">    }</span>
+
+    /// Associates subsequent activity with a user id. No-op unless the
+    /// personalization consent category is satisfied.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the user id, or null to clear
+    public static void setUserId(String id) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (!personalizationAllowed()) {</span>
+<span class="fc" id="L298">            return;</span>
+        }
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        for (AnalyticsProvider p : snapshot()) {</span>
+            try {
+<span class="fc" id="L302">                p.setUserId(id);</span>
+<span class="nc" id="L303">            } catch (Throwable t) {</span>
+<span class="nc" id="L304">                Log.e(t);</span>
+<span class="fc" id="L305">            }</span>
+<span class="fc" id="L306">        }</span>
+<span class="fc" id="L307">    }</span>
+
+    /// Sets a user property / custom dimension. No-op unless the analytics
+    /// consent category is satisfied.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the property name
+    ///
+    /// - `value`: the property value
+    public static void setUserProperty(String key, String value) {
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (!analyticsAllowed()) {</span>
+<span class="nc" id="L319">            return;</span>
+        }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        for (AnalyticsProvider p : snapshot()) {</span>
+            try {
+<span class="fc" id="L323">                p.setUserProperty(key, value);</span>
+<span class="nc" id="L324">            } catch (Throwable t) {</span>
+<span class="nc" id="L325">                Log.e(t);</span>
+<span class="fc" id="L326">            }</span>
+<span class="fc" id="L327">        }</span>
+<span class="fc" id="L328">    }</span>
+
+    /// Sets an app-scoped custom dimension used by the cloud console to segment
+    /// reports (for example {@code &quot;plan&quot;} or {@code &quot;role&quot;}). Dimensions are
+    /// persisted in {@link Preferences} so they survive restarts and are sent
+    /// with every first-party batch. Passing a null value removes the key.
+    /// Null or empty keys are ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the dimension key
+    ///
+    /// - `value`: the dimension value, or null to remove the key
+    public static void setDimension(String key, String value) {
+<span class="fc bfc" id="L342" title="All 4 branches covered.">        if (key == null || key.length() == 0) {</span>
+<span class="fc" id="L343">            return;</span>
+        }
+<span class="fc" id="L345">        synchronized (LOCK) {</span>
+<span class="fc" id="L346">            loadDimensions();</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (value == null) {</span>
+<span class="fc" id="L348">                DIMENSIONS.remove(key);</span>
+            } else {
+<span class="fc" id="L350">                DIMENSIONS.put(key, value);</span>
+            }
+<span class="fc" id="L352">            persistDimensions();</span>
+<span class="fc" id="L353">        }</span>
+<span class="fc" id="L354">    }</span>
+
+    /// Removes a single custom dimension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the dimension key
+    public static void clearDimension(String key) {
+<span class="fc" id="L362">        setDimension(key, null);</span>
+<span class="fc" id="L363">    }</span>
+
+    /// Removes every custom dimension.
+    public static void clearDimensions() {
+<span class="fc" id="L367">        synchronized (LOCK) {</span>
+<span class="fc" id="L368">            loadDimensions();</span>
+<span class="fc" id="L369">            DIMENSIONS.clear();</span>
+<span class="fc" id="L370">            persistDimensions();</span>
+<span class="fc" id="L371">        }</span>
+<span class="fc" id="L372">    }</span>
+
+    /// The current custom dimensions.
+    ///
+    /// #### Returns
+    ///
+    /// a defensive, insertion-ordered copy of the dimension map
+    public static Map&lt;String, String&gt; getDimensions() {
+<span class="fc" id="L380">        synchronized (LOCK) {</span>
+<span class="fc" id="L381">            loadDimensions();</span>
+<span class="fc" id="L382">            return new LinkedHashMap&lt;String, String&gt;(DIMENSIONS);</span>
+        }
+    }
+
+    /// Reports a crash / exception to the registered analytics providers as an
+    /// exception signal -- for example GA4's {@code app_exception} or the
+    /// Firebase equivalent -- so exception counts surface alongside your usage
+    /// metrics. No-op unless the crash reporting consent category is satisfied.
+    ///
+    /// This is deliberately separate from Codename One Crash Protection
+    /// ({@link com.codename1.crash.CrashProtection}). Crash Protection is a
+    /// dedicated crash-capture pipeline that records full, symbolicated stack
+    /// traces to the build cloud crash console for debugging. This method only
+    /// emits a lightweight exception event to whichever analytics backends you
+    /// have registered. The two subsystems are independent: use Crash
+    /// Protection to diagnose crashes, use {@code Analytics.crash} when you also
+    /// want exception events in your analytics; you can enable either or both.
+    ///
+    /// #### Parameters
+    ///
+    /// - `throwable`: the captured exception, may be null
+    ///
+    /// - `message`: a human readable description, may be null
+    ///
+    /// - `fatal`: whether the exception terminated the application
+    public static void crash(Throwable throwable, String message, boolean fatal) {
+<span class="fc" id="L408">        crash(AnalyticsCrashReport.create(throwable, message, fatal));</span>
+<span class="fc" id="L409">    }</span>
+
+    /// Reports a crash / exception across all providers. No-op unless the crash
+    /// reporting consent category is satisfied.
+    ///
+    /// #### Parameters
+    ///
+    /// - `report`: the crash report
+    public static void crash(AnalyticsCrashReport report) {
+<span class="pc bpc" id="L418" title="1 of 4 branches missed.">        if (report == null || !crashAllowed()) {</span>
+<span class="fc" id="L419">            return;</span>
+        }
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        for (AnalyticsProvider p : snapshot()) {</span>
+            try {
+<span class="fc" id="L423">                p.reportCrash(report);</span>
+<span class="nc" id="L424">            } catch (Throwable t) {</span>
+<span class="nc" id="L425">                Log.e(t);</span>
+<span class="fc" id="L426">            }</span>
+<span class="fc" id="L427">        }</span>
+<span class="fc" id="L428">    }</span>
+
+    /// Flushes any buffered events in every provider.
+    public static void flush() {
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        for (AnalyticsProvider p : snapshot()) {</span>
+            try {
+<span class="fc" id="L434">                p.flush();</span>
+<span class="nc" id="L435">            } catch (Throwable t) {</span>
+<span class="nc" id="L436">                Log.e(t);</span>
+<span class="fc" id="L437">            }</span>
+<span class="fc" id="L438">        }</span>
+<span class="fc" id="L439">    }</span>
+
+    /// The pseudonymous client id, generating and persisting one on first use.
+    /// Not derived from any hardware identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the client id
+    public static String clientId() {
+<span class="fc" id="L448">        synchronized (LOCK) {</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">            if (clientId == null) {</span>
+<span class="fc" id="L450">                String stored = Preferences.get(PREF_CLIENT_ID, &quot;&quot;);</span>
+<span class="pc bpc" id="L451" title="2 of 4 branches missed.">                if (stored == null || stored.length() == 0) {</span>
+<span class="fc" id="L452">                    clientId = newClientId();</span>
+<span class="fc" id="L453">                    Preferences.set(PREF_CLIENT_ID, clientId);</span>
+                } else {
+<span class="nc" id="L455">                    clientId = stored;</span>
+                }
+            }
+<span class="fc" id="L458">            return clientId;</span>
+        }
+    }
+
+    /// Generates a fresh pseudonymous client id, persists it and re-initialises
+    /// every provider with the new identity. Use this to honour a &quot;right to be
+    /// forgotten&quot; / erasure request from the user.
+    ///
+    /// #### Returns
+    ///
+    /// the new client id
+    public static String resetClientId() {
+        List&lt;AnalyticsProvider&gt; snapshot;
+<span class="fc" id="L471">        synchronized (LOCK) {</span>
+<span class="fc" id="L472">            clientId = newClientId();</span>
+<span class="fc" id="L473">            Preferences.set(PREF_CLIENT_ID, clientId);</span>
+<span class="fc" id="L474">            snapshot = new ArrayList&lt;AnalyticsProvider&gt;(PROVIDERS);</span>
+<span class="fc" id="L475">        }</span>
+<span class="fc" id="L476">        AnalyticsContext ctx = context();</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">        for (AnalyticsProvider p : snapshot) {</span>
+            try {
+<span class="nc" id="L479">                p.init(ctx);</span>
+<span class="nc" id="L480">            } catch (Throwable t) {</span>
+<span class="nc" id="L481">                Log.e(t);</span>
+<span class="nc" id="L482">            }</span>
+<span class="nc" id="L483">        }</span>
+<span class="fc" id="L484">        return clientId;</span>
+    }
+
+    // Must be called while holding LOCK. Lazily loads the persisted dimensions
+    // from a tab/newline delimited string: rows are newline separated, key and
+    // value within a row are tab separated. Values had tabs/newlines replaced
+    // with spaces on the way in, so the parse is unambiguous.
+    private static void loadDimensions() {
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        if (dimensionsLoaded) {</span>
+<span class="fc" id="L493">            return;</span>
+        }
+<span class="fc" id="L495">        dimensionsLoaded = true;</span>
+<span class="fc" id="L496">        String stored = Preferences.get(PREF_DIMENSIONS, &quot;&quot;);</span>
+<span class="pc bpc" id="L497" title="2 of 4 branches missed.">        if (stored == null || stored.length() == 0) {</span>
+<span class="fc" id="L498">            return;</span>
+        }
+<span class="nc" id="L500">        String[] rows = split(stored, '\n');</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">        for (String row : rows) {</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">            if (row.length() == 0) {</span>
+<span class="nc" id="L503">                continue;</span>
+            }
+<span class="nc" id="L505">            int tab = row.indexOf('\t');</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">            if (tab &lt; 0) {</span>
+<span class="nc" id="L507">                continue;</span>
+            }
+<span class="nc" id="L509">            String key = row.substring(0, tab);</span>
+<span class="nc" id="L510">            String value = row.substring(tab + 1);</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">            if (key.length() &gt; 0) {</span>
+<span class="nc" id="L512">                DIMENSIONS.put(key, value);</span>
+            }
+        }
+<span class="nc" id="L515">    }</span>
+
+    // Must be called while holding LOCK.
+    private static void persistDimensions() {
+<span class="fc bfc" id="L519" title="All 2 branches covered.">        if (DIMENSIONS.isEmpty()) {</span>
+<span class="fc" id="L520">            Preferences.set(PREF_DIMENSIONS, &quot;&quot;);</span>
+<span class="fc" id="L521">            return;</span>
+        }
+<span class="fc" id="L523">        StringBuilder b = new StringBuilder();</span>
+<span class="fc" id="L524">        boolean first = true;</span>
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; e : DIMENSIONS.entrySet()) {</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L527">                b.append('\n');</span>
+            }
+<span class="fc" id="L529">            b.append(sanitize(e.getKey())).append('\t').append(sanitize(e.getValue()));</span>
+<span class="fc" id="L530">            first = false;</span>
+<span class="fc" id="L531">        }</span>
+<span class="fc" id="L532">        Preferences.set(PREF_DIMENSIONS, b.toString());</span>
+<span class="fc" id="L533">    }</span>
+
+    // Replaces the delimiter characters so the persisted form parses back
+    // unambiguously. Dimension keys/values are simple labels, so this is safe.
+    private static String sanitize(String value) {
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L539">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L541">        return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');</span>
+    }
+
+    // CLDC-safe split (String.split is not available); never returns null.
+    private static String[] split(String value, char delim) {
+<span class="nc" id="L546">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L547">        int start = 0;</span>
+<span class="nc" id="L548">        int idx = value.indexOf(delim);</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">        while (idx &gt;= 0) {</span>
+<span class="nc" id="L550">            out.add(value.substring(start, idx));</span>
+<span class="nc" id="L551">            start = idx + 1;</span>
+<span class="nc" id="L552">            idx = value.indexOf(delim, start);</span>
+        }
+<span class="nc" id="L554">        out.add(value.substring(start));</span>
+<span class="nc" id="L555">        return out.toArray(new String[out.size()]);</span>
+    }
+
+    private static List&lt;AnalyticsProvider&gt; snapshot() {
+<span class="fc" id="L559">        synchronized (LOCK) {</span>
+<span class="fc" id="L560">            return new ArrayList&lt;AnalyticsProvider&gt;(PROVIDERS);</span>
+        }
+    }
+
+    private static AnalyticsConsent currentConsent() {
+<span class="fc" id="L565">        synchronized (LOCK) {</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">            if (!consentLoaded) {</span>
+<span class="nc" id="L567">                consentLoaded = true;</span>
+<span class="nc bnc" id="L568" title="All 2 branches missed.">                if (Preferences.get(PREF_CONSENT_SET, false)) {</span>
+<span class="nc" id="L569">                    consent = new AnalyticsConsent(</span>
+<span class="nc" id="L570">                            Preferences.get(PREF_CONSENT_ANALYTICS, false),</span>
+<span class="nc" id="L571">                            Preferences.get(PREF_CONSENT_CRASH, false),</span>
+<span class="nc" id="L572">                            Preferences.get(PREF_CONSENT_PERSONALIZATION, false),</span>
+<span class="nc" id="L573">                            Preferences.get(PREF_CONSENT_AD, false));</span>
+                }
+            }
+<span class="fc" id="L576">            return consent;</span>
+        }
+    }
+
+    private static boolean analyticsAllowed() {
+<span class="fc" id="L581">        AnalyticsConsent c = currentConsent();</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">        if (getConsentMode() == ConsentMode.OPT_OUT) {</span>
+<span class="pc bpc" id="L583" title="3 of 4 branches missed.">            return c == null || c.isAnalytics();</span>
+        }
+<span class="pc bpc" id="L585" title="1 of 4 branches missed.">        return c != null &amp;&amp; c.isAnalytics();</span>
+    }
+
+    private static boolean crashAllowed() {
+<span class="fc" id="L589">        AnalyticsConsent c = currentConsent();</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">        if (getConsentMode() == ConsentMode.OPT_OUT) {</span>
+<span class="pc bpc" id="L591" title="3 of 4 branches missed.">            return c == null || c.isCrashReporting();</span>
+        }
+<span class="pc bpc" id="L593" title="2 of 4 branches missed.">        return c != null &amp;&amp; c.isCrashReporting();</span>
+    }
+
+    private static boolean personalizationAllowed() {
+<span class="fc" id="L597">        AnalyticsConsent c = currentConsent();</span>
+<span class="fc bfc" id="L598" title="All 2 branches covered.">        if (getConsentMode() == ConsentMode.OPT_OUT) {</span>
+<span class="pc bpc" id="L599" title="3 of 4 branches missed.">            return c == null || c.isPersonalization();</span>
+        }
+<span class="pc bpc" id="L601" title="1 of 4 branches missed.">        return c != null &amp;&amp; c.isPersonalization();</span>
+    }
+
+    private static AnalyticsContext context() {
+<span class="fc" id="L605">        Display d = Display.getInstance();</span>
+<span class="fc" id="L606">        String appName = &quot;&quot;;</span>
+<span class="fc" id="L607">        String appVersion = &quot;1.0&quot;;</span>
+<span class="fc" id="L608">        String platform = &quot;&quot;;</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">        if (d != null) {</span>
+<span class="fc" id="L610">            appName = d.getProperty(&quot;AppName&quot;, &quot;&quot;);</span>
+<span class="fc" id="L611">            appVersion = d.getProperty(&quot;AppVersion&quot;, &quot;1.0&quot;);</span>
+<span class="fc" id="L612">            platform = d.getPlatformName();</span>
+        }
+<span class="fc" id="L614">        Locale loc = Locale.getDefault();</span>
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">        String locale = loc == null ? &quot;&quot; : loc.toString();</span>
+<span class="fc" id="L616">        return new AnalyticsContext(appName, appVersion, clientId(), locale, platform);</span>
+    }
+
+    private static String newClientId() {
+<span class="fc" id="L620">        Random r = new Random();</span>
+<span class="fc" id="L621">        char[] hex = &quot;0123456789abcdef&quot;.toCharArray();</span>
+<span class="fc" id="L622">        StringBuilder b = new StringBuilder(32);</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">        for (int i = 0; i &lt; 32; i++) {</span>
+<span class="fc" id="L624">            b.append(hex[r.nextInt(16)]);</span>
+        }
+<span class="fc" id="L626">        return b.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

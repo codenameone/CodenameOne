@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Base32.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Base32.java</span></div><h1>Base32.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// Base32 encoder/decoder per RFC 4648. Mostly useful for OTP shared secrets,
+/// which are conventionally distributed as Base32 strings (the format embedded
+/// in QR codes by authenticator apps).
+///
+/// #### Example
+///
+/// ```java
+/// byte[] secret = Base32.decode(&quot;JBSWY3DPEHPK3PXP&quot;);
+/// String enc    = Base32.encode(secret);
+/// ```
+public final class Base32 {
+    private Base32() {}
+
+<span class="fc" id="L38">    private static final char[] ALPHABET =</span>
+<span class="fc" id="L39">        &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ234567&quot;.toCharArray();</span>
+<span class="fc" id="L40">    private static final int[] DECODE = new int[128];</span>
+    static {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (int i = 0; i &lt; DECODE.length; i++) {</span>
+<span class="fc" id="L43">            DECODE[i] = -1;</span>
+        }
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int i = 0; i &lt; ALPHABET.length; i++) {</span>
+<span class="fc" id="L46">            DECODE[ALPHABET[i]] = i;</span>
+        }
+        // common lowercase variant
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int i = 0; i &lt; ALPHABET.length; i++) {</span>
+<span class="fc" id="L50">            char lc = (char) (ALPHABET[i] | 0x20);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (lc != ALPHABET[i]) {</span>
+<span class="fc" id="L52">                DECODE[lc] = i;</span>
+            }
+        }
+<span class="fc" id="L55">    }</span>
+
+    /// Encodes the bytes as a Base32 string (uppercase, with `=` padding).
+    public static String encode(byte[] data) {
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        if (data == null || data.length == 0) {</span>
+<span class="nc" id="L60">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L62">        int output = ((data.length + 4) / 5) * 8;</span>
+<span class="fc" id="L63">        StringBuilder b = new StringBuilder(output);</span>
+<span class="fc" id="L64">        int bits = 0;</span>
+<span class="fc" id="L65">        int value = 0;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (byte aData : data) {</span>
+<span class="fc" id="L67">            value = (value &lt;&lt; 8) | (aData &amp; 0xff);</span>
+<span class="fc" id="L68">            bits += 8;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            while (bits &gt;= 5) {</span>
+<span class="fc" id="L70">                b.append(ALPHABET[(value &gt;&gt;&gt; (bits - 5)) &amp; 0x1f]);</span>
+<span class="fc" id="L71">                bits -= 5;</span>
+            }
+        }
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (bits &gt; 0) {</span>
+<span class="nc" id="L75">            b.append(ALPHABET[(value &lt;&lt; (5 - bits)) &amp; 0x1f]);</span>
+        }
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        while (b.length() &lt; output) {</span>
+<span class="nc" id="L78">            b.append('=');</span>
+        }
+<span class="fc" id="L80">        return b.toString();</span>
+    }
+
+    /// Decodes a Base32 string. Padding and whitespace are tolerated; mixed
+    /// case is accepted.
+    public static byte[] decode(String s) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L87">            return new byte[0];</span>
+        }
+        // strip padding and whitespace
+<span class="fc" id="L90">        StringBuilder cleaned = new StringBuilder(s.length());</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L92">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L93" title="6 of 12 branches missed.">            if (c == '=' || c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '-') {</span>
+<span class="nc" id="L94">                continue;</span>
+            }
+<span class="fc" id="L96">            cleaned.append(c);</span>
+        }
+<span class="fc" id="L98">        int len = cleaned.length();</span>
+<span class="fc" id="L99">        byte[] out = new byte[len * 5 / 8];</span>
+<span class="fc" id="L100">        int bits = 0;</span>
+<span class="fc" id="L101">        int value = 0;</span>
+<span class="fc" id="L102">        int pos = 0;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L104">            char c = cleaned.charAt(i);</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">            if (c &gt;= DECODE.length || DECODE[c] &lt; 0) {</span>
+<span class="nc" id="L106">                throw new CryptoException(&quot;invalid Base32 character: &quot; + c);</span>
+            }
+<span class="fc" id="L108">            value = (value &lt;&lt; 5) | DECODE[c];</span>
+<span class="fc" id="L109">            bits += 5;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (bits &gt;= 8) {</span>
+<span class="fc" id="L111">                out[pos++] = (byte) ((value &gt;&gt;&gt; (bits - 8)) &amp; 0xff);</span>
+<span class="fc" id="L112">                bits -= 8;</span>
+            }
+        }
+<span class="fc" id="L115">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

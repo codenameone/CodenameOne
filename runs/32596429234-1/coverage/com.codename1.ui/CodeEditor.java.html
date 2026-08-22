@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodeEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">CodeEditor.java</span></div><h1>CodeEditor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.editor.CodePureEditor;
+import com.codename1.ui.editor.PureEditor;
+import com.codename1.ui.editor.SyntaxHighlighter;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.SuccessCallback;
+
+import java.util.Hashtable;
+import java.util.List;
+
+/// An IDE style source code editor with syntax highlighting, a line-number gutter and asynchronous
+/// code completion.
+///
+/// `CodeEditor` is built for editing source code on both touch devices (with the virtual keyboard) and
+/// desktops (with a physical keyboard). Code completion is driven by a `CodeCompletionProvider`, which
+/// can resolve proposals locally or from a remote language server.
+///
+/// Like `RichTextArea`, ports with low-level text input use the pure Codename One text engine
+/// (`com.codename1.ui.editor`) with a built-in incremental syntax highlighter. Ports without that input
+/// contract use an editable `BrowserComponent` fallback, and a port can transparently supply a native
+/// code editor instead.
+///
+/// #### Example
+///
+/// ```java
+/// CodeEditor editor = new CodeEditor();
+/// editor.setLanguage(&quot;java&quot;);
+/// editor.setText(&quot;public class Main {\n\n}&quot;);
+/// editor.setCompletionProvider((ed, code, cursor, results) -&gt; {
+///     List&lt;CodeCompletion&gt; out = new ArrayList&lt;&gt;();
+///     out.add(new CodeCompletion(&quot;System.out.println(&quot;, &quot;System.out.println()&quot;).setType(&quot;method&quot;));
+///     results.onSucess(out);
+/// });
+/// form.add(BorderLayout.CENTER, editor);
+/// ```
+///
+/// @author Shai Almog
+public class CodeEditor extends AbstractEditorComponent {
+<span class="fc" id="L65">    private static final Hashtable&lt;String, SyntaxHighlighter&gt; syntaxHighlighters =</span>
+            new Hashtable&lt;String, SyntaxHighlighter&gt;();
+<span class="fc" id="L67">    private String language = &quot;text&quot;;</span>
+<span class="fc" id="L68">    private String theme = &quot;light&quot;;</span>
+<span class="fc" id="L69">    private boolean showLineNumbers = true;</span>
+<span class="fc" id="L70">    private int tabSize = 4;</span>
+    private CodeCompletionProvider completionProvider;
+<span class="fc" id="L72">    private final EventDispatcher protectedEditListeners = new EventDispatcher();</span>
+
+    /// Creates an empty code editor.
+    public CodeEditor() {
+<span class="fc" id="L76">        super(&quot;CodeEditor&quot;);</span>
+<span class="fc" id="L77">    }</span>
+
+    /// Creates a code editor initialized with the supplied source and language.
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: the language id used for syntax highlighting (e.g. `&quot;java&quot;`, `&quot;javascript&quot;`,
+    ///   `&quot;kotlin&quot;`, `&quot;css&quot;`, `&quot;xml&quot;`, `&quot;json&quot;`, `&quot;python&quot;`)
+    ///
+    /// - `text`: the initial source code
+    public CodeEditor(String language, String text) {
+<span class="fc" id="L88">        this();</span>
+<span class="fc" id="L89">        setLanguage(language);</span>
+<span class="fc" id="L90">        setText(text);</span>
+<span class="fc" id="L91">    }</span>
+
+    @Override
+    String getEditorType() {
+<span class="fc" id="L95">        return &quot;code&quot;;</span>
+    }
+
+    @Override
+    PureEditor createPureEditor() {
+<span class="fc" id="L100">        return new CodePureEditor(this, getEditorType());</span>
+    }
+
+    /// Replaces the entire editor content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the source code
+    public void setText(String text) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        command(&quot;setText&quot;, text == null ? &quot;&quot; : text);</span>
+<span class="fc" id="L110">    }</span>
+
+    /// Retrieves the current source code. The callback is invoked on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: receives the source code
+    public void getText(SuccessCallback&lt;String&gt; callback) {
+<span class="fc" id="L118">        query(&quot;getText&quot;, null, callback);</span>
+<span class="fc" id="L119">    }</span>
+
+    /// Sets the language used for syntax highlighting.
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: the language id (e.g. `&quot;java&quot;`, `&quot;javascript&quot;`, `&quot;kotlin&quot;`, `&quot;css&quot;`, `&quot;xml&quot;`,
+    ///   `&quot;json&quot;`, `&quot;python&quot;`)
+    public void setLanguage(String language) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        this.language = language == null ? &quot;text&quot; : language;</span>
+<span class="fc" id="L129">        command(&quot;setLanguage&quot;, this.language);</span>
+<span class="fc" id="L130">    }</span>
+
+    /// Returns the current highlighting language id.
+    public String getLanguage() {
+<span class="fc" id="L134">        return language;</span>
+    }
+
+    /// Registers a syntax highlighter for a language id. Registration is global and affects existing
+    /// editors the next time their language is set. Passing null removes a previous registration.
+    public static void registerSyntaxHighlighter(String language, SyntaxHighlighter highlighter) {
+<span class="fc" id="L140">        String id = normalizeLanguage(language);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (highlighter == null) {</span>
+<span class="fc" id="L142">            syntaxHighlighters.remove(id);</span>
+        } else {
+<span class="fc" id="L144">            syntaxHighlighters.put(id, highlighter);</span>
+        }
+<span class="fc" id="L146">    }</span>
+
+    /// Returns the third-party syntax highlighter registered for a language, or null.
+    public static SyntaxHighlighter getRegisteredSyntaxHighlighter(String language) {
+<span class="fc" id="L150">        return syntaxHighlighters.get(normalizeLanguage(language));</span>
+    }
+
+    private static String normalizeLanguage(String language) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        return language == null ? &quot;text&quot; : language.trim().toLowerCase();</span>
+    }
+
+    /// Sets the color theme. Currently `&quot;light&quot;` and `&quot;dark&quot;` are supported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: the theme id
+    public void setTheme(String theme) {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        this.theme = theme == null ? &quot;light&quot; : theme;</span>
+<span class="fc" id="L164">        command(&quot;setTheme&quot;, this.theme);</span>
+<span class="fc" id="L165">    }</span>
+
+    /// Returns the current theme id.
+    public String getTheme() {
+<span class="fc" id="L169">        return theme;</span>
+    }
+
+    /// Shows or hides the line-number gutter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `show`: true to show line numbers
+    public void setShowLineNumbers(boolean show) {
+<span class="fc" id="L178">        this.showLineNumbers = show;</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        command(&quot;setLineNumbers&quot;, show ? &quot;1&quot; : &quot;0&quot;);</span>
+<span class="fc" id="L180">    }</span>
+
+    /// Returns true if the line-number gutter is shown.
+    public boolean isShowLineNumbers() {
+<span class="fc" id="L184">        return showLineNumbers;</span>
+    }
+
+    /// Sets the number of spaces inserted for a tab / used for indentation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tabSize`: the indentation width in spaces
+    public void setTabSize(int tabSize) {
+<span class="fc" id="L193">        this.tabSize = tabSize;</span>
+<span class="fc" id="L194">        command(&quot;setTabSize&quot;, String.valueOf(tabSize));</span>
+<span class="fc" id="L195">    }</span>
+
+    /// Returns the indentation width in spaces.
+    public int getTabSize() {
+<span class="fc" id="L199">        return tabSize;</span>
+    }
+
+    /// Makes the editor read-only or editable. This is a convenience around
+    /// `AbstractEditorComponent#setEditable(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `readOnly`: true to prevent editing
+    public void setReadOnly(boolean readOnly) {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        setEditable(!readOnly);</span>
+<span class="fc" id="L210">    }</span>
+
+    /// Returns true when the editor is read-only.
+    public boolean isReadOnly() {
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        return !isEditable();</span>
+    }
+
+    /// Inserts text at the current caret position, replacing any active selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to insert
+    public void insertAtCursor(String text) {
+<span class="fc" id="L223">        command(&quot;insertText&quot;, text);</span>
+<span class="fc" id="L224">    }</span>
+
+    /// Protects all text between matching marker lines from editing. This is intended for generated
+    /// source previews that contain explicit user-editable regions. Passing null clears protection.
+    public void setProtectedRegionMarkers(String startMarker, String endMarker) {
+<span class="pc bpc" id="L229" title="2 of 4 branches missed.">        command(&quot;setProtectedMarkers&quot;, startMarker == null || endMarker == null</span>
+                ? &quot;&quot; : startMarker + &quot;\n&quot; + endMarker);
+<span class="fc" id="L231">    }</span>
+
+    /// Registers a listener notified when an edit is refused because it falls inside a protected
+    /// region. Without it a protected region is silent, and one covering most of the document is
+    /// indistinguishable from an editor that ignores the keyboard. The event source is this editor
+    /// and the event is fired on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: invoked once per refused edit
+    public void addProtectedEditListener(ActionListener listener) {
+<span class="nc" id="L242">        protectedEditListeners.addListener(listener);</span>
+<span class="nc" id="L243">    }</span>
+
+    /// Removes a listener added by `#addProtectedEditListener(ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener to remove
+    public void removeProtectedEditListener(ActionListener listener) {
+<span class="nc" id="L251">        protectedEditListeners.removeListener(listener);</span>
+<span class="nc" id="L252">    }</span>
+
+    /// Moves the caret to a character offset, clamped by the editor backend to the document bounds.
+    public void setCursorPosition(int offset) {
+<span class="fc" id="L256">        command(&quot;setCursor&quot;, String.valueOf(Math.max(0, offset)));</span>
+<span class="fc" id="L257">    }</span>
+
+    /// Retrieves the current caret character offset. The callback is invoked on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: receives the caret offset as an Integer
+    public void getCursorPosition(final SuccessCallback&lt;Integer&gt; callback) {
+<span class="fc" id="L265">        query(&quot;getCursor&quot;, null, new StringToIntCallback(callback));</span>
+<span class="fc" id="L266">    }</span>
+
+    private static final class StringToIntCallback implements SuccessCallback&lt;String&gt; {
+        private final SuccessCallback&lt;Integer&gt; delegate;
+
+<span class="fc" id="L271">        StringToIntCallback(SuccessCallback&lt;Integer&gt; delegate) {</span>
+<span class="fc" id="L272">            this.delegate = delegate;</span>
+<span class="fc" id="L273">        }</span>
+
+        @Override
+        public void onSucess(String value) {
+<span class="fc" id="L277">            int v = 0;</span>
+            try {
+<span class="pc bpc" id="L279" title="2 of 4 branches missed.">                if (value != null &amp;&amp; value.length() &gt; 0) {</span>
+<span class="fc" id="L280">                    v = Integer.parseInt(value.trim());</span>
+                }
+<span class="fc" id="L282">            } catch (NumberFormatException err) {</span>
+<span class="fc" id="L283">                v = 0;</span>
+<span class="fc" id="L284">            }</span>
+<span class="fc" id="L285">            delegate.onSucess(Integer.valueOf(v));</span>
+<span class="fc" id="L286">        }</span>
+    }
+
+    /// Sets the diagnostics (errors / warnings / hints) displayed in the editor as squiggly underlines,
+    /// gutter markers and tooltips. Pass an empty list (or null) to clear all diagnostics.
+    ///
+    /// #### Parameters
+    ///
+    /// - `diagnostics`: the diagnostics to display
+    public void setDiagnostics(List&lt;CodeDiagnostic&gt; diagnostics) {
+<span class="nc" id="L296">        command(&quot;setDiagnostics&quot;, diagnosticsJson(diagnostics));</span>
+<span class="nc" id="L297">    }</span>
+
+    private static String diagnosticsJson(List&lt;CodeDiagnostic&gt; diagnostics) {
+<span class="nc" id="L300">        StringBuilder sb = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (diagnostics != null) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            for (CodeDiagnostic d : diagnostics) {</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                if (d == null) {</span>
+<span class="nc" id="L304">                    continue;</span>
+                }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if (sb.length() &gt; 1) {</span>
+<span class="nc" id="L307">                    sb.append(&quot;,&quot;);</span>
+                }
+<span class="nc" id="L309">                sb.append(&quot;{\&quot;l\&quot;:&quot;).append(d.getLine())</span>
+<span class="nc" id="L310">                    .append(&quot;,\&quot;c\&quot;:&quot;).append(d.getColumn())</span>
+<span class="nc" id="L311">                    .append(&quot;,\&quot;el\&quot;:&quot;).append(d.getEndLine())</span>
+<span class="nc" id="L312">                    .append(&quot;,\&quot;ec\&quot;:&quot;).append(d.getEndColumn())</span>
+<span class="nc" id="L313">                    .append(&quot;,\&quot;s\&quot;:\&quot;&quot;).append(jsonEscape(d.getSeverity()))</span>
+<span class="nc" id="L314">                    .append(&quot;\&quot;,\&quot;m\&quot;:\&quot;&quot;).append(jsonEscape(d.getMessage()))</span>
+<span class="nc" id="L315">                    .append(&quot;\&quot;}&quot;);</span>
+<span class="nc" id="L316">            }</span>
+        }
+<span class="nc" id="L318">        sb.append(&quot;]&quot;);</span>
+<span class="nc" id="L319">        return sb.toString();</span>
+    }
+
+    /// Sets the provider that supplies code completion proposals. Passing null disables completion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `provider`: the completion provider, or null to disable completion
+    public void setCompletionProvider(CodeCompletionProvider provider) {
+<span class="fc" id="L328">        this.completionProvider = provider;</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        command(&quot;setCompletionEnabled&quot;, provider != null ? &quot;1&quot; : &quot;0&quot;);</span>
+<span class="fc" id="L330">    }</span>
+
+    /// Returns the current completion provider, or null if none is set.
+    public CodeCompletionProvider getCompletionProvider() {
+<span class="fc" id="L334">        return completionProvider;</span>
+    }
+
+    @Override
+    void onEditorEvent(String type, String value) {
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (&quot;complete&quot;.equals(type)) {</span>
+<span class="fc" id="L340">            handleCompletionRequest(value);</span>
+<span class="fc" id="L341">            return;</span>
+        }
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (&quot;protectedEdit&quot;.equals(type)) {</span>
+<span class="fc" id="L344">            protectedEditListeners.fireActionEvent(new ActionEvent(this));</span>
+<span class="fc" id="L345">            return;</span>
+        }
+<span class="fc" id="L347">        super.onEditorEvent(type, value);</span>
+<span class="fc" id="L348">    }</span>
+
+    private void handleCompletionRequest(String value) {
+<span class="fc" id="L351">        final CodeCompletionProvider provider = completionProvider;</span>
+<span class="pc bpc" id="L352" title="1 of 4 branches missed.">        if (provider == null || value == null) {</span>
+<span class="fc" id="L353">            return;</span>
+        }
+<span class="fc" id="L355">        int colon = value.indexOf(':');</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (colon &lt; 0) {</span>
+<span class="nc" id="L357">            return;</span>
+        }
+<span class="fc" id="L359">        final String reqId = value.substring(0, colon);</span>
+        final int cursor;
+        int c;
+        try {
+<span class="fc" id="L363">            c = Integer.parseInt(value.substring(colon + 1).trim());</span>
+<span class="nc" id="L364">        } catch (NumberFormatException err) {</span>
+<span class="nc" id="L365">            c = 0;</span>
+<span class="fc" id="L366">        }</span>
+<span class="fc" id="L367">        cursor = c;</span>
+<span class="fc" id="L368">        getText(new SuccessCallback&lt;String&gt;() {</span>
+            @Override
+            public void onSucess(String code) {
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                final String safeCode = code == null ? &quot;&quot; : code;</span>
+<span class="fc" id="L372">                provider.getCompletions(CodeEditor.this, safeCode, cursor, new SuccessCallback&lt;List&lt;CodeCompletion&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(List&lt;CodeCompletion&gt; results) {
+<span class="fc" id="L375">                        command(&quot;showCompletions&quot;, reqId + &quot;:&quot; + toJson(results));</span>
+<span class="fc" id="L376">                    }</span>
+                });
+<span class="fc" id="L378">            }</span>
+        });
+<span class="fc" id="L380">    }</span>
+
+    private static String toJson(List&lt;CodeCompletion&gt; items) {
+<span class="fc" id="L383">        StringBuilder sb = new StringBuilder(&quot;[&quot;);</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        if (items != null) {</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            for (CodeCompletion cc : items) {</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                if (cc == null) {</span>
+<span class="nc" id="L387">                    continue;</span>
+                }
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                if (sb.length() &gt; 1) {</span>
+<span class="fc" id="L390">                    sb.append(&quot;,&quot;);</span>
+                }
+<span class="fc" id="L392">                sb.append(&quot;{\&quot;d\&quot;:\&quot;&quot;).append(jsonEscape(cc.getDisplayText()))</span>
+<span class="fc" id="L393">                    .append(&quot;\&quot;,\&quot;i\&quot;:\&quot;&quot;).append(jsonEscape(cc.getInsertText()))</span>
+<span class="fc" id="L394">                    .append(&quot;\&quot;,\&quot;t\&quot;:\&quot;&quot;).append(jsonEscape(cc.getType()))</span>
+<span class="fc" id="L395">                    .append(&quot;\&quot;,\&quot;x\&quot;:\&quot;&quot;).append(jsonEscape(cc.getDetail()))</span>
+<span class="fc" id="L396">                    .append(&quot;\&quot;}&quot;);</span>
+<span class="fc" id="L397">            }</span>
+        }
+<span class="fc" id="L399">        sb.append(&quot;]&quot;);</span>
+<span class="fc" id="L400">        return sb.toString();</span>
+    }
+
+    private static String jsonEscape(String s) {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L405">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L407">        StringBuilder sb = new StringBuilder(s.length() + 8);</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L409">            char ch = s.charAt(i);</span>
+<span class="pc bpc" id="L410" title="2 of 6 branches missed.">            switch (ch) {</span>
+                case '&quot;':
+<span class="fc" id="L412">                    sb.append(&quot;\\\&quot;&quot;);</span>
+<span class="fc" id="L413">                    break;</span>
+                case '\\':
+<span class="fc" id="L415">                    sb.append(&quot;\\\\&quot;);</span>
+<span class="fc" id="L416">                    break;</span>
+                case '\n':
+<span class="fc" id="L418">                    sb.append(&quot;\\n&quot;);</span>
+<span class="fc" id="L419">                    break;</span>
+                case '\r':
+<span class="nc" id="L421">                    sb.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L422">                    break;</span>
+                case '\t':
+<span class="nc" id="L424">                    sb.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L425">                    break;</span>
+                default:
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                    if (ch &lt; 0x20) {</span>
+<span class="nc" id="L428">                        String hex = Integer.toHexString(ch);</span>
+<span class="nc" id="L429">                        sb.append(&quot;\\u&quot;);</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                        for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="nc" id="L431">                            sb.append('0');</span>
+                        }
+<span class="nc" id="L433">                        sb.append(hex);</span>
+<span class="nc" id="L434">                    } else {</span>
+<span class="fc" id="L435">                        sb.append(ch);</span>
+                    }
+                    break;
+            }
+        }
+<span class="fc" id="L440">        return sb.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

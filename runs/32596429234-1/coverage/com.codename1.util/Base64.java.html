@@ -1,0 +1,849 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Base64.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">Base64.java</span></div><h1>Base64.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+/// @author Alexander Y. Kleymenov
+
+package com.codename1.util;
+
+import com.codename1.annotations.DisableDebugInfo;
+import com.codename1.annotations.DisableNullChecksAndArrayBoundsChecks;
+
+
+/// This class implements Base64 encoding/decoding functionality
+/// as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
+<span class="nc" id="L28">public abstract class Base64 {</span>
+
+    private static final int DECODE_INVALID = -1;
+    private static final int DECODE_WHITESPACE = -2;
+
+<span class="fc" id="L33">    private static final byte[] map = new byte[]</span>
+            {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+                    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b',
+                    'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+                    'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                    '4', '5', '6', '7', '8', '9', '+', '/'};
+
+<span class="fc" id="L40">    private static final byte[] decodeMap = new byte[256];</span>
+<span class="fc" id="L41">    private static final int[] decodeMapInt = new int[256];</span>
+    private static final int SIMD_BYTE_LANES = 16;
+
+    static {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int i = 0; i &lt; decodeMap.length; i++) {</span>
+<span class="fc" id="L46">            decodeMap[i] = (byte) DECODE_INVALID;</span>
+<span class="fc" id="L47">            decodeMapInt[i] = DECODE_INVALID;</span>
+        }
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int i = 0; i &lt; map.length; i++) {</span>
+<span class="fc" id="L50">            decodeMap[map[i] &amp; 0xff] = (byte) i;</span>
+<span class="fc" id="L51">            decodeMapInt[map[i] &amp; 0xff] = i;</span>
+        }
+<span class="fc" id="L53">        decodeMap['\n'] = (byte) DECODE_WHITESPACE;</span>
+<span class="fc" id="L54">        decodeMap['\r'] = (byte) DECODE_WHITESPACE;</span>
+<span class="fc" id="L55">        decodeMap[' '] = (byte) DECODE_WHITESPACE;</span>
+<span class="fc" id="L56">        decodeMap['\t'] = (byte) DECODE_WHITESPACE;</span>
+<span class="fc" id="L57">        decodeMapInt['\n'] = DECODE_WHITESPACE;</span>
+<span class="fc" id="L58">        decodeMapInt['\r'] = DECODE_WHITESPACE;</span>
+<span class="fc" id="L59">        decodeMapInt[' '] = DECODE_WHITESPACE;</span>
+<span class="fc" id="L60">        decodeMapInt['\t'] = DECODE_WHITESPACE;</span>
+<span class="fc" id="L61">    }</span>
+
+    public static byte[] decode(byte[] in) {
+<span class="fc" id="L64">        return decode(in, in.length);</span>
+    }
+
+    /// Decodes an array of bytes containing a Base64 ascii string into binary data
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array
+    ///
+    /// - `len`: the length of the array
+    ///
+    /// #### Returns
+    ///
+    /// the decoded array
+    public static byte[] decode(byte[] in, int len) {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (len == 0) {</span>
+<span class="fc" id="L80">            return new byte[0];</span>
+        }
+<span class="fc" id="L82">        int maxOutputLength = (len / 4) * 3 + 3;</span>
+<span class="fc" id="L83">        byte[] out = allocByteMaybeSimd(maxOutputLength);</span>
+<span class="fc" id="L84">        int outputLength = decode(in, len, out);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (outputLength &lt; 0) {</span>
+<span class="nc" id="L86">            return null;</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (outputLength == out.length) {</span>
+<span class="nc" id="L89">            return out;</span>
+        }
+<span class="fc" id="L91">        byte[] trimmed = allocByteMaybeSimd(outputLength);</span>
+<span class="fc" id="L92">        System.arraycopy(out, 0, trimmed, 0, outputLength);</span>
+<span class="fc" id="L93">        return trimmed;</span>
+    }
+
+    /// Decodes Base64 input into a caller-provided output buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: Base64 bytes
+    ///
+    /// - `len`: bytes from `in` to decode
+    ///
+    /// - `out`: destination buffer
+    ///
+    /// #### Returns
+    ///
+    /// decoded length, or `-1` for invalid Base64
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
+    public static int decode(byte[] in, int len, byte[] out) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (len == 0) {</span>
+<span class="nc" id="L113">            return 0;</span>
+        }
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if ((len &amp; 0x3) == 0) {</span>
+<span class="fc" id="L116">            int fastLength = decodeNoWhitespace(in, len, out);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (fastLength &gt;= 0) {</span>
+<span class="fc" id="L118">                return fastLength;</span>
+            }
+        }
+<span class="fc" id="L121">        int pad = 0;</span>
+<span class="fc" id="L122">        int end = len;</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        while (end &gt; 0) {</span>
+<span class="fc" id="L124">            int chr = in[end - 1] &amp; 0xff;</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            if (decodeMapInt[chr] == DECODE_WHITESPACE) {</span>
+<span class="nc" id="L126">                end--;</span>
+<span class="nc" id="L127">                continue;</span>
+            }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (chr == '=') {</span>
+<span class="fc" id="L130">                pad++;</span>
+<span class="fc" id="L131">                end--;</span>
+            } else {
+                break;
+            }
+<span class="fc" id="L135">        }</span>
+
+<span class="fc" id="L137">        int validChars = 0;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        for (int i = 0; i &lt; end; i++) {</span>
+<span class="fc" id="L139">            int chr = in[i] &amp; 0xff;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (chr == '=') {</span>
+<span class="nc" id="L141">                break;</span>
+            }
+<span class="fc" id="L143">            int value = decodeMapInt[chr];</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (value == DECODE_WHITESPACE) {</span>
+<span class="fc" id="L145">                continue;</span>
+            }
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (value == DECODE_INVALID) {</span>
+<span class="nc" id="L148">                return -1;</span>
+            }
+<span class="fc" id="L150">            validChars++;</span>
+        }
+
+<span class="fc" id="L153">        int totalSymbols = validChars + pad;</span>
+<span class="fc" id="L154">        int outputLength = (totalSymbols / 4) * 3 - pad;</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (outputLength &lt;= 0) {</span>
+<span class="nc" id="L156">            return 0;</span>
+        }
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (out.length &lt; outputLength) {</span>
+<span class="nc" id="L159">            throw new IllegalArgumentException(&quot;Output buffer too small for decoded data&quot;);</span>
+        }
+<span class="fc" id="L161">        int outIndex = 0;</span>
+
+<span class="fc" id="L163">        int quantum = 0;</span>
+<span class="fc" id="L164">        int quantumChars = 0;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int i = 0; i &lt; end; i++) {</span>
+<span class="fc" id="L166">            int chr = in[i] &amp; 0xff;</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            if (chr == '=') {</span>
+<span class="nc" id="L168">                break;</span>
+            }
+<span class="fc" id="L170">            int bits = decodeMapInt[chr];</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (bits == DECODE_WHITESPACE) {</span>
+<span class="fc" id="L172">                continue;</span>
+            }
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (bits == DECODE_INVALID) {</span>
+<span class="nc" id="L175">                return -1;</span>
+            }
+<span class="fc" id="L177">            quantum = (quantum &lt;&lt; 6) | bits;</span>
+<span class="fc" id="L178">            quantumChars++;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (quantumChars == 4) {</span>
+<span class="fc" id="L180">                out[outIndex++] = (byte) ((quantum &amp; 0x00FF0000) &gt;&gt; 16);</span>
+<span class="fc" id="L181">                out[outIndex++] = (byte) ((quantum &amp; 0x0000FF00) &gt;&gt; 8);</span>
+<span class="fc" id="L182">                out[outIndex++] = (byte) (quantum &amp; 0x000000FF);</span>
+<span class="fc" id="L183">                quantumChars = 0;</span>
+<span class="fc" id="L184">                quantum = 0;</span>
+            }
+        }
+
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (pad &gt; 0) {</span>
+<span class="pc bpc" id="L189" title="5 of 8 branches missed.">            if ((pad == 1 &amp;&amp; quantumChars != 3) || (pad == 2 &amp;&amp; quantumChars != 2)) {</span>
+<span class="nc" id="L190">                return -1;</span>
+            }
+<span class="fc" id="L192">            quantum = quantum &lt;&lt; (6 * pad);</span>
+<span class="fc" id="L193">            out[outIndex++] = (byte) ((quantum &amp; 0x00FF0000) &gt;&gt; 16);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (pad == 1) {</span>
+<span class="fc" id="L195">                out[outIndex++] = (byte) ((quantum &amp; 0x0000FF00) &gt;&gt; 8);</span>
+            }
+        }
+
+<span class="fc" id="L199">        return outIndex;</span>
+    }
+
+    public static int decode(byte[] in, byte[] out) {
+<span class="nc" id="L203">        return decode(in, in.length, out);</span>
+    }
+
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
+    private static int decodeNoWhitespace(byte[] in, int len, byte[] out) {
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if ((len &amp; 0x3) != 0) {</span>
+<span class="nc" id="L210">            return -1;</span>
+        }
+<span class="fc" id="L212">        int pad = 0;</span>
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">        if (len &gt; 0 &amp;&amp; in[len - 1] == '=') {</span>
+<span class="fc" id="L214">            pad++;</span>
+<span class="pc bpc" id="L215" title="1 of 4 branches missed.">            if (len &gt; 1 &amp;&amp; in[len - 2] == '=') {</span>
+<span class="fc" id="L216">                pad++;</span>
+            }
+        }
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (pad &gt; 2) {</span>
+<span class="nc" id="L220">            return -1;</span>
+        }
+
+<span class="fc" id="L223">        int outLength = (len / 4) * 3 - pad;</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (outLength &lt;= 0) {</span>
+<span class="nc" id="L225">            return 0;</span>
+        }
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (out.length &lt; outLength) {</span>
+<span class="nc" id="L228">            throw new IllegalArgumentException(&quot;Output buffer too small for decoded data&quot;);</span>
+        }
+<span class="fc" id="L230">        int outIndex = 0;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        int fullLen = len - (pad &gt; 0 ? 4 : 0);</span>
+<span class="fc" id="L232">        int[] decodeMapLocal = decodeMapInt;</span>
+<span class="fc" id="L233">        int simdFullLen = 0;</span>
+
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        for (int i = simdFullLen; i &lt; fullLen; i += 4) {</span>
+<span class="fc" id="L236">            int c0 = in[i] &amp; 0xff;</span>
+<span class="fc" id="L237">            int c1 = in[i + 1] &amp; 0xff;</span>
+<span class="fc" id="L238">            int c2 = in[i + 2] &amp; 0xff;</span>
+<span class="fc" id="L239">            int c3 = in[i + 3] &amp; 0xff;</span>
+<span class="fc" id="L240">            int b0 = decodeMapLocal[c0];</span>
+<span class="fc" id="L241">            int b1 = decodeMapLocal[c1];</span>
+<span class="fc" id="L242">            int b2 = decodeMapLocal[c2];</span>
+<span class="fc" id="L243">            int b3 = decodeMapLocal[c3];</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if ((b0 | b1 | b2 | b3) &lt; 0) {</span>
+<span class="nc" id="L245">                return -1;</span>
+            }
+<span class="fc" id="L247">            int quantum = (b0 &lt;&lt; 18) | (b1 &lt;&lt; 12) | (b2 &lt;&lt; 6) | b3;</span>
+<span class="fc" id="L248">            out[outIndex++] = (byte) ((quantum &gt;&gt; 16) &amp; 0xff);</span>
+<span class="fc" id="L249">            out[outIndex++] = (byte) ((quantum &gt;&gt; 8) &amp; 0xff);</span>
+<span class="fc" id="L250">            out[outIndex++] = (byte) (quantum &amp; 0xff);</span>
+        }
+
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        if (pad == 0) {</span>
+<span class="fc" id="L254">            return outIndex;</span>
+        }
+
+<span class="fc" id="L257">        int i = len - 4;</span>
+<span class="fc" id="L258">        int c0 = in[i] &amp; 0xff;</span>
+<span class="fc" id="L259">        int c1 = in[i + 1] &amp; 0xff;</span>
+<span class="fc" id="L260">        int b0 = decodeMapLocal[c0];</span>
+<span class="fc" id="L261">        int b1 = decodeMapLocal[c1];</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if ((b0 | b1) &lt; 0) {</span>
+<span class="nc" id="L263">            return -1;</span>
+        }
+<span class="fc" id="L265">        out[outIndex++] = (byte) ((b0 &lt;&lt; 2) | (b1 &gt;&gt; 4));</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (pad == 2) {</span>
+<span class="pc bpc" id="L267" title="2 of 4 branches missed.">            return (in[i + 2] == '=' &amp;&amp; in[i + 3] == '=') ? outIndex : -1;</span>
+        }
+
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (in[i + 3] != '=') {</span>
+<span class="nc" id="L271">            return -1;</span>
+        }
+<span class="fc" id="L273">        int b2 = decodeMapLocal[in[i + 2] &amp; 0xff];</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (b2 &lt; 0) {</span>
+<span class="nc" id="L275">            return -1;</span>
+        }
+<span class="fc" id="L277">        out[outIndex] = (byte) ((b1 &lt;&lt; 4) | (b2 &gt;&gt; 2));</span>
+<span class="fc" id="L278">        return outLength;</span>
+    }
+
+    /// Encodes the given array as a base64 string
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array to encode
+    ///
+    /// #### Returns
+    ///
+    /// the String containing the array
+    public static String encode(byte[] in) {
+<span class="fc" id="L291">        int length = in.length * 4 / 3;</span>
+<span class="fc" id="L292">        length += length / 76 + 3; // for crlr</span>
+<span class="fc" id="L293">        byte[] out = new byte[length];</span>
+<span class="fc" id="L294">        int index = 0;</span>
+        int i;
+<span class="fc" id="L296">        int crlr = 0;</span>
+<span class="fc" id="L297">        int end = in.length - in.length % 3;</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (i = 0; i &lt; end; i += 3) {</span>
+<span class="fc" id="L299">            out[index++] = map[(in[i] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="fc" id="L300">            out[index++] = map[((in[i] &amp; 0x03) &lt;&lt; 4)</span>
+                    | ((in[i + 1] &amp; 0xff) &gt;&gt; 4)];
+<span class="fc" id="L302">            out[index++] = map[((in[i + 1] &amp; 0x0f) &lt;&lt; 2)</span>
+                    | ((in[i + 2] &amp; 0xff) &gt;&gt; 6)];
+<span class="fc" id="L304">            out[index++] = map[(in[i + 2] &amp; 0x3f)];</span>
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">            if (((index - crlr) % 76 == 0) &amp;&amp; (index != 0)) {</span>
+<span class="fc" id="L306">                out[index++] = '\n';</span>
+<span class="fc" id="L307">                crlr++;</span>
+                //out[index++] = '\r';
+                //crlr++;
+            }
+        }
+<span class="pc bpc" id="L312" title="2 of 3 branches missed.">        switch (in.length % 3) {</span>
+            case 1:
+<span class="nc" id="L314">                out[index++] = map[(in[end] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="nc" id="L315">                out[index++] = map[(in[end] &amp; 0x03) &lt;&lt; 4];</span>
+<span class="nc" id="L316">                out[index++] = '=';</span>
+<span class="nc" id="L317">                out[index++] = '=';</span>
+<span class="nc" id="L318">                break;</span>
+            case 2:
+<span class="fc" id="L320">                out[index++] = map[(in[end] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="fc" id="L321">                out[index++] = map[((in[end] &amp; 0x03) &lt;&lt; 4)</span>
+                        | ((in[end + 1] &amp; 0xff) &gt;&gt; 4)];
+<span class="fc" id="L323">                out[index++] = map[((in[end + 1] &amp; 0x0f) &lt;&lt; 2)];</span>
+<span class="fc" id="L324">                out[index++] = '=';</span>
+<span class="fc" id="L325">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L329">        return com.codename1.util.StringUtil.newString(out, 0, index);</span>
+    }
+
+    /// Encodes the given array as a base64 string without breaking lines
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array to encode
+    ///
+    /// #### Returns
+    ///
+    /// the String containing the array
+    public static String encodeNoNewline(byte[] in) {
+<span class="fc" id="L342">        int inputLength = in.length;</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (inputLength == 0) {</span>
+<span class="fc" id="L344">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L346">        int outputLength = ((inputLength + 2) / 3) * 4;</span>
+<span class="fc" id="L347">        byte[] out = allocByteMaybeSimd(outputLength);</span>
+<span class="fc" id="L348">        encodeNoNewline(in, out);</span>
+<span class="fc" id="L349">        return com.codename1.util.StringUtil.newString(out, 0, outputLength);</span>
+    }
+
+    /// URL-safe Base64 encoding per RFC 4648 sec5: `+` becomes `-`, `/` becomes
+    /// `_`, and the trailing `=` padding is dropped. This is the encoding
+    /// used by JWTs and most modern web token formats. Reuses the same
+    /// SIMD-optimized encode path as [#encodeNoNewline(byte[])] under the
+    /// hood, so it is just as fast.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array to encode
+    ///
+    /// #### Returns
+    ///
+    /// the URL-safe Base64 string with no padding
+    public static String encodeUrlSafe(byte[] in) {
+<span class="fc" id="L366">        int inputLength = in.length;</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (inputLength == 0) {</span>
+<span class="nc" id="L368">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L370">        int outputLength = ((inputLength + 2) / 3) * 4;</span>
+<span class="fc" id="L371">        byte[] out = allocByteMaybeSimd(outputLength);</span>
+<span class="fc" id="L372">        encodeNoNewline(in, out);</span>
+        // Map standard alphabet to URL-safe alphabet and trim trailing '='
+<span class="fc" id="L374">        int unpadded = outputLength;</span>
+<span class="pc bpc" id="L375" title="1 of 4 branches missed.">        while (unpadded &gt; 0 &amp;&amp; out[unpadded - 1] == '=') {</span>
+<span class="fc" id="L376">            unpadded--;</span>
+        }
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        for (int i = 0; i &lt; unpadded; i++) {</span>
+<span class="fc" id="L379">            byte c = out[i];</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            if (c == '+') {</span>
+<span class="fc" id="L381">                out[i] = '-';</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            } else if (c == '/') {</span>
+<span class="fc" id="L383">                out[i] = '_';</span>
+            }
+        }
+<span class="fc" id="L386">        return com.codename1.util.StringUtil.newString(out, 0, unpadded);</span>
+    }
+
+    /// Decodes a URL-safe Base64 string (RFC 4648 sec5). Padding is optional --
+    /// the canonical URL-safe form drops it, but this method also accepts
+    /// strings that still carry trailing `=`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: URL-safe Base64 string
+    ///
+    /// #### Returns
+    ///
+    /// the decoded bytes
+    public static byte[] decodeUrlSafe(String s) {
+<span class="pc bpc" id="L401" title="2 of 4 branches missed.">        if (s == null || s.length() == 0) {</span>
+<span class="nc" id="L402">            return new byte[0];</span>
+        }
+<span class="fc" id="L404">        int len = s.length();</span>
+<span class="fc" id="L405">        int pad = (4 - (len &amp; 3)) &amp; 3;</span>
+<span class="fc" id="L406">        byte[] buf = new byte[len + pad];</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L408">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">            if (c == '-') {</span>
+<span class="fc" id="L410">                buf[i] = '+';</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">            } else if (c == '_') {</span>
+<span class="fc" id="L412">                buf[i] = '/';</span>
+            } else {
+<span class="fc" id="L414">                buf[i] = (byte) c;</span>
+            }
+        }
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        for (int i = 0; i &lt; pad; i++) {</span>
+<span class="fc" id="L418">            buf[len + i] = '=';</span>
+        }
+<span class="fc" id="L420">        return decode(buf, buf.length);</span>
+    }
+
+    /// Encodes input into a caller-provided output buffer without line breaks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: input bytes
+    ///
+    /// - `out`: destination buffer
+    ///
+    /// #### Returns
+    ///
+    /// number of bytes written to `out`
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
+    public static int encodeNoNewline(byte[] in, byte[] out) {
+<span class="fc" id="L437">        int inputLength = in.length;</span>
+<span class="fc" id="L438">        int outputLength = ((inputLength + 2) / 3) * 4;</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (out.length &lt; outputLength) {</span>
+<span class="nc" id="L440">            throw new IllegalArgumentException(&quot;Output buffer too small for encoded data&quot;);</span>
+        }
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">        if (inputLength == 0) {</span>
+<span class="nc" id="L443">            return 0;</span>
+        }
+<span class="fc" id="L445">        byte[] mapLocal = map;</span>
+<span class="fc" id="L446">        int end = inputLength - (inputLength % 3);</span>
+<span class="fc" id="L447">        int outIndex = 0;</span>
+<span class="fc" id="L448">        int i = 0;</span>
+<span class="fc" id="L449">        int fastEnd = end - 12;</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        for (; i &lt;= fastEnd; i += 12) {</span>
+<span class="fc" id="L451">            int b0 = in[i] &amp; 0xff;</span>
+<span class="fc" id="L452">            int b1 = in[i + 1] &amp; 0xff;</span>
+<span class="fc" id="L453">            int b2 = in[i + 2] &amp; 0xff;</span>
+<span class="fc" id="L454">            int b3 = in[i + 3] &amp; 0xff;</span>
+<span class="fc" id="L455">            int b4 = in[i + 4] &amp; 0xff;</span>
+<span class="fc" id="L456">            int b5 = in[i + 5] &amp; 0xff;</span>
+<span class="fc" id="L457">            int b6 = in[i + 6] &amp; 0xff;</span>
+<span class="fc" id="L458">            int b7 = in[i + 7] &amp; 0xff;</span>
+<span class="fc" id="L459">            int b8 = in[i + 8] &amp; 0xff;</span>
+<span class="fc" id="L460">            int b9 = in[i + 9] &amp; 0xff;</span>
+<span class="fc" id="L461">            int b10 = in[i + 10] &amp; 0xff;</span>
+<span class="fc" id="L462">            int b11 = in[i + 11] &amp; 0xff;</span>
+
+<span class="fc" id="L464">            out[outIndex++] = mapLocal[b0 &gt;&gt; 2];</span>
+<span class="fc" id="L465">            out[outIndex++] = mapLocal[((b0 &amp; 0x03) &lt;&lt; 4) | (b1 &gt;&gt; 4)];</span>
+<span class="fc" id="L466">            out[outIndex++] = mapLocal[((b1 &amp; 0x0f) &lt;&lt; 2) | (b2 &gt;&gt; 6)];</span>
+<span class="fc" id="L467">            out[outIndex++] = mapLocal[b2 &amp; 0x3f];</span>
+
+<span class="fc" id="L469">            out[outIndex++] = mapLocal[b3 &gt;&gt; 2];</span>
+<span class="fc" id="L470">            out[outIndex++] = mapLocal[((b3 &amp; 0x03) &lt;&lt; 4) | (b4 &gt;&gt; 4)];</span>
+<span class="fc" id="L471">            out[outIndex++] = mapLocal[((b4 &amp; 0x0f) &lt;&lt; 2) | (b5 &gt;&gt; 6)];</span>
+<span class="fc" id="L472">            out[outIndex++] = mapLocal[b5 &amp; 0x3f];</span>
+
+<span class="fc" id="L474">            out[outIndex++] = mapLocal[b6 &gt;&gt; 2];</span>
+<span class="fc" id="L475">            out[outIndex++] = mapLocal[((b6 &amp; 0x03) &lt;&lt; 4) | (b7 &gt;&gt; 4)];</span>
+<span class="fc" id="L476">            out[outIndex++] = mapLocal[((b7 &amp; 0x0f) &lt;&lt; 2) | (b8 &gt;&gt; 6)];</span>
+<span class="fc" id="L477">            out[outIndex++] = mapLocal[b8 &amp; 0x3f];</span>
+
+<span class="fc" id="L479">            out[outIndex++] = mapLocal[b9 &gt;&gt; 2];</span>
+<span class="fc" id="L480">            out[outIndex++] = mapLocal[((b9 &amp; 0x03) &lt;&lt; 4) | (b10 &gt;&gt; 4)];</span>
+<span class="fc" id="L481">            out[outIndex++] = mapLocal[((b10 &amp; 0x0f) &lt;&lt; 2) | (b11 &gt;&gt; 6)];</span>
+<span class="fc" id="L482">            out[outIndex++] = mapLocal[b11 &amp; 0x3f];</span>
+        }
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        for (; i &lt; end; i += 3) {</span>
+<span class="fc" id="L485">            int b0 = in[i] &amp; 0xff;</span>
+<span class="fc" id="L486">            int b1 = in[i + 1] &amp; 0xff;</span>
+<span class="fc" id="L487">            int b2 = in[i + 2] &amp; 0xff;</span>
+
+<span class="fc" id="L489">            out[outIndex++] = mapLocal[b0 &gt;&gt; 2];</span>
+<span class="fc" id="L490">            out[outIndex++] = mapLocal[((b0 &amp; 0x03) &lt;&lt; 4) | (b1 &gt;&gt; 4)];</span>
+<span class="fc" id="L491">            out[outIndex++] = mapLocal[((b1 &amp; 0x0f) &lt;&lt; 2) | (b2 &gt;&gt; 6)];</span>
+<span class="fc" id="L492">            out[outIndex++] = mapLocal[b2 &amp; 0x3f];</span>
+        }
+
+<span class="fc bfc" id="L495" title="All 3 branches covered.">        switch (inputLength - end) {</span>
+            case 1: {
+<span class="fc" id="L497">                int b0 = in[end] &amp; 0xff;</span>
+<span class="fc" id="L498">                out[outIndex++] = mapLocal[b0 &gt;&gt; 2];</span>
+<span class="fc" id="L499">                out[outIndex++] = mapLocal[(b0 &amp; 0x03) &lt;&lt; 4];</span>
+<span class="fc" id="L500">                out[outIndex++] = '=';</span>
+<span class="fc" id="L501">                out[outIndex++] = '=';</span>
+<span class="fc" id="L502">                break;</span>
+            }
+            case 2: {
+<span class="fc" id="L505">                int b0 = in[end] &amp; 0xff;</span>
+<span class="fc" id="L506">                int b1 = in[end + 1] &amp; 0xff;</span>
+<span class="fc" id="L507">                out[outIndex++] = mapLocal[b0 &gt;&gt; 2];</span>
+<span class="fc" id="L508">                out[outIndex++] = mapLocal[((b0 &amp; 0x03) &lt;&lt; 4) | (b1 &gt;&gt; 4)];</span>
+<span class="fc" id="L509">                out[outIndex++] = mapLocal[(b1 &amp; 0x0f) &lt;&lt; 2];</span>
+<span class="fc" id="L510">                out[outIndex++] = '=';</span>
+<span class="fc" id="L511">                break;</span>
+            }
+            default:
+                break;
+        }
+<span class="fc" id="L516">        return outIndex;</span>
+    }
+
+    private static final int SIMD_ENC_LANE0 = 0;
+    private static final int SIMD_ENC_LANE1 = SIMD_ENC_LANE0 + SIMD_BYTE_LANES;
+    private static final int SIMD_ENC_LANE2 = SIMD_ENC_LANE1 + SIMD_BYTE_LANES;
+    private static final int SIMD_ENC_OUT0 = SIMD_ENC_LANE2 + SIMD_BYTE_LANES;
+    private static final int SIMD_ENC_TMP = SIMD_ENC_OUT0 + SIMD_BYTE_LANES;
+    private static final int SIMD_ENC_OUT1 = SIMD_ENC_TMP + SIMD_BYTE_LANES;
+    private static final int SIMD_ENC_OUT2 = SIMD_ENC_OUT1 + SIMD_BYTE_LANES;
+    private static final int SIMD_ENCODE_SCRATCH_BYTES = SIMD_ENC_OUT2 + SIMD_BYTE_LANES;
+
+    private static final int SIMD_DEC_OUT0 = 0;
+    private static final int SIMD_DEC_OUT1 = SIMD_DEC_OUT0 + SIMD_BYTE_LANES;
+    private static final int SIMD_DEC_OUT2 = SIMD_DEC_OUT1 + SIMD_BYTE_LANES;
+    private static final int SIMD_DEC_OUT3 = SIMD_DEC_OUT2 + SIMD_BYTE_LANES;
+    private static final int SIMD_DEC_TMP = SIMD_DEC_OUT3 + SIMD_BYTE_LANES;
+    private static final int SIMD_DECODE_SCRATCH_BYTES = SIMD_DEC_TMP + SIMD_BYTE_LANES;
+
+    private static byte[] simdEncodeMap;
+    private static byte[] simdDecodeMap;
+    private static byte[] simdConst03;
+    private static byte[] simdConst0F;
+    private static byte[] simdConst3F;
+
+    private static byte[] getSimdEncodeMap(Simd simd) {
+<span class="nc" id="L542">        byte[] out = simdEncodeMap;</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        if (out != null) {</span>
+<span class="nc" id="L544">            return out;</span>
+        }
+<span class="nc" id="L546">        out = simd.allocByte(64);</span>
+<span class="nc" id="L547">        System.arraycopy(map, 0, out, 0, 64);</span>
+<span class="nc" id="L548">        simdEncodeMap = out;</span>
+<span class="nc" id="L549">        return out;</span>
+    }
+
+    private static byte[] getSimdDecodeMap(Simd simd) {
+<span class="nc" id="L553">        byte[] out = simdDecodeMap;</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">        if (out != null) {</span>
+<span class="nc" id="L555">            return out;</span>
+        }
+<span class="nc" id="L557">        out = simd.allocByte(256);</span>
+<span class="nc" id="L558">        fillRange(out, (byte) -1);</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">        for (int i = 0; i &lt; 64; i++) {</span>
+<span class="nc" id="L560">            out[map[i] &amp; 0xff] = (byte) i;</span>
+        }
+<span class="nc" id="L562">        simdDecodeMap = out;</span>
+<span class="nc" id="L563">        return out;</span>
+    }
+
+    private static byte[] getSimdConst03(Simd simd) {
+<span class="nc" id="L567">        byte[] out = simdConst03;</span>
+<span class="nc bnc" id="L568" title="All 2 branches missed.">        if (out != null) {</span>
+<span class="nc" id="L569">            return out;</span>
+        }
+<span class="nc" id="L571">        out = simd.allocByte(SIMD_BYTE_LANES);</span>
+<span class="nc" id="L572">        fillRange(out, (byte) 0x03);</span>
+<span class="nc" id="L573">        simdConst03 = out;</span>
+<span class="nc" id="L574">        return out;</span>
+    }
+
+    private static byte[] getSimdConst0F(Simd simd) {
+<span class="nc" id="L578">        byte[] out = simdConst0F;</span>
+<span class="nc bnc" id="L579" title="All 2 branches missed.">        if (out != null) {</span>
+<span class="nc" id="L580">            return out;</span>
+        }
+<span class="nc" id="L582">        out = simd.allocByte(SIMD_BYTE_LANES);</span>
+<span class="nc" id="L583">        fillRange(out, (byte) 0x0F);</span>
+<span class="nc" id="L584">        simdConst0F = out;</span>
+<span class="nc" id="L585">        return out;</span>
+    }
+
+    private static byte[] getSimdConst3F(Simd simd) {
+<span class="nc" id="L589">        byte[] out = simdConst3F;</span>
+<span class="nc bnc" id="L590" title="All 2 branches missed.">        if (out != null) {</span>
+<span class="nc" id="L591">            return out;</span>
+        }
+<span class="nc" id="L593">        out = simd.allocByte(SIMD_BYTE_LANES);</span>
+<span class="nc" id="L594">        fillRange(out, (byte) 0x3F);</span>
+<span class="nc" id="L595">        simdConst3F = out;</span>
+<span class="nc" id="L596">        return out;</span>
+    }
+
+    private static void fillRange(byte[] arr, byte value) {
+<span class="nc bnc" id="L600" title="All 2 branches missed.">        for (int i = 0; i &lt; arr.length; i++) {</span>
+<span class="nc" id="L601">            arr[i] = value;</span>
+        }
+<span class="nc" id="L603">    }</span>
+
+    /// SIMD-optimized Base64 encoding with explicit offsets.
+    /// Uses generic SIMD byte primitives over a single caller-invisible scratch slab.
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
+    public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset) {
+<span class="nc" id="L610">        int outputLength = ((inLength + 2) / 3) * 4;</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if (inLength == 0) {</span>
+<span class="nc" id="L612">            return 0;</span>
+        }
+<span class="nc" id="L614">        Simd simd = Simd.get();</span>
+<span class="nc" id="L615">        int end3 = inOffset + inLength - (inLength % 3);</span>
+<span class="nc" id="L616">        int si = inOffset;</span>
+<span class="nc" id="L617">        int di = outOffset;</span>
+        // Only take the SIMD byte path where it actually beats the autovectorized
+        // scalar codec (NEON: iOS / Windows-arm64). On x86-64 the /O2 vectorizer
+        // already matches it and SSE2 lacks a 3-way interleave, so gate to si and
+        // let the scalar tail below encode everything.
+<span class="nc bnc" id="L622" title="All 4 branches missed.">        boolean useSimd = simd.isSupported() &amp;&amp; simd.isByteShuffleAccelerated();</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">        int simdEnd = useSimd ? end3 - SIMD_BYTE_LANES * 3 + 1 : si;</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        byte[] scratch = simdEnd &gt; si ? simd.allocaByte(SIMD_ENCODE_SCRATCH_BYTES) : null;</span>
+<span class="nc" id="L625">        byte[] encodeMap = null;</span>
+<span class="nc" id="L626">        byte[] const03 = null;</span>
+<span class="nc" id="L627">        byte[] const0F = null;</span>
+<span class="nc" id="L628">        byte[] const3F = null;</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">        if (scratch != null) {</span>
+<span class="nc" id="L630">            encodeMap = getSimdEncodeMap(simd);</span>
+<span class="nc" id="L631">            const03 = getSimdConst03(simd);</span>
+<span class="nc" id="L632">            const0F = getSimdConst0F(simd);</span>
+<span class="nc" id="L633">            const3F = getSimdConst3F(simd);</span>
+        }
+
+<span class="nc bnc" id="L636" title="All 2 branches missed.">        while (si &lt; simdEnd) {</span>
+<span class="nc" id="L637">            simd.unpackBytesInterleaved3(in, si, scratch, SIMD_ENC_LANE0, SIMD_ENC_LANE1, SIMD_ENC_LANE2, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L638">            simd.shrLogical(scratch, SIMD_ENC_LANE0, 2, scratch, SIMD_ENC_OUT0, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L640">            simd.and(scratch, SIMD_ENC_LANE0, const03, 0, scratch, SIMD_ENC_TMP, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L641">            simd.shl(scratch, SIMD_ENC_TMP, 4, scratch, SIMD_ENC_TMP, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L642">            simd.shrLogical(scratch, SIMD_ENC_LANE1, 4, scratch, SIMD_ENC_OUT1, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L643">            simd.or(scratch, SIMD_ENC_TMP, scratch, SIMD_ENC_OUT1, scratch, SIMD_ENC_OUT1, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L645">            simd.and(scratch, SIMD_ENC_LANE1, const0F, 0, scratch, SIMD_ENC_TMP, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L646">            simd.shl(scratch, SIMD_ENC_TMP, 2, scratch, SIMD_ENC_TMP, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L647">            simd.shrLogical(scratch, SIMD_ENC_LANE2, 6, scratch, SIMD_ENC_OUT2, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L648">            simd.or(scratch, SIMD_ENC_TMP, scratch, SIMD_ENC_OUT2, scratch, SIMD_ENC_OUT2, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L650">            simd.and(scratch, SIMD_ENC_LANE2, const3F, 0, scratch, SIMD_ENC_LANE2, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L652">            simd.lookupBytes(encodeMap, scratch, SIMD_ENC_OUT0, scratch, SIMD_ENC_LANE0, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L653">            simd.lookupBytes(encodeMap, scratch, SIMD_ENC_OUT1, scratch, SIMD_ENC_LANE1, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L654">            simd.lookupBytes(encodeMap, scratch, SIMD_ENC_OUT2, scratch, SIMD_ENC_OUT0, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L655">            simd.lookupBytes(encodeMap, scratch, SIMD_ENC_LANE2, scratch, SIMD_ENC_LANE2, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L657">            simd.packBytesInterleaved4(scratch, SIMD_ENC_LANE0, SIMD_ENC_LANE1, SIMD_ENC_OUT0, SIMD_ENC_LANE2, out, di, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L658">            si += SIMD_BYTE_LANES * 3;</span>
+<span class="nc" id="L659">            di += SIMD_BYTE_LANES * 4;</span>
+        }
+
+<span class="nc" id="L662">        byte[] mapLocal = map;</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">        while (si &lt; end3) {</span>
+<span class="nc" id="L664">            int b0 = in[si] &amp; 0xff;</span>
+<span class="nc" id="L665">            int b1 = in[si + 1] &amp; 0xff;</span>
+<span class="nc" id="L666">            int b2 = in[si + 2] &amp; 0xff;</span>
+<span class="nc" id="L667">            out[di]     = mapLocal[b0 &gt;&gt; 2];</span>
+<span class="nc" id="L668">            out[di + 1] = mapLocal[((b0 &amp; 0x03) &lt;&lt; 4) | (b1 &gt;&gt; 4)];</span>
+<span class="nc" id="L669">            out[di + 2] = mapLocal[((b1 &amp; 0x0f) &lt;&lt; 2) | (b2 &gt;&gt; 6)];</span>
+<span class="nc" id="L670">            out[di + 3] = mapLocal[b2 &amp; 0x3f];</span>
+<span class="nc" id="L671">            si += 3;</span>
+<span class="nc" id="L672">            di += 4;</span>
+<span class="nc" id="L673">        }</span>
+
+<span class="nc bnc" id="L675" title="All 3 branches missed.">        switch (inOffset + inLength - end3) {</span>
+            case 1: {
+<span class="nc" id="L677">                int b0 = in[si] &amp; 0xff;</span>
+<span class="nc" id="L678">                out[di]     = mapLocal[b0 &gt;&gt; 2];</span>
+<span class="nc" id="L679">                out[di + 1] = mapLocal[(b0 &amp; 0x03) &lt;&lt; 4];</span>
+<span class="nc" id="L680">                out[di + 2] = '=';</span>
+<span class="nc" id="L681">                out[di + 3] = '=';</span>
+<span class="nc" id="L682">                break;</span>
+            }
+            case 2: {
+<span class="nc" id="L685">                int b0 = in[si] &amp; 0xff;</span>
+<span class="nc" id="L686">                int b1 = in[si + 1] &amp; 0xff;</span>
+<span class="nc" id="L687">                out[di]     = mapLocal[b0 &gt;&gt; 2];</span>
+<span class="nc" id="L688">                out[di + 1] = mapLocal[((b0 &amp; 0x03) &lt;&lt; 4) | (b1 &gt;&gt; 4)];</span>
+<span class="nc" id="L689">                out[di + 2] = mapLocal[(b1 &amp; 0x0f) &lt;&lt; 2];</span>
+<span class="nc" id="L690">                out[di + 3] = '=';</span>
+<span class="nc" id="L691">                break;</span>
+            }
+            default:
+                break;
+        }
+<span class="nc" id="L696">        return outputLength;</span>
+    }
+
+    /// Compatibility overload that ignores the legacy scratch parameter.
+    public static int encodeNoNewlineSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+<span class="nc" id="L701">        return encodeNoNewlineSimd(in, inOffset, inLength, out, outOffset);</span>
+    }
+
+    /// SIMD-optimized Base64 decoding for no-whitespace input.
+    /// Uses generic SIMD byte primitives over a single caller-invisible scratch slab.
+    @DisableDebugInfo
+    @DisableNullChecksAndArrayBoundsChecks
+    public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset) {
+<span class="nc bnc" id="L709" title="All 2 branches missed.">        if (inLength == 0) {</span>
+<span class="nc" id="L710">            return 0;</span>
+        }
+<span class="nc bnc" id="L712" title="All 2 branches missed.">        if ((inLength &amp; 0x3) != 0) {</span>
+<span class="nc" id="L713">            return -1;</span>
+        }
+<span class="nc" id="L715">        Simd simd = Simd.get();</span>
+
+<span class="nc" id="L717">        int pad = 0;</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">        if (in[inOffset + inLength - 1] == '=') {</span>
+<span class="nc" id="L719">            pad++;</span>
+<span class="nc bnc" id="L720" title="All 4 branches missed.">            if (inLength &gt; 1 &amp;&amp; in[inOffset + inLength - 2] == '=') {</span>
+<span class="nc" id="L721">                pad++;</span>
+            }
+        }
+<span class="nc bnc" id="L724" title="All 2 branches missed.">        if (pad &gt; 2) {</span>
+<span class="nc" id="L725">            return -1;</span>
+        }
+<span class="nc" id="L727">        int outLength = (inLength / 4) * 3 - pad;</span>
+<span class="nc bnc" id="L728" title="All 2 branches missed.">        if (outLength &lt;= 0) {</span>
+<span class="nc" id="L729">            return 0;</span>
+        }
+
+<span class="nc" id="L732">        int[] decodeMapLocal = decodeMapInt;</span>
+
+<span class="nc bnc" id="L734" title="All 2 branches missed.">        int fullLen = inLength - (pad &gt; 0 ? 4 : 0);</span>
+<span class="nc" id="L735">        int fullEnd = inOffset + fullLen;</span>
+<span class="nc" id="L736">        int si = inOffset;</span>
+<span class="nc" id="L737">        int di = outOffset;</span>
+        // Gate the SIMD byte path to where it beats autovectorized scalar (NEON);
+        // on x86-64 stay scalar (see encodeNoNewlineSimd).
+<span class="nc bnc" id="L740" title="All 4 branches missed.">        boolean useSimd = simd.isSupported() &amp;&amp; simd.isByteShuffleAccelerated();</span>
+<span class="nc bnc" id="L741" title="All 2 branches missed.">        int simdEnd = useSimd ? fullEnd - SIMD_BYTE_LANES * 4 + 1 : si;</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">        byte[] scratch = simdEnd &gt; si ? simd.allocaByte(SIMD_DECODE_SCRATCH_BYTES) : null;</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">        byte[] decodeMap = scratch != null ? getSimdDecodeMap(simd) : null;</span>
+<span class="nc bnc" id="L744" title="All 2 branches missed.">        while (si &lt; simdEnd) {</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">            if (simd.unpackLookupBytesInterleaved4(decodeMap, in, si, scratch, SIMD_DEC_OUT0, SIMD_DEC_OUT1, SIMD_DEC_OUT2, SIMD_DEC_OUT3, SIMD_BYTE_LANES) &lt; 0) {</span>
+<span class="nc" id="L746">                return -1;</span>
+            }
+<span class="nc" id="L748">            simd.shl(scratch, SIMD_DEC_OUT0, 2, scratch, SIMD_DEC_OUT0, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L749">            simd.shrLogical(scratch, SIMD_DEC_OUT1, 4, scratch, SIMD_DEC_TMP, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L750">            simd.or(scratch, SIMD_DEC_OUT0, scratch, SIMD_DEC_TMP, scratch, SIMD_DEC_OUT0, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L752">            simd.shl(scratch, SIMD_DEC_OUT1, 4, scratch, SIMD_DEC_OUT1, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L753">            simd.shrLogical(scratch, SIMD_DEC_OUT2, 2, scratch, SIMD_DEC_TMP, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L754">            simd.or(scratch, SIMD_DEC_OUT1, scratch, SIMD_DEC_TMP, scratch, SIMD_DEC_OUT1, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L756">            simd.shl(scratch, SIMD_DEC_OUT2, 6, scratch, SIMD_DEC_OUT2, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L757">            simd.or(scratch, SIMD_DEC_OUT2, scratch, SIMD_DEC_OUT3, scratch, SIMD_DEC_OUT2, SIMD_BYTE_LANES);</span>
+
+<span class="nc" id="L759">            simd.packBytesInterleaved3(scratch, SIMD_DEC_OUT0, SIMD_DEC_OUT1, SIMD_DEC_OUT2, out, di, SIMD_BYTE_LANES);</span>
+<span class="nc" id="L760">            si += SIMD_BYTE_LANES * 4;</span>
+<span class="nc" id="L761">            di += SIMD_BYTE_LANES * 3;</span>
+        }
+
+<span class="nc bnc" id="L764" title="All 2 branches missed.">        while (si &lt; fullEnd) {</span>
+<span class="nc" id="L765">            int c0 = in[si] &amp; 0xff;</span>
+<span class="nc" id="L766">            int c1 = in[si + 1] &amp; 0xff;</span>
+<span class="nc" id="L767">            int c2 = in[si + 2] &amp; 0xff;</span>
+<span class="nc" id="L768">            int c3 = in[si + 3] &amp; 0xff;</span>
+<span class="nc" id="L769">            int b0 = decodeMapLocal[c0];</span>
+<span class="nc" id="L770">            int b1 = decodeMapLocal[c1];</span>
+<span class="nc" id="L771">            int b2 = decodeMapLocal[c2];</span>
+<span class="nc" id="L772">            int b3 = decodeMapLocal[c3];</span>
+<span class="nc bnc" id="L773" title="All 2 branches missed.">            if ((b0 | b1 | b2 | b3) &lt; 0) {</span>
+<span class="nc" id="L774">                return -1;</span>
+            }
+<span class="nc" id="L776">            int quantum = (b0 &lt;&lt; 18) | (b1 &lt;&lt; 12) | (b2 &lt;&lt; 6) | b3;</span>
+<span class="nc" id="L777">            out[di++] = (byte) ((quantum &gt;&gt; 16) &amp; 0xff);</span>
+<span class="nc" id="L778">            out[di++] = (byte) ((quantum &gt;&gt; 8) &amp; 0xff);</span>
+<span class="nc" id="L779">            out[di++] = (byte) (quantum &amp; 0xff);</span>
+<span class="nc" id="L780">            si += 4;</span>
+<span class="nc" id="L781">        }</span>
+
+<span class="nc bnc" id="L783" title="All 2 branches missed.">        if (pad &gt; 0) {</span>
+<span class="nc" id="L784">            int i = inOffset + inLength - 4;</span>
+<span class="nc" id="L785">            int c0 = in[i] &amp; 0xff;</span>
+<span class="nc" id="L786">            int c1 = in[i + 1] &amp; 0xff;</span>
+<span class="nc" id="L787">            int b0 = decodeMapLocal[c0];</span>
+<span class="nc" id="L788">            int b1 = decodeMapLocal[c1];</span>
+<span class="nc bnc" id="L789" title="All 2 branches missed.">            if ((b0 | b1) &lt; 0) {</span>
+<span class="nc" id="L790">                return -1;</span>
+            }
+<span class="nc" id="L792">            out[di++] = (byte) ((b0 &lt;&lt; 2) | (b1 &gt;&gt; 4));</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">            if (pad == 2) {</span>
+<span class="nc bnc" id="L794" title="All 4 branches missed.">                return (in[i + 2] == '=' &amp;&amp; in[i + 3] == '=') ? outLength : -1;</span>
+            }
+<span class="nc bnc" id="L796" title="All 2 branches missed.">            if (in[i + 3] != '=') {</span>
+<span class="nc" id="L797">                return -1;</span>
+            }
+<span class="nc" id="L799">            int b2 = decodeMapLocal[in[i + 2] &amp; 0xff];</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">            if (b2 &lt; 0) {</span>
+<span class="nc" id="L801">                return -1;</span>
+            }
+<span class="nc" id="L803">            out[di] = (byte) ((b1 &lt;&lt; 4) | (b2 &gt;&gt; 2));</span>
+        }
+
+<span class="nc" id="L806">        return outLength;</span>
+    }
+
+    /// Compatibility overload that ignores the legacy scratch parameter.
+    public static int decodeNoWhitespaceSimd(byte[] in, int inOffset, int inLength, byte[] out, int outOffset, int[] scratch) {
+<span class="nc" id="L811">        return decodeNoWhitespaceSimd(in, inOffset, inLength, out, outOffset);</span>
+    }
+
+    /// Convenience overload for `encodeNoNewlineSimd(byte[], int, int, byte[], int)`
+    /// using zero offsets.
+    public static int encodeNoNewlineSimd(byte[] in, byte[] out) {
+<span class="nc" id="L817">        return encodeNoNewlineSimd(in, 0, in.length, out, 0);</span>
+    }
+
+    /// Convenience overload for `encodeNoNewlineSimd(byte[], int, int, byte[], int)`
+    /// that preserves the legacy scratch-bearing signature.
+    public static int encodeNoNewlineSimd(byte[] in, byte[] out, int[] scratch) {
+<span class="nc" id="L823">        return encodeNoNewlineSimd(in, 0, in.length, out, 0);</span>
+    }
+
+    /// Convenience overload for `decodeNoWhitespaceSimd(byte[], int, int, byte[], int)`
+    /// using zero input offset.
+    public static int decodeNoWhitespaceSimd(byte[] in, int len, byte[] out) {
+<span class="nc" id="L829">        return decodeNoWhitespaceSimd(in, 0, len, out, 0);</span>
+    }
+
+    /// Convenience overload for `decodeNoWhitespaceSimd(byte[], int, int, byte[], int)`
+    /// that preserves the legacy scratch-bearing signature.
+    public static int decodeNoWhitespaceSimd(byte[] in, int len, byte[] out, int[] scratch) {
+<span class="nc" id="L835">        return decodeNoWhitespaceSimd(in, 0, len, out, 0);</span>
+    }
+
+    private static byte[] allocByteMaybeSimd(int size) {
+<span class="pc bpc" id="L839" title="1 of 2 branches missed.">        if (size &lt;= 0) {</span>
+<span class="nc" id="L840">            return new byte[0];</span>
+        }
+<span class="fc" id="L842">        Simd simd = Simd.get();</span>
+<span class="pc bpc" id="L843" title="3 of 4 branches missed.">        if (simd.isSupported() &amp;&amp; size &gt;= 16) {</span>
+<span class="nc" id="L844">            return simd.allocByte(size);</span>
+        }
+<span class="fc" id="L846">        return new byte[size];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

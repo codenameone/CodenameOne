@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EditField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">EditField.java</span></div><h1>EditField.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.ui.editor.EditorHost;
+import com.codename1.ui.editor.EditorView;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.EventDispatcher;
+
+/// A pure Codename One text field.
+///
+/// `EditField` is a drop-in alternative to `TextField` / `TextArea` that edits text entirely with the
+/// framework's own text engine (the same engine that backs `CodeEditor` and `RichTextArea`) instead of
+/// a native peer. Selection, caret movement, word / line navigation, undo and clipboard all work on
+/// every port: on iOS, Android and JavaScript the platform soft keyboard, hardware keyboard and IME
+/// drive it through the low-level text-input SPI; on the desktop ports the raw physical-keyboard path
+/// is used. Because there is no native peer the field is a real, self-contained lightweight component
+/// -- it never floats above the UI, scrolls perfectly with its parent and can live anywhere a
+/// `Component` can.
+///
+/// It intentionally mirrors the common `TextField` / `TextArea` API (`#setText(String)`, `#getText()`,
+/// `#setHint(String)`, `#setConstraint(int)`, `#addDataChangedListener(DataChangedListener)`,
+/// `#addActionListener(ActionListener)`, `#setSingleLineTextArea(boolean)`) and implements the same
+/// `TextHolder` and `ActionSource` interfaces those components do, so code written against those
+/// interfaces (validators, form binding, generic listeners) works unchanged. It also offers the same
+/// constructor families: the `TextField`-style constructors create single-line fields while the
+/// `TextArea`-style `(rows, columns)` constructors create multi-line editors, making the single- vs
+/// multi-line choice explicit at construction. It is still a distinct class -- not assignable to
+/// `TextField` / `TextArea` -- so switching to the pure engine is always a deliberate, opt-in choice.
+///
+/// ```java
+/// // single line, like TextField
+/// EditField name = new EditField(&quot;&quot;, &quot;Name&quot;, TextArea.EMAILADDR);
+/// name.addActionListener(e -&gt; submit(name.getText()));
+/// form.add(name);
+///
+/// // multi line, like TextArea
+/// EditField notes = new EditField(5, 30);
+/// form.add(notes);
+/// ```
+public class EditField extends EditorView implements EditorHost, TextHolder, ActionSource {
+<span class="fc" id="L68">    private String hint = &quot;&quot;;</span>
+<span class="fc" id="L69">    private boolean singleLine = true;</span>
+<span class="fc" id="L70">    private int rows = 1;</span>
+<span class="fc" id="L71">    private int columns = 20;</span>
+<span class="fc" id="L72">    private int constraint = TextArea.ANY;</span>
+<span class="fc" id="L73">    private int actionType = TextInputConfig.ACTION_DONE;</span>
+<span class="fc" id="L74">    private final EventDispatcher dataListeners = new EventDispatcher();</span>
+<span class="fc" id="L75">    private final EventDispatcher actionListeners = new EventDispatcher();</span>
+
+    /// Creates an empty single-line field.
+    public EditField() {
+<span class="nc" id="L79">        this(&quot;&quot;);</span>
+<span class="nc" id="L80">    }</span>
+
+    /// Creates an empty single-line field with the given visible column count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of visible columns used to compute the preferred width
+    public EditField(int columns) {
+<span class="nc" id="L88">        this(&quot;&quot;);</span>
+<span class="nc" id="L89">        setColumns(columns);</span>
+<span class="nc" id="L90">    }</span>
+
+    /// Creates a single-line field with the given initial text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    public EditField(String text) {
+<span class="fc" id="L98">        super(null, false);</span>
+<span class="fc" id="L99">        setEditorHost(this);</span>
+<span class="fc" id="L100">        setUIID(&quot;TextField&quot;);</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        if (text != null &amp;&amp; text.length() &gt; 0) {</span>
+<span class="fc" id="L102">            setText(text);</span>
+        }
+<span class="fc" id="L104">    }</span>
+
+    /// Creates a single-line field with the given text and visible column count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `columns`: the number of visible columns
+    public EditField(String text, int columns) {
+<span class="nc" id="L114">        this(text);</span>
+<span class="nc" id="L115">        setColumns(columns);</span>
+<span class="nc" id="L116">    }</span>
+
+    /// Creates a single-line field with the given text and hint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `hint`: the placeholder shown while empty
+    public EditField(String text, String hint) {
+<span class="nc" id="L126">        this(text);</span>
+<span class="nc" id="L127">        setHint(hint);</span>
+<span class="nc" id="L128">    }</span>
+
+    /// Creates a single-line field with the given text, hint and constraint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `hint`: the placeholder shown while empty
+    ///
+    /// - `constraint`: one of the `TextArea` constraint constants (e.g. `TextArea#EMAILADDR`)
+    public EditField(String text, String hint, int constraint) {
+<span class="fc" id="L140">        this(text);</span>
+<span class="fc" id="L141">        setHint(hint);</span>
+<span class="fc" id="L142">        setConstraint(constraint);</span>
+<span class="fc" id="L143">    }</span>
+
+    /// Creates a single-line field with the given text, hint, visible column count and constraint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `hint`: the placeholder shown while empty
+    ///
+    /// - `columns`: the number of visible columns
+    ///
+    /// - `constraint`: one of the `TextArea` constraint constants (e.g. `TextArea#EMAILADDR`)
+    public EditField(String text, String hint, int columns, int constraint) {
+<span class="fc" id="L157">        this(text);</span>
+<span class="fc" id="L158">        setHint(hint);</span>
+<span class="fc" id="L159">        setColumns(columns);</span>
+<span class="fc" id="L160">        setConstraint(constraint);</span>
+<span class="fc" id="L161">    }</span>
+
+    /// Creates an empty multi-line field with the given visible row and column counts (the `TextArea`
+    /// equivalent). Using this constructor sets the field to multi-line mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the number of visible rows used to compute the preferred height
+    ///
+    /// - `columns`: the number of visible columns
+    public EditField(int rows, int columns) {
+<span class="fc" id="L172">        this(&quot;&quot;);</span>
+<span class="fc" id="L173">        setSingleLineTextArea(false);</span>
+<span class="fc" id="L174">        setRows(rows);</span>
+<span class="fc" id="L175">        setColumns(columns);</span>
+<span class="fc" id="L176">    }</span>
+
+    /// Creates a multi-line field with the given text, visible row and column counts (the `TextArea`
+    /// equivalent). Using this constructor sets the field to multi-line mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `rows`: the number of visible rows
+    ///
+    /// - `columns`: the number of visible columns
+    public EditField(String text, int rows, int columns) {
+<span class="nc" id="L189">        this(text);</span>
+<span class="nc" id="L190">        setSingleLineTextArea(false);</span>
+<span class="nc" id="L191">        setRows(rows);</span>
+<span class="nc" id="L192">        setColumns(columns);</span>
+<span class="nc" id="L193">    }</span>
+
+    /// Creates a multi-line field with the given text, visible row and column counts and constraint
+    /// (the `TextArea` equivalent). Using this constructor sets the field to multi-line mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `rows`: the number of visible rows
+    ///
+    /// - `columns`: the number of visible columns
+    ///
+    /// - `constraint`: one of the `TextArea` constraint constants
+    public EditField(String text, int rows, int columns, int constraint) {
+<span class="nc" id="L208">        this(text);</span>
+<span class="nc" id="L209">        setSingleLineTextArea(false);</span>
+<span class="nc" id="L210">        setRows(rows);</span>
+<span class="nc" id="L211">        setColumns(columns);</span>
+<span class="nc" id="L212">        setConstraint(constraint);</span>
+<span class="nc" id="L213">    }</span>
+
+    // ---- EditorHost bridge to the platform text-input SPI ----
+
+    @Override
+    public boolean isTextInputSupported() {
+<span class="fc" id="L219">        return Display.impl.isTextInputSupported();</span>
+    }
+
+    @Override
+    public Object startTextInput(TextInputClient client, TextInputConfig config) {
+<span class="fc" id="L224">        return Display.impl.startTextInput(client, config);</span>
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, TextInputState state) {
+<span class="nc" id="L229">        Display.impl.updateTextInputState(handle, state);</span>
+<span class="nc" id="L230">    }</span>
+
+    @Override
+    public void stopTextInput(Object handle) {
+<span class="nc" id="L234">        Display.impl.stopTextInput(handle);</span>
+<span class="nc" id="L235">    }</span>
+
+    @Override
+    public void editorChanged() {
+<span class="fc" id="L239">        dataListeners.fireDataChangeEvent(getCaretOffset(), DataChangedListener.CHANGED);</span>
+<span class="fc" id="L240">    }</span>
+
+    @Override
+    public void fireEditorEvent(String type, String value) {
+        // EditField exposes typed listeners (data change, action) rather than the semantic event
+        // channel the rich/code editors use, so there is nothing to route here.
+<span class="nc" id="L246">    }</span>
+
+    // ---- single line behavior ----
+
+    @Override
+    public TextInputConfig getConfig() {
+<span class="fc" id="L252">        TextInputConfig cfg = new TextInputConfig();</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        cfg.setMultiline(!singleLine);</span>
+<span class="fc" id="L254">        cfg.setConstraint(constraint);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (singleLine) {</span>
+<span class="fc" id="L256">            cfg.setActionType(actionType);</span>
+        }
+<span class="fc" id="L258">        return cfg;</span>
+    }
+
+    @Override
+    public void onEditorAction(int action) {
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (singleLine) {</span>
+<span class="fc" id="L264">            fireAction();</span>
+<span class="fc" id="L265">            return;</span>
+        }
+<span class="nc" id="L267">        super.onEditorAction(action);</span>
+<span class="nc" id="L268">    }</span>
+
+    @Override
+    protected boolean handleTypedText(String text) {
+<span class="pc bpc" id="L272" title="2 of 8 branches missed.">        if (singleLine &amp;&amp; text != null &amp;&amp; (text.indexOf('\n') &gt;= 0 || text.indexOf('\r') &gt;= 0)) {</span>
+            // a single-line field never contains a line break: a bare newline (the return key) fires the
+            // action, a pasted multi-line value keeps only its first line
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            boolean bareNewline = text.length() == 1;</span>
+<span class="fc" id="L276">            String cleaned = stripLineBreaks(text);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (cleaned.length() &gt; 0) {</span>
+<span class="fc" id="L278">                insertText(cleaned);</span>
+            }
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (bareNewline) {</span>
+<span class="fc" id="L281">                fireAction();</span>
+            }
+<span class="fc" id="L283">            return true;</span>
+        }
+<span class="fc" id="L285">        return super.handleTypedText(text);</span>
+    }
+
+    private static String stripLineBreaks(String text) {
+<span class="fc" id="L289">        StringBuilder sb = new StringBuilder(text.length());</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L291">            char c = text.charAt(i);</span>
+<span class="pc bpc" id="L292" title="1 of 4 branches missed.">            if (c != '\n' &amp;&amp; c != '\r') {</span>
+<span class="fc" id="L293">                sb.append(c);</span>
+            }
+        }
+<span class="fc" id="L296">        return sb.toString();</span>
+    }
+
+    // ---- TextField-like API ----
+
+    /// Sets the placeholder text shown while the field is empty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: the placeholder, or null / empty for none
+    public EditField setHint(String hint) {
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        this.hint = hint == null ? &quot;&quot; : hint;</span>
+<span class="fc" id="L308">        repaint();</span>
+<span class="fc" id="L309">        return this;</span>
+    }
+
+    /// Returns the placeholder text.
+    @Override
+    public String getHint() {
+<span class="fc" id="L315">        return hint;</span>
+    }
+
+    /// True for a single-line field (the default). A single-line field fires its action listeners on the
+    /// return key instead of inserting a line break.
+    public boolean isSingleLineTextArea() {
+<span class="fc" id="L321">        return singleLine;</span>
+    }
+
+    /// Sets whether this is a single-line field. Passing false makes it a multi-line editor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `singleLine`: true for a single line, false for multi-line
+    public void setSingleLineTextArea(boolean singleLine) {
+<span class="fc" id="L330">        this.singleLine = singleLine;</span>
+<span class="pc bpc" id="L331" title="3 of 4 branches missed.">        if (singleLine &amp;&amp; rows &gt; 1) {</span>
+<span class="nc" id="L332">            rows = 1;</span>
+        }
+<span class="fc" id="L334">    }</span>
+
+    /// Sets the input constraint (one of the `TextArea` constraint constants) that hints the platform
+    /// keyboard (e.g. email, numeric, URL).
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: a `TextArea` constraint constant
+    public void setConstraint(int constraint) {
+<span class="fc" id="L343">        this.constraint = constraint;</span>
+<span class="fc" id="L344">    }</span>
+
+    /// Returns the input constraint.
+    public int getConstraint() {
+<span class="fc" id="L348">        return constraint;</span>
+    }
+
+    /// Sets the soft-keyboard action button for a single-line field (one of the
+    /// `TextInputConfig#ACTION_DONE` family).
+    public void setActionType(int actionType) {
+<span class="nc" id="L354">        this.actionType = actionType;</span>
+<span class="nc" id="L355">    }</span>
+
+    /// Sets the number of visible rows used to compute the preferred height (multi-line fields).
+    public void setRows(int rows) {
+<span class="fc" id="L359">        this.rows = Math.max(1, rows);</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        if (this.rows &gt; 1) {</span>
+<span class="fc" id="L361">            singleLine = false;</span>
+        }
+<span class="fc" id="L363">    }</span>
+
+    /// Returns the number of visible rows.
+    public int getRows() {
+<span class="fc" id="L367">        return rows;</span>
+    }
+
+    /// Sets the number of visible columns used to compute the preferred width.
+    public void setColumns(int columns) {
+<span class="fc" id="L372">        this.columns = Math.max(1, columns);</span>
+<span class="fc" id="L373">    }</span>
+
+    /// Returns the number of visible columns.
+    public int getColumns() {
+<span class="fc" id="L377">        return columns;</span>
+    }
+
+    /// Sets whether the field is editable. A non-editable field still allows selection and copying.
+    ///
+    /// #### Parameters
+    ///
+    /// - `editable`: true to allow editing
+    public void setEditable(boolean editable) {
+<span class="fc" id="L386">        setEditableState(editable);</span>
+<span class="fc" id="L387">    }</span>
+
+    /// Returns whether the field is editable.
+    @Override
+    public boolean isEditable() {
+<span class="fc" id="L392">        return isEditableState();</span>
+    }
+
+    /// Adds a listener notified whenever the text changes.
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L397">        dataListeners.addListener(l);</span>
+<span class="fc" id="L398">    }</span>
+
+    /// Removes a data changed listener.
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L402">        dataListeners.removeListener(l);</span>
+<span class="nc" id="L403">    }</span>
+
+    /// Adds a listener notified when the action key (return on a single-line field) is pressed.
+    @Override
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L408">        actionListeners.addListener(l);</span>
+<span class="fc" id="L409">    }</span>
+
+    /// Removes an action listener.
+    @Override
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L414">        actionListeners.removeListener(l);</span>
+<span class="nc" id="L415">    }</span>
+
+    private void fireAction() {
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (actionListeners.hasListeners()) {</span>
+<span class="fc" id="L419">            actionListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Edit));</span>
+        }
+<span class="fc" id="L421">    }</span>
+
+    // ---- rendering / sizing ----
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L427">        super.paint(g);</span>
+<span class="pc bpc" id="L428" title="1 of 6 branches missed.">        if (hint.length() &gt; 0 &amp;&amp; getText().length() == 0 &amp;&amp; !hasFocus()) {</span>
+<span class="nc" id="L429">            paintPlaceholder(g);</span>
+        }
+<span class="fc" id="L431">    }</span>
+
+    private void paintPlaceholder(Graphics g) {
+<span class="nc" id="L434">        Style s = getStyle();</span>
+<span class="nc" id="L435">        Font f = s.getFont();</span>
+<span class="nc" id="L436">        g.setColor(hintColor(s));</span>
+<span class="nc" id="L437">        g.setFont(f);</span>
+<span class="nc" id="L438">        int x = getX() + s.getPaddingLeftNoRTL();</span>
+<span class="nc" id="L439">        int y = getY() + s.getPaddingTop();</span>
+<span class="nc" id="L440">        int baseline = getHeight() - s.getPaddingTop() - s.getPaddingBottom() - f.getHeight();</span>
+<span class="nc" id="L441">        g.drawString(hint, x, y + Math.max(0, baseline / 2));</span>
+<span class="nc" id="L442">    }</span>
+
+    private int hintColor(Style s) {
+        // a muted version of the foreground; falls back to a mid grey
+<span class="nc" id="L446">        int fg = s.getFgColor();</span>
+<span class="nc" id="L447">        int r = (fg &gt;&gt; 16) &amp; 0xff;</span>
+<span class="nc" id="L448">        int gg = (fg &gt;&gt; 8) &amp; 0xff;</span>
+<span class="nc" id="L449">        int b = fg &amp; 0xff;</span>
+<span class="nc" id="L450">        r = (r + 0x80) / 2;</span>
+<span class="nc" id="L451">        gg = (gg + 0x80) / 2;</span>
+<span class="nc" id="L452">        b = (b + 0x80) / 2;</span>
+<span class="nc" id="L453">        return (r &lt;&lt; 16) | (gg &lt;&lt; 8) | b;</span>
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="nc" id="L458">        Style s = getStyle();</span>
+<span class="nc" id="L459">        Font f = s.getFont();</span>
+<span class="nc" id="L460">        int w = columns * f.charWidth('m') + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL();</span>
+<span class="nc" id="L461">        int lineHeight = getLineHeight();</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        int visibleRows = singleLine ? 1 : Math.max(1, rows);</span>
+<span class="nc" id="L463">        int h = visibleRows * lineHeight + s.getPaddingTop() + s.getPaddingBottom();</span>
+<span class="nc" id="L464">        return new Dimension(w, h);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

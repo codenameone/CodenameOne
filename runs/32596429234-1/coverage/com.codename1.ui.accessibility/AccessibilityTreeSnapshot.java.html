@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessibilityTreeSnapshot.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.accessibility</a> &gt; <span class="el_source">AccessibilityTreeSnapshot.java</span></div><h1>AccessibilityTreeSnapshot.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.accessibility;
+
+import com.codename1.ui.geom.Rectangle;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Immutable accessibility tree for the current form.
+public final class AccessibilityTreeSnapshot {
+    private final long generation;
+    private final List&lt;Long&gt; rootIds;
+    private final Map&lt;Long, AccessibilityNodeSnapshot&gt; nodes;
+
+<span class="fc" id="L38">    AccessibilityTreeSnapshot(long generation, List&lt;Long&gt; rootIds, Map&lt;Long, AccessibilityNodeSnapshot&gt; nodes) {</span>
+<span class="fc" id="L39">        this.generation = generation;</span>
+<span class="fc" id="L40">        this.rootIds = Collections.unmodifiableList(new ArrayList&lt;Long&gt;(rootIds));</span>
+<span class="fc" id="L41">        this.nodes = Collections.unmodifiableMap(new LinkedHashMap&lt;Long, AccessibilityNodeSnapshot&gt;(nodes));</span>
+<span class="fc" id="L42">    }</span>
+
+    public long getGeneration() {
+<span class="nc" id="L45">        return generation;</span>
+    }
+    public List&lt;Long&gt; getRootIds() {
+<span class="fc" id="L48">        return rootIds;</span>
+    }
+    public Map&lt;Long, AccessibilityNodeSnapshot&gt; getNodes() {
+<span class="fc" id="L51">        return nodes;</span>
+    }
+    public AccessibilityNodeSnapshot getNode(long id) {
+<span class="fc" id="L54">        return nodes.get(Long.valueOf(id));</span>
+    }
+
+    /// Finds a node by its application-supplied stable identifier.
+    ///
+    /// #### Parameters
+    ///
+    /// - `identifier`: identifier assigned with `AccessibilityNode#setIdentifier(String)`
+    ///
+    /// #### Returns
+    ///
+    /// the matching node, or null when no node has that identifier.
+    public AccessibilityNodeSnapshot getNodeByIdentifier(String identifier) {
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (identifier == null) {</span>
+<span class="nc" id="L68">            return null;</span>
+        }
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        for (AccessibilityNodeSnapshot node : nodes.values()) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (identifier.equals(node.getIdentifier())) {</span>
+<span class="fc" id="L72">                return node;</span>
+            }
+<span class="fc" id="L74">        }</span>
+<span class="nc" id="L75">        return null;</span>
+    }
+
+    /// Returns the deepest semantic node containing the screen coordinate.
+    public AccessibilityNodeSnapshot getNodeAt(int x, int y) {
+<span class="nc" id="L80">        AccessibilityNodeSnapshot best = null;</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        for (AccessibilityNodeSnapshot node : nodes.values()) {</span>
+<span class="nc" id="L82">            Rectangle r = node.getBounds();</span>
+<span class="nc bnc" id="L83" title="All 6 branches missed.">            if (r.getWidth() &gt; 0 &amp;&amp; r.getHeight() &gt; 0 &amp;&amp; r.contains(x, y)) {</span>
+<span class="nc bnc" id="L84" title="All 4 branches missed.">                if (best == null || isDescendant(node, best)) {</span>
+<span class="nc" id="L85">                    best = node;</span>
+                }
+            }
+<span class="nc" id="L88">        }</span>
+<span class="nc" id="L89">        return best;</span>
+    }
+
+    private boolean isDescendant(AccessibilityNodeSnapshot possibleChild, AccessibilityNodeSnapshot possibleParent) {
+<span class="nc" id="L93">        long parent = possibleChild.getParentId();</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        while (parent &gt;= 0) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (parent == possibleParent.getId()) {</span>
+<span class="nc" id="L96">                return true;</span>
+            }
+<span class="nc" id="L98">            AccessibilityNodeSnapshot node = getNode(parent);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (node == null) {</span>
+<span class="nc" id="L100">                return false;</span>
+            }
+<span class="nc" id="L102">            parent = node.getParentId();</span>
+<span class="nc" id="L103">        }</span>
+<span class="nc" id="L104">        return false;</span>
+    }
+
+    public String toJson() {
+<span class="fc" id="L108">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L109">        out.append(&quot;{\&quot;generation\&quot;:&quot;).append(generation).append(&quot;,\&quot;roots\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (int i = 0; i &lt; rootIds.size(); i++) {</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L112">                out.append(',');</span>
+            }
+<span class="fc" id="L114">            out.append(rootIds.get(i));</span>
+        }
+<span class="fc" id="L116">        out.append(&quot;],\&quot;nodes\&quot;:[&quot;);</span>
+<span class="fc" id="L117">        boolean firstNode = true;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (AccessibilityNodeSnapshot node : nodes.values()) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (!firstNode) {</span>
+<span class="fc" id="L120">                out.append(',');</span>
+            }
+<span class="fc" id="L122">            firstNode = false;</span>
+<span class="fc" id="L123">            out.append('{');</span>
+<span class="fc" id="L124">            out.append(&quot;\&quot;id\&quot;:&quot;).append(node.getId());</span>
+<span class="fc" id="L125">            out.append(&quot;,\&quot;parent\&quot;:&quot;).append(node.getParentId());</span>
+<span class="fc" id="L126">            out.append(&quot;,\&quot;role\&quot;:&quot;);</span>
+<span class="fc" id="L127">            appendJson(out, node.getRole().name());</span>
+<span class="fc" id="L128">            out.append(&quot;,\&quot;label\&quot;:&quot;);</span>
+<span class="fc" id="L129">            appendJson(out, node.getLabel());</span>
+<span class="fc" id="L130">            out.append(&quot;,\&quot;value\&quot;:&quot;);</span>
+<span class="fc" id="L131">            appendJson(out, node.getValue());</span>
+<span class="fc" id="L132">            out.append(&quot;,\&quot;hint\&quot;:&quot;);</span>
+<span class="fc" id="L133">            appendJson(out, node.getHint());</span>
+<span class="fc" id="L134">            out.append(&quot;,\&quot;description\&quot;:&quot;);</span>
+<span class="fc" id="L135">            appendJson(out, node.getDescription());</span>
+<span class="fc" id="L136">            out.append(&quot;,\&quot;error\&quot;:&quot;);</span>
+<span class="fc" id="L137">            appendJson(out, node.getValidationError());</span>
+<span class="fc" id="L138">            out.append(&quot;,\&quot;paneTitle\&quot;:&quot;);</span>
+<span class="fc" id="L139">            appendJson(out, node.getPaneTitle());</span>
+<span class="fc" id="L140">            out.append(&quot;,\&quot;identifier\&quot;:&quot;);</span>
+<span class="fc" id="L141">            appendJson(out, node.getIdentifier());</span>
+<span class="fc" id="L142">            out.append(&quot;,\&quot;roleDescription\&quot;:&quot;);</span>
+<span class="fc" id="L143">            appendJson(out, node.getRoleDescription());</span>
+<span class="fc" id="L144">            out.append(&quot;,\&quot;checked\&quot;:&quot;);</span>
+<span class="fc" id="L145">            appendJson(out, node.getChecked().name());</span>
+<span class="fc" id="L146">            out.append(&quot;,\&quot;liveRegion\&quot;:&quot;);</span>
+<span class="fc" id="L147">            appendJson(out, node.getLiveRegion().name());</span>
+<span class="fc" id="L148">            out.append(&quot;,\&quot;selected\&quot;:&quot;);</span>
+<span class="fc" id="L149">            appendBoolean(out, node.getSelected());</span>
+<span class="fc" id="L150">            out.append(&quot;,\&quot;expanded\&quot;:&quot;);</span>
+<span class="fc" id="L151">            appendBoolean(out, node.getExpanded());</span>
+<span class="fc" id="L152">            out.append(&quot;,\&quot;enabled\&quot;:&quot;);</span>
+<span class="fc" id="L153">            appendBoolean(out, node.getEnabled());</span>
+<span class="fc" id="L154">            out.append(&quot;,\&quot;invalid\&quot;:&quot;);</span>
+<span class="fc" id="L155">            appendBoolean(out, node.getInvalid());</span>
+<span class="fc" id="L156">            out.append(&quot;,\&quot;busy\&quot;:&quot;);</span>
+<span class="fc" id="L157">            appendBoolean(out, node.getBusy());</span>
+<span class="fc" id="L158">            out.append(&quot;,\&quot;readOnly\&quot;:&quot;);</span>
+<span class="fc" id="L159">            appendBoolean(out, node.getReadOnly());</span>
+<span class="fc" id="L160">            out.append(&quot;,\&quot;required\&quot;:&quot;);</span>
+<span class="fc" id="L161">            appendBoolean(out, node.getRequired());</span>
+<span class="fc" id="L162">            out.append(&quot;,\&quot;multiline\&quot;:&quot;);</span>
+<span class="fc" id="L163">            appendBoolean(out, node.getMultiline());</span>
+<span class="fc" id="L164">            out.append(&quot;,\&quot;obscured\&quot;:&quot;);</span>
+<span class="fc" id="L165">            appendBoolean(out, node.getObscured());</span>
+<span class="fc" id="L166">            out.append(&quot;,\&quot;pressed\&quot;:&quot;);</span>
+<span class="fc" id="L167">            appendBoolean(out, node.getPressed());</span>
+<span class="fc" id="L168">            out.append(&quot;,\&quot;current\&quot;:&quot;);</span>
+<span class="fc" id="L169">            appendBoolean(out, node.getCurrent());</span>
+<span class="fc" id="L170">            out.append(&quot;,\&quot;modal\&quot;:&quot;).append(node.isModal());</span>
+<span class="fc" id="L171">            out.append(&quot;,\&quot;focusable\&quot;:&quot;).append(node.isFocusable());</span>
+<span class="fc" id="L172">            out.append(&quot;,\&quot;focused\&quot;:&quot;).append(node.isFocused());</span>
+<span class="fc" id="L173">            out.append(&quot;,\&quot;headingLevel\&quot;:&quot;).append(node.getHeadingLevel());</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (node.getRange() != null) {</span>
+<span class="nc" id="L175">                AccessibilityRange range = node.getRange();</span>
+<span class="nc" id="L176">                out.append(&quot;,\&quot;range\&quot;:{&quot;);</span>
+<span class="nc" id="L177">                out.append(&quot;\&quot;min\&quot;:&quot;).append(range.getMinimum());</span>
+<span class="nc" id="L178">                out.append(&quot;,\&quot;max\&quot;:&quot;).append(range.getMaximum());</span>
+<span class="nc" id="L179">                out.append(&quot;,\&quot;current\&quot;:&quot;).append(range.getCurrent());</span>
+<span class="nc" id="L180">                out.append(&quot;,\&quot;step\&quot;:&quot;).append(range.getStep());</span>
+<span class="nc" id="L181">                out.append(&quot;,\&quot;text\&quot;:&quot;);</span>
+<span class="nc" id="L182">                appendJson(out, range.getText());</span>
+<span class="nc" id="L183">                out.append('}');</span>
+            }
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            if (node.getCollectionInfo() != null) {</span>
+<span class="nc" id="L186">                AccessibilityCollectionInfo collection = node.getCollectionInfo();</span>
+<span class="nc" id="L187">                out.append(&quot;,\&quot;collection\&quot;:{&quot;);</span>
+<span class="nc" id="L188">                out.append(&quot;\&quot;rows\&quot;:&quot;).append(collection.getRowCount());</span>
+<span class="nc" id="L189">                out.append(&quot;,\&quot;columns\&quot;:&quot;).append(collection.getColumnCount());</span>
+<span class="nc" id="L190">                out.append(&quot;,\&quot;hierarchical\&quot;:&quot;).append(collection.isHierarchical());</span>
+<span class="nc" id="L191">                out.append(&quot;,\&quot;selectionMode\&quot;:&quot;).append(collection.getSelectionMode()).append('}');</span>
+            }
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            if (node.getCollectionItemInfo() != null) {</span>
+<span class="nc" id="L194">                AccessibilityCollectionItemInfo item = node.getCollectionItemInfo();</span>
+<span class="nc" id="L195">                out.append(&quot;,\&quot;collectionItem\&quot;:{&quot;);</span>
+<span class="nc" id="L196">                out.append(&quot;\&quot;row\&quot;:&quot;).append(item.getRowIndex());</span>
+<span class="nc" id="L197">                out.append(&quot;,\&quot;rowSpan\&quot;:&quot;).append(item.getRowSpan());</span>
+<span class="nc" id="L198">                out.append(&quot;,\&quot;column\&quot;:&quot;).append(item.getColumnIndex());</span>
+<span class="nc" id="L199">                out.append(&quot;,\&quot;columnSpan\&quot;:&quot;).append(item.getColumnSpan());</span>
+<span class="nc" id="L200">                out.append(&quot;,\&quot;position\&quot;:&quot;).append(item.getPositionInSet());</span>
+<span class="nc" id="L201">                out.append(&quot;,\&quot;setSize\&quot;:&quot;).append(item.getSetSize());</span>
+<span class="nc" id="L202">                out.append(&quot;,\&quot;level\&quot;:&quot;).append(item.getLevel());</span>
+<span class="nc" id="L203">                out.append(&quot;,\&quot;heading\&quot;:&quot;).append(item.isHeading()).append('}');</span>
+            }
+<span class="fc" id="L205">            Rectangle bounds = node.getBounds();</span>
+<span class="fc" id="L206">            out.append(&quot;,\&quot;bounds\&quot;:[&quot;)</span>
+<span class="fc" id="L207">                    .append(bounds.getX())</span>
+<span class="fc" id="L208">                    .append(',')</span>
+<span class="fc" id="L209">                    .append(bounds.getY())</span>
+<span class="fc" id="L210">                    .append(',')</span>
+<span class="fc" id="L211">                    .append(bounds.getWidth())</span>
+<span class="fc" id="L212">                    .append(',')</span>
+<span class="fc" id="L213">                    .append(bounds.getHeight())</span>
+<span class="fc" id="L214">                    .append(']');</span>
+<span class="fc" id="L215">            out.append(&quot;,\&quot;children\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            for (int i = 0; i &lt; node.getChildIds().size(); i++) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L218">                    out.append(',');</span>
+                }
+<span class="fc" id="L220">                out.append(node.getChildIds().get(i));</span>
+            }
+<span class="fc" id="L222">            out.append(&quot;],\&quot;actions\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            for (int i = 0; i &lt; node.getActions().size(); i++) {</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L225">                    out.append(',');</span>
+                }
+<span class="fc" id="L227">                AccessibilityAction action = node.getActions().get(i);</span>
+<span class="fc" id="L228">                out.append('{').append(&quot;\&quot;id\&quot;:&quot;);</span>
+<span class="fc" id="L229">                appendJson(out, action.getId());</span>
+<span class="fc" id="L230">                out.append(&quot;,\&quot;label\&quot;:&quot;);</span>
+<span class="fc" id="L231">                appendJson(out, action.getLabel());</span>
+<span class="fc" id="L232">                out.append(&quot;,\&quot;enabled\&quot;:&quot;).append(action.isEnabled()).append('}');</span>
+            }
+<span class="fc" id="L234">            out.append(&quot;]}&quot;);</span>
+<span class="fc" id="L235">        }</span>
+<span class="fc" id="L236">        out.append(&quot;]}&quot;);</span>
+<span class="fc" id="L237">        return out.toString();</span>
+    }
+
+    private static void appendJson(StringBuilder out, String value) {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L242">            out.append(&quot;null&quot;);</span>
+<span class="fc" id="L243">            return;</span>
+        }
+<span class="fc" id="L245">        out.append('&quot;');</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L247">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L248" title="2 of 4 branches missed.">            if (c == '&quot;' || c == '\\') {</span>
+<span class="nc" id="L249">                out.append('\\');</span>
+            }
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (c == '\n') {</span>
+<span class="nc" id="L252">                out.append(&quot;\\n&quot;);</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            } else if (c == '\r') {</span>
+<span class="nc" id="L254">                out.append(&quot;\\r&quot;);</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            } else if (c == '\t') {</span>
+<span class="nc" id="L256">                out.append(&quot;\\t&quot;);</span>
+            } else {
+<span class="fc" id="L258">                out.append(c);</span>
+            }
+        }
+<span class="fc" id="L261">        out.append('&quot;');</span>
+<span class="fc" id="L262">    }</span>
+
+    private static void appendBoolean(StringBuilder out, Boolean value) {
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L266">            out.append(&quot;null&quot;);</span>
+        } else {
+<span class="fc" id="L268">            out.append(value.booleanValue());</span>
+        }
+<span class="fc" id="L270">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

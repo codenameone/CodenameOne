@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Car.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">Car.java</span></div><h1>Car.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+import com.codename1.car.spi.CarBridge;
+import com.codename1.ui.Display;
+import java.util.ArrayList;
+import java.util.List;
+
+/// The static entry point for Apple CarPlay and Google Android Auto support. Register your
+/// `CarApplication` once (typically from your app's `init()`), observe connection state, and let the
+/// framework drive the rest:
+///
+/// ```java
+/// Car.setApplication(new MyCarApplication());
+/// Car.addConnectionListener(new CarConnectionListener() {
+///     public void carConnected(CarContext ctx)   { startLocationStream(); }
+///     public void carDisconnected()              { stopLocationStream(); }
+/// });
+/// ```
+///
+/// #### How it maps to the platforms
+///
+/// CarPlay and Android Auto are template-based: they do not render Codename One `Form`s, only the
+/// fixed `CarTemplate` catalog (list / grid / pane / message / navigation / now-playing). When a
+/// head unit connects, the platform port hands the framework a `com.codename1.car.spi.CarBridge`,
+/// the framework asks your `CarApplication` for a root `CarScreen`, and renders that screen's
+/// template onto the head unit. On the simulator and unsupported ports there is no bridge, so the
+/// API is an inert no-op and [#isCarConnected()] returns false.
+///
+/// #### Zero cost when unused
+///
+/// Merely referencing this class makes the build inject the native plumbing (CarPlay scene +
+/// entitlement on iOS, the `androidx.car.app` dependency + `CarAppService` on Android). Apps that
+/// never touch `com.codename1.car` get none of it.
+public final class Car {
+    private static CarApplication application;
+    private static CarContext currentContext;
+<span class="nc" id="L59">    private static final List&lt;CarConnectionListener&gt; listeners = new ArrayList&lt;CarConnectionListener&gt;();</span>
+
+    private Car() {
+    }
+
+    /// Registers the app's in-car experience. Call once, before a head unit connects (your `init()`
+    /// is the natural place). Replacing a previously registered application is allowed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `app`: the car application, or null to clear
+    public static void setApplication(CarApplication app) {
+<span class="nc" id="L71">        application = app;</span>
+<span class="nc" id="L72">    }</span>
+
+    /// Returns the registered car application, or null if none has been set.
+    ///
+    /// #### Returns
+    ///
+    /// the registered `CarApplication`, or null
+    public static CarApplication getApplication() {
+<span class="nc" id="L80">        return application;</span>
+    }
+
+    /// Returns true while a head unit (CarPlay / Android Auto) is currently connected.
+    ///
+    /// #### Returns
+    ///
+    /// true if a car is connected
+    public static boolean isCarConnected() {
+<span class="nc" id="L89">        return Display.getInstance().isCarConnected();</span>
+    }
+
+    /// Returns the context for the currently connected head unit, or null when none is connected.
+    ///
+    /// #### Returns
+    ///
+    /// the live `CarContext`, or null
+    public static CarContext getCurrentContext() {
+<span class="nc" id="L98">        return currentContext;</span>
+    }
+
+    /// Registers a listener notified (on the EDT) when a head unit connects or disconnects.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public static void addConnectionListener(CarConnectionListener l) {
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        if (l != null &amp;&amp; !listeners.contains(l)) {</span>
+<span class="nc" id="L108">            listeners.add(l);</span>
+        }
+<span class="nc" id="L110">    }</span>
+
+    /// Removes a previously registered connection listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public static void removeConnectionListener(CarConnectionListener l) {
+<span class="nc" id="L118">        listeners.remove(l);</span>
+<span class="nc" id="L119">    }</span>
+
+    // --- platform port entry points -----------------------------------------
+
+    /// Framework/port entry point: begins an in-car session for the supplied bridge. The framework
+    /// creates a `CarContext`, asks the registered `CarApplication` for a root screen on the EDT,
+    /// renders it, and fires the connection callbacks. Called by the platform port when a head unit
+    /// connects.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bridge`: the platform rendering bridge for the connected head unit
+    ///
+    /// #### Returns
+    ///
+    /// the new `CarContext` (also retrievable via [#getCurrentContext()])
+    public static CarContext startSession(final CarBridge bridge) {
+<span class="nc" id="L136">        final CarContext ctx = new CarContext(bridge);</span>
+<span class="nc" id="L137">        currentContext = ctx;</span>
+<span class="nc" id="L138">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L141">                CarApplication app = application;</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (app == null) {</span>
+<span class="nc" id="L143">                    com.codename1.io.Log.p(&quot;Car: a head unit connected but no CarApplication was &quot;</span>
+                            + &quot;registered. Call Car.setApplication(...) from your app's init().&quot;);
+<span class="nc" id="L145">                    return;</span>
+                }
+<span class="nc" id="L147">                CarScreen root = app.onCreateRootScreen(ctx);</span>
+<span class="nc" id="L148">                ctx.setRootScreen(root);</span>
+<span class="nc" id="L149">                app.onCarConnected(ctx);</span>
+<span class="nc" id="L150">                fireConnected(ctx);</span>
+<span class="nc" id="L151">            }</span>
+        });
+<span class="nc" id="L153">        return ctx;</span>
+    }
+
+    /// Framework/port entry point: ends the current in-car session. Fires the disconnect callbacks
+    /// and tears down the screen stack. Called by the platform port when the head unit disconnects.
+    public static void endSession() {
+<span class="nc" id="L159">        final CarContext ctx = currentContext;</span>
+<span class="nc" id="L160">        currentContext = null;</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (ctx == null) {</span>
+<span class="nc" id="L162">            return;</span>
+        }
+<span class="nc" id="L164">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L167">                CarApplication app = application;</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                if (app != null) {</span>
+<span class="nc" id="L169">                    app.onCarDisconnected();</span>
+                }
+<span class="nc" id="L171">                fireDisconnected();</span>
+<span class="nc" id="L172">                ctx.destroy();</span>
+<span class="nc" id="L173">            }</span>
+        });
+<span class="nc" id="L175">    }</span>
+
+    private static void fireConnected(CarContext ctx) {
+<span class="nc" id="L178">        CarConnectionListener[] copy = listeners.toArray(new CarConnectionListener[listeners.size()]);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        for (CarConnectionListener l : copy) {</span>
+<span class="nc" id="L180">            l.carConnected(ctx);</span>
+        }
+<span class="nc" id="L182">    }</span>
+
+    private static void fireDisconnected() {
+<span class="nc" id="L185">        CarConnectionListener[] copy = listeners.toArray(new CarConnectionListener[listeners.size()]);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        for (CarConnectionListener l : copy) {</span>
+<span class="nc" id="L187">            l.carDisconnected();</span>
+        }
+<span class="nc" id="L189">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

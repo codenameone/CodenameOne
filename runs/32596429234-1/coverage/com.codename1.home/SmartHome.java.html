@@ -1,0 +1,2747 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SmartHome.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">SmartHome.java</span></div><h1>SmartHome.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+import com.codename1.home.commissioning.Commissioner;
+import com.codename1.home.commissioning.CommissioningRequest;
+import com.codename1.home.commissioning.CommissioningResult;
+import com.codename1.home.spi.HomeBridge;
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.home.CommissioningGateway;
+import com.codename1.impl.home.HomeWire;
+import com.codename1.impl.home.PendingMap;
+import com.codename1.impl.home.SubscriptionState;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+
+/// Entry point for the Codename One smart-home API -- reading the accessories
+/// in a user's home, reading and writing what they can do, watching them for
+/// change, running scenes, and adding new Matter accessories.
+///
+/// [#getInstance()] never returns `null`. On a port with no smart-home support
+/// every operation fails fast with [HomeError#NOT_SUPPORTED] and every graph
+/// accessor returns an empty list, so calling code needs no platform-specific
+/// `if`.
+///
+/// #### Quick start
+///
+/// ```java
+/// SmartHome home = SmartHome.getInstance();
+/// // refresh() connects, and connecting is what prompts. Until it has run,
+/// // getAvailability() answers NOT_STARTED on iOS -- it cannot know what the
+/// // user decided without asking the platform, and asking is the prompt.
+/// home.refresh().onResult((structures, err) -&gt; {
+///     if (err != null) {
+///         switch (home.getAvailability()) {
+///             case PERMISSION_REQUIRED:
+///                 home.requestAuthorization();
+///                 break;
+///             case PERMISSION_DENIED:
+///                 // Asked and refused. iOS never shows that prompt twice.
+///                 home.openHomeSettings();
+///                 break;
+///             case NOT_CONFIGURED:
+///                 home.openEcosystemApp();
+///                 break;
+///             default:
+///                 break;
+///         }
+///         return;
+///     }
+///     HomeStructure h = home.getPrimaryStructure();
+///     for (Accessory a : h.getAccessoriesSupporting(Trait.ON_OFF)) {
+///         addRow(a);
+///     }
+/// });
+/// ```
+///
+/// Turning a light on:
+///
+/// ```java
+/// AccessoryService svc = lamp.getPrimaryService();
+/// home.write(new TraitWrite(lamp, svc, Trait.ON_OFF, TraitValue.of(true)));
+/// ```
+///
+/// #### Three things that will surprise you
+///
+/// **Android's default answer is not &quot;available&quot;.** With no extra setup an
+/// Android app can commission a Matter accessory and do nothing else: the
+/// graph is empty and no trait can be read or written. That is
+/// [HomeAvailability#COMMISSIONING_ONLY], and it exists because reporting
+/// `AVAILABLE` would make the word mean something entirely different there
+/// than it does on iOS. The full graph needs the Google Home APIs, which need
+/// a Google Cloud project and a Home Developer Console registration only you
+/// can create; [#getConfigurationProblems()] names what is missing.
+///
+/// **Nothing wakes your app for an accessory change.** HomeKit delivers
+/// changes only while your app is in the foreground, and the Google Home APIs
+/// need a live signed-in client -- the home hub, not your app, is what reacts
+/// to a sensor while the phone sleeps. Check
+/// [TraitSubscription#isPushDelivery()] rather than assuming; where it answers
+/// `false`, changes arrive when you call [#drainChanges()] and at no other
+/// time.
+///
+/// **A missing value is not zero and not an error.** An accessory can
+/// legitimately have nothing to report -- an unmeasured temperature, a hue on
+/// a light that is currently in white mode. Ask [TraitReading#hasValue()]
+/// before [TraitReading#getValue()]; nothing in this API substitutes a zero
+/// for a measurement that was never taken.
+///
+/// #### Threading
+///
+/// Every method here may be called from the EDT and returns immediately.
+/// Every `AsyncResource` this class hands back resolves on the EDT, and every
+/// [HomeChangeListener] and [HomeStructureListener] delivery arrives on it --
+/// on every platform, including the desktop, simulator and JavaScript ports,
+/// which marshal rather than answering on whichever thread happened to ask. A
+/// callback may touch components directly.
+///
+/// #### Platform support
+///
+/// - **iOS, iPadOS, watchOS, tvOS, macOS** -- HomeKit. Needs the
+///   `com.apple.developer.homekit` entitlement and an
+///   `ios.NSHomeKitUsageDescription` build hint; the build fails with an
+///   actionable message if the description is missing. Commissioning is
+///   iOS-only.
+/// - **Android** -- Google Play services Matter commissioning, reported as
+///   [HomeAvailability#COMMISSIONING_ONLY]: an accessory can be added to the
+///   user's home, and there is no graph to read or control it through. The
+///   Google Home APIs that would provide one need a per-developer Cloud
+///   project and consent screen that cannot be shipped for you, and are not
+///   in this release.
+/// - **Simulator, desktop, JavaScript** -- a local, app-private simulated
+///   home, reported as [HomeAvailability#LOCAL_ONLY].
+///
+/// #### Not claimed in this release
+///
+/// Automations and triggers -- scenes only, and [#isAutomationSupported()]
+/// answers `false` everywhere. Topology writes: creating homes, renaming
+/// rooms, moving accessories. Cameras and video. Security and alarm panels.
+/// Matter events, which is why [LockState#JAMMED] is unreachable outside
+/// HomeKit. Energy, appliance and diagnostic clusters. And Codename One is not
+/// a Matter controller -- everything Matter goes through the OS ecosystem, so
+/// the Apple Home or Google Home app has to be installed and set up.
+public final class SmartHome {
+
+    /// The one instance. Not re-created when the bridge appears, because it
+    /// owns subscriptions and listeners that a replacement would silently
+    /// drop.
+    private static SmartHome instance;
+
+    private HomeBridge bridge;
+    private boolean bridgeResolved;
+    private boolean started;
+    /// True between calling the bridge's start() and its answer.
+    ///
+    /// Separate from `started` because the window between the two is real and
+    /// a caller can land in it: startup code and a foreground handler both
+    /// refreshing is the ordinary case, not a contrived one. Treating the
+    /// second call as &quot;already started&quot; sends it to the bridge's refresh(),
+    /// which on iOS rebuilds a snapshot of an HMHomeManager that has not
+    /// loaded yet and resolves with no homes at all.
+    private boolean starting;
+    /// The request id of the start in flight, so its answer is told apart
+    /// from an ordinary refresh's. Zero when nothing is starting.
+    private int startingRequestId;
+    /// The refreshes that arrived during that window, answered together with
+    /// the start rather than sent to a backend that is not up.
+<span class="fc" id="L176">    private final List&lt;Integer&gt; deferredGraphRequests =</span>
+            new ArrayList&lt;Integer&gt;();
+<span class="fc" id="L178">    private int nextRequestId = 1;</span>
+<span class="fc" id="L179">    private int nextSubscriptionId = 1;</span>
+
+<span class="fc" id="L181">    private final PendingMap&lt;List&lt;HomeStructure&gt;&gt; pendingGraph =</span>
+            new PendingMap&lt;List&lt;HomeStructure&gt;&gt;();
+<span class="fc" id="L183">    private final PendingMap&lt;HomeAuthorizationStatus&gt; pendingAuthorization =</span>
+            new PendingMap&lt;HomeAuthorizationStatus&gt;();
+<span class="fc" id="L185">    private final PendingMap&lt;List&lt;TraitReading&gt;&gt; pendingReads =</span>
+            new PendingMap&lt;List&lt;TraitReading&gt;&gt;();
+<span class="fc" id="L187">    private final PendingMap&lt;List&lt;TraitWriteResult&gt;&gt; pendingWrites =</span>
+            new PendingMap&lt;List&lt;TraitWriteResult&gt;&gt;();
+<span class="fc" id="L189">    private final PendingMap&lt;Scene&gt; pendingScenes =</span>
+            new PendingMap&lt;Scene&gt;();
+<span class="fc" id="L191">    private final PendingMap&lt;CommissioningResult&gt; pendingCommissioning =</span>
+            new PendingMap&lt;CommissioningResult&gt;();
+<span class="fc" id="L193">    private final PendingMap&lt;Integer&gt; pendingDrains =</span>
+            new PendingMap&lt;Integer&gt;();
+<span class="fc" id="L195">    private final PendingMap&lt;Object&gt; pendingIdentify =</span>
+            new PendingMap&lt;Object&gt;();
+
+    /// The write each read request was built from, so a reply can be matched
+    /// back to what was asked for -- the wire carries only the answers.
+<span class="fc" id="L200">    private final Map&lt;Integer, TraitReadRequest&gt; readRequests =</span>
+            new HashMap&lt;Integer, TraitReadRequest&gt;();
+<span class="fc" id="L202">    private final Map&lt;Integer, List&lt;TraitWrite&gt;&gt; writeRequests =</span>
+            new HashMap&lt;Integer, List&lt;TraitWrite&gt;&gt;();
+
+<span class="fc" id="L205">    private final Map&lt;String, SubscriptionState&gt; subscriptions =</span>
+            new HashMap&lt;String, SubscriptionState&gt;();
+<span class="fc" id="L207">    private final List&lt;HomeStructureListener&gt; structureListeners =</span>
+            new ArrayList&lt;HomeStructureListener&gt;();
+
+<span class="fc" id="L210">    private List&lt;HomeStructure&gt; structures = Collections.emptyList();</span>
+    private final Commissioner commissioner;
+
+<span class="fc" id="L213">    private SmartHome() {</span>
+<span class="fc" id="L214">        commissioner = new Commissioner(new Gateway());</span>
+<span class="fc" id="L215">    }</span>
+
+    /// The smart-home API for this device.
+    ///
+    /// Never `null`. On a port with no support the returned instance answers
+    /// [HomeAvailability#NOT_SUPPORTED] and every operation fails fast, so
+    /// there is nothing to null-check and no platform branch to write.
+    ///
+    /// #### Returns
+    ///
+    /// the instance, never `null`
+    public static synchronized SmartHome getInstance() {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (instance == null) {</span>
+<span class="nc" id="L228">            instance = new SmartHome();</span>
+        }
+<span class="fc" id="L230">        return instance;</span>
+    }
+
+    /// Replaces the singleton with one wired to the supplied bridge, for
+    /// tests.
+    ///
+    /// Package-private, so only this package's tests can reach it -- the same
+    /// arrangement `com.codename1.maps.spi.MapProviderRegistry` uses for the
+    /// same reason. Global state that a test suite shares is otherwise
+    /// order-dependent: a test that runs after one which resolved a bridge
+    /// sees that bridge, and the failure looks like a bug in whichever test
+    /// happened to run second.
+    ///
+    /// Passing `null` gives a bridgeless instance without waiting for
+    /// `Display` to be absent, which is what the degradation tests need.
+    ///
+    /// #### Parameters
+    ///
+    /// - `testBridge`: the bridge to install, or `null` for none
+    static synchronized void resetForTest(HomeBridge testBridge) {
+<span class="fc" id="L250">        SmartHome replacement = new SmartHome();</span>
+<span class="fc" id="L251">        replacement.installBridge(testBridge);</span>
+<span class="fc" id="L252">        instance = replacement;</span>
+<span class="fc" id="L253">    }</span>
+
+    /// Holds the instance monitor, not the class one.
+    ///
+    /// `resetForTest` is `static synchronized`, which locks the class -- a
+    /// different monitor from the one [#bridge()] uses, so assigning the
+    /// fields there directly left them written under one lock and read under
+    /// another.
+    private synchronized void installBridge(HomeBridge testBridge) {
+<span class="fc" id="L262">        this.bridge = testBridge;</span>
+<span class="fc" id="L263">        this.bridgeResolved = true;</span>
+<span class="fc" id="L264">    }</span>
+
+    /// Resolved on first use rather than in the constructor.
+    ///
+    /// A static initializer or a constructor lookup would run before
+    /// `Display.init`, find no bridge, and cache that answer for the life of
+    /// the process -- so an app that touched this class early would report
+    /// no smart-home support on a phone that has it.
+    private synchronized HomeBridge bridge() {
+<span class="pc bpc" id="L273" title="3 of 4 branches missed.">        if (!bridgeResolved &amp;&amp; Display.isInitialized()) {</span>
+<span class="nc" id="L274">            bridge = Display.getInstance().getHomeBridge();</span>
+<span class="nc" id="L275">            bridgeResolved = true;</span>
+        }
+<span class="fc" id="L277">        return bridge;</span>
+    }
+
+    private synchronized int nextRequestId() {
+<span class="fc" id="L281">        int id = nextRequestId++;</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (nextRequestId &lt;= 0) {</span>
+            // Zero is reserved for unsolicited deliveries, so the wrap goes
+            // back to one rather than to zero.
+<span class="nc" id="L285">            nextRequestId = 1;</span>
+        }
+<span class="fc" id="L287">        return id;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // capability
+    // ------------------------------------------------------------------
+
+    /// Whether this device has any smart-home support at all.
+    ///
+    /// A coarse question. [#getAvailability()] is the one worth asking,
+    /// because &quot;supported&quot; covers a device whose user has never opened the
+    /// Home app and one whose every light is ready to switch.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a backend is present
+    public boolean isSupported() {
+<span class="fc" id="L304">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">        return b != null &amp;&amp; b.isSupported();</span>
+    }
+
+    /// Whether a home graph is usable right now, and when it is not, why.
+    ///
+    /// Check this before anything else, and branch through it rather than
+    /// through platform detection.
+    ///
+    /// #### Returns
+    ///
+    /// the availability, never `null`
+    public HomeAvailability getAvailability() {
+<span class="fc" id="L317">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L318" title="1 of 4 branches missed.">        if (b == null || !b.isSupported()) {</span>
+<span class="fc" id="L319">            return HomeAvailability.NOT_SUPPORTED;</span>
+        }
+<span class="fc" id="L321">        HomeAvailability[] all = HomeAvailability.values();</span>
+<span class="fc" id="L322">        int ordinal = b.getAvailability();</span>
+<span class="pc bpc" id="L323" title="2 of 4 branches missed.">        if (ordinal &lt; 0 || ordinal &gt;= all.length) {</span>
+<span class="nc" id="L324">            return HomeAvailability.NOT_SUPPORTED;</span>
+        }
+<span class="fc" id="L326">        return all[ordinal];</span>
+    }
+
+    /// Which platform service is behind this instance.
+    ///
+    /// For explaining a limitation to a user, not for branching on -- every
+    /// real capability question has its own query. See [HomeBackend].
+    ///
+    /// #### Returns
+    ///
+    /// the backend, never `null`
+    public HomeBackend getBackend() {
+<span class="fc" id="L338">        HomeBridge b = bridge();</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L340">            return HomeBackend.NONE;</span>
+        }
+<span class="fc" id="L342">        String id = b.getBackendId();</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (&quot;homekit&quot;.equals(id)) {</span>
+<span class="nc" id="L344">            return HomeBackend.HOMEKIT;</span>
+        }
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (&quot;google_home&quot;.equals(id)) {</span>
+<span class="nc" id="L347">            return HomeBackend.GOOGLE_HOME;</span>
+        }
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        if (&quot;matter_only&quot;.equals(id)) {</span>
+<span class="nc" id="L350">            return HomeBackend.MATTER_COMMISSIONING_ONLY;</span>
+        }
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">        if (&quot;local&quot;.equals(id)) {</span>
+<span class="fc" id="L353">            return HomeBackend.LOCAL;</span>
+        }
+<span class="nc" id="L355">        return HomeBackend.NONE;</span>
+    }
+
+    /// Build configuration this backend needs and does not have.
+    ///
+    /// One sentence per problem, each naming the build hint that fixes it --
+    /// a missing `ios.NSHomeKitUsageDescription`, a missing
+    /// `android.googleHome.projectId`. Empty when nothing is missing.
+    ///
+    /// **This text is for you, not for your user.** Nothing here can be fixed
+    /// at runtime; it is a description of what the build left out. Log it,
+    /// show it in a debug screen, and do not put it in front of someone
+    /// holding a phone.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list, possibly empty
+    public List&lt;String&gt; getConfigurationProblems() {
+<span class="fc" id="L373">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="fc" id="L375">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L377">        String[] problems = b.getConfigurationProblems();</span>
+<span class="nc bnc" id="L378" title="All 4 branches missed.">        if (problems == null || problems.length == 0) {</span>
+<span class="nc" id="L379">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L381">        List&lt;String&gt; out = new ArrayList&lt;String&gt;(problems.length);</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        for (String problem : problems) {</span>
+<span class="nc bnc" id="L383" title="All 4 branches missed.">            if (problem != null &amp;&amp; problem.length() &gt; 0) {</span>
+<span class="nc" id="L384">                out.add(problem);</span>
+            }
+        }
+<span class="nc" id="L387">        return Collections.unmodifiableList(out);</span>
+    }
+
+    /// Whether accessory and structure identifiers survive an app restart.
+    ///
+    /// Both shipping backends answer `true`, so a favourite can be persisted
+    /// by id. Ask before doing so anyway -- a local or test backend that
+    /// regenerates its graph does not, and a favourites list that silently
+    /// empties on every launch is a confusing bug to trace.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when identifiers are stable across launches
+    public boolean areIdsPersistent() {
+<span class="fc" id="L401">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L402" title="3 of 4 branches missed.">        return b != null &amp;&amp; b.areIdsPersistent();</span>
+    }
+
+    /// Whether this release can create or run automations -- a scene plus a
+    /// trigger.
+    ///
+    /// **Always `false`.** HomeKit, Google Home and Matter model triggers in
+    /// three incompatible ways and Matter has none at all, so there is no
+    /// honest common shape to expose. Scenes work everywhere; see
+    /// [#executeScene(Scene)].
+    ///
+    /// The method exists rather than the capability being absent silently, so
+    /// an app can say why the feature it wanted is not offered.
+    ///
+    /// #### Returns
+    ///
+    /// `false`
+    public boolean isAutomationSupported() {
+<span class="fc" id="L420">        return false;</span>
+    }
+
+    /// Adding new Matter accessories.
+    ///
+    /// Never `null`; ask [Commissioner#isSupported()] before offering an &quot;add
+    /// a device&quot; button.
+    ///
+    /// #### Returns
+    ///
+    /// the commissioner, never `null`
+    public Commissioner getCommissioner() {
+<span class="fc" id="L432">        return commissioner;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // authorization
+    // ------------------------------------------------------------------
+
+    /// Whether the user has granted this app access to their home.
+    ///
+    /// #### Returns
+    ///
+    /// the status, never `null`
+    public HomeAuthorizationStatus getAuthorizationStatus() {
+<span class="fc" id="L445">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="fc" id="L447">            return HomeAuthorizationStatus.UNKNOWN;</span>
+        }
+<span class="nc" id="L449">        HomeAuthorizationStatus[] all = HomeAuthorizationStatus.values();</span>
+<span class="nc" id="L450">        int ordinal = b.getAuthorizationStatus();</span>
+<span class="nc bnc" id="L451" title="All 4 branches missed.">        if (ordinal &lt; 0 || ordinal &gt;= all.length) {</span>
+<span class="nc" id="L452">            return HomeAuthorizationStatus.UNKNOWN;</span>
+        }
+<span class="nc" id="L454">        return all[ordinal];</span>
+    }
+
+    /// Prompts the user for access to their home.
+    ///
+    /// Resolves when the platform's flow finishes, **whatever the user
+    /// chose** -- so a resolved result means they were asked, not that they
+    /// agreed. Read the status it carries.
+    ///
+    /// #### Returns
+    ///
+    /// the resulting status, delivered on the EDT
+    public AsyncResource&lt;HomeAuthorizationStatus&gt; requestAuthorization() {
+<span class="fc" id="L467">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="fc" id="L469">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+<span class="nc" id="L472">        int id = nextRequestId();</span>
+<span class="nc" id="L473">        EdtResult&lt;HomeAuthorizationStatus&gt; result =</span>
+<span class="nc" id="L474">                pendingAuthorization.open(id);</span>
+<span class="nc" id="L475">        b.requestAuthorization(id);</span>
+<span class="nc" id="L476">        return result;</span>
+    }
+
+    /// Opens the system settings page where the user can change this app's
+    /// smart-home access.
+    ///
+    /// The only recovery from [HomeAuthorizationStatus#DENIED]: once the user
+    /// has said no, the platform will not ask again from inside the app.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when something was opened
+    public boolean openHomeSettings() {
+<span class="fc" id="L489">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L490" title="3 of 4 branches missed.">        return b != null &amp;&amp; b.openHomeSettings();</span>
+    }
+
+    /// Opens the platform's ecosystem app -- Apple Home, Google Home.
+    ///
+    /// The right answer to [HomeAvailability#NOT_CONFIGURED]: a user with no
+    /// homes has to create one somewhere, and it is not here.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the app was opened; `false` when it is not installed
+    public boolean openEcosystemApp() {
+<span class="fc" id="L502">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L503" title="3 of 4 branches missed.">        return b != null &amp;&amp; b.openEcosystemApp();</span>
+    }
+
+    /// Opens wherever the user installs or updates the backend's provider.
+    ///
+    /// The recovery from [HomeAvailability#PROVIDER_NOT_INSTALLED] and
+    /// [HomeAvailability#PROVIDER_UPDATE_REQUIRED].
+    ///
+    /// #### Returns
+    ///
+    /// `true` when something was opened
+    public boolean openProviderSetup() {
+<span class="fc" id="L515">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L516" title="3 of 4 branches missed.">        return b != null &amp;&amp; b.openProviderSetup();</span>
+    }
+
+    // ------------------------------------------------------------------
+    // graph
+    // ------------------------------------------------------------------
+
+    /// Loads the home graph from the platform.
+    ///
+    /// Call this once before reading [#getStructures()], and again whenever a
+    /// [HomeStructureListener] says the topology moved. It connects to the
+    /// backend on first use, so it is also what triggers a permission prompt
+    /// on a platform that defers one.
+    ///
+    /// #### Returns
+    ///
+    /// the homes, delivered on the EDT
+    public AsyncResource&lt;List&lt;HomeStructure&gt;&gt; refresh() {
+<span class="fc" id="L534">        HomeBridge b = bridge();</span>
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L536">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+<span class="fc" id="L539">        int id = nextRequestId();</span>
+<span class="fc" id="L540">        EdtResult&lt;List&lt;HomeStructure&gt;&gt; result = pendingGraph.open(id);</span>
+<span class="fc" id="L541">        boolean needsStart = false;</span>
+<span class="fc" id="L542">        boolean deferred = false;</span>
+<span class="fc" id="L543">        synchronized (this) {</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">            if (starting) {</span>
+<span class="fc" id="L545">                deferredGraphRequests.add(Integer.valueOf(id));</span>
+<span class="fc" id="L546">                deferred = true;</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            } else if (!started) {</span>
+<span class="fc" id="L548">                starting = true;</span>
+<span class="fc" id="L549">                startingRequestId = id;</span>
+<span class="fc" id="L550">                needsStart = true;</span>
+            }
+<span class="fc" id="L552">        }</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">        if (needsStart) {</span>
+<span class="fc" id="L554">            b.start(id);</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">        } else if (!deferred) {</span>
+<span class="fc" id="L556">            b.refresh(id);</span>
+        }
+<span class="fc" id="L558">        return result;</span>
+    }
+
+    /// The homes, as of the last [#refresh()].
+    ///
+    /// Empty until a refresh has completed -- this reads a cached snapshot and
+    /// never calls into the platform, so it cannot block and cannot fail. See
+    /// [Accessory] for why the graph is snapshots rather than live handles.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list, possibly empty
+    public List&lt;HomeStructure&gt; getStructures() {
+<span class="fc" id="L571">        synchronized (this) {</span>
+<span class="fc" id="L572">            return structures;</span>
+        }
+    }
+
+    /// The user's default home, as of the last [#refresh()].
+    ///
+    /// The one their ecosystem app opens. An app that only ever wants one home
+    /// should use this rather than the first entry of [#getStructures()],
+    /// which is in whatever order the platform gave them.
+    ///
+    /// #### Returns
+    ///
+    /// the primary home, the first home when none is marked primary, or
+    /// `null` when there are none
+    public HomeStructure getPrimaryStructure() {
+<span class="fc" id="L587">        List&lt;HomeStructure&gt; all = getStructures();</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">        for (HomeStructure structure : all) {</span>
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">            if (structure.isPrimary()) {</span>
+<span class="fc" id="L590">                return structure;</span>
+            }
+<span class="nc" id="L592">        }</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">        return all.isEmpty() ? null : all.get(0);</span>
+    }
+
+    /// One accessory by identifier, across every home.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessoryId`: the identifier to look up, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// the accessory, or `null` when no home holds it
+    public Accessory findAccessory(String accessoryId) {
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">        if (accessoryId == null) {</span>
+<span class="nc" id="L607">            return null;</span>
+        }
+<span class="fc bfc" id="L609" title="All 2 branches covered.">        for (HomeStructure structure : getStructures()) {</span>
+<span class="fc" id="L610">            Accessory a = structure.getAccessory(accessoryId);</span>
+<span class="fc bfc" id="L611" title="All 2 branches covered.">            if (a != null) {</span>
+<span class="fc" id="L612">                return a;</span>
+            }
+<span class="fc" id="L614">        }</span>
+<span class="fc" id="L615">        return null;</span>
+    }
+
+    /// Asks an accessory to make itself known -- blink, beep, whatever it
+    /// does.
+    ///
+    /// Best-effort: mandatory in Matter and present on HomeKit, but not
+    /// reliably surfaced by the Google Home APIs, where it fails with
+    /// [HomeError#TRAIT_NOT_SUPPORTED] rather than doing nothing quietly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessory`: the accessory to identify
+    ///
+    /// #### Returns
+    ///
+    /// completion, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `accessory` is `null`
+    public AsyncResource&lt;Object&gt; identify(Accessory accessory) {
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">        if (accessory == null) {</span>
+<span class="nc" id="L638">            throw new IllegalArgumentException(&quot;accessory is required&quot;);</span>
+        }
+<span class="fc" id="L640">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L642">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+<span class="fc" id="L645">        int id = nextRequestId();</span>
+<span class="fc" id="L646">        EdtResult&lt;Object&gt; result = pendingIdentify.open(id);</span>
+        // Through the start path, like every other identifier-taking
+        // operation: on iOS the native knows no accessory at all until the
+        // home database has loaded, so an app acting on an accessory it kept
+        // -- across a stop(), or from its own storage -- was told
+        // ACCESSORY_NOT_FOUND on every cold launch for an accessory that was
+        // right there.
+<span class="fc" id="L653">        afterStart(new IssueIdentify(b, id, accessory.getId()));</span>
+<span class="fc" id="L654">        return result;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // reads
+    // ------------------------------------------------------------------
+
+    /// The largest number of traits this backend reads in one call, or zero
+    /// for no limit.
+    ///
+    /// Informational: [#read(TraitReadRequest)] splits a larger request and
+    /// recombines the answers, so there is no size a caller has to stay under.
+    ///
+    /// #### Returns
+    ///
+    /// the batch limit, or zero
+    public int getMaxReadBatchSize() {
+<span class="nc" id="L671">        HomeBridge b = bridge();</span>
+<span class="nc bnc" id="L672" title="All 2 branches missed.">        return b == null ? 0 : b.getMaxReadBatchSize();</span>
+    }
+
+    /// Reads trait values.
+    ///
+    /// One [TraitReading] per requested trait, in the order they were added.
+    /// **A partial success is the normal case**: three values and one
+    /// unreachable accessory resolve successfully, with the failure carried on
+    /// that one reading. The resource itself fails only when the request never
+    /// reached the platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: what to read
+    ///
+    /// #### Returns
+    ///
+    /// the readings, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `request` is `null`
+    public AsyncResource&lt;List&lt;TraitReading&gt;&gt; read(TraitReadRequest request) {
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L696">            throw new IllegalArgumentException(&quot;request is required&quot;);</span>
+        }
+        // Before the bridge check, deliberately. A request that asks for
+        // nothing has no platform component, so answering &quot;nothing&quot; is
+        // correct everywhere -- and a caller who built a request from a list
+        // that filtered down to empty should not get a different answer on
+        // the desktop than on a phone.
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        if (request.isEmpty()) {</span>
+<span class="fc" id="L704">            EdtResult&lt;List&lt;TraitReading&gt;&gt; empty =</span>
+                    new EdtResult&lt;List&lt;TraitReading&gt;&gt;();
+<span class="fc" id="L706">            empty.complete(Collections.&lt;TraitReading&gt;emptyList());</span>
+<span class="fc" id="L707">            return empty;</span>
+        }
+<span class="fc" id="L709">        HomeBridge b = bridge();</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L711">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+<span class="fc" id="L714">        int max = b.getMaxReadBatchSize();</span>
+<span class="fc bfc" id="L715" title="All 4 branches covered.">        if (max &gt; 0 &amp;&amp; request.size() &gt; max) {</span>
+            // The limit is the backend's, and honouring it is this class's
+            // job: a caller reading forty traits should not have to know that
+            // one platform takes thirty at a time. Split here, recombined in
+            // order below, so the answer is indistinguishable from the
+            // unsplit one.
+<span class="fc" id="L721">            return readInChunks(request, max);</span>
+        }
+<span class="fc" id="L723">        int id = nextRequestId();</span>
+<span class="fc" id="L724">        EdtResult&lt;List&lt;TraitReading&gt;&gt; result = pendingReads.open(id);</span>
+        // A snapshot, because the request is the caller's object and they are
+        // free to keep adding to it. What comes back is lined up against what
+        // went out, position by position, and the two have to be the same
+        // list for that to mean anything.
+<span class="fc" id="L729">        TraitReadRequest sent = copyOf(request);</span>
+<span class="fc" id="L730">        synchronized (this) {</span>
+<span class="fc" id="L731">            readRequests.put(Integer.valueOf(id), sent);</span>
+<span class="fc" id="L732">        }</span>
+<span class="fc" id="L733">        List&lt;String&gt; accessoryIds = sent.getAccessoryIds();</span>
+<span class="fc" id="L734">        List&lt;String&gt; serviceIds = sent.getServiceIds();</span>
+<span class="fc" id="L735">        List&lt;Trait&gt; traits = sent.getTraits();</span>
+<span class="fc" id="L736">        String[] traitIds = new String[traits.size()];</span>
+<span class="fc bfc" id="L737" title="All 2 branches covered.">        for (int i = 0; i &lt; traits.size(); i++) {</span>
+<span class="fc" id="L738">            traitIds[i] = traits.get(i).getId();</span>
+        }
+<span class="fc" id="L740">        afterStart(new IssueRead(b, id, toArray(accessoryIds),</span>
+<span class="fc" id="L741">                toArray(serviceIds), traitIds, sent.isAllowCached()));</span>
+<span class="fc" id="L742">        return result;</span>
+    }
+
+    /// Reads one trait, for the common case where a request builder would be
+    /// noise.
+    ///
+    /// Prefer [#read(TraitReadRequest)] when reading more than one: the cost
+    /// of a read is the round trip to the platform, so four separate calls are
+    /// four of them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessory`: the accessory to read
+    ///
+    /// - `service`: the service on it
+    ///
+    /// - `trait`: the trait to read
+    ///
+    /// #### Returns
+    ///
+    /// the reading, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when any argument is `null`
+    public AsyncResource&lt;TraitReading&gt; read(Accessory accessory,
+            AccessoryService service, Trait trait) {
+<span class="fc" id="L769">        final EdtResult&lt;TraitReading&gt; single = new EdtResult&lt;TraitReading&gt;();</span>
+<span class="fc" id="L770">        read(new TraitReadRequest().add(accessory, service, trait))</span>
+<span class="fc" id="L771">                .onResult(new SingleReading(single, accessory, service,</span>
+                        trait));
+<span class="fc" id="L773">        return single;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // writes
+    // ------------------------------------------------------------------
+
+    /// The largest number of traits this backend writes in one call, or zero
+    /// for no limit.
+    ///
+    /// #### Returns
+    ///
+    /// the batch limit, or zero
+    public int getMaxWriteBatchSize() {
+<span class="nc" id="L787">        HomeBridge b = bridge();</span>
+<span class="nc bnc" id="L788" title="All 2 branches missed.">        return b == null ? 0 : b.getMaxWriteBatchSize();</span>
+    }
+
+    /// Writes trait values.
+    ///
+    /// One [TraitWriteResult] per write, in order. **A partial success is the
+    /// normal case** -- &quot;turn off every light&quot; against a home with a dead bulb
+    /// mostly worked, and failing the whole operation would have the caller
+    /// retry and flicker the house. The resource itself fails only when the
+    /// request never reached the platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writes`: what to change
+    ///
+    /// #### Returns
+    ///
+    /// the outcomes, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `writes` is `null` or holds a
+    ///   `null`
+    public AsyncResource&lt;List&lt;TraitWriteResult&gt;&gt; write(
+            List&lt;TraitWrite&gt; writes) {
+<span class="pc bpc" id="L813" title="1 of 2 branches missed.">        if (writes == null) {</span>
+<span class="nc" id="L814">            throw new IllegalArgumentException(&quot;writes are required&quot;);</span>
+        }
+        // Before the bridge check, for the same reason as in read().
+<span class="fc bfc" id="L817" title="All 2 branches covered.">        if (writes.isEmpty()) {</span>
+<span class="fc" id="L818">            EdtResult&lt;List&lt;TraitWriteResult&gt;&gt; empty =</span>
+                    new EdtResult&lt;List&lt;TraitWriteResult&gt;&gt;();
+<span class="fc" id="L820">            empty.complete(Collections.&lt;TraitWriteResult&gt;emptyList());</span>
+<span class="fc" id="L821">            return empty;</span>
+        }
+<span class="fc" id="L823">        HomeBridge b = bridge();</span>
+<span class="fc bfc" id="L824" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L825">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+        // Every element checked before anything is sent, so an argument
+        // rejection cannot land halfway. Otherwise a batch of two against a
+        // backend that takes one throws on the second write's bad value only
+        // after the first has already moved a real accessory -- and the
+        // caller has an exception saying nothing happened.
+<span class="fc" id="L833">        List&lt;TraitWrite&gt; snapshot = new ArrayList&lt;TraitWrite&gt;(writes.size());</span>
+<span class="fc bfc" id="L834" title="All 2 branches covered.">        for (int i = 0; i &lt; writes.size(); i++) {</span>
+<span class="fc" id="L835">            TraitWrite w = writes.get(i);</span>
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">            if (w == null) {</span>
+<span class="nc" id="L837">                throw new IllegalArgumentException(</span>
+                        &quot;writes cannot contain a null at index &quot; + i);
+            }
+<span class="fc" id="L840">            requireEnumDomain(w.getTrait(), w.getValue(), &quot;write&quot;);</span>
+            // Throws on a cross-dimension unit, which is the other way an
+            // argument can be rejected below.
+<span class="fc" id="L843">            canonicalNumeric(w.getTrait(), w.getValue());</span>
+<span class="fc" id="L844">            snapshot.add(w);</span>
+        }
+<span class="fc" id="L846">        int maxWrites = b.getMaxWriteBatchSize();</span>
+<span class="pc bpc" id="L847" title="3 of 4 branches missed.">        if (maxWrites &gt; 0 &amp;&amp; snapshot.size() &gt; maxWrites) {</span>
+<span class="nc" id="L848">            return writeInChunks(snapshot, maxWrites);</span>
+        }
+<span class="fc" id="L850">        int count = snapshot.size();</span>
+<span class="fc" id="L851">        String[] accessoryIds = new String[count];</span>
+<span class="fc" id="L852">        String[] serviceIds = new String[count];</span>
+<span class="fc" id="L853">        String[] traitIds = new String[count];</span>
+<span class="fc" id="L854">        int[] kinds = new int[count];</span>
+<span class="fc" id="L855">        double[] numeric = new double[count];</span>
+<span class="fc" id="L856">        String[] text = new String[count];</span>
+<span class="fc" id="L857">        int[] units = new int[count];</span>
+        // Per write, not per batch: two locks in one batch can want different
+        // PINs, and a single slot would hand one of them the other's.
+<span class="fc" id="L860">        String[] authorization = new String[count];</span>
+<span class="fc" id="L861">        List&lt;TraitWrite&gt; copy = new ArrayList&lt;TraitWrite&gt;(count);</span>
+<span class="fc bfc" id="L862" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+            // Already checked and copied above.
+<span class="fc" id="L864">            TraitWrite w = snapshot.get(i);</span>
+<span class="fc" id="L865">            copy.add(w);</span>
+<span class="fc" id="L866">            TraitValue v = w.getValue();</span>
+<span class="fc" id="L867">            accessoryIds[i] = w.getAccessoryId();</span>
+<span class="fc" id="L868">            serviceIds[i] = w.getServiceId();</span>
+<span class="fc" id="L869">            traitIds[i] = w.getTrait().getId();</span>
+<span class="fc" id="L870">            kinds[i] = v.getKind().ordinal();</span>
+            // Converted to the trait's own unit here, once, rather than in
+            // each bridge. A caller is free to say
+            // TraitValue.of(68, TraitUnit.FAHRENHEIT) for a Celsius trait,
+            // and a backend that reads the number and ignores the unit --
+            // which is what HomeKit's write path does -- would then set 68
+            // degrees Celsius. The unit still travels alongside for a bridge
+            // that wants it; it is now always the canonical one.
+<span class="fc" id="L878">            numeric[i] = canonicalNumeric(w.getTrait(), v);</span>
+<span class="pc bpc" id="L879" title="1 of 2 branches missed.">            text[i] = v.getKind() == TraitValueKind.STRING ? v.getString() : &quot;&quot;;</span>
+<span class="fc" id="L880">            units[i] = canonicalUnitWireId(w.getTrait(), v);</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">            authorization[i] = w.getAuthorizationData() == null ? &quot;&quot;</span>
+<span class="fc" id="L882">                    : w.getAuthorizationData();</span>
+        }
+<span class="fc" id="L884">        int id = nextRequestId();</span>
+<span class="fc" id="L885">        EdtResult&lt;List&lt;TraitWriteResult&gt;&gt; result = pendingWrites.open(id);</span>
+<span class="fc" id="L886">        synchronized (this) {</span>
+<span class="fc" id="L887">            writeRequests.put(Integer.valueOf(id), copy);</span>
+<span class="fc" id="L888">        }</span>
+<span class="fc" id="L889">        afterStart(new IssueWrite(b, id, accessoryIds, serviceIds, traitIds,</span>
+                kinds, numeric, text, units, authorization));
+<span class="fc" id="L891">        return result;</span>
+    }
+
+    /// Writes one trait value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `write`: what to change
+    ///
+    /// #### Returns
+    ///
+    /// the outcome, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `write` is `null`
+    public AsyncResource&lt;TraitWriteResult&gt; write(TraitWrite write) {
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">        if (write == null) {</span>
+<span class="nc" id="L909">            throw new IllegalArgumentException(&quot;write is required&quot;);</span>
+        }
+<span class="fc" id="L911">        final EdtResult&lt;TraitWriteResult&gt; single =</span>
+                new EdtResult&lt;TraitWriteResult&gt;();
+<span class="fc" id="L913">        List&lt;TraitWrite&gt; one = new ArrayList&lt;TraitWrite&gt;(1);</span>
+<span class="fc" id="L914">        one.add(write);</span>
+<span class="fc" id="L915">        write(one).onResult(new SingleWriteResult(single, write));</span>
+<span class="fc" id="L916">        return single;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // subscriptions
+    // ------------------------------------------------------------------
+
+    /// Watches traits for change.
+    ///
+    /// The handle comes back immediately; the platform registration happens
+    /// behind it. **Hold on to the handle and [TraitSubscription#stop()] it**
+    /// -- a dropped subscription keeps its listener reachable and keeps the
+    /// platform delivering.
+    ///
+    /// Check [TraitSubscription#isPushDelivery()] on the result. Where it
+    /// answers `false`, which is everywhere except HomeKit in the foreground,
+    /// this listener will not fire until you call [#drainChanges()].
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: what to watch
+    ///
+    /// - `listener`: where changes are delivered, on the EDT
+    ///
+    /// #### Returns
+    ///
+    /// the subscription handle, never `null`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when either argument is `null`, or the
+    ///   request is empty
+    public TraitSubscription subscribe(SubscriptionRequest request,
+            HomeChangeListener listener) {
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L951">            throw new IllegalArgumentException(&quot;request is required&quot;);</span>
+        }
+<span class="pc bpc" id="L953" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="nc" id="L954">            throw new IllegalArgumentException(&quot;listener is required&quot;);</span>
+        }
+<span class="fc bfc" id="L956" title="All 2 branches covered.">        if (request.isEmpty()) {</span>
+<span class="fc" id="L957">            throw new IllegalArgumentException(</span>
+                    &quot;a subscription that watches nothing would never fire;&quot;
+                            + &quot; add at least one trait&quot;);
+        }
+<span class="fc" id="L961">        HomeBridge b = bridge();</span>
+        String subscriptionId;
+<span class="fc" id="L963">        synchronized (this) {</span>
+<span class="fc" id="L964">            subscriptionId = &quot;s&quot; + (nextSubscriptionId++);</span>
+<span class="fc" id="L965">        }</span>
+<span class="pc bpc" id="L966" title="1 of 4 branches missed.">        boolean push = b != null &amp;&amp; b.isPushDelivery()</span>
+<span class="pc bnc" id="L967" title="All 2 branches missed.">                &amp;&amp; allWatchedTraitsNotify(request);</span>
+<span class="fc" id="L968">        TraitSubscription handle =</span>
+                new TraitSubscription(subscriptionId, this, push);
+<span class="fc" id="L970">        SubscriptionState state = new SubscriptionState(subscriptionId,</span>
+<span class="fc" id="L971">                listener, request.getMinIntervalMillis(),</span>
+<span class="fc" id="L972">                request.isDeliverInitialValues());</span>
+<span class="fc" id="L973">        synchronized (this) {</span>
+<span class="fc" id="L974">            subscriptions.put(subscriptionId, state);</span>
+<span class="fc" id="L975">        }</span>
+<span class="fc bfc" id="L976" title="All 2 branches covered.">        if (b == null) {</span>
+            // Nothing to register against. The handle is live and inert, which
+            // is the same shape as every other unsupported answer here: the
+            // caller's teardown code still works and no null check is needed.
+<span class="fc" id="L980">            return handle;</span>
+        }
+<span class="fc" id="L982">        List&lt;String&gt; accessoryIds = request.getAccessoryIds();</span>
+<span class="fc" id="L983">        List&lt;String&gt; serviceIds = request.getServiceIds();</span>
+<span class="fc" id="L984">        List&lt;Trait&gt; traits = request.getTraits();</span>
+<span class="fc" id="L985">        String[] traitIds = new String[traits.size()];</span>
+<span class="fc bfc" id="L986" title="All 2 branches covered.">        for (int i = 0; i &lt; traits.size(); i++) {</span>
+<span class="fc" id="L987">            traitIds[i] = traits.get(i).getId();</span>
+        }
+<span class="fc" id="L989">        afterStart(new IssueSubscribe(this, b, nextRequestId(), subscriptionId,</span>
+<span class="fc" id="L990">                toArray(accessoryIds), toArray(serviceIds), traitIds));</span>
+<span class="pc bpc" id="L991" title="1 of 2 branches missed.">        if (request.isDeliverInitialValues()) {</span>
+<span class="nc" id="L992">            deliverInitialValues(state, request);</span>
+        }
+<span class="fc" id="L994">        return handle;</span>
+    }
+
+    /// Runs a platform operation once the backend is connected.
+    ///
+    /// The identifier-taking overloads of read, write and subscribe exist so
+    /// an app can act on ids it persisted, without re-fetching the graph
+    /// first -- and on iOS the native side knows no accessory at all until
+    /// the manager has loaded, so those calls answered ACCESSORY_NOT_FOUND on
+    /// every cold launch. Starting first is what makes that documented use
+    /// work.
+    ///
+    /// Already-started is the overwhelmingly common case and costs nothing:
+    /// the operation is issued inline, on the caller's thread, exactly as
+    /// before.
+    ///
+    /// #### Parameters
+    ///
+    /// - `operation`: the bridge call to issue
+    private void afterStart(Runnable operation) {
+        boolean ready;
+<span class="fc" id="L1015">        synchronized (this) {</span>
+<span class="fc" id="L1016">            ready = started;</span>
+<span class="fc" id="L1017">        }</span>
+<span class="fc bfc" id="L1018" title="All 2 branches covered.">        if (ready) {</span>
+<span class="fc" id="L1019">            operation.run();</span>
+<span class="fc" id="L1020">            return;</span>
+        }
+<span class="fc" id="L1022">        refresh().onResult(new RunAfterStart(operation));</span>
+<span class="fc" id="L1023">    }</span>
+
+    /// Issues a deferred operation once the start has answered.
+    ///
+    /// Runs whether the start succeeded or failed: the operation has its own
+    /// answer to give the caller, and the platform's own error for a read of
+    /// an accessory it cannot reach says more than a start failure would.
+    private static final class RunAfterStart
+            implements com.codename1.util.AsyncResult&lt;List&lt;HomeStructure&gt;&gt; {
+
+        private final Runnable operation;
+
+<span class="fc" id="L1035">        RunAfterStart(Runnable operation) {</span>
+<span class="fc" id="L1036">            this.operation = operation;</span>
+<span class="fc" id="L1037">        }</span>
+
+        @Override
+        public void onReady(List&lt;HomeStructure&gt; value, Throwable error) {
+<span class="fc" id="L1041">            operation.run();</span>
+<span class="fc" id="L1042">        }</span>
+    }
+
+    /// A read waiting for the backend. Named rather than anonymous so it
+    /// carries no synthetic reference to the enclosing instance (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    /// Runs or deletes a scene, once the backend is connected.
+    private static final class IssueScene implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String structureId;
+        private final String sceneId;
+        private final boolean delete;
+
+        IssueScene(HomeBridge bridge, int id, String structureId,
+<span class="fc" id="L1058">                String sceneId, boolean delete) {</span>
+<span class="fc" id="L1059">            this.bridge = bridge;</span>
+<span class="fc" id="L1060">            this.id = id;</span>
+<span class="fc" id="L1061">            this.structureId = structureId;</span>
+<span class="fc" id="L1062">            this.sceneId = sceneId;</span>
+<span class="fc" id="L1063">            this.delete = delete;</span>
+<span class="fc" id="L1064">        }</span>
+
+        @Override
+        public void run() {
+<span class="pc bpc" id="L1068" title="1 of 2 branches missed.">            if (delete) {</span>
+<span class="nc" id="L1069">                bridge.deleteScene(id, structureId, sceneId);</span>
+            } else {
+<span class="fc" id="L1071">                bridge.executeScene(id, structureId, sceneId);</span>
+            }
+<span class="fc" id="L1073">        }</span>
+    }
+
+    /// Creates a scene, once the backend is connected.
+    private static final class IssueCreateScene implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String structureId;
+        private final String name;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+        private final int[] kinds;
+        private final double[] numericValues;
+        private final String[] stringValues;
+        private final int[] unitWireIds;
+
+        IssueCreateScene(HomeBridge bridge, int id, String structureId,
+                String name, String[] accessoryIds, String[] serviceIds,
+                String[] traitIds, int[] kinds, double[] numericValues,
+<span class="fc" id="L1094">                String[] stringValues, int[] unitWireIds) {</span>
+<span class="fc" id="L1095">            this.bridge = bridge;</span>
+<span class="fc" id="L1096">            this.id = id;</span>
+<span class="fc" id="L1097">            this.structureId = structureId;</span>
+<span class="fc" id="L1098">            this.name = name;</span>
+<span class="fc" id="L1099">            this.accessoryIds = accessoryIds;</span>
+<span class="fc" id="L1100">            this.serviceIds = serviceIds;</span>
+<span class="fc" id="L1101">            this.traitIds = traitIds;</span>
+<span class="fc" id="L1102">            this.kinds = kinds;</span>
+<span class="fc" id="L1103">            this.numericValues = numericValues;</span>
+<span class="fc" id="L1104">            this.stringValues = stringValues;</span>
+<span class="fc" id="L1105">            this.unitWireIds = unitWireIds;</span>
+<span class="fc" id="L1106">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L1110">            bridge.createScene(id, structureId, name, accessoryIds,</span>
+                    serviceIds, traitIds, kinds, numericValues, stringValues,
+                    unitWireIds);
+<span class="fc" id="L1113">        }</span>
+    }
+
+    /// Asks an accessory to identify itself, once the backend is connected.
+    private static final class IssueIdentify implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String accessoryId;
+
+<span class="fc" id="L1123">        IssueIdentify(HomeBridge bridge, int id, String accessoryId) {</span>
+<span class="fc" id="L1124">            this.bridge = bridge;</span>
+<span class="fc" id="L1125">            this.id = id;</span>
+<span class="fc" id="L1126">            this.accessoryId = accessoryId;</span>
+<span class="fc" id="L1127">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L1131">            bridge.identify(id, accessoryId);</span>
+<span class="fc" id="L1132">        }</span>
+    }
+
+    private static final class IssueRead implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+        private final boolean allowCached;
+
+        IssueRead(HomeBridge bridge, int id, String[] accessoryIds,
+<span class="fc" id="L1145">                String[] serviceIds, String[] traitIds, boolean allowCached) {</span>
+<span class="fc" id="L1146">            this.bridge = bridge;</span>
+<span class="fc" id="L1147">            this.id = id;</span>
+<span class="fc" id="L1148">            this.accessoryIds = accessoryIds;</span>
+<span class="fc" id="L1149">            this.serviceIds = serviceIds;</span>
+<span class="fc" id="L1150">            this.traitIds = traitIds;</span>
+<span class="fc" id="L1151">            this.allowCached = allowCached;</span>
+<span class="fc" id="L1152">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L1156">            bridge.readTraits(id, accessoryIds, serviceIds, traitIds,</span>
+                    allowCached);
+<span class="fc" id="L1158">        }</span>
+    }
+
+    /// A write waiting for the backend.
+    private static final class IssueWrite implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+        private final int[] kinds;
+        private final double[] numeric;
+        private final String[] text;
+        private final int[] units;
+        private final String[] authorization;
+
+        IssueWrite(HomeBridge bridge, int id, String[] accessoryIds,
+                String[] serviceIds, String[] traitIds, int[] kinds,
+                double[] numeric, String[] text, int[] units,
+<span class="fc" id="L1178">                String[] authorization) {</span>
+<span class="fc" id="L1179">            this.bridge = bridge;</span>
+<span class="fc" id="L1180">            this.id = id;</span>
+<span class="fc" id="L1181">            this.accessoryIds = accessoryIds;</span>
+<span class="fc" id="L1182">            this.serviceIds = serviceIds;</span>
+<span class="fc" id="L1183">            this.traitIds = traitIds;</span>
+<span class="fc" id="L1184">            this.kinds = kinds;</span>
+<span class="fc" id="L1185">            this.numeric = numeric;</span>
+<span class="fc" id="L1186">            this.text = text;</span>
+<span class="fc" id="L1187">            this.units = units;</span>
+<span class="fc" id="L1188">            this.authorization = authorization;</span>
+<span class="fc" id="L1189">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L1193">            bridge.writeTraits(id, accessoryIds, serviceIds, traitIds, kinds,</span>
+                    numeric, text, units, authorization);
+<span class="fc" id="L1195">        }</span>
+    }
+
+    /// A subscription waiting for the backend.
+    private static final class IssueSubscribe implements Runnable {
+
+        private final SmartHome home;
+        private final HomeBridge bridge;
+        private final int requestId;
+        private final String subscriptionId;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+
+        IssueSubscribe(SmartHome home, HomeBridge bridge, int requestId,
+                String subscriptionId, String[] accessoryIds,
+<span class="fc" id="L1211">                String[] serviceIds, String[] traitIds) {</span>
+<span class="fc" id="L1212">            this.home = home;</span>
+<span class="fc" id="L1213">            this.bridge = bridge;</span>
+<span class="fc" id="L1214">            this.requestId = requestId;</span>
+<span class="fc" id="L1215">            this.subscriptionId = subscriptionId;</span>
+<span class="fc" id="L1216">            this.accessoryIds = accessoryIds;</span>
+<span class="fc" id="L1217">            this.serviceIds = serviceIds;</span>
+<span class="fc" id="L1218">            this.traitIds = traitIds;</span>
+<span class="fc" id="L1219">        }</span>
+
+        @Override
+        public void run() {
+<span class="pc bpc" id="L1223" title="1 of 2 branches missed.">            if (!home.isSubscriptionLive(subscriptionId)) {</span>
+                // Stopped while the backend was still starting. Registering
+                // it now would leave a native watch and a HomeKit
+                // notification alive with no Java state behind them: the
+                // deliveries go nowhere, unsubscribe has already run, and
+                // nothing will ever turn them off -- so a screen opened and
+                // closed during startup leaks a registration each time and
+                // can hold a characteristic's notification on for a later
+                // subscription that wanted it off.
+<span class="nc" id="L1232">                return;</span>
+            }
+<span class="fc" id="L1234">            bridge.subscribe(requestId, subscriptionId, accessoryIds,</span>
+                    serviceIds, traitIds);
+<span class="fc" id="L1236">        }</span>
+    }
+
+    /// Whether every trait in a request reports its own changes.
+    ///
+    /// A backend that pushes still has individual traits that do not -- a
+    /// HomeKit characteristic without event notification is read when
+    /// somebody asks and never volunteers -- and those reach a listener only
+    /// through [#drainChanges()]. Reporting push for a subscription that
+    /// holds one tells the caller it need not drain, which is precisely how
+    /// that trait then never updates.
+    ///
+    /// Anything this cannot look up counts as needing a poll. That is the
+    /// cheap direction, and the earlier reading of it was backwards: an app
+    /// subscribing with persisted ids before its first refresh has an empty
+    /// graph, so EVERY lookup is unknown -- and calling that push told the
+    /// caller not to drain, which is the one thing that stops those traits
+    /// ever updating. A needless drain costs a round trip; a missed one
+    /// costs the value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: what is being subscribed to
+    ///
+    /// #### Returns
+    ///
+    /// `true` when nothing in the request has to be polled
+    private boolean allWatchedTraitsNotify(SubscriptionRequest request) {
+<span class="nc" id="L1264">        List&lt;String&gt; accessoryIds = request.getAccessoryIds();</span>
+<span class="nc" id="L1265">        List&lt;String&gt; serviceIds = request.getServiceIds();</span>
+<span class="nc" id="L1266">        List&lt;Trait&gt; traits = request.getTraits();</span>
+<span class="nc bnc" id="L1267" title="All 2 branches missed.">        for (int i = 0; i &lt; traits.size(); i++) {</span>
+<span class="nc" id="L1268">            Accessory accessory = findAccessory(accessoryIds.get(i));</span>
+<span class="nc bnc" id="L1269" title="All 2 branches missed.">            if (accessory == null) {</span>
+<span class="nc" id="L1270">                return false;</span>
+            }
+<span class="nc" id="L1272">            AccessoryService service =</span>
+<span class="nc" id="L1273">                    accessory.getService(serviceIds.get(i));</span>
+<span class="nc bnc" id="L1274" title="All 2 branches missed.">            if (service == null) {</span>
+<span class="nc" id="L1275">                return false;</span>
+            }
+<span class="nc" id="L1277">            TraitConstraint c = service.getConstraint(traits.get(i));</span>
+<span class="nc bnc" id="L1278" title="All 4 branches missed.">            if (c == null || !c.notifiesOnChange()) {</span>
+<span class="nc" id="L1279">                return false;</span>
+            }
+        }
+<span class="nc" id="L1282">        return true;</span>
+    }
+
+    private void deliverInitialValues(final SubscriptionState state,
+            SubscriptionRequest request) {
+<span class="nc" id="L1287">        TraitReadRequest read = new TraitReadRequest();</span>
+<span class="nc" id="L1288">        List&lt;String&gt; accessoryIds = request.getAccessoryIds();</span>
+<span class="nc" id="L1289">        List&lt;String&gt; serviceIds = request.getServiceIds();</span>
+<span class="nc" id="L1290">        List&lt;Trait&gt; traits = request.getTraits();</span>
+<span class="nc bnc" id="L1291" title="All 2 branches missed.">        for (int i = 0; i &lt; traits.size(); i++) {</span>
+<span class="nc" id="L1292">            read.add(accessoryIds.get(i), serviceIds.get(i), traits.get(i));</span>
+        }
+<span class="nc" id="L1294">        read(read).onResult(new InitialDelivery(state));</span>
+<span class="nc" id="L1295">    }</span>
+
+    /// Whether a subscription is still registered, for a deferred
+    /// registration that has to decide whether it is still wanted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `subscriptionId`: the subscription to check
+    ///
+    /// #### Returns
+    ///
+    /// `true` when it has not been stopped
+    private synchronized boolean isSubscriptionLive(String subscriptionId) {
+<span class="fc" id="L1308">        return subscriptions.containsKey(subscriptionId);</span>
+    }
+
+    /// Called by [TraitSubscription#stop()].
+    void unsubscribeInternal(TraitSubscription subscription) {
+        SubscriptionState state;
+<span class="fc" id="L1314">        synchronized (this) {</span>
+<span class="fc" id="L1315">            state = subscriptions.remove(subscription.getId());</span>
+<span class="fc" id="L1316">        }</span>
+<span class="pc bpc" id="L1317" title="1 of 2 branches missed.">        if (state != null) {</span>
+<span class="fc" id="L1318">            state.dispose();</span>
+        }
+<span class="fc" id="L1320">        HomeBridge b = bridge();</span>
+<span class="fc bfc" id="L1321" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L1322">            b.unsubscribe(subscription.getId());</span>
+        }
+<span class="fc" id="L1324">    }</span>
+
+    /// Collects changes the platform has been holding and delivers them to
+    /// the subscriptions that asked for them.
+    ///
+    /// **The only way changes arrive** on every backend except HomeKit in the
+    /// foreground; see [TraitSubscription#isPushDelivery()]. Wire this into
+    /// the point where your app comes to the foreground, and into whatever
+    /// polling cadence suits what you are showing.
+    ///
+    /// #### Returns
+    ///
+    /// how many changed readings were delivered, on the EDT
+    public AsyncResource&lt;Integer&gt; drainChanges() {
+<span class="fc" id="L1338">        HomeBridge b = bridge();</span>
+<span class="fc bfc" id="L1339" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L1340">            EdtResult&lt;Integer&gt; none = new EdtResult&lt;Integer&gt;();</span>
+<span class="fc" id="L1341">            none.complete(Integer.valueOf(0));</span>
+<span class="fc" id="L1342">            return none;</span>
+        }
+<span class="fc" id="L1344">        int id = nextRequestId();</span>
+<span class="fc" id="L1345">        EdtResult&lt;Integer&gt; result = pendingDrains.open(id);</span>
+<span class="fc" id="L1346">        b.drainChanges(id);</span>
+<span class="fc" id="L1347">        return result;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // structure listeners
+    // ------------------------------------------------------------------
+
+    /// Watches the home graph for topology changes.
+    ///
+    /// Deliveries arrive on the EDT. This is about accessories appearing,
+    /// disappearing, being renamed, moving room or changing reachability --
+    /// not about their values, which is what [#subscribe(SubscriptionRequest,
+    /// HomeChangeListener)] is for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener to add; `null` is ignored
+    public void addStructureListener(HomeStructureListener listener) {
+<span class="fc bfc" id="L1365" title="All 2 branches covered.">        if (listener == null) {</span>
+<span class="fc" id="L1366">            return;</span>
+        }
+<span class="fc" id="L1368">        synchronized (this) {</span>
+<span class="fc bfc" id="L1369" title="All 2 branches covered.">            if (!structureListeners.contains(listener)) {</span>
+<span class="fc" id="L1370">                structureListeners.add(listener);</span>
+            }
+<span class="fc" id="L1372">        }</span>
+<span class="fc" id="L1373">    }</span>
+
+    /// Stops watching the home graph.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener to remove; `null` and unknown listeners are
+    ///   ignored
+    public void removeStructureListener(HomeStructureListener listener) {
+<span class="fc bfc" id="L1382" title="All 2 branches covered.">        if (listener == null) {</span>
+<span class="fc" id="L1383">            return;</span>
+        }
+<span class="fc" id="L1385">        synchronized (this) {</span>
+<span class="fc" id="L1386">            structureListeners.remove(listener);</span>
+<span class="fc" id="L1387">        }</span>
+<span class="fc" id="L1388">    }</span>
+
+    // ------------------------------------------------------------------
+    // scenes
+    // ------------------------------------------------------------------
+
+    /// Runs a scene.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scene`: the scene to run
+    ///
+    /// #### Returns
+    ///
+    /// completion, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `scene` is `null`
+    public AsyncResource&lt;Scene&gt; executeScene(Scene scene) {
+<span class="pc bpc" id="L1408" title="1 of 2 branches missed.">        if (scene == null) {</span>
+<span class="nc" id="L1409">            throw new IllegalArgumentException(&quot;scene is required&quot;);</span>
+        }
+<span class="fc" id="L1411">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L1412" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L1413">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+<span class="pc bpc" id="L1416" title="1 of 2 branches missed.">        if (!scene.isExecutable()) {</span>
+<span class="nc" id="L1417">            return failed(HomeError.UNAUTHORIZED, &quot;the scene \&quot;&quot;</span>
+<span class="nc" id="L1418">                    + scene.getName() + &quot;\&quot; cannot be run from here&quot;);</span>
+        }
+<span class="fc" id="L1420">        int id = nextRequestId();</span>
+<span class="fc" id="L1421">        EdtResult&lt;Scene&gt; result = pendingScenes.open(id);</span>
+        // Through the start path, like every other operation that takes
+        // identifiers: a scene an app kept -- in its own storage, or across a
+        // stop() -- names a home the native cannot resolve until the HomeKit
+        // database has loaded, and running it on a cold launch answered
+        // INVALID_ARGUMENT for a scene that was there.
+<span class="fc" id="L1427">        afterStart(new IssueScene(b, id, scene.getStructureId(),</span>
+<span class="fc" id="L1428">                scene.getId(), false));</span>
+<span class="fc" id="L1429">        return result;</span>
+    }
+
+    /// Creates a scene from a set of accessory states.
+    ///
+    /// Check [HomeStructure#isSceneAuthoringSupported()] before offering this;
+    /// several backends will run a scene and not author one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `structure`: the home to create it in
+    ///
+    /// - `name`: the scene's name
+    ///
+    /// - `actions`: what it should do; [TraitWrite#toSceneAction()] turns the
+    ///   changes a user just made into these
+    ///
+    /// #### Returns
+    ///
+    /// the new scene, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when any argument is `null`, when the
+    ///   name is empty, or when there are no actions
+    public AsyncResource&lt;Scene&gt; createScene(HomeStructure structure,
+            String name, List&lt;SceneAction&gt; actions) {
+<span class="pc bpc" id="L1456" title="1 of 2 branches missed.">        if (structure == null) {</span>
+<span class="nc" id="L1457">            throw new IllegalArgumentException(&quot;structure is required&quot;);</span>
+        }
+<span class="pc bpc" id="L1459" title="2 of 4 branches missed.">        if (name == null || name.trim().length() == 0) {</span>
+<span class="nc" id="L1460">            throw new IllegalArgumentException(&quot;a scene needs a name&quot;);</span>
+        }
+<span class="pc bpc" id="L1462" title="2 of 4 branches missed.">        if (actions == null || actions.isEmpty()) {</span>
+<span class="nc" id="L1463">            throw new IllegalArgumentException(</span>
+                    &quot;a scene with no actions would do nothing&quot;);
+        }
+<span class="fc" id="L1466">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L1467" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L1468">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+<span class="pc bpc" id="L1471" title="1 of 2 branches missed.">        if (!structure.isSceneAuthoringSupported()) {</span>
+<span class="nc" id="L1472">            return failed(HomeError.NOT_SUPPORTED,</span>
+<span class="nc" id="L1473">                    &quot;scenes cannot be created in \&quot;&quot; + structure.getName()</span>
+                            + &quot;\&quot;; check isSceneAuthoringSupported() first&quot;);
+        }
+<span class="fc" id="L1476">        int count = actions.size();</span>
+<span class="fc" id="L1477">        String[] accessoryIds = new String[count];</span>
+<span class="fc" id="L1478">        String[] serviceIds = new String[count];</span>
+<span class="fc" id="L1479">        String[] traitIds = new String[count];</span>
+<span class="fc" id="L1480">        int[] kinds = new int[count];</span>
+<span class="fc" id="L1481">        double[] numeric = new double[count];</span>
+<span class="fc" id="L1482">        String[] text = new String[count];</span>
+<span class="fc" id="L1483">        int[] units = new int[count];</span>
+<span class="fc bfc" id="L1484" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L1485">            SceneAction a = actions.get(i);</span>
+<span class="pc bpc" id="L1486" title="1 of 2 branches missed.">            if (a == null) {</span>
+<span class="nc" id="L1487">                throw new IllegalArgumentException(</span>
+                        &quot;actions cannot contain a null at index &quot; + i);
+            }
+<span class="fc" id="L1490">            TraitValue v = a.getValue();</span>
+<span class="fc" id="L1491">            requireEnumDomain(a.getTrait(), v, &quot;scene action&quot;);</span>
+<span class="fc" id="L1492">            accessoryIds[i] = a.getAccessoryId();</span>
+<span class="fc" id="L1493">            serviceIds[i] = a.getServiceId();</span>
+<span class="fc" id="L1494">            traitIds[i] = a.getTrait().getId();</span>
+<span class="fc" id="L1495">            kinds[i] = v.getKind().ordinal();</span>
+            // Same normalization as write(): a scene action is a write that
+            // happens later, and a backend that ignores the unit would apply
+            // the wrong number every time the scene runs.
+<span class="fc" id="L1499">            numeric[i] = canonicalNumeric(a.getTrait(), v);</span>
+<span class="pc bpc" id="L1500" title="1 of 2 branches missed.">            text[i] = v.getKind() == TraitValueKind.STRING ? v.getString() : &quot;&quot;;</span>
+<span class="fc" id="L1501">            units[i] = canonicalUnitWireId(a.getTrait(), v);</span>
+        }
+<span class="fc" id="L1503">        int id = nextRequestId();</span>
+<span class="fc" id="L1504">        EdtResult&lt;Scene&gt; result = pendingScenes.open(id);</span>
+<span class="fc" id="L1505">        afterStart(new IssueCreateScene(b, id, structure.getId(),</span>
+<span class="fc" id="L1506">                name.trim(), accessoryIds, serviceIds, traitIds, kinds,</span>
+                numeric, text, units));
+<span class="fc" id="L1508">        return result;</span>
+    }
+
+    /// Deletes a scene.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scene`: the scene to delete
+    ///
+    /// #### Returns
+    ///
+    /// completion, delivered on the EDT
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `scene` is `null`
+    public AsyncResource&lt;Scene&gt; deleteScene(Scene scene) {
+<span class="nc bnc" id="L1525" title="All 2 branches missed.">        if (scene == null) {</span>
+<span class="nc" id="L1526">            throw new IllegalArgumentException(&quot;scene is required&quot;);</span>
+        }
+<span class="nc" id="L1528">        HomeBridge b = bridge();</span>
+<span class="nc bnc" id="L1529" title="All 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L1530">            return failed(HomeError.NOT_SUPPORTED,</span>
+                    &quot;this platform has no smart-home support&quot;);
+        }
+<span class="nc" id="L1533">        int id = nextRequestId();</span>
+<span class="nc" id="L1534">        EdtResult&lt;Scene&gt; result = pendingScenes.open(id);</span>
+<span class="nc" id="L1535">        afterStart(new IssueScene(b, id, scene.getStructureId(),</span>
+<span class="nc" id="L1536">                scene.getId(), true));</span>
+<span class="nc" id="L1537">        return result;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // native -&gt; Java delivery
+    // ------------------------------------------------------------------
+
+    /// Answers [#refresh()]'s first call. Called by the ports from any
+    /// thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `availabilityOrdinal`: the availability now that the backend is
+    ///   connected
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverStarted(int requestId, int availabilityOrdinal,
+            String error) {
+<span class="fc" id="L1557">        getInstance().onGraphAnswer(requestId, error);</span>
+<span class="fc" id="L1558">    }</span>
+
+    /// Answers [#refresh()]. Called by the ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverRefreshed(int requestId, String error) {
+<span class="fc" id="L1568">        getInstance().onGraphAnswer(requestId, error);</span>
+<span class="fc" id="L1569">    }</span>
+
+    /// Answers [#requestAuthorization()]. Called by the ports from any
+    /// thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `statusOrdinal`: the resulting
+    ///   [HomeAuthorizationStatus] ordinal
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverAuthorization(int requestId, int statusOrdinal,
+            String error) {
+<span class="nc" id="L1584">        SmartHome home = getInstance();</span>
+<span class="nc" id="L1585">        EdtResult&lt;HomeAuthorizationStatus&gt; result =</span>
+<span class="nc" id="L1586">                home.pendingAuthorization.take(requestId);</span>
+<span class="nc bnc" id="L1587" title="All 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L1588">            return;</span>
+        }
+<span class="nc" id="L1590">        HomeException failure = HomeWire.decodeError(error);</span>
+<span class="nc bnc" id="L1591" title="All 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L1592">            result.error(failure);</span>
+<span class="nc" id="L1593">            return;</span>
+        }
+<span class="nc" id="L1595">        HomeAuthorizationStatus[] all = HomeAuthorizationStatus.values();</span>
+<span class="nc bnc" id="L1596" title="All 4 branches missed.">        result.complete(statusOrdinal &gt;= 0 &amp;&amp; statusOrdinal &lt; all.length</span>
+                ? all[statusOrdinal] : HomeAuthorizationStatus.UNKNOWN);
+<span class="nc" id="L1598">    }</span>
+
+    /// Answers [#read(TraitReadRequest)]. Called by the ports from any
+    /// thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `lines`: one encoded reading per requested trait
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverReadings(int requestId, String[] lines,
+            String error) {
+<span class="fc" id="L1612">        SmartHome home = getInstance();</span>
+<span class="fc" id="L1613">        EdtResult&lt;List&lt;TraitReading&gt;&gt; result = home.pendingReads.take(requestId);</span>
+        TraitReadRequest asked;
+<span class="fc" id="L1615">        synchronized (home) {</span>
+<span class="fc" id="L1616">            asked = home.readRequests.remove(Integer.valueOf(requestId));</span>
+<span class="fc" id="L1617">        }</span>
+<span class="pc bpc" id="L1618" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L1619">            return;</span>
+        }
+<span class="fc" id="L1621">        HomeException failure = HomeWire.decodeError(error);</span>
+<span class="pc bpc" id="L1622" title="1 of 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L1623">            result.error(failure);</span>
+<span class="nc" id="L1624">            return;</span>
+        }
+<span class="fc" id="L1626">        result.complete(decodeReadings(lines, asked));</span>
+<span class="fc" id="L1627">    }</span>
+
+    /// Answers [#write(java.util.List)]. Called by the ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `lines`: one outcome per write, as
+    ///   `accessoryId \t serviceId \t traitId \t applied \t errorName \t
+    ///   errorMessage`
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverWriteResults(int requestId, String[] lines,
+            String error) {
+<span class="fc" id="L1642">        SmartHome home = getInstance();</span>
+<span class="fc" id="L1643">        EdtResult&lt;List&lt;TraitWriteResult&gt;&gt; result =</span>
+<span class="fc" id="L1644">                home.pendingWrites.take(requestId);</span>
+        List&lt;TraitWrite&gt; writes;
+<span class="fc" id="L1646">        synchronized (home) {</span>
+<span class="fc" id="L1647">            writes = home.writeRequests.remove(Integer.valueOf(requestId));</span>
+<span class="fc" id="L1648">        }</span>
+<span class="pc bpc" id="L1649" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L1650">            return;</span>
+        }
+<span class="fc" id="L1652">        HomeException failure = HomeWire.decodeError(error);</span>
+<span class="pc bpc" id="L1653" title="1 of 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L1654">            result.error(failure);</span>
+<span class="nc" id="L1655">            return;</span>
+        }
+<span class="fc" id="L1657">        result.complete(decodeWriteResults(lines, writes));</span>
+<span class="fc" id="L1658">    }</span>
+
+    /// Answers [#executeScene(Scene)], [#createScene(HomeStructure,
+    /// java.lang.String, java.util.List)] and [#deleteScene(Scene)]. Called by
+    /// the ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `sceneLine`: the affected scene, encoded as in
+    ///   `HomeBridge#getScenes(java.lang.String)`, or `null`
+    ///
+    /// - `structureId`: the home the scene belongs to
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverSceneResult(int requestId, String sceneLine,
+            String structureId, String error) {
+<span class="fc" id="L1676">        SmartHome home = getInstance();</span>
+<span class="fc" id="L1677">        EdtResult&lt;Scene&gt; result = home.pendingScenes.take(requestId);</span>
+<span class="pc bpc" id="L1678" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L1679">            return;</span>
+        }
+<span class="fc" id="L1681">        HomeException failure = HomeWire.decodeError(error);</span>
+<span class="fc bfc" id="L1682" title="All 2 branches covered.">        if (failure != null) {</span>
+<span class="fc" id="L1683">            result.error(failure);</span>
+<span class="fc" id="L1684">            return;</span>
+        }
+<span class="pc bpc" id="L1686" title="2 of 4 branches missed.">        result.complete(sceneLine == null || sceneLine.length() == 0 ? null</span>
+<span class="fc" id="L1687">                : HomeWire.decodeScene(sceneLine, structureId,</span>
+<span class="fc" id="L1688">                        Collections.&lt;SceneAction&gt;emptyList()));</span>
+<span class="fc" id="L1689">    }</span>
+
+    /// Answers [Commissioner#commission(CommissioningRequest)]. Called by the
+    /// ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `accessoryId`: the new accessory, or `null`
+    ///
+    /// - `accessoryName`: the name it ended up with, or `null`
+    ///
+    /// - `structureId`: the home it joined, or `null`
+    ///
+    /// - `commissionedToThisApp`: `1` when this app can address it
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverCommissioningResult(int requestId,
+            String accessoryId, String accessoryName, String structureId,
+            int commissionedToThisApp, String error) {
+<span class="fc" id="L1710">        SmartHome home = getInstance();</span>
+<span class="fc" id="L1711">        EdtResult&lt;CommissioningResult&gt; result =</span>
+<span class="fc" id="L1712">                home.pendingCommissioning.take(requestId);</span>
+<span class="pc bpc" id="L1713" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L1714">            return;</span>
+        }
+<span class="fc" id="L1716">        HomeException failure = HomeWire.decodeError(error);</span>
+<span class="pc bpc" id="L1717" title="1 of 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L1718">            result.error(failure);</span>
+<span class="nc" id="L1719">            return;</span>
+        }
+<span class="pc bpc" id="L1721" title="1 of 2 branches missed.">        result.complete(new CommissioningResult(accessoryId, accessoryName,</span>
+                structureId, commissionedToThisApp != 0));
+<span class="fc" id="L1723">    }</span>
+
+    /// Answers [#identify(Accessory)]. Called by the ports from any thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverIdentifyResult(int requestId, String error) {
+<span class="fc" id="L1733">        SmartHome home = getInstance();</span>
+<span class="fc" id="L1734">        EdtResult&lt;Object&gt; result = home.pendingIdentify.take(requestId);</span>
+<span class="pc bpc" id="L1735" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L1736">            return;</span>
+        }
+<span class="fc" id="L1738">        HomeException failure = HomeWire.decodeError(error);</span>
+<span class="fc bfc" id="L1739" title="All 2 branches covered.">        if (failure != null) {</span>
+<span class="fc" id="L1740">            result.error(failure);</span>
+        } else {
+<span class="fc" id="L1742">            result.complete(null);</span>
+        }
+<span class="fc" id="L1744">    }</span>
+
+    /// Answers [#drainChanges()]. Called by the ports from any thread, after
+    /// every [#deliverChanges(java.lang.String, java.lang.String[])] the drain
+    /// produced.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request being answered
+    ///
+    /// - `deliveredCount`: how many readings were handed over
+    ///
+    /// - `error`: the encoded failure, or `null` for success
+    public static void deliverDrained(int requestId, int deliveredCount,
+            String error) {
+<span class="fc" id="L1759">        SmartHome home = getInstance();</span>
+<span class="fc" id="L1760">        EdtResult&lt;Integer&gt; result = home.pendingDrains.take(requestId);</span>
+<span class="pc bpc" id="L1761" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L1762">            return;</span>
+        }
+<span class="fc" id="L1764">        HomeException failure = HomeWire.decodeError(error);</span>
+<span class="pc bpc" id="L1765" title="1 of 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L1766">            result.error(failure);</span>
+        } else {
+<span class="fc" id="L1768">            result.complete(Integer.valueOf(deliveredCount));</span>
+        }
+<span class="fc" id="L1770">    }</span>
+
+    /// Delivers watched trait changes. Called by the ports from any thread,
+    /// unsolicited or in response to a drain.
+    ///
+    /// #### Parameters
+    ///
+    /// - `subscriptionId`: which subscription these belong to
+    ///
+    /// - `lines`: the encoded readings
+    public static void deliverChanges(String subscriptionId, String[] lines) {
+<span class="fc" id="L1781">        SmartHome home = getInstance();</span>
+        SubscriptionState state;
+<span class="fc" id="L1783">        synchronized (home) {</span>
+<span class="fc" id="L1784">            state = home.subscriptions.get(subscriptionId);</span>
+<span class="fc" id="L1785">        }</span>
+<span class="pc bpc" id="L1786" title="1 of 2 branches missed.">        if (state == null) {</span>
+<span class="nc" id="L1787">            return;</span>
+        }
+<span class="fc" id="L1789">        state.offer(decodeReadings(lines), false);</span>
+<span class="fc" id="L1790">    }</span>
+
+    /// Tells subscribers that changes were missed and their values are stale.
+    ///
+    /// #### Parameters
+    ///
+    /// - `subscriptionId`: which subscription lost its stream
+    public static void deliverResyncRequired(String subscriptionId) {
+<span class="fc" id="L1798">        SmartHome home = getInstance();</span>
+        SubscriptionState state;
+<span class="fc" id="L1800">        synchronized (home) {</span>
+<span class="fc" id="L1801">            state = home.subscriptions.get(subscriptionId);</span>
+<span class="fc" id="L1802">        }</span>
+<span class="pc bpc" id="L1803" title="1 of 2 branches missed.">        if (state != null) {</span>
+<span class="fc" id="L1804">            state.markResyncRequired();</span>
+        }
+<span class="fc" id="L1806">    }</span>
+
+    /// Reports a change to the home graph. Called by the ports from any
+    /// thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changeKindOrdinal`: the [StructureChangeKind] ordinal
+    ///
+    /// - `structureId`: the home affected, or `null`
+    ///
+    /// - `accessoryId`: the accessory affected, or `null`
+    public static void notifyStructureChanged(int changeKindOrdinal,
+            String structureId, String accessoryId) {
+<span class="fc" id="L1820">        StructureChangeKind[] all = StructureChangeKind.values();</span>
+<span class="pc bpc" id="L1821" title="2 of 4 branches missed.">        StructureChangeKind kind = changeKindOrdinal &gt;= 0</span>
+                &amp;&amp; changeKindOrdinal &lt; all.length ? all[changeKindOrdinal]
+                : StructureChangeKind.STRUCTURES_CHANGED;
+<span class="fc" id="L1824">        getInstance().fireStructureChanged(</span>
+                new HomeStructureEvent(kind, structureId, accessoryId));
+<span class="fc" id="L1826">    }</span>
+
+    // ------------------------------------------------------------------
+    // internals
+    // ------------------------------------------------------------------
+
+    private void onGraphAnswer(int requestId, String error) {
+<span class="fc" id="L1833">        EdtResult&lt;List&lt;HomeStructure&gt;&gt; result = pendingGraph.take(requestId);</span>
+<span class="fc" id="L1834">        HomeException failure = HomeWire.decodeError(error);</span>
+        List&lt;Integer&gt; waiting;
+<span class="pc bpc" id="L1836" title="1 of 2 branches missed.">        if (failure != null) {</span>
+            boolean wasStart;
+<span class="nc" id="L1838">            synchronized (this) {</span>
+                // Only the START's own failure resets the startup state. Both
+                // answers arrive here, and clearing it for an ordinary
+                // refresh failure -- an accessory that timed out an hour
+                // later -- marked a perfectly connected bridge as never
+                // started, so the next refresh called start() on it again;
+                // worse, a second stale failure could land while that retry
+                // was in flight and fail its deferred callers with an
+                // unrelated error.
+<span class="nc bnc" id="L1847" title="All 4 branches missed.">                wasStart = starting &amp;&amp; requestId == startingRequestId;</span>
+<span class="nc bnc" id="L1848" title="All 2 branches missed.">                if (wasStart) {</span>
+                    // A failed start must not leave the flag set, or the
+                    // retry would call refresh() on a bridge that never
+                    // connected and fail in a way that no longer names the
+                    // real problem.
+<span class="nc" id="L1853">                    started = false;</span>
+<span class="nc" id="L1854">                    starting = false;</span>
+<span class="nc" id="L1855">                    startingRequestId = 0;</span>
+                }
+<span class="nc bnc" id="L1857" title="All 2 branches missed.">                waiting = wasStart ? drainDeferred()</span>
+<span class="nc" id="L1858">                        : Collections.&lt;Integer&gt;emptyList();</span>
+<span class="nc" id="L1859">            }</span>
+<span class="nc bnc" id="L1860" title="All 2 branches missed.">            if (result != null) {</span>
+<span class="nc" id="L1861">                result.error(failure);</span>
+            }
+<span class="nc bnc" id="L1863" title="All 2 branches missed.">            for (Integer deferred : waiting) {</span>
+<span class="nc" id="L1864">                EdtResult&lt;List&lt;HomeStructure&gt;&gt; r =</span>
+<span class="nc" id="L1865">                        pendingGraph.take(deferred.intValue());</span>
+<span class="nc bnc" id="L1866" title="All 2 branches missed.">                if (r != null) {</span>
+<span class="nc" id="L1867">                    r.error(failure);</span>
+                }
+<span class="nc" id="L1869">            }</span>
+<span class="nc" id="L1870">            return;</span>
+        }
+<span class="fc" id="L1872">        List&lt;HomeStructure&gt; rebuilt = buildGraph();</span>
+<span class="fc" id="L1873">        synchronized (this) {</span>
+<span class="fc" id="L1874">            structures = rebuilt;</span>
+<span class="pc bpc" id="L1875" title="1 of 4 branches missed.">            if (starting &amp;&amp; requestId == startingRequestId) {</span>
+<span class="fc" id="L1876">                starting = false;</span>
+<span class="fc" id="L1877">                startingRequestId = 0;</span>
+<span class="fc" id="L1878">                started = true;</span>
+            }
+            // Same rule as the failure path: the deferred requests are
+            // waiting for the START, so an unrelated refresh answering first
+            // must not hand them its own result.
+<span class="pc bpc" id="L1883" title="1 of 2 branches missed.">            waiting = starting ? Collections.&lt;Integer&gt;emptyList()</span>
+<span class="fc" id="L1884">                    : drainDeferred();</span>
+<span class="fc" id="L1885">        }</span>
+<span class="pc bpc" id="L1886" title="1 of 2 branches missed.">        if (result != null) {</span>
+<span class="fc" id="L1887">            result.complete(rebuilt);</span>
+        }
+        // The refreshes that arrived while the start was in flight. They get
+        // the start's own answer, which is the graph they asked for -- issuing
+        // a second round trip per caller would be slower and could still race.
+<span class="fc bfc" id="L1892" title="All 2 branches covered.">        for (Integer deferred : waiting) {</span>
+<span class="fc" id="L1893">            EdtResult&lt;List&lt;HomeStructure&gt;&gt; r =</span>
+<span class="fc" id="L1894">                    pendingGraph.take(deferred.intValue());</span>
+<span class="pc bpc" id="L1895" title="1 of 2 branches missed.">            if (r != null) {</span>
+<span class="fc" id="L1896">                r.complete(rebuilt);</span>
+            }
+<span class="fc" id="L1898">        }</span>
+<span class="fc" id="L1899">    }</span>
+
+    /// Takes the deferred request ids. Callers hold this instance's monitor.
+    ///
+    /// #### Returns
+    ///
+    /// the ids, possibly empty
+    private List&lt;Integer&gt; drainDeferred() {
+<span class="fc bfc" id="L1907" title="All 2 branches covered.">        if (deferredGraphRequests.isEmpty()) {</span>
+<span class="fc" id="L1908">            return Collections.&lt;Integer&gt;emptyList();</span>
+        }
+<span class="fc" id="L1910">        List&lt;Integer&gt; copy = new ArrayList&lt;Integer&gt;(deferredGraphRequests);</span>
+<span class="fc" id="L1911">        deferredGraphRequests.clear();</span>
+<span class="fc" id="L1912">        return copy;</span>
+    }
+
+    private List&lt;HomeStructure&gt; buildGraph() {
+<span class="fc" id="L1916">        HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L1917" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L1918">            return Collections.emptyList();</span>
+        }
+<span class="fc" id="L1920">        String[] structureLines = b.getStructures();</span>
+<span class="pc bpc" id="L1921" title="2 of 4 branches missed.">        if (structureLines == null || structureLines.length == 0) {</span>
+<span class="nc" id="L1922">            return Collections.emptyList();</span>
+        }
+<span class="fc" id="L1924">        List&lt;HomeStructure&gt; out =</span>
+                new ArrayList&lt;HomeStructure&gt;(structureLines.length);
+<span class="fc bfc" id="L1926" title="All 2 branches covered.">        for (String line : structureLines) {</span>
+<span class="fc" id="L1927">            String[] f = HomeWire.split(line);</span>
+<span class="fc" id="L1928">            String structureId = HomeWire.field(f, 0);</span>
+<span class="pc bpc" id="L1929" title="1 of 2 branches missed.">            if (structureId.length() == 0) {</span>
+<span class="nc" id="L1930">                continue;</span>
+            }
+<span class="fc" id="L1932">            out.add(new HomeStructure(structureId, HomeWire.field(f, 1),</span>
+<span class="fc" id="L1933">                    HomeWire.flag(f, 2), HomeWire.flag(f, 3),</span>
+<span class="fc" id="L1934">                    HomeWire.flag(f, 4), buildRooms(b, structureId),</span>
+<span class="fc" id="L1935">                    buildZones(b, structureId),</span>
+<span class="fc" id="L1936">                    buildAccessories(b, structureId),</span>
+<span class="fc" id="L1937">                    buildScenes(b, structureId)));</span>
+        }
+<span class="fc" id="L1939">        return Collections.unmodifiableList(out);</span>
+    }
+
+    private static List&lt;HomeRoom&gt; buildRooms(HomeBridge b, String structureId) {
+<span class="fc" id="L1943">        String[] lines = b.getRooms(structureId);</span>
+<span class="fc" id="L1944">        List&lt;HomeRoom&gt; out = new ArrayList&lt;HomeRoom&gt;();</span>
+<span class="pc bpc" id="L1945" title="1 of 2 branches missed.">        if (lines == null) {</span>
+<span class="nc" id="L1946">            return out;</span>
+        }
+<span class="fc bfc" id="L1948" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc" id="L1949">            HomeRoom room = HomeWire.decodeRoom(line, structureId);</span>
+<span class="pc bpc" id="L1950" title="1 of 2 branches missed.">            if (room != null) {</span>
+<span class="fc" id="L1951">                out.add(room);</span>
+            }
+        }
+<span class="fc" id="L1954">        return out;</span>
+    }
+
+    private static List&lt;HomeZone&gt; buildZones(HomeBridge b, String structureId) {
+<span class="fc" id="L1958">        String[] lines = b.getZones(structureId);</span>
+<span class="fc" id="L1959">        List&lt;HomeZone&gt; out = new ArrayList&lt;HomeZone&gt;();</span>
+<span class="pc bpc" id="L1960" title="1 of 2 branches missed.">        if (lines == null) {</span>
+<span class="nc" id="L1961">            return out;</span>
+        }
+<span class="pc bpc" id="L1963" title="1 of 2 branches missed.">        for (String line : lines) {</span>
+<span class="nc" id="L1964">            HomeZone zone = HomeWire.decodeZone(line);</span>
+<span class="nc bnc" id="L1965" title="All 2 branches missed.">            if (zone != null) {</span>
+<span class="nc" id="L1966">                out.add(zone);</span>
+            }
+        }
+<span class="fc" id="L1969">        return out;</span>
+    }
+
+    private static List&lt;Accessory&gt; buildAccessories(HomeBridge b,
+            String structureId) {
+<span class="fc" id="L1974">        String[] lines = b.getAccessories(structureId);</span>
+<span class="fc" id="L1975">        List&lt;Accessory&gt; out = new ArrayList&lt;Accessory&gt;();</span>
+<span class="pc bpc" id="L1976" title="1 of 2 branches missed.">        if (lines == null) {</span>
+<span class="nc" id="L1977">            return out;</span>
+        }
+<span class="fc bfc" id="L1979" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc" id="L1980">            String accessoryId = HomeWire.field(HomeWire.split(line), 0);</span>
+<span class="pc bpc" id="L1981" title="1 of 2 branches missed.">            if (accessoryId.length() == 0) {</span>
+<span class="nc" id="L1982">                continue;</span>
+            }
+<span class="fc" id="L1984">            Accessory accessory = HomeWire.decodeAccessory(line,</span>
+<span class="fc" id="L1985">                    buildServices(b, accessoryId));</span>
+<span class="pc bpc" id="L1986" title="1 of 2 branches missed.">            if (accessory != null) {</span>
+<span class="fc" id="L1987">                out.add(accessory);</span>
+            }
+        }
+<span class="fc" id="L1990">        return out;</span>
+    }
+
+    private static List&lt;AccessoryService&gt; buildServices(HomeBridge b,
+            String accessoryId) {
+<span class="fc" id="L1995">        String[] lines = b.getServices(accessoryId);</span>
+<span class="fc" id="L1996">        List&lt;AccessoryService&gt; out = new ArrayList&lt;AccessoryService&gt;();</span>
+<span class="pc bpc" id="L1997" title="1 of 2 branches missed.">        if (lines == null) {</span>
+<span class="nc" id="L1998">            return out;</span>
+        }
+<span class="fc bfc" id="L2000" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc" id="L2001">            String serviceId = HomeWire.field(HomeWire.split(line), 0);</span>
+<span class="pc bpc" id="L2002" title="1 of 2 branches missed.">            if (serviceId.length() == 0) {</span>
+<span class="nc" id="L2003">                continue;</span>
+            }
+<span class="fc" id="L2005">            AccessoryService service = HomeWire.decodeService(line,</span>
+<span class="fc" id="L2006">                    buildConstraints(b, accessoryId, serviceId));</span>
+<span class="pc bpc" id="L2007" title="1 of 2 branches missed.">            if (service != null) {</span>
+<span class="fc" id="L2008">                out.add(service);</span>
+            }
+        }
+<span class="fc" id="L2011">        return out;</span>
+    }
+
+    private static List&lt;TraitConstraint&gt; buildConstraints(HomeBridge b,
+            String accessoryId, String serviceId) {
+<span class="fc" id="L2016">        String[] lines = b.getTraits(accessoryId, serviceId);</span>
+<span class="fc" id="L2017">        List&lt;TraitConstraint&gt; out = new ArrayList&lt;TraitConstraint&gt;();</span>
+<span class="pc bpc" id="L2018" title="1 of 2 branches missed.">        if (lines == null) {</span>
+<span class="nc" id="L2019">            return out;</span>
+        }
+<span class="fc bfc" id="L2021" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc" id="L2022">            TraitConstraint constraint =</span>
+<span class="fc" id="L2023">                    HomeWire.decodeTraitConstraint(line);</span>
+<span class="pc bpc" id="L2024" title="1 of 2 branches missed.">            if (constraint != null) {</span>
+<span class="fc" id="L2025">                out.add(constraint);</span>
+            }
+        }
+<span class="fc" id="L2028">        return out;</span>
+    }
+
+    private static List&lt;Scene&gt; buildScenes(HomeBridge b, String structureId) {
+<span class="fc" id="L2032">        String[] lines = b.getScenes(structureId);</span>
+<span class="fc" id="L2033">        List&lt;Scene&gt; out = new ArrayList&lt;Scene&gt;();</span>
+<span class="pc bpc" id="L2034" title="1 of 2 branches missed.">        if (lines == null) {</span>
+<span class="nc" id="L2035">            return out;</span>
+        }
+<span class="fc bfc" id="L2037" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc" id="L2038">            String sceneId = HomeWire.field(HomeWire.split(line), 0);</span>
+<span class="pc bpc" id="L2039" title="1 of 2 branches missed.">            if (sceneId.length() == 0) {</span>
+<span class="nc" id="L2040">                continue;</span>
+            }
+<span class="fc" id="L2042">            Scene scene = HomeWire.decodeScene(line, structureId,</span>
+<span class="fc" id="L2043">                    buildSceneActions(b, structureId, sceneId));</span>
+<span class="pc bpc" id="L2044" title="1 of 2 branches missed.">            if (scene != null) {</span>
+<span class="fc" id="L2045">                out.add(scene);</span>
+            }
+        }
+<span class="fc" id="L2048">        return out;</span>
+    }
+
+    private static List&lt;SceneAction&gt; buildSceneActions(HomeBridge b,
+            String structureId, String sceneId) {
+<span class="fc" id="L2053">        String[] lines = b.getSceneActions(structureId, sceneId);</span>
+<span class="fc" id="L2054">        List&lt;SceneAction&gt; out = new ArrayList&lt;SceneAction&gt;();</span>
+<span class="pc bpc" id="L2055" title="1 of 2 branches missed.">        if (lines == null) {</span>
+<span class="nc" id="L2056">            return out;</span>
+        }
+<span class="fc bfc" id="L2058" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc" id="L2059">            SceneAction action = HomeWire.decodeSceneAction(line);</span>
+<span class="pc bpc" id="L2060" title="1 of 2 branches missed.">            if (action != null) {</span>
+<span class="fc" id="L2061">                out.add(action);</span>
+            }
+        }
+<span class="fc" id="L2064">        return out;</span>
+    }
+
+    /// Decodes changed readings, where there is nothing to line them up
+    /// against and a record that will not decode is simply not a change.
+    private static List&lt;TraitReading&gt; decodeReadings(String[] lines) {
+<span class="pc bpc" id="L2070" title="2 of 4 branches missed.">        if (lines == null || lines.length == 0) {</span>
+<span class="nc" id="L2071">            return Collections.emptyList();</span>
+        }
+<span class="fc" id="L2073">        List&lt;TraitReading&gt; out = new ArrayList&lt;TraitReading&gt;(lines.length);</span>
+<span class="fc bfc" id="L2074" title="All 2 branches covered.">        for (String line : lines) {</span>
+<span class="fc" id="L2075">            TraitReading reading = HomeWire.decodeReading(line);</span>
+<span class="pc bpc" id="L2076" title="1 of 2 branches missed.">            if (reading != null) {</span>
+<span class="fc" id="L2077">                out.add(reading);</span>
+            }
+        }
+<span class="fc" id="L2080">        return Collections.unmodifiableList(out);</span>
+    }
+
+    /// Decodes a read's answer, one reading per trait asked for, in the order
+    /// they were asked for.
+    ///
+    /// A record that will not decode -- a port a version ahead, a truncated
+    /// line -- becomes a failed reading in its own position rather than
+    /// disappearing. Dropping it shifts every later reading up one, and
+    /// `read()` promises positional correspondence, so a caller lining values
+    /// up with the controls that asked for them puts the humidity on the
+    /// thermostat dial.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lines`: the encoded readings
+    ///
+    /// - `asked`: what was requested, or `null` when it is no longer known
+    ///
+    /// #### Returns
+    ///
+    /// the readings, immutable
+    private static List&lt;TraitReading&gt; decodeReadings(String[] lines,
+            TraitReadRequest asked) {
+<span class="pc bpc" id="L2104" title="1 of 2 branches missed.">        if (asked == null) {</span>
+<span class="nc" id="L2105">            return decodeReadings(lines);</span>
+        }
+<span class="fc" id="L2107">        List&lt;String&gt; accessoryIds = asked.getAccessoryIds();</span>
+<span class="fc" id="L2108">        List&lt;String&gt; serviceIds = asked.getServiceIds();</span>
+<span class="fc" id="L2109">        List&lt;Trait&gt; traits = asked.getTraits();</span>
+<span class="fc" id="L2110">        int count = traits.size();</span>
+<span class="fc" id="L2111">        List&lt;TraitReading&gt; out = new ArrayList&lt;TraitReading&gt;(count);</span>
+<span class="fc bfc" id="L2112" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="pc bpc" id="L2113" title="2 of 4 branches missed.">            TraitReading reading = lines != null &amp;&amp; i &lt; lines.length</span>
+<span class="pc" id="L2114">                    ? HomeWire.decodeReading(lines[i]) : null;</span>
+            // Checked against the slot it landed in, not just decoded. A row
+            // that is well formed but out of order -- a port that reordered
+            // its answer, or repeated one -- reads as a perfectly good value
+            // for the wrong control, and read() promises the caller can line
+            // its own list up against this one by position.
+<span class="fc bfc" id="L2120" title="All 2 branches covered.">            if (reading != null</span>
+<span class="pc bpc" id="L2121" title="1 of 2 branches missed.">                    &amp;&amp; !(accessoryIds.get(i).equals(reading.getAccessoryId())</span>
+<span class="pc bpc" id="L2122" title="1 of 2 branches missed.">                            &amp;&amp; serviceIds.get(i).equals(reading.getServiceId())</span>
+<span class="pc bpc" id="L2123" title="1 of 2 branches missed.">                            &amp;&amp; traits.get(i).getId().equals(</span>
+<span class="fc" id="L2124">                                    reading.getTrait().getId()))) {</span>
+<span class="nc" id="L2125">                reading = null;</span>
+            }
+<span class="fc bfc" id="L2127" title="All 2 branches covered.">            if (reading == null) {</span>
+<span class="fc" id="L2128">                reading = TraitReading.failed(accessoryIds.get(i),</span>
+<span class="fc" id="L2129">                        serviceIds.get(i), traits.get(i),</span>
+                        HomeError.INVALID_DATA,
+                        &quot;the platform's answer for this trait could not be&quot;
+                                + &quot; read&quot;);
+            }
+<span class="fc" id="L2134">            out.add(reading);</span>
+        }
+<span class="fc" id="L2136">        return Collections.unmodifiableList(out);</span>
+    }
+
+    private static List&lt;TraitWriteResult&gt; decodeWriteResults(String[] lines,
+            List&lt;TraitWrite&gt; writes) {
+<span class="pc bpc" id="L2141" title="2 of 4 branches missed.">        if (writes == null || writes.isEmpty()) {</span>
+<span class="nc" id="L2142">            return Collections.emptyList();</span>
+        }
+<span class="fc" id="L2144">        List&lt;TraitWriteResult&gt; out =</span>
+<span class="fc" id="L2145">                new ArrayList&lt;TraitWriteResult&gt;(writes.size());</span>
+<span class="fc bfc" id="L2146" title="All 2 branches covered.">        for (int i = 0; i &lt; writes.size(); i++) {</span>
+<span class="fc" id="L2147">            TraitWrite w = writes.get(i);</span>
+<span class="pc bpc" id="L2148" title="2 of 4 branches missed.">            if (lines == null || i &gt;= lines.length) {</span>
+                // The port answered with fewer outcomes than there were
+                // writes. Reported as unknown rather than assumed applied:
+                // a write silently counted as successful is how a light stays
+                // on and nothing in the app ever says so.
+<span class="nc" id="L2153">                out.add(TraitWriteResult.failed(w, HomeError.UNKNOWN,</span>
+                        &quot;the port did not report an outcome for this write&quot;));
+<span class="nc" id="L2155">                continue;</span>
+            }
+<span class="fc" id="L2157">            String[] f = HomeWire.split(lines[i]);</span>
+            // Checked against the write it is claimed to answer, the way the
+            // read decoder checks its own rows. A well-formed row in the
+            // wrong slot attaches one accessory's failure to another
+            // accessory's write, and the caller lines this list up against
+            // the one it passed in.
+<span class="pc bpc" id="L2163" title="1 of 2 branches missed.">            if (!HomeWire.field(f, 0).equals(w.getAccessoryId())</span>
+<span class="pc bpc" id="L2164" title="1 of 2 branches missed.">                    || !HomeWire.field(f, 1).equals(w.getServiceId())</span>
+<span class="pc bpc" id="L2165" title="1 of 2 branches missed.">                    || !HomeWire.field(f, 2).equals(w.getTrait().getId())) {</span>
+<span class="nc" id="L2166">                out.add(TraitWriteResult.failed(w, HomeError.INVALID_DATA,</span>
+                        &quot;the port's outcome for this write named a different&quot;
+                                + &quot; trait&quot;));
+<span class="nc" id="L2169">                continue;</span>
+            }
+<span class="fc" id="L2171">            String errorName = HomeWire.field(f, 4);</span>
+<span class="fc bfc" id="L2172" title="All 2 branches covered.">            if (errorName.length() &gt; 0) {</span>
+<span class="fc" id="L2173">                out.add(TraitWriteResult.failed(w,</span>
+<span class="fc" id="L2174">                        HomeError.forName(errorName), HomeWire.field(f, 5)));</span>
+<span class="pc bpc" id="L2175" title="1 of 2 branches missed.">            } else if (HomeWire.flag(f, 3)) {</span>
+<span class="fc" id="L2176">                out.add(TraitWriteResult.applied(w));</span>
+            } else {
+<span class="nc" id="L2178">                out.add(TraitWriteResult.failed(w, HomeError.UNKNOWN,</span>
+                        &quot;the accessory did not accept this write&quot;));
+            }
+        }
+<span class="fc" id="L2182">        return Collections.unmodifiableList(out);</span>
+    }
+
+    private void fireStructureChanged(final HomeStructureEvent event) {
+        final HomeStructureListener[] snapshot;
+<span class="fc" id="L2187">        synchronized (this) {</span>
+<span class="fc bfc" id="L2188" title="All 2 branches covered.">            if (structureListeners.isEmpty()) {</span>
+<span class="fc" id="L2189">                return;</span>
+            }
+<span class="fc" id="L2191">            snapshot = new HomeStructureListener[structureListeners.size()];</span>
+<span class="fc bfc" id="L2192" title="All 2 branches covered.">            for (int i = 0; i &lt; snapshot.length; i++) {</span>
+<span class="fc" id="L2193">                snapshot[i] = structureListeners.get(i);</span>
+            }
+<span class="fc" id="L2195">        }</span>
+<span class="pc bpc" id="L2196" title="3 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L2197">            Display.getInstance().callSerially(</span>
+                    new StructureDispatch(snapshot, event));
+<span class="nc" id="L2199">            return;</span>
+        }
+<span class="fc" id="L2201">        dispatchStructure(snapshot, event);</span>
+<span class="fc" id="L2202">    }</span>
+
+    private static void dispatchStructure(HomeStructureListener[] listeners,
+            HomeStructureEvent event) {
+<span class="fc bfc" id="L2206" title="All 2 branches covered.">        for (HomeStructureListener listener : listeners) {</span>
+<span class="fc" id="L2207">            listener.structureChanged(event);</span>
+        }
+<span class="fc" id="L2209">    }</span>
+
+    private static String[] toArray(List&lt;String&gt; list) {
+<span class="fc" id="L2212">        String[] out = new String[list.size()];</span>
+<span class="fc bfc" id="L2213" title="All 2 branches covered.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L2214">            out[i] = list.get(i);</span>
+        }
+<span class="fc" id="L2216">        return out;</span>
+    }
+
+    /// A copy of a read request, so a caller mutating theirs cannot change
+    /// what is in flight.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the caller's request
+    ///
+    /// #### Returns
+    ///
+    /// an equal request that nothing else holds
+    private static TraitReadRequest copyOf(TraitReadRequest request) {
+<span class="fc" id="L2230">        TraitReadRequest copy = new TraitReadRequest();</span>
+<span class="fc" id="L2231">        copy.setAllowCached(request.isAllowCached());</span>
+<span class="fc" id="L2232">        List&lt;String&gt; accessoryIds = request.getAccessoryIds();</span>
+<span class="fc" id="L2233">        List&lt;String&gt; serviceIds = request.getServiceIds();</span>
+<span class="fc" id="L2234">        List&lt;Trait&gt; traits = request.getTraits();</span>
+<span class="fc bfc" id="L2235" title="All 2 branches covered.">        for (int i = 0; i &lt; traits.size(); i++) {</span>
+<span class="fc" id="L2236">            copy.add(accessoryIds.get(i), serviceIds.get(i), traits.get(i));</span>
+        }
+<span class="fc" id="L2238">        return copy;</span>
+    }
+
+    /// Reads a request too large for the backend, in pieces.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the whole request
+    ///
+    /// - `max`: the backend's limit
+    ///
+    /// #### Returns
+    ///
+    /// the readings of every piece, in the order they were asked for
+    private AsyncResource&lt;List&lt;TraitReading&gt;&gt; readInChunks(
+            TraitReadRequest request, int max) {
+<span class="fc" id="L2254">        List&lt;String&gt; accessoryIds = request.getAccessoryIds();</span>
+<span class="fc" id="L2255">        List&lt;String&gt; serviceIds = request.getServiceIds();</span>
+<span class="fc" id="L2256">        List&lt;Trait&gt; traits = request.getTraits();</span>
+<span class="fc" id="L2257">        int total = traits.size();</span>
+<span class="fc" id="L2258">        int parts = (total + max - 1) / max;</span>
+<span class="fc" id="L2259">        EdtResult&lt;List&lt;TraitReading&gt;&gt; combined =</span>
+                new EdtResult&lt;List&lt;TraitReading&gt;&gt;();
+<span class="fc" id="L2261">        ChunkJoin&lt;TraitReading&gt; join =</span>
+                new ChunkJoin&lt;TraitReading&gt;(combined, parts);
+<span class="fc bfc" id="L2263" title="All 2 branches covered.">        for (int part = 0; part &lt; parts; part++) {</span>
+<span class="fc" id="L2264">            TraitReadRequest piece = new TraitReadRequest();</span>
+<span class="fc" id="L2265">            piece.setAllowCached(request.isAllowCached());</span>
+<span class="fc" id="L2266">            int from = part * max;</span>
+<span class="fc" id="L2267">            int to = Math.min(from + max, total);</span>
+<span class="fc bfc" id="L2268" title="All 2 branches covered.">            for (int i = from; i &lt; to; i++) {</span>
+<span class="fc" id="L2269">                piece.add(accessoryIds.get(i), serviceIds.get(i),</span>
+<span class="fc" id="L2270">                        traits.get(i));</span>
+            }
+<span class="fc" id="L2272">            read(piece).onResult(new ChunkPart&lt;TraitReading&gt;(join, part));</span>
+        }
+<span class="fc" id="L2274">        return combined;</span>
+    }
+
+    /// Writes a batch too large for the backend, in pieces.
+    ///
+    /// Not atomic across the pieces, and it never was: the SPI has no
+    /// transaction and a batch that fails halfway leaves what it applied
+    /// applied. That is why every write reports its own outcome.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writes`: the whole batch
+    ///
+    /// - `max`: the backend's limit
+    ///
+    /// #### Returns
+    ///
+    /// the outcome of every write, in the order they were given
+    private AsyncResource&lt;List&lt;TraitWriteResult&gt;&gt; writeInChunks(
+            List&lt;TraitWrite&gt; writes, int max) {
+<span class="nc" id="L2294">        int total = writes.size();</span>
+<span class="nc" id="L2295">        int parts = (total + max - 1) / max;</span>
+<span class="nc" id="L2296">        EdtResult&lt;List&lt;TraitWriteResult&gt;&gt; combined =</span>
+                new EdtResult&lt;List&lt;TraitWriteResult&gt;&gt;();
+<span class="nc" id="L2298">        ChunkJoin&lt;TraitWriteResult&gt; join =</span>
+                new ChunkJoin&lt;TraitWriteResult&gt;(combined, parts);
+<span class="nc bnc" id="L2300" title="All 2 branches missed.">        for (int part = 0; part &lt; parts; part++) {</span>
+<span class="nc" id="L2301">            int from = part * max;</span>
+<span class="nc" id="L2302">            int to = Math.min(from + max, total);</span>
+<span class="nc" id="L2303">            List&lt;TraitWrite&gt; piece =</span>
+<span class="nc" id="L2304">                    new ArrayList&lt;TraitWrite&gt;(writes.subList(from, to));</span>
+<span class="nc" id="L2305">            write(piece).onResult(new ChunkPart&lt;TraitWriteResult&gt;(join, part));</span>
+        }
+<span class="nc" id="L2307">        return combined;</span>
+    }
+
+    /// Collects the pieces of a split request and completes the caller once
+    /// they are all in, in the order they were asked for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `&lt;T&gt;`: what each piece returns a list of
+    private static final class ChunkJoin&lt;T&gt; {
+
+        private final EdtResult&lt;List&lt;T&gt;&gt; combined;
+        private final List&lt;List&lt;T&gt;&gt; parts;
+        private int outstanding;
+        private Throwable failure;
+        private boolean answered;
+
+<span class="fc" id="L2324">        ChunkJoin(EdtResult&lt;List&lt;T&gt;&gt; combined, int parts) {</span>
+<span class="fc" id="L2325">            this.combined = combined;</span>
+<span class="fc" id="L2326">            this.outstanding = parts;</span>
+<span class="fc" id="L2327">            this.parts = new ArrayList&lt;List&lt;T&gt;&gt;(parts);</span>
+<span class="fc bfc" id="L2328" title="All 2 branches covered.">            for (int i = 0; i &lt; parts; i++) {</span>
+<span class="fc" id="L2329">                this.parts.add(null);</span>
+            }
+<span class="fc" id="L2331">        }</span>
+
+        void part(int index, List&lt;T&gt; values, Throwable error) {
+            // Everything the answer needs is taken under the lock and read
+            // outside it. Completing a resource runs the caller's callbacks,
+            // and one that starts another request would otherwise be doing it
+            // while this monitor is held.
+            boolean done;
+            Throwable failed;
+<span class="fc" id="L2340">            List&lt;T&gt; all = null;</span>
+<span class="fc" id="L2341">            synchronized (this) {</span>
+<span class="pc bpc" id="L2342" title="1 of 2 branches missed.">                if (answered) {</span>
+<span class="nc" id="L2343">                    return;</span>
+                }
+<span class="pc bpc" id="L2345" title="3 of 4 branches missed.">                if (error != null &amp;&amp; failure == null) {</span>
+<span class="nc" id="L2346">                    failure = error;</span>
+                }
+<span class="fc" id="L2348">                parts.set(index, values);</span>
+<span class="fc" id="L2349">                outstanding--;</span>
+<span class="fc bfc" id="L2350" title="All 2 branches covered.">                done = outstanding &lt;= 0;</span>
+<span class="fc" id="L2351">                failed = failure;</span>
+<span class="fc bfc" id="L2352" title="All 2 branches covered.">                if (done) {</span>
+<span class="fc" id="L2353">                    answered = true;</span>
+<span class="pc bpc" id="L2354" title="1 of 2 branches missed.">                    if (failed == null) {</span>
+<span class="fc" id="L2355">                        all = new ArrayList&lt;T&gt;();</span>
+<span class="fc bfc" id="L2356" title="All 2 branches covered.">                        for (List&lt;T&gt; piece : parts) {</span>
+<span class="pc bpc" id="L2357" title="1 of 2 branches missed.">                            if (piece != null) {</span>
+<span class="fc" id="L2358">                                all.addAll(piece);</span>
+                            }
+<span class="fc" id="L2360">                        }</span>
+                    }
+                }
+<span class="fc" id="L2363">            }</span>
+<span class="fc bfc" id="L2364" title="All 2 branches covered.">            if (!done) {</span>
+<span class="fc" id="L2365">                return;</span>
+            }
+<span class="pc bpc" id="L2367" title="1 of 2 branches missed.">            if (failed != null) {</span>
+                // One piece failing fails the whole request. The alternative
+                // is a short list the caller has no way to line up with what
+                // they asked for.
+<span class="nc" id="L2371">                combined.error(failed);</span>
+<span class="nc" id="L2372">                return;</span>
+            }
+<span class="fc" id="L2374">            combined.complete(Collections.unmodifiableList(all));</span>
+<span class="fc" id="L2375">        }</span>
+    }
+
+    /// One piece's answer. Named rather than anonymous so it carries no
+    /// synthetic reference to anything enclosing (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class ChunkPart&lt;T&gt;
+            implements com.codename1.util.AsyncResult&lt;List&lt;T&gt;&gt; {
+
+        private final ChunkJoin&lt;T&gt; join;
+        private final int index;
+
+<span class="fc" id="L2387">        ChunkPart(ChunkJoin&lt;T&gt; join, int index) {</span>
+<span class="fc" id="L2388">            this.join = join;</span>
+<span class="fc" id="L2389">            this.index = index;</span>
+<span class="fc" id="L2390">        }</span>
+
+        @Override
+        public void onReady(List&lt;T&gt; values, Throwable error) {
+<span class="fc" id="L2394">            join.part(index, values, error);</span>
+<span class="fc" id="L2395">        }</span>
+    }
+
+    /// Refuses a value out of the wrong domain enum.
+    ///
+    /// Every enum crosses the wire as an ordinal, and an ordinal out of the
+    /// wrong enum is a perfectly good number: `AlarmState.WARNING` is 1, and
+    /// 1 in `LockState` is `UNSECURED`. The kind check that guards the rest
+    /// of the value cannot see the difference, so unguarded this is a way to
+    /// open a door by asking a lock for an alarm state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait being written
+    ///
+    /// - `value`: the value supplied
+    ///
+    /// - `what`: what is being built, for the message
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value is out of the trait's
+    ///   domain
+    private static void requireEnumDomain(Trait trait, TraitValue value,
+            String what) {
+<span class="fc bfc" id="L2420" title="All 2 branches covered.">        if (trait.acceptsEnumValue(value)) {</span>
+<span class="fc bfc" id="L2421" title="All 2 branches covered.">            if (trait.acceptsEnumWrite(value)) {</span>
+<span class="fc" id="L2422">                return;</span>
+            }
+            // In the domain, but one of the states an accessory reports and
+            // cannot be asked for -- a door that is OPENING. The enum's own
+            // isWritable() says so; a backend that stored it anyway would
+            // report success for a request no accessory can carry out.
+<span class="fc" id="L2428">            throw new IllegalArgumentException(&quot;this &quot; + what + &quot; gives &quot;</span>
+<span class="fc" id="L2429">                    + trait.getId() + &quot; the value &quot; + value.getEnumName()</span>
+                    + &quot;, which is a state an accessory reports rather than&quot;
+                    + &quot; one it can be asked for; see the constant's&quot;
+                    + &quot; isWritable()&quot;);
+        }
+<span class="fc" id="L2434">        throw new IllegalArgumentException(&quot;this &quot; + what + &quot; gives &quot;</span>
+<span class="fc" id="L2435">                + trait.getId() + &quot; the value &quot; + value.getEnumName()</span>
+                + &quot;, which is not one of its own; every enum crosses to the&quot;
+                + &quot; platform as an ordinal, so a constant from another enum&quot;
+                + &quot; would be applied as whichever of this trait's constants&quot;
+                + &quot; shares its number&quot;);
+    }
+
+    /// A written value's numeric component, in the trait's own unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait being written
+    ///
+    /// - `value`: the value the caller supplied
+    ///
+    /// #### Returns
+    ///
+    /// the numeric component, converted when the value is a quantity
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value's unit measures a
+    ///   different dimension than the trait's
+    private static double canonicalNumeric(Trait trait, TraitValue value) {
+<span class="fc bfc" id="L2459" title="All 2 branches covered.">        if (value.getKind() != TraitValueKind.DOUBLE) {</span>
+<span class="fc" id="L2460">            return HomeWire.numericOf(value);</span>
+        }
+<span class="fc" id="L2462">        TraitUnit target = trait.getUnit();</span>
+<span class="fc bfc" id="L2463" title="All 2 branches covered.">        if (target == value.getUnit()) {</span>
+<span class="fc" id="L2464">            return value.getRawDouble();</span>
+        }
+        // Throws when the dimensions differ, which is the right answer: a
+        // brightness given in degrees Celsius is a bug in the caller, and
+        // applying the number regardless would move a real light.
+<span class="fc" id="L2469">        return value.getDouble(target);</span>
+    }
+
+    /// The unit the numeric component is now in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait being written
+    ///
+    /// - `value`: the value the caller supplied
+    ///
+    /// #### Returns
+    ///
+    /// the wire id of the trait's unit for a quantity, of the value's own
+    /// unit otherwise
+    private static int canonicalUnitWireId(Trait trait, TraitValue value) {
+<span class="fc bfc" id="L2485" title="All 2 branches covered.">        return value.getKind() == TraitValueKind.DOUBLE</span>
+<span class="fc" id="L2486">                ? trait.getUnit().getWireId()</span>
+<span class="fc" id="L2487">                : value.getUnit().getWireId();</span>
+    }
+
+    /// Fails a commissioning request the platform never answered.
+    ///
+    /// The timeout is honoured here rather than in each bridge because not one
+    /// of the platform flows takes one: Play services owns its sheet until the
+    /// user leaves it, and MatterSupport owns its own. A caller who asked for
+    /// a limit and got none would wait forever on a flow that cannot come
+    /// back -- an activity that never returns a result, a sheet dismissed by
+    /// the system.
+    ///
+    /// A late answer is not a problem: the request id is gone from the pending
+    /// map by then, so it is ignored the same way a duplicate would be.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request to fail
+    ///
+    /// - `timeoutMillis`: the limit; zero leaves the platform's own
+    ///
+    /// - `result`: the resource being timed, so the timer goes away when it
+    ///   answers
+    private void armCommissioningTimeout(int requestId, int timeoutMillis,
+            EdtResult&lt;CommissioningResult&gt; result) {
+<span class="pc bpc" id="L2512" title="1 of 2 branches missed.">        if (timeoutMillis &lt;= 0) {</span>
+<span class="fc" id="L2513">            return;</span>
+        }
+<span class="nc" id="L2515">        Timer timer = new Timer();</span>
+<span class="nc" id="L2516">        timer.schedule(</span>
+                new CommissioningTimeout(this, timer, requestId, timeoutMillis),
+                timeoutMillis);
+        // Cancelled the moment the request answers, however it answers.
+        // Timer's thread is not a daemon, so a flow that finished in seconds
+        // would otherwise hold the process open for the whole limit -- and a
+        // user commissioning an accessory may reasonably have been given
+        // minutes.
+<span class="nc" id="L2524">        result.onResult(new CancelTimeout(timer));</span>
+<span class="nc" id="L2525">    }</span>
+
+    /// Cancels a commissioning timeout once its request has answered.
+    private static final class CancelTimeout
+            implements com.codename1.util.AsyncResult&lt;CommissioningResult&gt; {
+
+        private final Timer timer;
+
+<span class="nc" id="L2533">        CancelTimeout(Timer timer) {</span>
+<span class="nc" id="L2534">            this.timer = timer;</span>
+<span class="nc" id="L2535">        }</span>
+
+        @Override
+        public void onReady(CommissioningResult value, Throwable error) {
+<span class="nc" id="L2539">            timer.cancel();</span>
+<span class="nc" id="L2540">        }</span>
+    }
+
+    /// Named rather than anonymous so the scheduled task carries no synthetic
+    /// reference to the enclosing instance (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class CommissioningTimeout extends TimerTask {
+
+        private final SmartHome home;
+        private final Timer timer;
+        private final int requestId;
+        private final int limit;
+
+        CommissioningTimeout(SmartHome home, Timer timer, int requestId,
+<span class="nc" id="L2554">                int limit) {</span>
+<span class="nc" id="L2555">            this.home = home;</span>
+<span class="nc" id="L2556">            this.timer = timer;</span>
+<span class="nc" id="L2557">            this.requestId = requestId;</span>
+<span class="nc" id="L2558">            this.limit = limit;</span>
+<span class="nc" id="L2559">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc" id="L2563">            timer.cancel();</span>
+<span class="nc" id="L2564">            EdtResult&lt;CommissioningResult&gt; waiting =</span>
+<span class="nc" id="L2565">                    home.pendingCommissioning.take(requestId);</span>
+<span class="nc bnc" id="L2566" title="All 2 branches missed.">            if (waiting == null) {</span>
+<span class="nc" id="L2567">                return;</span>
+            }
+<span class="nc" id="L2569">            waiting.error(new HomeException(HomeError.TIMEOUT,</span>
+                    &quot;the add-accessory flow did not finish within &quot; + limit
+                            + &quot;ms&quot;));
+<span class="nc" id="L2572">        }</span>
+    }
+
+    private static &lt;T&gt; EdtResult&lt;T&gt; failed(HomeError error, String message) {
+<span class="fc" id="L2576">        EdtResult&lt;T&gt; result = new EdtResult&lt;T&gt;();</span>
+<span class="pc bpc" id="L2577" title="1 of 2 branches missed.">        result.error(error == HomeError.NOT_CONFIGURED</span>
+                ? new HomeConfigurationException(message)
+                : new HomeException(error, message));
+<span class="fc" id="L2580">        return result;</span>
+    }
+
+    /// Named rather than anonymous so the queued runnable carries no synthetic
+    /// reference to the enclosing instance (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class StructureDispatch implements Runnable {
+
+        private final HomeStructureListener[] listeners;
+        private final HomeStructureEvent event;
+
+        StructureDispatch(HomeStructureListener[] listeners,
+<span class="nc" id="L2592">                HomeStructureEvent event) {</span>
+<span class="nc" id="L2593">            this.listeners = listeners;</span>
+<span class="nc" id="L2594">            this.event = event;</span>
+<span class="nc" id="L2595">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc" id="L2599">            dispatchStructure(listeners, event);</span>
+<span class="nc" id="L2600">        }</span>
+    }
+
+    /// Narrows a one-trait batch read back to the single reading the
+    /// convenience overload promised.
+    private static final class SingleReading
+            implements com.codename1.util.AsyncResult&lt;List&lt;TraitReading&gt;&gt; {
+
+        private final EdtResult&lt;TraitReading&gt; target;
+        private final Accessory accessory;
+        private final AccessoryService service;
+        private final Trait trait;
+
+        SingleReading(EdtResult&lt;TraitReading&gt; target, Accessory accessory,
+<span class="fc" id="L2614">                AccessoryService service, Trait trait) {</span>
+<span class="fc" id="L2615">            this.target = target;</span>
+<span class="fc" id="L2616">            this.accessory = accessory;</span>
+<span class="fc" id="L2617">            this.service = service;</span>
+<span class="fc" id="L2618">            this.trait = trait;</span>
+<span class="fc" id="L2619">        }</span>
+
+        @Override
+        public void onReady(List&lt;TraitReading&gt; readings, Throwable error) {
+<span class="pc bpc" id="L2623" title="1 of 2 branches missed.">            if (error != null) {</span>
+<span class="nc" id="L2624">                target.error(error);</span>
+<span class="nc" id="L2625">                return;</span>
+            }
+<span class="pc bpc" id="L2627" title="2 of 4 branches missed.">            if (readings == null || readings.isEmpty()) {</span>
+                // Answered with nothing rather than with a reading. Reported
+                // as a failure of that trait rather than as an empty success,
+                // because the caller asked for one value and there is none.
+<span class="nc" id="L2631">                target.complete(TraitReading.failed(accessory.getId(),</span>
+<span class="nc" id="L2632">                        service.getId(), trait, HomeError.UNKNOWN,</span>
+                        &quot;the port returned no reading for this trait&quot;));
+<span class="nc" id="L2634">                return;</span>
+            }
+<span class="fc" id="L2636">            target.complete(readings.get(0));</span>
+<span class="fc" id="L2637">        }</span>
+    }
+
+    /// Narrows a one-write batch back to the single outcome the convenience
+    /// overload promised.
+    private static final class SingleWriteResult
+            implements com.codename1.util.AsyncResult&lt;List&lt;TraitWriteResult&gt;&gt; {
+
+        private final EdtResult&lt;TraitWriteResult&gt; target;
+        private final TraitWrite write;
+
+        SingleWriteResult(EdtResult&lt;TraitWriteResult&gt; target,
+<span class="fc" id="L2649">                TraitWrite write) {</span>
+<span class="fc" id="L2650">            this.target = target;</span>
+<span class="fc" id="L2651">            this.write = write;</span>
+<span class="fc" id="L2652">        }</span>
+
+        @Override
+        public void onReady(List&lt;TraitWriteResult&gt; results, Throwable error) {
+<span class="pc bpc" id="L2656" title="1 of 2 branches missed.">            if (error != null) {</span>
+<span class="nc" id="L2657">                target.error(error);</span>
+<span class="nc" id="L2658">                return;</span>
+            }
+<span class="pc bpc" id="L2660" title="2 of 4 branches missed.">            if (results == null || results.isEmpty()) {</span>
+<span class="nc" id="L2661">                target.complete(TraitWriteResult.failed(write,</span>
+                        HomeError.UNKNOWN,
+                        &quot;the port did not report an outcome for this write&quot;));
+<span class="nc" id="L2664">                return;</span>
+            }
+<span class="fc" id="L2666">            target.complete(results.get(0));</span>
+<span class="fc" id="L2667">        }</span>
+    }
+
+    /// Feeds a subscription's up-front read into it as its first batch, so a
+    /// screen populated by a subscription has one code path rather than two.
+    private static final class InitialDelivery
+            implements com.codename1.util.AsyncResult&lt;List&lt;TraitReading&gt;&gt; {
+
+        private final SubscriptionState state;
+
+<span class="nc" id="L2677">        InitialDelivery(SubscriptionState state) {</span>
+<span class="nc" id="L2678">            this.state = state;</span>
+<span class="nc" id="L2679">        }</span>
+
+        @Override
+        public void onReady(List&lt;TraitReading&gt; readings, Throwable error) {
+<span class="nc bnc" id="L2683" title="All 6 branches missed.">            if (error != null || readings == null || readings.isEmpty()) {</span>
+                // Nothing to seed the screen with. Deliberately silent: the
+                // subscription itself is registered and live, and failing it
+                // over an unavailable initial value would take the live
+                // updates down with it.
+                //
+                // The state still has to be told the read is over, or the
+                // live changes it is holding back for this delivery would
+                // never be released.
+<span class="nc" id="L2692">                state.initialDeliveryUnavailable();</span>
+<span class="nc" id="L2693">                return;</span>
+            }
+<span class="nc" id="L2695">            state.offer(readings, true);</span>
+<span class="nc" id="L2696">        }</span>
+    }
+
+    /// The seam `com.codename1.home.commissioning.Commissioner` reaches this
+    /// class through, so commissioning can live in its own package -- which it
+    /// must, because the build server decides what native machinery to include
+    /// by scanning for package prefixes and commissioning costs an entire
+    /// extra Xcode target.
+<span class="fc" id="L2704">    private final class Gateway implements CommissioningGateway {</span>
+
+        @Override
+        public int getCommissioningStyle() {
+<span class="fc" id="L2708">            HomeBridge b = bridge();</span>
+<span class="fc bfc" id="L2709" title="All 2 branches covered.">            if (b == null) {</span>
+<span class="fc" id="L2710">                return com.codename1.home.commissioning.CommissioningStyle.NONE</span>
+<span class="fc" id="L2711">                        .ordinal();</span>
+            }
+<span class="fc" id="L2713">            return b.getCommissioningStyle();</span>
+        }
+
+        @Override
+        public AsyncResource&lt;CommissioningResult&gt; commission(
+                CommissioningRequest request) {
+<span class="fc" id="L2719">            HomeBridge b = bridge();</span>
+<span class="pc bpc" id="L2720" title="1 of 2 branches missed.">            if (b == null) {</span>
+<span class="nc" id="L2721">                return SmartHome.&lt;CommissioningResult&gt;failed(</span>
+                        HomeError.COMMISSIONING_UNAVAILABLE,
+                        &quot;this platform cannot add smart-home accessories&quot;);
+            }
+<span class="fc" id="L2725">            int id = nextRequestId();</span>
+<span class="fc" id="L2726">            EdtResult&lt;CommissioningResult&gt; result =</span>
+<span class="fc" id="L2727">                    pendingCommissioning.open(id);</span>
+<span class="fc" id="L2728">            b.commission(id, orEmpty(request.getRawSetupPayload()),</span>
+<span class="fc" id="L2729">                    orEmpty(request.getStructureId()),</span>
+<span class="fc" id="L2730">                    orEmpty(request.getRoomId()),</span>
+<span class="fc" id="L2731">                    orEmpty(request.getSuggestedName()),</span>
+<span class="fc" id="L2732">                    request.getTimeoutMillis());</span>
+<span class="fc" id="L2733">            armCommissioningTimeout(id, request.getTimeoutMillis(), result);</span>
+<span class="fc" id="L2734">            return result;</span>
+        }
+
+        @Override
+        public boolean openEcosystemApp() {
+<span class="fc" id="L2739">            return SmartHome.this.openEcosystemApp();</span>
+        }
+
+        private String orEmpty(String value) {
+<span class="fc bfc" id="L2743" title="All 2 branches covered.">            return value == null ? &quot;&quot; : value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

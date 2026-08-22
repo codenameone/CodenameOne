@@ -1,0 +1,2173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EditorView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">EditorView.java</span></div><h1>EditorView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.TextInputClient;
+import com.codename1.ui.TextInputConfig;
+import com.codename1.ui.TextInputState;
+import com.codename1.ui.RichTextClipboardData;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.WheelEvent;
+import com.codename1.ui.geom.Dimension;
+
+/// The pure Codename One text editing surface. It renders a plain text `EditorDocument` with its own
+/// `Graphics` code, owns the caret and selection, handles pointer and keyboard interaction, and captures
+/// text through the low level `TextInputClient` contract (soft keyboard / IME) when the platform
+/// supports it, falling back to raw `keyPressed` capture on physical keyboard platforms.
+///
+/// This class provides the shared editing behavior. Feature layers (syntax highlighting, the gutter,
+/// styled rich text) subclass it and override `#paintContent(Graphics, int, int, int, int)` and the
+/// document/measurement hooks.
+public class EditorView extends Component implements TextInputClient {
+    private EditorHost host;
+    private final boolean codeMode;
+<span class="fc" id="L51">    private EditorDocument doc = new EditorDocument();</span>
+<span class="fc" id="L52">    private final UndoManager undo = new UndoManager();</span>
+
+    private int caret;
+<span class="fc" id="L55">    private int anchor = -1;</span>
+    private boolean multiKeyModeInstalled;
+<span class="fc" id="L57">    private int composingStart = -1;</span>
+<span class="fc" id="L58">    private int composingEnd = -1;</span>
+    // pre-composition snapshot so the finalized composition forms a single undo unit
+    private String composingBaseRemoved;
+    private Object composingBeforeState;
+<span class="fc" id="L62">    private boolean editable = true;</span>
+
+    private int scrollY;
+    private int scrollX;
+<span class="fc" id="L66">    private boolean caretOn = true;</span>
+    private long lastBlink;
+    private boolean animRegistered;
+
+    private Object inputHandle;
+    private boolean inputActive;
+
+<span class="fc" id="L73">    private int bgColor = 0xffffff;</span>
+<span class="fc" id="L74">    private int fgColor = 0x111111;</span>
+<span class="fc" id="L75">    private int selColor = 0xb3d4fc;</span>
+
+    /// Creates an editor view.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the bridge to the owning editor component / platform input source
+    ///
+    /// - `codeMode`: true for a code editor (autocorrect and autocapitalize disabled)
+<span class="fc" id="L84">    public EditorView(EditorHost host, boolean codeMode) {</span>
+<span class="fc" id="L85">        this.host = host;</span>
+<span class="fc" id="L86">        this.codeMode = codeMode;</span>
+<span class="fc" id="L87">        setFocusable(true);</span>
+<span class="fc" id="L88">        setGrabsPointerEvents(true);</span>
+        // own the arrow / enter / tab keys so the form's focus traversal does not steal them
+<span class="fc" id="L90">        setHandlesInput(true);</span>
+        // handle the mouse wheel / trackpad (shift = horizontal) ourselves so scrolling works without a
+        // scrollable ancestor; consuming the event stops the default scroll gesture from selecting text
+<span class="fc" id="L93">        addMouseWheelListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                if (evt instanceof WheelEvent) {</span>
+<span class="nc" id="L97">                    WheelEvent we = (WheelEvent) evt;</span>
+<span class="nc" id="L98">                    scrollByPixels(we.getDeltaX(), we.getDeltaY());</span>
+<span class="nc" id="L99">                    evt.consume();</span>
+                }
+<span class="nc" id="L101">            }</span>
+        });
+<span class="fc" id="L103">    }</span>
+
+    /// Scrolls the content by the given pixel deltas (as delivered by the mouse wheel gesture).
+    protected void scrollByPixels(int deltaX, int deltaY) {
+<span class="nc" id="L107">        scrollX = clampInt(scrollX - deltaX, 0, maxScrollX());</span>
+<span class="nc" id="L108">        scrollY = clampInt(scrollY - deltaY, 0, maxScroll());</span>
+<span class="nc" id="L109">        repaint();</span>
+<span class="nc" id="L110">    }</span>
+
+    /// Binds the editor host after construction. Used by a subclass that is its own host (see
+    /// `com.codename1.ui.EditField`), which cannot pass `this` to the constructor.
+    protected final void setEditorHost(EditorHost h) {
+<span class="fc" id="L115">        this.host = h;</span>
+<span class="fc" id="L116">    }</span>
+
+    /// Returns the backing document.
+    public EditorDocument getDocument() {
+<span class="fc" id="L120">        return doc;</span>
+    }
+
+    /// Returns the undo manager.
+    public UndoManager getUndoManager() {
+<span class="fc" id="L125">        return undo;</span>
+    }
+
+    /// Returns the current caret offset.
+    public int getCaretOffset() {
+<span class="fc" id="L130">        return caret;</span>
+    }
+
+    /// Sets the surface background color.
+    public void setBackgroundColor(int color) {
+<span class="fc" id="L135">        this.bgColor = color;</span>
+<span class="fc" id="L136">    }</span>
+
+    /// Sets the default text color.
+    public void setTextColor(int color) {
+<span class="fc" id="L140">        this.fgColor = color;</span>
+<span class="fc" id="L141">    }</span>
+
+    /// Sets the selection highlight color.
+    public void setSelectionColor(int color) {
+<span class="fc" id="L145">        this.selColor = color;</span>
+<span class="fc" id="L146">    }</span>
+
+    /// Returns the default text color used by the base renderer.
+    protected int getTextColor() {
+<span class="fc" id="L150">        return fgColor;</span>
+    }
+
+    /// Replaces the whole document text and resets the caret and history.
+    public void setText(String text) {
+<span class="fc" id="L155">        doc.setText(text);</span>
+<span class="fc" id="L156">        caret = 0;</span>
+<span class="fc" id="L157">        anchor = -1;</span>
+<span class="fc" id="L158">        composingStart = -1;</span>
+<span class="fc" id="L159">        composingEnd = -1;</span>
+<span class="fc" id="L160">        undo.clear();</span>
+<span class="fc" id="L161">        scrollY = 0;</span>
+<span class="fc" id="L162">        scrollX = 0;</span>
+<span class="fc" id="L163">        documentEdited(0);</span>
+<span class="fc" id="L164">        documentReset();</span>
+<span class="fc" id="L165">        onDocumentChanged();</span>
+<span class="fc" id="L166">    }</span>
+
+    /// Returns the whole document text.
+    public String getText() {
+<span class="fc" id="L170">        return doc.getText();</span>
+    }
+
+    /// Enables or disables editing.
+    public void setEditableState(boolean editable) {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (this.editable == editable) {</span>
+<span class="fc" id="L176">            return;</span>
+        }
+<span class="fc" id="L178">        this.editable = editable;</span>
+        // keep the platform session in step: a read-only editor must not hold the soft
+        // keyboard open, and re-enabling while focused should bring it back
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!editable) {</span>
+<span class="fc" id="L182">            stopInput();</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        } else if (hasFocus()) {</span>
+<span class="fc" id="L184">            startInput();</span>
+        }
+<span class="fc" id="L186">    }</span>
+
+    /// True when editing is enabled.
+    public boolean isEditableState() {
+<span class="fc" id="L190">        return editable;</span>
+    }
+
+    /// Relinquishes focus and stops the active platform text-input session.
+    public void blur() {
+<span class="fc" id="L195">        com.codename1.ui.Form form = getComponentForm();</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">        if (form != null &amp;&amp; equals(form.getFocused())) {</span>
+<span class="fc" id="L197">            form.setFocused(null);</span>
+        } else {
+<span class="nc" id="L199">            stopInput();</span>
+        }
+<span class="fc" id="L201">    }</span>
+
+    // ---- font / geometry ----
+
+    private Font cachedBase;
+    private Font cachedFrom;
+    private int fontSizeOverridePx;
+
+    /// Returns the base editor font size in pixels.
+    protected int baseFontSizePixels() {
+<span class="nc" id="L211">        return getEditorFont().getHeight();</span>
+    }
+
+    /// Optionally overrides the editor font size in device independent pixels. Pass 0 to use the font
+    /// supplied by the component's style (the default, which is correctly sized for the current skin).
+    public void setFontSizeDips(int dips) {
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        this.fontSizeOverridePx = dips &lt;= 0 ? 0 : Display.getInstance().convertToPixels((float) dips);</span>
+<span class="nc" id="L218">        cachedBase = null;</span>
+<span class="nc" id="L219">        invalidateLayout();</span>
+<span class="nc" id="L220">        repaint();</span>
+<span class="nc" id="L221">    }</span>
+
+    /// Returns the font used to render text. By default this is the component's style font (managed and
+    /// correctly sized by Codename One, and refreshed when the skin / theme reloads, which avoids stale
+    /// native font handles rendering as squares). Subclasses may override to supply styled variants.
+    protected Font getEditorFont() {
+<span class="fc" id="L227">        Font sf = getStyle().getFont();</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (sf == null) {</span>
+<span class="nc" id="L229">            sf = Font.getDefaultFont();</span>
+        }
+<span class="pc bpc" id="L231" title="1 of 4 branches missed.">        if (cachedBase != null &amp;&amp; cachedFrom == sf) { // NOPMD - intentional identity comparison</span>
+<span class="fc" id="L232">            return cachedBase;</span>
+        }
+<span class="fc" id="L234">        cachedFrom = sf;</span>
+<span class="fc" id="L235">        Font result = sf;</span>
+<span class="pc bpc" id="L236" title="3 of 4 branches missed.">        if (fontSizeOverridePx &gt; 0 &amp;&amp; sf.isTTFNativeFont()) {</span>
+            try {
+<span class="nc" id="L238">                result = sf.derive(fontSizeOverridePx, Font.STYLE_PLAIN);</span>
+<span class="nc" id="L239">            } catch (Throwable t) {</span>
+<span class="nc" id="L240">                result = sf;</span>
+<span class="nc" id="L241">            }</span>
+        }
+<span class="fc" id="L243">        cachedBase = result;</span>
+<span class="fc" id="L244">        return result;</span>
+    }
+
+    /// Returns the default height of a single visual line in pixels.
+    protected int getLineHeight() {
+<span class="fc" id="L249">        int h = getEditorFont().getHeight();</span>
+<span class="fc" id="L250">        return h + Math.max(2, h / 8);</span>
+    }
+
+    /// Returns the height of the given line. The default is uniform (`#getLineHeight()`); the rich text
+    /// editor overrides this for headings and font size runs.
+    protected int lineHeightAt(int line) {
+<span class="fc" id="L256">        return getLineHeight();</span>
+    }
+
+    /// True when every line has the same height (the common case, and the fast path). Feature layers with
+    /// variable line heights override this to return false.
+    protected boolean uniformLineHeight() {
+<span class="fc" id="L262">        return true;</span>
+    }
+
+    private int[] cumTops;
+<span class="fc" id="L266">    private boolean layoutDirty = true;</span>
+
+    /// Invalidates the cached line layout (used by feature layers when line heights change).
+    protected void invalidateLayout() {
+<span class="fc" id="L270">        layoutDirty = true;</span>
+<span class="fc" id="L271">        cachedMaxLineWidth = -1;</span>
+<span class="fc" id="L272">    }</span>
+
+    private void ensureCum() {
+<span class="fc" id="L275">        int lc = doc.getLineCount();</span>
+<span class="pc bpc" id="L276" title="2 of 6 branches missed.">        if (!layoutDirty &amp;&amp; cumTops != null &amp;&amp; cumTops.length == lc + 1) {</span>
+<span class="fc" id="L277">            return;</span>
+        }
+<span class="fc" id="L279">        cumTops = new int[lc + 1];</span>
+<span class="fc" id="L280">        int y = 0;</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        for (int i = 0; i &lt; lc; i++) {</span>
+<span class="fc" id="L282">            cumTops[i] = y;</span>
+<span class="fc" id="L283">            y += lineHeightAt(i);</span>
+        }
+<span class="fc" id="L285">        cumTops[lc] = y;</span>
+<span class="fc" id="L286">        layoutDirty = false;</span>
+<span class="fc" id="L287">    }</span>
+
+    /// Returns the top y pixel of the given line relative to the content top (before scroll).
+    protected int lineTopContent(int line) {
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (uniformLineHeight()) {</span>
+<span class="fc" id="L292">            return line * getLineHeight();</span>
+        }
+<span class="fc" id="L294">        ensureCum();</span>
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">        int l = line &lt; 0 ? 0 : (line &gt; doc.getLineCount() ? doc.getLineCount() : line);</span>
+<span class="fc" id="L296">        return cumTops[l];</span>
+    }
+
+    /// Returns the total content height in pixels.
+    protected int contentTotalHeight() {
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (uniformLineHeight()) {</span>
+<span class="fc" id="L302">            return doc.getLineCount() * getLineHeight();</span>
+        }
+<span class="fc" id="L304">        ensureCum();</span>
+<span class="fc" id="L305">        return cumTops[doc.getLineCount()];</span>
+    }
+
+    /// Returns the line index at the given content relative y pixel.
+    protected int lineAtContentY(int y) {
+<span class="fc" id="L310">        int lc = doc.getLineCount();</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (uniformLineHeight()) {</span>
+<span class="fc" id="L312">            return clampInt(y / getLineHeight(), 0, lc - 1);</span>
+        }
+<span class="fc" id="L314">        ensureCum();</span>
+<span class="fc" id="L315">        int lo = 0;</span>
+<span class="fc" id="L316">        int hi = lc - 1;</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        while (lo &lt; hi) {</span>
+<span class="fc" id="L318">            int mid = (lo + hi + 1) &gt;&gt;&gt; 1;</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            if (cumTops[mid] &lt;= y) {</span>
+<span class="fc" id="L320">                lo = mid;</span>
+            } else {
+<span class="fc" id="L322">                hi = mid - 1;</span>
+            }
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">        return lo;</span>
+    }
+
+    /// Returns the left inset (padding plus any gutter) at which text starts.
+    protected int getContentLeftInset() {
+<span class="fc" id="L330">        return getStyle().getPaddingLeftNoRTL();</span>
+    }
+
+    private int contentX() {
+<span class="fc" id="L334">        return getX() + getContentLeftInset();</span>
+    }
+
+    private int contentY() {
+<span class="fc" id="L338">        return getY() + getStyle().getPaddingTop();</span>
+    }
+
+    /// Returns the width available for text (component width minus padding and any gutter).
+    protected int contentWidth() {
+<span class="fc" id="L343">        return getWidth() - getContentLeftInset() - getStyle().getPaddingRightNoRTL();</span>
+    }
+
+    private int contentHeight() {
+<span class="fc" id="L347">        return getHeight() - getStyle().getPaddingTop() - getStyle().getPaddingBottom();</span>
+    }
+
+    // ---- selection helpers ----
+
+    /// True when a non empty selection exists.
+    public boolean hasSelection() {
+<span class="pc bpc" id="L354" title="1 of 4 branches missed.">        return anchor &gt;= 0 &amp;&amp; anchor != caret;</span>
+    }
+
+    /// Returns the inclusive start offset of the selection (or the caret when none).
+    public int getSelectionStart() {
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        if (anchor &lt; 0) {</span>
+<span class="fc" id="L360">            return caret;</span>
+        }
+<span class="fc" id="L362">        return Math.min(anchor, caret);</span>
+    }
+
+    /// Returns the exclusive end offset of the selection (or the caret when none).
+    public int getSelectionEnd() {
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (anchor &lt; 0) {</span>
+<span class="fc" id="L368">            return caret;</span>
+        }
+<span class="fc" id="L370">        return Math.max(anchor, caret);</span>
+    }
+
+    // ---- painting ----
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L377">        g.setColor(bgColor);</span>
+<span class="fc" id="L378">        g.fillRect(getX(), getY(), getWidth(), getHeight());</span>
+<span class="fc" id="L379">        paintContent(g, contentX(), contentY() - scrollY, contentWidth(), contentHeight());</span>
+<span class="pc bpc" id="L380" title="3 of 4 branches missed.">        if (touchSelection &amp;&amp; hasSelection()) {</span>
+<span class="nc" id="L381">            paintSelectionUI(g);</span>
+        }
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        if (loupeActive) {</span>
+<span class="nc" id="L384">            paintLoupe(g);</span>
+        }
+<span class="fc" id="L386">    }</span>
+
+    // ---- touch selection UI (long-press, draggable handles, context toolbar, magnifier loupe) ----
+
+    private boolean touchSelection;
+    private int draggingHandle;
+    private int[] startHandleLocal;
+    private int[] endHandleLocal;
+    private int[][] toolbarButtons;
+    private java.util.List&lt;String&gt; toolbarLabels;
+    private boolean loupeActive;
+    private int loupeOffset;
+    private Font loupeFontCache;
+    private Font loupeBaseFont;
+
+    /// The magnified font used inside the loupe (1.5x the editor font), cached against the base font so a
+    /// theme/skin change regenerates it.
+    private Font loupeFont() {
+<span class="nc" id="L404">        Font base = getEditorFont();</span>
+<span class="nc bnc" id="L405" title="All 4 branches missed.">        if (loupeFontCache == null || loupeBaseFont != base) { // NOPMD - intentional identity comparison</span>
+<span class="nc" id="L406">            loupeBaseFont = base;</span>
+<span class="nc" id="L407">            loupeFontCache = base.derive(base.getHeight() * 1.5f, Font.STYLE_PLAIN);</span>
+        }
+<span class="nc" id="L409">        return loupeFontCache;</span>
+    }
+
+    /// Draws the selection magnifier: a rounded callout above the touched offset showing the text around
+    /// it enlarged, with a caret marker centered on the touch. Shown while placing the caret with a long
+    /// press and while dragging a selection handle, mirroring the native touch selection feel.
+    private void paintLoupe(Graphics g) {
+<span class="nc" id="L416">        int off = doc.clamp(loupeOffset);</span>
+<span class="nc" id="L417">        int ln = doc.lineOfOffset(off);</span>
+<span class="nc" id="L418">        String line = doc.getLineText(ln);</span>
+<span class="nc" id="L419">        int col = off - doc.getLineStart(ln);</span>
+<span class="nc" id="L420">        Font base = getEditorFont();</span>
+<span class="nc" id="L421">        Font big = loupeFont();</span>
+<span class="nc" id="L422">        int lh = big.getHeight();</span>
+<span class="nc" id="L423">        int pad = base.charWidth('m');</span>
+<span class="nc" id="L424">        int bubbleH = lh + pad;</span>
+<span class="nc" id="L425">        int bubbleW = Math.min(getWidth() - 8, big.charWidth('m') * 16);</span>
+<span class="nc" id="L426">        int caretBaseX = measureColumnX(ln, line, col, base);</span>
+<span class="nc" id="L427">        int caretLocalX = getContentLeftInset() + lineContentOffsetX(ln) + caretBaseX - scrollX;</span>
+<span class="nc" id="L428">        int caretLocalY = getStyle().getPaddingTop() + lineTopContent(ln) - scrollY;</span>
+<span class="nc" id="L429">        int bx = clampInt(caretLocalX - bubbleW / 2, 4, Math.max(4, getWidth() - 4 - bubbleW));</span>
+<span class="nc" id="L430">        int by = caretLocalY - bubbleH - handleRadius() * 3;</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">        if (by &lt; 4) {</span>
+<span class="nc" id="L432">            by = caretLocalY + lineHeightAt(ln) + handleRadius() * 3;</span>
+        }
+<span class="nc" id="L434">        int ax = getX() + bx;</span>
+<span class="nc" id="L435">        int ay = getY() + by;</span>
+<span class="nc" id="L436">        int arc = Math.max(8, bubbleH / 2);</span>
+<span class="nc" id="L437">        g.setColor(0xffffff);</span>
+<span class="nc" id="L438">        g.fillRoundRect(ax, ay, bubbleW, bubbleH, arc, arc);</span>
+<span class="nc" id="L439">        g.setColor(0x1a73e8);</span>
+<span class="nc" id="L440">        g.drawRoundRect(ax, ay, bubbleW, bubbleH, arc, arc);</span>
+<span class="nc" id="L441">        g.pushClip();</span>
+<span class="nc" id="L442">        g.clipRect(ax + 2, ay + 2, bubbleW - 4, bubbleH - 4);</span>
+        // scale the (bidi aware) caret x from the base to the magnified font so the touched glyph is centered
+<span class="nc" id="L444">        int scaledCaretX = caretBaseX * lh / Math.max(1, base.getHeight());</span>
+<span class="nc" id="L445">        int textX = ax + bubbleW / 2 - scaledCaretX;</span>
+<span class="nc" id="L446">        int textY = ay + (bubbleH - lh) / 2;</span>
+<span class="nc" id="L447">        g.setColor(fgColor);</span>
+<span class="nc" id="L448">        g.setFont(big);</span>
+<span class="nc" id="L449">        g.drawString(line, textX, textY);</span>
+<span class="nc" id="L450">        g.setColor(0x1a73e8);</span>
+<span class="nc" id="L451">        g.fillRect(ax + bubbleW / 2, textY, Math.max(1, lh / 14), lh);</span>
+<span class="nc" id="L452">        g.popClip();</span>
+<span class="nc" id="L453">        g.setFont(base);</span>
+<span class="nc" id="L454">    }</span>
+
+    private int handleRadius() {
+<span class="nc" id="L457">        return Math.max(6, getEditorFont().getHeight() / 3);</span>
+    }
+
+    // returns {localX, localYTop, lineHeight} for an offset (component-local, matches paint origin getX/getY)
+    private int[] offsetLocal(int off) {
+<span class="nc" id="L462">        Font f = getEditorFont();</span>
+<span class="nc" id="L463">        int line = doc.lineOfOffset(off);</span>
+<span class="nc" id="L464">        int col = off - doc.getLineStart(line);</span>
+<span class="nc" id="L465">        String text = doc.getLineText(line);</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">        if (col &gt; text.length()) {</span>
+<span class="nc" id="L467">            col = text.length();</span>
+        }
+<span class="nc" id="L469">        int lx = getContentLeftInset() + lineContentOffsetX(line) + measureColumnX(line, text, col, f) - scrollX;</span>
+<span class="nc" id="L470">        int ly = getStyle().getPaddingTop() + lineTopContent(line) - scrollY;</span>
+<span class="nc" id="L471">        return new int[]{lx, ly, lineHeightAt(line)};</span>
+    }
+
+    private void paintSelectionUI(Graphics g) {
+<span class="nc" id="L475">        int hr = handleRadius();</span>
+<span class="nc" id="L476">        int[] s = offsetLocal(getSelectionStart());</span>
+<span class="nc" id="L477">        int[] e = offsetLocal(getSelectionEnd());</span>
+<span class="nc" id="L478">        int color = 0x1a73e8;</span>
+        // start handle: stem + ball above the line top
+<span class="nc" id="L480">        g.setColor(color);</span>
+<span class="nc" id="L481">        g.fillRect(getX() + s[0] - 1, getY() + s[1], 2, s[2]);</span>
+<span class="nc" id="L482">        g.fillArc(getX() + s[0] - hr, getY() + s[1] - hr * 2, hr * 2, hr * 2, 0, 360);</span>
+<span class="nc" id="L483">        startHandleLocal = new int[]{s[0], s[1] - hr};</span>
+        // end handle: stem + ball below the line bottom
+<span class="nc" id="L485">        g.setColor(color);</span>
+<span class="nc" id="L486">        g.fillRect(getX() + e[0] - 1, getY() + e[1], 2, e[2]);</span>
+<span class="nc" id="L487">        g.fillArc(getX() + e[0] - hr, getY() + e[1] + e[2], hr * 2, hr * 2, 0, 360);</span>
+<span class="nc" id="L488">        endHandleLocal = new int[]{e[0], e[1] + e[2] + hr};</span>
+<span class="nc" id="L489">        paintToolbar(g, s);</span>
+<span class="nc" id="L490">    }</span>
+
+    private void paintToolbar(Graphics g, int[] anchor) {
+<span class="nc" id="L493">        Font f = getEditorFont();</span>
+<span class="nc" id="L494">        java.util.List&lt;String&gt; labels = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L495">        labels.add(&quot;Copy&quot;);</span>
+<span class="nc bnc" id="L496" title="All 2 branches missed.">        if (editable) {</span>
+<span class="nc" id="L497">            labels.add(&quot;Cut&quot;);</span>
+<span class="nc" id="L498">            labels.add(&quot;Paste&quot;);</span>
+        }
+<span class="nc" id="L500">        labels.add(&quot;Select All&quot;);</span>
+<span class="nc" id="L501">        int pad = f.charWidth('m');</span>
+<span class="nc" id="L502">        int bh = f.getHeight() + pad;</span>
+<span class="nc" id="L503">        int[] w = new int[labels.size()];</span>
+<span class="nc" id="L504">        int total = 0;</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">        for (int i = 0; i &lt; labels.size(); i++) {</span>
+<span class="nc" id="L506">            w[i] = f.stringWidth(labels.get(i)) + pad * 2;</span>
+<span class="nc" id="L507">            total += w[i];</span>
+        }
+<span class="nc" id="L509">        int tx = anchor[0] - total / 2;</span>
+<span class="nc" id="L510">        int ty = anchor[1] - bh - handleRadius() * 2;</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">        if (tx &lt; 0) {</span>
+<span class="nc" id="L512">            tx = 0;</span>
+        }
+<span class="nc bnc" id="L514" title="All 2 branches missed.">        if (tx + total &gt; getWidth()) {</span>
+<span class="nc" id="L515">            tx = getWidth() - total;</span>
+        }
+<span class="nc bnc" id="L517" title="All 2 branches missed.">        if (ty &lt; 0) {</span>
+<span class="nc" id="L518">            ty = anchor[1] + anchor[2] + handleRadius() * 2;</span>
+        }
+<span class="nc" id="L520">        g.setColor(0x222222);</span>
+<span class="nc" id="L521">        g.fillRect(getX() + tx, getY() + ty, total, bh);</span>
+<span class="nc" id="L522">        toolbarButtons = new int[labels.size()][4];</span>
+<span class="nc" id="L523">        toolbarLabels = labels;</span>
+<span class="nc" id="L524">        int cx = tx;</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">        for (int i = 0; i &lt; labels.size(); i++) {</span>
+<span class="nc" id="L526">            toolbarButtons[i] = new int[]{cx, ty, w[i], bh};</span>
+<span class="nc" id="L527">            g.setColor(0xf0f0f0);</span>
+<span class="nc" id="L528">            g.setFont(f);</span>
+<span class="nc" id="L529">            g.drawString(labels.get(i), getX() + cx + pad, getY() + ty + pad / 2);</span>
+<span class="nc" id="L530">            cx += w[i];</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">            if (i &lt; labels.size() - 1) {</span>
+<span class="nc" id="L532">                g.setColor(0x555555);</span>
+<span class="nc" id="L533">                g.drawLine(getX() + cx, getY() + ty + 4, getX() + cx, getY() + ty + bh - 4);</span>
+            }
+        }
+<span class="nc" id="L536">    }</span>
+
+    @Override
+    public void longPointerPress(int x, int y) {
+<span class="nc" id="L540">        int off = offsetAtPoint(x, y);</span>
+<span class="nc" id="L541">        selectWordAt(off);</span>
+<span class="nc" id="L542">        touchSelection = hasSelection();</span>
+<span class="nc" id="L543">        loupeActive = true;</span>
+<span class="nc" id="L544">        loupeOffset = off;</span>
+<span class="nc" id="L545">        repaint();</span>
+<span class="nc" id="L546">    }</span>
+
+    private boolean nearLocal(int[] handleLocal, int x, int y) {
+<span class="nc bnc" id="L549" title="All 2 branches missed.">        if (handleLocal == null) {</span>
+<span class="nc" id="L550">            return false;</span>
+        }
+<span class="nc" id="L552">        int lx = x - getAbsoluteX();</span>
+<span class="nc" id="L553">        int ly = y - getAbsoluteY();</span>
+<span class="nc" id="L554">        int r = handleRadius() * 3;</span>
+<span class="nc" id="L555">        int dx = lx - handleLocal[0];</span>
+<span class="nc" id="L556">        int dy = ly - handleLocal[1];</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">        return dx * dx + dy * dy &lt;= r * r;</span>
+    }
+
+    private boolean handleTouchSelectionPress(int x, int y) {
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (!touchSelection) {</span>
+<span class="fc" id="L562">            return false;</span>
+        }
+<span class="nc" id="L564">        int lx = x - getAbsoluteX();</span>
+<span class="nc" id="L565">        int ly = y - getAbsoluteY();</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">        if (toolbarButtons != null) {</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            for (int i = 0; i &lt; toolbarButtons.length; i++) {</span>
+<span class="nc" id="L568">                int[] r = toolbarButtons[i];</span>
+<span class="nc bnc" id="L569" title="All 8 branches missed.">                if (lx &gt;= r[0] &amp;&amp; lx &lt;= r[0] + r[2] &amp;&amp; ly &gt;= r[1] &amp;&amp; ly &lt;= r[1] + r[3]) {</span>
+<span class="nc" id="L570">                    doToolbarAction(toolbarLabels.get(i));</span>
+<span class="nc" id="L571">                    return true;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L575" title="All 2 branches missed.">        if (nearLocal(startHandleLocal, x, y)) {</span>
+<span class="nc" id="L576">            anchor = getSelectionEnd();</span>
+<span class="nc" id="L577">            caret = getSelectionStart();</span>
+<span class="nc" id="L578">            draggingHandle = 1;</span>
+<span class="nc" id="L579">            return true;</span>
+        }
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        if (nearLocal(endHandleLocal, x, y)) {</span>
+<span class="nc" id="L582">            anchor = getSelectionStart();</span>
+<span class="nc" id="L583">            caret = getSelectionEnd();</span>
+<span class="nc" id="L584">            draggingHandle = 2;</span>
+<span class="nc" id="L585">            return true;</span>
+        }
+        // tap outside the selection UI dismisses it
+<span class="nc" id="L588">        touchSelection = false;</span>
+<span class="nc" id="L589">        startHandleLocal = null;</span>
+<span class="nc" id="L590">        endHandleLocal = null;</span>
+<span class="nc" id="L591">        toolbarButtons = null;</span>
+<span class="nc" id="L592">        return false;</span>
+    }
+
+    private void doToolbarAction(String label) {
+<span class="nc bnc" id="L596" title="All 2 branches missed.">        if (&quot;Copy&quot;.equals(label)) {</span>
+<span class="nc" id="L597">            copySelection();</span>
+<span class="nc bnc" id="L598" title="All 2 branches missed.">        } else if (&quot;Cut&quot;.equals(label)) {</span>
+<span class="nc" id="L599">            cutSelection();</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">        } else if (&quot;Paste&quot;.equals(label)) {</span>
+<span class="nc" id="L601">            pasteClipboard();</span>
+<span class="nc bnc" id="L602" title="All 2 branches missed.">        } else if (&quot;Select All&quot;.equals(label)) {</span>
+<span class="nc" id="L603">            selectAll();</span>
+<span class="nc" id="L604">            touchSelection = true;</span>
+<span class="nc" id="L605">            repaint();</span>
+<span class="nc" id="L606">            return;</span>
+        }
+<span class="nc" id="L608">        touchSelection = false;</span>
+<span class="nc" id="L609">        repaint();</span>
+<span class="nc" id="L610">    }</span>
+
+    /// Paints the document content. `originY` is already offset by the scroll position, so line `n` is at
+    /// `originY + n * getLineHeight()`. Subclasses override to add highlighting, a gutter or styled runs
+    /// but should call through for the shared caret / selection rendering, or reimplement it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics context
+    ///
+    /// - `originX`: the x pixel at which line text starts
+    ///
+    /// - `originY`: the y pixel of the first line (scroll adjusted)
+    ///
+    /// - `width`: the content width
+    ///
+    /// - `height`: the content height
+    protected void paintContent(Graphics g, int originX, int originY, int width, int height) {
+<span class="fc" id="L628">        Font f = getEditorFont();</span>
+<span class="fc" id="L629">        g.setFont(f);</span>
+<span class="fc" id="L630">        int lineCount = doc.getLineCount();</span>
+<span class="fc" id="L631">        int first = lineAtContentY(scrollY);</span>
+<span class="fc" id="L632">        int last = Math.min(lineCount - 1, lineAtContentY(scrollY + height) + 1);</span>
+<span class="fc" id="L633">        paintBeforeContent(g, originX, originY, first, last, getLineHeight(), f);</span>
+        // clip the text area (so horizontally scrolled text does not paint over the gutter) and apply
+        // the horizontal scroll offset
+<span class="fc" id="L636">        g.pushClip();</span>
+<span class="fc" id="L637">        g.clipRect(originX, getY() + getStyle().getPaddingTop(), width, height);</span>
+<span class="fc" id="L638">        int tx = originX - scrollX;</span>
+<span class="fc" id="L639">        int ss = getSelectionStart();</span>
+<span class="fc" id="L640">        int se = getSelectionEnd();</span>
+<span class="fc" id="L641">        int eolPad = f.charWidth(' ');</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">        for (int ln = first; ln &lt;= last; ln++) {</span>
+<span class="fc" id="L643">            int ly = originY + lineTopContent(ln);</span>
+<span class="fc" id="L644">            int lh = lineHeightAt(ln);</span>
+<span class="fc" id="L645">            String text = doc.getLineText(ln);</span>
+<span class="fc" id="L646">            int lineStart = doc.getLineStart(ln);</span>
+<span class="fc" id="L647">            int lineEnd = doc.getLineEnd(ln);</span>
+<span class="pc bpc" id="L648" title="2 of 6 branches missed.">            if (ss != se &amp;&amp; ss &lt;= lineEnd &amp;&amp; se &gt;= lineStart) {</span>
+<span class="fc" id="L649">                int lineOff = lineContentOffsetX(ln);</span>
+<span class="fc" id="L650">                int a = clampInt(ss - lineStart, 0, text.length());</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">                boolean pastEol = se &gt; lineEnd;</span>
+<span class="fc bfc" id="L652" title="All 2 branches covered.">                int b = pastEol ? text.length() : clampInt(se - lineStart, 0, text.length());</span>
+<span class="fc" id="L653">                g.setColor(selColor);</span>
+<span class="fc" id="L654">                int[] segs = lineVisualSegments(ln, text, a, b, f);</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">                for (int si = 0; si &lt; segs.length; si += 2) {</span>
+<span class="fc" id="L656">                    g.fillRect(tx + lineOff + segs[si], ly, segs[si + 1], lh);</span>
+                }
+<span class="fc bfc" id="L658" title="All 2 branches covered.">                if (pastEol) {</span>
+                    // selection continues across the line break: pad at the visual end of the line
+<span class="fc" id="L660">                    int endX = tx + lineOff + measureColumnX(ln, text, text.length(), f);</span>
+<span class="fc" id="L661">                    g.fillRect(endX, ly, eolPad, lh);</span>
+                }
+            }
+<span class="fc" id="L664">            paintLine(g, ln, text, tx, ly, lh, f);</span>
+<span class="fc" id="L665">            paintLineDecorations(g, ln, text, tx, ly, lh, f);</span>
+<span class="fc" id="L666">            paintComposingUnderline(g, ln, text, lineStart, lineEnd, tx, ly, lh, f);</span>
+        }
+<span class="fc" id="L668">        paintCaret(g, tx, originY, f);</span>
+<span class="fc" id="L669">        g.popClip();</span>
+<span class="fc" id="L670">    }</span>
+
+    /// Draws the IME composition (marked text) underline for the portion of the active composing range
+    /// that falls on the given line. The composing range is set by `#setComposingText(String, int)` while
+    /// an input method is composing (e.g. CJK) and cleared by `#finishComposing()`.
+    protected void paintComposingUnderline(Graphics g, int line, String text, int lineStart, int lineEnd,
+            int tx, int ly, int lineHeight, Font f) {
+<span class="fc bfc" id="L677" title="All 4 branches covered.">        if (composingStart &lt; 0 || composingEnd &lt;= composingStart) {</span>
+<span class="fc" id="L678">            return;</span>
+        }
+<span class="pc bpc" id="L680" title="2 of 4 branches missed.">        if (composingStart &gt; lineEnd || composingEnd &lt; lineStart) {</span>
+<span class="nc" id="L681">            return;</span>
+        }
+<span class="fc" id="L683">        int lineOff = lineContentOffsetX(line);</span>
+<span class="fc" id="L684">        int a = clampInt(composingStart - lineStart, 0, text.length());</span>
+<span class="fc" id="L685">        int b = clampInt(Math.min(composingEnd, lineEnd) - lineStart, 0, text.length());</span>
+<span class="fc" id="L686">        int xa = tx + lineOff + measureColumnX(line, text, a, f);</span>
+<span class="fc" id="L687">        int xb = tx + lineOff + measureColumnX(line, text, b, f);</span>
+<span class="fc" id="L688">        int left = Math.min(xa, xb);</span>
+<span class="fc" id="L689">        int w = Math.abs(xb - xa);</span>
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        if (w &lt;= 0) {</span>
+<span class="nc" id="L691">            return;</span>
+        }
+<span class="fc" id="L693">        int thickness = Math.max(1, lineHeight / 16);</span>
+<span class="fc" id="L694">        int uy = ly + lineHeight - thickness - Math.max(1, lineHeight / 12);</span>
+<span class="fc" id="L695">        g.setColor(fgColor);</span>
+<span class="fc" id="L696">        g.fillRect(left, uy, w, thickness);</span>
+<span class="fc" id="L697">    }</span>
+
+    /// Hook invoked before the visible lines are drawn, used by the code editor to paint the line number
+    /// gutter. `originY` is scroll adjusted so line `n` sits at `originY + n * lineHeight`.
+    protected void paintBeforeContent(Graphics g, int originX, int originY, int firstLine, int lastLine, int lineHeight, Font f) {
+<span class="fc" id="L702">    }</span>
+
+    /// Hook invoked after a line's text is drawn, used by the code editor to paint diagnostic squiggles.
+    protected void paintLineDecorations(Graphics g, int line, String text, int x, int y, int lineHeight, Font f) {
+<span class="fc" id="L706">    }</span>
+
+    /// Returns the y pixel of the top of the given line in component local coordinates (scroll adjusted).
+    protected int lineTop(int line) {
+<span class="fc" id="L710">        return getStyle().getPaddingTop() - scrollY + lineTopContent(line);</span>
+    }
+
+    /// Returns the first fully or partially visible line index.
+    protected int firstVisibleLine() {
+<span class="fc" id="L715">        return lineAtContentY(scrollY);</span>
+    }
+
+    /// Returns the current horizontal scroll offset in pixels.
+    protected int getHorizontalScroll() {
+<span class="fc" id="L720">        return scrollX;</span>
+    }
+
+    /// Returns the current vertical scroll offset in pixels.
+    protected int getVerticalScroll() {
+<span class="fc" id="L725">        return scrollY;</span>
+    }
+
+    /// Returns the largest valid vertical content offset.
+    protected int getMaximumVerticalScroll() {
+<span class="fc" id="L730">        return maxScroll();</span>
+    }
+
+    /// Paints a single line of text. Subclasses override to add syntax coloring; the base implementation
+    /// draws the whole line in the default text color.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics context
+    ///
+    /// - `line`: the zero based line index
+    ///
+    /// - `text`: the line text
+    ///
+    /// - `x`: the x pixel at which the line text starts
+    ///
+    /// - `y`: the top y pixel of the line
+    ///
+    /// - `lineHeight`: the line height
+    ///
+    /// - `f`: the font
+    protected void paintLine(Graphics g, int line, String text, int x, int y, int lineHeight, Font f) {
+<span class="fc bfc" id="L752" title="All 2 branches covered.">        if (text.length() == 0) {</span>
+<span class="fc" id="L753">            return;</span>
+        }
+<span class="fc" id="L755">        g.setColor(fgColor);</span>
+<span class="fc bfc" id="L756" title="All 2 branches covered.">        if (BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L757">            g.drawString(text, x, y);</span>
+<span class="fc" id="L758">            return;</span>
+        }
+        // Draw each directional run as its own substring at its visual x; the platform font engine shapes
+        // and orders the glyphs within the (single-direction) run.
+<span class="fc" id="L762">        int[][] runs = bidiRuns(text, f);</span>
+<span class="fc bfc" id="L763" title="All 2 branches covered.">        for (int[] run : runs) {</span>
+<span class="fc" id="L764">            g.drawString(text.substring(run[0], run[1]), x + run[3], y);</span>
+        }
+<span class="fc" id="L766">    }</span>
+
+    private void paintCaret(Graphics g, int originX, int originY, Font f) {
+<span class="pc bpc" id="L769" title="1 of 6 branches missed.">        if (!caretOn || !hasFocus() || !editable) {</span>
+<span class="fc" id="L770">            return;</span>
+        }
+<span class="fc" id="L772">        int cl = doc.lineOfOffset(caret);</span>
+<span class="fc" id="L773">        int col = caret - doc.getLineStart(cl);</span>
+<span class="fc" id="L774">        String line = doc.getLineText(cl);</span>
+<span class="pc bpc" id="L775" title="1 of 2 branches missed.">        if (col &gt; line.length()) {</span>
+<span class="nc" id="L776">            col = line.length();</span>
+        }
+<span class="fc" id="L778">        int cx = originX + lineContentOffsetX(cl) + measureColumnX(cl, line, col, f);</span>
+<span class="fc" id="L779">        int cy = originY + lineTopContent(cl);</span>
+<span class="fc" id="L780">        int cw = Math.max(1, f.getHeight() / 16);</span>
+<span class="fc" id="L781">        g.setColor(fgColor);</span>
+<span class="fc" id="L782">        g.fillRect(cx, cy, cw, lineHeightAt(cl));</span>
+<span class="fc" id="L783">    }</span>
+
+    private static int clampInt(int v, int lo, int hi) {
+<span class="fc bfc" id="L786" title="All 2 branches covered.">        if (v &lt; lo) {</span>
+<span class="fc" id="L787">            return lo;</span>
+        }
+<span class="fc bfc" id="L789" title="All 2 branches covered.">        if (v &gt; hi) {</span>
+<span class="fc" id="L790">            return hi;</span>
+        }
+<span class="fc" id="L792">        return v;</span>
+    }
+
+    // ---- hit testing ----
+
+    /// Returns the document offset nearest the given absolute screen point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `absX`: absolute x
+    ///
+    /// - `absY`: absolute y
+    @Override
+    public int offsetAtPoint(int absX, int absY) {
+<span class="fc" id="L806">        Font f = getEditorFont();</span>
+        // pointer coordinates are absolute (form space); convert to content-local
+<span class="fc" id="L808">        int localY = absY - getAbsoluteY() - getStyle().getPaddingTop() + scrollY;</span>
+<span class="fc" id="L809">        int ln = lineAtContentY(localY);</span>
+<span class="fc" id="L810">        int lineStart = doc.getLineStart(ln);</span>
+<span class="fc" id="L811">        String text = doc.getLineText(ln);</span>
+<span class="fc" id="L812">        int localX = absX - getAbsoluteX() - getContentLeftInset() + scrollX - lineContentOffsetX(ln);</span>
+<span class="fc" id="L813">        return lineStart + columnAtX(ln, text, localX, f);</span>
+    }
+
+    // ---- editing primitives ----
+
+    /// This view edits text, so key codes reaching it are characters rather than commands.
+    ///
+    /// Only while it is editable. A read only view declines the insert in `keyReleased`, so
+    /// claiming the code anyway took a colliding soft key away from the menu bar and then did
+    /// nothing with it -- the command was silently lost.
+    @Override
+    protected boolean consumesRawTextInput() {
+<span class="nc" id="L825">        return isEditableState();</span>
+    }
+
+    /// Whether the given range may be modified. Subclasses that make part of the document read only
+    /// override this so every mutation path is covered, including input method composition, which
+    /// writes to the document without going through `#replaceRange(int, int, String, boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: inclusive start offset of the edit
+    ///
+    /// - `end`: exclusive end offset of the edit
+    ///
+    /// **Returns:** true when the edit may proceed
+    protected boolean isEditAllowed(int start, int end) {
+<span class="fc" id="L840">        return true;</span>
+    }
+
+    /// Replaces the range `[start, end)` with `text`, updating the caret, history and platform input
+    /// state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: inclusive start offset
+    ///
+    /// - `end`: exclusive end offset
+    ///
+    /// - `text`: the replacement text (may be empty)
+    ///
+    /// - `record`: true to record the mutation for undo
+    protected void replaceRange(int start, int end, String text, boolean record) {
+<span class="fc" id="L856">        start = doc.clamp(start);</span>
+<span class="fc" id="L857">        end = doc.clamp(end);</span>
+<span class="pc bpc" id="L858" title="1 of 2 branches missed.">        if (start &gt; end) {</span>
+<span class="nc" id="L859">            int t = start;</span>
+<span class="nc" id="L860">            start = end;</span>
+<span class="nc" id="L861">            end = t;</span>
+        }
+<span class="pc bpc" id="L863" title="1 of 2 branches missed.">        String value = EditorDocument.normalizeText(text == null ? &quot;&quot; : text);</span>
+<span class="fc" id="L864">        String removed = doc.substring(start, end);</span>
+<span class="fc bfc" id="L865" title="All 2 branches covered.">        Object beforeState = record ? captureDocumentState() : null;</span>
+<span class="fc" id="L866">        doc.delete(start, end);</span>
+<span class="fc" id="L867">        doc.insert(start, value);</span>
+<span class="fc" id="L868">        caret = start + value.length();</span>
+<span class="fc" id="L869">        anchor = -1;</span>
+<span class="fc" id="L870">        documentEdited(start);</span>
+<span class="fc" id="L871">        documentReplaced(start, removed, value);</span>
+<span class="fc bfc" id="L872" title="All 2 branches covered.">        if (record) {</span>
+<span class="fc" id="L873">            undo.record(start, removed, value, beforeState, captureDocumentState());</span>
+        }
+<span class="fc" id="L875">        onDocumentChanged();</span>
+<span class="fc" id="L876">    }</span>
+
+    /// Hook invoked when the document is mutated at `fromOffset`, used by feature layers (e.g. the code
+    /// editor) to invalidate cached tokenization from the affected line onward.
+    protected void documentEdited(int fromOffset) {
+<span class="fc" id="L881">    }</span>
+
+    /// Hook invoked when a range is replaced, carrying the exact removed and inserted text so feature
+    /// layers (e.g. the rich text editor) can keep a parallel style / block model in sync. The default is
+    /// a no-op.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the offset at which the replacement happened
+    ///
+    /// - `removed`: the removed text
+    ///
+    /// - `inserted`: the inserted text
+    protected void documentReplaced(int start, String removed, String inserted) {
+<span class="fc" id="L895">    }</span>
+
+    /// Hook invoked when the whole document is reset (e.g. by `#setText(String)`), so feature layers can
+    /// rebuild their parallel models. The default is a no-op.
+    protected void documentReset() {
+<span class="fc" id="L900">    }</span>
+
+    /// Captures feature-layer state associated with the document for undo/redo. Plain and code editors
+    /// return null; rich editors override this to snapshot formatting, blocks, links and images.
+    protected Object captureDocumentState() {
+<span class="fc" id="L905">        return null;</span>
+    }
+
+    /// Restores a feature-layer snapshot captured by `#captureDocumentState()`.
+    protected void restoreDocumentState(Object state) {
+<span class="fc" id="L910">    }</span>
+
+    /// Refreshes the most recent undo unit after a feature layer finishes decorating an inserted range.
+    protected final void refreshUndoAfterState() {
+<span class="fc" id="L914">        undo.updateLastAfterState(captureDocumentState());</span>
+<span class="fc" id="L915">    }</span>
+
+    /// Inserts text at the caret, replacing any active selection.
+    public void insertText(String text) {
+<span class="pc bpc" id="L919" title="3 of 6 branches missed.">        if (!editable || text == null || text.length() == 0) {</span>
+<span class="nc" id="L920">            return;</span>
+        }
+<span class="pc bpc" id="L922" title="1 of 2 branches missed.">        if (handleTypedText(text)) {</span>
+<span class="nc" id="L923">            return;</span>
+        }
+<span class="fc" id="L925">        replaceRange(getSelectionStart(), getSelectionEnd(), text, true);</span>
+<span class="fc" id="L926">    }</span>
+
+    /// Hook giving feature layers a chance to intercept typed text before the default insertion (used by
+    /// the code editor for bracket / quote auto close, tab expansion and auto indent). Return true when
+    /// the text was consumed. The default returns false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text being typed / committed
+    protected boolean handleTypedText(String text) {
+<span class="fc" id="L936">        return false;</span>
+    }
+
+    /// Handles a tab key press (delivered as `#KEY_TAB`). Feature layers override this for indent /
+    /// dedent behavior. The default inserts a tab character on a plain tab and does nothing on a
+    /// dedent (a plain editor has no indentation to remove).
+    ///
+    /// #### Parameters
+    ///
+    /// - `dedent`: true when shift was held (shift-tab)
+    protected void handleTab(boolean dedent) {
+<span class="nc bnc" id="L947" title="All 2 branches missed.">        if (!dedent) {</span>
+<span class="nc" id="L948">            replaceRange(getSelectionStart(), getSelectionEnd(), &quot;\t&quot;, true);</span>
+        }
+<span class="nc" id="L950">    }</span>
+
+    /// Returns the host bridge, for feature layers that need to fire editor events.
+    protected EditorHost host() {
+<span class="fc" id="L954">        return host;</span>
+    }
+
+    /// Deletes the selection, or the character before the caret when there is none. This is what
+    /// Backspace does, including its handling of a surrogate pair, and it is public so a host that
+    /// has swallowed the keystroke -- a desktop menu accelerator, for instance -- can hand it back
+    /// rather than approximating it with the IME oriented `#deleteSurroundingText(int, int)`.
+    public void deleteBackward() {
+<span class="pc bpc" id="L962" title="1 of 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L963">            return;</span>
+        }
+<span class="pc bpc" id="L965" title="1 of 2 branches missed.">        if (hasSelection()) {</span>
+<span class="nc" id="L966">            replaceRange(getSelectionStart(), getSelectionEnd(), &quot;&quot;, true);</span>
+<span class="nc" id="L967">            return;</span>
+        }
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">        if (caret &gt; 0) {</span>
+<span class="fc" id="L970">            int prev = caret - 1;</span>
+<span class="pc bpc" id="L971" title="4 of 6 branches missed.">            if (prev &gt; 0 &amp;&amp; Character.isLowSurrogate(doc.charAt(prev)) &amp;&amp; Character.isHighSurrogate(doc.charAt(prev - 1))) {</span>
+<span class="nc" id="L972">                prev--;</span>
+            }
+<span class="fc" id="L974">            replaceRange(prev, caret, &quot;&quot;, true);</span>
+        }
+<span class="fc" id="L976">    }</span>
+
+    private void deleteForward() {
+<span class="nc bnc" id="L979" title="All 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L980">            return;</span>
+        }
+<span class="nc bnc" id="L982" title="All 2 branches missed.">        if (hasSelection()) {</span>
+<span class="nc" id="L983">            replaceRange(getSelectionStart(), getSelectionEnd(), &quot;&quot;, true);</span>
+<span class="nc" id="L984">            return;</span>
+        }
+<span class="nc bnc" id="L986" title="All 2 branches missed.">        if (caret &lt; doc.length()) {</span>
+<span class="nc" id="L987">            int next = caret + 1;</span>
+<span class="nc bnc" id="L988" title="All 6 branches missed.">            if (next &lt; doc.length() &amp;&amp; Character.isHighSurrogate(doc.charAt(caret)) &amp;&amp; Character.isLowSurrogate(doc.charAt(next))) {</span>
+<span class="nc" id="L989">                next++;</span>
+            }
+<span class="nc" id="L991">            replaceRange(caret, next, &quot;&quot;, true);</span>
+        }
+<span class="nc" id="L993">    }</span>
+
+    // ---- navigation ----
+
+    /// Moves the caret to a new offset, optionally extending the selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `newCaret`: the target offset (clamped to the document)
+    ///
+    /// - `extend`: true to extend the selection from the current anchor
+    public void moveCaret(int newCaret, boolean extend) {
+<span class="fc" id="L1005">        touchSelection = false;</span>
+<span class="fc" id="L1006">        newCaret = doc.clamp(newCaret);</span>
+<span class="pc bpc" id="L1007" title="1 of 2 branches missed.">        if (extend) {</span>
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">            if (anchor &lt; 0) {</span>
+<span class="nc" id="L1009">                anchor = caret;</span>
+            }
+        } else {
+<span class="fc" id="L1012">            anchor = -1;</span>
+        }
+<span class="fc" id="L1014">        caret = newCaret;</span>
+<span class="fc" id="L1015">        undo.breakRun();</span>
+<span class="fc" id="L1016">        resetBlink();</span>
+<span class="fc" id="L1017">        scrollCaretVisible();</span>
+<span class="fc" id="L1018">        pushInputState();</span>
+<span class="fc" id="L1019">        repaint();</span>
+<span class="fc" id="L1020">    }</span>
+
+    private int caretLeft() {
+<span class="nc" id="L1023">        int p = caret - 1;</span>
+<span class="nc bnc" id="L1024" title="All 6 branches missed.">        if (p &gt; 0 &amp;&amp; Character.isLowSurrogate(doc.charAt(p)) &amp;&amp; Character.isHighSurrogate(doc.charAt(p - 1))) {</span>
+<span class="nc" id="L1025">            p--;</span>
+        }
+<span class="nc" id="L1027">        return p;</span>
+    }
+
+    private int caretRight() {
+<span class="nc" id="L1031">        int p = caret + 1;</span>
+<span class="nc bnc" id="L1032" title="All 6 branches missed.">        if (p &lt; doc.length() &amp;&amp; Character.isHighSurrogate(doc.charAt(caret)) &amp;&amp; Character.isLowSurrogate(doc.charAt(p))) {</span>
+<span class="nc" id="L1033">            p++;</span>
+        }
+<span class="nc" id="L1035">        return p;</span>
+    }
+
+    private int caretVertical(int delta) {
+<span class="nc" id="L1039">        int cl = doc.lineOfOffset(caret);</span>
+<span class="nc" id="L1040">        int col = caret - doc.getLineStart(cl);</span>
+<span class="nc" id="L1041">        int target = clampInt(cl + delta, 0, doc.getLineCount() - 1);</span>
+<span class="nc" id="L1042">        int lineLen = doc.getLineEnd(target) - doc.getLineStart(target);</span>
+<span class="nc" id="L1043">        return doc.getLineStart(target) + Math.min(col, lineLen);</span>
+    }
+
+    private void lineHome(boolean extend) {
+<span class="fc" id="L1047">        moveCaret(doc.getLineStart(doc.lineOfOffset(caret)), extend);</span>
+<span class="fc" id="L1048">    }</span>
+
+    private void lineEndKey(boolean extend) {
+<span class="fc" id="L1051">        moveCaret(doc.getLineEnd(doc.lineOfOffset(caret)), extend);</span>
+<span class="fc" id="L1052">    }</span>
+
+    /// Selects the entire document.
+    public void selectAll() {
+<span class="nc" id="L1056">        anchor = 0;</span>
+<span class="nc" id="L1057">        caret = doc.length();</span>
+<span class="nc" id="L1058">        resetBlink();</span>
+<span class="nc" id="L1059">        pushInputState();</span>
+<span class="nc" id="L1060">        repaint();</span>
+<span class="nc" id="L1061">    }</span>
+
+    // ---- clipboard ----
+
+    /// Copies the selection to the clipboard. Public so a host that owns the platform menu bar can
+    /// route its Copy item here: a menu accelerator consumes the keystroke before the editor sees
+    /// it, so the host has to perform the operation on the editor's behalf.
+    public void copySelection() {
+<span class="nc bnc" id="L1069" title="All 2 branches missed.">        if (hasSelection()) {</span>
+<span class="nc" id="L1070">            Display.getInstance().copyToClipboard(doc.substring(getSelectionStart(), getSelectionEnd()));</span>
+        }
+<span class="nc" id="L1072">    }</span>
+
+    /// Cuts the selection to the clipboard. See `#copySelection()` for why this is public.
+    public void cutSelection() {
+<span class="nc bnc" id="L1076" title="All 4 branches missed.">        if (hasSelection() &amp;&amp; editable) {</span>
+<span class="nc" id="L1077">            copySelection();</span>
+<span class="nc" id="L1078">            replaceRange(getSelectionStart(), getSelectionEnd(), &quot;&quot;, true);</span>
+        }
+<span class="nc" id="L1080">    }</span>
+
+    /// Inserts the clipboard contents at the caret. See `#copySelection()` for why this is public.
+    public void pasteClipboard() {
+<span class="pc bpc" id="L1084" title="1 of 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L1085">            return;</span>
+        }
+<span class="fc" id="L1087">        ClipboardContent content = Display.getInstance().getClipboardContent();</span>
+<span class="pc bpc" id="L1088" title="1 of 2 branches missed.">        Object data = content == null ? Display.getInstance().getPasteDataFromClipboard() : content;</span>
+<span class="fc" id="L1089">        pasteClipboardData(data);</span>
+<span class="fc" id="L1090">    }</span>
+
+    /// Inserts clipboard data. Rich editor subclasses may override this to preserve formatting.
+    protected void pasteClipboardData(Object data) {
+<span class="pc bpc" id="L1094" title="1 of 2 branches missed.">        if (data instanceof ClipboardContent) {</span>
+<span class="fc" id="L1095">            insertText(((ClipboardContent) data).getText(ClipboardContent.MIME_TEXT));</span>
+<span class="fc" id="L1096">            return;</span>
+        }
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">        if (data instanceof RichTextClipboardData) {</span>
+<span class="nc" id="L1099">            insertText(((RichTextClipboardData) data).getPlainText());</span>
+<span class="nc" id="L1100">            return;</span>
+        }
+<span class="nc bnc" id="L1102" title="All 2 branches missed.">        if (data instanceof String) {</span>
+<span class="nc" id="L1103">            insertText((String) data);</span>
+        }
+<span class="nc" id="L1105">    }</span>
+
+    // ---- document change plumbing ----
+
+    private void onDocumentChanged() {
+<span class="fc" id="L1110">        composingStart = -1;</span>
+<span class="fc" id="L1111">        composingEnd = -1;</span>
+<span class="fc" id="L1112">        composingBaseRemoved = null;</span>
+<span class="fc" id="L1113">        composingBeforeState = null;</span>
+<span class="fc" id="L1114">        touchSelection = false;</span>
+<span class="fc" id="L1115">        invalidateLayout();</span>
+<span class="fc" id="L1116">        resetBlink();</span>
+<span class="fc" id="L1117">        scrollCaretVisible();</span>
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">        if (host != null) {</span>
+<span class="fc" id="L1119">            host.editorChanged();</span>
+        }
+<span class="fc" id="L1121">        pushInputState();</span>
+<span class="fc" id="L1122">        repaint();</span>
+<span class="fc" id="L1123">    }</span>
+
+    private int maxScroll() {
+<span class="fc" id="L1126">        return Math.max(0, contentTotalHeight() - contentHeight());</span>
+    }
+
+<span class="fc" id="L1129">    private int cachedMaxLineWidth = -1;</span>
+
+    private int maxScrollX() {
+<span class="pc bpc" id="L1132" title="1 of 2 branches missed.">        if (cachedMaxLineWidth &lt; 0) {</span>
+<span class="fc" id="L1133">            Font f = getEditorFont();</span>
+<span class="fc" id="L1134">            int w = 0;</span>
+<span class="fc" id="L1135">            int lc = doc.getLineCount();</span>
+<span class="fc bfc" id="L1136" title="All 2 branches covered.">            for (int i = 0; i &lt; lc; i++) {</span>
+<span class="fc" id="L1137">                int lw = lineContentOffsetX(i) + f.stringWidth(doc.getLineText(i));</span>
+<span class="fc bfc" id="L1138" title="All 2 branches covered.">                if (lw &gt; w) {</span>
+<span class="fc" id="L1139">                    w = lw;</span>
+                }
+            }
+<span class="fc" id="L1142">            cachedMaxLineWidth = w;</span>
+        }
+<span class="fc" id="L1144">        return Math.max(0, cachedMaxLineWidth - contentWidth() + getEditorFont().charWidth('m') * 2);</span>
+    }
+
+    /// Returns the extra left offset of a line's text within the content area (0 for plain text and
+    /// code; the rich text editor overrides this for list bullets, indentation, block quotes and
+    /// alignment so the caret and selection line up with the drawn text).
+    protected int lineContentOffsetX(int line) {
+<span class="fc" id="L1151">        return 0;</span>
+    }
+
+    /// Pixel width of the substring `text[from, to)`. `Font.substringWidth` takes an offset and a length,
+    /// so this converts an end index to a length for the bidi geometry helpers.
+    private static int subw(Font f, String text, int from, int to) {
+<span class="fc bfc" id="L1157" title="All 2 branches covered.">        if (to &lt;= from) {</span>
+<span class="fc" id="L1158">            return 0;</span>
+        }
+<span class="fc" id="L1160">        return f.substringWidth(text, from, to - from);</span>
+    }
+
+    /// Returns the visual pixel x (from the start of a line) of the caret before logical column `col`.
+    /// For plain left-to-right text this is simply the substring width; for lines containing right-to-left
+    /// or mixed (bidirectional) text it maps the logical column through the resolved visual order so the
+    /// caret lines up with the reordered glyphs. The rich text editor overrides this to measure per styled
+    /// run.
+    protected int measureColumnX(int line, String text, int col, Font f) {
+<span class="fc bfc" id="L1169" title="All 2 branches covered.">        if (BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L1170">            return f.substringWidth(text, 0, col);</span>
+        }
+<span class="fc" id="L1172">        int[][] runs = bidiRuns(text, f);</span>
+<span class="pc bpc" id="L1173" title="1 of 2 branches missed.">        for (int[] run : runs) {</span>
+<span class="fc" id="L1174">            int lo = run[0];</span>
+<span class="fc" id="L1175">            int hi = run[1];</span>
+<span class="fc" id="L1176">            int lvl = run[2];</span>
+<span class="fc" id="L1177">            int rx = run[3];</span>
+<span class="pc bpc" id="L1178" title="1 of 4 branches missed.">            if (col &gt;= lo &amp;&amp; col &lt;= hi) {</span>
+<span class="fc bfc" id="L1179" title="All 2 branches covered.">                if ((lvl &amp; 1) == 0) {</span>
+<span class="fc" id="L1180">                    return rx + subw(f, text, lo, col);</span>
+                }
+<span class="fc" id="L1182">                return rx + subw(f, text, col, hi);</span>
+            }
+        }
+<span class="nc" id="L1185">        return f.substringWidth(text, 0, Math.min(col, text.length()));</span>
+    }
+
+    /// Returns the column nearest a given content-local x pixel on a line. Bidi aware: it locates the
+    /// visual run containing the pixel and maps back to a logical column. The rich text editor overrides
+    /// it to be styled-run aware.
+    protected int columnAtX(int line, String text, int localX, Font f) {
+<span class="fc bfc" id="L1192" title="All 2 branches covered.">        if (BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L1193">            int col = 0;</span>
+<span class="fc bfc" id="L1194" title="All 2 branches covered.">            while (col &lt; text.length()) {</span>
+<span class="fc" id="L1195">                int wFull = measureColumnX(line, text, col + 1, f);</span>
+<span class="fc" id="L1196">                int wHalf = (measureColumnX(line, text, col, f) + wFull) / 2;</span>
+<span class="fc bfc" id="L1197" title="All 2 branches covered.">                if (localX &lt; wHalf) {</span>
+<span class="fc" id="L1198">                    break;</span>
+                }
+<span class="fc" id="L1200">                col++;</span>
+<span class="fc" id="L1201">            }</span>
+<span class="fc" id="L1202">            return col;</span>
+        }
+<span class="fc" id="L1204">        int[][] runs = bidiRuns(text, f);</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">        for (int r = 0; r &lt; runs.length; r++) {</span>
+<span class="fc" id="L1206">            int lo = runs[r][0];</span>
+<span class="fc" id="L1207">            int hi = runs[r][1];</span>
+<span class="fc" id="L1208">            int lvl = runs[r][2];</span>
+<span class="fc" id="L1209">            int rx = runs[r][3];</span>
+<span class="fc" id="L1210">            int rw = subw(f, text, lo, hi);</span>
+<span class="fc bfc" id="L1211" title="All 2 branches covered.">            boolean lastRun = r == runs.length - 1;</span>
+<span class="fc bfc" id="L1212" title="All 4 branches covered.">            if (localX &lt; rx + rw || lastRun) {</span>
+<span class="fc bfc" id="L1213" title="All 2 branches covered.">                if ((lvl &amp; 1) == 0) {</span>
+<span class="fc" id="L1214">                    int col = lo;</span>
+<span class="fc bfc" id="L1215" title="All 2 branches covered.">                    while (col &lt; hi) {</span>
+<span class="fc" id="L1216">                        int wa = rx + subw(f, text, lo, col);</span>
+<span class="fc" id="L1217">                        int wb = rx + subw(f, text, lo, col + 1);</span>
+<span class="fc bfc" id="L1218" title="All 2 branches covered.">                        if (localX &lt; (wa + wb) / 2) {</span>
+<span class="fc" id="L1219">                            break;</span>
+                        }
+<span class="fc" id="L1221">                        col++;</span>
+<span class="fc" id="L1222">                    }</span>
+<span class="fc" id="L1223">                    return col;</span>
+                }
+<span class="fc" id="L1225">                int col = hi;</span>
+<span class="fc bfc" id="L1226" title="All 2 branches covered.">                while (col &gt; lo) {</span>
+<span class="fc" id="L1227">                    int wa = rx + subw(f, text, col, hi);</span>
+<span class="fc" id="L1228">                    int wb = rx + subw(f, text, col - 1, hi);</span>
+<span class="fc bfc" id="L1229" title="All 2 branches covered.">                    if (localX &lt; (wa + wb) / 2) {</span>
+<span class="fc" id="L1230">                        break;</span>
+                    }
+<span class="fc" id="L1232">                    col--;</span>
+<span class="fc" id="L1233">                }</span>
+<span class="fc" id="L1234">                return col;</span>
+            }
+        }
+<span class="nc" id="L1237">        return text.length();</span>
+    }
+
+    /// Builds the visual directional runs of a line for bidi layout. Each entry is
+    /// `{logicalStart, logicalEnd, level, runX}` where `runX` is the pixel offset of the run's left edge
+    /// from the line content start. Runs are returned in visual (left to right) order.
+    private int[][] bidiRuns(String text, Font f) {
+<span class="fc" id="L1244">        int n = text.length();</span>
+<span class="fc" id="L1245">        byte[] levels = BidiUtil.resolveLevels(text, isRTL());</span>
+<span class="fc" id="L1246">        int[] v2l = BidiUtil.reorderVisual(levels);</span>
+<span class="fc" id="L1247">        java.util.List&lt;int[]&gt; runs = new java.util.ArrayList&lt;int[]&gt;();</span>
+<span class="fc" id="L1248">        int i = 0;</span>
+<span class="fc bfc" id="L1249" title="All 2 branches covered.">        while (i &lt; n) {</span>
+<span class="fc" id="L1250">            int lvl = levels[v2l[i]];</span>
+<span class="fc" id="L1251">            int j = i;</span>
+<span class="fc" id="L1252">            int lo = v2l[i];</span>
+<span class="fc" id="L1253">            int hi = v2l[i];</span>
+<span class="fc bfc" id="L1254" title="All 4 branches covered.">            while (j &lt; n &amp;&amp; levels[v2l[j]] == lvl) {</span>
+<span class="fc bfc" id="L1255" title="All 2 branches covered.">                if (v2l[j] &lt; lo) {</span>
+<span class="fc" id="L1256">                    lo = v2l[j];</span>
+                }
+<span class="fc bfc" id="L1258" title="All 2 branches covered.">                if (v2l[j] &gt; hi) {</span>
+<span class="fc" id="L1259">                    hi = v2l[j];</span>
+                }
+<span class="fc" id="L1261">                j++;</span>
+            }
+<span class="fc" id="L1263">            runs.add(new int[]{lo, hi + 1, lvl, 0});</span>
+<span class="fc" id="L1264">            i = j;</span>
+<span class="fc" id="L1265">        }</span>
+<span class="fc" id="L1266">        int x = 0;</span>
+<span class="fc" id="L1267">        int[][] out = runs.toArray(new int[runs.size()][]);</span>
+<span class="fc bfc" id="L1268" title="All 2 branches covered.">        for (int r = 0; r &lt; out.length; r++) {</span>
+<span class="fc" id="L1269">            out[r][3] = x;</span>
+<span class="fc" id="L1270">            x += subw(f, text, out[r][0], out[r][1]);</span>
+        }
+<span class="fc" id="L1272">        return out;</span>
+    }
+
+    /// Returns the visual selection segments for the logical range `[from, to)` on a line as a flat array
+    /// of `{x, width, x, width, ...}` in content-local pixels. A bidi line can yield several disjoint
+    /// segments; a plain line yields a single segment.
+    protected int[] lineVisualSegments(int line, String text, int from, int to, Font f) {
+<span class="fc" id="L1279">        from = clampInt(from, 0, text.length());</span>
+<span class="fc" id="L1280">        to = clampInt(to, 0, text.length());</span>
+<span class="pc bpc" id="L1281" title="1 of 2 branches missed.">        if (from &gt;= to) {</span>
+<span class="nc" id="L1282">            return new int[0];</span>
+        }
+<span class="fc bfc" id="L1284" title="All 2 branches covered.">        if (BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L1285">            int xa = measureColumnX(line, text, from, f);</span>
+<span class="fc" id="L1286">            int xb = measureColumnX(line, text, to, f);</span>
+<span class="fc" id="L1287">            return new int[]{Math.min(xa, xb), Math.abs(xb - xa)};</span>
+        }
+<span class="fc" id="L1289">        int[][] runs = bidiRuns(text, f);</span>
+<span class="fc" id="L1290">        java.util.List&lt;int[]&gt; segs = new java.util.ArrayList&lt;int[]&gt;();</span>
+<span class="fc bfc" id="L1291" title="All 2 branches covered.">        for (int[] run : runs) {</span>
+<span class="fc" id="L1292">            int lo = run[0];</span>
+<span class="fc" id="L1293">            int hi = run[1];</span>
+<span class="fc" id="L1294">            int lvl = run[2];</span>
+<span class="fc" id="L1295">            int rx = run[3];</span>
+<span class="fc" id="L1296">            int a = Math.max(from, lo);</span>
+<span class="fc" id="L1297">            int b = Math.min(to, hi);</span>
+<span class="pc bpc" id="L1298" title="1 of 2 branches missed.">            if (a &gt;= b) {</span>
+<span class="nc" id="L1299">                continue;</span>
+            }
+            int xl;
+            int xr;
+<span class="fc bfc" id="L1303" title="All 2 branches covered.">            if ((lvl &amp; 1) == 0) {</span>
+<span class="fc" id="L1304">                xl = rx + subw(f, text, lo, a);</span>
+<span class="fc" id="L1305">                xr = rx + subw(f, text, lo, b);</span>
+            } else {
+<span class="fc" id="L1307">                xl = rx + subw(f, text, b, hi);</span>
+<span class="fc" id="L1308">                xr = rx + subw(f, text, a, hi);</span>
+            }
+<span class="fc" id="L1310">            segs.add(new int[]{Math.min(xl, xr), Math.abs(xr - xl)});</span>
+        }
+<span class="fc" id="L1312">        int[] flat = new int[segs.size() * 2];</span>
+<span class="fc bfc" id="L1313" title="All 2 branches covered.">        for (int k = 0; k &lt; segs.size(); k++) {</span>
+<span class="fc" id="L1314">            flat[k * 2] = segs.get(k)[0];</span>
+<span class="fc" id="L1315">            flat[k * 2 + 1] = segs.get(k)[1];</span>
+        }
+<span class="fc" id="L1317">        return flat;</span>
+    }
+
+    private void scrollCaretVisible() {
+<span class="fc bfc" id="L1321" title="All 2 branches covered.">        if (contentHeight() &lt;= 0) {</span>
+            // The component has not been laid out yet (height is 0, so contentHeight() is
+            // negative once padding is subtracted). Scrolling to the caret here would push
+            // scrollY to roughly one line, hiding the first line under the title bar once the
+            // real bounds arrive. Defer until laidOut() runs with a real viewport.
+<span class="fc" id="L1326">            return;</span>
+        }
+<span class="fc" id="L1328">        int cl = doc.lineOfOffset(caret);</span>
+<span class="fc" id="L1329">        int top = lineTopContent(cl);</span>
+<span class="fc" id="L1330">        int bottom = top + lineHeightAt(cl);</span>
+<span class="pc bpc" id="L1331" title="1 of 2 branches missed.">        if (top - scrollY &lt; 0) {</span>
+<span class="nc" id="L1332">            scrollY = top;</span>
+<span class="pc bpc" id="L1333" title="1 of 2 branches missed.">        } else if (bottom - scrollY &gt; contentHeight()) {</span>
+<span class="nc" id="L1334">            scrollY = bottom - contentHeight();</span>
+        }
+<span class="fc" id="L1336">        scrollY = clampInt(scrollY, 0, maxScroll());</span>
+
+<span class="fc" id="L1338">        int caretX = caretContentX();</span>
+<span class="fc" id="L1339">        int viewW = contentWidth();</span>
+<span class="fc" id="L1340">        int margin = getEditorFont().charWidth('m') * 2;</span>
+<span class="fc bfc" id="L1341" title="All 2 branches covered.">        if (caretX - scrollX &lt; margin) {</span>
+<span class="fc" id="L1342">            scrollX = Math.max(0, caretX - margin);</span>
+<span class="pc bpc" id="L1343" title="1 of 2 branches missed.">        } else if (caretX - scrollX &gt; viewW - margin) {</span>
+<span class="nc" id="L1344">            scrollX = caretX - viewW + margin;</span>
+        }
+<span class="fc" id="L1346">        int maxX = Math.max(0, caretLineWidth() - viewW + margin);</span>
+<span class="fc" id="L1347">        scrollX = clampInt(scrollX, 0, maxX);</span>
+<span class="fc" id="L1348">    }</span>
+
+    private int caretContentX() {
+<span class="fc" id="L1351">        int cl = doc.lineOfOffset(caret);</span>
+<span class="fc" id="L1352">        int col = caret - doc.getLineStart(cl);</span>
+<span class="fc" id="L1353">        String line = doc.getLineText(cl);</span>
+<span class="pc bpc" id="L1354" title="1 of 2 branches missed.">        if (col &gt; line.length()) {</span>
+<span class="nc" id="L1355">            col = line.length();</span>
+        }
+<span class="fc" id="L1357">        return lineContentOffsetX(cl) + measureColumnX(cl, line, col, getEditorFont());</span>
+    }
+
+    private int caretLineWidth() {
+<span class="fc" id="L1361">        int cl = doc.lineOfOffset(caret);</span>
+<span class="fc" id="L1362">        return lineContentOffsetX(cl) + getEditorFont().stringWidth(doc.getLineText(cl));</span>
+    }
+
+    private void resetBlink() {
+<span class="fc" id="L1366">        caretOn = true;</span>
+<span class="fc" id="L1367">        lastBlink = System.currentTimeMillis();</span>
+<span class="fc" id="L1368">    }</span>
+
+    @Override
+    protected void laidOut() {
+<span class="fc" id="L1372">        super.laidOut();</span>
+        // Now that the real viewport height is known, apply any scroll-to-caret that was
+        // deferred while the component was unlaid-out (see scrollCaretVisible), and re-clamp
+        // a stale scroll offset into range.
+<span class="fc" id="L1376">        scrollY = clampInt(scrollY, 0, maxScroll());</span>
+<span class="fc" id="L1377">        scrollCaretVisible();</span>
+<span class="fc" id="L1378">    }</span>
+
+    // ---- focus + input source lifecycle ----
+
+    @Override
+    protected void focusGained() {
+<span class="fc" id="L1384">        super.focusGained();</span>
+        // Typing happens on key release, and Display drops any release whose code does not match
+        // the most recent press. Anyone typing at speed presses the next key before releasing the
+        // last one, so releases were being discarded and characters silently vanished -- always
+        // the same ones, because it depends on which pairs overlap. Multi key mode delivers every
+        // release. Only an editor that found the mode off turns it on, and only that editor turns
+        // it back off on focus loss; an application that runs in multi key mode by choice is left
+        // alone rather than having the mode switched off underneath it.
+<span class="pc bpc" id="L1392" title="1 of 4 branches missed.">        if (!multiKeyModeInstalled &amp;&amp; !Display.getInstance().isMultiKeyMode()) {</span>
+<span class="fc" id="L1393">            Display.getInstance().setMultiKeyMode(true);</span>
+<span class="fc" id="L1394">            multiKeyModeInstalled = true;</span>
+        }
+<span class="fc" id="L1396">        startInput();</span>
+<span class="pc bpc" id="L1397" title="2 of 4 branches missed.">        if (!animRegistered &amp;&amp; getComponentForm() != null) {</span>
+<span class="fc" id="L1398">            getComponentForm().registerAnimated(this);</span>
+<span class="fc" id="L1399">            animRegistered = true;</span>
+        }
+<span class="fc" id="L1401">        resetBlink();</span>
+<span class="fc" id="L1402">        repaint();</span>
+<span class="fc" id="L1403">    }</span>
+
+    /// Switches multi key mode back off, and only if this editor is the one that switched it on.
+    /// An editor that found the mode already on, or that was initialized but never focused, must
+    /// not touch it: doing so would switch the mode off underneath whoever does own it, bringing
+    /// back the dropped keystrokes this exists to prevent.
+    private void restoreMultiKeyMode() {
+<span class="fc bfc" id="L1410" title="All 2 branches covered.">        if (!multiKeyModeInstalled) {</span>
+<span class="fc" id="L1411">            return;</span>
+        }
+<span class="fc" id="L1413">        multiKeyModeInstalled = false;</span>
+<span class="fc" id="L1414">        Display.getInstance().setMultiKeyMode(false);</span>
+<span class="fc" id="L1415">    }</span>
+
+    @Override
+    protected void focusLost() {
+<span class="fc" id="L1419">        super.focusLost();</span>
+<span class="fc" id="L1420">        restoreMultiKeyMode();</span>
+<span class="fc" id="L1421">        stopInput();</span>
+<span class="pc bpc" id="L1422" title="2 of 4 branches missed.">        if (animRegistered &amp;&amp; getComponentForm() != null) {</span>
+<span class="fc" id="L1423">            getComponentForm().deregisterAnimated(this);</span>
+<span class="fc" id="L1424">            animRegistered = false;</span>
+        }
+<span class="fc" id="L1426">        repaint();</span>
+<span class="fc" id="L1427">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L1431">        super.deinitialize();</span>
+        // Removing a focused component clears the form's focus without firing focusLost
+        // (Container.removeComponentImpl uses setFocusedInternal), so release the platform
+        // input session here or the stale handle would block startInput on the next focus
+        // gain, leaving the editor deaf until an explicit focus round-trip. The form also
+        // drops animation registrations on deinit, so reset the flag to re-register the
+        // caret blink when focus returns. Multi key mode is restored here for the same reason:
+        // focusLost never runs on this path and the setting is global.
+<span class="fc" id="L1439">        restoreMultiKeyMode();</span>
+<span class="fc" id="L1440">        stopInput();</span>
+<span class="fc" id="L1441">        animRegistered = false;</span>
+<span class="fc" id="L1442">    }</span>
+
+    private void startInput() {
+<span class="pc bpc" id="L1445" title="1 of 6 branches missed.">        if (host != null &amp;&amp; editable &amp;&amp; host.isTextInputSupported()) {</span>
+            // a leftover handle means an unbalanced lifecycle (e.g. the view was re-added while
+            // a session was bound); release it so the session is rebound to the current state
+<span class="pc bpc" id="L1448" title="1 of 2 branches missed.">            if (inputHandle != null) {</span>
+<span class="nc" id="L1449">                host.stopTextInput(inputHandle);</span>
+            }
+<span class="fc" id="L1451">            inputHandle = host.startTextInput(this, getConfig());</span>
+<span class="fc bfc" id="L1452" title="All 2 branches covered.">            inputActive = inputHandle != null;</span>
+        }
+<span class="fc" id="L1454">    }</span>
+
+    private void stopInput() {
+<span class="pc bpc" id="L1457" title="1 of 4 branches missed.">        if (host != null &amp;&amp; inputHandle != null) {</span>
+<span class="fc" id="L1458">            host.stopTextInput(inputHandle);</span>
+        }
+<span class="fc" id="L1460">        inputHandle = null;</span>
+<span class="fc" id="L1461">        inputActive = false;</span>
+<span class="fc" id="L1462">    }</span>
+
+    private void pushInputState() {
+<span class="pc bpc" id="L1465" title="1 of 4 branches missed.">        if (host != null &amp;&amp; inputActive) {</span>
+<span class="fc" id="L1466">            host.updateTextInputState(inputHandle, getEditingState());</span>
+        }
+<span class="fc" id="L1468">    }</span>
+
+    @Override
+    public boolean animate() {
+<span class="fc" id="L1472">        boolean sup = super.animate();</span>
+<span class="pc bpc" id="L1473" title="1 of 2 branches missed.">        if (hasFocus()) {</span>
+<span class="fc" id="L1474">            long now = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L1475" title="1 of 2 branches missed.">            if (now - lastBlink &gt;= 500) {</span>
+<span class="nc bnc" id="L1476" title="All 2 branches missed.">                caretOn = !caretOn;</span>
+<span class="nc" id="L1477">                lastBlink = now;</span>
+<span class="nc" id="L1478">                return true;</span>
+            }
+        }
+<span class="fc" id="L1481">        return sup;</span>
+    }
+
+    // ---- pointer ----
+
+    private long lastClickTime;
+<span class="fc" id="L1487">    private int lastClickOffset = -1;</span>
+    private int clickCount;
+    private boolean multiClickSelecting;
+    private boolean touchPointerGesture;
+    private boolean touchScrolling;
+    private int pointerPressX;
+    private int pointerPressY;
+    private int pointerPressScrollX;
+    private int pointerPressScrollY;
+    private int pointerPressCaret;
+    private int pointerPressAnchor;
+
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="fc" id="L1501">        requestFocus();</span>
+<span class="pc bpc" id="L1502" title="1 of 2 branches missed.">        touchPointerGesture = !Display.getInstance().isDesktop();</span>
+<span class="fc" id="L1503">        touchScrolling = false;</span>
+<span class="fc" id="L1504">        pointerPressX = x;</span>
+<span class="fc" id="L1505">        pointerPressY = y;</span>
+<span class="fc" id="L1506">        pointerPressScrollX = scrollX;</span>
+<span class="fc" id="L1507">        pointerPressScrollY = scrollY;</span>
+<span class="fc" id="L1508">        pointerPressCaret = caret;</span>
+<span class="fc" id="L1509">        pointerPressAnchor = anchor;</span>
+<span class="pc bpc" id="L1510" title="1 of 2 branches missed.">        if (handleTouchSelectionPress(x, y)) {</span>
+<span class="nc" id="L1511">            return;</span>
+        }
+<span class="fc" id="L1513">        int off = offsetAtPoint(x, y);</span>
+<span class="fc" id="L1514">        long now = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L1515" title="3 of 4 branches missed.">        if (now - lastClickTime &lt; 400 &amp;&amp; Math.abs(off - lastClickOffset) &lt;= 1) {</span>
+<span class="nc" id="L1516">            clickCount++;</span>
+        } else {
+<span class="fc" id="L1518">            clickCount = 1;</span>
+        }
+<span class="fc" id="L1520">        lastClickTime = now;</span>
+<span class="fc" id="L1521">        lastClickOffset = off;</span>
+<span class="pc bpc" id="L1522" title="1 of 2 branches missed.">        if (clickCount == 2) {</span>
+<span class="nc" id="L1523">            multiClickSelecting = true;</span>
+<span class="nc" id="L1524">            selectWordAt(off);</span>
+<span class="nc" id="L1525">            return;</span>
+        }
+<span class="pc bpc" id="L1527" title="1 of 2 branches missed.">        if (clickCount &gt;= 3) {</span>
+<span class="nc" id="L1528">            multiClickSelecting = true;</span>
+<span class="nc" id="L1529">            selectLineAt(off);</span>
+<span class="nc" id="L1530">            return;</span>
+        }
+<span class="fc" id="L1532">        multiClickSelecting = false;</span>
+<span class="fc" id="L1533">        caret = off;</span>
+<span class="fc" id="L1534">        anchor = off;</span>
+<span class="fc" id="L1535">        resetBlink();</span>
+<span class="fc" id="L1536">        pushInputState();</span>
+<span class="fc" id="L1537">        repaint();</span>
+<span class="fc" id="L1538">    }</span>
+
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="pc bpc" id="L1542" title="1 of 2 branches missed.">        if (draggingHandle != 0) {</span>
+<span class="nc" id="L1543">            caret = offsetAtPoint(x, y);</span>
+<span class="nc" id="L1544">            loupeActive = true;</span>
+<span class="nc" id="L1545">            loupeOffset = caret;</span>
+<span class="nc" id="L1546">            resetBlink();</span>
+<span class="nc" id="L1547">            scrollCaretVisible();</span>
+<span class="nc" id="L1548">            repaint();</span>
+<span class="nc" id="L1549">            return;</span>
+        }
+<span class="pc bpc" id="L1551" title="1 of 2 branches missed.">        if (loupeActive) {</span>
+            // long-press caret placement drag: keep the magnifier following the finger
+<span class="nc" id="L1553">            caret = offsetAtPoint(x, y);</span>
+<span class="nc" id="L1554">            loupeOffset = caret;</span>
+<span class="nc" id="L1555">            resetBlink();</span>
+<span class="nc" id="L1556">            scrollCaretVisible();</span>
+<span class="nc" id="L1557">            repaint();</span>
+<span class="nc" id="L1558">            return;</span>
+        }
+<span class="pc bpc" id="L1560" title="2 of 4 branches missed.">        if (touchPointerGesture &amp;&amp; !multiClickSelecting) {</span>
+<span class="fc" id="L1561">            int dx = x - pointerPressX;</span>
+<span class="fc" id="L1562">            int dy = y - pointerPressY;</span>
+<span class="fc" id="L1563">            int threshold = Math.max(4, getEditorFont().getHeight() / 3);</span>
+<span class="pc bpc" id="L1564" title="3 of 6 branches missed.">            if (touchScrolling || Math.abs(dx) &gt; threshold || Math.abs(dy) &gt; threshold) {</span>
+<span class="fc" id="L1565">                touchScrolling = true;</span>
+<span class="fc" id="L1566">                caret = pointerPressCaret;</span>
+<span class="fc" id="L1567">                anchor = pointerPressAnchor;</span>
+<span class="fc" id="L1568">                scrollX = clampInt(pointerPressScrollX - dx, 0, maxScrollX());</span>
+<span class="fc" id="L1569">                scrollY = clampInt(pointerPressScrollY - dy, 0, maxScroll());</span>
+<span class="fc" id="L1570">                clickCount = 0;</span>
+<span class="fc" id="L1571">                lastClickOffset = -1;</span>
+<span class="fc" id="L1572">                repaint();</span>
+            }
+<span class="fc" id="L1574">            return;</span>
+        }
+<span class="nc bnc" id="L1576" title="All 2 branches missed.">        if (multiClickSelecting) {</span>
+<span class="nc" id="L1577">            return;</span>
+        }
+<span class="nc" id="L1579">        caret = offsetAtPoint(x, y);</span>
+<span class="nc" id="L1580">        resetBlink();</span>
+<span class="nc" id="L1581">        scrollCaretVisible();</span>
+<span class="nc" id="L1582">        repaint();</span>
+<span class="nc" id="L1583">    }</span>
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L1587">        boolean wasLoupe = loupeActive;</span>
+<span class="fc" id="L1588">        loupeActive = false;</span>
+<span class="pc bpc" id="L1589" title="1 of 2 branches missed.">        if (touchScrolling) {</span>
+<span class="fc" id="L1590">            touchScrolling = false;</span>
+<span class="fc" id="L1591">            pushInputState();</span>
+<span class="fc" id="L1592">            repaint();</span>
+<span class="fc" id="L1593">            return;</span>
+        }
+<span class="nc bnc" id="L1595" title="All 2 branches missed.">        if (draggingHandle != 0) {</span>
+<span class="nc" id="L1596">            caret = offsetAtPoint(x, y);</span>
+<span class="nc" id="L1597">            draggingHandle = 0;</span>
+<span class="nc" id="L1598">            touchSelection = hasSelection();</span>
+<span class="nc" id="L1599">            pushInputState();</span>
+<span class="nc" id="L1600">            repaint();</span>
+<span class="nc" id="L1601">            return;</span>
+        }
+<span class="nc bnc" id="L1603" title="All 2 branches missed.">        if (wasLoupe) {</span>
+            // finished a long-press caret placement / word selection; keep the current selection or caret
+<span class="nc" id="L1605">            pushInputState();</span>
+<span class="nc" id="L1606">            repaint();</span>
+<span class="nc" id="L1607">            return;</span>
+        }
+<span class="nc bnc" id="L1609" title="All 2 branches missed.">        if (multiClickSelecting) {</span>
+<span class="nc" id="L1610">            multiClickSelecting = false;</span>
+<span class="nc" id="L1611">            return;</span>
+        }
+<span class="nc" id="L1613">        caret = offsetAtPoint(x, y);</span>
+<span class="nc bnc" id="L1614" title="All 2 branches missed.">        if (anchor == caret) {</span>
+<span class="nc" id="L1615">            anchor = -1;</span>
+        }
+<span class="nc" id="L1617">        pushInputState();</span>
+<span class="nc" id="L1618">        repaint();</span>
+<span class="nc" id="L1619">    }</span>
+
+    // ---- raw keyboard (reference path when no platform input source) ----
+
+    private boolean isPrimaryModifierDown() {
+<span class="nc" id="L1624">        Display d = Display.getInstance();</span>
+<span class="nc bnc" id="L1625" title="All 4 branches missed.">        return d.isMetaKeyDown() || d.isControlKeyDown();</span>
+    }
+
+    private boolean handleShortcut(int keyCode) {
+<span class="nc" id="L1629">        Display d = Display.getInstance();</span>
+<span class="nc bnc" id="L1630" title="All 6 branches missed.">        if (!(d.isMetaKeyDown() || d.isControlKeyDown()) || d.isAltKeyDown()) {</span>
+<span class="nc" id="L1631">            return false;</span>
+        }
+<span class="nc" id="L1633">        char ch = Character.toLowerCase((char) keyCode);</span>
+<span class="nc bnc" id="L1634" title="All 2 branches missed.">        if (ch == 'c') {</span>
+<span class="nc" id="L1635">            copySelection();</span>
+<span class="nc" id="L1636">            return true;</span>
+        }
+<span class="nc bnc" id="L1638" title="All 2 branches missed.">        if (ch == 'x') {</span>
+<span class="nc" id="L1639">            cutSelection();</span>
+<span class="nc" id="L1640">            return true;</span>
+        }
+<span class="nc bnc" id="L1642" title="All 2 branches missed.">        if (ch == 'v') {</span>
+<span class="nc" id="L1643">            pasteClipboard();</span>
+<span class="nc" id="L1644">            return true;</span>
+        }
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">        if (ch == 'a') {</span>
+<span class="nc" id="L1647">            selectAll();</span>
+<span class="nc" id="L1648">            return true;</span>
+        }
+<span class="nc bnc" id="L1650" title="All 2 branches missed.">        if (ch == 'z') {</span>
+<span class="nc bnc" id="L1651" title="All 2 branches missed.">            if (d.isShiftKeyDown()) {</span>
+<span class="nc" id="L1652">                performRedo();</span>
+            } else {
+<span class="nc" id="L1654">                performUndo();</span>
+            }
+<span class="nc" id="L1656">            return true;</span>
+        }
+<span class="nc bnc" id="L1658" title="All 2 branches missed.">        if (ch == 'y') {</span>
+<span class="nc" id="L1659">            performRedo();</span>
+<span class="nc" id="L1660">            return true;</span>
+        }
+<span class="nc" id="L1662">        return false;</span>
+    }
+
+    private boolean handleNavKey(int keyCode) {
+<span class="nc" id="L1666">        Display d = Display.getInstance();</span>
+<span class="nc" id="L1667">        boolean shift = d.isShiftKeyDown();</span>
+<span class="nc" id="L1668">        boolean word = d.isAltKeyDown();</span>
+<span class="nc bnc" id="L1669" title="All 4 branches missed.">        boolean lineJump = d.isMetaKeyDown() || d.isControlKeyDown();</span>
+<span class="nc" id="L1670">        int action = d.getGameAction(keyCode);</span>
+<span class="nc bnc" id="L1671" title="All 2 branches missed.">        if (action == Display.GAME_LEFT) {</span>
+<span class="nc bnc" id="L1672" title="All 2 branches missed.">            if (lineJump) {</span>
+<span class="nc" id="L1673">                lineHome(shift);</span>
+<span class="nc bnc" id="L1674" title="All 2 branches missed.">            } else if (word) {</span>
+<span class="nc" id="L1675">                moveCaret(wordLeft(), shift);</span>
+            } else {
+<span class="nc" id="L1677">                moveCaret(caretLeft(), shift);</span>
+            }
+<span class="nc" id="L1679">            return true;</span>
+        }
+<span class="nc bnc" id="L1681" title="All 2 branches missed.">        if (action == Display.GAME_RIGHT) {</span>
+<span class="nc bnc" id="L1682" title="All 2 branches missed.">            if (lineJump) {</span>
+<span class="nc" id="L1683">                lineEndKey(shift);</span>
+<span class="nc bnc" id="L1684" title="All 2 branches missed.">            } else if (word) {</span>
+<span class="nc" id="L1685">                moveCaret(wordRight(), shift);</span>
+            } else {
+<span class="nc" id="L1687">                moveCaret(caretRight(), shift);</span>
+            }
+<span class="nc" id="L1689">            return true;</span>
+        }
+<span class="nc bnc" id="L1691" title="All 2 branches missed.">        if (action == Display.GAME_UP) {</span>
+<span class="nc bnc" id="L1692" title="All 2 branches missed.">            if (lineJump) {</span>
+<span class="nc" id="L1693">                moveCaret(0, shift);</span>
+            } else {
+<span class="nc" id="L1695">                moveCaret(caretVertical(-1), shift);</span>
+            }
+<span class="nc" id="L1697">            return true;</span>
+        }
+<span class="nc bnc" id="L1699" title="All 2 branches missed.">        if (action == Display.GAME_DOWN) {</span>
+<span class="nc bnc" id="L1700" title="All 2 branches missed.">            if (lineJump) {</span>
+<span class="nc" id="L1701">                moveCaret(doc.length(), shift);</span>
+            } else {
+<span class="nc" id="L1703">                moveCaret(caretVertical(1), shift);</span>
+            }
+<span class="nc" id="L1705">            return true;</span>
+        }
+<span class="nc bnc" id="L1707" title="All 2 branches missed.">        if (keyCode == 8) {</span>
+<span class="nc" id="L1708">            deleteBackward();</span>
+<span class="nc" id="L1709">            return true;</span>
+        }
+<span class="nc bnc" id="L1711" title="All 2 branches missed.">        if (keyCode == 127) {</span>
+<span class="nc" id="L1712">            deleteForward();</span>
+<span class="nc" id="L1713">            return true;</span>
+        }
+<span class="nc" id="L1715">        return false;</span>
+    }
+
+    private static boolean isWordChar(char c) {
+<span class="pc bpc" id="L1719" title="8 of 14 branches missed.">        return (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '_';</span>
+    }
+
+    private int wordLeft() {
+<span class="fc" id="L1723">        int p = caret;</span>
+<span class="pc bpc" id="L1724" title="1 of 4 branches missed.">        while (p &gt; 0 &amp;&amp; !isWordChar(doc.charAt(p - 1))) {</span>
+<span class="fc" id="L1725">            p--;</span>
+        }
+<span class="pc bpc" id="L1727" title="1 of 4 branches missed.">        while (p &gt; 0 &amp;&amp; isWordChar(doc.charAt(p - 1))) {</span>
+<span class="fc" id="L1728">            p--;</span>
+        }
+<span class="fc" id="L1730">        return p;</span>
+    }
+
+    private int wordRight() {
+<span class="fc" id="L1734">        int p = caret;</span>
+<span class="fc" id="L1735">        int n = doc.length();</span>
+<span class="pc bpc" id="L1736" title="2 of 4 branches missed.">        while (p &lt; n &amp;&amp; !isWordChar(doc.charAt(p))) {</span>
+<span class="nc" id="L1737">            p++;</span>
+        }
+<span class="pc bpc" id="L1739" title="1 of 4 branches missed.">        while (p &lt; n &amp;&amp; isWordChar(doc.charAt(p))) {</span>
+<span class="fc" id="L1740">            p++;</span>
+        }
+<span class="fc" id="L1742">        return p;</span>
+    }
+
+    private void selectWordAt(int offset) {
+<span class="nc" id="L1746">        int s = offset;</span>
+<span class="nc" id="L1747">        int e = offset;</span>
+<span class="nc bnc" id="L1748" title="All 4 branches missed.">        while (s &gt; 0 &amp;&amp; isWordChar(doc.charAt(s - 1))) {</span>
+<span class="nc" id="L1749">            s--;</span>
+        }
+<span class="nc bnc" id="L1751" title="All 4 branches missed.">        while (e &lt; doc.length() &amp;&amp; isWordChar(doc.charAt(e))) {</span>
+<span class="nc" id="L1752">            e++;</span>
+        }
+<span class="nc" id="L1754">        anchor = s;</span>
+<span class="nc" id="L1755">        caret = e;</span>
+<span class="nc" id="L1756">        resetBlink();</span>
+<span class="nc" id="L1757">        pushInputState();</span>
+<span class="nc" id="L1758">        repaint();</span>
+<span class="nc" id="L1759">    }</span>
+
+    private void selectLineAt(int offset) {
+<span class="nc" id="L1762">        int line = doc.lineOfOffset(offset);</span>
+<span class="nc" id="L1763">        anchor = doc.getLineStart(line);</span>
+<span class="nc" id="L1764">        caret = doc.getLineEnd(line);</span>
+<span class="nc" id="L1765">        resetBlink();</span>
+<span class="nc" id="L1766">        pushInputState();</span>
+<span class="nc" id="L1767">        repaint();</span>
+<span class="nc" id="L1768">    }</span>
+
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="nc bnc" id="L1772" title="All 4 branches missed.">        if (!inputActive &amp;&amp; editable) {</span>
+<span class="nc bnc" id="L1773" title="All 2 branches missed.">            if (handleShortcut(keyCode)) {</span>
+<span class="nc" id="L1774">                return;</span>
+            }
+<span class="nc bnc" id="L1776" title="All 2 branches missed.">            if (handleNavKey(keyCode)) {</span>
+<span class="nc" id="L1777">                return;</span>
+            }
+        }
+<span class="nc" id="L1780">        super.keyPressed(keyCode);</span>
+<span class="nc" id="L1781">    }</span>
+
+    @Override
+    public void keyRepeated(int keyCode) {
+<span class="nc bnc" id="L1785" title="All 8 branches missed.">        if (!inputActive &amp;&amp; editable &amp;&amp; !isPrimaryModifierDown() &amp;&amp; handleNavKey(keyCode)) {</span>
+<span class="nc" id="L1786">            return;</span>
+        }
+<span class="nc" id="L1788">        super.keyRepeated(keyCode);</span>
+<span class="nc" id="L1789">    }</span>
+
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="nc bnc" id="L1793" title="All 4 branches missed.">        if (!inputActive &amp;&amp; editable) {</span>
+<span class="nc bnc" id="L1794" title="All 4 branches missed.">            if (isPrimaryModifierDown() || Display.getInstance().isAltKeyDown()) {</span>
+                // modifier combos are handled in keyPressed; never type the raw character
+<span class="nc" id="L1796">                return;</span>
+            }
+<span class="nc bnc" id="L1798" title="All 4 branches missed.">            if (keyCode == 10 || keyCode == 13) {</span>
+<span class="nc" id="L1799">                insertText(&quot;\n&quot;);</span>
+<span class="nc" id="L1800">                return;</span>
+            }
+<span class="nc bnc" id="L1802" title="All 2 branches missed.">            if (keyCode == 9) {</span>
+<span class="nc" id="L1803">                insertText(&quot;\t&quot;);</span>
+<span class="nc" id="L1804">                return;</span>
+            }
+<span class="nc" id="L1806">            int action = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc bnc" id="L1807" title="All 6 branches missed.">            if (action == 0 &amp;&amp; keyCode &gt;= 32 &amp;&amp; keyCode != 127) {</span>
+<span class="nc" id="L1808">                insertText(String.valueOf((char) keyCode));</span>
+<span class="nc" id="L1809">                return;</span>
+            }
+        }
+<span class="nc" id="L1812">        super.keyReleased(keyCode);</span>
+<span class="nc" id="L1813">    }</span>
+
+    // ---- TextInputClient ----
+
+    @Override
+    public void commitText(String text) {
+<span class="fc bfc" id="L1819" title="All 2 branches covered.">        if (!editable) {</span>
+<span class="fc" id="L1820">            return;</span>
+        }
+<span class="fc bfc" id="L1822" title="All 2 branches covered.">        if (composingStart &gt;= 0) {</span>
+            // Finalize the composition as ONE undo unit spanning from the pre-composition
+            // document (including any selection the first compose replaced) to the committed
+            // text. The intermediate compose updates were never recorded, so recording the
+            // plain range replacement here would put stale offsets on the undo stack.
+<span class="fc" id="L1827">            int base = composingStart;</span>
+<span class="pc bpc" id="L1828" title="1 of 2 branches missed.">            String removed = composingBaseRemoved == null ? &quot;&quot; : composingBaseRemoved;</span>
+<span class="fc" id="L1829">            Object before = composingBeforeState;</span>
+<span class="fc" id="L1830">            replaceRange(composingStart, composingEnd, text, false);</span>
+<span class="fc" id="L1831">            composingBaseRemoved = null;</span>
+<span class="fc" id="L1832">            composingBeforeState = null;</span>
+<span class="fc" id="L1833">            String inserted = doc.substring(base, caret);</span>
+<span class="pc bpc" id="L1834" title="2 of 4 branches missed.">            if (removed.length() &gt; 0 || inserted.length() &gt; 0) {</span>
+<span class="fc" id="L1835">                undo.breakRun();</span>
+<span class="fc" id="L1836">                undo.record(base, removed, inserted, before, captureDocumentState());</span>
+<span class="fc" id="L1837">                undo.breakRun();</span>
+            }
+<span class="fc" id="L1839">            return;</span>
+        }
+<span class="fc bfc" id="L1841" title="All 2 branches covered.">        if (handleTypedText(text)) {</span>
+<span class="fc" id="L1842">            return;</span>
+        }
+<span class="fc" id="L1844">        replaceRange(getSelectionStart(), getSelectionEnd(), text, true);</span>
+<span class="fc" id="L1845">    }</span>
+
+    @Override
+    public void setComposingText(String text, int relativeCaret) {
+<span class="pc bpc" id="L1849" title="1 of 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L1850">            return;</span>
+        }
+<span class="pc bpc" id="L1852" title="1 of 2 branches missed.">        String value = EditorDocument.normalizeText(text == null ? &quot;&quot; : text);</span>
+        int start;
+        int end;
+<span class="fc bfc" id="L1855" title="All 2 branches covered.">        if (composingStart &gt;= 0) {</span>
+<span class="fc" id="L1856">            start = composingStart;</span>
+<span class="fc" id="L1857">            end = composingEnd;</span>
+        } else {
+<span class="fc" id="L1859">            start = getSelectionStart();</span>
+<span class="fc" id="L1860">            end = getSelectionEnd();</span>
+        }
+<span class="fc" id="L1862">        start = doc.clamp(start);</span>
+<span class="fc" id="L1863">        end = doc.clamp(end);</span>
+<span class="pc bpc" id="L1864" title="1 of 2 branches missed.">        if (!isEditAllowed(start, end)) {</span>
+<span class="nc" id="L1865">            return;</span>
+        }
+<span class="fc bfc" id="L1867" title="All 2 branches covered.">        if (composingStart &lt; 0) {</span>
+            // snapshot the pre-composition document so the whole composition (including the
+            // selection this first compose replaces) finalizes as a single undo unit in
+            // commitText / finishComposing; intermediate compose updates are never recorded
+<span class="fc" id="L1871">            composingBaseRemoved = doc.substring(start, end);</span>
+<span class="fc" id="L1872">            composingBeforeState = captureDocumentState();</span>
+        }
+<span class="fc" id="L1874">        String removed = doc.substring(start, end);</span>
+<span class="fc" id="L1875">        doc.delete(start, end);</span>
+<span class="fc" id="L1876">        doc.insert(start, value);</span>
+<span class="fc" id="L1877">        composingStart = start;</span>
+<span class="fc" id="L1878">        composingEnd = start + value.length();</span>
+<span class="fc" id="L1879">        caret = composingEnd;</span>
+<span class="fc" id="L1880">        anchor = -1;</span>
+        // composition is not recorded until finalized; keep undo aware of the net removal only once
+<span class="fc" id="L1882">        undo.breakRun();</span>
+<span class="fc" id="L1883">        documentEdited(start);</span>
+<span class="fc" id="L1884">        documentReplaced(start, removed, value);</span>
+<span class="pc bpc" id="L1885" title="1 of 4 branches missed.">        if (removed.length() &gt; 0 || value.length() &gt; 0) {</span>
+<span class="fc" id="L1886">            invalidateLayout();</span>
+<span class="fc" id="L1887">            resetBlink();</span>
+<span class="fc" id="L1888">            scrollCaretVisible();</span>
+<span class="pc bpc" id="L1889" title="1 of 2 branches missed.">            if (host != null) {</span>
+<span class="fc" id="L1890">                host.editorChanged();</span>
+            }
+<span class="fc" id="L1892">            pushInputState();</span>
+<span class="fc" id="L1893">            repaint();</span>
+        }
+<span class="fc" id="L1895">    }</span>
+
+    @Override
+    public void finishComposing() {
+<span class="pc bpc" id="L1899" title="1 of 2 branches missed.">        if (composingStart &gt;= 0) {</span>
+            // the composed text stays; record the whole composition as one undo unit against
+            // the pre-composition snapshot
+<span class="fc" id="L1902">            String inserted = doc.substring(composingStart, composingEnd);</span>
+<span class="pc bpc" id="L1903" title="1 of 2 branches missed.">            String removed = composingBaseRemoved == null ? &quot;&quot; : composingBaseRemoved;</span>
+<span class="pc bpc" id="L1904" title="1 of 4 branches missed.">            if (removed.length() &gt; 0 || inserted.length() &gt; 0) {</span>
+<span class="fc" id="L1905">                undo.breakRun();</span>
+<span class="fc" id="L1906">                undo.record(composingStart, removed, inserted, composingBeforeState, captureDocumentState());</span>
+<span class="fc" id="L1907">                undo.breakRun();</span>
+            }
+        }
+<span class="fc" id="L1910">        composingStart = -1;</span>
+<span class="fc" id="L1911">        composingEnd = -1;</span>
+<span class="fc" id="L1912">        composingBaseRemoved = null;</span>
+<span class="fc" id="L1913">        composingBeforeState = null;</span>
+<span class="fc" id="L1914">    }</span>
+
+    @Override
+    public void deleteSurroundingText(int before, int after) {
+<span class="nc bnc" id="L1918" title="All 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L1919">            return;</span>
+        }
+<span class="nc" id="L1921">        int s = doc.clamp(caret - Math.max(0, before));</span>
+<span class="nc" id="L1922">        int e = doc.clamp(caret + Math.max(0, after));</span>
+<span class="nc" id="L1923">        replaceRange(s, e, &quot;&quot;, true);</span>
+<span class="nc" id="L1924">    }</span>
+
+    @Override
+    public void onKeyCommand(int command, int modifiers) {
+<span class="fc bfc" id="L1928" title="All 2 branches covered.">        boolean extend = (modifiers &amp; MOD_SHIFT) != 0;</span>
+        // Ctrl / Cmd jump to the line (horizontal) or document (vertical) edge; Alt jumps by word.
+        // Mirrors the raw handleNavKey path so the modifiers behave the same whether or not a
+        // platform text-input source is active.
+<span class="fc bfc" id="L1932" title="All 2 branches covered.">        boolean lineJump = (modifiers &amp; MOD_CTRL) != 0;</span>
+<span class="fc bfc" id="L1933" title="All 2 branches covered.">        boolean word = (modifiers &amp; MOD_ALT) != 0;</span>
+<span class="pc bpc" id="L1934" title="11 of 18 branches missed.">        switch (command) {</span>
+            case KEY_LEFT:
+<span class="fc bfc" id="L1936" title="All 2 branches covered.">                if (lineJump) {</span>
+<span class="fc" id="L1937">                    lineHome(extend);</span>
+<span class="pc bpc" id="L1938" title="1 of 2 branches missed.">                } else if (word) {</span>
+<span class="fc" id="L1939">                    moveCaret(wordLeft(), extend);</span>
+                } else {
+<span class="nc" id="L1941">                    moveCaret(caretLeft(), extend);</span>
+                }
+<span class="nc" id="L1943">                break;</span>
+            case KEY_RIGHT:
+<span class="fc bfc" id="L1945" title="All 2 branches covered.">                if (lineJump) {</span>
+<span class="fc" id="L1946">                    lineEndKey(extend);</span>
+<span class="pc bpc" id="L1947" title="1 of 2 branches missed.">                } else if (word) {</span>
+<span class="fc" id="L1948">                    moveCaret(wordRight(), extend);</span>
+                } else {
+<span class="nc" id="L1950">                    moveCaret(caretRight(), extend);</span>
+                }
+<span class="nc" id="L1952">                break;</span>
+            case KEY_UP:
+<span class="pc bpc" id="L1954" title="1 of 2 branches missed.">                moveCaret(lineJump ? 0 : caretVertical(-1), extend);</span>
+<span class="fc" id="L1955">                break;</span>
+            case KEY_DOWN:
+<span class="pc bpc" id="L1957" title="1 of 2 branches missed.">                moveCaret(lineJump ? doc.length() : caretVertical(1), extend);</span>
+<span class="fc" id="L1958">                break;</span>
+            case KEY_HOME:
+<span class="nc" id="L1960">                lineHome(extend);</span>
+<span class="nc" id="L1961">                break;</span>
+            case KEY_END:
+<span class="nc" id="L1963">                lineEndKey(extend);</span>
+<span class="nc" id="L1964">                break;</span>
+            case KEY_PAGE_UP:
+<span class="nc" id="L1966">                moveCaret(caretVertical(-Math.max(1, contentHeight() / getLineHeight())), extend);</span>
+<span class="nc" id="L1967">                break;</span>
+            case KEY_PAGE_DOWN:
+<span class="nc" id="L1969">                moveCaret(caretVertical(Math.max(1, contentHeight() / getLineHeight())), extend);</span>
+<span class="nc" id="L1970">                break;</span>
+            case KEY_BACKSPACE:
+<span class="fc" id="L1972">                deleteBackward();</span>
+<span class="fc" id="L1973">                break;</span>
+            case KEY_DELETE:
+<span class="nc" id="L1975">                deleteForward();</span>
+<span class="nc" id="L1976">                break;</span>
+            case KEY_COPY:
+<span class="nc" id="L1978">                copySelection();</span>
+<span class="nc" id="L1979">                break;</span>
+            case KEY_CUT:
+<span class="nc" id="L1981">                cutSelection();</span>
+<span class="nc" id="L1982">                break;</span>
+            case KEY_PASTE:
+<span class="fc" id="L1984">                pasteClipboard();</span>
+<span class="fc" id="L1985">                break;</span>
+            case KEY_SELECT_ALL:
+<span class="nc" id="L1987">                selectAll();</span>
+<span class="nc" id="L1988">                break;</span>
+            case KEY_UNDO:
+<span class="nc" id="L1990">                performUndo();</span>
+<span class="nc" id="L1991">                break;</span>
+            case KEY_REDO:
+<span class="nc" id="L1993">                performRedo();</span>
+<span class="nc" id="L1994">                break;</span>
+            case KEY_TAB:
+<span class="pc bpc" id="L1996" title="1 of 2 branches missed.">                if (editable) {</span>
+<span class="fc bfc" id="L1997" title="All 2 branches covered.">                    handleTab((modifiers &amp; MOD_SHIFT) != 0);</span>
+                }
+                break;
+            default:
+                break;
+        }
+<span class="fc" id="L2003">    }</span>
+
+    /// Undoes the last edit.
+    public void performUndo() {
+<span class="fc" id="L2007">        UndoManager.Edit edit = undo.undoEdit(doc);</span>
+<span class="pc bpc" id="L2008" title="1 of 2 branches missed.">        if (edit != null) {</span>
+<span class="fc" id="L2009">            caret = doc.clamp(edit.start + edit.removed.length());</span>
+<span class="fc" id="L2010">            anchor = -1;</span>
+<span class="fc" id="L2011">            documentEdited(edit.start);</span>
+<span class="fc" id="L2012">            documentReplaced(edit.start, edit.inserted, edit.removed);</span>
+<span class="fc" id="L2013">            restoreDocumentState(edit.beforeState);</span>
+<span class="fc" id="L2014">            onDocumentChanged();</span>
+        }
+<span class="fc" id="L2016">    }</span>
+
+    /// Redoes the last undone edit.
+    public void performRedo() {
+<span class="fc" id="L2020">        UndoManager.Edit edit = undo.redoEdit(doc);</span>
+<span class="pc bpc" id="L2021" title="1 of 2 branches missed.">        if (edit != null) {</span>
+<span class="fc" id="L2022">            caret = doc.clamp(edit.start + edit.inserted.length());</span>
+<span class="fc" id="L2023">            anchor = -1;</span>
+<span class="fc" id="L2024">            documentEdited(edit.start);</span>
+<span class="fc" id="L2025">            documentReplaced(edit.start, edit.removed, edit.inserted);</span>
+<span class="fc" id="L2026">            restoreDocumentState(edit.afterState);</span>
+<span class="fc" id="L2027">            onDocumentChanged();</span>
+        }
+<span class="fc" id="L2029">    }</span>
+
+    @Override
+    public void onEditorAction(int action) {
+<span class="nc bnc" id="L2033" title="All 4 branches missed.">        if (action == TextInputConfig.ACTION_DEFAULT &amp;&amp; editable) {</span>
+<span class="nc" id="L2034">            insertText(&quot;\n&quot;);</span>
+        }
+<span class="nc" id="L2036">    }</span>
+
+    @Override
+    public TextInputState getEditingState() {
+<span class="fc" id="L2040">        return new TextInputState(doc.getText(), getSelectionStart(), getSelectionEnd(), composingStart, composingEnd);</span>
+    }
+
+    @Override
+    public int[] getCaretRect() {
+<span class="nc" id="L2045">        return rectForOffset(caret);</span>
+    }
+
+    @Override
+    public int[] rectForOffset(int offset) {
+<span class="nc" id="L2050">        offset = doc.clamp(offset);</span>
+<span class="nc" id="L2051">        Font f = getEditorFont();</span>
+<span class="nc" id="L2052">        int cl = doc.lineOfOffset(offset);</span>
+<span class="nc" id="L2053">        int col = offset - doc.getLineStart(cl);</span>
+<span class="nc" id="L2054">        String line = doc.getLineText(cl);</span>
+<span class="nc bnc" id="L2055" title="All 2 branches missed.">        if (col &gt; line.length()) {</span>
+<span class="nc" id="L2056">            col = line.length();</span>
+        }
+<span class="nc" id="L2058">        int localX = getContentLeftInset() + lineContentOffsetX(cl) + measureColumnX(cl, line, col, f) - scrollX;</span>
+<span class="nc" id="L2059">        int localY = getStyle().getPaddingTop() + lineTopContent(cl) - scrollY;</span>
+<span class="nc" id="L2060">        return new int[]{getAbsoluteX() + localX, getAbsoluteY() + localY, Math.max(1, f.getHeight() / 16), lineHeightAt(cl)};</span>
+    }
+
+    @Override
+    public int getTextLength() {
+<span class="fc" id="L2065">        return doc.length();</span>
+    }
+
+    @Override
+    public String getTextRange(int start, int end) {
+<span class="nc" id="L2070">        start = doc.clamp(start);</span>
+<span class="nc" id="L2071">        end = doc.clamp(end);</span>
+<span class="nc bnc" id="L2072" title="All 2 branches missed.">        if (start &gt; end) {</span>
+<span class="nc" id="L2073">            int t = start;</span>
+<span class="nc" id="L2074">            start = end;</span>
+<span class="nc" id="L2075">            end = t;</span>
+        }
+<span class="nc" id="L2077">        return doc.substring(start, end);</span>
+    }
+
+    @Override
+    public int[] selectionRects(int start, int end) {
+<span class="nc" id="L2082">        start = doc.clamp(start);</span>
+<span class="nc" id="L2083">        end = doc.clamp(end);</span>
+<span class="nc bnc" id="L2084" title="All 2 branches missed.">        if (start &gt; end) {</span>
+<span class="nc" id="L2085">            int t = start;</span>
+<span class="nc" id="L2086">            start = end;</span>
+<span class="nc" id="L2087">            end = t;</span>
+        }
+<span class="nc" id="L2089">        Font f = getEditorFont();</span>
+<span class="nc" id="L2090">        int firstLine = doc.lineOfOffset(start);</span>
+<span class="nc" id="L2091">        int lastLine = doc.lineOfOffset(end);</span>
+<span class="nc" id="L2092">        java.util.List&lt;int[]&gt; rects = new java.util.ArrayList&lt;int[]&gt;();</span>
+<span class="nc bnc" id="L2093" title="All 2 branches missed.">        for (int ln = firstLine; ln &lt;= lastLine; ln++) {</span>
+<span class="nc" id="L2094">            int ls = doc.getLineStart(ln);</span>
+<span class="nc" id="L2095">            int le = doc.getLineEnd(ln);</span>
+<span class="nc" id="L2096">            String text = doc.getLineText(ln);</span>
+<span class="nc" id="L2097">            int a = clampInt(Math.max(start, ls) - ls, 0, text.length());</span>
+<span class="nc" id="L2098">            int b = clampInt(Math.min(end, le) - ls, 0, text.length());</span>
+<span class="nc" id="L2099">            int lx = getContentLeftInset() + lineContentOffsetX(ln) - scrollX;</span>
+<span class="nc" id="L2100">            int y = getStyle().getPaddingTop() + lineTopContent(ln) - scrollY;</span>
+            // A bidi line can produce several disjoint visual rectangles for one logical range.
+<span class="nc" id="L2102">            int[] segs = lineVisualSegments(ln, text, a, b, f);</span>
+<span class="nc bnc" id="L2103" title="All 4 branches missed.">            boolean crossesEol = ln &lt; lastLine &amp;&amp; end &gt; le;</span>
+<span class="nc bnc" id="L2104" title="All 4 branches missed.">            if (segs.length == 0 &amp;&amp; crossesEol) {</span>
+<span class="nc" id="L2105">                int ex = lx + measureColumnX(ln, text, text.length(), f);</span>
+<span class="nc" id="L2106">                rects.add(new int[]{getAbsoluteX() + ex, getAbsoluteY() + y, f.charWidth(' '), lineHeightAt(ln)});</span>
+            }
+<span class="nc bnc" id="L2108" title="All 2 branches missed.">            for (int si = 0; si &lt; segs.length; si += 2) {</span>
+<span class="nc" id="L2109">                int rx = lx + segs[si];</span>
+<span class="nc" id="L2110">                int rw = segs[si + 1];</span>
+                // extend the last segment to cover the trailing newline when the selection wraps
+<span class="nc bnc" id="L2112" title="All 4 branches missed.">                if (crossesEol &amp;&amp; si == segs.length - 2) {</span>
+<span class="nc" id="L2113">                    rw += f.charWidth(' ');</span>
+                }
+<span class="nc" id="L2115">                rects.add(new int[]{getAbsoluteX() + rx, getAbsoluteY() + y, Math.max(1, rw), lineHeightAt(ln)});</span>
+            }
+        }
+<span class="nc" id="L2118">        int[] out = new int[rects.size() * 4];</span>
+<span class="nc bnc" id="L2119" title="All 2 branches missed.">        for (int i = 0; i &lt; rects.size(); i++) {</span>
+<span class="nc" id="L2120">            int[] r = rects.get(i);</span>
+<span class="nc" id="L2121">            out[i * 4] = r[0];</span>
+<span class="nc" id="L2122">            out[i * 4 + 1] = r[1];</span>
+<span class="nc" id="L2123">            out[i * 4 + 2] = r[2];</span>
+<span class="nc" id="L2124">            out[i * 4 + 3] = r[3];</span>
+        }
+<span class="nc" id="L2126">        return out;</span>
+    }
+
+    @Override
+    public void replaceRange(int start, int end, String text) {
+<span class="nc" id="L2131">        replaceRange(start, end, text, true);</span>
+<span class="nc" id="L2132">    }</span>
+
+    @Override
+    public void setSelectionRange(int start, int end) {
+<span class="fc" id="L2136">        start = doc.clamp(start);</span>
+<span class="fc" id="L2137">        end = doc.clamp(end);</span>
+<span class="fc bfc" id="L2138" title="All 2 branches covered.">        anchor = start == end ? -1 : start;</span>
+<span class="fc" id="L2139">        caret = end;</span>
+<span class="fc" id="L2140">        resetBlink();</span>
+<span class="fc" id="L2141">        scrollCaretVisible();</span>
+<span class="fc" id="L2142">        repaint();</span>
+<span class="fc" id="L2143">    }</span>
+
+    @Override
+    public TextInputConfig getConfig() {
+<span class="fc" id="L2147">        TextInputConfig cfg = new TextInputConfig();</span>
+<span class="fc bfc" id="L2148" title="All 2 branches covered.">        if (codeMode) {</span>
+<span class="fc" id="L2149">            cfg.setAutoCorrect(false).setAutoCapitalize(false);</span>
+        }
+<span class="fc" id="L2151">        cfg.setMultiline(true);</span>
+<span class="fc" id="L2152">        return cfg;</span>
+    }
+
+    @Override
+    public void inputFocusGained() {
+<span class="nc" id="L2157">    }</span>
+
+    @Override
+    public void inputFocusLost() {
+<span class="nc" id="L2161">    }</span>
+
+    // ---- preferred size ----
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L2167">        Font f = getEditorFont();</span>
+<span class="fc" id="L2168">        int w = 20 * f.charWidth('m') + getContentLeftInset() + getStyle().getPaddingRightNoRTL();</span>
+<span class="fc" id="L2169">        int h = 6 * getLineHeight() + getStyle().getPaddingTop() + getStyle().getPaddingBottom();</span>
+<span class="fc" id="L2170">        return new Dimension(w, h);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,799 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Geometry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.geom</a> &gt; <span class="el_source">Geometry.java</span></div><h1>Geometry.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.geom;
+
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.GeneralPath.ShapeUtil;
+import com.codename1.util.MathUtil;
+
+import java.util.Arrays;
+import java.util.List;
+
+/// A utility class to assist with geometry elements like bezier curves
+///
+/// @author Steve Hannah
+<span class="nc" id="L37">class Geometry {</span>
+
+    private static int factorial(int n) {
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (n &lt; 0) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(&quot;factorial does not support negative numbers&quot;);</span>
+        }
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L44">            return 1;</span>
+        }
+<span class="fc" id="L46">        return n * factorial(n - 1);</span>
+    }
+
+    /// Encapsulates a BezierCurve.  Some functionality supports curves of arbitrary degree,
+    /// but the most useful stuff only supports quadratic and cubic curves.
+    ///
+    /// The main point of this class is to provide the ability to segment bezier curves
+    /// into smaller components so that `GeneralPath#intersection(com.codename1.ui.geom.Rectangle)`
+    /// will work for paths that contain curves.
+    static class BezierCurve {
+
+        /// The x, and y points used for the bezier curves.  (x[0], y[0]) is the starting point
+        /// , (x[x.length-1], y[y.length-1]) is the end point, and all indices in between
+        /// are the control points.  Cubic curves will have 4 points, quadratic curves, 3 points, lines
+        /// 2 points.
+        final double[] x;
+        final double[] y;
+
+        private Point2D startPoint;
+        private Point2D endPoint;
+        private Rectangle2D boundingRect;
+
+
+        /// Creates a bezier curve with the provided points.  Points should be entered as (x1, y1, x2, y2, ..., xn, yn.
+        ///
+        /// #### Parameters
+        ///
+        /// - `pts`: The points.
+<span class="fc" id="L74">        public BezierCurve(double... pts) {</span>
+<span class="fc" id="L75">            int len = pts.length;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (len % 2 != 0) {</span>
+<span class="fc" id="L77">                throw new IllegalArgumentException(&quot;Length of points array must be even.&quot;);</span>
+            }
+<span class="fc" id="L79">            x = new double[len / 2];</span>
+<span class="fc" id="L80">            y = new double[len / 2];</span>
+
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i += 2) {</span>
+<span class="fc" id="L83">                x[i / 2] = pts[i];</span>
+<span class="fc" id="L84">                y[i / 2] = pts[i + 1];</span>
+            }
+
+<span class="fc" id="L87">        }</span>
+
+        /// Creates a new bezier curve as a copy of another.
+        ///
+        /// #### Parameters
+        ///
+        /// - `toCopy`: The curve to copy.
+<span class="fc" id="L94">        public BezierCurve(BezierCurve toCopy) {</span>
+<span class="fc" id="L95">            x = new double[toCopy.x.length];</span>
+<span class="fc" id="L96">            y = new double[toCopy.y.length];</span>
+<span class="fc" id="L97">            System.arraycopy(toCopy.x, 0, x, 0, toCopy.x.length);</span>
+<span class="fc" id="L98">            System.arraycopy(toCopy.y, 0, y, 0, toCopy.y.length);</span>
+<span class="fc" id="L99">        }</span>
+
+        public static void extractBezierCurvesFromPath(Shape shape, List&lt;BezierCurve&gt; out) {
+<span class="fc" id="L102">            PathIterator it = shape.getPathIterator();</span>
+            int type;
+<span class="fc" id="L104">            double[] buf = new double[6];</span>
+<span class="fc" id="L105">            double prevX = 0;</span>
+<span class="fc" id="L106">            double prevY = 0;</span>
+<span class="fc" id="L107">            double markX = 0;</span>
+<span class="fc" id="L108">            double markY = 0;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            while (!it.isDone()) {</span>
+<span class="fc" id="L110">                type = it.currentSegment(buf);</span>
+<span class="pc bpc" id="L111" title="3 of 6 branches missed.">                switch (type) {</span>
+                    case PathIterator.SEG_MOVETO:
+<span class="fc" id="L113">                        prevX = buf[0];</span>
+<span class="fc" id="L114">                        prevY = buf[1];</span>
+<span class="fc" id="L115">                        markX = prevX;</span>
+<span class="fc" id="L116">                        markY = prevY;</span>
+<span class="fc" id="L117">                        break;</span>
+                    case PathIterator.SEG_LINETO:
+<span class="nc" id="L119">                        prevX = buf[0];</span>
+<span class="nc" id="L120">                        prevY = buf[1];</span>
+<span class="nc" id="L121">                        break;</span>
+                    case PathIterator.SEG_CLOSE:
+<span class="nc" id="L123">                        prevX = markX;</span>
+<span class="nc" id="L124">                        prevY = markY;</span>
+<span class="nc" id="L125">                        break;</span>
+                    case PathIterator.SEG_QUADTO:
+<span class="fc" id="L127">                        out.add(new BezierCurve(prevX, prevY, buf[0], buf[1], buf[2], buf[3]));</span>
+<span class="fc" id="L128">                        prevX = buf[2];</span>
+<span class="fc" id="L129">                        prevY = buf[3];</span>
+<span class="fc" id="L130">                        break;</span>
+                    case PathIterator.SEG_CUBICTO:
+<span class="fc" id="L132">                        out.add(new BezierCurve(prevX, prevY, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]));</span>
+<span class="fc" id="L133">                        prevX = buf[4];</span>
+<span class="fc" id="L134">                        prevY = buf[5];</span>
+<span class="fc" id="L135">                        break;</span>
+                    default:
+                        break;
+
+
+                }
+<span class="fc" id="L141">                it.next();</span>
+
+            }
+<span class="fc" id="L144">        }</span>
+
+        /// Checks an array to see if it already contains a value within the desired epsilon range.
+        ///
+        /// #### Parameters
+        ///
+        /// - `needle`: The value to search for
+        ///
+        /// - `haystack`: The array to check
+        ///
+        /// - `epsilon`: The range considered to be a match.
+        ///
+        /// - `startIndex`: Start index to check
+        ///
+        /// - `endIndex`: End index to check
+        private static boolean contains(double needle, double[] haystack, double epsilon, int startIndex, int endIndex) {
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            for (int i = startIndex; i &lt; endIndex; i++) {</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                if (Math.abs(needle - haystack[i]) &lt; epsilon) {</span>
+<span class="nc" id="L162">                    return true;</span>
+                }
+            }
+<span class="fc" id="L165">            return false;</span>
+        }
+
+        /// Copies range from one array to another.  Only unique values are copied (epsilon arg is used for equality range).
+        /// Returns the number of items that were copied.
+        ///
+        /// #### Parameters
+        ///
+        /// - `src`: Source array
+        ///
+        /// - `srcStart`: Start index in source array to copy from
+        ///
+        /// - `dst`: Destination array
+        ///
+        /// - `dstStart`: Start index in destination array to copy to.
+        ///
+        /// - `len`: Number of elements to copy (max).
+        ///
+        /// - `epsilon`: Range considered for equality.
+        ///
+        /// #### Returns
+        ///
+        /// The number of elements that were actually copied.
+        private static int arraycopy(double[] src, int srcStart, double[] dst, int dstStart, int len, double epsilon) {
+<span class="fc" id="L189">            int numCopied = 0;</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                if (!contains(src[srcStart + i], dst, epsilon, 0, dstStart)) {</span>
+<span class="fc" id="L192">                    dst[dstStart++] = src[srcStart + i];</span>
+<span class="fc" id="L193">                    numCopied++;</span>
+                }
+            }
+<span class="fc" id="L196">            return numCopied;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L201">            return &quot;Curve{x=&quot; + Arrays.toString(x) + &quot;, y=&quot; + Arrays.toString(y) + &quot;}&quot;;</span>
+        }
+
+        /// Gets the end point of the curve.
+        public Point2D getEndPoint() {
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            if (endPoint == null) {</span>
+<span class="fc" id="L207">                endPoint = new Point2D(x[n()], y[n()]);</span>
+            }
+<span class="fc" id="L209">            return endPoint;</span>
+        }
+
+        /// Gets the start point of the curve.
+        public Point2D getStartPoint() {
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (startPoint == null) {</span>
+<span class="fc" id="L215">                startPoint = new Point2D(x[0], y[0]);</span>
+            }
+<span class="fc" id="L217">            return startPoint;</span>
+        }
+
+        public int n() {
+<span class="fc" id="L221">            return x.length - 1;</span>
+        }
+
+        /// ith polynomial coefficient for x(t) (i.e. the x component of B(t).  See https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Polynomial_form
+        ///
+        /// #### Parameters
+        ///
+        /// - `j`: The power of t for which this is a coefficient in sum(t^j * C[j], j=0..n
+        ///
+        /// #### Returns
+        ///
+        /// The coefficient
+        public double cx(int j) {
+<span class="fc" id="L234">            return (double) factorial(n()) / factorial(n() - j) * sumFactorX(j, j);</span>
+        }
+
+        /// Calculates the &quot;summation&quot; factor in `#cx(int)`.  See https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Polynomial_form
+        /// sum(-1^(i+j)*x[i]/(i!*(j-i)!), i=0..j
+        ///
+        /// #### Parameters
+        ///
+        /// - `j`: The coefficient that this factor belongs to.
+        ///
+        /// - `i`
+        private double sumFactorX(int j, int i) {
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (i == 0) {</span>
+<span class="fc" id="L247">                return MathUtil.pow(-1, j) * x[0] / factorial(j);</span>
+            }
+<span class="fc" id="L249">            return MathUtil.pow(-1, i + j) * x[i] / factorial(i) / factorial(j - i) + sumFactorX(j, i - 1);</span>
+
+        }
+
+        /// The y component of the curve function.  See `#cx(int)`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `j`
+        public double cy(int j) {
+<span class="fc" id="L259">            return (double) factorial(n()) / factorial(n() - j) * sumFactorY(j, j);</span>
+        }
+
+        /// The y counterpart of `int)`
+        ///
+        /// #### Parameters
+        ///
+        /// - `j`
+        ///
+        /// - `i`
+        private double sumFactorY(int j, int i) {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (i == 0) {</span>
+<span class="fc" id="L271">                return MathUtil.pow(-1, j) * y[0] / factorial(j);</span>
+            }
+<span class="fc" id="L273">            return MathUtil.pow(-1, i + j) * y[i] / factorial(i) / factorial(j - i) + sumFactorY(j, i - 1);</span>
+
+        }
+
+        /// Gets x coord for t value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `t`: The t value in the curve.  t must be in [0 .. 1]
+        ///
+        /// #### Returns
+        ///
+        /// The x value corresponding to the given t.
+        public double x(double t) {
+<span class="fc" id="L287">            return termX(t, n());</span>
+        }
+
+        /// Calculates up to the jth term of the x func.   See https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Polynomial_form
+        private double termX(double t, int j) {
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (j == 0) {</span>
+<span class="fc" id="L293">                return cx(j);</span>
+            }
+<span class="fc" id="L295">            return cx(j) * MathUtil.pow(t, j) + termX(t, j - 1);</span>
+        }
+
+        /// Gets derivative's coefficients in increasing order of degree in t.
+        public double[] getDerivativeCoefficientsX() {
+<span class="pc bpc" id="L300" title="2 of 4 branches missed.">            switch (n()) {</span>
+                case 1:
+<span class="nc" id="L302">                    return new double[]{cx(1), 0, 0};</span>
+                case 2:
+<span class="fc" id="L304">                    return new double[]{cx(1), 2 * cx(2), 0};</span>
+                case 3:
+<span class="nc" id="L306">                    return new double[]{cx(1), 2 * cx(2), 3 * cx(3)};</span>
+                default:
+<span class="fc" id="L308">                    throw new IllegalArgumentException(&quot;Derivative coefficients only implements for beziers of order 3 or lower.&quot;);</span>
+            }
+        }
+
+        /// Gets derivative's coefficients in increasing order of degree in t.
+        public double[] getDerivativeCoefficientsY() {
+<span class="pc bpc" id="L314" title="2 of 4 branches missed.">            switch (n()) {</span>
+                case 1:
+<span class="nc" id="L316">                    return new double[]{cy(1), 0, 0};</span>
+                case 2:
+<span class="fc" id="L318">                    return new double[]{cy(1), 2 * cy(2), 0};</span>
+                case 3:
+<span class="nc" id="L320">                    return new double[]{cy(1), 2 * cy(2), 3 * cy(3)};</span>
+                default:
+<span class="fc" id="L322">                    throw new IllegalArgumentException(&quot;Derivative coefficients only implements for beziers of order 3 or lower.&quot;);</span>
+            }
+        }
+
+        /// Gets y coord for t value
+        ///
+        /// #### Parameters
+        ///
+        /// - `t`: The t value on the bezier function to retrieve y at.  T must be in [0 .. 1].
+        public double y(double t) {
+<span class="fc" id="L332">            return termY(t, n());</span>
+        }
+
+        /// Calculates up to the jth term of the x func.   See https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Polynomial_form
+        private double termY(double t, int j) {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            if (j == 0) {</span>
+<span class="fc" id="L338">                return cy(j);</span>
+            }
+<span class="fc" id="L340">            return cy(j) * MathUtil.pow(t, j) + termY(t, j - 1);</span>
+        }
+
+        /// Finds all t values that intersect the give x vertical line.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`
+        ///
+        /// - `res`: Output array.  For quadratics, this should be length at least 2.  For cubics, length must be at least 3.
+        ///
+        /// #### Returns
+        ///
+        /// The number of x values found.
+        private int findTValuesForX(double x, double[] res) {
+
+<span class="pc bpc" id="L356" title="2 of 3 branches missed.">            switch (n()) {</span>
+                case 2:
+<span class="fc" id="L358">                    return ShapeUtil.solveQuad(new double[]{cx(0) - x, cx(1), cx(2), 0}, res);</span>
+
+                case 3:
+<span class="nc" id="L361">                    return ShapeUtil.solveCubic(new double[]{cx(0) - x, cx(1), cx(2), cx(3)}, res);</span>
+                default:
+
+<span class="nc" id="L364">                    throw new IllegalArgumentException(&quot;Only 2 and 3 degree bezier curves are supported&quot;);</span>
+
+            }
+        }
+
+        /// Finds all t values that intersect the give y horizontal line.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`
+        ///
+        /// - `res`: Output array.  For quadratics, this should be length at least 2.  For cubics, length must be at least 3.
+        ///
+        /// #### Returns
+        ///
+        /// The number of x values found.
+        private int findTValuesForY(double y, double[] res) {
+
+<span class="pc bpc" id="L382" title="2 of 3 branches missed.">            switch (n()) {</span>
+                case 2:
+<span class="fc" id="L384">                    return ShapeUtil.solveQuad(new double[]{cy(0) - y, cy(1), cy(2)}, res);</span>
+
+                case 3:
+<span class="nc" id="L387">                    return ShapeUtil.solveCubic(new double[]{cy(0) - y, cy(1), cy(2), cy(3)}, res);</span>
+                default:
+
+<span class="nc" id="L390">                    throw new IllegalArgumentException(&quot;Only 2 and 3 degree bezier curves are supported&quot;);</span>
+
+            }
+        }
+
+        /// Returns bezier curve running in the opposite direction.
+        public BezierCurve reverse() {
+<span class="fc" id="L397">            int len = x.length;</span>
+<span class="fc" id="L398">            double[] params = new double[len * 2];</span>
+<span class="fc" id="L399">            int index = 0;</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">            for (int i = len - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L401">                params[index++] = x[i];</span>
+<span class="fc" id="L402">                params[index++] = y[i];</span>
+
+            }
+<span class="fc" id="L405">            return new BezierCurve(params);</span>
+
+        }
+
+        /// Segements this curve into two shorter curves.  Split at point t.
+        ///
+        /// #### Parameters
+        ///
+        /// - `t`: t value where split should occur.  0 &lt; t &lt; 1
+        ///
+        /// - `out`: List where the two segemeted curves will be added.
+        public void segment(double t, List&lt;BezierCurve&gt; out) {
+<span class="fc" id="L417">            out.add(segment(t));</span>
+<span class="fc" id="L418">            out.add(reverse().segment(1 - t).reverse());</span>
+<span class="fc" id="L419">        }</span>
+
+        /// Adds bezier curve to a path.
+        ///
+        /// #### Parameters
+        ///
+        /// - `p`: The path to add to.
+        ///
+        /// - `join`: If false, it will first add a moveTo() command to the path.
+        public void addToPath(GeneralPath p, boolean join) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">            if (n() == 2) {</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">                if (!join) {</span>
+<span class="fc" id="L431">                    p.moveTo(x[0], y[0]);</span>
+                }
+<span class="fc" id="L433">                p.quadTo(x[1], y[1], x[2], y[2]);</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">            } else if (n() == 3) {</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">                if (!join) {</span>
+<span class="nc" id="L436">                    p.moveTo(x[0], y[0]);</span>
+                }
+<span class="nc" id="L438">                p.curveTo(x[1], y[1], x[2], y[2], x[3], y[3]);</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">            } else if (n() == 1) {</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                if (join) {</span>
+<span class="fc" id="L441">                    p.moveTo(x[0], y[0]);</span>
+                }
+<span class="fc" id="L443">                p.lineTo(x[1], y[1]);</span>
+            }
+<span class="fc" id="L445">        }</span>
+
+        /// Strokes the bezier curve on a graphics context.
+        ///
+        /// #### Parameters
+        ///
+        /// - `g`
+        ///
+        /// - `stroke`
+        ///
+        /// - `translateX`
+        ///
+        /// - `translateY`
+        public void stroke(Graphics g, Stroke stroke, int translateX, int translateY) {
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">            if (stroke == null) {</span>
+<span class="nc" id="L460">                stroke = new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1f);</span>
+            }
+<span class="fc" id="L462">            GeneralPath p = new GeneralPath();</span>
+<span class="fc" id="L463">            addToPath(p, false);</span>
+<span class="fc" id="L464">            p.transform(Transform.makeTranslation(translateX, translateY));</span>
+<span class="fc" id="L465">            g.drawShape(p, stroke);</span>
+<span class="fc" id="L466">        }</span>
+
+        public Rectangle2D getBoundingRect() {
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">            if (boundingRect == null) {</span>
+<span class="fc" id="L470">                Point2D start = getStartPoint();</span>
+<span class="fc" id="L471">                Point2D end = getEndPoint();</span>
+<span class="fc" id="L472">                int numSolutions = 0;</span>
+<span class="fc" id="L473">                double[] res = new double[3];</span>
+<span class="fc" id="L474">                double x1 = Math.min(start.getX(), end.getX());</span>
+<span class="fc" id="L475">                double y1 = Math.min(start.getY(), end.getY());</span>
+<span class="fc" id="L476">                double x2 = Math.max(start.getX(), end.getX());</span>
+<span class="fc" id="L477">                double y2 = Math.max(start.getY(), end.getY());</span>
+<span class="pc bpc" id="L478" title="3 of 4 branches missed.">                switch (n()) {</span>
+                    case 1:
+<span class="nc" id="L480">                        break;</span>
+                    case 0:
+<span class="nc" id="L482">                        break;</span>
+                    case 2:
+                    case 3:
+
+<span class="fc" id="L486">                        numSolutions = ShapeUtil.solveQuad(getDerivativeCoefficientsX(), res);</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">                        if (numSolutions &gt; 0) {</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                            for (int i = 0; i &lt; numSolutions; i++) {</span>
+<span class="nc" id="L489">                                double t = res[i];</span>
+<span class="nc bnc" id="L490" title="All 4 branches missed.">                                if (t &lt; 0 || t &gt; 1) {</span>
+<span class="nc" id="L491">                                    continue;</span>
+                                }
+<span class="nc" id="L493">                                double xt = x(t);</span>
+<span class="nc" id="L494">                                double yt = y(t);</span>
+<span class="nc" id="L495">                                x1 = Math.min(x1, xt);</span>
+<span class="nc" id="L496">                                y1 = Math.min(y1, yt);</span>
+<span class="nc" id="L497">                                x2 = Math.max(x2, xt);</span>
+<span class="nc" id="L498">                                y2 = Math.max(y2, yt);</span>
+                            }
+
+                        }
+<span class="fc" id="L502">                        numSolutions = ShapeUtil.solveQuad(getDerivativeCoefficientsY(), res);</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">                        if (numSolutions &gt; 0) {</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">                            for (int i = 0; i &lt; numSolutions; i++) {</span>
+<span class="fc" id="L505">                                double t = res[i];</span>
+<span class="pc bpc" id="L506" title="2 of 4 branches missed.">                                if (t &lt; 0 || t &gt; 1) {</span>
+<span class="nc" id="L507">                                    continue;</span>
+                                }
+<span class="fc" id="L509">                                double xt = x(t);</span>
+<span class="fc" id="L510">                                double yt = y(t);</span>
+<span class="fc" id="L511">                                x1 = Math.min(x1, xt);</span>
+<span class="fc" id="L512">                                y1 = Math.min(y1, yt);</span>
+<span class="fc" id="L513">                                x2 = Math.max(x2, xt);</span>
+<span class="fc" id="L514">                                y2 = Math.max(y2, yt);</span>
+                            }
+
+                        }
+                        break;
+                    default:
+<span class="nc" id="L520">                        throw new IllegalArgumentException(&quot;getBoundingRect() only supported for bezier curves of order 3 or less&quot;);</span>
+
+
+                }
+<span class="fc" id="L524">                boundingRect = new Rectangle2D(x1, y1, x2 - x1, y2 - y1);</span>
+            }
+<span class="fc" id="L526">            return boundingRect;</span>
+        }
+
+        /// Segments the curve into 2 smaller component curves split at the given t value.  t in [0 .. 1].
+        /// Returns only the first segment.  You can use reverse().segment(1-t).reverse() to get the other segment.
+        ///
+        /// #### Parameters
+        ///
+        /// - `t`: The value of t to segment on.
+        ///
+        /// #### Returns
+        ///
+        /// The first segment.
+        public BezierCurve segment(double t) {
+<span class="fc" id="L540">            return segment(0, t);</span>
+        }
+
+        /// Finds all of the t values that cross the given x vertical between y=minY and y=maxY.  The
+        /// t values are added to the out array, and the number of matches is returned.
+        /// On quadratic curves, there should be a maximum of 2 results.  On cubic curves, there will be
+        /// a maximum 3 results.
+        ///
+        /// #### Parameters
+        ///
+        /// - `x`: The x value for which we wish to find t.
+        ///
+        /// - `minY`: Minimum y value we are interested in.
+        ///
+        /// - `maxY`: Maximum y value we are interested in.
+        ///
+        /// - `out`: Out array.  For quadratics, this needs to have length at least 2.  For cubics, at least 3.
+        ///
+        /// #### Returns
+        ///
+        /// The number of results found.
+        public int findTValuesForX(double x, double minY, double maxY, double[] out) {
+
+<span class="fc" id="L563">            int numMatches = findTValuesForX(x, out);</span>
+<span class="fc" id="L564">            int numFiltered = 0;</span>
+<span class="fc bfc" id="L565" title="All 2 branches covered.">            for (int i = 0; i &lt; numMatches; i++) {</span>
+<span class="pc bpc" id="L566" title="1 of 4 branches missed.">                if (out[i] &lt; 0 || out[i] &gt; 1) {</span>
+<span class="nc" id="L567">                    continue;</span>
+                }
+<span class="fc" id="L569">                double ty = y(out[i]);</span>
+<span class="pc bpc" id="L570" title="2 of 4 branches missed.">                if (ty &gt;= minY &amp;&amp; ty &lt;= maxY) {</span>
+<span class="fc" id="L571">                    out[numFiltered] = out[i];</span>
+<span class="fc" id="L572">                    numFiltered++;</span>
+                }
+            }
+<span class="fc" id="L575">            return numFiltered;</span>
+        }
+
+        /// Finds all of the t values that cross the given y horizontal between x=minX and x=maxX.  The
+        /// t values are added to the out array, and the number of matches is returned.
+        /// On quadratic curves, there should be a maximum of 2 results.  On cubic curves, there will be
+        /// a maximum 3 results.
+        ///
+        /// #### Parameters
+        ///
+        /// - `y`: The x value for which we wish to find t.
+        ///
+        /// - `minX`: Minimum x value we are interested in.
+        ///
+        /// - `maxX`: Maximum x value we are interested in.
+        ///
+        /// - `out`: Out array.  For quadratics, this needs to have length at least 2.  For cubics, at least 3.
+        ///
+        /// #### Returns
+        ///
+        /// The number of results found.
+        public int findTValuesForY(double y, double minX, double maxX, double[] out) {
+
+<span class="fc" id="L598">            int numMatches = findTValuesForY(y, out);</span>
+<span class="fc" id="L599">            int numFiltered = 0;</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">            for (int i = 0; i &lt; numMatches; i++) {</span>
+<span class="pc bpc" id="L601" title="1 of 4 branches missed.">                if (out[i] &lt; 0 || out[i] &gt; 1) {</span>
+<span class="nc" id="L602">                    continue;</span>
+                }
+<span class="fc" id="L604">                double tx = x(out[i]);</span>
+<span class="fc bfc" id="L605" title="All 4 branches covered.">                if (tx &gt;= minX &amp;&amp; tx &lt;= maxX) {</span>
+<span class="fc" id="L606">                    out[numFiltered] = out[i];</span>
+<span class="fc" id="L607">                    numFiltered++;</span>
+                }
+            }
+<span class="fc" id="L610">            return numFiltered;</span>
+        }
+
+        /// Compares two bezier curves to see if they are equal (within epsilon margin of error).
+        ///
+        /// #### Parameters
+        ///
+        /// - `c`: The bezier curve to compare to
+        ///
+        /// - `epsilon`: @param epsilon Curves are equal if all x and y values are within epsilon of the corresponding x/y value
+        /// in the other curve.  epsilon must be greater than 0
+        ///
+        /// #### Returns
+        ///
+        /// True if curves are equal within epsilon margin of error.
+        public boolean equals(BezierCurve c, double epsilon) {
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            if (c.n() != n()) {</span>
+<span class="nc" id="L627">                return false;</span>
+            }
+<span class="fc" id="L629">            int len = x.length;</span>
+<span class="fc bfc" id="L630" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                if (Math.abs(x[i] - c.x[i]) &gt; epsilon) {</span>
+<span class="fc" id="L632">                    return false;</span>
+                }
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">                if (Math.abs(y[i] - c.y[i]) &gt; epsilon) {</span>
+<span class="nc" id="L635">                    return false;</span>
+                }
+            }
+<span class="fc" id="L638">            return true;</span>
+        }
+
+        /// Segments the bezier curve on all intersection points of the provided rectangle.
+        ///
+        /// #### Parameters
+        ///
+        /// - `rect`: The rectangle on which to segment the curve.
+        ///
+        /// - `out`: list where the segmented curves are appended.
+        public void segment(Rectangle2D rect, List&lt;BezierCurve&gt; out) {
+            //System.out.println(&quot;segment(&quot;+rect+&quot;) on  &quot;+this);
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">            int numIntersections = (n() == 2) ? ShapeUtil.intersectQuad(x[0], y[0], x[1], y[1], x[2], y[2], rect.getX(), rect.getY(), rect.getX() + rect.getWidth(), rect.getY() + rect.getHeight()) :</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">                    n() == 3 ? ShapeUtil.intersectCubic(x[0], y[0], x[1], y[1], x[2], y[2], x[3], y[3], rect.getX(), rect.getY(), rect.getX() + rect.getWidth(), rect.getHeight() + rect.getY()) :</span>
+<span class="pc bnc" id="L652" title="All 2 branches missed.">                            n() == 1 ? ShapeUtil.intersectLine(x[0], y[0], x[1], y[1], rect.getX(), rect.getY(), rect.getX() + rect.getWidth(), rect.getY() + rect.getHeight()) :</span>
+                                    -1;
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">            if (numIntersections == -1) {</span>
+<span class="nc" id="L655">                throw new IllegalArgumentException(&quot;Cannot segment bezier curve of this order: &quot; + n());</span>
+            }
+
+<span class="fc bfc" id="L658" title="All 2 branches covered.">            if (numIntersections == 0) {</span>
+<span class="fc" id="L659">                out.add(new BezierCurve(this));</span>
+<span class="fc" id="L660">                return;</span>
+            }
+
+
+            // To store t values of intersection points
+<span class="fc" id="L665">            double[] tvals = new double[numIntersections];</span>
+<span class="fc" id="L666">            int nextTvalIndex = 0;</span>
+<span class="fc" id="L667">            double[] res = new double[3];</span>
+<span class="fc" id="L668">            int numMatches = 0;</span>
+<span class="fc" id="L669">            double epsilon = 0.01;</span>
+            // left edge
+
+<span class="fc" id="L672">            numMatches = findTValuesForX(rect.getX(), rect.getY(), rect.getY() + rect.getHeight(), res);</span>
+<span class="fc bfc" id="L673" title="All 2 branches covered.">            if (numMatches &gt; 0) {</span>
+<span class="fc" id="L674">                nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);</span>
+            }
+            // right edge
+<span class="fc" id="L677">            numMatches = findTValuesForX(rect.getX() + rect.getWidth(), rect.getY(), rect.getY() + rect.getHeight(), res);</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">            if (numMatches &gt; 0) {</span>
+<span class="fc" id="L679">                nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);</span>
+            }
+            // top edge
+<span class="fc" id="L682">            numMatches = findTValuesForY(rect.getY(), rect.getX(), rect.getX() + rect.getWidth(), res);</span>
+<span class="pc bpc" id="L683" title="1 of 2 branches missed.">            if (numMatches &gt; 0) {</span>
+<span class="nc" id="L684">                nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);</span>
+            }
+            // bottom edge
+<span class="fc" id="L687">            numMatches = findTValuesForY(rect.getY() + rect.getHeight(), rect.getX(), rect.getX() + rect.getWidth(), res);</span>
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">            if (numMatches &gt; 0) {</span>
+                //System.out.println(&quot;Bottom: &quot;+numMatches+&quot; &quot;+Arrays.toString(res));
+<span class="nc" id="L690">                nextTvalIndex += arraycopy(res, 0, tvals, nextTvalIndex, numMatches, epsilon);</span>
+            }
+
+<span class="fc" id="L693">            Arrays.sort(tvals, 0, nextTvalIndex);</span>
+            //System.out.println(&quot;tvals=&quot;+Arrays.toString(tvals)+&quot;; numSegments=&quot;+(nextTvalIndex+1));
+<span class="fc" id="L695">            int numSegments = nextTvalIndex + 1;</span>
+<span class="pc bpc" id="L696" title="1 of 3 branches missed.">            switch (numSegments) {</span>
+                case 1:
+<span class="nc" id="L698">                    out.add(new BezierCurve(this));</span>
+<span class="nc" id="L699">                    return;</span>
+                case 2:
+<span class="pc bpc" id="L701" title="3 of 4 branches missed.">                    if (tvals[0] &gt; epsilon &amp;&amp; tvals[0] &lt; 1 - epsilon) {</span>
+<span class="nc" id="L702">                        segment(tvals[0], out);</span>
+                    } else {
+<span class="fc" id="L704">                        out.add(new BezierCurve(this));</span>
+                    }
+<span class="fc" id="L706">                    return;</span>
+                default:
+<span class="fc" id="L708">                    int tIndex = 0;</span>
+<span class="pc bpc" id="L709" title="1 of 4 branches missed.">                    while (tvals[tIndex] &lt; epsilon || tvals[tIndex] &gt; 1 - epsilon) {</span>
+<span class="fc" id="L710">                        tIndex++;</span>
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">                        if (tIndex &gt;= nextTvalIndex) {</span>
+<span class="nc" id="L712">                            out.add(new BezierCurve(this));</span>
+<span class="nc" id="L713">                            return;</span>
+                        }
+                    }
+
+<span class="fc" id="L717">                    segment(tvals[tIndex], out);</span>
+<span class="fc" id="L718">                    BezierCurve last = out.remove(out.size() - 1);</span>
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">                    if (last.equals(this, epsilon)) {</span>
+<span class="nc" id="L720">                        out.add(last);</span>
+                    } else {
+<span class="fc" id="L722">                        last.segment(rect, out);</span>
+                    }
+            }
+
+
+<span class="fc" id="L727">        }</span>
+
+        /// Creates a new bezier curve on 0 to t1.
+        ///
+        /// #### Parameters
+        ///
+        /// - `t0`: Start t
+        ///
+        /// - `t1`: End t
+        ///
+        /// #### Returns
+        ///
+        /// A new bezier curve on 0 to t1.
+        private BezierCurve segment(double t0, double t1) {
+<span class="fc bfc" id="L741" title="All 4 branches covered.">            if (t1 &lt;= 0 || t1 &gt;= 1) {</span>
+<span class="fc" id="L742">                throw new IllegalArgumentException(&quot;t must be between 0 and 1 but found &quot; + t1);</span>
+            }
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">            if (n() == 2) {</span>
+<span class="fc" id="L745">                double x0 = x(t0);</span>
+<span class="fc" id="L746">                double y0 = y(t0);</span>
+<span class="fc" id="L747">                double xt = x(t1);</span>
+<span class="fc" id="L748">                double yt = y(t1);</span>
+<span class="fc" id="L749">                double x3 = (x[1] - x[0]) * t1 + x[0];</span>
+<span class="fc" id="L750">                double y3 = (y[1] - y[0]) * t1 + y[0];</span>
+
+<span class="fc" id="L752">                return new BezierCurve(x0, y0,</span>
+                        x3, y3,
+                        xt, yt
+                );
+
+<span class="nc bnc" id="L757" title="All 2 branches missed.">            } else if (n() == 3) {</span>
+<span class="nc bnc" id="L758" title="All 2 branches missed.">                if (t0 != 0) {</span>
+<span class="nc" id="L759">                    throw new IllegalArgumentException(&quot;Only supports t0=0 right now with cubics&quot;);</span>
+                }
+<span class="nc" id="L761">                double t = t1;</span>
+<span class="nc" id="L762">                double x1 = x[0];</span>
+<span class="nc" id="L763">                double y1 = y[0];</span>
+<span class="nc" id="L764">                double x2 = x[1];</span>
+<span class="nc" id="L765">                double y2 = y[1];</span>
+<span class="nc" id="L766">                double x3 = x[2];</span>
+<span class="nc" id="L767">                double y3 = y[2];</span>
+<span class="nc" id="L768">                double x4 = x[3];</span>
+<span class="nc" id="L769">                double y4 = y[3];</span>
+<span class="nc" id="L770">                double x12 = (x2 - x1) * t + x1;</span>
+<span class="nc" id="L771">                double y12 = (y2 - y1) * t + y1;</span>
+
+<span class="nc" id="L773">                double x23 = (x3 - x2) * t + x2;</span>
+<span class="nc" id="L774">                double y23 = (y3 - y2) * t + y2;</span>
+
+<span class="nc" id="L776">                double x34 = (x4 - x3) * t + x3;</span>
+<span class="nc" id="L777">                double y34 = (y4 - y3) * t + y3;</span>
+
+<span class="nc" id="L779">                double x123 = (x23 - x12) * t + x12;</span>
+<span class="nc" id="L780">                double y123 = (y23 - y12) * t + y12;</span>
+
+<span class="nc" id="L782">                double x234 = (x34 - x23) * t + x23;</span>
+<span class="nc" id="L783">                double y234 = (y34 - y23) * t + y23;</span>
+
+<span class="nc" id="L785">                double x1234 = (x234 - x123) * t + x123;</span>
+<span class="nc" id="L786">                double y1234 = (y234 - y123) * t + y123;</span>
+
+<span class="nc" id="L788">                return new BezierCurve(x1, y1, x12, y12, x123, y123, x1234, y1234);</span>
+
+            }
+<span class="nc" id="L791">            throw new IllegalArgumentException(&quot;Cannot segment bezier curves with order &quot; + n());</span>
+        }
+
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

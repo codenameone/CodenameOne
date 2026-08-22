@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.db</a> &gt; <span class="el_source">DatabaseConfig.java</span></div><h1>DatabaseConfig.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.db;
+
+import java.io.IOException;
+
+/// Describes how a database should be opened, and in particular how it is keyed.
+///
+/// Pass an instance to `Database#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)`.
+/// Opening without a config, through `Database#openOrCreate(java.lang.String)`, is
+/// always plaintext and always will be -- there is no implicit upgrade.
+///
+/// #### Security
+///
+/// **A passphrase written into your source code is not a secret.** String literals
+/// are recoverable from a shipped .ipa or .apk in minutes, so a constant passphrase
+/// buys you nothing against anyone who has the file. This is the mistake that gets
+/// made most often, so it is worth being blunt about it: if your application cannot
+/// ask a human for a passphrase, use `#managed()` instead. A random key held in the
+/// platform key store is strictly better than a constant compiled into the binary.
+///
+/// Encryption here protects data **at rest** and nothing else. It does not defend
+/// against a rooted or jailbroken device, a debugger attached to the running
+/// process, or a memory dump: while the database is open the key is in memory.
+///
+/// #### Choosing a mode
+///
+/// ```java
+/// // A human supplies the secret. Nothing is stored on the device.
+/// DatabaseConfig.passphrase(passwordField.getText());
+///
+/// // No secret to manage. A random key is generated once and kept in the
+/// // platform key store. Best default when there is nobody to prompt.
+/// DatabaseConfig.managed();
+///
+/// // The application already has 32 bytes of key material of its own.
+/// DatabaseConfig.rawKey(keyBytes);
+///
+/// // Explicitly plaintext.
+/// DatabaseConfig.plain();
+/// ```
+///
+/// #### On-disk format
+///
+/// Every platform that supports encryption reads and writes the same format, so a
+/// database created on one device can be opened on another and in the simulator.
+/// See the `com.codename1.db` package documentation for the pinned parameters.
+public final class DatabaseConfig {
+
+    /// No encryption. The database is a plain SQLite file.
+    public static final int KEY_NONE = 0;
+
+    /// The key is derived from an application supplied passphrase.
+    public static final int KEY_PASSPHRASE = 1;
+
+    /// The key is random, generated once, and held in the platform key store.
+    public static final int KEY_MANAGED = 2;
+
+    /// The key is 32 raw bytes supplied by the application.
+    public static final int KEY_RAW = 3;
+
+    /// The only cipher profile currently defined.
+    static final String PROFILE_SQLCIPHER4 = &quot;sqlcipher4&quot;;
+
+<span class="fc" id="L85">    private static final char[] HEX = &quot;0123456789abcdef&quot;.toCharArray();</span>
+
+    private final int keyMode;
+    private final String keyAlias;
+    private char[] passphrase;
+    private byte[] rawKey;
+
+<span class="fc" id="L92">    private DatabaseConfig(int keyMode, String keyAlias, char[] passphrase, byte[] rawKey) {</span>
+<span class="fc" id="L93">        this.keyMode = keyMode;</span>
+<span class="fc" id="L94">        this.keyAlias = keyAlias;</span>
+<span class="fc" id="L95">        this.passphrase = passphrase;</span>
+<span class="fc" id="L96">        this.rawKey = rawKey;</span>
+<span class="fc" id="L97">    }</span>
+
+    /// Returns a config that opens the database unencrypted.
+    ///
+    /// This is identical to calling `Database#openOrCreate(java.lang.String)` and
+    /// exists so that code choosing between modes at runtime has something to
+    /// return for the plaintext case.
+    ///
+    /// #### Returns
+    ///
+    /// a plaintext config
+    public static DatabaseConfig plain() {
+<span class="nc" id="L109">        return new DatabaseConfig(KEY_NONE, null, null, null);</span>
+    }
+
+    /// Returns a config keyed from the supplied passphrase.
+    ///
+    /// The passphrase is stretched into a key by the cipher's key derivation
+    /// function, so a weak passphrase yields a weak database. Nothing is stored on
+    /// the device: losing the passphrase means losing the data.
+    ///
+    /// #### Parameters
+    ///
+    /// - `passphrase`: the secret, which must not be null or empty, and must not contain the
+    ///   character with code point zero
+    ///
+    /// #### Returns
+    ///
+    /// a passphrase-keyed config
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the passphrase is null, empty, or contains the character
+    ///   with code point zero
+    public static DatabaseConfig passphrase(String passphrase) {
+<span class="pc bpc" id="L132" title="2 of 4 branches missed.">        if (passphrase == null || passphrase.length() == 0) {</span>
+<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;The database passphrase must not be null or empty&quot;);</span>
+        }
+        // Rejected rather than truncated. The cipher takes a key as bytes and a length, and the
+        // engines behind this API disagree about where that length comes from: some measure to the
+        // first zero byte, which would silently reduce two passphrases differing only after such a
+        // character to the same key, and make one passphrase open a database on one platform and
+        // not on another.
+        // Refusing is the one answer that is the same everywhere, and it is loud.
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (passphrase.indexOf(0) &gt;= 0) {</span>
+<span class="nc" id="L142">            throw new IllegalArgumentException(&quot;The database passphrase must not contain the &quot;</span>
+                    + &quot;character with code point zero. It cannot be carried to every platform's &quot;
+                    + &quot;cipher without being silently cut short there, so it is refused rather &quot;
+                    + &quot;than quietly weakening the key.&quot;);
+        }
+        // Refused for the same reason and in the same spirit: the engines read a key of exactly
+        // this shape as 32 raw bytes written in hexadecimal rather than as text to run the key
+        // derivation over. A passphrase that happens to look like one would therefore be used as a
+        // raw key, silently skipping the derivation this method promises -- weaker in a way
+        // nothing would report. Add any character to it, or use rawKey if raw bytes were meant.
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (looksLikeRawKeyLiteral(passphrase)) {</span>
+<span class="fc" id="L153">            throw new IllegalArgumentException(&quot;The database passphrase must not have the form of &quot;</span>
+                    + &quot;a raw key literal, x' followed by 64 hexadecimal digits and a closing &quot;
+                    + &quot;quote. The engines read that as raw bytes rather than as a passphrase, so &quot;
+                    + &quot;it would silently skip the key derivation. Use rawKey(byte[]) for raw bytes.&quot;);
+        }
+<span class="fc" id="L158">        return new DatabaseConfig(KEY_PASSPHRASE, null, passphrase.toCharArray(), null);</span>
+    }
+
+    /// Returns a config keyed by a random key held in the platform key store,
+    /// using the database name as the key alias.
+    ///
+    /// The first time a database is opened this way a fresh random key is
+    /// generated and stored. Subsequent opens retrieve the same key. The
+    /// application never sees or handles the key.
+    ///
+    /// #### Durability
+    ///
+    /// The key lives and dies with the platform key store entry. Uninstalling the
+    /// application, wiping the device, or -- on Android -- restoring a backup onto a
+    /// different device leaves the database permanently unreadable, because
+    /// Android key store keys cannot be exported. iOS keychain entries do survive
+    /// an encrypted backup and restore. If the data must outlive the device, use
+    /// `#passphrase(java.lang.String)` with a secret the user or your server holds.
+    ///
+    /// #### Returns
+    ///
+    /// a config keyed from the platform key store
+    public static DatabaseConfig managed() {
+<span class="nc" id="L181">        return new DatabaseConfig(KEY_MANAGED, null, null, null);</span>
+    }
+
+    /// Returns a config keyed by a random key held in the platform key store under
+    /// an explicit alias.
+    ///
+    /// Use this when several databases should share one key, or when the database
+    /// name may change but the key should not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyAlias`: the key store alias, which must not be null or empty
+    ///
+    /// #### Returns
+    ///
+    /// a config keyed from the platform key store
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the alias is null or empty
+    ///
+    /// #### See also
+    ///
+    /// - #managed()
+    public static DatabaseConfig managed(String keyAlias) {
+<span class="nc bnc" id="L206" title="All 4 branches missed.">        if (keyAlias == null || keyAlias.length() == 0) {</span>
+<span class="nc" id="L207">            throw new IllegalArgumentException(&quot;The managed key alias must not be null or empty&quot;);</span>
+        }
+<span class="nc" id="L209">        return new DatabaseConfig(KEY_MANAGED, keyAlias, null, null);</span>
+    }
+
+    /// Returns a config keyed directly by 32 raw bytes, bypassing key derivation.
+    ///
+    /// Use this when the application already derives key material by its own means,
+    /// for instance from a server-issued secret. Because no key derivation function
+    /// is applied, the bytes must already be uniformly random -- do not pass a
+    /// hashed password here and expect passphrase-grade protection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: exactly 32 bytes of key material
+    ///
+    /// #### Returns
+    ///
+    /// a raw-keyed config
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the array is null or is not exactly 32 bytes
+    public static DatabaseConfig rawKey(byte[] key) {
+<span class="nc bnc" id="L231" title="All 4 branches missed.">        if (key == null || key.length != 32) {</span>
+<span class="nc" id="L232">            throw new IllegalArgumentException(&quot;A raw database key must be exactly 32 bytes&quot;);</span>
+        }
+<span class="nc" id="L234">        byte[] copy = new byte[32];</span>
+<span class="nc" id="L235">        System.arraycopy(key, 0, copy, 0, 32);</span>
+<span class="nc" id="L236">        return new DatabaseConfig(KEY_RAW, null, null, copy);</span>
+    }
+
+    /// Returns the key mode, one of `#KEY_NONE`, `#KEY_PASSPHRASE`, `#KEY_MANAGED`
+    /// or `#KEY_RAW`.
+    ///
+    /// #### Returns
+    ///
+    /// the key mode
+    public int getKeyMode() {
+<span class="nc" id="L246">        return keyMode;</span>
+    }
+
+    /// Returns whether this config asks for an encrypted database.
+    ///
+    /// #### Returns
+    ///
+    /// true unless the mode is `#KEY_NONE`
+    public boolean isEncrypted() {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        return keyMode != KEY_NONE;</span>
+    }
+
+    /// Returns the explicit managed key alias, or null when the database name is
+    /// used as the alias.
+    ///
+    /// #### Returns
+    ///
+    /// the alias or null
+    public String getKeyAlias() {
+<span class="nc" id="L265">        return keyAlias;</span>
+    }
+
+    /// Returns the cipher profile name that describes the on-disk format.
+    ///
+    /// Only one profile is currently defined. The accessor exists so that a future
+    /// profile can be introduced without changing the shape of this class.
+    ///
+    /// #### Returns
+    ///
+    /// the profile identifier
+    public String getCipherProfile() {
+<span class="nc" id="L277">        return PROFILE_SQLCIPHER4;</span>
+    }
+
+    /// Returns whether keys for this config are protected by dedicated key storage
+    /// hardware on the current platform.
+    ///
+    /// This is false for `#passphrase(java.lang.String)` and `#rawKey(byte[])`,
+    /// because the application, not the platform, holds that key material. For
+    /// `#managed()` it reflects the platform: true where a hardware backed key
+    /// store is available, and **false in the simulator**, where the key is
+    /// protected only by a software derived key in the desktop user profile.
+    ///
+    /// Applications with a hard requirement on hardware backing should check this
+    /// and refuse to store sensitive data when it returns false.
+    ///
+    /// #### Returns
+    ///
+    /// true when the key is held in hardware backed storage
+    public boolean isKeyHardwareBacked() {
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (keyMode != KEY_MANAGED) {</span>
+<span class="nc" id="L297">            return false;</span>
+        }
+<span class="nc" id="L299">        return Database.isManagedKeyHardwareBacked();</span>
+    }
+
+    /// Clears the key material held by this config.
+    ///
+    /// Call this once the database has been opened. The passphrase and raw key
+    /// buffers are overwritten with zeroes.
+    ///
+    /// Note the honest limitation: the value actually handed to the database engine
+    /// is a `String`, because every supported engine keys from one, and Java strings
+    /// are immutable and cannot be wiped. This method reduces the window, it does
+    /// not eliminate it.
+    public void wipe() {
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (passphrase != null) {</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            for (int iter = 0; iter &lt; passphrase.length; iter++) {</span>
+<span class="nc" id="L314">                passphrase[iter] = 0;</span>
+            }
+<span class="nc" id="L316">            passphrase = null;</span>
+        }
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (rawKey != null) {</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            for (int iter = 0; iter &lt; rawKey.length; iter++) {</span>
+<span class="nc" id="L320">                rawKey[iter] = 0;</span>
+            }
+<span class="nc" id="L322">            rawKey = null;</span>
+        }
+<span class="nc" id="L324">    }</span>
+
+    /// Produces the key literal handed to the underlying engine.
+    ///
+    /// This exists for the platform implementations; applications have no reason to call it.
+    /// Passphrases are returned verbatim. Raw and managed keys are rendered as the literal `x'`
+    /// followed by 64 hexadecimal characters and a closing quote, which is the one form every
+    /// supported engine interprets identically as a raw key with no key derivation applied.
+    ///
+    /// For a managed key this is the call that generates and stores the key on first use, so it
+    /// can fail even though the config itself was built successfully.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: used as the key store alias when no explicit alias was set
+    ///
+    /// #### Returns
+    ///
+    /// the key literal, or null when the config is plaintext
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a managed key could not be produced or stored
+    public String resolveKeyMaterial(String databaseName) throws IOException {
+<span class="nc bnc" id="L348" title="All 4 branches missed.">        switch (keyMode) {</span>
+            case KEY_NONE:
+<span class="nc" id="L350">                return null;</span>
+            case KEY_PASSPHRASE:
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                if (passphrase == null) {</span>
+<span class="nc" id="L353">                    throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                            &quot;The passphrase has already been wiped from this configuration&quot;);
+                }
+<span class="nc" id="L356">                return new String(passphrase);</span>
+            case KEY_RAW:
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                if (rawKey == null) {</span>
+<span class="nc" id="L359">                    throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,</span>
+                            &quot;The raw key has already been wiped from this configuration&quot;);
+                }
+<span class="nc" id="L362">                return toKeyLiteral(rawKey);</span>
+            default:
+<span class="nc bnc" id="L364" title="All 2 branches missed.">                return toKeyLiteral(ManagedKeys.keyFor(keyAlias != null ? keyAlias : databaseName));</span>
+        }
+    }
+
+    /// The length of the literal `#toKeyLiteral(byte[])` writes: `x'`, 64 hex digits, `'`.
+    private static final int RAW_KEY_LITERAL_LENGTH = 67;
+
+    /// Whether a string is exactly the literal an engine reads as 32 raw bytes.
+    ///
+    /// `x'` then 64 hexadecimal digits then `'`, which is what `#toKeyLiteral(byte[])` writes.
+    static boolean looksLikeRawKeyLiteral(String value) {
+        // 67: &quot;x'&quot; is two, the digits are sixty-four, the closing quote is one. Requiring 68
+        // meant the literal toKeyLiteral actually writes was never recognized, so the rejection
+        // this method exists for never fired and such a passphrase reached the engines as a raw
+        // key -- exactly the silent skip of the derivation it was written to prevent.
+<span class="pc bpc" id="L379" title="1 of 4 branches missed.">        if (value == null || value.length() != RAW_KEY_LITERAL_LENGTH) {</span>
+<span class="fc" id="L380">            return false;</span>
+        }
+<span class="pc bpc" id="L382" title="3 of 4 branches missed.">        if (value.charAt(0) != 'x' &amp;&amp; value.charAt(0) != 'X') {</span>
+<span class="nc" id="L383">            return false;</span>
+        }
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">        if (value.charAt(1) != '\'' || value.charAt(RAW_KEY_LITERAL_LENGTH - 1) != '\'') {</span>
+<span class="nc" id="L386">            return false;</span>
+        }
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        for (int iter = 2; iter &lt; RAW_KEY_LITERAL_LENGTH - 1; iter++) {</span>
+<span class="fc" id="L389">            char c = value.charAt(iter);</span>
+<span class="pc bpc" id="L390" title="7 of 12 branches missed.">            boolean hex = (c &gt;= '0' &amp;&amp; c &lt;= '9') || (c &gt;= 'a' &amp;&amp; c &lt;= 'f') || (c &gt;= 'A' &amp;&amp; c &lt;= 'F');</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">            if (!hex) {</span>
+<span class="nc" id="L392">                return false;</span>
+            }
+        }
+<span class="fc" id="L395">        return true;</span>
+    }
+
+    /// Renders 32 bytes as the engine level raw key literal.
+    static String toKeyLiteral(byte[] key) {
+<span class="fc" id="L400">        StringBuilder b = new StringBuilder(68);</span>
+<span class="fc" id="L401">        b.append(&quot;x'&quot;);</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        for (byte raw : key) {</span>
+<span class="fc" id="L403">            int v = raw &amp; 0xff;</span>
+<span class="fc" id="L404">            b.append(HEX[v &gt;&gt;&gt; 4]);</span>
+<span class="fc" id="L405">            b.append(HEX[v &amp; 0x0f]);</span>
+        }
+<span class="fc" id="L407">        b.append('\'');</span>
+<span class="fc" id="L408">        return b.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
