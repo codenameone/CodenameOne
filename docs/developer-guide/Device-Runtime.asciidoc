@@ -154,7 +154,7 @@ The interpreter represents every reference array as `Object[]`, because an array
 
 `A[] values = new A[1]; Object[] alias = values; alias[0] = new B();` succeeds here for unrelated pushed classes `A` and `B`, where Java throws `ArrayStoreException`.
 
-`instanceof` and `checkcast` against such an array answer by inspecting the elements, which is why the cast that follows still behaves. Against a *host* component type the host is asked instead and answers exactly, so this deviation is confined to arrays whose leaf class exists only in the bundle.
+`instanceof` and `checkcast` against such an array answer by inspecting the elements, which is why the cast that follows still behaves. An empty array trivially satisfies any element predicate, so `new A[0] instanceof B[]` returns true for unrelated pushed `A` and `B` where Java returns false. Against a *host* component type the host is asked instead and answers exactly, so this deviation is confined to arrays whose leaf class exists only in the bundle.
 
 Closing it means carrying the component type with every interpreted array -- a wrapper object around `Object[]`, threaded through every array opcode and every crossing into host code. That's a large change to the hottest paths in the interpreter for a mistake the compiler already rejects unless the program goes out of its way to alias the array. It's written down rather than done, and the deviation is asserted in `InterpRuntimeContractTest` so it stays a known one.
 

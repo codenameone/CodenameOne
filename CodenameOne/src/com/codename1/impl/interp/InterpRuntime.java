@@ -2328,17 +2328,17 @@ public final class InterpRuntime {
         }
         // Elements of a reference array cross the same way a scalar argument
         // does: as their peers. `Arrays.sort(items)` where the items implement
-        // a host Comparable would otherwise hand the host a wrapper it can only
-        // fail to cast -- and the array is converted back afterwards, since a
-        // host method may reorder or replace elements in place and interpreted
-        // code has to find its own objects there again.
-        Vector arrays = null;
+        // a host Comparable would otherwise hand the host a wrapper it can
+        // only fail to cast. The array is not converted back afterwards --
+        // `Arrays.asList(items)`, `Collections.addAll` and other collectors
+        // retain the passed array, and reverting elements in place would
+        // leave the host's alias holding InterpObject wrappers that do not
+        // implement the interfaces their peers do. Interpreted reads via
+        // AALOAD run each element through `fromHost`, so an element that
+        // stayed as its peer round-trips back to the wrapper on the way in
+        // and everything the interpreter compares by identity still matches.
         for (Object arg : args) {
             if (arg instanceof Object[]) {
-                if (arrays == null) {
-                    arrays = new Vector();
-                }
-                arrays.addElement(arg);
                 toHostElements(arg, new Vector());
             }
         }
@@ -2378,11 +2378,10 @@ public final class InterpRuntime {
             }
             throw t;
         } finally {
-            if (arrays != null) {
-                for (int i = 0; i < arrays.size(); i++) {
-                    fromHostElements(arrays.elementAt(i), new Vector());
-                }
-            }
+            // No fromHostElements sweep: the peers stay in place so a host
+            // method that retained the array (Arrays.asList, Collections.
+            // addAll, an executor's task queue) keeps its host-compatible
+            // view. Interpreted reads round-trip via `fromHost` at AALOAD.
             // Class[] parameters: mirror the host's writes on the materialised
             // Class[] back to the interpreter-owned Object[] so the caller
             // sees mutations, matching Java's array-by-reference semantics.
@@ -2415,17 +2414,6 @@ public final class InterpRuntime {
         }
     }
 
-    /// Whether an array's component type is `java.lang.Object` -- the shape the
-    /// interpreter gives its own reference arrays, and the only one that can
-    /// hold an InterpObject.
-    private static boolean isPlainObjectArray(Object array) {
-        Class component = array.getClass().getComponentType();
-        // Unknown rather than absent: a platform that cannot answer is not a
-        // reason to leave peers where interpreted objects belong, and on that
-        // platform an array store is unchecked anyway.
-        return component == null || "java.lang.Object".equals(component.getName());
-    }
-
     /// Replaces peer-backed elements of a reference array with their peers.
     ///
     /// In place, and recursively for nested arrays, because the array itself is
@@ -2449,28 +2437,13 @@ public final class InterpRuntime {
         }
     }
 
-    /// The reverse: peers become the interpreted objects they stand for again.
-    ///
-    /// Only in an array the interpreter owns, which is always a plain
-    /// `Object[]`. An array declared with a host component type -- `Painter[]`,
-    /// holding the peers because that is what a `Painter[]` can hold -- must
-    /// keep them: storing an InterpObject there is an ArrayStoreException, and
-    /// nothing needs it anyway, since reading an element converts it.
-    private static void fromHostElements(Object array, Vector seen) {
-        if (!(array instanceof Object[]) || seen.contains(array)
-                || !isPlainObjectArray(array)) {
-            return;
-        }
-        seen.addElement(array);
-        Object[] a = (Object[]) array;
-        for (int i = 0; i < a.length; i++) {
-            if (a[i] instanceof Object[]) {
-                fromHostElements(a[i], seen);
-            } else {
-                a[i] = fromHost(a[i]);
-            }
-        }
-    }
+    // `fromHostElements` used to sweep peer-populated arrays back to wrappers
+    // after the host call returned. Removed because host methods like
+    // `Arrays.asList` and `Collections.addAll` retain the array they were
+    // handed; reverting in place would leave the host's alias holding
+    // InterpObject wrappers that do not implement the interfaces their peers
+    // do. AALOAD converts elements through `fromHost` on read, so both sides
+    // see the representation they expect.
 
     /// The simple name of a class, as `Class.getSimpleName` reports it.
     ///
