@@ -358,8 +358,25 @@ public class Window extends Container implements TopLevelContainer {
                 protected void paintBackground(Graphics g) {
                     if (getComponentCount() > 0 && super.isVisible()) {
                         super.setVisible(false);
-                        Window.this.paint(g);
-                        super.setVisible(true);
+                        // Clear inInternalPaint across this call so the window paints its
+                        // background too. This runs while the window is mid-paint, and
+                        // paint() skips the background in that state -- correctly, for the
+                        // window's own pass, which has already drawn it. This pass is a
+                        // different thing: it is the backdrop for whatever sits in this
+                        // pane, so it has to be a whole window, background included.
+                        // Without it the children were redrawn straight over the pixels
+                        // already on screen. Anything opaque repainted its own background
+                        // and hid that, but the title area is transparent, so its text was
+                        // composited over the identical text underneath and came out
+                        // heavier -- the one visible symptom of a window being drawn twice.
+                        boolean wasInInternalPaint = inInternalPaint;
+                        inInternalPaint = false;
+                        try {
+                            Window.this.paint(g);
+                        } finally {
+                            inInternalPaint = wasInInternalPaint;
+                            super.setVisible(true);
+                        }
                     }
                 }
             };
