@@ -25,6 +25,7 @@ package com.codename1.ui;
 import com.codename1.impl.WindowManager;
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.events.ActionListener;
@@ -3002,6 +3003,24 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     /// {@inheritDoc}
+    ///
+    /// The indexed overloads need delegating too. They are separate methods rather
+    /// than paths through the two above, so without these an indexed add put the
+    /// component in the window root beside the title area and the content pane --
+    /// where the root's own BorderLayout would place it, and where
+    /// `#getContentPane()` cannot see it.
+    @Override
+    public void addComponent(int index, Component cmp) {
+        contentPane.addComponent(index, cmp);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addComponent(int index, Object constraints, Component cmp) {
+        contentPane.addComponent(index, constraints, cmp);
+    }
+
+    /// {@inheritDoc}
     @Override
     public void removeComponent(Component cmp) {
         contentPane.removeComponent(cmp);
@@ -3011,6 +3030,89 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     public void removeAll() {
         contentPane.removeAll();
+    }
+
+    // The animation and replace family, delegated for the same reason add() is: the
+    // application's components live in the content pane, so animating or searching the
+    // window root would animate the title area along with them and look for children
+    // that are not there. Form delegates every one of these.
+
+    /// {@inheritDoc}
+    @Override
+    public int getComponentIndex(Component cmp) {
+        return contentPane.getComponentIndex(cmp);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void replace(Component current, Component next, Transition t) {
+        contentPane.replace(current, next, t);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void replaceAndWait(Component current, Component next, Transition t) {
+        contentPane.replaceAndWait(current, next, t);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateLayout(int duration) {
+        contentPane.animateLayout(duration);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateLayoutAndWait(int duration) {
+        contentPane.animateLayoutAndWait(duration);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateLayoutFade(int duration, int startingOpacity) {
+        contentPane.animateLayoutFade(duration, startingOpacity);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateLayoutFadeAndWait(int duration, int startingOpacity) {
+        contentPane.animateLayoutFadeAndWait(duration, startingOpacity);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateHierarchy(int duration) {
+        contentPane.animateHierarchy(duration);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateHierarchyAndWait(int duration) {
+        contentPane.animateHierarchyAndWait(duration);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateHierarchyFade(int duration, int startingOpacity) {
+        contentPane.animateHierarchyFade(duration, startingOpacity);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateHierarchyFadeAndWait(int duration, int startingOpacity) {
+        contentPane.animateHierarchyFadeAndWait(duration, startingOpacity);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateUnlayout(int duration, int opacity, Runnable callback) {
+        contentPane.animateUnlayout(duration, opacity, callback);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void animateUnlayoutAndWait(int duration, int opacity) {
+        contentPane.animateUnlayoutAndWait(duration, opacity);
     }
 
     /// {@inheritDoc}

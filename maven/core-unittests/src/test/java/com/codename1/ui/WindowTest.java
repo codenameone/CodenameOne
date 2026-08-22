@@ -358,6 +358,48 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void theAnimateAndReplaceFamilyTargetsTheContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("delegating", new com.codename1.ui.layouts.FlowLayout());
+        Label a = new Label("a");
+        Label b = new Label("b");
+        w.add(a);
+
+        // getComponentIndex looks in the content pane, where the application's
+        // components actually are -- the window root holds only the title area and the
+        // content pane, so asking it would answer -1 for every child.
+        assertEquals(0, w.getComponentIndex(a),
+                "getComponentIndex has to look where the children are");
+
+        w.replace(a, b, null);
+
+        assertSame(b, w.getContentPane().getComponentAt(0),
+                "replace has to work on the content pane, as it does on a Form");
+        assertEquals(-1, w.getContentPane().getComponentIndex(a));
+    }
+
+    @FormTest
+    void indexedAddsReachTheWindowsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("indexed", new com.codename1.ui.layouts.FlowLayout());
+        Label first = new Label("first");
+        Label second = new Label("second");
+
+        w.addComponent(first);
+        // The indexed overloads are separate methods, not paths through the plain one,
+        // so they needed delegating in their own right. Without it the component landed
+        // in the window root beside the title area and the content pane could not see
+        // it.
+        w.addComponent(0, second);
+
+        assertEquals(2, w.getContentPane().getComponentCount(),
+                "an indexed add belongs in the content pane, as it does on a Form");
+        assertSame(second, w.getContentPane().getComponentAt(0),
+                "and at the index it asked for");
+        assertSame(first, w.getContentPane().getComponentAt(1));
+    }
+
+    @FormTest
     void aWindowsContentPaneScrollsVerticallyByDefault() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("default");
