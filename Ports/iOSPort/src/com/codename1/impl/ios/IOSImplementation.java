@@ -2024,7 +2024,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // the cascade is emulated here. Doing it for the user-driven minimize
                 // as well as for hide() is what makes the two paths agree -- an owner
                 // becomes hidden both ways.
-                MacWindowManager.cascadeOwnerVisibility(windowId, shown);
+                MacWindowManager.windowVisibilityChanged(windowId, shown);
                 if (shown) {
                     Display.getInstance().windowShowNotify(windowId);
                 } else {

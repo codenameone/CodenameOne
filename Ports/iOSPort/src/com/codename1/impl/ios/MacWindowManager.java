@@ -180,9 +180,9 @@ public class MacWindowManager extends WindowManager {
         return out;
     }
 
-    /// Hides or restores the windows owned by the window with the given id, which is
-    /// how a Catalyst window follows its owner being minimized by the user -- there is
-    /// no scene-level owner relation to do it for us.
+    /// Records a window's new visibility and takes the windows it owns with it, which
+    /// is how a Catalyst window follows its owner being minimized by the user -- there
+    /// is no scene-level owner relation to do it for us.
     ///
     /// Runs on the EDT. The caller marshals it there so a native slot cannot be freed
     /// by a concurrent dispose and handed to a new window between the lookup here and
@@ -190,15 +190,26 @@ public class MacWindowManager extends WindowManager {
     ///
     /// #### Parameters
     ///
-    /// - `ownerWindowId`: the owner's window id, 0 for the application's main window
+    /// - `windowId`: the window whose visibility changed, 0 for the main window
     ///
-    /// - `shown`: true when the owner became visible, false when it went away
-    static void cascadeOwnerVisibility(int ownerWindowId, boolean shown) {
+    /// - `shown`: true when it became visible, false when it went away
+    static void windowVisibilityChanged(int windowId, boolean shown) {
         // Window id 0 is the main window, which has no Peer; windows owned by the main
         // Form carry the MAIN_WINDOW sentinel instead.
-        Object owner = ownerWindowId == 0 ? MAIN_WINDOW : peerForWindowId(ownerWindowId);
+        Object owner = windowId == 0 ? MAIN_WINDOW : peerForWindowId(windowId);
         if (owner == null) {
             return;
+        }
+        if (owner instanceof Peer) {
+            // Record what the platform just did to this window before cascading from
+            // it. Without this, a window the user minimized on its own still looks
+            // visible here, so a later owner hide marks it hidden-by-owner and the
+            // owner's restore brings back a window the user had put away. The flag is
+            // cleared either way: this change came from the platform, not from an
+            // owner, so no owner may undo it.
+            Peer self = (Peer) owner;
+            self.visible = shown;
+            self.hiddenByOwner = false;
         }
         cascadeFrom(owner, shown);
     }
@@ -261,6 +272,11 @@ public class MacWindowManager extends WindowManager {
             return;
         }
         w.visible = false;
+        // An explicit hide takes the window's visibility over from any owner. Leaving
+        // this set would let the owner's restore show a window the application had
+        // deliberately hidden, and report it restored while its component hierarchy is
+        // still invisible.
+        w.hiddenByOwner = false;
         IOSImplementation.nativeInstance.macWindowShow(w.slot, false);
         // An owned window cannot stay on screen without its owner. Recorded as
         // hidden-by-owner so showing the owner again brings back exactly the children
