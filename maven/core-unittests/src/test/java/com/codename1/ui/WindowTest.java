@@ -1129,6 +1129,79 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelGestureIntoAWindowHiddenByItsOwnListenerIsDropped() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("self hiding", new BorderLayout());
+        WheelHidingComponent target = new WheelHidingComponent(w);
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.revalidate();
+
+        // The window is showing when the wheel arrives, so it passes the check on the
+        // way in. The listener then hides it and does not consume, which is what leaves
+        // the queued press, drags and release aimed at a hierarchy nobody can see.
+        // Through the port entry point, not Display.windowMouseWheelEvent: the wrapper
+        // is what queues the synthetic gesture after an unconsumed listener, so calling
+        // the inner method directly would never reach the code under test.
+        Display.impl.windowPointerWheelMoved(w.getWindowId(),
+                target.getAbsoluteX() + 2, target.getAbsoluteY() + 2, 0, 3, false, 0);
+        DisplayTest.flushEdt();
+        DisplayTest.flushEdt();
+
+        assertTrue(target.sawWheel(), "the listener has to have run for this to mean anything");
+        // Counted rather than observed through isScrollWheeling(): that flag is set by
+        // the first queued step and cleared by the last, and flushEdt drains all four,
+        // so it reads false either way. The pointer events the gesture dispatches are
+        // what persist.
+        assertEquals(0, target.pointerEvents(),
+                "no scroll gesture may be played into a window the wheel listener hid");
+
+        w.dispose();
+    }
+
+    /// Hides the window it is given when it sees a wheel event, without consuming it.
+    private static final class WheelHidingComponent extends Component {
+        private final Window target;
+        private boolean sawWheel;
+        private int pointerEvents;
+
+        WheelHidingComponent(Window target) {
+            this.target = target;
+        }
+
+        boolean sawWheel() {
+            return sawWheel;
+        }
+
+        int pointerEvents() {
+            return pointerEvents;
+        }
+
+        @Override
+        public void pointerPressed(int x, int y) {
+            pointerEvents++;
+        }
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            pointerEvents++;
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            pointerEvents++;
+        }
+
+        @Override
+        public boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
+            sawWheel = true;
+            target.hide();
+            return false;
+        }
+    }
+
+    @FormTest
     void aGestureOverABlockedWindowIsDropped() {
         implementation.setMultiWindowSupported(true);
         final int[] pinches = new int[1];

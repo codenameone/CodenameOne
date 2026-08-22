@@ -9424,7 +9424,16 @@ public abstract class CodenameOneImplementation {
             return null;
         }
         if (windowId > 0) {
-            return com.codename1.ui.Desktop.getInstance().windowById(windowId);
+            com.codename1.ui.Window w = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+            // Visibility as well as modality, and for the same reason: an unconsumed
+            // wheel listener can hide or minimize its own window before the gesture
+            // starts, and a hidden window stays registered -- so the synthetic press,
+            // drags and release would scroll and activate components in a hierarchy
+            // nobody can see.
+            if (w == null || !w.isWindowShowing()) {
+                return null;
+            }
+            return w;
         }
         return d.getCurrent();
     }
