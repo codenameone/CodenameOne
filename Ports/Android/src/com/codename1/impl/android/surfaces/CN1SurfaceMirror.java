@@ -400,6 +400,18 @@ public final class CN1SurfaceMirror {
             // so listFiles() returning null is how "there is nothing here" arrives, and there is
             // no directory to guard against.
             File kindDir = CN1SurfaceStore.kindDir(ctx, kindId);
+            // The DESCRIPTOR first, and on its own. A Data Layer deletion cannot be replayed --
+            // unlike a changed item, the tombstone is consumed once and there is nothing to ask
+            // for again -- so this has one attempt at making the surface go away, and what
+            // actually does that is the timeline being gone. Art left behind is clutter the next
+            // publish collects; a descriptor left behind is a complication still showing content
+            // the phone withdrew.
+            File timeline = new File(kindDir, "timeline.json");
+            if (timeline.exists() && !timeline.delete()) {
+                Log.w(TAG, "Could not delete " + timeline + ", so the watch may keep showing a "
+                        + "surface the phone withdrew. The deletion cannot be redelivered; the "
+                        + "next publish of " + kindId + " will replace it.");
+            }
             File[] files = kindDir.listFiles();
             if (files != null) {
                 for (File f : files) {

@@ -549,6 +549,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // descriptor CN1SurfaceMirror.receive wrote sitting on disk -- the complication
                 // kept showing content the phone had already withdrawn.
                 if (deleted) {
+                    // The tombstone is consumed either way, and deliberately. A Data Layer
+                    // deletion is not redelivered -- unlike a changed item there is nothing left
+                    // to ask for -- so there is no later attempt to preserve it for. The mirror
+                    // deletes the descriptor first for that reason, and says so when it cannot.
                     surfaceMirror("remove", appPath, null);
                 } else {
                     surfaceMirror("receive", appPath, readMirrorPayload(event));

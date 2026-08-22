@@ -15403,6 +15403,15 @@ BOOL cn1HandleSurfaceURL(NSURL *url) {
 // newest is the one the user just tapped.
 static NSString *cn1WatchPendingSurfaceURL = nil;
 
+/// Whether the drain has run, owned by the lock below rather than read from the runtime.
+///
+/// Asking cn1_watch_runtime_isJavaReady and then storing is two steps, and the VM thread can
+/// become ready and drain an empty slot between them -- the URL is stored a moment later and
+/// nothing ever looks at it again. So readiness and the slot move together under one lock: the
+/// drain sets this flag while holding it, and a tap either sees the flag and delivers or does not
+/// and is found by the drain.
+static BOOL cn1WatchSurfaceURLDrained = NO;
+
 void cn1_watch_surface_url(const char *url) {
     if (url == NULL) {
         return;
@@ -15410,14 +15419,19 @@ void cn1_watch_surface_url(const char *url) {
     POOL_BEGIN();
     NSString *str = [NSString stringWithUTF8String:url];
     if (str != nil) {
-        extern int cn1_watch_runtime_isJavaReady(void);
-        if (cn1_watch_runtime_isJavaReady()) {
-            cn1HandleSurfaceURL([NSURL URLWithString:str]);
-        } else {
-            @synchronized ([CN1WatchSurfaceURLLock class]) {
+        BOOL deliverNow = NO;
+        @synchronized ([CN1WatchSurfaceURLLock class]) {
+            if (cn1WatchSurfaceURLDrained) {
+                deliverNow = YES;
+            } else {
                 [cn1WatchPendingSurfaceURL release];
                 cn1WatchPendingSurfaceURL = [str retain];
             }
+        }
+        // Outside the lock: handling the URL calls into Java, which must not run holding a lock
+        // the VM thread also takes.
+        if (deliverNow) {
+            cn1HandleSurfaceURL([NSURL URLWithString:str]);
         }
     }
     POOL_END();
@@ -15429,6 +15443,9 @@ void cn1_watch_surface_url(const char *url) {
 void cn1_watch_surface_drainPending(void) {
     NSString *pending = nil;
     @synchronized ([CN1WatchSurfaceURLLock class]) {
+        // The flag and the slot together, so a tap arriving alongside this either lands in the
+        // slot before it is emptied or delivers itself afterwards -- never neither.
+        cn1WatchSurfaceURLDrained = YES;
         pending = cn1WatchPendingSurfaceURL;
         cn1WatchPendingSurfaceURL = nil;
     }
@@ -15730,10 +15747,20 @@ void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
             // malformed payload from writing outside the kind's own directory.
             continue;
         }
-        [[imageBlobs objectAtIndex:i]
+        if (![[imageBlobs objectAtIndex:i]
                 writeToFile:[kindDir stringByAppendingPathComponent:
                         [name stringByAppendingString:@".png"]]
-                atomically:YES];
+                atomically:YES]) {
+            // The descriptor is NOT installed. Writing it anyway would make a timeline live
+            // against art that is not there -- a hole in the complication -- and the collection
+            // that follows would then delete whatever the previous descriptor was still using,
+            // so the watch would end up worse off than if nothing had arrived. Leaving the old
+            // timeline in place keeps a complete surface on the face, and the next publish or
+            // reload sends the whole set again.
+            NSLog(@"[CN1Surfaces] could not store mirrored image \"%@\" for \"%@\"; keeping the "
+                    "previous timeline", name, kind);
+            return;
+        }
     }
     if (![json writeToFile:[kindDir stringByAppendingPathComponent:@"timeline.json"]
                 atomically:YES]) {
