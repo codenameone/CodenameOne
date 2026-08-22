@@ -458,7 +458,13 @@ static gboolean cn1DesktopOnWindowState(GtkWidget* widget, GdkEventWindowState* 
     }
     if (e->new_window_state & GDK_WINDOW_STATE_ICONIFIED) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_HIDDEN, 0, 0, 0);
-    } else {
+    } else if (gtk_widget_get_visible(w->window)) {
+        /* Only a window that is actually mapped. An owned window is de-iconified with
+         * its owner, and reporting that for one the application had hidden itself would
+         * tell the framework a window is back when nothing is on screen -- the same
+         * mistake the Windows port made by keeping one flag for "hidden with its owner"
+         * and "minimized". There is no flag to go stale here, so this is the whole of
+         * it. */
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_SHOWN, 0, 0, 0);
     }
     return FALSE;
