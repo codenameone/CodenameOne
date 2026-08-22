@@ -169,9 +169,35 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // header (included first by every surfaces TU) so the define is visible across translation
 // units, mirroring CN1_USE_CARPLAY.
 //#define CN1_USE_WIDGETS
-// WidgetKit home-screen widgets are unavailable on watchOS / tvOS; undo the define there.
-#if TARGET_OS_WATCH || TARGET_OS_TV
+// tvOS has no WidgetKit at all, so the define is undone there.
+//
+// watchOS deliberately KEEPS it. A complication is a WidgetKit widget in an accessory family,
+// hosted by the watch app's own CN1WatchWidgets extension and fed from the watch's own App
+// Group container -- the same identifier as the phone's, but a separate container on the
+// device, which is why the watch has to publish for itself rather than reading what the phone
+// wrote. The surfaces natives below are pure Foundation and resolve the Swift bridge through
+// NSClassFromString, so they are exactly as real on the watch as on the phone. While this
+// undef also covered watchOS, Surfaces.publish() from a watch app compiled to the unsupported
+// stub and silently did nothing.
+#if TARGET_OS_TV
 #undef CN1_USE_WIDGETS
+#endif
+
+#ifdef CN1_USE_WIDGETS
+// Decodes a cn1surface:// deep link -- a widget, live activity or complication tap -- and
+// dispatches it to the Java framework. Implemented in IOSNative.m rather than in the app
+// delegate because the delegate is #if !TARGET_OS_WATCH and the watch reaches the same link
+// through its SwiftUI scene. Returns YES when the URL was ours and has been consumed.
+BOOL cn1HandleSurfaceURL(NSURL *url);
+
+#if TARGET_OS_WATCH
+// Applies a timeline the phone mirrored across into the watch's own App Group container and
+// re-renders. Called from CN1WatchConnectivity's didReceiveUserInfo, which may run with no CN1
+// runtime at all -- the whole point of the background wake is to refresh a complication, not to
+// start an application -- so this touches no Java.
+void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
+        NSArray<NSString *> *imageNames, NSArray<NSData *> *imageBlobs);
+#endif
 #endif
 
 // CN1_USE_INTENTS gates the app intents native bridge: the IOSNative intents* implementations

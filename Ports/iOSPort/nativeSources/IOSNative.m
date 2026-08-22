@@ -15302,26 +15302,144 @@ static Class cn1SurfacesBridgeClass() {
     return NSClassFromString(@"CN1SurfaceBridge");
 }
 
-// True when the running OS meets the CN1Widgets extension's deployment target
+// True when the running OS meets the widget extension's deployment target
 // (CN1SurfacesMinOS Info.plist key, injected by the builder from
-// ios.surfaces.deploymentTarget; defaults to 16.1). Below that version the
+// ios.surfaces.deploymentTarget; defaults to 16.1 on iOS). Below that version the
 // extension cannot run or appear in the widget gallery, so the API must not
 // report widget support even though WidgetKit itself shipped with iOS 14.
+//
+// The fallback is per-platform because the two extensions have different floors and this
+// compares against the OS actually running. The watch app's CN1WatchWidgets extension targets
+// watchOS 10, so the iOS default of 16.1 would be compared against a watchOS version and never
+// be met -- every watch would have reported no widget support, whatever was in the plist.
 static BOOL cn1SurfacesMinOSSupported() {
     NSString *min = nil;
     id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesMinOS"];
     if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
         min = (NSString *)v;
     } else {
+#if TARGET_OS_WATCH
+        min = @"10.0";
+#else
         min = @"16.1";
+#endif
     }
     NSArray *parts = [min componentsSeparatedByString:@"."];
     NSOperatingSystemVersion required;
-    required.majorVersion = parts.count > 0 ? [[parts objectAtIndex:0] integerValue] : 16;
-    required.minorVersion = parts.count > 1 ? [[parts objectAtIndex:1] integerValue] : 1;
+#if TARGET_OS_WATCH
+    NSInteger defaultMajor = 10;
+    NSInteger defaultMinor = 0;
+#else
+    NSInteger defaultMajor = 16;
+    NSInteger defaultMinor = 1;
+#endif
+    required.majorVersion = parts.count > 0 ? [[parts objectAtIndex:0] integerValue] : defaultMajor;
+    required.minorVersion = parts.count > 1 ? [[parts objectAtIndex:1] integerValue] : defaultMinor;
     required.patchVersion = parts.count > 2 ? [[parts objectAtIndex:2] integerValue] : 0;
     return [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:required];
 }
+
+// Decodes a cn1surface://a?src=..&id=..&p=<url-encoded JSON> deep link -- a widget, live
+// activity or complication tap -- and hands it to the Java framework.
+//
+// Shared because the two platforms reach it from opposite directions. On iOS every openURL path
+// funnels through the app delegate, which is entirely #if !TARGET_OS_WATCH; on watchOS there is
+// no UIApplicationDelegate at all and the URL arrives at the SwiftUI scene's onOpenURL, which
+// calls cn1_watch_surface_url below. Leaving the decode in the delegate meant a complication tap
+// launched the watch app and then dropped the action on the floor.
+//
+// Surfaces.dispatchAction queues internally until the app registers its handler, so a cold-start
+// tap -- which is the usual case for a complication -- is safe.
+BOOL cn1HandleSurfaceURL(NSURL *url) {
+    if (url == nil || url.scheme == nil
+            || [@"cn1surface" caseInsensitiveCompare:url.scheme] != NSOrderedSame) {
+        return NO;
+    }
+    NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+    NSString *src = nil;
+    NSString *actionId = nil;
+    NSString *params = nil;
+    for (NSURLQueryItem *item in components.queryItems) {
+        if ([item.name isEqualToString:@"src"]) {
+            src = item.value;
+        } else if ([item.name isEqualToString:@"id"]) {
+            actionId = item.value;
+        } else if ([item.name isEqualToString:@"p"]) {
+            // NSURLQueryItem.value is already percent-decoded JSON.
+            params = item.value;
+        }
+    }
+    JAVA_OBJECT jSrc = src == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG src);
+    JAVA_OBJECT jActionId = actionId == nil ? JAVA_NULL
+            : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG actionId);
+    JAVA_OBJECT jParams = params == nil ? JAVA_NULL
+            : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG params);
+    com_codename1_impl_ios_IOSSurfaceCallbacks_nativeSurfaceAction___java_lang_String_java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG jSrc, jActionId, jParams);
+    return YES;
+}
+
+#if TARGET_OS_WATCH
+/// A lock object for the pending-URL slot, which the SwiftUI scene and the VM bootstrap thread
+/// both touch.
+@interface CN1WatchSurfaceURLLock : NSObject
+@end
+@implementation CN1WatchSurfaceURLLock
+@end
+
+// Called from the generated CN1WatchApp.swift scene's onOpenURL. A complication tap launches the
+// watch app with the URL rather than delivering it to a delegate, so this is the whole path.
+
+// The tap that arrived before the VM did.
+//
+// A complication tap on a terminated watch app launches it WITH the URL, and SwiftUI delivers
+// onOpenURL as soon as the scene exists -- which is before cn1_watch_runtime_start has finished
+// bringing the VM up, because it starts it on a pthread and returns. Handling the URL then reaches
+// into a half-built runtime to make Java strings and call into Java. So it waits: one pending URL,
+// handed over by cn1_watch_runtime_markJavaReady, which is the same readiness the lifecycle phases
+// queue behind.
+//
+// One slot and not a queue. A launch carries one URL, and if a second somehow arrived first the
+// newest is the one the user just tapped.
+static NSString *cn1WatchPendingSurfaceURL = nil;
+
+void cn1_watch_surface_url(const char *url) {
+    if (url == NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    NSString *str = [NSString stringWithUTF8String:url];
+    if (str != nil) {
+        extern int cn1_watch_runtime_isJavaReady(void);
+        if (cn1_watch_runtime_isJavaReady()) {
+            cn1HandleSurfaceURL([NSURL URLWithString:str]);
+        } else {
+            @synchronized ([CN1WatchSurfaceURLLock class]) {
+                [cn1WatchPendingSurfaceURL release];
+                cn1WatchPendingSurfaceURL = [str retain];
+            }
+        }
+    }
+    POOL_END();
+}
+
+/// Hands over a tap that arrived before the runtime was ready. Called from
+/// cn1_watch_runtime_markJavaReady, and defined whatever this build carries so that call needs no
+/// guard of its own.
+void cn1_watch_surface_drainPending(void) {
+    NSString *pending = nil;
+    @synchronized ([CN1WatchSurfaceURLLock class]) {
+        pending = cn1WatchPendingSurfaceURL;
+        cn1WatchPendingSurfaceURL = nil;
+    }
+    if (pending != nil) {
+        POOL_BEGIN();
+        cn1HandleSurfaceURL([NSURL URLWithString:pending]);
+        POOL_END();
+        [pending release];
+    }
+}
+#endif
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
@@ -15361,6 +15479,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_Str
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT descriptorJson) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return JAVA_NULL;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         JAVA_OBJECT result = JAVA_NULL;
@@ -15377,9 +15502,17 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_S
         return result;
     }
     return JAVA_NULL;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT stateJson) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         Class bridge = cn1SurfacesBridgeClass();
@@ -15391,9 +15524,17 @@ void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_
         }
         POOL_END();
     }
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT finalStateJson, JAVA_BOOLEAN dismissImmediately) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         Class bridge = cn1SurfacesBridgeClass();
@@ -15406,7 +15547,237 @@ void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_jav
         }
         POOL_END();
     }
+#endif
 }
+
+// --- Phone -> watch complication mirror ------------------------------------
+//
+// An App Group container is device-local: the watch resolves the same identifier to a directory
+// of its own, which the phone cannot see. So a phone-side Surfaces.publish() is invisible to a
+// complication until the descriptor actually travels, and this is that transport.
+//
+// WCSession's transferCurrentComplicationUserInfo is the only API that WAKES the watch app in
+// the background to refresh a complication. updateApplicationContext -- which putData already
+// owns, with its own stamp and tombstone protocol -- delivers only when the watch app next runs,
+// which for a complication means "possibly never". The budget is small and reported, so this
+// degrades through progressively weaker delivery rather than pretending: no complication placed
+// or budget spent falls back to transferUserInfo, which arrives eventually; over the size cap
+// drops the imagery and then gives up entirely. The local publish has already succeeded, so the
+// phone's own widget stays correct whatever happens here.
+
+#if !TARGET_OS_WATCH
+
+// A property list has a hard ceiling around 64KB and rejects the whole payload on overflow.
+// Complication art is a few dozen points square, so 48KB is generous and leaves envelope room.
+#define CN1_SURFACES_MIRROR_MAX_BYTES (48 * 1024)
+
+// The kinds worth mirroring, from the CN1SurfacesWatchKinds Info.plist key the builder writes
+// from the manifest's watch families. Decided at build time so a publish of a phone-only kind
+// costs one dictionary lookup and nothing else.
+static NSSet *cn1SurfacesWatchKinds() {
+    static NSSet *kinds = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesWatchKinds"];
+        if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+            kinds = [[NSSet alloc] initWithArray:[(NSString *)v componentsSeparatedByString:@","]];
+        } else {
+            kinds = [[NSSet alloc] init];
+        }
+    });
+    return kinds;
+}
+
+static void cn1SurfacesLogOnce(NSString *key, NSString *message) {
+    static NSMutableSet *said = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ said = [[NSMutableSet alloc] init]; });
+    @synchronized (said) {
+        if ([said containsObject:key]) {
+            return;
+        }
+        [said addObject:key];
+    }
+    NSLog(@"[CN1Surfaces] %@", message);
+}
+
+void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_java_lang_String_java_lang_String_1ARRAY_byte_2ARRAY(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kindId, JAVA_OBJECT timelineJson,
+        JAVA_OBJECT imageNames, JAVA_OBJECT imageBlobs) {
+    if (kindId == JAVA_NULL || timelineJson == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    NSString *kind = toNSString(CN1_THREAD_STATE_PASS_ARG kindId);
+    if (kind == nil || ![cn1SurfacesWatchKinds() containsObject:kind]) {
+        POOL_END();
+        return;
+    }
+    Class sessionClass = NSClassFromString(@"CN1WatchConnectivity");
+    if (sessionClass == nil) {
+        cn1SurfacesLogOnce(@"noWC", @"watch mirror unavailable: this build has no "
+                "WatchConnectivity glue");
+        POOL_END();
+        return;
+    }
+    NSString *json = toNSString(CN1_THREAD_STATE_PASS_ARG timelineJson);
+    if (json == nil) {
+        POOL_END();
+        return;
+    }
+    NSMutableDictionary *payload = [NSMutableDictionary dictionary];
+    [payload setObject:kind forKey:@"cn1.surfaces.kind"];
+    [payload setObject:[json dataUsingEncoding:NSUTF8StringEncoding] forKey:@"cn1.surfaces.json"];
+
+    // Imagery travels in the same dictionary rather than through transferFile, deliberately.
+    // A file transfer is a separate unordered queue with no atomicity against the descriptor, so
+    // a complication could render against art that had not landed yet -- worse than a gap.
+    if (imageNames != JAVA_NULL && imageBlobs != JAVA_NULL) {
+        JAVA_ARRAY names = (JAVA_ARRAY)imageNames;
+        JAVA_ARRAY blobs = (JAVA_ARRAY)imageBlobs;
+        JAVA_OBJECT *nameData = (JAVA_OBJECT *)names->data;
+        JAVA_OBJECT *blobData = (JAVA_OBJECT *)blobs->data;
+        int count = (int)(names->length < blobs->length ? names->length : blobs->length);
+        for (int i = 0; i < count; i++) {
+            if (nameData[i] == JAVA_NULL || blobData[i] == JAVA_NULL) {
+                continue;
+            }
+            NSString *name = toNSString(CN1_THREAD_STATE_PASS_ARG nameData[i]);
+            JAVA_ARRAY blob = (JAVA_ARRAY)blobData[i];
+            if (name == nil || blob->length <= 0) {
+                continue;
+            }
+            [payload setObject:[NSData dataWithBytes:blob->data length:(NSUInteger)blob->length]
+                        forKey:[@"cn1.surfaces.img." stringByAppendingString:name]];
+        }
+    }
+
+    NSData *encoded = [NSPropertyListSerialization dataWithPropertyList:payload
+            format:NSPropertyListBinaryFormat_v1_0 options:0 error:nil];
+    if (encoded == nil || [encoded length] > CN1_SURFACES_MIRROR_MAX_BYTES) {
+        // Shed the imagery first: a complication that renders its numbers with a missing glyph
+        // is worth more than one that never updates.
+        NSMutableDictionary *lean = [NSMutableDictionary dictionary];
+        [lean setObject:[payload objectForKey:@"cn1.surfaces.kind"] forKey:@"cn1.surfaces.kind"];
+        [lean setObject:[payload objectForKey:@"cn1.surfaces.json"] forKey:@"cn1.surfaces.json"];
+        NSData *leanEncoded = [NSPropertyListSerialization dataWithPropertyList:lean
+                format:NSPropertyListBinaryFormat_v1_0 options:0 error:nil];
+        if (leanEncoded == nil || [leanEncoded length] > CN1_SURFACES_MIRROR_MAX_BYTES) {
+            cn1SurfacesLogOnce([@"tooBig." stringByAppendingString:kind],
+                    [NSString stringWithFormat:@"widget kind \"%@\" is too large to mirror to the "
+                            "watch (%lu bytes, cap %d); the watch keeps its previous timeline",
+                            kind, (unsigned long)(leanEncoded == nil ? 0 : [leanEncoded length]),
+                            CN1_SURFACES_MIRROR_MAX_BYTES]);
+            POOL_END();
+            return;
+        }
+        cn1SurfacesLogOnce([@"noImages." stringByAppendingString:kind],
+                [NSString stringWithFormat:@"widget kind \"%@\" exceeds the watch mirror cap with "
+                        "its imagery; mirroring the layout without it", kind]);
+        payload = lean;
+    }
+
+    // The Objective-C half owns WCSession; reaching it here would duplicate its activation and
+    // delegate bookkeeping.
+    ((void (*)(id, SEL, NSDictionary *))objc_msgSend)((id)sessionClass,
+            NSSelectorFromString(@"mirrorComplicationUserInfo:"), payload);
+    POOL_END();
+}
+
+#else
+
+// On the watch the app's own publish is authoritative. Mirroring back would send a timeline the
+// phone did not ask for and, when the phone mirrored in the first place, loop.
+void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_java_lang_String_java_lang_String_1ARRAY_byte_2ARRAY(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kindId, JAVA_OBJECT timelineJson,
+        JAVA_OBJECT imageNames, JAVA_OBJECT imageBlobs) {
+}
+
+#endif
+
+#if TARGET_OS_WATCH
+// Applies a timeline the phone mirrored across: write it into the watch's own App Group
+// container -- the one the complication extension reads -- and ask WidgetKit to re-render.
+//
+// Called from CN1WatchConnectivity's didReceiveUserInfo, which may run with no CN1 runtime at
+// all: transferCurrentComplicationUserInfo wakes the app in the background precisely to refresh a
+// complication, and starting the whole application to do a file write would bring a UI forward
+// nobody asked for. So this is plain Foundation and touches no Java.
+//
+// The layout matches what IOSSurfaceBridge writes locally, because the extension reads one
+// format and does not care which side produced it.
+void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
+        NSArray<NSString *> *imageNames, NSArray<NSData *> *imageBlobs) {
+    NSString *container = cn1SurfacesContainerPath();
+    if (container == nil || kind == nil || json == nil) {
+        return;
+    }
+    NSString *kindDir = [[container stringByAppendingPathComponent:@"cn1surfaces"]
+            stringByAppendingPathComponent:kind];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSError *err = nil;
+    if (![fm createDirectoryAtPath:kindDir withIntermediateDirectories:YES
+                        attributes:nil error:&err]) {
+        NSLog(@"[CN1Surfaces] could not prepare the mirrored surface directory: %@", err);
+        return;
+    }
+    // Imagery first, so the descriptor is never live against art that has not landed. Names are
+    // content hashes, so an unchanged image rewrites identical bytes.
+    for (NSUInteger i = 0; i < [imageNames count] && i < [imageBlobs count]; i++) {
+        NSString *name = [imageNames objectAtIndex:i];
+        if ([name rangeOfString:@"/"].location != NSNotFound) {
+            // A name is a hash, never a path. Refusing one that looks like a path keeps a
+            // malformed payload from writing outside the kind's own directory.
+            continue;
+        }
+        [[imageBlobs objectAtIndex:i]
+                writeToFile:[kindDir stringByAppendingPathComponent:
+                        [name stringByAppendingString:@".png"]]
+                atomically:YES];
+    }
+    if (![json writeToFile:[kindDir stringByAppendingPathComponent:@"timeline.json"]
+                atomically:YES]) {
+        NSLog(@"[CN1Surfaces] could not write the mirrored timeline for \"%@\"", kind);
+        return;
+    }
+    // AFTER the replacement document is in place, so an extension rendering concurrently re-reads
+    // the new timeline before its art can disappear -- the same order IOSSurfaceBridge uses for a
+    // local publish. Without this the mirror had no collection at all: blob names are content
+    // hashes, so every changed image left its predecessor in the App Group container for ever,
+    // and a container that only grows is a watch app that eventually cannot write.
+    //
+    // The reference set is the document's own "images" list, not the blobs that arrived in this
+    // message. A mirror only ships art the watch has not seen, so the transferred names are a
+    // subset and collecting against them would delete the images being kept.
+    NSError *parseErr = nil;
+    id doc = [NSJSONSerialization JSONObjectWithData:json options:0 error:&parseErr];
+    if ([doc isKindOfClass:[NSDictionary class]]) {
+        id names = [(NSDictionary *)doc objectForKey:@"images"];
+        NSMutableSet *referenced = [NSMutableSet set];
+        if ([names isKindOfClass:[NSArray class]]) {
+            for (id name in (NSArray *)names) {
+                [referenced addObject:[NSString stringWithFormat:@"%@", name]];
+            }
+        }
+        for (NSString *entry in [fm contentsOfDirectoryAtPath:kindDir error:NULL]) {
+            if (![[entry pathExtension] isEqualToString:@"png"]) {
+                continue;
+            }
+            if (![referenced containsObject:[entry stringByDeletingPathExtension]]) {
+                [fm removeItemAtPath:[kindDir stringByAppendingPathComponent:entry] error:NULL];
+            }
+        }
+    } else {
+        NSLog(@"[CN1Surfaces] could not read the mirrored timeline of \"%@\" to collect its "
+                "images: %@", kind, parseErr);
+    }
+    Class bridge = cn1SurfacesBridgeClass();
+    if (bridge != nil) {
+        ((void (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                NSSelectorFromString(@"reloadTimelines:"), kind);
+    }
+}
+#endif
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     if (@available(iOS 14.0, *)) {
@@ -15420,6 +15791,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THR
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // Live activities are an iOS capability: watchOS has no ActivityKit, and the Swift bridge
+    // compiles its ActivityKit bodies out there. Answering here rather than relying on that
+    // states the intent -- and keeps the symbol, which the watch slice still links because the
+    // Java method is reachable from shared code.
+#if TARGET_OS_WATCH
+    return JAVA_FALSE;
+#else
     if (@available(iOS 16.1, *)) {
         POOL_BEGIN();
         BOOL supported = NO;
@@ -15433,6 +15811,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_
         return supported ? JAVA_TRUE : JAVA_FALSE;
     }
     return JAVA_FALSE;
+#endif
 }
 
 #else // CN1_USE_WIDGETS
@@ -15452,6 +15831,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_S
 void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT stateJson) {
 }
 void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT finalStateJson, JAVA_BOOLEAN dismissImmediately) {
+}
+void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_java_lang_String_java_lang_String_1ARRAY_byte_2ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kindId, JAVA_OBJECT timelineJson, JAVA_OBJECT imageNames, JAVA_OBJECT imageBlobs) {
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
@@ -16010,6 +16391,28 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boole
 #if defined(CN1_USE_WATCHCONNECTIVITY) && !TARGET_OS_TV && !TARGET_OS_MACCATALYST
 
 #import "CN1WatchConnectivity.h"
+
+#if TARGET_OS_WATCH
+// Brings the session up on the watch without anyone asking for it.
+//
+// Every other route into CN1WatchConnectivity is a wearable native, so the session is activated
+// lazily the first time the app touches com.codename1.wearable. An app that declares watch
+// surfaces and never touches that API takes no such route: the delegate is never installed, the
+// WCSession is never activated, and didReceiveUserInfo: therefore cannot fire -- which is exactly
+// the surfaces-only configuration the phone-to-watch mirror exists to serve. Nothing reports it,
+// because the phone half sends successfully into a session that has no listener.
+//
+// Called from the generated app delegate's applicationDidFinishLaunching, NOT from initVM.
+// A mirrored complication update wakes a terminated watch app in the background, where the
+// SwiftUI root view is not guaranteed to appear -- so CN1WatchHost.startWithWidth() may never
+// run and initVM with it. Activating there left the session unreachable in exactly the launch
+// this transport causes.
+//
+// The accessor activates on first use, so asking for it is the whole job.
+void cn1_watch_activate_connectivity(void) {
+    [CN1WatchConnectivity shared];
+}
+#endif
 
 // Callbacks the delegate calls when the peer sends something. Each hops into the Java callback
 // surface, which owns EDT dispatch and the cold-start queue.

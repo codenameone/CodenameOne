@@ -449,33 +449,19 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 #endif
 
 #ifdef CN1_USE_WIDGETS
-    // Surface action deep link (cn1surface://a?src=..&id=..&p=<url-encoded JSON>) from a widget
-    // or live activity tap. Decode and hand it straight to the Java framework;
+    // Surface action deep link (cn1surface://a?src=..&id=..&p=<url-encoded JSON>) from a widget,
+    // live activity or complication tap. Handed straight to the Java framework;
     // Surfaces.dispatchAction queues internally until the app registers its action handler, so
     // cold-start taps are safe (every openURL path -- delegate, legacy handleOpenURL and the
     // scene delegate's connection/openURLContexts callbacks -- funnels through cn1OpenURL after
     // the VM is up, exactly like the shouldApplicationHandleURL call below). These URLs are
     // consumed here: do NOT store them in AppArg and report them handled so no other machinery
     // sees them.
-    if (url.scheme != nil && [@"cn1surface" caseInsensitiveCompare:url.scheme] == NSOrderedSame) {
-        NSURLComponents *cn1SurfaceComponents = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
-        NSString *cn1SurfaceSrc = nil;
-        NSString *cn1SurfaceActionId = nil;
-        NSString *cn1SurfaceParams = nil;
-        for (NSURLQueryItem *item in cn1SurfaceComponents.queryItems) {
-            if ([item.name isEqualToString:@"src"]) {
-                cn1SurfaceSrc = item.value;
-            } else if ([item.name isEqualToString:@"id"]) {
-                cn1SurfaceActionId = item.value;
-            } else if ([item.name isEqualToString:@"p"]) {
-                // NSURLQueryItem.value is already percent-decoded JSON.
-                cn1SurfaceParams = item.value;
-            }
-        }
-        JAVA_OBJECT jSurfaceSrc = cn1SurfaceSrc == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG cn1SurfaceSrc);
-        JAVA_OBJECT jSurfaceActionId = cn1SurfaceActionId == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG cn1SurfaceActionId);
-        JAVA_OBJECT jSurfaceParams = cn1SurfaceParams == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG cn1SurfaceParams);
-        com_codename1_impl_ios_IOSSurfaceCallbacks_nativeSurfaceAction___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jSurfaceSrc, jSurfaceActionId, jSurfaceParams);
+    // Decoded by cn1HandleSurfaceURL in IOSNative.m rather than here, because the watch reaches
+    // the same deep link with no UIApplicationDelegate to route it through -- a complication tap
+    // launches the app and delivers the URL to the SwiftUI scene instead. One decoder, so the two
+    // platforms cannot drift on what a surface action means.
+    if (cn1HandleSurfaceURL(url)) {
         return YES;
     }
 #endif // CN1_USE_WIDGETS

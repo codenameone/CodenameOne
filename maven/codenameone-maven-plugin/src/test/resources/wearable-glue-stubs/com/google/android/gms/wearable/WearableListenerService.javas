@@ -1,0 +1,10 @@
+package com.google.android.gms.wearable;
+public class WearableListenerService extends android.app.Service {
+    public void onDataChanged(DataEventBuffer events) { }
+    public void onMessageReceived(MessageEvent event) { }
+    public void onCapabilityChanged(CapabilityInfo info) { }
+    public void onPeerConnected(Node peer) { }
+    public void onPeerDisconnected(Node peer) { }
+    public void onCreate() { }
+    public void onDestroy() { }
+}

@@ -26,6 +26,7 @@ import com.codename1.wearable.WearableConnection;
 
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.WearableListenerService;
 
@@ -152,7 +153,11 @@ public class CN1WearableListenerService extends WearableListenerService {
     @Override
     public void onMessageReceived(final MessageEvent event) {
         // Same reasoning as onDataChanged: isFromAKnownNode can block on a cold start.
-        final MessageEvent frozen = event.freeze();
+        // Copied field by field rather than frozen: DataEvent is Freezable and MessageEvent is
+        // not -- it is a plain four-method interface -- so there is no freeze() to call here. The
+        // copy is what makes the hand-off safe, because Play services may recycle the event once
+        // onMessageReceived returns and the worker below reads it after that.
+        final MessageEvent frozen = new FrozenMessageEvent(event);
         MESSAGE_WORKER.execute(new Runnable() {
             public void run() {
                 handleMessageReceived(frozen);
@@ -303,6 +308,162 @@ public class CN1WearableListenerService extends WearableListenerService {
         });
     }
 
+    /**
+     * An immutable copy of a delivered {@link MessageEvent}.
+     *
+     * <p>{@link com.google.android.gms.wearable.DataEvent} extends {@code Freezable} and hands out
+     * a detached copy through {@code freeze()}; {@code MessageEvent} does not, so a hand-off to a
+     * worker thread has to copy the four accessors by hand. Play services documents the delivered
+     * event as valid only for the duration of the callback, and every read below happens after it
+     * has returned.</p>
+     *
+     * <p>Implementing the interface, rather than passing the fields separately, keeps
+     * {@code handleMessageReceived} typed against {@code MessageEvent}. If Play services ever adds
+     * a fifth method this stops compiling, which is the intended way to find out.</p>
+     */
+    private static final class FrozenMessageEvent implements MessageEvent {
+        private final int requestId;
+        private final String path;
+        private final String sourceNodeId;
+        private final byte[] data;
+
+        FrozenMessageEvent(MessageEvent event) {
+            requestId = event.getRequestId();
+            path = event.getPath();
+            sourceNodeId = event.getSourceNodeId();
+            byte[] payload = event.getData();
+            data = payload == null ? null : (byte[]) payload.clone();
+        }
+
+        @Override
+        public int getRequestId() {
+            return requestId;
+        }
+
+        @Override
+        public String getPath() {
+            return path;
+        }
+
+        @Override
+        public String getSourceNodeId() {
+            return sourceNodeId;
+        }
+
+        @Override
+        public byte[] getData() {
+            return data;
+        }
+    }
+
+    /** The port's surface mirror, or null on a port that predates it. See {@link #surfaceMirror}. */
+    private static Class<?> mirrorClass;
+    private static boolean mirrorLookedUp;
+
+    /**
+     * The mirror class, looked up once, or null when this port has no surfaces implementation.
+     *
+     * <p>Reflective on purpose. This service is injected into EVERY build that references
+     * {@code com.codename1.wearable}, including a versioned build pinned to a Codename One
+     * release older than external surfaces -- and a hard reference to a class that port does not
+     * contain fails javac in a file the developer never wrote, for a feature they never enabled.
+     * The same reason {@code CN1WatchSurfaceNotifier} reaches for the androidx complication
+     * classes this way.</p>
+     *
+     * <p>Safe against R8 because the two conditions coincide: the builder emits
+     * {@code -keep class com.codename1.impl.android.surfaces.**} exactly when the app uses
+     * surfaces, which is exactly when this class is present to be found. A rename would otherwise
+     * turn this into the failure the reflection ban exists for -- working in the simulator and
+     * silently dead in a release build.</p>
+     *
+     * @return the mirror class, or null
+     */
+    private static synchronized Class<?> mirrorClass() {
+        if (!mirrorLookedUp) {
+            mirrorLookedUp = true;
+            try {
+                mirrorClass = Class.forName(
+                        "com.codename1.impl.android.surfaces.CN1SurfaceMirror");
+            } catch (Throwable t) {
+                // A port without surfaces. Mirror traffic cannot arrive for it either, because
+                // nothing on the phone half would have sent any.
+                mirrorClass = null;
+            }
+        }
+        return mirrorClass;
+    }
+
+    /** Whether a path belongs to the surface mirror rather than to the application. */
+    private static boolean surfaceMirrorHandles(String path) {
+        Class<?> mirror = mirrorClass();
+        if (mirror == null || path == null) {
+            return false;
+        }
+        try {
+            return Boolean.TRUE.equals(mirror.getMethod("isMirrorPath", String.class)
+                    .invoke(null, path));
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Hands one piece of mirror traffic to the port.
+     *
+     * @param method {@code receive}, {@code receiveFile} or {@code remove}
+     * @param path the reserved application path
+     * @param payload the payload, or null for {@code remove}
+     * @return true when the mirror took it; false when there is no mirror or it threw. A caller
+     *         that acknowledges delivery has to know the difference, because an acknowledgement
+     *         is durable and stops the sender retrying
+     */
+    private boolean surfaceMirror(String method, String path, byte[] payload) {
+        Class<?> mirror = mirrorClass();
+        if (mirror == null) {
+            return false;
+        }
+        try {
+            if (payload == null && "remove".equals(method)) {
+                mirror.getMethod(method, android.content.Context.class, String.class)
+                        .invoke(null, this, path);
+                return true;
+            }
+            Object answer = mirror
+                    .getMethod(method, android.content.Context.class, String.class, byte[].class)
+                    .invoke(null, this, path, payload);
+            // The mirror's own answer where it has one. receiveFile catches its write failures
+            // internally and reports them by returning false, so a call that merely did not throw
+            // proves nothing -- and an acknowledgement made on that basis is durable, which loses
+            // the artwork rather than having it redelivered. A void method (receive) answers null
+            // and is taken at its word.
+            return !(answer instanceof Boolean) || ((Boolean) answer).booleanValue();
+        } catch (Throwable t) {
+            // Caught rather than propagated: a listener that throws takes the Data Layer
+            // callback down with it, and mirror traffic is a refresh rather than something the
+            // app is waiting on. Logged under the mirror's own tag so it reads beside the
+            // failures the mirror reports itself.
+            android.util.Log.w("CN1Surfaces",
+                    "Could not hand " + path + " to the surface mirror", t);
+            return false;
+        }
+    }
+
+    /**
+     * The payload of a mirrored surface item.
+     *
+     * <p>Read straight from the DataMap rather than through the bridge's ordering machinery: a
+     * mirror is a replacement, not a replicated value with a logical clock, and the newest write
+     * always wins.</p>
+     */
+    private static byte[] readMirrorPayload(DataEvent event) {
+        try {
+            return DataMapItem.fromDataItem(event.getDataItem()).getDataMap()
+                    .getByteArray(CN1WearableBridge.payloadKey());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     private void handleDataChanged(java.lang.Iterable<DataEvent> events, long removalGeneration,
             java.util.Set<String> openRemovals) {
         // Before anything is read: in a cold service process this is the only context there is, and
@@ -374,6 +535,26 @@ public class CN1WearableListenerService extends WearableListenerService {
                     ? null
                     : CN1WearableBridge.decode(
                             path.substring(CN1WearableBridge.pathPrefix().length()));
+            // Framework bookkeeping, routed BEFORE anything app-visible and before
+            // ensureAppRunning -- the same position and the same reasoning the acknowledgement
+            // traffic above uses. A mirrored complication is applied by writing a file and asking
+            // the watch face to re-read; there is nothing for the application to do, and starting
+            // it would bring a UI forward that the user did not ask for. Delivering it to the
+            // app's own listeners would also show it a message it never sent itself.
+            if (appPath != null
+                    && surfaceMirrorHandles(appPath)) {
+                // Deletions too, and NOT through the ordinary value-removal path below. A mirror
+                // is a replacement rather than a replicated value, so it never entered that
+                // path's cache or its logical clock, and letting a tombstone go there left the
+                // descriptor CN1SurfaceMirror.receive wrote sitting on disk -- the complication
+                // kept showing content the phone had already withdrawn.
+                if (deleted) {
+                    surfaceMirror("remove", appPath, null);
+                } else {
+                    surfaceMirror("receive", appPath, readMirrorPayload(event));
+                }
+                continue;
+            }
             // Read before anything is cleared, so the reset below can tell this device's own
             // removal from a republish that landed while it was being processed.
             String beforeTombstone = !transferItem && deleted
@@ -442,6 +623,19 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // Confirmed from inside the delivery: dispatched is not delivered, and a
                     // claim persisted for a file the app never received suppresses the redelivery
                     // that would have replaced it.
+                    if (surfaceMirrorHandles(transfer.logicalPath)) {
+                        // Mirrored complication artwork. Stored beside the descriptor that names
+                        // it, without waking the app: see the data-item branch above.
+                        // Confirmed only if it was actually stored. The helper catches whatever
+                        // the mirror throws -- a directory that is momentarily unwritable, say --
+                        // and a claim made anyway is durable: the sender stops retrying and the
+                        // artwork is gone for good. An unconfirmed transfer is redelivered, which
+                        // is the whole point of the acknowledgement.
+                        CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq,
+                                surfaceMirror("receiveFile", transfer.logicalPath,
+                                        transfer.payload));
+                        continue;
+                    }
                     if (!started) {
                         ensureAppRunning();
                         started = true;

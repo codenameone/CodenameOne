@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -312,6 +313,38 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+    /// The kinds declaring a watch complication family, as {id, label, comma-joined families}.
+    ///
+    /// Collected while the surfaces manifest is parsed and consumed after the module layout is
+    /// known, because where the generated services go -- the phone module or a separate wear one
+    /// -- depends on the distribution and there is only one code path for both.
+    private final List<String[]> watchSurfaceKinds = new ArrayList<String[]>();
+    /// The androidx.wear dependency block, which belongs to the WATCH module alone.
+    ///
+    /// These declare minSdk 26, so adding them to a companion build's shared dependency hint
+    /// fails the phone module's manifest merge against a library it never uses.
+    private String watchSurfaceDependencies = "";
+    /// The generated phone stub's source, so the Wear module can derive its own from it.
+    private String generatedStubSource;
+    /**
+     * Permission declarations the Wear manifest needs but is not otherwise given.
+     *
+     * <p>The companion manifest is generated independently rather than merged, so
+     * anything the phone half computes locally has to be carried across by hand.</p>
+     */
+    private String watchSharedPermissions = "";
+
+    /** Push service declarations the Wear manifest needs too; see the phone manifest. */
+    private String watchPushManifestEntries = "";
+
+    /** The FileProvider declaration the Wear manifest needs too. */
+    private String watchProviderTag = "";
+
+    /** The local-notification receiver the Wear manifest needs too. */
+    private String watchAlarmReceiver = "";
+
+    /** The JobScheduler service declaration the Wear manifest needs too. */
+    private String watchBackgroundWorkService = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -338,6 +371,41 @@ public class AndroidGradleBuilder extends Executor {
     /** The declared watch lifecycle class, or an empty string when the project declares none. */
     private static String watchMainClass(BuildRequest request) {
         return request.getArg("watchMain", "").trim();
+    }
+
+    /**
+     * Which Gradle module is the Wear OS product, or null when this build produces none.
+     *
+     * <p>One question, answered once, because everything downstream -- where the complication
+     * services are generated, which manifest carries them, which module gets the androidx.wear
+     * dependencies -- is the same code either way and differs only in the destination.</p>
+     *
+     * <ul>
+     *   <li>{@code app} when the build is a standalone Wear APK: the single artifact IS the
+     *       watch app.</li>
+     *   <li>{@code wear} for a companion build, where the watch app is a second module beside
+     *       the phone one.</li>
+     *   <li>null when the project declares no watch lifecycle class, which is every project
+     *       that has not asked for a watch.</li>
+     * </ul>
+     *
+     * @param request the build being generated
+     * @return the module directory name, or null
+     */
+    static String watchModuleName(BuildRequest request) {
+        if (watchMainClass(request).length() == 0) {
+            return null;
+        }
+        if ("true".equals(request.getArg("watchStandalone", "false"))) {
+            return "app";
+        }
+        // A companion build generates the watch app beside the phone app. Opting out leaves the
+        // phone build exactly as it was, which is what a project that only wants the wearable
+        // link -- not a watch app -- is asking for.
+        if ("false".equals(request.getArg("android.watchModule", "true"))) {
+            return null;
+        }
+        return "wear";
     }
 
     /// Whether the new wearable declaration governs, leaving the retired android.wear hints out.
@@ -3349,53 +3417,6 @@ public class AndroidGradleBuilder extends Executor {
         // into the generated project and add the dependency. The Android port itself cannot
         // reference play-services-wearable, which is why these ship as .java resources here and are
         // only added for apps that talk to a watch.
-        if (usesWearable) {
-            File wearImpl = new File(srcDir, "com/codename1/impl/android");
-            wearImpl.mkdirs();
-            String[] glue = {"CN1WearableBridge.java", "CN1WearableListenerService.java"};
-            for (String g : glue) {
-                InputStream gin = getResourceAsStream("/com/codename1/builders/wearable/" + g);
-                if (gin == null) {
-                    throw new BuildException("Missing wearable glue resource " + g);
-                }
-                try {
-                    copy(gin, new FileOutputStream(new File(wearImpl, g)));
-                } catch (IOException ex) {
-                    throw new BuildException("Failed to write wearable glue " + g, ex);
-                }
-            }
-            playServicesWear = true;
-            // The capability the peer half advertises, so isCompanionAppInstalled() can tell a
-            // watch running this app from a watch that merely exists.
-            // resDir, NOT projectDir + "app/...". projectDir already IS the generated app module,
-            // so the extra segment put this at <app>/app/src/main/res/values -- a directory Gradle
-            // never packages. The failure is silent and total: the capability is never advertised,
-            // so after the first query isCompanionAppInstalled() and isReachable() answer false and
-            // message fan-out filters out every valid peer as "not running the app".
-            File wearValues = new File(resDir, "values");
-            wearValues.mkdirs();
-            try {
-                createFile(new File(wearValues, "cn1_wearable.xml"),
-                        ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                        + "<resources>\n"
-                        + "    <string-array name=\"android_wear_capabilities\">\n"
-                        + "        <item>cn1_wearable</item>\n"
-                        + "    </string-array>\n"
-                        + "</resources>\n").getBytes("UTF-8"));
-            } catch (IOException ex) {
-                throw new BuildException("Failed to write the wearable capability declaration", ex);
-            }
-        }
-        if (watchMainClass(request).length() > 0
-                && !"true".equals(request.getArg("watchStandalone", "false"))) {
-            // Say so rather than quietly producing one artifact: a companion Wear APK is not
-            // generated yet (see the wearables chapter of the developer guide).
-            log("[wearable] codename1.watchMain is set without codename1.watchStandalone. The "
-                    + "Apple Watch companion is built, but a companion Wear OS APK is not produced "
-                    + "yet -- set codename1.watchStandalone=true to build the watch app as the "
-                    + "Android product.");
-        }
-
         // External surfaces (com.codename1.surfaces): parse the build-time kinds manifest,
         // generate one thin widget provider subclass per kind, copy the pre-baked RemoteViews
         // layout/drawable resources shipped with the plugin and emit the per-kind
@@ -3411,6 +3432,7 @@ public class AndroidGradleBuilder extends Executor {
         String intentsActivityMetaData = intentsShortcutsMetaData;
 
         String surfacesManifestEntries = "";
+        String watchSurfacesManifestEntries = "";
         if (usesSurfaces) {
             File surfacesJsonFile = new File(assetsDir, "surfaces.json");
             if (!surfacesJsonFile.exists()) {
@@ -3490,6 +3512,39 @@ public class AndroidGradleBuilder extends Executor {
                     throw new BuildException("Invalid widget kind id '" + kindId
                             + "' in surfaces.json; ids must match [a-z][a-z0-9_]*");
                 }
+                java.util.List<String> kindFamilies =
+                        com.codename1.util.SurfaceKindFamilies.read(surfaceKind);
+                // A name this framework does not know is a typo, and it used to be a silent one:
+                // isWatch tested for a "watch" prefix, so "watchCircle" suppressed the kind's
+                // phone widget and turned on watch codegen while every mapping downstream
+                // recognised only the real four -- leaving the kind with no surface on any
+                // platform and a build that went green. isWatch is now exact, which turns the
+                // typo into a plain phone family instead; say so rather than quietly rendering
+                // a home-screen widget the author did not ask for.
+                for (String declared : kindFamilies) {
+                    if (!com.codename1.util.SurfaceKindFamilies.isKnown(declared)) {
+                        throw new BuildException("Widget kind '" + kindId
+                                + "' in surfaces.json declares the family '" + declared
+                                + "', which is not one this framework knows. The watch families "
+                                + "are watchCircular, watchRectangular, watchInline and "
+                                + "watchCorner; the phone families are small, medium, large and "
+                                + "lockscreen.");
+                    }
+                }
+                boolean watchBearing =
+                        com.codename1.util.SurfaceKindFamilies.hasWatchFamily(kindFamilies);
+                if (watchBearing) {
+                    watchSurfaceKinds.add(new String[] {kindId,
+                            surfaceKind.get("name") instanceof String
+                                    ? (String) surfaceKind.get("name") : kindId,
+                            joinFamilies(kindFamilies)});
+                }
+                if (!com.codename1.util.SurfaceKindFamilies.hasPhoneFamily(kindFamilies)) {
+                    // A complication is not a home-screen widget, and rendering one as though it
+                    // were puts a surface in front of the user that the manifest never asked for.
+                    // iOS already refuses the same thing, so this is the two platforms agreeing.
+                    continue;
+                }
                 String providerClass = "CN1Widget_" + surfaceKindClassSuffix(kindId);
                 String providerSource = "package com.codename1.impl.android;\n\n"
                         + "/** Generated by the Codename One build from surfaces.json. */\n"
@@ -3537,9 +3592,12 @@ public class AndroidGradleBuilder extends Executor {
             }
             // the invisible trampoline that turns a widget/live-activity tap into a
             // Surfaces.dispatchAction call and brings the main activity forward
+            // Exported only for a Tile, and only when this module is the watch product; see
+            // anyWatchTile. A phone build keeps it private, which is what it has always been.
+            boolean tileTrampoline = "app".equals(watchModuleName(request)) && anyWatchTile();
             surfaceReceivers.append("        <activity android:name=\"com.codename1.impl.android.surfaces.CN1SurfaceActionActivity\"\n")
                     .append("                  android:theme=\"@android:style/Theme.NoDisplay\"\n")
-                    .append("                  android:exported=\"false\"\n")
+                    .append("                  android:exported=\"" + tileTrampoline + "\"\n")
                     .append("                  android:excludeFromRecents=\"true\"\n")
                     .append("                  android:noHistory=\"true\"\n")
                     .append("                  android:taskAffinity=\"\" />\n");
@@ -3558,7 +3616,93 @@ public class AndroidGradleBuilder extends Executor {
                 // runtime permission declared (permissionAdd dedups against user overrides)
                 postNotificationsPermission = true;
             }
+            reportWatchSurfaces(request);
+            watchSurfacesManifestEntries = generateWatchSurfaces(request, srcDir, resDir);
+            if (watchSurfacesManifestEntries.length() > 0 && "app".equals(watchModuleName(request))) {
+                // Standalone: this module is the watch product, so its own dependency list and
+                // its own floor are the right places for both.
+                request.putArgument("gradleDependencies",
+                        request.getArg("gradleDependencies", "") + "\n"
+                                + watchSurfaceDependencies);
+                // Wear OS 3 is the floor for the complication data source and Tile APIs, and in a
+                // STANDALONE build the app module IS the watch product, so its floor has to rise.
+                //
+                // Only then. In a companion build the phone module is a phone app that happens to
+                // ship a watch beside it, and raising this would have made a phone APK supporting
+                // API 21-25 uninstallable on the devices it already served. generateWearModule
+                // raises 26 on the wear module alone, which is where the libraries actually land.
+                minSDK = maxInt("26", minSDK);
+            }
         }
+
+        // AFTER the surfaces manifest is parsed, because the decision below reads the kinds it
+        // produces. Run before it, watchSurfaceKinds was always empty -- so an app that publishes
+        // complications and never writes a line of com.codename1.wearable got no Data Layer glue,
+        // no dependency and an empty listener declaration, and the mirror it was meant to enable
+        // had no transport at either end.
+        // The mirror rides the Data Layer, and the app that publishes a complication need never
+        // have written a line of com.codename1.wearable -- so the class scan alone would leave the
+        // mirror with no transport in exactly the apps that want one. Skipped under the legacy
+        // Play services monolith, where adding the wearable artifact is a hard conflict.
+        if (!usesWearable && !watchSurfaceKinds.isEmpty() && watchModuleName(request) != null
+                && !legacyGplayServicesMode) {
+            log("[wearable] Enabling the Wearable Data Layer glue: watch-bearing surface kinds "
+                    + "are declared, so a phone-side Surfaces.publish() of one is mirrored to the "
+                    + "watch. This adds play-services-wearable to the app.");
+            usesWearable = true;
+        } else if (!usesWearable && !watchSurfaceKinds.isEmpty()
+                && watchModuleName(request) != null && legacyGplayServicesMode) {
+            // Said out loud rather than skipped in silence. The complication services still
+            // generate and a watch-side publish still works, but a phone-side one does not reach
+            // the watch, and nothing else in the build would tell the developer that -- they
+            // would be looking at a complication that never updates from the phone and no reason
+            // for it. Not a hard failure, because adding the wearable artifact under the legacy
+            // Play services monolith is a dependency conflict this build would lose.
+            log("[wearable] android.includeGPlayServices=true, so the Wearable Data Layer glue "
+                    + "cannot be added -- the wearable artifact conflicts with the legacy Play "
+                    + "services monolith. The complication and Tile services are still generated "
+                    + "and the watch app's own Surfaces.publish() still feeds them, but a "
+                    + "PHONE-side publish will NOT be mirrored to the watch. Drop "
+                    + "android.includeGPlayServices to get the mirror.");
+        }
+        if (usesWearable) {
+            File wearImpl = new File(srcDir, "com/codename1/impl/android");
+            wearImpl.mkdirs();
+            String[] glue = {"CN1WearableBridge.java", "CN1WearableListenerService.java"};
+            for (String g : glue) {
+                InputStream gin = getResourceAsStream("/com/codename1/builders/wearable/" + g);
+                if (gin == null) {
+                    throw new BuildException("Missing wearable glue resource " + g);
+                }
+                try {
+                    copy(gin, new FileOutputStream(new File(wearImpl, g)));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to write wearable glue " + g, ex);
+                }
+            }
+            playServicesWear = true;
+            // The capability the peer half advertises, so isCompanionAppInstalled() can tell a
+            // watch running this app from a watch that merely exists.
+            // resDir, NOT projectDir + "app/...". projectDir already IS the generated app module,
+            // so the extra segment put this at <app>/app/src/main/res/values -- a directory Gradle
+            // never packages. The failure is silent and total: the capability is never advertised,
+            // so after the first query isCompanionAppInstalled() and isReachable() answer false and
+            // message fan-out filters out every valid peer as "not running the app".
+            File wearValues = new File(resDir, "values");
+            wearValues.mkdirs();
+            try {
+                createFile(new File(wearValues, "cn1_wearable.xml"),
+                        ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<resources>\n"
+                        + "    <string-array name=\"android_wear_capabilities\">\n"
+                        + "        <item>cn1_wearable</item>\n"
+                        + "    </string-array>\n"
+                        + "</resources>\n").getBytes("UTF-8"));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write the wearable capability declaration", ex);
+            }
+        }
+
 
 
         // We need to choose the correct PlayServices class file for the version of play services
@@ -4182,6 +4326,7 @@ public class AndroidGradleBuilder extends Executor {
             mediabuttonReceiver = "";
         }
         String alarmRecevier = "<receiver android:name=\"com.codename1.impl.android.LocalNotificationPublisher\" android:exported=\"false\"></receiver>\n";
+        watchAlarmReceiver = alarmRecevier;
         String backgroundLocationReceiver = "<receiver android:name=\"com.codename1.location.BackgroundLocationBroadcastReceiver\" android:exported=\"true\"></receiver>\n";
         if (!playServicesLocation) {
             backgroundLocationReceiver = "";
@@ -4193,6 +4338,10 @@ public class AndroidGradleBuilder extends Executor {
         // (harmless when unused). The foreground service entry is emitted only when the
         // app references com.codename1.background.ForegroundService.
         String backgroundWorkService = "<service android:name=\"com.codename1.impl.android.CodenameOneJobService\" android:permission=\"android.permission.BIND_JOB_SERVICE\" android:exported=\"false\" />\n";
+        // The Wear manifest needs it too: the watch lifecycle can call
+        // Display.scheduleBackgroundWork, which schedules this component through JobScheduler, and
+        // a component the manifest does not declare cannot be scheduled.
+        watchBackgroundWorkService = backgroundWorkService;
         String foregroundServiceEntry = "";
         if (usesForegroundService) {
             foregroundServicePermission = true;
@@ -4599,6 +4748,13 @@ public class AndroidGradleBuilder extends Executor {
                     "    <uses-permission android:name=\"" + p
                             + "\" android:required=\"false\" />\n");
         }
+        // Held for the companion Wear manifest, which is generated independently and would
+        // otherwise never see these. A watchMain that reads media on Wear OS 4 needs the same
+        // READ_MEDIA_* declarations the phone half gets, or the runtime permission cannot be
+        // granted and every read fails on the watch alone -- and the same is true of external
+        // storage on API 26 to 29, where the watch would be refused an operation the phone
+        // artifact is permitted.
+        watchSharedPermissions = readMediaPermissions + externalStoragePermission;
         String xmlizedDisplayName = xmlize(request.getDisplayName());
 
         String applicationAttr = request.getArg("android.xapplication_attr", "");
@@ -4651,6 +4807,12 @@ public class AndroidGradleBuilder extends Executor {
                 "              android:resource=\"@xml/file_paths\">\n" +
                 "          </meta-data>\n" +
                 "      </provider>";
+        // Held for the companion Wear manifest, which is generated independently. The wear module
+        // compiles the same shared implementation and packages the same file_paths.xml, so a
+        // watch that shares or opens a local file on API 24+ needs the same provider -- and a
+        // watch that schedules a local notification needs the receiver that delivers it when the
+        // app is not running.
+        watchProviderTag = providerTag;
 
         if (!providerTag.isEmpty()) {
             File filePathsFile = new File(xmlDir, "file_paths.xml");
@@ -4706,15 +4868,19 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // Held for the companion Wear manifest, which is generated independently. The wear
+        // module compiles the same generated CN1FirebaseMessagingService, resolves the same
+        // Firebase dependencies and now carries the same google-services.json -- everything but
+        // the declaration that lets Play services bind it, so a push arriving on the watch had
+        // nothing to deliver to.
+        watchPushManifestEntries = pushManifestEntries;
+
         String launchMode = request.getArg("android.activity.launchMode", "singleTop");
         String xActivity = request.getArg("android.xactivity", "");
         if (!xActivity.contains("android:exported")) {
             xActivity += " android:exported=\"true\"";
         }
-        String activityTheme = "@style/CustomTheme";
-        if (extendAppCompatActivity) {
-            activityTheme = "@@style/Theme.AppCompat.NoActionBar";
-        }
+        String activityTheme = launcherTheme();
         String manifestSource
                 = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                 + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
@@ -4780,6 +4946,11 @@ public class AndroidGradleBuilder extends Executor {
                 + carAppService
                 + wearableListenerService
                 + surfacesManifestEntries
+                // Only in a STANDALONE build does this manifest belong to the watch. A companion
+                // build's watch services go in the wear module's own manifest, which
+                // generateWearModule writes; putting them here too would declare a complication
+                // data source on a phone, where nothing can bind it.
+                + ("app".equals(watchModuleName(request)) ? watchSurfacesManifestEntries : "")
                 + intentsManifestEntries
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
@@ -4835,7 +5006,7 @@ public class AndroidGradleBuilder extends Executor {
         String localNotificationCode = "";
 
         localNotificationCode = ""
-                + "        if(i instanceof com.codename1.notifications.LocalNotificationCallback){\n"
+                + "        if(((Object)i) instanceof com.codename1.notifications.LocalNotificationCallback){\n"
                 + "            Intent intent = getIntent();\n"
                 + "            if(intent != null && intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationID\")){\n"
                 + "                String id = intent.getExtras().getString(\"LocalNotificationID\");\n"
@@ -4855,7 +5026,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "                        }\n"
                 + "                    }\n"
                 + "                }\n"
-                + "                ((com.codename1.notifications.LocalNotificationCallback)i).localNotificationReceived(id);\n"
+                + "                ((com.codename1.notifications.LocalNotificationCallback)(Object)i).localNotificationReceived(id);\n"
                 + "            }\n"
                 + "        }\n"
                 + "        com.codename1.impl.android.AndroidImplementation.setCurrentApplicationInstance(i);\n"
@@ -5340,13 +5511,13 @@ public class AndroidGradleBuilder extends Executor {
                     + "        }\n"
                     + "        if (i == null) {\n"
                     + "          i = new " + appLifecycleClass(request) + "();\n"
-                    + "          if(i instanceof PushCallback) {\n"
-                    + "                com.codename1.impl.CodenameOneImplementation.setPushCallback((PushCallback)i);\n"
+                    + "          if(((Object)i) instanceof PushCallback) {\n"
+                    + "                com.codename1.impl.CodenameOneImplementation.setPushCallback((PushCallback)(Object)i);\n"
                     + "          }\n";
 
             stubSourceCode +=
-                    "           if (i instanceof com.codename1.push.PushActionsProvider) {\n"
-                            + "                try{AndroidImplementation.installNotificationActionCategories((com.codename1.push.PushActionsProvider)i);}catch(java.io.IOException ex){ex.printStackTrace();}\n"
+                    "           if (((Object)i) instanceof com.codename1.push.PushActionsProvider) {\n"
+                            + "                try{AndroidImplementation.installNotificationActionCategories((com.codename1.push.PushActionsProvider)(Object)i);}catch(java.io.IOException ex){ex.printStackTrace();}\n"
                             + "           }\n";
 
         } catch (Exception ex) {
@@ -5934,6 +6105,10 @@ public class AndroidGradleBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source file", ex);
         }
+        // Kept so the companion Wear module can derive its own stub from it. The stub is typed
+        // throughout to the lifecycle class it starts, so a subclass cannot re-root it -- the
+        // watch one is the same generated source with a different entry point substituted.
+        generatedStubSource = stubSourceCode;
 
         try {
             File projectPropertiesFile = new File(projectDir, "project.properties");
@@ -6587,6 +6762,10 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to write gradle properties to "+gradleFile, ex);
         }
 
+        generateWearModule(request, studioProjectDir, gradleProps, watchSurfacesManifestEntries,
+                basePermissions + permissions + xPermissions + watchSharedPermissions,
+                intVersion, wearableListenerService);
+
         String rootGradleProps = "// Top-level build file where you can add configuration options common to all sub-projects/modules.\n" +
                 "buildscript {\n" +
                 "    repositories {\n" +
@@ -6824,6 +7003,22 @@ public class AndroidGradleBuilder extends Executor {
                 : "";
     }
 
+    /**
+     * {@link #xmlize} plus the quote escape an ATTRIBUTE value needs.
+     *
+     * <p>xmlize handles the three characters that matter in element content and leaves the double
+     * quote alone, which is right there and wrong inside {@code android:label="..."} -- a display
+     * name containing one closed the attribute early and the manifest stopped parsing, failing
+     * the build on a name the developer was entitled to choose. Single quotes go too, so the
+     * result is safe in either delimiter.</p>
+     *
+     * @param s the value to place inside an XML attribute
+     * @return the escaped value
+     */
+    static String xmlizeAttribute(String s) {
+        return xmlize(s).replace("\"", "&quot;").replace("'", "&apos;");
+    }
+
     static String xmlize(String s) {
         s = s.replace("&", "&amp;");
         s = s.replace("<", "&lt;");
@@ -6859,11 +7054,13 @@ public class AndroidGradleBuilder extends Executor {
      */
     static String surfaceKindClassSuffix(String kindId) {
         StringBuilder sb = new StringBuilder(kindId.length());
+        StringBuilder positions = new StringBuilder();
         boolean upper = true;
         for (int i = 0; i < kindId.length(); i++) {
             char c = kindId.charAt(i);
             if (c == '_') {
                 upper = true;
+                positions.append('_').append(i);
                 continue;
             }
             if (upper) {
@@ -6873,7 +7070,962 @@ public class AndroidGradleBuilder extends Executor {
                 sb.append(c);
             }
         }
+        // Folding away underscores is not injective: "status" and "status_" both read as Status,
+        // and two kinds sharing a suffix share a generated class -- the second overwrites the
+        // first and both manifest entries point at it, so one kind serves the other kind's data.
+        // Both ids are legal, so they have to be kept apart rather than one refused.
+        //
+        // The positions and not a count: a count separates "status" from "status_" but not
+        // "a__b" from "a_b_", which both discard two. Ids are [a-z][a-z0-9_]*, so the folded
+        // name plus where the underscores were is the whole original -- nothing else can produce
+        // the same pair. Absent for an id without underscores, so every name in an existing
+        // project is unchanged.
+        return sb.append(positions).toString();
+    }
+
+    /**
+     * Says what happens to the declared watch complication families, loudly and every time.
+     *
+     * <p>The failure this exists to prevent is silence. A developer declares a complication,
+     * hears nothing, and gets no surface: on a build with no watch product there is nothing to
+     * host it, and a watch-only kind no longer produces a home-screen widget either -- which is
+     * correct, and would otherwise look like the declaration was ignored.</p>
+     *
+     * @param request the build being generated
+     */
+    private void reportWatchSurfaces(BuildRequest request) {
+        if (watchSurfaceKinds.isEmpty()) {
+            return;
+        }
+        StringBuilder ids = new StringBuilder();
+        for (String[] kind : watchSurfaceKinds) {
+            if (ids.length() > 0) {
+                ids.append(", ");
+            }
+            ids.append(kind[0]);
+        }
+        if (watchModuleName(request) == null) {
+            log("[surfaces] NOTE: these kinds declare watch complication families and will NOT "
+                    + "appear on any device in this build: " + ids + ". They are hosted by a Wear "
+                    + "OS product, and this build produces none -- declare codename1.watchMain "
+                    + "(with codename1.watchStandalone for a watch-only APK), or declare a phone "
+                    + "family alongside them.");
+            return;
+        }
+        log("[surfaces] Generating Wear OS complication data sources for: " + ids);
+        for (String[] kind : watchSurfaceKinds) {
+            String families = kind[2];
+            if (families.contains("watchCorner")) {
+                log("[surfaces] Kind \"" + kind[0] + "\" declares watchCorner. Wear OS has no "
+                        + "corner slot, so it renders as the circular family.");
+            }
+            if (declaresTile(families)) {
+                log("[surfaces] Kind \"" + kind[0] + "\" declares watchRectangular: generating a "
+                        + "LONG_TEXT complication data source and a Tile.");
+            }
+        }
+    }
+
+    /**
+     * Generates the Wear OS complication data sources and Tile services, and returns their
+     * manifest entries.
+     *
+     * <p>The generated classes carry nothing but their kind id: every decision lives in the
+     * injected {@code CN1ComplicationDataSource} / {@code CN1SurfaceTileService}, which ship as
+     * build-time resources because they compile against {@code androidx.wear} libraries the
+     * Android port must not depend on -- an app publishing no complication should not carry
+     * them.</p>
+     *
+     * <p>Everything goes into the WATCH module, which is the phone module itself in a standalone
+     * build and a separate one in a companion build. One code path, one destination variable.</p>
+     *
+     * @param request the build being generated
+     * @param srcDir the watch module's java source root
+     * @param resDir the watch module's resource root
+     * @return the manifest service entries, or an empty string when there is nothing to declare
+     */
+    private String generateWatchSurfaces(BuildRequest request, File srcDir, File resDir)
+            throws BuildException {
+        String module = watchModuleName(request);
+        if (watchSurfaceKinds.isEmpty() || module == null) {
+            return "";
+        }
+        // The WATCH module's own roots, which in a companion build are NOT the phone's.
+        //
+        // The wear module shares the phone's source directory, so anything written to srcDir is
+        // compiled by both -- and these import androidx.wear, whose dependencies belong to the
+        // wear module alone. A companion build therefore failed compiling the PHONE module
+        // against imports it has no libraries for. Writing them into the wear module's own root
+        // keeps them on the one side that can compile them; the shared source set still carries
+        // everything else.
+        File watchSrcDir = watchSourceRoot(module, srcDir);
+        File implDir = new File(watchSrcDir, "com/codename1/impl/android");
+        implDir.mkdirs();
+        File surfacesDir = new File(watchSrcDir, "com/codename1/impl/android/surfaces");
+        surfacesDir.mkdirs();
+        // The Tile service only when a Tile is actually declared. Gradle compiles every source in
+        // the tree whether or not a subclass names it, and its androidx.wear.tiles and
+        // protolayout dependencies are added only for a rectangular family -- so copying it
+        // unconditionally failed a complication-only build on unresolved imports.
+        for (String resource : watchSurfaceSources(watchSurfaceKinds)) {
+            InputStream in = getResourceAsStream(
+                    "/com/codename1/builders/surfaces/wear/" + resource);
+            if (in == null) {
+                throw new BuildException("Missing Wear surfaces resource " + resource);
+            }
+            try {
+                copy(in, new FileOutputStream(new File(surfacesDir, resource)));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write Wear surfaces glue " + resource, ex);
+            }
+        }
+        StringBuilder entries = new StringBuilder();
+        StringBuilder kindIds = new StringBuilder();
+        for (String[] kind : watchSurfaceKinds) {
+            String kindId = kind[0];
+            // RAW here: complicationServiceEntry and tileServiceEntry put it in an attribute and
+            // escape it themselves. Escaping first turned "A & B" into "A &amp;amp; B", which the
+            // watch face then shows as "A &amp; B".
+            String label = kind[1];
+            String families = kind[2];
+            String suffix = surfaceKindClassSuffix(kindId);
+            writeWatchService(surfacesDir, implDir, "CN1Complication_" + suffix,
+                    "CN1ComplicationDataSource", kindId);
+            entries.append(complicationServiceEntry(request, "CN1Complication_" + suffix, label,
+                    complicationTypes(families)));
+            if (declaresTile(families)) {
+                writeWatchService(surfacesDir, implDir, "CN1Tile_" + suffix,
+                        "CN1SurfaceTileService", kindId);
+                entries.append(tileServiceEntry("CN1Tile_" + suffix, label));
+            }
+            if (kindIds.length() > 0) {
+                kindIds.append("</item>\n        <item>");
+            }
+            kindIds.append(kindId);
+        }
+        // Read by CN1WatchSurface.isWatchKind and by the mirror, so it has to land in the watch
+        // module's OWN res dir -- the same trap the wearable capability declaration documents
+        // just above, where an extra "app/" segment made the resource silently unpackaged.
+        // The PHONE's res dir, deliberately, even in a companion build. CN1SurfaceMirror reads
+        // this list on the PHONE to decide which kinds are worth sending, so putting it only in
+        // the wear module would leave the sender unable to see it and nothing would ever mirror.
+        // The wear module shares the phone's res directory, so writing it here gives it to both.
+        File values = new File(resDir, "values");
+        values.mkdirs();
+        try {
+            createFile(new File(values, "cn1_surfaces_watch.xml"),
+                    ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                    + "<resources>\n"
+                    + "    <string-array name=\"cn1_surface_watch_kinds\">\n"
+                    + "        <item>" + kindIds + "</item>\n"
+                    + "    </string-array>\n"
+                    + "</resources>\n").getBytes("UTF-8"));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to write the watch surface kind declaration", ex);
+        }
+        addWatchSurfaceDependencies(request);
+        return entries.toString();
+    }
+
+    /** Writes one generated service subclass, which carries only its kind id. */
+    private void writeWatchService(File surfacesDir, File implDir, String className,
+            String baseClass, String kindId) throws BuildException {
+        String source = "package com.codename1.impl.android;\n\n"
+                + "/** Generated by the Codename One build from surfaces.json. */\n"
+                + "public class " + className
+                + " extends com.codename1.impl.android.surfaces." + baseClass + " {\n"
+                + "    @Override\n"
+                + "    protected String getKindId() {\n"
+                + "        return \"" + kindId + "\";\n"
+                + "    }\n"
+                + "}\n";
+        try {
+            createFile(new File(implDir, className + ".java"),
+                    source.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to generate " + className, ex);
+        }
+    }
+
+    /**
+     * The manifest entry for a complication data source.
+     *
+     * <p>{@code UPDATE_PERIOD_SECONDS} defaults to 0 on purpose: the timeline model here is
+     * push-driven exactly like the widget path, so a system poll would spend watch battery
+     * asking a question the app has already answered.</p>
+     */
+    private String complicationServiceEntry(BuildRequest request, String className, String label,
+            String supportedTypes) {
+        return "        <service android:name=\"com.codename1.impl.android." + className + "\"\n"
+                + "                 android:exported=\"true\"\n"
+                + "                 android:label=\"" + xmlizeAttribute(label) + "\"\n"
+                + "                 android:permission=\"com.google.android.wearable.permission."
+                + "BIND_COMPLICATION_PROVIDER\">\n"
+                + "            <intent-filter>\n"
+                + "                <action android:name=\"android.support.wearable.complications."
+                + "ACTION_COMPLICATION_UPDATE_REQUEST\" />\n"
+                + "            </intent-filter>\n"
+                + "            <meta-data android:name=\"android.support.wearable.complications."
+                + "SUPPORTED_TYPES\" android:value=\"" + supportedTypes + "\" />\n"
+                + "            <meta-data android:name=\"android.support.wearable.complications."
+                + "UPDATE_PERIOD_SECONDS\" android:value=\""
+                + request.getArg("android.surfaces.complicationUpdateSeconds", "0") + "\" />\n"
+                + "        </service>\n";
+    }
+
+    private String tileServiceEntry(String className, String label) {
+        return "        <service android:name=\"com.codename1.impl.android." + className + "\"\n"
+                + "                 android:exported=\"true\"\n"
+                + "                 android:label=\"" + xmlizeAttribute(label) + "\"\n"
+                + "                 android:permission=\"com.google.android.wearable.permission."
+                + "BIND_TILE_PROVIDER\">\n"
+                + "            <intent-filter>\n"
+                + "                <action android:name=\"androidx.wear.tiles.action."
+                + "BIND_TILE_PROVIDER\" />\n"
+                + "            </intent-filter>\n"
+                + "            <meta-data android:name=\"androidx.wear.tiles.PREVIEW\" "
+                + "android:resource=\"@drawable/icon\" />\n"
+                + "        </service>\n";
+    }
+
+    /**
+     * Adds the androidx.wear dependencies the generated services need.
+     *
+     * <p>Only when a complication is actually declared, and only the Tile half when a Tile is.
+     * concurrent-futures is not decoration: {@code TileService.onTileRequest} returns a
+     * {@code ListenableFuture} and the stub artifact tiles pulls in has no
+     * {@code Futures.immediateFuture}, so {@code CallbackToFutureAdapter} is the reliable
+     * Java-only route.</p>
+     */
+    /**
+     * The theme the app's launcher activity declares.
+     *
+     * <p>One resolution, because the companion Wear manifest is written independently of the
+     * phone's and needs the same answer: the generated stub extends {@code AppCompatActivity}
+     * when {@code android.extendAppCompatActivity} is set, and AppCompat refuses to start under
+     * a theme that is not a {@code Theme.AppCompat} descendant. A Wear launcher left on the
+     * platform default crashed on the first frame.</p>
+     *
+     * <p>The AppCompat value used to be written as {@code @@style/...}. In an Android resource
+     * attribute a leading {@code @@} is the escape for a literal {@code @}, so that was the
+     * eight-character string "@style/Theme.AppCompat.NoActionBar" and not a reference to
+     * anything -- the theme was never applied. Corrected here rather than copied into a second
+     * manifest, since the branch only runs when a project has asked for AppCompat and the
+     * intent is not in doubt.</p>
+     *
+     * @return the theme reference for the launcher activity
+     */
+    private String launcherTheme() {
+        return extendAppCompatActivity
+                ? "@style/Theme.AppCompat.NoActionBar" : "@style/CustomTheme";
+    }
+
+    /**
+     * The Wear manifest's {@code <application>} opening tag.
+     *
+     * <p>Written the way the phone manifest writes its own: a default is emitted only when
+     * {@code android.xapplication_attr} has not already said it. Emitting both produced the same
+     * attribute twice, and a duplicate attribute is not a merge conflict but an XML document that
+     * does not parse -- so a companion project that customised its label or icon failed before
+     * packaging, which is the whole build rather than the watch half of it.</p>
+     *
+     * @param request the build being generated
+     * @return the opening tag, ending with the closing angle bracket and a newline
+     */
+    private String wearApplicationTag(BuildRequest request) {
+        String attrs = request.getArg("android.xapplication_attr", "");
+        StringBuilder sb = new StringBuilder("    <application");
+        // android.blockLabel honoured, as the phone tag honours it, and escaped for an ATTRIBUTE:
+        // xmlize leaves the double quote alone, so a display name like Acme "Watch" closed the
+        // attribute early and the manifest stopped parsing.
+        if (!attrs.contains("android:label")
+                && !"true".equalsIgnoreCase(request.getArg("android.blockLabel", "false"))) {
+            sb.append(" android:label=\"")
+              .append(xmlizeAttribute(request.getDisplayName())).append("\"");
+        }
+        if (!attrs.contains("android:icon")) {
+            sb.append(" android:icon=\"@drawable/icon\"");
+        }
+        if (attrs.length() > 0) {
+            sb.append(" ").append(attrs);
+        }
+        return sb.append(">\n").toString();
+    }
+
+    /**
+     * How far above the phone's the Wear artifact's version code sits by default.
+     *
+     * <p>Large enough to partition the space rather than merely satisfy the ordering rule. Play
+     * refuses a version code it has already seen for an applicationId, and the two artifacts
+     * share one -- so an offset of 1 makes the Wear artifact consume the code the next phone
+     * release needs. A hundred million is beyond any hand-maintained sequence and still leaves
+     * room under Play's ceiling for a project numbering in the millions.</p>
+     */
+    static final int DEFAULT_WATCH_VERSION_CODE_OFFSET = 100000000;
+
+    /** Play's ceiling for a version code. */
+    static final int MAX_PLAY_VERSION_CODE = 2100000000;
+
+    /**
+     * Whether any declared kind earns a Tile, and so whether the tap trampoline has to be
+     * reachable from outside this app.
+     *
+     * <p>A complication's tap is a {@code PendingIntent} the app itself created, which the
+     * system can fire into a private activity. A Tile's is not: ProtoLayout's
+     * {@code LaunchAction} names a component and the TILE HOST starts it, from its own process,
+     * so a non-exported trampoline fails the permission check and the tap does nothing at all.
+     * Nothing in the build warns about it, because the manifest is valid.</p>
+     *
+     * <p>Exporting an activity is not free -- any installed app can then start it with extras of
+     * its choosing, and this one dispatches an action id to the app's listeners -- so it is asked
+     * per build rather than granted once: a project with complications and no Tile keeps the
+     * trampoline private.</p>
+     *
+     * @return true when at least one kind declares a Tile
+     */
+    private boolean anyWatchTile() {
+        for (String[] kind : watchSurfaceKinds) {
+            if (declaresTile(kind[2])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The androidx.wear dependency block for the Wear module.
+     *
+     * <p>Pure so it can be pinned directly. What has to stay true is a pairing rather than a
+     * list: the Tile half is optional, and every line it adds has to arrive together.</p>
+     *
+     * @param compile the dependency keyword this build uses -- implementation, or compile on a
+     *        legacy support-library build
+     * @param anyTile whether any declared kind earns a Tile
+     * @param complicationsVersion the watchface-complications-data-source version
+     * @param tilesVersion the tiles version
+     * @param protoLayoutVersion the protolayout version, used for both protolayout artifacts
+     * @param guavaVersion the Guava version floor; see the comment on the Guava line
+     * @return the dependency lines, each already indented for the block they are inserted into
+     */
+    static String watchSurfaceDependencyBlock(String compile, boolean anyTile,
+            String complicationsVersion, String tilesVersion, String protoLayoutVersion,
+            String guavaVersion) {
+        StringBuilder deps = new StringBuilder();
+        deps.append("    ").append(compile)
+                .append(" 'androidx.wear.watchface:watchface-complications-data-source:")
+                .append(complicationsVersion).append("'\n");
+        if (anyTile) {
+            deps.append("    ").append(compile).append(" 'androidx.wear.tiles:tiles:")
+                    .append(tilesVersion).append("'\n");
+            deps.append("    ").append(compile)
+                    .append(" 'androidx.wear.protolayout:protolayout:")
+                    .append(protoLayoutVersion).append("'\n");
+            deps.append("    ").append(compile)
+                    .append(" 'androidx.wear.protolayout:protolayout-material:")
+                    .append(protoLayoutVersion).append("'\n");
+            // TileService.onTileRequest returns a ListenableFuture, and the stub artifact tiles
+            // pulls in has no Futures.immediateFuture, so CallbackToFutureAdapter is the reliable
+            // Java-only route.
+            deps.append("    ").append(compile)
+                    .append(" 'androidx.concurrent:concurrent-futures:1.1.0'\n");
+            // Guava, for one class. concurrent-futures and tiles both ask for
+            // com.google.guava:listenablefuture:1.0, a jar holding only ListenableFuture -- the
+            // type onTileRequest returns. Guava publishes the SAME coordinate at
+            // 9999.0-empty-to-avoid-conflict-with-guava containing no classes at all, so that a
+            // build carrying full Guava does not get the class twice; anything pulling the marker
+            // wins the version comparison and the real jar drops out. CameraX's graph does that
+            // to a Codename One app, and the import then fails in a generated Tile service the
+            // developer never wrote.
+            //
+            // So supply what the marker assumes is already there rather than fighting it. Forcing
+            // 1.0 back instead looks lighter and is wrong: an app whose graph ALREADY carries
+            // full Guava -- androidx.car.app brings 31.1-android -- then has ListenableFuture in
+            // two jars and fails checkDuplicateClasses instead, which is how this was found. The
+            // floor is deliberately low so a project already on a newer Guava keeps it; R8 takes
+            // the unused bulk back out of a release build.
+            deps.append("    ").append(compile).append(" 'com.google.guava:guava:")
+                    .append(guavaVersion).append("'\n");
+        }
+        return deps.toString();
+    }
+
+    private void addWatchSurfaceDependencies(BuildRequest request) throws BuildException {
+        // The same keyword the rest of the dependency block uses; AndroidX builds are
+        // "implementation" and the legacy ones "compile".
+        String compile = useAndroidX ? "implementation" : "compile";
+        boolean anyTile = false;
+        for (String[] kind : watchSurfaceKinds) {
+            if (declaresTile(kind[2])) {
+                anyTile = true;
+                break;
+            }
+        }
+        String deps = watchSurfaceDependencyBlock(compile, anyTile,
+                request.getArg("android.wear.complicationsVersion", "1.2.1"),
+                request.getArg("android.wear.tilesVersion", "1.4.1"),
+                request.getArg("android.wear.protoLayoutVersion", "1.2.1"),
+                request.getArg("android.wear.guavaVersion", "31.1-android"));
+        // Held rather than pushed into the shared gradleDependencies hint, because in a
+        // COMPANION build that hint feeds the phone module too -- and these libraries declare
+        // minSdk 26. A phone app supporting API 24 then failed its manifest merge against a
+        // library it has no use for. Where they actually land is decided by the caller, which
+        // knows which module is the watch.
+        watchSurfaceDependencies = deps;
+        // These libraries are AndroidX-only, so a legacy support-library build cannot carry them.
+        // Said here, naming the setting, rather than failing later inside Gradle with a manifest
+        // merge error that names none of this.
+        if (!useAndroidX) {
+            throw new BuildException("Wear OS complications need AndroidX: the "
+                    + "androidx.wear complication and Tile libraries have no support-library "
+                    + "equivalent. Set android.useAndroidX=true (and android.useJetifier=true if "
+                    + "you depend on older libraries), or remove the watch families from "
+                    + "surfaces.json.");
+        }
+    }
+
+    /**
+     * Generates the companion Wear OS module, so a companion build hands back a Wear artifact
+     * beside the phone one instead of only the phone app.
+     *
+     * <p>The module SHARES the app module's source, resource and asset directories rather than
+     * copying them. A copy would roughly double disk and dex time on a cloud builder for a tree
+     * that is identical apart from one class. What differs is declared here: its own generated
+     * stub rooted at {@code codename1.watchMain}, its own manifest, and the complication and Tile
+     * services.</p>
+     *
+     * <p><b>Both modules declare the same namespace</b>, which AGP permits and which is required
+     * rather than merely convenient: the shared sources sit in the app's own package and refer to
+     * {@code R} unqualified, so a second namespace would give the wear module an {@code R} class
+     * the shared code cannot see. The same {@code applicationId} is what makes Play treat the two
+     * artifacts as one app.</p>
+     *
+     * <p>Nothing here runs for a project that declared no watch, or for a standalone build where
+     * the single APK already is the watch app.</p>
+     *
+     * @param request the build being generated
+     * @param studioProjectDir the generated project root, which holds settings.gradle
+     * @param appGradle the app module's build.gradle, which this one is derived from
+     * @param watchServices the complication and Tile manifest entries
+     * @param sharedPermissions the permissions the phone manifest declares, base ones
+     *     included -- the watch compiles the same Codename One sources, so a watchMain making an
+     *     ordinary network request needs INTERNET as much as the phone does, and this manifest is
+     *     selected outright rather than merged with the phone's
+     * @param intVersion the phone's version code, which the watch's must exceed
+     * @param wearableListenerService the Data Layer listener declaration, which the watch needs
+     *     as much as the phone does -- it is the half that RECEIVES a mirrored complication
+     */
+    private void generateWearModule(BuildRequest request, File studioProjectDir, String appGradle,
+            String watchServices, String sharedPermissions, int intVersion,
+            String wearableListenerService) throws BuildException {
+        if (!"wear".equals(watchModuleName(request))) {
+            return;
+        }
+        File wearDir = new File(studioProjectDir, "wear");
+        File wearSrc = new File(wearDir, "src/main/java");
+        File wearRes = new File(wearDir, "src/main/res");
+        wearSrc.mkdirs();
+        wearRes.mkdirs();
+
+        String watchMain = watchMainClass(request);
+        String phoneStub = request.getMainClass() + "Stub";
+        String stubName = request.getMainClass() + "WatchStub";
+        if (generatedStubSource == null) {
+            throw new BuildException("The Wear module needs the generated stub, which has not "
+                    + "been produced yet");
+        }
+        // Derived from the phone stub rather than subclassing it: the stub is typed throughout to
+        // the lifecycle class it starts, so re-rooting it means substituting that type. The
+        // phone stub itself stays in the app module and is compiled into both harmlessly, because
+        // each manifest names its own -- which is what lets the source set be shared at all.
+        String phoneMain = appLifecycleClass(request);
+        String watchSimpleName = watchMain.substring(watchMain.lastIndexOf('.') + 1);
+        String stub = generatedStubSource
+                .replace("class " + phoneStub, "class " + stubName)
+                .replace(phoneStub + "()", stubName + "()")
+                .replace(phoneStub + " stubInstance", stubName + " stubInstance")
+                .replace(phoneStub + " getInstance", stubName + " getInstance")
+                // The qualified-this the run() hand-off uses. Renaming the class without this
+                // leaves "<PhoneStub>.this" naming a class that is no longer an enclosing one,
+                // and javac says exactly that.
+                .replace(phoneStub + ".this", stubName + ".this")
+                .replace(phoneStub + ".headphones", stubName + ".headphones")
+                .replace("new " + phoneMain + "(", "new " + watchSimpleName + "(")
+                .replace(" " + phoneMain + " i;", " " + watchSimpleName + " i;")
+                .replace(" " + phoneMain + " getAppInstance", " " + watchSimpleName
+                        + " getAppInstance");
+        if (watchMain.indexOf('.') > 0) {
+            stub = stub.replace("import com.codename1.ui.*;",
+                    "import com.codename1.ui.*;\nimport " + watchMain + ";");
+        }
+        // Re-rooting the phone stub is a set of textual substitutions over generated code, and
+        // the failure mode when one is missing is not subtle but it IS remote: the watch module
+        // fails to compile, minutes later, naming a file the developer never wrote. Anything the
+        // list above did not catch still says the phone stub's name, so say so here instead --
+        // at generation time, naming the construct, in the build that produced it.
+        int leftover = stub.indexOf(phoneStub);
+        if (leftover >= 0) {
+            int from = Math.max(0, leftover - 60);
+            int to = Math.min(stub.length(), leftover + 60);
+            throw new BuildException("The Wear stub still refers to the phone stub "
+                    + phoneStub + ", so re-rooting it missed a construct and the wear module "
+                    + "would not compile. Near: ..." + stub.substring(from, to).replace('\n', ' ')
+                    + "... Add a substitution for it in generateWearModule.");
+        }
+        File stubDir = new File(wearSrc, request.getPackageName().replace('.', '/'));
+        stubDir.mkdirs();
+        try {
+            createFile(new File(stubDir, stubName + ".java"),
+                    stub.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to generate the Wear OS stub", ex);
+        }
+
+        int wearVersion = wearVersionCode(request, intVersion);
+        log("[wearable] Wear module version code " + wearVersion + " (phone " + intVersion + ")");
+
+        String wearGradle = deriveWearGradle(appGradle, intVersion, wearVersion,
+                watchSurfaceDependencies);
+        try {
+            createFile(new File(wearDir, "build.gradle"),
+                    wearGradle.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to write the Wear module build.gradle", ex);
+        }
+        copyMobileServiceConfig(studioProjectDir, wearDir);
+
+        String wearManifest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
+                // The tools namespace, because the application hints copied below routinely use
+                // it: tools:replace and tools:node are how a project resolves a manifest-merger
+                // conflict, and a root that declares only xmlns:android makes the copy a document
+                // that will not parse at all.
+                + "          xmlns:tools=\"http://schemas.android.com/tools\"\n"
+                + "          package=\"" + request.getPackageName() + "\">\n"
+                + "    <uses-feature android:name=\"android.hardware.type.watch\" "
+                + "android:required=\"true\" />\n"
+                + sharedPermissions
+                // android.xapplication_attr and android.xapplication carried across. This
+                // manifest is selected outright by the module's sourceSets rather than merged
+                // with the phone's, so a project that names a custom android:name Application --
+                // the usual way to initialise a native SDK -- or declares application-level
+                // meta-data got the stock Application and no meta-data on the watch, while the
+                // watch module compiles the very sources that expect them. The two hints are the
+                // ones that describe the application ITSELF; phone-only components stay behind
+                // deliberately, and a project that needs a watch-only difference can still say so
+                // by keeping the phone-only parts out of these hints.
+                + wearApplicationTag(request)
+                + "  " + request.getArg("android.xapplication", "") + "\n"
+                // Says the watch app needs its phone half, which is what a companion IS. A
+                // standalone build says the opposite, in the phone manifest.
+                + "        <meta-data android:name=\"com.google.android.wearable.standalone\" "
+                + "android:value=\"false\" />\n"
+                // Same theme the phone launcher gets. The shared stub extends AppCompatActivity
+                // when the project asks for it, and AppCompat refuses to start under a theme that
+                // is not one of its own -- so a Wear launcher on the platform default crashed on
+                // the first frame.
+                + "        <activity android:name=\"." + stubName + "\" "
+                + "android:theme=\"" + launcherTheme() + "\" "
+                + "android:exported=\"true\">\n"
+                + "            <intent-filter>\n"
+                + "                <action android:name=\"android.intent.action.MAIN\" />\n"
+                + "                <category android:name=\"android.intent.category.LAUNCHER\" />\n"
+                + "            </intent-filter>\n"
+                + "        </activity>\n"
+                // The Data Layer listener. This manifest is selected outright by the module's
+                // sourceSets rather than merged with the phone's, so anything the watch needs has
+                // to be declared here -- and the watch needs this one MORE than the phone does:
+                // it is the half that RECEIVES a mirrored complication. Without it Play services
+                // has nothing to bind in the watch APK, and every mirrored descriptor is dropped.
+                + wearableListenerService
+                // Push, when the project uses it. See watchPushManifestEntries.
+                + watchPushManifestEntries
+                // The FileProvider and the local-notification receiver, for the same reason: the
+                // wear module compiles the same sources and packages the same file_paths.xml, and
+                // a scheduled notification is delivered by a manifest-declared receiver or not at
+                // all.
+                + "  " + watchProviderTag + "\n"
+                + "  " + watchAlarmReceiver
+                + "  " + watchBackgroundWorkService
+                // A complication or Tile tap still needs the trampoline, and a TILE tap needs it
+                // reachable from the tile host's process -- see anyWatchTile.
+                + "        <activity android:name=\"com.codename1.impl.android.surfaces."
+                + "CN1SurfaceActionActivity\"\n"
+                + "                  android:theme=\"@android:style/Theme.NoDisplay\"\n"
+                + "                  android:exported=\"" + anyWatchTile() + "\"\n"
+                + "                  android:excludeFromRecents=\"true\"\n"
+                + "                  android:noHistory=\"true\"\n"
+                + "                  android:taskAffinity=\"\" />\n"
+                + watchServices
+                + "    </application>\n"
+                + "</manifest>\n";
+        try {
+            createFile(new File(wearDir, "src/main/AndroidManifest.xml"),
+                    wearManifest.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to write the Wear module manifest", ex);
+        }
+
+        // Only now, so a project without a watch produces a byte-identical settings.gradle.
+        File settings = new File(studioProjectDir, "settings.gradle");
+        try {
+            String existing = new String(java.nio.file.Files.readAllBytes(settings.toPath()),
+                    StandardCharsets.UTF_8);
+            if (existing.indexOf("':wear'") < 0) {
+                createFile(settings, (existing + "\ninclude ':wear'\n")
+                        .getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (IOException ex) {
+            throw new BuildException("Failed to add the Wear module to settings.gradle", ex);
+        }
+
+        // The Gradle tasks are invoked unqualified from the project root, so "assembleRelease"
+        // runs in every subproject that has it -- this module included. Nothing extra is needed
+        // to build it; what was needed was collecting its output, which the daemon now does.
+        log("[wearable] Generated the companion Wear OS module; the build produces a Wear "
+                + "artifact beside the phone one.");
+    }
+
+
+    /**
+     * The Wear artifact's version code, which must outrank the phone's.
+     *
+     * <p>On a watch Play picks among the APKs the device supports by version code, so the wear
+     * one has to be higher to be chosen. On a phone the required watch feature filters it out
+     * entirely, so the phone APK still wins there whatever this says.</p>
+     *
+     * @param request the build being generated
+     * @param intVersion the phone's version code
+     * @return the wear module's version code
+     */
+    static int wearVersionCode(BuildRequest request, int intVersion) throws BuildException {
+        String explicit = request.getArg("android.watchVersionCode", "");
+        int resolved;
+        String setting;
+        if (explicit.length() > 0) {
+            // Refused rather than substituted. Falling back to intVersion + 1 hid the typo AND
+            // recreated the collision this method exists to prevent: the Wear artifact would
+            // consume the next phone release's code, and the developer would be looking at a
+            // hint that says something else entirely.
+            try {
+                resolved = Integer.parseInt(explicit.trim());
+            } catch (NumberFormatException malformed) {
+                throw new BuildException("android.watchVersionCode is '" + explicit
+                        + "', which is not a version code. It must be a whole number greater "
+                        + "than the phone's " + intVersion + " and no more than "
+                        + MAX_PLAY_VERSION_CODE + ".");
+            }
+            setting = "android.watchVersionCode=" + explicit;
+        } else {
+            String offset = request.getArg("android.watchVersionCodeOffset",
+                    String.valueOf(DEFAULT_WATCH_VERSION_CODE_OFFSET));
+            resolved = intVersion + parseIntSafe(offset, DEFAULT_WATCH_VERSION_CODE_OFFSET);
+            setting = "android.watchVersionCodeOffset=" + offset;
+        }
+        // Play never accepts a version code twice for one application, and the two artifacts share
+        // an applicationId. An offset of 1 satisfies the ordering rule and then collides with the
+        // NEXT release: ship phone 100 with Wear 101, and the release after it cannot upload phone
+        // 101 at all. A project on sequential codes hits that on its second release, which is
+        // where this would have been found. The default offset partitions the space instead, so a
+        // Wear code can only collide with a phone code the project will never reach.
+        if (resolved > MAX_PLAY_VERSION_CODE) {
+            throw new BuildException("The Wear version code " + resolved
+                    + " exceeds the " + MAX_PLAY_VERSION_CODE + " Play allows. " + setting
+                    + " is added to the phone's " + intVersion + "; a project whose own codes are "
+                    + "already this large -- a date-derived code, usually -- needs a smaller "
+                    + "android.watchVersionCodeOffset, chosen so it cannot collide with a code "
+                    + "the project will use later.");
+        }
+        // The whole multi-APK arrangement rests on this ordering. A watch picks among the APKs it
+        // supports by version code, so a Wear artifact that does not outrank the phone one loses
+        // to a phone APK the watch also happens to support -- and the failure is not a build
+        // error but a watch quietly running the phone build, which nobody would trace back to a
+        // hint. Refuse it here, naming the setting, rather than shipping an arrangement that
+        // cannot work.
+        if (resolved <= intVersion) {
+            throw new BuildException("The Wear version code must be higher than the phone's. "
+                    + setting + " resolves to " + resolved + ", and the phone build is "
+                    + intVersion + ". Play picks among the APKs a device supports by version "
+                    + "code, so a watch would install the phone build instead of the Wear one.");
+        }
+        return resolved;
+    }
+
+    private static int parseIntSafe(String value, int fallback) {
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    /**
+     * The source root the generated Wear services belong in.
+     *
+     * <p>In a companion build that is the wear module's own, NOT the phone's. The wear module
+     * shares the phone's source directory, so anything written to the phone's root is compiled by
+     * both -- and these import {@code androidx.wear}, whose dependencies belong to the wear module
+     * alone. A companion build therefore failed compiling the PHONE module against imports it has
+     * no libraries for.</p>
+     *
+     * @param module the watch module name, from {@link #watchModuleName(BuildRequest)}
+     * @param appSrcDir the phone module's java source root
+     * @return where to generate the services
+     */
+    static File watchSourceRoot(String module, File appSrcDir) {
+        if (!"wear".equals(module)) {
+            return appSrcDir;
+        }
+        // appSrcDir is <studio>/app/src/main/java, so four levels up is the project root.
+        File wearModule = new File(appSrcDir.getParentFile().getParentFile()
+                .getParentFile().getParentFile(), "wear");
+        return new File(wearModule, "src/main/java");
+    }
+
+    /**
+     * Which injected Wear sources to copy for a set of kinds.
+     *
+     * <p>The Tile service only when a Tile is actually declared. Gradle compiles every source in
+     * the tree whether or not a generated subclass names it, and the tiles/protolayout
+     * dependencies are added only for a rectangular family -- so copying it unconditionally
+     * failed a complication-only build on unresolved imports.</p>
+     *
+     * @param kinds the watch-bearing kinds, as {id, label, families}
+     * @return the resource names to copy
+     */
+    static List<String> watchSurfaceSources(List<String[]> kinds) {
+        List<String> out = new ArrayList<String>();
+        out.add("CN1ComplicationDataSource.java");
+        for (String[] kind : kinds) {
+            if (declaresTile(kind[2])) {
+                out.add("CN1SurfaceTileService.java");
+                break;
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Gives the Wear module the mobile-services config the phone module already has.
+     *
+     * <p>The Wear build.gradle is derived from the phone's, so an app using FCM or Firebase
+     * Analytics carries {@code apply plugin: 'com.google.gms.google-services'} into it, and that
+     * plugin fails the whole multi-module build when it cannot find its config file -- which is
+     * written only under {@code app}. The phone artifact goes down with the watch one, which is
+     * the worst shape this failure could take.</p>
+     *
+     * <p>Copying rather than dropping the plugin, because the derived dependency block already
+     * carries the Firebase libraries: with the plugin gone they would be present and
+     * unconfigured, and FirebaseApp initialization fails at runtime on the watch instead of at
+     * build time on the desk. The two modules share an applicationId, so the same file is the
+     * right one.</p>
+     *
+     * @param studioProjectDir the generated project root
+     * @param wearDir the Wear module directory
+     */
+    private void copyMobileServiceConfig(File studioProjectDir, File wearDir)
+            throws BuildException {
+        String[] configs = {"google-services.json", "agconnect-services.json"};
+        for (String config : configs) {
+            File from = new File(new File(studioProjectDir, "app"), config);
+            if (!from.exists()) {
+                continue;
+            }
+            try {
+                copy(new FileInputStream(from), new FileOutputStream(new File(wearDir, config)));
+                log("[wearable] Copied " + config + " into the Wear module; the derived "
+                        + "build.gradle applies the same plugin the phone module does.");
+            } catch (IOException ex) {
+                throw new BuildException("Failed to copy " + config
+                        + " into the Wear module, which the google-services plugin needs", ex);
+            }
+        }
+    }
+
+    /**
+     * Derives the Wear module's build.gradle from the phone module's.
+     *
+     * <p>Textual substitution, which is cheap and total -- and every one of these has been wrong
+     * at least once in a way no compiler could see. A generated Gradle file only fails when
+     * Gradle evaluates it, which on CI is twenty minutes after the mistake, so this is separated
+     * from writing it and pinned by WearModuleGradleTest.</p>
+     *
+     * @param appGradle the phone module's build.gradle
+     * @param intVersion the phone's version code
+     * @param wearVersion the watch's version code, which must outrank it
+     * @param wearDependencies the androidx.wear block, which belongs to this module alone
+     * @return the wear module's build.gradle
+     */
+    static String deriveWearGradle(String appGradle, int intVersion, int wearVersion,
+            String wearDependencies) {
+        String gradle = appGradle
+                // Libraries are shared from the app module rather than copied.
+                .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
+                .replace("dirs 'libs'", "dirs '../app/libs'")
+                // The signing key lives in the app module and nowhere else, and Gradle resolves
+                // file("keyStore") relative to the project it appears in -- so a verbatim copy
+                // sent the wear module looking for a keystore beside itself. A release build then
+                // failed to CONFIGURE, taking the phone artifact down with it: this is not the
+                // watch half degrading, it is the whole multi-module build not starting.
+                .replace("storeFile file(\"keyStore\")", "storeFile file(\"../app/keyStore\")")
+                // Same trap as the keystore, one line further on. The generated proguard.cfg is
+                // written into the app module and nowhere else, and Gradle resolves a bare
+                // proguardFiles path against the project it appears in -- so the default
+                // release build had the Wear R8 task looking for a file beside itself and
+                // failing, which takes the phone artifact down with it.
+                .replace("'proguard.cfg'", "'../app/proguard.cfg'");
+        // Share the app module's tree instead of duplicating it, and add this module's own
+        // generated sources on top. insertAfterFirst and not replace: an "android {" block can
+        // appear more than once -- a coverage harness appends a second one to add a build type --
+        // and only the module's own block wants a source set.
+        gradle = insertAfterFirst(gradle, "android {\n",
+                "    sourceSets.main {\n"
+                + "        java.srcDirs = ['../app/src/main/java', 'src/main/java']\n"
+                + "        res.srcDirs = ['../app/src/main/res', 'src/main/res']\n"
+                + "        assets.srcDirs = ['../app/src/main/assets']\n"
+                // ../app/src/main/JAVA, matching what the phone module declares. The generated
+                // in-app billing interface for a pre-v8 port is written next to the Java it
+                // serves, which is why the phone gradle names src/main/java as an AIDL root --
+                // and pointing this at a src/main/aidl that no build creates left the wear module
+                // compiling the billing sources with no IInAppBillingService to compile against.
+                + "        aidl.srcDirs = ['../app/src/main/java']\n"
+                + "        manifest.srcFile 'src/main/AndroidManifest.xml'\n"
+                + "    }\n");
+        // The androidx.wear libraries, HERE and not in the shared dependency hint. They declare
+        // minSdk 26, and this is the only module raised to it -- putting them in the hint failed
+        // the phone module's manifest merge against libraries it never uses.
+        //
+        // "\ndependencies {" and not "dependencies {": the buildscript block is indented and
+        // comes FIRST, and a plain replace put an implementation() call inside buildscript's
+        // dependency handler, where the method does not exist and the whole :wear project failed
+        // to evaluate. insertAfterFirst for the same reason one level up -- the generated file
+        // also carries an androidTest dependency block, which has no use for these.
+        gradle = insertAfterFirst(gradle, "\ndependencies {\n", wearDependencies);
+        // Appended, and not substituted into the generated declarations. android.xgradle_default_config
+        // lets a project add its OWN minSdkVersion and versionCode inside defaultConfig, and those
+        // come after the builder's -- so rewriting the builder's left the project's value
+        // effective and this module quietly kept the phone's version code, or a floor below the
+        // one the Wear libraries need. A trailing block is evaluated last, whatever the file
+        // above it says, which is the only form that cannot be overridden by a hint.
+        //
+        // The floor rises only for the libraries that demand it. Wear OS 3 is where the
+        // complication and Tile APIs start, so a module carrying them cannot support less -- but
+        // a companion watch app that only uses the lifecycle or the Data Layer has always run on
+        // the Wear OS 2 baseline, and raising it for every watchMain build took API 23 to 25
+        // watches away from projects that declared no surface at all.
+        StringBuilder wins = new StringBuilder();
+        wins.append("\n// Last word on the two values the Wear artifact cannot get wrong. See\n")
+                .append("// deriveWearGradle: a defaultConfig fragment from android.xgradle_default_config\n")
+                .append("// appears after the generated declarations and would otherwise win.\n")
+                .append("android {\n")
+                .append("    defaultConfig {\n")
+                .append("        versionCode ").append(wearVersion).append("\n");
+        if (wearDependencies != null && wearDependencies.length() > 0) {
+            wins.append("        minSdkVersion 26\n");
+        }
+        wins.append("    }\n")
+                .append("}\n");
+        return gradle + wins;
+    }
+
+    /**
+     * Inserts text directly after the FIRST occurrence of an anchor, or returns the input when
+     * the anchor is absent.
+     *
+     * <p>{@code String.replace} rewrites every occurrence, which in a generated build.gradle is
+     * almost never what is wanted: the anchors here name block openings that legitimately repeat.
+     * Two separate CI failures came from that, so the intent is spelled out rather than encoded
+     * in a longer anchor string.</p>
+     *
+     * @param text the text to insert into
+     * @param anchor the opening to insert after
+     * @param insertion the text to insert
+     * @return the text with the insertion applied at most once
+     */
+    private static String insertAfterFirst(String text, String anchor, String insertion) {
+        int at = text.indexOf(anchor);
+        if (at < 0) {
+            return text;
+        }
+        int after = at + anchor.length();
+        return text.substring(0, after) + insertion + text.substring(after);
+    }
+
+    /** Joins declared families for the codegen tables, normalized to the portable spelling. */
+    static String joinFamilies(List<String> families) {
+        StringBuilder sb = new StringBuilder();
+        for (String family : families) {
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
+            sb.append(com.codename1.util.SurfaceKindFamilies.normalize(family));
+        }
         return sb.toString();
+    }
+
+    /**
+     * The Wear complication types a kind's declared families map onto, as the comma-separated
+     * SUPPORTED_TYPES value the manifest meta-data carries.
+     *
+     * <p>A watch face asks a data source for one specific type and gets nothing if the source
+     * does not offer it, so this is what decides whether a complication can be placed in a given
+     * slot at all. The mapping is the one {@code WidgetSize} documents: circular is a gauge or a
+     * glyph, inline is one short string, rectangular is the roomy one. SHORT_TEXT is offered
+     * everywhere because every family can degrade to a number or a word, and a slot that would
+     * otherwise refuse the source entirely is better filled than empty.</p>
+     *
+     * @param familiesCsv the kind's declared families, comma separated
+     * @return the SUPPORTED_TYPES value, never empty when any watch family was declared
+     */
+    ///
+    /// Advertised from the DECLARED FAMILY, which is all this build can see. Whether a given
+    /// layout will contain a progress node or an image is a property of what the app publishes at
+    /// runtime, and it can differ between one publish and the next -- so narrowing the advertised
+    /// set here would be guessing about a document that does not exist yet, and guessing low
+    /// makes the kind unselectable in a slot it will later be able to fill. When a face asks for
+    /// a type the current layout cannot produce, the data source answers with no data, which is
+    /// the defined way to say so; the slot then falls back to another type or shows its empty
+    /// state, and the next publish can change the answer.
+    static String complicationTypes(String familiesCsv) {
+        LinkedHashSet<String> types = new LinkedHashSet<String>();
+        for (String family : familiesCsv.split(",")) {
+            String f = family.trim();
+            if ("watchCircular".equals(f) || "watchCorner".equals(f)) {
+                // Wear OS has no corner slot; a corner complication is round, so it renders as
+                // the circular family here exactly as WidgetSize says it does.
+                types.add("RANGED_VALUE");
+                types.add("MONOCHROMATIC_IMAGE");
+                types.add("SHORT_TEXT");
+            } else if ("watchRectangular".equals(f)) {
+                types.add("LONG_TEXT");
+                types.add("SHORT_TEXT");
+            } else if ("watchInline".equals(f)) {
+                types.add("SHORT_TEXT");
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String type : types) {
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
+            sb.append(type);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Whether a kind also earns a Tile: the rectangular family is the only one roomy enough for
+     * a layout rather than a readout.
+     *
+     * @param familiesCsv the kind's declared families, comma separated
+     * @return true if a TileService should be generated
+     */
+    static boolean declaresTile(String familiesCsv) {
+        for (String family : familiesCsv.split(",")) {
+            if ("watchRectangular".equals(family.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

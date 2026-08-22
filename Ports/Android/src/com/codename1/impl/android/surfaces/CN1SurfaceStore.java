@@ -85,7 +85,14 @@ public final class CN1SurfaceStore {
         deleteUnreferencedImages(dir, timelineJson);
     }
 
-    private static void deleteUnreferencedImages(File dir, String timelineJson) {
+    /// Deletes image blobs a timeline no longer references. The document's `images` list is
+    /// the complete reference set, and blob names are content hashes, so a changed image would
+    /// otherwise leave its predecessor behind for ever.
+    ///
+    /// Package-private rather than private because the mirror receiver persists a timeline that
+    /// arrived over the Data Layer rather than one this process published, and needs the same
+    /// collection afterwards.
+    static void deleteUnreferencedImages(File dir, String timelineJson) {
         try {
             org.json.JSONObject doc = new org.json.JSONObject(timelineJson);
             org.json.JSONArray names = doc.optJSONArray("images");

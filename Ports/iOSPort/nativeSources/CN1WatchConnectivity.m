@@ -936,6 +936,58 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     return [WCSession isSupported] ? [WCSession defaultSession] : nil;
 }
 
+// --- surface mirror ------------------------------------------------------
+//
+// Complication content published on the phone, delivered to the watch. Kept beside the rest of
+// the WCSession plumbing rather than in IOSNative.m so session activation and delegate
+// bookkeeping have one owner.
+
++ (void)mirrorComplicationUserInfo:(NSDictionary *)info {
+#if TARGET_OS_WATCH
+    // Only the phone mirrors. The watch's own publish is authoritative and sending it back would
+    // loop when the phone mirrored in the first place.
+    (void)info;
+#else
+    if (info == nil) {
+        return;
+    }
+    // Activates lazily on first touch, which is what makes this work in an app that publishes
+    // surfaces and never calls the wearable API.
+    CN1WatchConnectivity *self_ = [CN1WatchConnectivity shared];
+    WCSession *s = [self_ session];
+    if (s == nil || !s.isPaired || !s.isWatchAppInstalled) {
+        // No watch, or no watch app to receive it. Not a failure: most installs are this.
+        return;
+    }
+    // The ladder, weakest guarantee last.
+    //
+    // transferCurrentComplicationUserInfo is the only API that WAKES the watch app in the
+    // background to refresh a complication, and it is budgeted -- roughly fifty a day. Spending
+    // one when the user has placed no complication wastes the budget the app will want later,
+    // and spending one that is not there fails outright, so both cases fall through to
+    // transferUserInfo: queued, unbudgeted, and applied whenever the watch app next runs. That
+    // is materially weaker -- a complication may show stale content until then -- which is why
+    // it is the fallback rather than the default.
+    BOOL wantsWake = s.isComplicationEnabled;
+    if (wantsWake && s.remainingComplicationUserInfoTransfers == 0) {
+        wantsWake = NO;
+        NSLog(@"[CN1Surfaces] the watch complication refresh budget is spent for today; "
+              "queueing the update to apply when the watch app next runs");
+    }
+    @try {
+        if (wantsWake) {
+            [s transferCurrentComplicationUserInfo:info];
+        } else {
+            [s transferUserInfo:info];
+        }
+    } @catch (NSException *ex) {
+        // WCSession raises rather than returning an error for a payload it will not carry. The
+        // publish itself already succeeded, so this is reported and dropped.
+        NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
+    }
+#endif
+}
+
 // --- state ---------------------------------------------------------------
 
 - (BOOL)isSupported {
@@ -1431,6 +1483,57 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     cn1_wearable_deliverMessage(path.UTF8String, body.bytes, (int) body.length, token);
 }
+
+- (void)session:(WCSession *)session didReceiveUserInfo:(NSDictionary<NSString *, id> *)userInfo {
+    // The receiving half of the surface mirror. Both rungs of the sender's ladder --
+    // transferCurrentComplicationUserInfo and transferUserInfo -- arrive here.
+    //
+    // Framework traffic is routed BEFORE anything app-visible, the same way /cnxk acknowledgement
+    // traffic is: a reserved key is bookkeeping, and delivering it to the app's own listeners
+    // would show it a message it never sent itself.
+    if (userInfo != nil && [userInfo objectForKey:@"cn1.surfaces.kind"] != nil) {
+        [self applyMirroredSurface:userInfo];
+        return;
+    }
+    // Nothing else uses this queue today. Ignored rather than guessed at: a payload with no
+    // reserved key did not come from this framework.
+}
+
+#if TARGET_OS_WATCH
+/// Applies a mirrored timeline: persist it where the complication extension reads, then ask
+/// WidgetKit to re-render.
+///
+/// Deliberately HEADLESS -- it does not start the CN1 runtime. Everything this needs is a file
+/// write and a WidgetCenter poke, and the app process may well not be running: the whole point of
+/// the wake is to refresh a complication, not to bring an application forward the user did not
+/// ask for. When the runtime IS up, Surfaces.publishRemote is called as well so the app's own
+/// diagnostics observe the update.
+- (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {
+    NSString *kind = [info objectForKey:@"cn1.surfaces.kind"];
+    NSData *json = [info objectForKey:@"cn1.surfaces.json"];
+    if (![kind isKindOfClass:[NSString class]] || ![json isKindOfClass:[NSData class]]) {
+        return;
+    }
+    NSMutableArray *names = [NSMutableArray array];
+    NSMutableArray *blobs = [NSMutableArray array];
+    for (NSString *key in info) {
+        if ([key hasPrefix:@"cn1.surfaces.img."]) {
+            id blob = [info objectForKey:key];
+            if ([blob isKindOfClass:[NSData class]]) {
+                [names addObject:[key substringFromIndex:[@"cn1.surfaces.img." length]]];
+                [blobs addObject:blob];
+            }
+        }
+    }
+    cn1_watch_apply_mirrored_surface(kind, json, names, blobs);
+}
+#else
+- (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {
+    // Only the watch consumes a mirror. Reaching here on the phone means the payload came back
+    // the way it went, which nothing sends.
+    (void)info;
+}
+#endif
 
 - (void)session:(WCSession *)session
         didReceiveApplicationContext:(NSDictionary<NSString *, id> *)applicationContext {

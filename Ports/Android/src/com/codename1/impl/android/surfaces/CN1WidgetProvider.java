@@ -143,7 +143,10 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
     /// publish -- and at most once per 15 minutes per kind. Failures are swallowed: modern
     /// Android may refuse a background service start, in which case the widget simply keeps
     /// showing the last entry until the app's own fetch schedule catches up.
-    private static void requestAppRefresh(Context context, String kindId) {
+    /// Package-private rather than private: a Tile reaching the end of its timeline needs the
+    /// same throttled request, and reimplementing it there would give the two surfaces different
+    /// refresh behaviour for one published document.
+    static void requestAppRefresh(Context context, String kindId) {
         try {
             String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
             if (listenerClass == null) {

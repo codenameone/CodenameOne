@@ -189,9 +189,19 @@ if [ ! -x "$PATCH_GRADLE_JAVA" ]; then
   exit 1
 fi
 
+PATCH_GRADLE_MODULES=(--app "$APP_BUILD_GRADLE")
+# A companion Wear build adds a second application module. It needs the same compileSdk pin as
+# the phone one: unpinned it picks the newest platform on the runner, and an API the port still
+# compiles against can be gone there (FingerprintManager is absent from API 37).
+WEAR_BUILD_GRADLE="$GRADLE_PROJECT_DIR/wear/build.gradle"
+if [ -f "$WEAR_BUILD_GRADLE" ]; then
+  ba_log "Wear module present; pinning its SDK levels too"
+  PATCH_GRADLE_MODULES+=(--app "$WEAR_BUILD_GRADLE")
+fi
+
 "$PATCH_GRADLE_JAVA" "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" \
   --root "$ROOT_BUILD_GRADLE" \
-  --app "$APP_BUILD_GRADLE" \
+  "${PATCH_GRADLE_MODULES[@]}" \
   --compile-sdk 36 \
   --target-sdk 36
 # --- END: robust Gradle patch ---

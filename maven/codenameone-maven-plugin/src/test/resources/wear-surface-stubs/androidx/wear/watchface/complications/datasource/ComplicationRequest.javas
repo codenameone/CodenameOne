@@ -1,0 +1,3 @@
+package androidx.wear.watchface.complications.datasource;
+import androidx.wear.watchface.complications.data.ComplicationType;
+public class ComplicationRequest { public ComplicationType getComplicationType() { return null; } }

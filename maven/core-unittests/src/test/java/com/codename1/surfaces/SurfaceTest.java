@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -849,6 +850,52 @@ class SurfaceTest {
         SurfaceDiagnostics.beforeRasterizingImageEncode();
         Surfaces.publish("never_registered", new WidgetTimeline()
                 .setContent(new SurfaceText("x")));
+    }
+
+    /// A timeline names its images rather than embedding them -- the serializer hashes the bytes
+    /// and puts the hash on the wire -- so a descriptor produced elsewhere is only complete if
+    /// its side-map came with it. publishRemote used to discard the map unconditionally, which
+    /// made every referenced image render as a gap.
+    @Test
+    void publishRemoteCarriesTheImagesTheDescriptorReferences() {
+        FakeBridge bridge = new FakeBridge();
+        Surfaces.setBridge(bridge);
+        Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+        images.put("abc123", new byte[] {1, 2, 3});
+
+        Surfaces.publishRemote("scores", "{\"layouts\":{}}", images);
+
+        assertEquals("scores", bridge.publishedKind);
+        assertEquals(1, bridge.publishedImages.size());
+        assertArrayEquals(new byte[] {1, 2, 3}, bridge.publishedImages.get("abc123"));
+    }
+
+    /// The two-argument form is the older entry point and must keep behaving as it did.
+    @Test
+    void publishRemoteWithoutImagesPassesAnEmptyMap() {
+        FakeBridge bridge = new FakeBridge();
+        Surfaces.setBridge(bridge);
+
+        Surfaces.publishRemote("scores", "{\"layouts\":{}}");
+
+        assertEquals("scores", bridge.publishedKind);
+        assertTrue(bridge.publishedImages.isEmpty());
+        // And a null map is the same thing, not a crash.
+        Surfaces.publishRemote("scores", "{\"layouts\":{}}", null);
+        assertTrue(bridge.publishedImages.isEmpty());
+    }
+
+    /// Nothing reaches an unsupported platform, with or without imagery.
+    @Test
+    void publishRemoteIsInertWhereWidgetsAreUnsupported() {
+        FakeBridge bridge = new FakeBridge();
+        bridge.widgetsSupported = false;
+        Surfaces.setBridge(bridge);
+
+        Surfaces.publishRemote("scores", "{}", new LinkedHashMap<String, byte[]>());
+        Surfaces.publishRemote("scores", "{}");
+
+        assertNull(bridge.publishedKind);
     }
 
     @Test

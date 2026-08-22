@@ -204,12 +204,39 @@ public final class Surfaces {
     /// the same wire format as `publish()`. The descriptor is persisted directly once the
     /// Codename One runtime receives it. A platform that doesn't run application code for a
     /// background push applies it when the application next starts or resumes.
+    ///
+    /// Equivalent to [#publishRemote(String,String,Map)] with no imagery. A descriptor that
+    /// references an image by name renders a gap where it should be, so prefer the overload
+    /// whenever the artwork travelled with the descriptor.
     public static void publishRemote(String kindId, String timelineJson) {
+        publishRemote(kindId, timelineJson, Collections.<String, byte[]>emptyMap());
+    }
+
+    /// As [#publishRemote(String,String)], with the imagery the descriptor references.
+    ///
+    /// A timeline's node tree names its images rather than embedding them -- `SurfaceSerializer`
+    /// hashes the bytes and puts the hash on the wire -- so a descriptor that arrived from
+    /// somewhere else is only complete if its side-map arrived too. Without this overload
+    /// `publishRemote` discarded the imagery unconditionally and every referenced image rendered
+    /// as a gap.
+    ///
+    /// The two callers are a server push and the phone-to-watch mirror, which forwards a
+    /// phone-side `publish()` of a watch-bearing kind to the watch. Both are the same operation:
+    /// a descriptor produced elsewhere, applied here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the widget kind id
+    /// - `timelineJson`: the serialized timeline, in the same wire format `publish()` produces
+    /// - `images`: the referenced images by name, or an empty map when the descriptor names none
+    public static void publishRemote(String kindId, String timelineJson,
+            Map<String, byte[]> images) {
         SurfaceBridge b = bridgeInternal();
         if (b == null || !b.areWidgetsSupported() || kindId == null || timelineJson == null) {
             return;
         }
-        b.publishWidgetTimeline(kindId, timelineJson, Collections.<String, byte[]>emptyMap());
+        b.publishWidgetTimeline(kindId, timelineJson,
+                images == null ? Collections.<String, byte[]>emptyMap() : images);
     }
 
     /// Asks the platform to re-render widgets from their already-published timelines.

@@ -1,0 +1,26 @@
+package com.google.android.gms.wearable;
+public class DataMap {
+    public static DataMap fromByteArray(byte[] b) { return null; }
+    public byte[] toByteArray() { return null; }
+    public java.util.Set<String> keySet() { return null; }
+    public boolean containsKey(String k) { return false; }
+    public Object remove(String k) { return null; }
+    public void putString(String k, String v) { }
+    public void putLong(String k, long v) { }
+    public void putInt(String k, int v) { }
+    public void putBoolean(String k, boolean v) { }
+    public void putByteArray(String k, byte[] v) { }
+    public void putAsset(String k, Asset v) { }
+    public void putStringArrayList(String k, java.util.ArrayList<String> v) { }
+    public String getString(String k) { return null; }
+    public String getString(String k, String def) { return def; }
+    public long getLong(String k) { return 0L; }
+    public long getLong(String k, long def) { return def; }
+    public int getInt(String k) { return 0; }
+    public int getInt(String k, int def) { return def; }
+    public boolean getBoolean(String k) { return false; }
+    public boolean getBoolean(String k, boolean def) { return def; }
+    public byte[] getByteArray(String k) { return null; }
+    public Asset getAsset(String k) { return null; }
+    public java.util.ArrayList<String> getStringArrayList(String k) { return null; }
+}

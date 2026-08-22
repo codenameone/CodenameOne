@@ -32,10 +32,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Generates the {@code CN1Widgets} WidgetKit app-extension target that the Codename One
- * iOS build wires into the generated Xcode project when the app references
- * {@code com.codename1.surfaces} (see the {@code surfaces.json} project manifest and the
- * {@code ios.surfaces.*} build hints).
+ * Generates a WidgetKit app-extension target that the Codename One iOS build wires into the
+ * generated Xcode project when the app references {@code com.codename1.surfaces} (see the
+ * {@code surfaces.json} project manifest and the {@code ios.surfaces.*} build hints).
+ *
+ * <p>There are two flavours, selected with {@link #setWatchTarget(boolean)}. The default
+ * {@code CN1Widgets} extension is embedded in the phone app and hosts home and lock-screen
+ * widgets; the {@code CN1WatchWidgets} flavour is embedded in the watch app and hosts
+ * complications. They are separate targets in one project and share every Swift source that
+ * can be shared, differing in which WidgetKit families they may name -- see
+ * {@link #mapFamily(String, boolean)} for why the two sets are not interchangeable.</p>
  *
  * <p>The extension is fully generic: the static Swift renderer sources shipped as plugin
  * resources under {@code com/codename1/builders/surfaces/ios/} render whatever timeline
@@ -50,10 +56,11 @@ import java.util.Map;
  *       requires {@code init()}, so a parameterized struct cannot serve every kind; each
  *       generated struct hardcodes its kind metadata and delegates to the shared
  *       {@code cn1MakeWidgetConfiguration} factory in CN1DescriptorWidget.swift. When
- *       live activities are enabled the bundle also lists {@code CN1LiveActivityWidget()}
- *       unconditionally - the struct itself guards every ActivityKit reference with
- *       {@code #if canImport(ActivityKit)}, which keeps the composition simple and
- *       compiles cleanly on SDKs/platforms without ActivityKit.</li>
+ *       live activities are enabled the iOS bundle also lists
+ *       {@code CN1LiveActivityWidget()} unconditionally - the struct itself guards every
+ *       ActivityKit reference with {@code #if canImport(ActivityKit)}, which keeps the
+ *       composition simple and compiles cleanly on SDKs without ActivityKit. The watch
+ *       flavour omits it entirely, watchOS having no ActivityKit at all.</li>
  * </ul>
  *
  * <p>{@link #buildAppTargetFileMap()} returns the glue compiled into the MAIN APP target
@@ -62,9 +69,10 @@ import java.util.Map;
  * matches app and extension by the {@code ActivityAttributes} type, so both modules need
  * the identical struct).</p>
  *
- * <p>The extension's deployment target defaults to 16.1 (ActivityKit's floor); the host
- * app's own deployment target is unaffected - the extension simply never runs on older
- * iOS versions.</p>
+ * <p>The iOS extension's deployment target defaults to 16.1 (ActivityKit's floor); the host
+ * app's own deployment target is unaffected - the extension simply never runs on older iOS
+ * versions. The watch flavour defaults to {@link #WATCH_MIN_DEPLOYMENT_TARGET} and refuses
+ * anything below it.</p>
  */
 public class IOSWidgetExtensionBuilder {
 
@@ -74,7 +82,7 @@ public class IOSWidgetExtensionBuilder {
     /** Classpath folder holding the static Swift renderer sources. */
     private static final String RESOURCE_ROOT = "/com/codename1/builders/surfaces/ios/";
 
-    /** Static Swift sources copied verbatim into the extension target. */
+    /** Static Swift sources copied verbatim into the iOS extension target. */
     private static final String[] EXTENSION_SOURCES = {
         "CN1SurfaceModel.swift",
         "CN1SurfaceRenderer.swift",
@@ -82,6 +90,31 @@ public class IOSWidgetExtensionBuilder {
         "CN1DescriptorWidget.swift",
         "CN1SurfaceAttributes.swift",
     };
+
+    /**
+     * The same sources minus the two ActivityKit ones, for the watchOS extension target.
+     *
+     * <p>watchOS has no ActivityKit at all. Both files are already
+     * {@code #if canImport(ActivityKit)} guarded, so shipping them would compile to nothing
+     * rather than fail -- but a target carrying the attributes of a capability the platform
+     * does not have is a claim, and the next person to read the target would believe it.</p>
+     */
+    private static final String[] WATCH_EXTENSION_SOURCES = {
+        "CN1SurfaceModel.swift",
+        "CN1SurfaceRenderer.swift",
+        "CN1WidgetProvider.swift",
+        "CN1DescriptorWidget.swift",
+    };
+
+    /**
+     * Lowest watchOS the generated extension can target.
+     *
+     * <p>Not WidgetKit's own watchOS 9 floor: {@code containerBackground(for:)}, which every
+     * generated widget applies, is watchOS 10. Below 10.0 the availability check around it
+     * stops compiling, so 9.0 would not merely lose the background -- it would fail the
+     * build.</p>
+     */
+    public static final String WATCH_MIN_DEPLOYMENT_TARGET = "10.0";
 
     /**
      * One widget kind declared in surfaces.json. Ids must match
@@ -131,6 +164,7 @@ public class IOSWidgetExtensionBuilder {
     private String appGroupId;
     private String deploymentTarget = "16.1";
     private boolean liveActivitiesEnabled;
+    private boolean watchTarget;
     private final List<Kind> kinds = new ArrayList<Kind>();
 
     /** Bare-bones constructor. Configure with the fluent setters. */
@@ -140,6 +174,40 @@ public class IOSWidgetExtensionBuilder {
      * Sets the extension target name (Xcode target, .appex bundle and bundle-id suffix).
      * Must be an ASCII identifier. Defaults to {@code CN1Widgets}.
      */
+    /**
+     * The extension's marketing version. Defaults to the historical constant so a caller that
+     * says nothing keeps its current output.
+     */
+    private String shortVersion = "1.0";
+
+    /** The extension's build version; see {@link #shortVersion}. */
+    private String bundleVersion = "1";
+
+    /**
+     * Sets the versions this extension declares.
+     *
+     * <p>Apple validates an embedded bundle's versions against the app that contains it, and an
+     * extension pinned to 1.0/1 inside an app at any other version is rejected at submission --
+     * a failure that appears only when the archive is uploaded, long after every build has gone
+     * green. The container's resolved values are the ones to pass; they are not simply the
+     * project version, because {@code ios.plistInject} and {@code ios.bundleVersion} both get a
+     * say in what the app itself ends up declaring.</p>
+     *
+     * @param shortVersionValue the containing app's CFBundleShortVersionString
+     * @param bundleVersionValue the containing app's CFBundleVersion
+     * @return this builder
+     */
+    public IOSWidgetExtensionBuilder setVersions(String shortVersionValue,
+            String bundleVersionValue) {
+        if (shortVersionValue != null && shortVersionValue.length() > 0) {
+            this.shortVersion = shortVersionValue;
+        }
+        if (bundleVersionValue != null && bundleVersionValue.length() > 0) {
+            this.bundleVersion = bundleVersionValue;
+        }
+        return this;
+    }
+
     public IOSWidgetExtensionBuilder setExtensionName(String name) {
         this.extensionName = name;
         return this;
@@ -175,6 +243,27 @@ public class IOSWidgetExtensionBuilder {
         return this;
     }
 
+    /**
+     * Builds the watchOS flavour of the extension rather than the iOS one.
+     *
+     * <p>The two are separate targets in the same project, embedded in different apps: the iOS
+     * extension rides in the phone app and hosts home and lock-screen widgets, the watch one
+     * rides in the watch app and hosts complications. They share every Swift source that can
+     * be shared, and differ in which families they may name -- see
+     * {@link #mapFamily(String, boolean)}.</p>
+     *
+     * @param watch true to generate the watch flavour
+     * @return this builder
+     */
+    public IOSWidgetExtensionBuilder setWatchTarget(boolean watch) {
+        this.watchTarget = watch;
+        if (watch && "16.1".equals(deploymentTarget)) {
+            // The iOS default is meaningless on the watch and would be rejected below.
+            this.deploymentTarget = WATCH_MIN_DEPLOYMENT_TARGET;
+        }
+        return this;
+    }
+
     /** Declares one widget kind (from surfaces.json). */
     public IOSWidgetExtensionBuilder addKind(Kind kind) {
         kinds.add(kind);
@@ -186,6 +275,7 @@ public class IOSWidgetExtensionBuilder {
     public String getAppGroupId() { return appGroupId; }
     public String getDeploymentTarget() { return deploymentTarget; }
     public boolean isLiveActivitiesEnabled() { return liveActivitiesEnabled; }
+    public boolean isWatchTarget() { return watchTarget; }
     public List<Kind> getKinds() { return kinds; }
 
     /**
@@ -194,7 +284,7 @@ public class IOSWidgetExtensionBuilder {
      */
     public Map<String, byte[]> buildFileMap() throws IOException {
         validate();
-        if (!hasIosSurface()) {
+        if (!hasSurface()) {
             // Every declared kind is a watch complication and there is no live activity, so nothing
             // would reach the bundle body -- and a WidgetBundle whose body holds no Widget expression
             // does not compile. Callers check hasIosSurface() and skip the extension; reaching here
@@ -204,18 +294,22 @@ public class IOSWidgetExtensionBuilder {
             // Deliberately here rather than in validate(): the APP-target glue is still wanted when
             // the app publishes surfaces that only a watch can show, so buildAppTargetFileMap() must
             // not be blocked by this.
-            throw new IllegalStateException("the iOS widget extension would be empty: every kind "
-                    + "declares only watch complication families. Check hasIosSurface() before "
+            throw new IllegalStateException((watchTarget
+                    ? "the watchOS widget extension would be empty: no kind declares a watch "
+                            + "complication family. Check hasWatchSurface() before "
+                    : "the iOS widget extension would be empty: every kind declares only watch "
+                            + "complication families. Check hasIosSurface() before ")
                     + "generating the extension");
         }
         LinkedHashMap<String, byte[]> map = new LinkedHashMap<String, byte[]>();
         map.put("Info.plist", utf8(buildInfoPlist()));
         map.put(extensionName + ".entitlements", utf8(buildEntitlements()));
         map.put("buildSettings.properties", utf8(buildBuildSettings()));
-        for (String source : EXTENSION_SOURCES) {
+        for (String source : (watchTarget ? WATCH_EXTENSION_SOURCES : EXTENSION_SOURCES)) {
             map.put(source, utf8(loadResource(source)));
         }
-        if (liveActivitiesEnabled) {
+        // Live activities are an iOS capability; watchOS has no ActivityKit.
+        if (liveActivitiesEnabled && !watchTarget) {
             map.put("CN1LiveActivityWidget.swift", utf8(loadResource("CN1LiveActivityWidget.swift")));
         }
         map.put("CN1SurfaceConfig.swift", utf8(buildConfigSwift()));
@@ -262,14 +356,22 @@ public class IOSWidgetExtensionBuilder {
         // produces a perfectly legal bundle -- ten complications plus one iOS widget is one widget.
         int emitted = 0;
         for (Kind kind : kinds) {
-            if (!isWatchOnly(kind)) {
+            if (watchTarget ? hasWatchFamily(kind) : !isWatchOnly(kind)) {
                 emitted++;
             }
         }
-        if (emitted > (liveActivitiesEnabled ? 9 : 10)) {
-            throw new IllegalStateException("surfaces.json declares more than "
-                    + (liveActivitiesEnabled ? 9 : 10) + " widget kinds with an iOS surface; a "
+        // The live activity occupies a slot in the iOS bundle only; the watch has none.
+        int limit = (liveActivitiesEnabled && !watchTarget) ? 9 : 10;
+        if (emitted > limit) {
+            throw new IllegalStateException("surfaces.json declares more than " + limit
+                    + " widget kinds with " + (watchTarget ? "a watch" : "an iOS") + " surface; a "
                     + "single WidgetBundle supports at most 10 widgets");
+        }
+        if (watchTarget && compareVersions(deploymentTarget, WATCH_MIN_DEPLOYMENT_TARGET) < 0) {
+            throw new IllegalStateException("the watch widget extension cannot target watchOS "
+                    + deploymentTarget + ": containerBackground(for:), which every generated "
+                    + "widget applies, is watchOS " + WATCH_MIN_DEPLOYMENT_TARGET
+                    + " and its availability check does not compile below that");
         }
         for (Kind kind : kinds) {
             if (kind.getId() == null || !isKindId(kind.getId())) {
@@ -337,8 +439,8 @@ public class IOSWidgetExtensionBuilder {
         plistKeyString(sb, "CFBundleInfoDictionaryVersion", "6.0");
         plistKeyString(sb, "CFBundleName", "$(PRODUCT_NAME)");
         plistKeyString(sb, "CFBundlePackageType", "$(PRODUCT_BUNDLE_PACKAGE_TYPE)");
-        plistKeyString(sb, "CFBundleShortVersionString", "1.0");
-        plistKeyString(sb, "CFBundleVersion", "1");
+        plistKeyString(sb, "CFBundleShortVersionString", shortVersion);
+        plistKeyString(sb, "CFBundleVersion", bundleVersion);
         plistKeyString(sb, APP_GROUP_PLIST_KEY, appGroupId);
         // No NSExtensionPrincipalClass: the @main CN1WidgetBundle is the entry point.
         // (NSSupportsLiveActivities belongs in the HOST APP's Info.plist, injected by
@@ -375,9 +477,23 @@ public class IOSWidgetExtensionBuilder {
         sb.append("# Auto-generated by Codename One IOSWidgetExtensionBuilder.\n");
         sb.append("# Picked up by com.codename1.builders.IPhoneBuilder when the CN1Widgets\n");
         sb.append("# extension folder is wired into the generated Xcode project.\n");
-        sb.append("IPHONEOS_DEPLOYMENT_TARGET=").append(deploymentTarget).append("\n");
+        if (watchTarget) {
+            sb.append("WATCHOS_DEPLOYMENT_TARGET=").append(deploymentTarget).append("\n");
+            sb.append("SDKROOT=watchos\n");
+            sb.append("SUPPORTED_PLATFORMS=watchos watchsimulator\n");
+            // 4 is the watch device family. Without it the extension builds for the phone
+            // families and is rejected when the watch app tries to embed it.
+            sb.append("TARGETED_DEVICE_FAMILY=4\n");
+            sb.append("ARCHS[sdk=watchos*]=arm64_32\n");
+        } else {
+            sb.append("IPHONEOS_DEPLOYMENT_TARGET=").append(deploymentTarget).append("\n");
+        }
         sb.append("SWIFT_VERSION=5.0\n");
-        sb.append("ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES\n");
+        // The watch app embeds the Swift runtime once, for itself and everything nested inside
+        // it. An extension that embeds its own copy is dead weight in the bundle and can fail
+        // validation, so the iOS answer here is the wrong one for a nested watch extension.
+        sb.append("ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=")
+                .append(watchTarget ? "NO" : "YES").append("\n");
         sb.append("SKIP_INSTALL=YES\n");
         sb.append("PRODUCT_BUNDLE_IDENTIFIER=").append(hostBundleId).append(".")
                 .append(extensionName).append("\n");
@@ -411,22 +527,22 @@ public class IOSWidgetExtensionBuilder {
         sb.append("struct CN1WidgetBundle: WidgetBundle {\n");
         sb.append("    var body: some Widget {\n");
         for (Kind kind : kinds) {
-            if (isWatchOnly(kind)) {
+            if (!hostsKind(kind)) {
                 continue;
             }
             sb.append("        ").append(structName(kind)).append("()\n");
         }
-        if (liveActivitiesEnabled) {
+        if (liveActivitiesEnabled && !watchTarget) {
             sb.append("        CN1LiveActivityWidget()\n");
         }
         sb.append("    }\n");
         sb.append("}\n");
         for (Kind kind : kinds) {
-            if (isWatchOnly(kind)) {
-                // Nothing to host it: the generated extension target is the iOS one, so a kind that
-                // declares only complication families has no surface here. Emitting it anyway would
-                // fall through to the default home-screen sizes and ship an iPhone widget the
-                // manifest never asked for.
+            if (!hostsKind(kind)) {
+                // Nothing here to host it. In the iOS target that is a kind declaring only
+                // complication families -- emitting it would fall through to the default
+                // home-screen sizes and ship an iPhone widget the manifest never asked for. In
+                // the watch target it is a kind declaring no complication family at all.
                 continue;
             }
             sb.append("\n");
@@ -436,13 +552,20 @@ public class IOSWidgetExtensionBuilder {
             sb.append("                kind: \"").append(escapeSwift(kind.getId())).append("\",\n");
             sb.append("                displayName: \"").append(escapeSwift(kind.getName())).append("\",\n");
             sb.append("                description: \"").append(escapeSwift(kind.getDescription())).append("\",\n");
-            // .accessoryCorner exists only on watchOS, so the corner family is emitted behind a
-            // platform guard rather than in the shared list -- naming the symbol on iOS would not
-            // compile even in code that never runs.
-            String shared = familiesSwift(kind, false);
-            String watchOnly = watchOnlyFamiliesSwift(kind, false);
+            // .accessoryCorner exists only on watchOS. In the watch target that is simply one
+            // more family in the list; in the iOS target it is emitted behind a platform guard,
+            // because naming the symbol on iOS would not compile even in code that never runs.
+            String shared = familiesSwift(kind, watchTarget);
+            String watchOnly = watchOnlyFamiliesSwift(kind, watchTarget);
             if (watchOnly.length() == 0) {
                 sb.append("                families: [").append(shared).append("])\n");
+            } else if (watchTarget) {
+                // Watch-only target: no guard, the corner family just joins the list.
+                sb.append("                families: [").append(shared);
+                if (shared.length() > 0) {
+                    sb.append(", ");
+                }
+                sb.append(watchOnly).append("])\n");
             } else {
                 sb.append("#if os(watchOS)\n");
                 sb.append("                families: [").append(shared);
@@ -464,6 +587,12 @@ public class IOSWidgetExtensionBuilder {
         return "CN1Widget_" + kind.getId();
     }
 
+    /// Whether this flavour of the extension has a surface for the kind: a watch target hosts
+    /// the kinds declaring a complication family, an iOS target hosts everything else.
+    private boolean hostsKind(Kind kind) {
+        return watchTarget ? hasWatchFamily(kind) : !isWatchOnly(kind);
+    }
+
     private static String familiesSwift(Kind kind, boolean watchTarget) {
         List<String> families = kind.getIosFamilies();
         StringBuilder sb = new StringBuilder();
@@ -479,17 +608,24 @@ public class IOSWidgetExtensionBuilder {
             }
         }
         if (sb.length() == 0) {
+            if (watchTarget) {
+                // The home-screen default is meaningless here and unnameable besides. A kind
+                // with no usable watch family is skipped by the caller, which hasWatchFamily()
+                // has already decided, so this is the empty-list case rather than a fallback.
+                return "";
+            }
             // No (usable) family declaration: all three home-screen sizes.
             return ".systemSmall, .systemMedium, .systemLarge";
         }
         return sb.toString();
     }
 
-    /// The families that exist only on watchOS, emitted behind an os(watchOS) guard.
+    /// The families that exist only on watchOS.
     ///
-    /// Like the other watch families this is confined to a watch target: the corner complication has
-    /// no iOS surface, so emitting it -- and the platform guard that carries it -- into the iOS
-    /// extension would advertise something the manifest never asked for.
+    /// Confined to a watch target: the corner complication has no iOS surface, so emitting it --
+    /// and the platform guard that carried it -- into the iOS extension would advertise something
+    /// the manifest never asked for. Inside the watch target no guard is needed at all, because
+    /// the target's SUPPORTED_PLATFORMS is watchOS alone.
     private static String watchOnlyFamiliesSwift(Kind kind, boolean watchTarget) {
         if (!watchTarget) {
             return "";
@@ -507,30 +643,11 @@ public class IOSWidgetExtensionBuilder {
 
     /// The portable family name for a declaration, resolving the WidgetKit spellings.
     ///
-    /// Normalised in ONE place because four decisions read these names -- the Swift family list,
-    /// the watch-only classification, whether a kind has any watch family at all, and the corner
-    /// complication's platform guard -- and three of them tested `startsWith("watch")`. So
-    /// `accessoryCircular` was accepted by none of them: the kind looked like an iOS surface and
-    /// fell through to the systemSmall/Medium/Large default, turning a complication into three
-    /// home-screen widgets rather than withholding it.
-    ///
-    /// ONLY accessoryCorner. The other accessory spellings are not watch families:
-    /// `.accessoryCircular`, `.accessoryInline` and `.accessoryRectangular` are the iPhone
-    /// LOCK-SCREEN families as well as watch ones, and CN1DescriptorWidget.swift already renders
-    /// all three on iOS -- they sit under `if #available(iOS 16.0, watchOS 9.0)`, while only
-    /// `.accessoryCorner` is inside `#if os(watchOS)`. Folding them into the watch names withheld a
-    /// lock-screen widget the manifest had asked for, which is the mirror of the bug this method
-    /// was added to fix.
-    ///
-    /// So the two namings are NOT interchangeable for these three, and accessoryRectangular already
-    /// said so: it maps to the portable `lockscreen`, not to watchRectangular. The portable
-    /// `watch*` names mean "complication only"; the WidgetKit spellings mean the WidgetKit family,
-    /// which on iOS is the lock screen.
+    /// Kept as a method here because this class and its tests read it by this name; the rule
+    /// itself, and the long account of what getting it wrong costs, lives in
+    /// [SurfaceKindFamilies#normalize(String)] so the Android builder applies exactly the same one.
     static String normalizeFamily(String family) {
-        if ("accessoryCorner".equals(family)) {
-            return "watchCorner";
-        }
-        return family;
+        return SurfaceKindFamilies.normalize(family);
     }
 
     private static String mapFamily(String rawFamily, boolean watchTarget) {
@@ -538,6 +655,18 @@ public class IOSWidgetExtensionBuilder {
         // WidgetKit-style spellings are accepted, so manifests written against either
         // naming in the docs resolve to the same families.
         String family = normalizeFamily(rawFamily);
+        // The phone families have no watch surface, and the three system ones cannot even be
+        // NAMED there: WidgetFamily.systemSmall and friends are @available(watchOS, unavailable),
+        // so emitting one into the watch bundle fails the build rather than producing a widget
+        // nobody sees. lockscreen joins them because an iPhone lock screen is not a watch face.
+        if (watchTarget) {
+            if ("small".equals(family) || "systemSmall".equals(family)
+                    || "medium".equals(family) || "systemMedium".equals(family)
+                    || "large".equals(family) || "systemLarge".equals(family)
+                    || "lockscreen".equals(family)) {
+                return null;
+            }
+        }
         if ("small".equals(family) || "systemSmall".equals(family)) {
             return ".systemSmall";
         }
@@ -589,7 +718,7 @@ public class IOSWidgetExtensionBuilder {
     }
 
     /// True when the kind declares at least one watch complication family, which is what decides
-    /// whether the watch flavour of the extension is worth generating at all.
+    /// whether the watch flavour of the extension hosts it.
     ///
     /// @param kind the kind to inspect
     /// @return true if the kind offers a complication
@@ -617,30 +746,72 @@ public class IOSWidgetExtensionBuilder {
         return false;
     }
 
-    public static boolean isWatchOnly(Kind kind) {
-        List<String> families = kind.getIosFamilies();
-        if (families == null || families.isEmpty()) {
-            return false;
-        }
-        for (String family : families) {
-            if (family != null && !normalizeFamily(family).startsWith("watch")) {
-                return false;
-            }
-        }
-        return true;
+    /**
+     * Whether THIS flavour of the extension would host anything, so the caller can skip
+     * generating a target that has nothing to show.
+     *
+     * @return true if there is something for this extension to host
+     */
+    public boolean hasSurface() {
+        return watchTarget ? hasWatchSurface() : hasIosSurface();
     }
 
-    public static boolean hasWatchFamily(Kind kind) {
-        List<String> families = kind.getIosFamilies();
-        if (families == null) {
-            return false;
-        }
-        for (String family : families) {
-            if (family != null && normalizeFamily(family).startsWith("watch")) {
+    /**
+     * Whether the watch widget extension would host anything: at least one kind declaring a
+     * watch complication family.
+     *
+     * <p>Live activities never count -- watchOS has no ActivityKit -- so unlike
+     * {@link #hasIosSurface()} this is decided by the kinds alone.</p>
+     *
+     * @return true if there is a complication to show
+     */
+    public boolean hasWatchSurface() {
+        for (Kind kind : kinds) {
+            if (hasWatchFamily(kind)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Compares two dotted version strings numerically, so "10.0" orders above "9.0" as it
+     * would not under string comparison.
+     *
+     * @param a left version
+     * @param b right version
+     * @return negative, zero or positive as a orders below, with or above b
+     */
+    private static int compareVersions(String a, String b) {
+        String[] left = (a == null ? "" : a).split("\\.");
+        String[] right = (b == null ? "" : b).split("\\.");
+        for (int i = 0; i < Math.max(left.length, right.length); i++) {
+            int l = parsePart(left, i);
+            int r = parsePart(right, i);
+            if (l != r) {
+                return l < r ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+
+    private static int parsePart(String[] parts, int index) {
+        if (index >= parts.length) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(parts[index].trim());
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    public static boolean isWatchOnly(Kind kind) {
+        return SurfaceKindFamilies.isWatchOnly(kind.getIosFamilies());
+    }
+
+    public static boolean hasWatchFamily(Kind kind) {
+        return SurfaceKindFamilies.hasWatchFamily(kind.getIosFamilies());
     }
 
     private static void plistKeyString(StringBuilder sb, String key, String value) {

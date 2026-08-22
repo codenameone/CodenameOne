@@ -23,7 +23,7 @@ Platform widget galleries are compiled into the native app, so widget kinds must
 include::../demos/common/src/main/snippets/developer-guide/external-surfaces.json[tag=external-surfaces-json-001,indent=0]
 ----
 
-The `id` values must match `[a-z][a-z0-9_]*`. The `iosFamilies` list accepts both the portable names (`small`, `medium`, `large`, `lockscreen`) and the WidgetKit spellings (`systemSmall`, `systemMedium`, `systemLarge`, `accessoryRectangular`); when omitted, all three home-screen sizes are offered. The `androidMinWidthDp` / `androidMinHeightDp` / `androidResizeMode` fields fill the Android provider metadata. An optional top-level `appGroup` pins the iOS App Group id, and `"liveActivities": true` enables the live activity plumbing.
+The `id` values must match `[a-z][a-z0-9_]*`. The `families` list accepts the portable names (`small`, `medium`, `large`, `lockscreen`, and the four `watch*` complication families) as well as the WidgetKit spellings (`systemSmall`, `systemMedium`, `systemLarge`, `accessoryRectangular`); when omitted, all three home-screen sizes are offered. `iosFamilies` is the older spelling of the same key and still works -- it predates there being a second platform that cared -- and is read only when `families` is absent. The `androidMinWidthDp` / `androidMinHeightDp` / `androidResizeMode` fields fill the Android provider metadata. An optional top-level `appGroup` pins the iOS App Group id, and `"liveActivities": true` enables the live activity plumbing.
 
 At runtime, mirror the manifest by registering each kind in your app's `init()`:
 
@@ -56,7 +56,7 @@ image::img/surfaces-sample-form.png[The SurfacesSample main form with publish an
 
 ==== Previewing in the simulator
 
-Open *Widgets > Widgets Preview* in the simulator. The window lists your registered kinds, renders the published timeline of the selected kind at any size in light or dark mode, flips timeline entries on schedule, and ticks countdowns exactly as a home-screen widget would. The mock Dynamic Island at the bottom renders running live activities. Clicks map through to your action handler, and a desktop (non-simulator) build renders the same publishes as floating widget windows pinned from a tray icon.
+Open *Widgets > Widgets Preview* in the simulator. The window lists your registered kinds, renders the published timeline of the selected kind at any size in light or dark mode, flips timeline entries on schedule, and ticks countdowns exactly as a home-screen widget would. The four watch complication families are listed too, at the accessory families' own sizes and clipped round where a watch face clips them -- worth seeing, because a face shows nothing a circular complication draws into its corners. What it previews is the node tree, not the per-platform lowering, so a complication that looks right there can still arrive on a Wear OS face as one number. The mock Dynamic Island at the bottom renders running live activities. Clicks map through to your action handler, and a desktop (non-simulator) build renders the same publishes as floating widget windows pinned from a tray icon.
 
 === The node catalog
 
@@ -179,6 +179,61 @@ Widget taps deep link back into the app through the `cn1surface://` URL scheme, 
 
 Widgets are rendered through `RemoteViews` by generated per-kind providers; no Android-specific build hints are needed, and the per-kind sizing metadata comes from `surfaces.json`. Timeline entry flips are scheduled with inexact alarms (a 30-second window) to avoid the exact-alarm permission by default; apps that need to-the-second flips can opt in with the `android.surfaces.exactAlarms` build hint. Second-precision countdowns still tick natively through `Chronometer`. Live activities lower to ongoing notifications, which on Android 13 and newer require the `POST_NOTIFICATIONS` runtime permission: the build declares it for you when `surfaces.json` sets `"liveActivities": true`, and the first `LiveActivity.start(...)` raises the system prompt, blocking the calling thread until the user answers. Codename One raises it at most twice across an install -- Android stops showing the dialog after two refusals anyway -- and spends an attempt only on a request it managed to issue. Android reports a dismissed dialog exactly as it reports a refusal, so dismissing one does cost an attempt, but one rather than the whole budget. Start the first activity while your app is in the foreground: there is no UI to prompt from in a background service or push handler, so a start from one before the permission is granted is refused without spending an attempt. `LiveActivity.isSupported()` is the programmatic signal once the answer has settled -- a spent budget or, for an app that never declared the permission, a missing manifest entry -- and `adb logcat -s CN1Surfaces` explains every refusal, reporting each settled reason once. A grant from anywhere counts -- these prompts, push registration, `Display.requestNotificationPermission(...)` or the system settings -- because the live permission state is always checked first. The approximations listed in the node catalog table apply: font weights collapse to regular/bold, circular progress falls back to linear, relative dates refresh only on entry flips, and vector nodes render as bitmaps.
 
+==== Apple Watch
+
+A kind declaring a `WATCH_*` family gets a second WidgetKit extension,
+`CN1WatchWidgets`, embedded in the watch app rather than the phone app. It needs
+watchOS 10 (`watchNative.surfaces.deploymentTarget` overrides the floor), and it
+shares the App Group identifier with the phone -- though the container behind it
+is watch-local, which is why the watch publishes its own timelines. Under manual
+signing the extension's bundle id, `<your.package>.watchkitapp.CN1WatchWidgets`,
+needs its own provisioning profile; the generic
+`ios.appext.CN1WatchWidgets.provisioningURL` hint supplies it.
+
+==== Wear OS
+
+A watch-bearing kind gets a `ComplicationDataSourceService`, and the
+`WATCH_RECTANGULAR` family additionally gets a `TileService`. Both are generated
+into the Wear module -- the single APK in a standalone build, the `wear` module
+in a companion one -- and pull in the `androidx.wear` complication and Tile
+libraries, which are AndroidX-only and raise that module's `minSdkVersion` to 26.
+The phone module's floor is untouched.
+
+The node catalog maps as follows. A complication is the lossy one: the face asks
+for a typed value and composes it itself.
+
+[cols="1,2,2"]
+|===
+|Node |Complication |Tile
+
+|`SurfaceText` / `SurfaceDynamicText`
+|First two nodes only, as text and title
+|Rendered, but a countdown is frozen and refreshed on timeline flips
+
+|`SurfaceImage` / `SurfaceVector`
+|First node only, as a monochrome glyph the face tints
+|Rendered as an inline image resource
+
+|`SurfaceProgress`
+|Becomes the ranged value
+|**Renders natively as an arc** -- better than the phone widget, which degrades a circular bar to linear
+
+|`SurfaceRow` / `SurfaceColumn` / `SurfaceBox`
+|Traversal order only; there is no layout to honour
+|Rendered
+
+|Padding, background, alignment, weight, colour
+|Dropped -- the face owns its design
+|Rendered
+
+|Actions
+|Root action only, as the complication tap
+|**Per-node actions work** -- better than a small iOS widget
+|===
+
+Everything a complication drops is logged once per render; `adb logcat -s
+CN1Surfaces` shows what a face is actually displaying.
+
 ==== Desktop, Windows, and Linux
 
 In a desktop build the app shows a tray icon whose menu pins a floating widget per kind: a frameless, always-on-top window rendering the published timeline, with clicks dispatched to your action handler. Window positions and the pinned set persist across runs, and a running live activity docks a pill window at the top of the primary screen. Desktop widgets are process-bound in this release -- they exist while the app process runs. On Windows the plain signed executable ships these layered floating widgets with zero packaging; setting `windows.msix=true` additionally wraps the build in an MSIX package that declares a Windows 11 Widgets Board provider, so your kinds appear in the Win+W board rendered as Adaptive Cards. The MSIX channel is opt-in because it has real distribution prerequisites: a certificate the target machine trusts, the Windows App Runtime redistributable on the target machine, and Windows 11 for the board itself. On Linux the widgets are frameless GTK applet windows; on Wayland compositors that support the layer-shell protocol (KDE Plasma, Sway and the rest of the `wlroots` family) a runtime-loaded `gtk-layer-shell` places widgets above the wallpaper as real desktop applets with persistent positions and drag-to-move, and on GNOME Wayland they degrade to plain floating windows because the compositor controls global positioning and keep-above.
@@ -196,6 +251,12 @@ In a desktop build the app shows a tray icon whose menu pins a floating widget p
 | `ios.debug.appext.CN1Widgets.provisioningURL` / `ios.release.appext.CN1Widgets.provisioningURL` | | Build-type-specific variants: the URL of the development profile used by debug device builds and the URL of the distribution profile used by release builds. The variant matching the build target overrides the unqualified hint
 | `ios.background_modes` | | Add `fetch` so background fetch can re-publish timelines on device
 | `android.surfaces.exactAlarms` | `false` | Schedule widget timeline entry flips with exact alarms; declares `SCHEDULE_EXACT_ALARM` and falls back to the inexact 30-second window when the user revokes the special app access
+| `watchNative.surfaces.deploymentTarget` | `10.0` | Deployment target of the watchOS complication extension. Can't go below 10.0: the container background every generated widget applies is watchOS 10, so a lower floor fails the build rather than losing the background
+| `ios.appext.CN1WatchWidgets.provisioningURL` | | URL of the watch complication extension's provisioning profile, for cloud manual-signing builds. The `ios.debug.` / `ios.release.` variants work as they do for `CN1Widgets`
+| `android.surfaces.complicationUpdateSeconds` | `0` | How often the system polls a Wear complication data source. Zero means never: the timeline model is push-driven, so a poll spends watch battery asking a question the app has already answered
+| `android.wear.complicationsVersion` / `android.wear.tilesVersion` / `android.wear.protoLayoutVersion` | pinned | Override the `androidx.wear` library versions the generated complication and Tile services compile against
+| `android.watchModule` | `true` | Set to `false` to keep the wearable link without generating a companion Wear module; the phone build is then unchanged
+| `android.watchVersionCode` / `android.watchVersionCodeOffset` | `+1` | The Wear artifact's version code, which must outrank the phone's for Play to pick it on a watch
 | `windows.msix` | `false` | Wrap the Windows build in an MSIX package with a Widgets Board provider
 | `windows.msix.identityName` | package name | MSIX package identity name
 | `windows.msix.publisher` | `CN=<display name>` | MSIX identity publisher; must match the signing certificate subject
@@ -208,4 +269,6 @@ In a desktop build the app shows a tray icon whose menu pins a floating widget p
 * Updates originate from the app (timelines, background fetch, live activity updates). Server-pushed widget content and ActivityKit push tokens are planned; the wire format already accommodates them.
 * The node catalog is intentionally the lowest common denominator -- there is no arbitrary per-pixel drawing beyond `SurfaceVector`, and no embedding of regular Codename One components.
 * `WidgetSize.LOCKSCREEN` maps to the iOS `accessoryRectangular` family and is ignored on Android in this release.
+* A kind declaring only `WATCH_*` families produces no phone surface on either platform -- those kinds are hosted by the watch. Declare a phone family alongside them if you want both.
+* What a watch face shows is narrower than what you laid out, and on Wear OS much narrower. See the wearables chapter for the per-family mapping and what gets dropped.
 * The Widgets Board provider requires the `windows.msix` opt-in and its distribution prerequisites; without it, Windows desktop widgets are floating windows.
