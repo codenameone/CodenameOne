@@ -1929,6 +1929,23 @@ public final class InterpRuntime {
                 pushBoxed(f, returnKind, new NativeStub((InterpClass) args[0]));
                 return;
             }
+            // `System.identityHashCode(value)` on a pushed InterpObject would
+            // otherwise hash the peer -- `popBoxed` converted the argument to
+            // its hostPeer before this call site, and the peer is a different
+            // object from the interpreter's InterpObject wrapper. The
+            // interpreter's own `hashCode` (in `objectCall`) hashes the
+            // InterpObject, so a caller doing
+            // `value.hashCode() == System.identityHashCode(value)` would see
+            // the two differ. Compute the identity hash on the InterpObject
+            // side of the boundary so both paths agree.
+            if ("java/lang/System".equals(owner) && "identityHashCode".equals(name)
+                    && "(Ljava/lang/Object;)I".equals(desc) && args.length == 1) {
+                Object v = fromHost(args[0]);
+                if (v instanceof InterpObject) {
+                    pushBoxed(f, returnKind, Integer.valueOf(System.identityHashCode(v)));
+                    return;
+                }
+            }
             pushBoxed(f, returnKind, hostCall(owner, name, desc, null, args, false));
             return;
         }
