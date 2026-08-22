@@ -228,6 +228,12 @@ public class Window extends Container implements TopLevelContainer {
         setVisible(false);
         contentPane = new Container(contentPaneLayout);
         contentPane.setUIID("ContentPane");
+        // The same default a Form's content pane gets. Without it, content taller than
+        // the window is simply clipped and unreachable, and identical content moved
+        // from a Form to a Window silently stopped scrolling unless the application
+        // knew to opt in. A BorderLayout content pane ignores this, as it does on a
+        // Form -- setScrollableY forces false for one.
+        contentPane.setScrollableY(true);
         titleArea.setUIID("TitleArea");
         titleArea.addComponent(BorderLayout.CENTER, this.title);
         super.addComponent(BorderLayout.NORTH, titleArea);
@@ -3037,6 +3043,17 @@ public class Window extends Container implements TopLevelContainer {
     // set the flag on the root -- where nothing reads it -- while the identical call on
     // a Form reached the content pane, so code moved from a Form to a Window silently
     // stopped scrolling.
+
+    /// {@inheritDoc}
+    ///
+    /// Forwarded to the content pane as well as the window root: the application's
+    /// layout runs in the content pane, so setting it on the root alone left
+    /// directional layouts and alignment reversed while `isRTL()` reported true.
+    @Override
+    public void setRTL(boolean r) {
+        super.setRTL(r);
+        contentPane.setRTL(r);
+    }
 
     /// {@inheritDoc}
     @Override

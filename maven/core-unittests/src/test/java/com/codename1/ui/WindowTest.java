@@ -358,6 +358,38 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aWindowsContentPaneScrollsVerticallyByDefault() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("default");
+
+        // scrollableYFlag() rather than isScrollableY(): the latter is a computed
+        // predicate -- it also requires content taller than the container, or always
+        // tensile -- so on an empty pane it reads false whether or not the constructor
+        // set the default, and the assertion would have proved nothing either way.
+        boolean scrolls = w.getContentPane().scrollableYFlag();
+
+        // The same default a Form's content pane gets. Without it, content taller than
+        // the window is clipped and unreachable, and identical content moved from a
+        // Form silently stopped scrolling.
+        assertTrue(scrolls,
+                "a window's content pane scrolls vertically by default, as a Form's does");
+    }
+
+    @FormTest
+    void settingRTLOnAWindowReachesItsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("rtl", new com.codename1.ui.layouts.FlowLayout());
+
+        w.setRTL(true);
+
+        // The application's layout runs in the content pane, so setting it on the root
+        // alone left directional layouts reversed while isRTL() reported true.
+        assertTrue(w.getContentPane().isRTL(),
+                "setRTL has to reach the content pane, as it does on a Form");
+        assertTrue(w.isRTL());
+    }
+
+    @FormTest
     void scrollSettingsReachTheWindowsContentPane() {
         implementation.setMultiWindowSupported(true);
         // Deliberately not a BorderLayout content pane: setScrollableY forces false
