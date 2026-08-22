@@ -86,4 +86,11 @@ class InterpPlatformRegistrationTest {
         assertRegisters("Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java",
                 "InterpIOSLinker");
     }
+
+    @Test
+    @DisplayName("the JavaSE simulator port registers its linker")
+    void javaseRegistersItsLinker() throws Exception {
+        assertRegisters("Ports/JavaSE/src/com/codename1/impl/javase/JavaSEPort.java",
+                "InterpJavaSELinker");
+    }
 }

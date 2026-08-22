@@ -9806,6 +9806,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         inInit = true;
         installGeneratedSvgRegistry();
 
+        // The device runtime's reflection-backed linker. Registered here for
+        // the same reason iOS registers its own in IOSImplementation.init:
+        // pushed code cannot bind without a linker, and the JavaSE simulator
+        // is the documented target for `cn1-push.sh --lan` during
+        // development. Reflection is always present on the JVM, so this
+        // linker has no availability check like the iOS one does.
+        com.codename1.impl.interp.InterpPlatform.register(new InterpJavaSELinker());
+
         // Make the desktop stdio and loopback socket MCP transports available to
         // com.codename1.mcp.MCP.
         MCPStdioTransport.register();

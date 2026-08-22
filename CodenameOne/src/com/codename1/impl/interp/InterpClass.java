@@ -292,6 +292,15 @@ public final class InterpClass {
         return false;
     }
 
+    /// The package of this class's internal name -- everything up to the last
+    /// '/', or empty for the default package. Used to decide whether a
+    /// package-private method of a supertype is inherited: JLS 8.4.6 says one
+    /// is visible only to classes in the same package.
+    String packageName() {
+        int slash = name.lastIndexOf('/');
+        return slash < 0 ? "" : name.substring(0, slash);
+    }
+
     private void buildVtable() {
         Hashtable t = new Hashtable();
         // Every interface transitively reachable through this class or any
@@ -317,9 +326,13 @@ public final class InterpClass {
         // interface entries here is right. Interface-owned entries in the
         // superclass's vtable are skipped because the pass above already
         // covered every interface in the chain -- copying them would just
-        // reintroduce the same clobber.
+        // reintroduce the same clobber. The receiver package gates
+        // package-private inheritance: a superclass's default-access method
+        // is only visible to a subclass in the same package (JLS 8.4.6), and
+        // installing it as callable on a cross-package subclass would silently
+        // execute a method a real JVM refuses with IllegalAccessError.
         if (superInterp != null) {
-            copyInto(t, superInterp, false);
+            copyInto(t, superInterp, packageName());
         }
         for (InterpMethod m : methods) {
             if (!m.isStatic()) {
@@ -377,8 +390,19 @@ public final class InterpClass {
     /// {@code false} for the superclass pass -- the latter avoids reintroducing
     /// an interface default the superclass merely inherited, which the interface
     /// pass has already selected across the whole class chain.
+    /// Copies non-private class methods from `source.vtable` into `target`.
+    /// Called for the superclass pass only -- the interface pass runs
+    /// {@link #copyDeclaredMethods} instead, so an inherited default cannot
+    /// mask a sibling interface's override.
+    ///
+    /// Interface entries in `source.vtable` are skipped because the interface
+    /// pass has already selected the maximally specific one across the whole
+    /// class chain. Package-private entries are skipped when the receiver
+    /// class is in a different package: JLS 8.4.6 makes such a method
+    /// invisible across packages, and installing it would silently execute
+    /// a method the JVM refuses with IllegalAccessError.
     private static void copyInto(Hashtable target, InterpClass source,
-                                 boolean interfaceOwnedToo) {
+                                 String receiverPackage) {
         if (source.vtable == null) {
             source.buildVtable();
         }
@@ -386,18 +410,22 @@ public final class InterpClass {
         while (e.hasMoreElements()) {
             Object k = e.nextElement();
             InterpMethod m = (InterpMethod) source.vtable.get(k);
-            // Private methods are not inherited. Copying one down means a
-            // subclass that declares no such method resolves to the parent's,
-            // which Java would have reported as a compile error and which here
-            // silently runs code the subclass cannot even name.
             if (m.isPrivate()) {
                 continue;
             }
-            if (!interfaceOwnedToo && m.owner.isInterface()) {
+            if (m.owner.isInterface()) {
+                continue;
+            }
+            if (isPackagePrivate(m)
+                    && !receiverPackage.equals(m.owner.packageName())) {
                 continue;
             }
             target.put(k, m);
         }
+    }
+
+    private static boolean isPackagePrivate(InterpMethod m) {
+        return !m.isPublic() && !m.isProtected() && !m.isPrivate();
     }
 
     /// Whether this interpreted class is, transitively, a subtype of the named
