@@ -1078,18 +1078,18 @@ public final class InterpRuntime {
                                 "opcode " + op + " in " + m), snapshotStack());
                 }
             } catch (InterpThrowable it) {
+                // Cancellation (InterpCancelled) is now caught by any handler,
+                // including javac's compiler-generated cleanup for
+                // try-with-resources (which is a `catch (Throwable)` entry
+                // rather than a catch-all). The Stop button and EDT budget
+                // are still honoured: `cancelRequested` stays set, so the
+                // next checkpoint after the handler returns raises
+                // `InterpCancelled` again. A `catch (Throwable)` around a
+                // loop can therefore run its cleanup but cannot resume --
+                // the back-edge checkpoint will re-fire cancellation on the
+                // next iteration.
                 Object thrown = it.getThrown();
-                // Cancellation extends Error precisely so a user `catch
-                // (Exception)` cannot swallow it, but a program surrounding
-                // its loop with `catch (Throwable)` or `catch (Error)` would
-                // still match, resume, and defeat the Stop button and the
-                // EDT budget. Only finally-style catch-all handlers (which
-                // javac synthesises for `finally` blocks and synchronized
-                // regions to release monitors and close resources) are
-                // allowed to run for a cancellation, and the finally body
-                // ends by re-throwing so the unwind continues.
-                boolean cancellation = thrown instanceof InterpCancelled;
-                int handler = findHandler(m, insn, thrown, cancellation);
+                int handler = findHandler(m, insn, thrown, false);
                 if (handler < 0) {
                     throw it;
                 }
@@ -1113,11 +1113,28 @@ public final class InterpRuntime {
 
             if (next <= insn) {
                 // Back edge: the only place a loop can spin, so the only place
-                // that needs a fuel check.
+                // that needs a fuel check. The checkpoint is wrapped in its
+                // own try/catch that routes an InterpThrowable through
+                // `findHandler` -- otherwise a Stop or budget cancellation
+                // fired from a back edge would escape run() without ever
+                // reaching the source-level `finally`, skipping the very
+                // cleanup that had to run for the resource close.
                 ThreadState st = state();
                 st.fuel--;
                 if (st.fuel <= 0) {
-                    checkpoint(st);
+                    try {
+                        checkpoint(st);
+                    } catch (InterpThrowable it) {
+                        Object thrown = it.getThrown();
+                        int handler = findHandler(m, insn, thrown, false);
+                        if (handler < 0) {
+                            throw it;
+                        }
+                        f.sp = 0;
+                        f.pushRef(thrown);
+                        insn = handler;
+                        continue;
+                    }
                 }
             }
             insn = next;
@@ -1579,19 +1596,12 @@ public final class InterpRuntime {
         return false;
     }
 
-    /// Whether the named static field is declared `volatile` -- walked up the
-    /// class chain because javac names the access-site type as the owner,
-    /// which may be a subclass that inherits the field.
-    private boolean isStaticFieldVolatile(String owner, String name) {
-        InterpClass declaring = bundle.findClass(owner);
-        while (declaring != null) {
-            if (declaring.isStaticVolatile(name)) {
-                return true;
-            }
-            declaring = declaring.superInterp;
-        }
-        return false;
-    }
+    // Static-field volatile access needs no explicit synchronisation from
+    // the interpreter: static storage goes through `Hashtable.get`/`put`,
+    // whose synchronised bodies establish happens-before between the writer
+    // and any reader that also enters the map. That gives static volatile
+    // the same memory-visibility guarantee the JVM does, without an extra
+    // wrapping monitor.
 
     /// The nearest host ancestor's internal name, or null when there is none.
     ///
@@ -3472,8 +3482,19 @@ public final class InterpRuntime {
         return f != null && f.thrown == t ? f.hostCall : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
     }
 
-    private int findHandler(InterpMethod m, int insn, Object thrown, boolean finallyOnly)
+    private int findHandler(InterpMethod m, int insn, Object thrown, boolean unusedFilter)
             throws Throwable {
+        // `unusedFilter` was a per-throwable filter used to gate cancellation
+        // to catch-all handlers only. That skipped javac's compiler-generated
+        // cleanup for try-with-resources (which is a typed `catch (Throwable)`
+        // rather than a catch-all), so the resource never closed on cancel.
+        // The runtime now allows any handler to match; `cancelRequested`
+        // stays set for the ThreadState, so the next checkpoint after the
+        // handler returns re-raises `InterpCancelled` -- a user
+        // `catch (Throwable)` around a loop cannot silence Stop for long
+        // because the back-edge checkpoint keeps firing it. The parameter
+        // is kept in the signature so callers do not all need touching for
+        // the removed distinction.
         int[] t = m.exceptionTable;
         for (int i = 0; i < t.length; i += 4) {
             if (insn < t[i] || insn >= t[i + 1]) {
@@ -3482,13 +3503,6 @@ public final class InterpRuntime {
             int typeExtern = t[i + 3];
             if (typeExtern < 0) {
                 return t[i + 2];   // finally / catch-all
-            }
-            // A cancellation only runs finally-style handlers; the caller
-            // gates on it so a `catch (Throwable)` around a runaway loop
-            // cannot resume the loop by matching InterpCancelled through
-            // its Error supertype.
-            if (finallyOnly) {
-                continue;
             }
             if (thrown != null && isInstanceOf(thrown, typeExtern)) {
                 return t[i + 2];

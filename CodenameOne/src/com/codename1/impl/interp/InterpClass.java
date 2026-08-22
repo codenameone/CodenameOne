@@ -75,22 +75,6 @@ public final class InterpClass {
     /// this constant only.
     public static final int ACC_VOLATILE = 0x0040;
 
-    /// Names of static fields declared volatile, so a `getstatic` / `putstatic`
-    /// through the interpreter can synchronise on the declaring class the way
-    /// the JVM synchronises on the field's memory location.
-    private final Hashtable volatileStatics = new Hashtable();
-
-    /// Marks a static field as `volatile`. Called from the bundle reader
-    /// when the access word for a static carries `ACC_VOLATILE`.
-    void markStaticVolatile(String fieldName) {
-        volatileStatics.put(fieldName, Boolean.TRUE);
-    }
-
-    /// Whether the named static field is `volatile`.
-    boolean isStaticVolatile(String fieldName) {
-        return volatileStatics.get(fieldName) != null;
-    }
-
     /// Whether an instance-field slot (in this class's own declared range)
     /// is `volatile`.
     boolean isInstanceFieldVolatile(int slotInThisClass) {

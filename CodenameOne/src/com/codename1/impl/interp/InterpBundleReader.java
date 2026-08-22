@@ -240,11 +240,13 @@ public final class InterpBundleReader {
         for (int i = 0; i < staticFieldCount; i++) {
             String fname = b.strings[in.readInt()];
             String fdesc = b.strings[in.readInt()];
-            int faccess = in.readInt();
+            // Static access flags are read past for format compatibility --
+            // the writer serialises them alongside the field row -- but not
+            // consulted: static storage goes through `Hashtable.get`/`put`,
+            // whose synchronised bodies establish happens-before, so volatile
+            // needs no extra wrapping the way instance fields do.
+            in.readInt();
             c.setStaticValue(fname, InterpValues.defaultValue(fdesc));
-            if ((faccess & InterpClass.ACC_VOLATILE) != 0) {
-                c.markStaticVolatile(fname);
-            }
         }
 
         int methodCount = in.readInt();
