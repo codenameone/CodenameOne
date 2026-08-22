@@ -93,7 +93,8 @@ class WearModuleGradleTest {
     private static final String WEAR_DEPS =
             "    implementation 'androidx.wear.watchface:watchface-complications-data-source:1.2.1'\n"
             + "    implementation 'androidx.wear.tiles:tiles:1.4.1'\n"
-            + "    implementation 'androidx.concurrent:concurrent-futures:1.1.0'\n";
+            + "    implementation 'androidx.concurrent:concurrent-futures:1.1.0'\n"
+            + "    implementation 'com.google.guava:guava:31.1-android'\n";
 
     /// The REAL derivation, not a copy of it. A test that reproduced the substitutions would
     /// pass while the builder drifted away from it, which is the one failure mode these
@@ -130,47 +131,47 @@ class WearModuleGradleTest {
                 "the instrumentation block must still follow, untouched:\n" + wear);
     }
 
-    /// TileService.onTileRequest returns a ListenableFuture, and the class lives in
-    /// com.google.guava:listenablefuture:1.0. Guava publishes an EMPTY jar under the same
-    /// coordinate at version 9999.0-empty-to-avoid-conflict-with-guava, for builds that carry
-    /// full Guava. Anything pulling the marker wins the comparison and the real jar is dropped --
-    /// CameraX's graph does exactly that -- and the import stops resolving in a generated Tile
-    /// service the developer never wrote.
+    /// TileService.onTileRequest returns a ListenableFuture, whose class ships in
+    /// com.google.guava:listenablefuture:1.0. Guava publishes the SAME coordinate at
+    /// 9999.0-empty-to-avoid-conflict-with-guava holding NO classes, for builds that carry full
+    /// Guava; anything pulling the marker wins the version comparison and the real jar drops out
+    /// -- CameraX's graph does exactly that. Supplying Guava is what makes the marker correct.
+    /// Forcing 1.0 back instead put ListenableFuture in two jars for a project whose graph
+    /// already had Guava, and failed checkDuplicateClasses.
     @Test
-    void aRealListenableFutureIsForcedBackOntoTheClasspath() {
-        String wear = deriveWearGradle();
+    void aTileBringsGuavaSoListenableFutureHasSomewhereToComeFrom() {
+        String deps = AndroidGradleBuilder.watchSurfaceDependencyBlock(
+                "implementation", true, "1.2.1", "1.4.1", "1.2.1", "31.1-android");
 
-        assertTrue(wear.contains("resolutionStrategy.force 'com.google.guava:listenablefuture:1.0'"),
-                "the empty marker artifact would win without this:\n" + wear);
+        assertTrue(deps.contains("androidx.concurrent:concurrent-futures"), deps);
+        assertTrue(deps.contains("com.google.guava:guava:31.1-android"),
+                "the empty marker artifact leaves ListenableFuture with no provider:\n" + deps);
+        assertFalse(deps.contains("resolutionStrategy"),
+                "forcing the 1.0 jar duplicates the class wherever full Guava is present:\n"
+                        + deps);
     }
 
-    /// ...but only while nothing supplies the class already. When the app carries full Guava the
-    /// marker is doing its job, and forcing 1.0 would put ListenableFuture in two jars and fail
-    /// at dex time instead.
+    /// A kind with no rectangular family earns no Tile, and then none of it is needed.
     @Test
-    void theForceIsOmittedWhenTheAppAlreadyCarriesGuava() {
-        String withGuava = PHONE_GRADLE.replace(
-                "    implementation fileTree(dir: 'libs', include: ['*.jar'])\n",
-                "    implementation fileTree(dir: 'libs', include: ['*.jar'])\n"
-                        + "    implementation 'com.google.guava:guava:33.0.0-android'\n");
+    void aComplicationOnlyKindPullsNoTileDependencies() {
+        String deps = AndroidGradleBuilder.watchSurfaceDependencyBlock(
+                "implementation", false, "1.2.1", "1.4.1", "1.2.1", "31.1-android");
 
-        String wear = AndroidGradleBuilder.deriveWearGradle(withGuava, 100, 101, WEAR_DEPS);
-
-        assertFalse(wear.contains("resolutionStrategy.force"),
-                "forcing on top of full Guava duplicates the class:\n" + wear);
+        assertTrue(deps.contains("watchface-complications-data-source:1.2.1"), deps);
+        assertFalse(deps.contains("tiles"), deps);
+        assertFalse(deps.contains("guava"), deps);
+        assertFalse(deps.contains("concurrent-futures"), deps);
     }
 
-    /// A kind with no rectangular family generates no Tile, so concurrent-futures is not added
-    /// and there is no ListenableFuture to rescue.
+    /// A legacy support-library build writes "compile" throughout, and these lines have to match
+    /// the block they are inserted into.
     @Test
-    void theForceIsOmittedWhenNoTileIsGenerated() {
-        String complicationOnly =
-                "    implementation 'androidx.wear.watchface:watchface-complications-data-source:1.2.1'\n";
+    void theDependencyKeywordFollowsTheBuild() {
+        String deps = AndroidGradleBuilder.watchSurfaceDependencyBlock(
+                "compile", true, "1.2.1", "1.4.1", "1.2.1", "31.1-android");
 
-        String wear = AndroidGradleBuilder.deriveWearGradle(PHONE_GRADLE, 100, 101, complicationOnly);
-
-        assertFalse(wear.contains("resolutionStrategy.force"),
-                "nothing here needs ListenableFuture:\n" + wear);
+        assertFalse(deps.contains("implementation "), deps);
+        assertTrue(deps.contains("    compile 'com.google.guava:guava:"), deps);
     }
 
     /// The androidx.wear dependency must land in the PROJECT block. The buildscript block is

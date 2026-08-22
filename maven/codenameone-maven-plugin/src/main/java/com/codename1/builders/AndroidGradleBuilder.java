@@ -7190,15 +7190,67 @@ public class AndroidGradleBuilder extends Executor {
      * {@code Futures.immediateFuture}, so {@code CallbackToFutureAdapter} is the reliable
      * Java-only route.</p>
      */
+    /**
+     * The androidx.wear dependency block for the Wear module.
+     *
+     * <p>Pure so it can be pinned directly. What has to stay true is a pairing rather than a
+     * list: the Tile half is optional, and every line it adds has to arrive together.</p>
+     *
+     * @param compile the dependency keyword this build uses -- implementation, or compile on a
+     *        legacy support-library build
+     * @param anyTile whether any declared kind earns a Tile
+     * @param complicationsVersion the watchface-complications-data-source version
+     * @param tilesVersion the tiles version
+     * @param protoLayoutVersion the protolayout version, used for both protolayout artifacts
+     * @param guavaVersion the Guava version floor; see the comment on the Guava line
+     * @return the dependency lines, each already indented for the block they are inserted into
+     */
+    static String watchSurfaceDependencyBlock(String compile, boolean anyTile,
+            String complicationsVersion, String tilesVersion, String protoLayoutVersion,
+            String guavaVersion) {
+        StringBuilder deps = new StringBuilder();
+        deps.append("    ").append(compile)
+                .append(" 'androidx.wear.watchface:watchface-complications-data-source:")
+                .append(complicationsVersion).append("'\n");
+        if (anyTile) {
+            deps.append("    ").append(compile).append(" 'androidx.wear.tiles:tiles:")
+                    .append(tilesVersion).append("'\n");
+            deps.append("    ").append(compile)
+                    .append(" 'androidx.wear.protolayout:protolayout:")
+                    .append(protoLayoutVersion).append("'\n");
+            deps.append("    ").append(compile)
+                    .append(" 'androidx.wear.protolayout:protolayout-material:")
+                    .append(protoLayoutVersion).append("'\n");
+            // TileService.onTileRequest returns a ListenableFuture, and the stub artifact tiles
+            // pulls in has no Futures.immediateFuture, so CallbackToFutureAdapter is the reliable
+            // Java-only route.
+            deps.append("    ").append(compile)
+                    .append(" 'androidx.concurrent:concurrent-futures:1.1.0'\n");
+            // Guava, for one class. concurrent-futures and tiles both ask for
+            // com.google.guava:listenablefuture:1.0, a jar holding only ListenableFuture -- the
+            // type onTileRequest returns. Guava publishes the SAME coordinate at
+            // 9999.0-empty-to-avoid-conflict-with-guava containing no classes at all, so that a
+            // build carrying full Guava does not get the class twice; anything pulling the marker
+            // wins the version comparison and the real jar drops out. CameraX's graph does that
+            // to a Codename One app, and the import then fails in a generated Tile service the
+            // developer never wrote.
+            //
+            // So supply what the marker assumes is already there rather than fighting it. Forcing
+            // 1.0 back instead looks lighter and is wrong: an app whose graph ALREADY carries
+            // full Guava -- androidx.car.app brings 31.1-android -- then has ListenableFuture in
+            // two jars and fails checkDuplicateClasses instead, which is how this was found. The
+            // floor is deliberately low so a project already on a newer Guava keeps it; R8 takes
+            // the unused bulk back out of a release build.
+            deps.append("    ").append(compile).append(" 'com.google.guava:guava:")
+                    .append(guavaVersion).append("'\n");
+        }
+        return deps.toString();
+    }
+
     private void addWatchSurfaceDependencies(BuildRequest request) throws BuildException {
         // The same keyword the rest of the dependency block uses; AndroidX builds are
         // "implementation" and the legacy ones "compile".
         String compile = useAndroidX ? "implementation" : "compile";
-        StringBuilder deps = new StringBuilder();
-        deps.append("    ").append(compile)
-                .append(" 'androidx.wear.watchface:watchface-complications-data-source:")
-                .append(request.getArg("android.wear.complicationsVersion", "1.2.1"))
-                .append("'\n");
         boolean anyTile = false;
         for (String[] kind : watchSurfaceKinds) {
             if (declaresTile(kind[2])) {
@@ -7206,26 +7258,17 @@ public class AndroidGradleBuilder extends Executor {
                 break;
             }
         }
-        if (anyTile) {
-            deps.append("    ").append(compile).append(" 'androidx.wear.tiles:tiles:")
-                    .append(request.getArg("android.wear.tilesVersion", "1.4.1")).append("'\n");
-            deps.append("    ").append(compile)
-                    .append(" 'androidx.wear.protolayout:protolayout:")
-                    .append(request.getArg("android.wear.protoLayoutVersion", "1.2.1"))
-                    .append("'\n");
-            deps.append("    ").append(compile)
-                    .append(" 'androidx.wear.protolayout:protolayout-material:")
-                    .append(request.getArg("android.wear.protoLayoutVersion", "1.2.1"))
-                    .append("'\n");
-            deps.append("    ").append(compile)
-                    .append(" 'androidx.concurrent:concurrent-futures:1.1.0'\n");
-        }
+        String deps = watchSurfaceDependencyBlock(compile, anyTile,
+                request.getArg("android.wear.complicationsVersion", "1.2.1"),
+                request.getArg("android.wear.tilesVersion", "1.4.1"),
+                request.getArg("android.wear.protoLayoutVersion", "1.2.1"),
+                request.getArg("android.wear.guavaVersion", "31.1-android"));
         // Held rather than pushed into the shared gradleDependencies hint, because in a
         // COMPANION build that hint feeds the phone module too -- and these libraries declare
         // minSdk 26. A phone app supporting API 24 then failed its manifest merge against a
         // library it has no use for. Where they actually land is decided by the caller, which
         // knows which module is the watch.
-        watchSurfaceDependencies = deps.toString();
+        watchSurfaceDependencies = deps;
         // These libraries are AndroidX-only, so a legacy support-library build cannot carry them.
         // Said here, naming the setting, rather than failing later inside Gradle with a manifest
         // merge error that names none of this.
@@ -7536,7 +7579,7 @@ public class AndroidGradleBuilder extends Executor {
         // to evaluate. insertAfterFirst for the same reason one level up -- the generated file
         // also carries an androidTest dependency block, which has no use for these.
         gradle = insertAfterFirst(gradle, "\ndependencies {\n", wearDependencies);
-        return gradle + listenableFutureFix(appGradle, wearDependencies);
+        return gradle;
     }
 
     /**
@@ -7560,44 +7603,6 @@ public class AndroidGradleBuilder extends Executor {
         }
         int after = at + anchor.length();
         return text.substring(0, after) + insertion + text.substring(after);
-    }
-
-    /**
-     * Puts a real {@code ListenableFuture} back on the Wear module's compile classpath.
-     *
-     * <p>{@code TileService.onTileRequest} returns a {@code ListenableFuture}, and the tiles and
-     * concurrent-futures libraries both ask for {@code com.google.guava:listenablefuture:1.0} --
-     * a jar holding that one class. Guava publishes a second version of the same coordinate,
-     * {@code 9999.0-empty-to-avoid-conflict-with-guava}, which contains NO classes at all: it
-     * exists so that a build carrying full Guava does not end up with the class twice. Any
-     * dependency that pulls the marker wins the version comparison, the real jar is dropped, and
-     * the import stops resolving -- which is what CameraX's transitive graph does to a Codename
-     * One app, with the compile error landing in a generated Tile service the developer never
-     * wrote.</p>
-     *
-     * <p>Forcing 1.0 is right only while nothing supplies the class already. When the app really
-     * does carry full Guava the marker is doing its job, and forcing would put
-     * {@code ListenableFuture} in two jars and fail at dex time instead -- so this is emitted
-     * only when the phone module declares no Guava, which is a question about generated text and
-     * can be answered here.</p>
-     *
-     * @param appGradle the phone module's build.gradle, scanned for a full Guava dependency
-     * @param wearDependencies the Wear dependency block; empty when no Tile is generated
-     * @return the Gradle snippet to append, or an empty string when it is not needed
-     */
-    private static String listenableFutureFix(String appGradle, String wearDependencies) {
-        if (wearDependencies == null
-                || wearDependencies.indexOf("androidx.concurrent:concurrent-futures") < 0) {
-            return "";
-        }
-        if (appGradle.indexOf("com.google.guava:guava:") >= 0) {
-            return "";
-        }
-        return "\n// See listenableFutureFix: the empty 9999.0 marker artifact would otherwise\n"
-                + "// win over the 1.0 jar that actually holds ListenableFuture.\n"
-                + "configurations.all {\n"
-                + "    resolutionStrategy.force 'com.google.guava:listenablefuture:1.0'\n"
-                + "}\n";
     }
 
     /** Joins declared families for the codegen tables, normalized to the portable spelling. */
