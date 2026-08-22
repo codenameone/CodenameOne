@@ -4553,6 +4553,27 @@ public final class Display extends CN1Constants {
     /// Paints every open window after the main surface. Iterates by index and
     /// re-reads the size because a nested event loop -- a modal dialog, or
     /// invokeAndBlock -- can dispose a window part way through.
+    /// Repaints the main form and every open window.
+    ///
+    /// For work that finishes without knowing which top level is showing its result --
+    /// an image that has just decoded, say. Repainting only the current form left that
+    /// result invisible in every window until something else happened to dirty one.
+    ///
+    /// Lives here rather than at the call site so `Desktop` and `Window` are not
+    /// referenced from code every application uses: on ParparVM that reference would
+    /// keep the whole window implementation alive in binaries that never open one.
+    /// `Display` already reaches `Desktop`, so this adds nothing.
+    void repaintTopLevels() {
+        Form current = getCurrent();
+        if (current != null) {
+            current.repaint();
+        }
+        ArrayList<Window> open = Desktop.getInstance().windowList();
+        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
+            open.get(iter).repaint();
+        }
+    }
+
     private void paintOpenWindows() {
         ArrayList<Window> open = Desktop.getInstance().windowList();
         for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
