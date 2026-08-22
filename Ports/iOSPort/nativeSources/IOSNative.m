@@ -555,13 +555,6 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
     //
     // Safe this early because the transition forwarders serial-dispatch onto the EDT, so a phase
     // released now queues BEHIND the app start this callback just scheduled.
-#if defined(CN1_USE_WIDGETS) && defined(CN1_USE_WATCHCONNECTIVITY)
-    // Before the app starts, so a mirrored complication that arrives while the watch app is
-    // launching is not dropped. See cn1_watch_activate_connectivity: a surfaces-only watch app
-    // never calls a wearable native, so nothing else would ever activate the session.
-    extern void cn1_watch_activate_connectivity(void);
-    cn1_watch_activate_connectivity();
-#endif
     extern void cn1_watch_runtime_markJavaReady(void);
     cn1_watch_runtime_markJavaReady();
     while (1) {
@@ -16362,6 +16355,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boole
 // WCSession is never activated, and didReceiveUserInfo: therefore cannot fire -- which is exactly
 // the surfaces-only configuration the phone-to-watch mirror exists to serve. Nothing reports it,
 // because the phone half sends successfully into a session that has no listener.
+//
+// Called from the generated app delegate's applicationDidFinishLaunching, NOT from initVM.
+// A mirrored complication update wakes a terminated watch app in the background, where the
+// SwiftUI root view is not guaranteed to appear -- so CN1WatchHost.startWithWidth() may never
+// run and initVM with it. Activating there left the session unreachable in exactly the launch
+// this transport causes.
 //
 // The accessor activates on first use, so asking for it is the whole job.
 void cn1_watch_activate_connectivity(void) {

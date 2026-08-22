@@ -643,6 +643,14 @@ class WatchNativeBuilder {
         sw.append("    }\n")
           .append("}\n\n")
           .append("final class CN1WatchAppDelegate: NSObject, WKApplicationDelegate {\n")
+          // BEFORE anything SwiftUI does, and deliberately not from initVM. A mirrored
+          // complication update wakes a terminated watch app in the background, where the root
+          // view is not guaranteed to appear -- so CN1WatchHost.startWithWidth() may never run,
+          // initVM with it, and the WCSession activation that lives there never happens. That is
+          // precisely the launch the mirror causes, so putting the activation anywhere the VM
+          // gates would leave it unreachable in its own use case. This delegate callback runs on
+          // every launch either way.
+          .append("    func applicationDidFinishLaunching() { cn1_watch_bootstrap_didFinishLaunching() }\n")
           .append("    func applicationDidBecomeActive() { CN1WatchHost.shared().applicationDidBecomeActive() }\n")
           .append("    func applicationWillResignActive() { CN1WatchHost.shared().applicationWillResignActive() }\n")
           // The active/resign pair only starts and stops the paint pump. These two carry the CN1
@@ -768,7 +776,19 @@ class WatchNativeBuilder {
           .append("extern void cn1_watch_runtime_pointerReleased(int x, int y);\n")
           .append("extern void cn1_watch_runtime_didEnterBackground(void);\n")
           .append("extern void cn1_watch_runtime_willEnterForeground(void);\n\n")
-          .append("// App-specific entry: register natives + set the main class, init\n")
+          // Always defined, whatever this build carries, so the Swift delegate can call it
+          // unconditionally. Its body is what changes.
+          .append("// Called from the app delegate on EVERY launch, including a background wake\n")
+          .append("// that never shows the root view -- see the comment on the call site.\n");
+        if (watchWidgetExtensionDir != null) {
+            bs.append("extern void cn1_watch_activate_connectivity(void);\n")
+              .append("void cn1_watch_bootstrap_didFinishLaunching(void) {\n")
+              .append("    cn1_watch_activate_connectivity();\n")
+              .append("}\n\n");
+        } else {
+            bs.append("void cn1_watch_bootstrap_didFinishLaunching(void) { }\n\n");
+        }
+        bs.append("// App-specific entry: register natives + set the main class, init\n")
           .append("// Display (starts the EDT) and block this thread inside initVM.\n")
           .append("extern void ").append(mainStub)
           .append("_main___java_lang_String_1ARRAY(struct ThreadLocalData* threadStateData, JAVA_OBJECT arg);\n")
@@ -795,6 +815,11 @@ class WatchNativeBuilder {
 
         // 3) Bridging header.
         StringBuilder bridging = new StringBuilder("#import \"CN1WatchHost.h\"\n");
+        // Always declared, because the generated delegate always calls it and the bootstrap
+        // always defines it. What differs is whether its body does anything.
+        bridging.append("\n// Launch hook: implemented in the generated CN1WatchBootstrap.m,\n")
+                .append("// called from CN1WatchAppDelegate.applicationDidFinishLaunching.\n")
+                .append("void cn1_watch_bootstrap_didFinishLaunching(void);\n");
         if (watchWidgetExtensionDir != null) {
             // The complication tap path. A plain C function rather than an Objective-C class, so
             // Swift only sees it if it is declared in the bridging header -- and the SwiftUI
