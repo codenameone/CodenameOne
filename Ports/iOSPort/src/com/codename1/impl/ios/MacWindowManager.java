@@ -110,6 +110,11 @@ public class MacWindowManager extends WindowManager {
     /// cascade below can start from.
     private static final Object MAIN_WINDOW = new Object();
 
+    /// The main scene's visibility. Tracked because the main scene has no `Peer` to
+    /// hold it, and a window owned by the main `Form` must not be mapped while the
+    /// main scene is minimized.
+    private static boolean mainWindowVisible = true;
+
     private static Peer peer(Object p) {
         return p instanceof Peer ? (Peer) p : null;
     }
@@ -159,12 +164,42 @@ public class MacWindowManager extends WindowManager {
         if (w == null) {
             return;
         }
+        if (ownerHidden(w)) {
+            // An owned window cannot be on screen while its owner is not, and the
+            // cascade only reacts to the owner *changing* visibility -- it would never
+            // revisit a window mapped independently while the owner was already away.
+            // Recording the request as owner-hidden makes the owner's restore bring
+            // this window up with the rest, and reporting it keeps the framework from
+            // painting a window that is not on screen.
+            w.visible = false;
+            w.hiddenByOwner = true;
+            com.codename1.ui.Display.getInstance().windowHideNotify(w.windowId);
+            return;
+        }
         w.visible = true;
         w.hiddenByOwner = false;
         IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
         // Only the ones this owner took down. A child hidden by the application stays
         // hidden, exactly as AWT and GTK behave when an owner is shown again.
         cascadeFrom(w, true);
+    }
+
+    /// Whether any owner above the given window is currently away, so the window may
+    /// not be mapped.
+    private static boolean ownerHidden(Peer w) {
+        Object owner = w.owner;
+        while (owner != null) {
+            if (!(owner instanceof Peer)) {
+                // The main scene, which keeps its visibility in mainWindowVisible.
+                return !mainWindowVisible;
+            }
+            Peer above = (Peer) owner;
+            if (!above.visible) {
+                return true;
+            }
+            owner = above.owner;
+        }
+        return false;
     }
 
     /// The live windows owned by the given peer.
@@ -199,6 +234,9 @@ public class MacWindowManager extends WindowManager {
         Object owner = windowId == 0 ? MAIN_WINDOW : peerForWindowId(windowId);
         if (owner == null) {
             return;
+        }
+        if (windowId == 0) {
+            mainWindowVisible = shown;
         }
         if (owner instanceof Peer) {
             // Record what the platform just did to this window before cascading from
