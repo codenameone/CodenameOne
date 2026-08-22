@@ -189,7 +189,14 @@ public final class InterpRuntime {
         InterpMethod m = c.declaredMethod("main", "([Ljava/lang/String;)V");
         cancelRequested = false;
         ensureInitialized(c);
-        if (m != null) {
+        // Only a `public static void main(String[])` is an entry point, per
+        // the same rule the JVM applies. A Lifecycle subclass that happens to
+        // declare a private or instance helper of the same signature is not
+        // meant to be entered through it -- the packer's finder rejects one
+        // for exactly this reason, and the runtime has to match or a bundle
+        // whose main class was chosen via the Lifecycle fallback would still
+        // invoke the helper here with a null receiver.
+        if (m != null && m.isStatic() && m.isPublic()) {
             return invokeInterpreted(m, null, new Object[]{args});
         }
         // A real Codename One application has no main: its entry point is a
@@ -199,8 +206,8 @@ public final class InterpRuntime {
         if (extendsHost(c, "com/codename1/system/Lifecycle")) {
             return runLifecycle(c);
         }
-        throw new IllegalStateException(main + " has neither main(String[]) nor"
-                + " a Lifecycle to start");
+        throw new IllegalStateException(main + " has neither public static"
+                + " main(String[]) nor a Lifecycle to start");
     }
 
     /// The pushed Lifecycle, when the program has one.
@@ -2162,17 +2169,8 @@ public final class InterpRuntime {
                     if (classArrayPairs == null) {
                         classArrayPairs = new Vector();
                     }
-                    // Snapshot of what we handed to the host, so the finally
-                    // block can tell which slots the host actually mutated
-                    // (identity change against this snapshot) and leave the
-                    // rest alone -- otherwise we would overwrite the caller's
-                    // InterpClass tokens with the nearest-host-ancestor
-                    // stand-ins we passed across, on every read-only call.
-                    Object[] snapshot = new Object[converted.length];
-                    System.arraycopy(converted, 0, snapshot, 0, converted.length);
                     classArrayPairs.addElement(src);
                     classArrayPairs.addElement(converted);
-                    classArrayPairs.addElement(snapshot);
                     args[i] = converted;
                 }
             }
@@ -2234,28 +2232,28 @@ public final class InterpRuntime {
                     fromHostElements(arrays.elementAt(i), new Vector());
                 }
             }
-            // Class[] parameters: mirror any writes the host made on the
-            // materialised Class[] back to the interpreter-owned Object[] so
-            // the caller sees mutations, in line with normal Java array-by-
-            // reference semantics. Untouched slots keep the original element
-            // (an InterpClass token stays a token) -- otherwise a read-only
-            // host call would silently turn `{Pushed.class}` into
-            // `{NearestHostAncestor.class}` because dst was materialised
-            // through `hostClassFor`, and a later `types[0] == Pushed.class`
-            // would answer false for a callee that never wrote anything.
+            // Class[] parameters: mirror the host's writes on the materialised
+            // Class[] back to the interpreter-owned Object[] so the caller
+            // sees mutations, matching Java's array-by-reference semantics.
+            //
+            // Every slot is copied unconditionally: a "did the host write this
+            // slot?" test based on post-call identity can't distinguish "host
+            // was read-only" from "host explicitly assigned the same value we
+            // passed in" (which for a pushed-only token materialised through
+            // `hostClassFor` to Object.class is `Object.class` on both sides).
+            // Copying always is the honest answer -- a pushed-only class was
+            // never a real host Class to begin with, so an InterpClass token
+            // that survives a host call and equals its ancestor stand-in is
+            // no more informative than the ancestor itself. Callers that need
+            // to compare against the original token afterwards should keep
+            // their own reference rather than re-read the array slot.
             if (classArrayPairs != null) {
-                for (int i = 0; i < classArrayPairs.size(); i += 3) {
+                for (int i = 0; i < classArrayPairs.size(); i += 2) {
                     Object[] src = (Object[]) classArrayPairs.elementAt(i);
                     Object[] dst = (Object[]) classArrayPairs.elementAt(i + 1);
-                    Object[] materialised = (Object[]) classArrayPairs.elementAt(i + 2);
                     int len = src.length < dst.length ? src.length : dst.length;
                     for (int k = 0; k < len; k++) {
-                        // Identity check against what we handed the host: if
-                        // the slot still holds that value, the host did not
-                        // touch it and the source's original token stays.
-                        if (dst[k] != materialised[k]) {  //NOPMD CompareObjectsWithEquals - identity is the whole point
-                            src[k] = dst[k];
-                        }
+                        src[k] = dst[k];
                     }
                 }
             }
