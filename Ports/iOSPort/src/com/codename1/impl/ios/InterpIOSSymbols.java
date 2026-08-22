@@ -46,6 +46,18 @@ class InterpIOSSymbols {
     /** "owner.name+descriptor" -> method id. */
     private final Hashtable methodIds = new Hashtable();
 
+    /**
+     * The ids of methods that cannot be reached by interface dispatch --
+     * static and private members. Kept apart from {@link #methodIds} because
+     * an explicit {@code invokestatic Interface.staticM()} still has to
+     * resolve the id, while a virtual call through an implementor must not
+     * pick it up over a same-descriptor default declared on another
+     * superinterface. Filtering in the collection step is what enforces
+     * "static and private interface methods are not inherited" without
+     * hiding the ids from every dispatch.
+     */
+    private final Hashtable interfaceIneligible = new Hashtable();
+
     /** "owner#name" -> instance field id. */
     private final Hashtable fieldIds = new Hashtable();
 
@@ -167,7 +179,17 @@ class InterpIOSSymbols {
                     // The translator spells a constructor __INIT__; the bundle
                     // and every call site use the JVM's <init>.
                     String name = "__INIT__".equals(p[3]) ? "<init>" : p[3];
-                    methodIds.put(ownerName + "." + name + p[4], Integer.valueOf(p[1]));
+                    Integer methodId = Integer.valueOf(p[1]);
+                    methodIds.put(ownerName + "." + name + p[4], methodId);
+                    // Columns 5 (isStatic) and 6 (isPrivate), each optional
+                    // for compatibility with older sidecars that stopped at
+                    // column 4 or 5. A "1" in either marks the id as not
+                    // reachable by interface dispatch.
+                    boolean staticFlag = p.length >= 6 && "1".equals(p[5]);
+                    boolean privateFlag = p.length >= 7 && "1".equals(p[6]);
+                    if (staticFlag || privateFlag) {
+                        interfaceIneligible.put(methodId, Boolean.TRUE);
+                    }
                 }
             }
         } else if (table.charAt(start) == 'f' && table.startsWith("field\t", start)) {
@@ -359,7 +381,13 @@ class InterpIOSSymbols {
                 continue;
             }
             Integer id = (Integer)methodIds.get(ifaceName + "." + name + descriptor);
-            if (id != null) {
+            // Only instance, non-private members are inherited through an
+            // interface. A static or private declaration keeps its id in the
+            // table for explicit invokestatic / invokespecial resolution, but
+            // must not compete as a candidate for virtual dispatch through an
+            // implementor -- otherwise a static `A.m()` gets picked over a
+            // default `B.m()` when the receiver implements both.
+            if (id != null && interfaceIneligible.get(id) == null) {
                 candidateOwners.addElement(ifaceName);
                 candidateIds.addElement(id);
             }

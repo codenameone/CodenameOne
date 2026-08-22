@@ -412,14 +412,20 @@ public class Parser extends ClassVisitor {
                     if (desc == null) {
                         desc = "";
                     }
-                    // Extended method row: classId, name, desc, isStatic.
-                    // Older proxies that only know 4 columns ignore the 5th
-                    // because the parser slices with `split("\t", -1)` and
-                    // size-checks before reading.
+                    // Extended method row: classId, name, desc, isStatic,
+                    // isPrivate. Older proxies that only know 4 or 5 columns
+                    // ignore the tail because the parser slices with
+                    // `split("\t", -1)` and size-checks before reading; the
+                    // device runtime's interface dispatch needs both flags to
+                    // filter out methods Java does not inherit through an
+                    // interface, so a static or private interface member with
+                    // the same descriptor as another interface's default
+                    // cannot be picked over the default.
                     w.write("method\t" + m.getMethodOffset() + "\t" + classId
                             + "\t" + m.getMethodName()
                             + "\t" + desc
-                            + "\t" + (m.isStatic() ? "1" : "0") + "\n");
+                            + "\t" + (m.isStatic() ? "1" : "0")
+                            + "\t" + (m.isPrivate() ? "1" : "0") + "\n");
                     Set<Integer> lines = new TreeSet<>();
                     for (com.codename1.tools.translator.bytecodes.Instruction ins : m.getInstructions()) {
                         if (ins instanceof com.codename1.tools.translator.bytecodes.LineNumber) {
