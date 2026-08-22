@@ -1201,6 +1201,7 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
 void CN1MacWindowGetBounds(int slot, int* out) {
     CN1MacWindow* w = slotAt(slot);
     UIWindow* window;
+    int pendingBounds[4];
     if (w == NULL || out == NULL) {
         return;
     }
@@ -1210,6 +1211,15 @@ void CN1MacWindowGetBounds(int slot, int* out) {
      * must not be read off the main thread anyway. */
     pthread_mutex_lock(&g_slotLock);
     window = [w->window retain];
+    /* Copied under the same lock rather than read afterwards. These are the fallback
+     * answer when no scene has connected yet, and CN1MacWindowReportLayout updates
+     * pendingWidth and pendingHeight under this lock from UIKit's main queue -- so
+     * reading them unlocked could return a rectangle mixing an old origin with a new
+     * size, which setWindowSize() then feeds straight back to the platform. */
+    pendingBounds[0] = w->pendingX;
+    pendingBounds[1] = w->pendingY;
+    pendingBounds[2] = w->pendingWidth;
+    pendingBounds[3] = w->pendingHeight;
     pthread_mutex_unlock(&g_slotLock);
     if (window != nil) {
         __block CGFloat scale = 1.0;
@@ -1231,10 +1241,10 @@ void CN1MacWindowGetBounds(int slot, int* out) {
          * setWindowSize() reads these bounds and writes the whole rectangle back --
          * so reporting a zero origin here overwrote an explicitly placed window's
          * position before it ever appeared. The size below already worked this way. */
-        out[0] = w->pendingX;
-        out[1] = w->pendingY;
-        out[2] = w->pendingWidth;
-        out[3] = w->pendingHeight;
+        out[0] = pendingBounds[0];
+        out[1] = pendingBounds[1];
+        out[2] = pendingBounds[2];
+        out[3] = pendingBounds[3];
     }
 }
 

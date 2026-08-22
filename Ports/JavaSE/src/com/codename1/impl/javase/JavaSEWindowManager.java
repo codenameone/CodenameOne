@@ -569,13 +569,26 @@ public class JavaSEWindowManager extends WindowManager {
      * the old taskbar behaviour while {@code Window.isUtilityWindow()} reported the
      * requested value -- a setter that silently did nothing.
      */
-    private static void applyWhileUndisplayable(final Peer p, final Runnable change) {
+    /// The peer that owns the given AWT window, or null when it is not one of ours.
+    private Peer peerFor(java.awt.Window frame) {
+        synchronized (peers) {
+            for (Peer each : peers) {
+                if (each.frame == frame) { //NOPMD CompareObjectsWithEquals
+                    return each;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void applyWhileUndisplayable(final Peer p, final Runnable change) {
         runOnAwt(new Runnable() {
             @Override
             public void run() {
                 // The hide and show below are an implementation detail of applying the
                 // change, not a visibility transition the framework should hear about.
                 p.reconfiguring = true;
+                java.util.List<Peer> childrenSuppressed = new java.util.ArrayList<Peer>();
                 try {
                 boolean wasVisible = p.frame.isVisible();
                 java.awt.Window[] owned = p.frame.getOwnedWindows();
@@ -584,6 +597,16 @@ public class JavaSEWindowManager extends WindowManager {
                 for (java.awt.Window each : owned) {
                     if (each.isVisible()) {
                         wereVisible.add(each);
+                        // The owner's hide takes its visible children down with it and
+                        // they are put back explicitly below, so their listeners see
+                        // the same spurious pair the owner's did. Marking only the
+                        // owner left every owned window reporting a minimize and a
+                        // restore, and cancelling its pending input.
+                        Peer child = peerFor(each);
+                        if (child != null) {
+                            child.reconfiguring = true;
+                            childrenSuppressed.add(child);
+                        }
                     }
                 }
                 if (wasVisible) {
@@ -600,6 +623,9 @@ public class JavaSEWindowManager extends WindowManager {
                 }
                 } finally {
                     p.reconfiguring = false;
+                    for (Peer child : childrenSuppressed) {
+                        child.reconfiguring = false;
+                    }
                 }
             }
         });

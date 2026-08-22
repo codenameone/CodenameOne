@@ -2962,7 +2962,13 @@ public final class Display extends CN1Constants {
     /// - `windowId`: the id the port was given when the window was created
     public void windowShowNotify(int windowId) {
         if (windowId > 0) {
-            addSingleArgumentEvent(SHOW_NOTIFY | (windowId << 8), 0);
+            // Deliberately not the packed input queue. That queue drops events when it
+            // is full and while invokeAndBlock is running in drop mode, and nothing
+            // reconciles a lost one afterwards: a dropped show leaves a visible window
+            // the framework believes is iconified and never paints again, and a
+            // dropped hide leaves a hidden window painting and keeping the event
+            // dispatch thread awake. Lifecycle notifications are not droppable.
+            callSerially(new WindowCallback(windowId, WindowCallback.SHOWN));
         }
     }
 
@@ -2973,7 +2979,8 @@ public final class Display extends CN1Constants {
     /// - `windowId`: the id the port was given when the window was created
     public void windowHideNotify(int windowId) {
         if (windowId > 0) {
-            addSingleArgumentEvent(HIDE_NOTIFY | (windowId << 8), 0);
+            // See windowShowNotify: not droppable.
+            callSerially(new WindowCallback(windowId, WindowCallback.HIDDEN));
         }
     }
 
@@ -3448,6 +3455,8 @@ public final class Display extends CN1Constants {
         private static final int MONITORS_CHANGED = 4;
         private static final int MOVED = 5;
         private static final int CLOSED_NATIVELY = 6;
+        private static final int SHOWN = 7;
+        private static final int HIDDEN = 8;
 
         private final int windowId;
         private final int kind;
@@ -3518,6 +3527,16 @@ public final class Display extends CN1Constants {
                 case MOVED:
                     if (w != null) {
                         w.moved();
+                    }
+                    break;
+                case SHOWN:
+                    if (w != null) {
+                        w.showNotify();
+                    }
+                    break;
+                case HIDDEN:
+                    if (w != null) {
+                        w.hideNotify();
                     }
                     break;
                 case CLOSED_NATIVELY:

@@ -135,6 +135,14 @@ pretending.
 Consuming the event in a close listener vetoes the close regardless of the operation,
 which is how a window asks the user to save first.
 
+That veto isn't available on Mac Catalyst. UIKit hands a scene disconnection over
+after the scene is already gone, so there is nothing left to refuse: the window is
+disposed, the close listeners don't run, and `HIDE_ON_CLOSE` and
+`DO_NOTHING_ON_CLOSE` have no effect for the title-bar control. Don't rely on a save
+prompt there. An application that has to intervene should close the window itself --
+calling `dispose()` from a menu item or a button is a request, and that's vetoable
+on every platform.
+
 Every open window is disposed when the application shuts down, so a window can't outlive
 the event dispatch thread that paints it.
 
