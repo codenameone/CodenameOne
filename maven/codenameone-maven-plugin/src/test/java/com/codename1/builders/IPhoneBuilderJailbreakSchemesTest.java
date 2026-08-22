@@ -52,14 +52,34 @@ class IPhoneBuilderJailbreakSchemesTest {
     }
 
     private static List<String> declare(BuildRequest r) throws Exception {
+        return declare(r, 26);
+    }
+
+    private static List<String> declare(BuildRequest r, int xcodeVersion) throws Exception {
+        IPhoneBuilder b = new IPhoneBuilder();
+        java.lang.reflect.Field xc = IPhoneBuilder.class.getDeclaredField("xcodeVersion");
+        xc.setAccessible(true);
+        xc.setInt(b, xcodeVersion);
         Method m = IPhoneBuilder.class.getDeclaredMethod(
                 "declareApplicationQueriesSchemes", BuildRequest.class,
                 String[].class, String.class);
         m.setAccessible(true);
-        m.invoke(new IPhoneBuilder(), r, IPhoneBuilder.JAILBREAK_QUERY_SCHEMES, "why");
+        m.invoke(b, r, IPhoneBuilder.JAILBREAK_QUERY_SCHEMES, "why");
         String hint = r.getArg("ios.applicationQueriesSchemes", "");
         return hint.length() == 0 ? java.util.Collections.<String>emptyList()
                 : Arrays.asList(hint.split(","));
+    }
+
+    /// `n` schemes of the project's own, none of them ours.
+    private static String ownSchemes(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append("app").append(i);
+        }
+        return sb.toString();
     }
 
     @Test
@@ -135,5 +155,52 @@ class IPhoneBuilderJailbreakSchemesTest {
                 + "<key>UIFileSharingEnabled</key><true/>");
         assertTrue(declare(r).containsAll(
                 Arrays.asList(IPhoneBuilder.JAILBREAK_QUERY_SCHEMES)));
+    }
+
+    // ------------------------------------------------------------------
+    // The cap
+    // ------------------------------------------------------------------
+
+    /// iOS honours at most 50 LSApplicationQueriesSchemes entries for an app linked
+    /// against the iOS 15 SDK or later, and 25 from the iOS 27 SDK. Past that,
+    /// canOpenURL: answers false -- so appending blindly would not help this probe and
+    /// would push the project's own schemes into the ignored region.
+    @Test
+    void ourSchemesGiveWayRatherThanPushTheProjectPastTheCap() throws Exception {
+        BuildRequest r = request("ios.applicationQueriesSchemes", ownSchemes(50));
+        List<String> got = declare(r, 26);
+        assertEquals(50, got.size());
+        assertFalse(got.contains("sileo"));
+        // The project keeps every one of its own.
+        assertTrue(got.contains("app0"));
+        assertTrue(got.contains("app49"));
+    }
+
+    @Test
+    void theCapTightensForTheIos27Sdk() throws Exception {
+        assertTrue(declare(request("ios.applicationQueriesSchemes", ownSchemes(24)), 26)
+                .contains("filza"));
+        List<String> got = declare(request("ios.applicationQueriesSchemes", ownSchemes(24)), 27);
+        assertEquals(25, got.size());
+        assertTrue(got.contains("cydia"));
+        assertFalse(got.contains("filza"));
+    }
+
+    /// Partial room is used, not discarded: the first entries fit and the rest are
+    /// reported. Priority order matters here -- cydia and sileo come first.
+    @Test
+    void asManyAsFitAreAdded() throws Exception {
+        List<String> got = declare(request("ios.applicationQueriesSchemes", ownSchemes(48)), 26);
+        assertEquals(50, got.size());
+        assertTrue(got.contains("cydia"));
+        assertTrue(got.contains("sileo"));
+        assertFalse(got.contains("zbra"));
+    }
+
+    /// A project already over the cap on its own is left exactly as it is.
+    @Test
+    void aProjectAlreadyOverTheCapIsNotTouched() throws Exception {
+        BuildRequest r = request("ios.applicationQueriesSchemes", ownSchemes(60));
+        assertEquals(60, declare(r, 26).size());
     }
 }

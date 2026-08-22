@@ -12924,14 +12924,23 @@ public class IOSImplementation extends CodenameOneImplementation {
      * <p>Cydia alone was the whole list, and Cydia is the package manager of a rootful
      * jailbreak nobody has shipped for current iOS. A rootless device runs Sileo, so the
      * probe looked for the one front end that was certain not to be there.</p>
+     *
+     * <p>Kept deliberately short, and it must stay that way. Every entry is spent out of
+     * the app's LSApplicationQueriesSchemes budget, which iOS caps at 25 for an app linked
+     * against the iOS 27 SDK -- a secondary probe is not entitled to a quarter of it.
+     * Adding a scheme here means adding it to
+     * {@code IPhoneBuilder.JAILBREAK_QUERY_SCHEMES} too, or it is declared nowhere and
+     * silently answers false.</p>
+     *
+     * <p>This probe also has a shelf life: canOpenURL: is deprecated as of iOS 27. It
+     * still works and Apple has named no removal date, but the native probes in
+     * CN1JailbreakDetector are the ones to invest in.</p>
      */
     private static final String[] JAILBREAK_URL_SCHEMES = {
         "cydia://package/com.example.package",
         "sileo://package/com.example.package",
         "zbra://packages/com.example.package",
-        "filza://view",
-        "undecimus://",
-        "activator://"
+        "filza://view"
     };
 
     private boolean packageManagerProbe() {

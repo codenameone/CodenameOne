@@ -153,9 +153,28 @@ public class IPhoneBuilder extends Executor {
     /// about, and Cydia belongs to a rootful jailbreak nobody ships for current iOS --
     /// a rootless device runs Sileo, so the probe looked for the one front end certain
     /// not to be there.
+    ///
+    /// Four, not the obvious longer list. These entries are spent out of the app's
+    /// budget, not ours -- iOS caps the array, at 25 entries for an app linked against
+    /// the iOS 27 SDK -- so a secondary probe taking a quarter of it is not a reasonable
+    /// trade. `undecimus` and `activator` were dropped on that basis: unc0ver is the
+    /// iOS 11-14 era and Activator is a tweak rather than evidence of one. What is left
+    /// covers rootful (cydia), rootless (sileo), the alternative package manager (zbra)
+    /// and the file browser almost every jailbroken device carries (filza).
     static final String[] JAILBREAK_QUERY_SCHEMES = {
-        "cydia", "sileo", "zbra", "filza", "undecimus", "activator"
+        "cydia", "sileo", "zbra", "filza"
     };
+
+    /// How many LSApplicationQueriesSchemes entries iOS honours.
+    ///
+    /// The cap keys off the SDK the app was LINKED against, not the OS it runs on: 50 for
+    /// iOS 15 and later, 25 for iOS 27 and later. Going over does not fail the build --
+    /// canOpenURL: simply answers false for the entries past the cap, which is the same
+    /// silent wrong answer this declaration exists to prevent, except now it is the app's
+    /// own schemes that quietly stop resolving.
+    private int applicationQueriesSchemeCap() {
+        return xcodeVersion >= 27 ? 25 : 50;
+    }
 
     /// Adds `schemes` to ios.applicationQueriesSchemes, entry by entry.
     ///
@@ -186,6 +205,8 @@ public class IPhoneBuilder extends Executor {
             }
         }
         java.util.List<String> missing = new ArrayList<String>();
+        java.util.List<String> overCap = new ArrayList<String>();
+        int cap = applicationQueriesSchemeCap();
         for (String scheme : schemes) {
             if (declared.contains(scheme)) {
                 continue;
@@ -196,7 +217,20 @@ public class IPhoneBuilder extends Executor {
                 }
                 continue;
             }
+            // Ours are the ones that give way. A project near the cap is already
+            // spending it on schemes its features need, and appending past the cap
+            // would not buy this probe anything anyway -- iOS ignores the overflow --
+            // while pushing the app's own entries into the ignored region.
+            if (declared.size() >= cap) {
+                overCap.add(scheme);
+                continue;
+            }
             declared.add(scheme);
+        }
+        if (!overCap.isEmpty()) {
+            log("ios.applicationQueriesSchemes already holds " + declared.size()
+                    + " entries and iOS honours at most " + cap + " for this SDK, so "
+                    + overCap + " was not added. " + why);
         }
         if (alreadyInjected != null) {
             if (!missing.isEmpty()) {
