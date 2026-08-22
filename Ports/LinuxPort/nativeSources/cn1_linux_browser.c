@@ -220,7 +220,13 @@ typedef struct { CN1Browser* b; int slot; } CN1BrowserHostReq;
 static void cn1BrowserSetHostOnMain(void* p) {
     CN1BrowserHostReq* req = (CN1BrowserHostReq*) p;
     CN1Browser* b = req->b;
-    if (b->slot == req->slot) {
+    /* The slot alone is not enough to conclude the view is already where it belongs.
+     * Disposing a window detaches whatever its overlay was hosting, and window
+     * creation reuses the lowest free slot -- so the next window commonly gets the
+     * same number, and skipping on the number alone left the browser unparented and
+     * invisible while the framework believed it was hosted. Attachment is the thing
+     * being decided, so attachment is what gets tested. */
+    if (b->slot == req->slot && gtk_widget_get_parent(b->view) != 0) {
         return;
     }
     /* Moved between overlays rather than recreated: the view keeps its page, its load
