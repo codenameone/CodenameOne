@@ -1572,6 +1572,18 @@ public final class InterpRuntime {
     /// Resolving from the runtime type instead would silently read the
     /// subclass's field, which is the sort of difference that produces a wrong
     /// number rather than an error.
+    /// Whether the named Object method is one that reports naming or identity
+    /// (`toString`, `hashCode`, `equals`) rather than one tied to the object's
+    /// monitor (`wait`, `notify`, `notifyAll`). The interface-only-peer route
+    /// above uses this to hand naming/identity to the interpreter -- so the
+    /// pushed class's own name shows through -- while leaving monitor
+    /// operations on the peer, which is what MONITORENTER already locked.
+    private static boolean isObjectNamingOrIdentity(String methodName) {
+        return "toString".equals(methodName)
+                || "hashCode".equals(methodName)
+                || "equals".equals(methodName);
+    }
+
     private int fieldIndex(InterpObject io, String owner, String name) {
         InterpClass declaring = bundle.findClass(owner);
         if (declaring == null) {
@@ -2039,15 +2051,22 @@ public final class InterpRuntime {
                     return;
                 }
             }
-            // Object's default methods on an interface-only peer: the shim's
-            // Object.toString/hashCode/equals prints the shim class's own
-            // name (`Interp_Runnable@...`), which is neither the pushed
-            // class's name nor consistent with `getClass()` above. Answer
-            // through `objectCall` instead, which already delegates to
-            // interpreted overrides when the class has one and falls back to
-            // the pushed class's own name otherwise.
+            // Object's naming/identity defaults on an interface-only peer:
+            // the shim's Object.toString/hashCode/equals prints the shim
+            // class's own name (`Interp_Runnable@...`), which is neither the
+            // pushed class's name nor consistent with `getClass()` above.
+            // Answered through `objectCall` here so the class's own name
+            // shows through and an interpreted override still wins via the
+            // `resolveVirtual` result higher up.
+            //
+            // Only those three -- `wait`/`notify`/`notifyAll` stay on the
+            // peer, because `MONITORENTER` already locked the peer (see
+            // `synchronized`) and running them on `io` instead acquires a
+            // different monitor and raises IllegalMonitorStateException. Any
+            // other Object method that reaches here is also left to the peer.
             if (io.hostPeer != null && io.hostPeerFromInterfacesOnly
-                    && "java/lang/Object".equals(owner)) {
+                    && "java/lang/Object".equals(owner)
+                    && isObjectNamingOrIdentity(name)) {
                 Object early = objectCall(io, name, args, op == InterpOpcodes.INVOKESPECIAL);
                 if (early != NOT_OBJECT_METHOD) {
                     pushBoxed(f, returnKind, early);
@@ -2841,7 +2860,16 @@ public final class InterpRuntime {
             return Integer.valueOf(System.identityHashCode(io));
         }
         if ("equals".equals(name) && args.length == 1) {
-            return args[0] == io ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Object.equals default is identity
+            // The argument came off the interpreter's stack through
+            // `popBoxed`, which converts a peer-backed object back to the
+            // InterpObject it stands for -- but a peer that was set on an
+            // InterpObject with an interface-only shim would arrive here as
+            // the peer, not the wrapper, when the caller passed `this`. A
+            // plain `args[0] == io` would answer false for `value.equals(value)`.
+            // Compare identity through `fromHost` so both representations
+            // resolve to the same InterpObject.
+            Object other = fromHost(args[0]);
+            return other == io ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Object.equals default is identity
         }
         if ("toString".equals(name) && args.length == 0) {
             if (special) {
