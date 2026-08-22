@@ -28,7 +28,7 @@
 #if TARGET_OS_MACCATALYST
 #import "CN1MacWindows.h"
 /* True when the scene was claimed by a Codename One Window. */
-extern BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
+extern BOOL CN1MacWindowAdoptScene(UIWindowScene* scene, NSSet<NSUserActivity*>* activities);
 extern int CN1MacWindowIdForScene(UIWindowScene* scene);
 extern void CN1MacWindowSceneDisconnected(UIWindowScene* scene);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
@@ -49,7 +49,10 @@ extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
     // A second scene of the app role belongs to a com.codename1.ui.Window, not to
     // the application's main form. Hand it to the window layer, which owns it from
     // here; only the first scene installs the main root view controller.
-    if (CN1MacWindowAdoptScene((UIWindowScene *)scene)) {
+    // The connection's activities carry the token the activation request was stamped
+    // with, so the window layer can take the scene its own request produced rather
+    // than assuming scenes connect in the order they were asked for.
+    if (CN1MacWindowAdoptScene((UIWindowScene *)scene, connectionOptions.userActivities)) {
         return;
     }
 #endif

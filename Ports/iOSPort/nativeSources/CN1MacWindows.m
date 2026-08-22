@@ -662,6 +662,63 @@ static void dropPendingSlotLocked(int slot) {
     g_pendingCount = write;
 }
 
+/*
+ * Identity carried on an activation request so the scene that answers it can be
+ * matched to the window that asked, instead of to the oldest outstanding request.
+ *
+ * The FIFO this used to rely on assumes UIKit connects scenes in request order, which
+ * it does not promise: two windows opened together could be handed each other's scene
+ * and with it each other's title, geometry, content and lifecycle events. The token is
+ * the request's slot and its generation, so a request left over from a disposed window
+ * is recognised as stale rather than matched to whoever holds the slot now.
+ */
+static NSString* const CN1_MAC_WINDOW_ACTIVITY = @"com.codenameone.window.activation";
+static NSString* const CN1_MAC_WINDOW_SLOT_KEY = @"cn1WindowSlot";
+static NSString* const CN1_MAC_WINDOW_GENERATION_KEY = @"cn1WindowGeneration";
+
+/* Caller owns the result. */
+static NSUserActivity* CN1MacWindowRequestActivity(int slot, int generation) {
+    NSUserActivity* activity =
+            [[NSUserActivity alloc] initWithActivityType:CN1_MAC_WINDOW_ACTIVITY];
+    activity.userInfo = @{ CN1_MAC_WINDOW_SLOT_KEY : @(slot),
+                           CN1_MAC_WINDOW_GENERATION_KEY : @(generation) };
+    return activity;
+}
+
+/*
+ * The slot a connecting scene was requested for, or -1 when it carries no token of
+ * ours -- a scene the system created on its own, or a system that did not deliver the
+ * activity back. The caller then falls back to the request queue, which is what this
+ * always did.
+ */
+static int CN1MacWindowSlotForActivities(NSSet<NSUserActivity*>* activities) {
+    if (activities == nil) {
+        return -1;
+    }
+    for (NSUserActivity* activity in activities) {
+        if (![activity.activityType isEqualToString:CN1_MAC_WINDOW_ACTIVITY]) {
+            continue;
+        }
+        NSNumber* slot = activity.userInfo[CN1_MAC_WINDOW_SLOT_KEY];
+        NSNumber* generation = activity.userInfo[CN1_MAC_WINDOW_GENERATION_KEY];
+        if (slot == nil || generation == nil) {
+            continue;
+        }
+        int s = [slot intValue];
+        int g = [generation intValue];
+        if (s < 0 || s >= CN1_MAC_MAX_WINDOWS) {
+            continue;
+        }
+        /* Stale token: the window that asked is gone and the slot may belong to
+         * another one now, so the queue decides rather than this. */
+        if (!g_macWindows[s].inUse || g_macWindows[s].generation != g) {
+            continue;
+        }
+        return s;
+    }
+    return -1;
+}
+
 static BOOL isPendingSlotLocked(int slot) {
     int iter;
     for (iter = 0; iter < g_pendingCount; iter++) {
@@ -810,13 +867,15 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
             UISceneActivationRequestOptions* options =
                     [[UISceneActivationRequestOptions alloc] init];
             options.requestingScene = [UIApplication sharedApplication].connectedScenes.anyObject;
+            NSUserActivity* identity = CN1MacWindowRequestActivity(slot, generation);
             [[UIApplication sharedApplication] requestSceneSessionActivation:nil
-                                                                userActivity:nil
+                                                                userActivity:identity
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene activation failed: %@", error);
                 CN1MacWindowActivationFailed(slot, generation, requestSeq);
             }];
+            [identity release];
             [options release];
         }
     });
@@ -827,17 +886,22 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
  * Adopts a newly connected scene into the slot that asked for it. Called from the
  * scene delegate, which is the only place a scene object becomes available.
  */
-BOOL CN1MacWindowAdoptScene(UIWindowScene* scene) {
+BOOL CN1MacWindowAdoptScene(UIWindowScene* scene, NSSet<NSUserActivity*>* activities) {
     BOOL claimed;
+    int requested;
     pthread_mutex_lock(&g_slotLock);
+    // The slot this scene was actually requested for, when the system handed our
+    // token back. -1 means it did not, and the request queue decides instead --
+    // which is what this always did.
+    requested = CN1MacWindowSlotForActivities(activities);
     // Nothing is waiting, or this scene was already adopted: it belongs to the
     // application's main form.
-    claimed = g_pendingCount > 0 && slotForSceneLocked(scene) < 0;
+    claimed = (requested >= 0 || g_pendingCount > 0) && slotForSceneLocked(scene) < 0;
     pthread_mutex_unlock(&g_slotLock);
     if (!claimed) {
         return NO;
     }
-    CN1MacWindowSceneConnected(scene);
+    CN1MacWindowSceneConnectedFor(scene, requested);
     return YES;
 }
 
@@ -897,11 +961,30 @@ void CN1MacWindowSceneDisconnected(UIWindowScene* scene) {
 }
 
 void CN1MacWindowSceneConnected(UIWindowScene* scene) {
+    CN1MacWindowSceneConnectedFor(scene, -1);
+}
+
+/*
+ * Adopts a scene into the window it was requested for.
+ *
+ * `requested` is the slot the arriving scene's own token names, or -1 when it carries
+ * none -- a scene the system produced without one, or a system that did not hand the
+ * activity back. Only then does the request queue decide, which is what this did for
+ * every scene before the token existed.
+ */
+void CN1MacWindowSceneConnectedFor(UIWindowScene* scene, int requested) {
     int contentReadyWindowId = -1;
     int slot;
     CN1MacWindow* w;
     pthread_mutex_lock(&g_slotLock);
-    slot = popPendingSlotLocked();
+    if (requested >= 0) {
+        slot = requested;
+        /* Its queue entry is spent either way; leaving it would hand the next scene
+         * to a window that already has one. */
+        dropPendingSlotLocked(slot);
+    } else {
+        slot = popPendingSlotLocked();
+    }
     if (slot < 0 || !g_macWindows[slot].inUse) {
         /* The window this scene was requested for is already gone. Park the scene
          * rather than dropping it on the floor: it is a live native scene, and
@@ -1127,13 +1210,15 @@ BOOL CN1MacWindowReopen(int slot) {
             UISceneActivationRequestOptions* options =
                     [[UISceneActivationRequestOptions alloc] init];
             options.requestingScene = [UIApplication sharedApplication].connectedScenes.anyObject;
+            NSUserActivity* identity = CN1MacWindowRequestActivity(slot, generation);
             [[UIApplication sharedApplication] requestSceneSessionActivation:nil
-                                                                userActivity:nil
+                                                                userActivity:identity
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene reopen failed: %@", error);
                 CN1MacWindowActivationFailed(slot, generation, requestSeq);
             }];
+            [identity release];
             [options release];
         }
     });

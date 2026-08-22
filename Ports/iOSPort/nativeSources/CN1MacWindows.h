@@ -112,10 +112,11 @@ UIView* CN1MacWindowEditingHostView(void);
 /* Invoked from the scene delegate when a Codename One window scene connects, so
  * a scene the system restored on launch is adopted rather than orphaned. */
 void CN1MacWindowSceneConnected(UIWindowScene* scene);
+void CN1MacWindowSceneConnectedFor(UIWindowScene* scene, int requested);
 
 /* Claims a newly connected scene for a Codename One window if one is waiting for
  * it. Returns NO when the scene belongs to the application's main form. */
-BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
+BOOL CN1MacWindowAdoptScene(UIWindowScene* scene, NSSet<NSUserActivity*>* activities);
 
 /** Requests a scene again for a window whose scene was destroyed unasked. */
 BOOL CN1MacWindowReopen(int slot);
