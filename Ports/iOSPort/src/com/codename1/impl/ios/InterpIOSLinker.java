@@ -458,8 +458,14 @@ public class InterpIOSLinker implements InterpLinker {
             case K_SHORT:   return ((Short)value).shortValue();
             case K_INT:     return ((Integer)value).intValue();
             case K_LONG:    return ((Long)value).longValue();
-            case K_FLOAT:   return Float.floatToIntBits(((Float)value).floatValue()) & 0xffffffffL;
-            case K_DOUBLE:  return Double.doubleToLongBits(((Double)value).doubleValue());
+            // Raw bits: `floatToIntBits`/`doubleToLongBits` collapse every NaN
+            // pattern to the canonical form. A pushed program that computed a
+            // noncanonical NaN via `Float.intBitsToFloat(0x7fc00001)` and
+            // handed it to a host method would then see `0x7fc00000` come back
+            // through `floatToRawIntBits`, unlike normal JVM execution and
+            // unlike the reflection linker's marshalling path.
+            case K_FLOAT:   return Float.floatToRawIntBits(((Float)value).floatValue()) & 0xffffffffL;
+            case K_DOUBLE:  return Double.doubleToRawLongBits(((Double)value).doubleValue());
             default:        return 0;
         }
     }

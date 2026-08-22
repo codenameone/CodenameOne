@@ -113,7 +113,11 @@ public final class DevicePush {
 
     public static void main(String[] args) throws Exception {
         File classes = new File("target/classes");
-        File sources = new File("src/main/java");
+        // Sources accumulate: a Kotlin project has classes under both
+        // `src/main/java` and `src/main/kotlin`, and the bundle needs every
+        // root so `SourceFile` attributes -- `MyApp.kt` for a Kotlin class --
+        // resolve. Repeated `--source` on the command line each add one root.
+        List<File> sources = new ArrayList<File>();
         String mainClass = "";
         int port = 18234;
         boolean lan = false;
@@ -124,7 +128,7 @@ public final class DevicePush {
             if ("--classes".equals(a)) {
                 classes = new File(args[++i]);
             } else if ("--source".equals(a)) {
-                sources = new File(args[++i]);
+                sources.add(new File(args[++i]));
             } else if ("--main".equals(a)) {
                 mainClass = args[++i];
             } else if ("--port".equals(a)) {
@@ -138,6 +142,12 @@ public final class DevicePush {
                 usage();
                 return;
             }
+        }
+        if (sources.isEmpty()) {
+            // The default retains the classic single-root behaviour for a
+            // caller that never passes --source. A caller with more than
+            // one root passes each explicitly.
+            sources.add(new File("src/main/java"));
         }
         if (!classes.isDirectory()) {
             System.err.println("no compiled classes at " + classes.getAbsolutePath()
@@ -180,7 +190,7 @@ public final class DevicePush {
 
     // ------------------------------------------------------------ the bundle
 
-    private static byte[] buildBundle(File classesDir, File sourceRoot, String mainClass)
+    private static byte[] buildBundle(File classesDir, List<File> sourceRoots, String mainClass)
             throws Exception {
         InterpBundleWriter w = new InterpBundleWriter();
         List<File> classes = new ArrayList<File>();
@@ -191,16 +201,21 @@ public final class DevicePush {
         for (File f : classes) {
             w.addClassFile(f);
         }
-        if (sourceRoot.isDirectory()) {
-            // The runtime refuses to run a class whose source it cannot show,
-            // and resources -- theme.res, CSS, images -- travel with it so the
-            // program wears its own design rather than the host app's.
-            w.addSourceTree(sourceRoot);
-            w.addResourceTree(sourceRoot);
-        }
-        File res = new File(sourceRoot.getParentFile(), "resources");
-        if (res.isDirectory()) {
-            w.addResourceTree(res);
+        // Every configured root contributes sources and resources. A Kotlin
+        // project passes `src/main/java` and `src/main/kotlin`; a mixed
+        // project may add another. The runtime refuses to run a class whose
+        // source it cannot show, and resources -- theme.res, CSS, images --
+        // travel with the bundle so the program wears its own design rather
+        // than the host app's.
+        for (File sourceRoot : sourceRoots) {
+            if (sourceRoot.isDirectory()) {
+                w.addSourceTree(sourceRoot);
+                w.addResourceTree(sourceRoot);
+            }
+            File res = new File(sourceRoot.getParentFile(), "resources");
+            if (res.isDirectory()) {
+                w.addResourceTree(res);
+            }
         }
         if (mainClass.length() == 0) {
             mainClass = findEntryPoint(classes);

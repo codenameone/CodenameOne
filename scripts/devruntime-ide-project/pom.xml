@@ -112,8 +112,16 @@
                             <arguments>
                                 <argument>--classes</argument>
                                 <argument>${project.build.outputDirectory}</argument>
+                                <!-- Both roots: a Kotlin project compiles
+                                     `src/main/kotlin` to the same target/classes
+                                     but the SourceFile attributes still name .kt
+                                     files, and the bundle needs those on hand.
+                                     Passing a root that does not exist is a
+                                     no-op inside DevicePush. -->
                                 <argument>--source</argument>
                                 <argument>${project.basedir}/src/main/java</argument>
+                                <argument>--source</argument>
+                                <argument>${project.basedir}/src/main/kotlin</argument>
                                 <argument>--port</argument>
                                 <argument>${devruntime.port}</argument>
                             </arguments>
@@ -146,8 +154,16 @@
                             <arguments>
                                 <argument>--classes</argument>
                                 <argument>${project.build.outputDirectory}</argument>
+                                <!-- Both roots: a Kotlin project compiles
+                                     `src/main/kotlin` to the same target/classes
+                                     but the SourceFile attributes still name .kt
+                                     files, and the bundle needs those on hand.
+                                     Passing a root that does not exist is a
+                                     no-op inside DevicePush. -->
                                 <argument>--source</argument>
                                 <argument>${project.basedir}/src/main/java</argument>
+                                <argument>--source</argument>
+                                <argument>${project.basedir}/src/main/kotlin</argument>
                                 <argument>--port</argument>
                                 <argument>${devruntime.port}</argument>
                                 <argument>--lan</argument>
