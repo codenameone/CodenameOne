@@ -580,14 +580,6 @@ static _Atomic long cn1GcFullDrains = 0;
 static _Atomic long cn1GcGraceFullDrains = 0;
 // Set only while a grace pass is running, on the GC thread that runs it.
 static __thread int cn1GcInGracePass = 0;
-// Page-heap bytes allocated across the whole run, charged cycle by cycle. Divided by
-// the cycle count it says how far the mutator ran ahead of the collector, which is what
-// "the collector is keeping up" means as a number: a healthy run allocates about one
-// collection trigger per cycle, and a collector that cannot keep up simply coalesces the
-// crossings it missed into the one cycle it did manage. That ratio is a property of the
-// two speeds rather than of either, so it reads the same on a loaded machine, unlike a
-// peak footprint. Tracer-gated, like the counters above.
-static _Atomic long long cn1GcAllocatedTotal = 0;
 static _Atomic int cn1GcOverflowTrace = -1;
 static int cn1GcOverflowTraceOn(void) {
     int on = atomic_load_explicit(&cn1GcOverflowTrace, memory_order_relaxed);
@@ -602,21 +594,13 @@ static void cn1ReportGcOverflow(void) {
     if(!cn1GcOverflowTraceOn()) {
         return;
     }
-#ifdef CN1_DISABLE_BIBOP
-    long triggerKb = 0;   // no page heap in this configuration, so no page-heap trigger
-#else
-    long triggerKb = (long)(atomic_load_explicit(&bibopGcTriggerBytes,
-                                                 memory_order_relaxed) / 1024);
-#endif
     fprintf(stderr, "[GC-OVERFLOW] overflowCycles=%ld graceDrains=%ld fullDrains=%ld"
-                    " graceFullDrains=%ld cycles=%d allocatedKb=%lld triggerKb=%ld\n",
+                    " graceFullDrains=%ld cycles=%d\n",
             atomic_load_explicit(&cn1GcOverflowCycles, memory_order_relaxed),
             atomic_load_explicit(&cn1GcGraceDrains, memory_order_relaxed),
             atomic_load_explicit(&cn1GcFullDrains, memory_order_relaxed),
             atomic_load_explicit(&cn1GcGraceFullDrains, memory_order_relaxed),
-            currentGcMarkValue,
-            atomic_load_explicit(&cn1GcAllocatedTotal, memory_order_relaxed) / 1024,
-            triggerKb);
+            currentGcMarkValue);
 }
 
 static void cn1ReportLowMemoryParks(void) {
@@ -2766,7 +2750,6 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeList = 0;
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
-    atomic_store_explicit(&p->gcGraceMarked, 0, memory_order_relaxed);
     // Page-release state. Both MUST be initialized here: a page from
     // cn1BibopRawPage is indeterminate memory, and cn1BibopTrimFreePool READS
     // gcPageReleased before anything has written it. A stale nonzero value would
@@ -2828,11 +2811,6 @@ void cn1BibopBeginGcCycle(void) {
     // sustained allocator.
     bibopCycleAllocatedBytes = atomic_exchange_explicit(&bibopBytesSinceGc, 0,
                                                          memory_order_acq_rel);
-    if(cn1GcOverflowTraceOn()) {
-        atomic_fetch_add_explicit(&cn1GcAllocatedTotal,
-                                  (long long)bibopCycleAllocatedBytes,
-                                  memory_order_relaxed);
-    }
     // Same charge-to-next-cycle rule for the legacy byte counter (large arrays
     // and anything above CN1_BIBOP_MAX_OBJECT): see cn1LegacyBytesSinceGc.
     // Same atomic-exchange idiom as the BiBOP reset above: a racing fetch_add
@@ -3429,39 +3407,6 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_BIBOP_GC_HARD_CAP_MULTIPLIER
 #define CN1_BIBOP_GC_HARD_CAP_MULTIPLIER 3
 #endif
-// Bound on the dynamic widening below, in collection triggers, applied ONLY once the
-// process is already large (issue #5537). Free RAM is a reason to let a fast thread run
-// FURTHER ahead of the collector; it is not a reason to accumulate an unbounded amount
-// of garbage. On a host with no per-process ceiling -- the iOS Simulator, macOS,
-// Catalyst, a desktop build -- the fractions below evaluate to gigabytes, and nothing
-// stopped a game-tree search from reaching a 15.6GB footprint against a 4MB live set
-// while the collector completed 7 cycles in five seconds. Under a ceiling that shape is
-// the app being killed; off one it is the "memory usage escalates, 500MB to 5GB in five
-// minutes" the reporter saw in the simulator.
-//
-// Expressed in TRIGGERS rather than as a constant because the trigger already tracks the
-// heap: cn1BibopAdaptAfterSweep doubles it (to CN1_BIBOP_GC_MAX_TRIGGER_BYTES) for a
-// survivor-heavy workload and returns it to the base for a churning one. So an app that
-// needs the headroom -- a render holding a large live set -- keeps 8 of its own enlarged
-// triggers, while pure churn is held to 8 of the base one.
-//
-// GATED ON FOOTPRINT because the point is to stop unbounded GROWTH, not to stop a thread
-// from running ahead. A volume cap is a cliff: crossing it parks the mutator for a whole
-// collection, and applying one unconditionally costs 47% on the objectAllocation
-// microbenchmark (measured) for a process that was never going to grow anyway. Below the
-// floor nothing is clamped and the pacing is exactly what it was; above it the app has
-// demonstrated it can grow, and bounding the run-ahead is what keeps it from continuing.
-#ifndef CN1_BIBOP_GC_MAX_CAP_MULTIPLIER
-#define CN1_BIBOP_GC_MAX_CAP_MULTIPLIER 8
-#endif
-// Footprint at which the bound above starts applying. Well above what a healthy app of
-// any size settles at with the collector keeping up, and well below the point where an
-// unbounded run-ahead has done real damage. Where there is no footprint probe (Windows)
-// the reading is 0 and the bound never engages, which leaves that platform on the static
-// cap it already had.
-#ifndef CN1_PACING_GROWTH_FLOOR_BYTES
-#define CN1_PACING_GROWTH_FLOOR_BYTES (512LL*1024*1024)
-#endif
 // A thread with more than this many legacy allocations since the last GC (heapAllocationSize,
 // reset each cycle) is treated as high-throughput and gets the deeper pacing headroom below.
 #ifndef CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS
@@ -3536,38 +3481,8 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 // Cached free-memory reading, refreshed once per GC cycle (cn1RefreshFreeMemCache, called from
 // codenameOneGCMark) so the dynamic pacing cap costs no per-page-acquire syscall.
 _Atomic long cn1CachedFreeMem = 0;
-// This process's own metered size, sampled on the same once-per-cycle cadence. Read by
-// the pacing cap to decide whether the growth bound above applies; 0 where the platform
-// has no probe, which reads as "not large" and leaves the cap alone.
-static _Atomic long long cn1CachedProcFootprint = 0;
-// TEST HOOK. CN1_SIMULATE_FREE_MEMORY=<bytes> substitutes a fixed reading for the host's
-// available memory. The dynamic pacing cap is a FRACTION of that reading, so how far a
-// mutator may run ahead of the collector -- and therefore, off a per-process ceiling,
-// how large the process gets -- depends on how much RAM the machine happened to have
-// free. That makes the issue-5537 growth shape reproduce on an idle developer machine
-// and vanish on a busy one, in both directions, which is no basis for a guard: without
-// this hook the same test passes for opposite reasons on the same host an hour apart.
-// Off unless set. -1 = env not probed yet. long long for the LLP64 target.
-static _Atomic long long cn1SimulatedFreeMem = -1;
-static long long cn1SimulatedFreeMemBytes(void) {
-    long long v = atomic_load_explicit(&cn1SimulatedFreeMem, memory_order_relaxed);
-    if(v < 0) {
-        const char* e = getenv("CN1_SIMULATE_FREE_MEMORY");
-        v = e ? atoll(e) : 0;
-        if(v < 0) {
-            v = 0;
-        }
-        atomic_store_explicit(&cn1SimulatedFreeMem, v, memory_order_relaxed);
-    }
-    return v;
-}
 void cn1RefreshFreeMemCache(void) {
-    long long simFree = cn1SimulatedFreeMemBytes();
-    atomic_store_explicit(&cn1CachedFreeMem,
-                          simFree > 0 ? (long)simFree : cn1_available_memory(),
-                          memory_order_relaxed);
-    atomic_store_explicit(&cn1CachedProcFootprint, (long long)cn1ProcFootprintBytes(),
-                          memory_order_relaxed);
+    atomic_store_explicit(&cn1CachedFreeMem, cn1_available_memory(), memory_order_relaxed);
 }
 
 // DYNAMIC PACING CAP (perf-tier1). The fixed 3x-trigger cap starves a high-throughput allocator:
@@ -3624,19 +3539,6 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
        || threadStateData->heapAllocationSize > CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS) {
         long hi = fm / 2;
         if(hi > cap) cap = hi;
-    }
-    // Bound the widening, once this process has shown it can grow. Never below the
-    // static cap, which is what "never tighter than before" means once the multiplier is
-    // applied to the same trigger.
-    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed)
-            > CN1_PACING_GROWTH_FLOOR_BYTES) {
-        long capCeiling = trigger * CN1_BIBOP_GC_MAX_CAP_MULTIPLIER;
-        if(capCeiling < base) {
-            capCeiling = base;
-        }
-        if(cap > capCeiling) {
-            cap = capCeiling;
-        }
     }
     if(cn1PacingTraceOn()) {
         long seen = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
@@ -4551,12 +4453,6 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
 #endif
         int n = atomic_load_explicit(&page->bumpIndex, memory_order_acquire);
-        // Take (and clear) the grace-mark tally before any branch below can leave the
-        // page: the O(1) decisions add no live count at all, so a tally left behind
-        // would be subtracted from a LATER cycle's survivors. Marking is finished, so
-        // this is the complete count for the window since this page was last swept.
-        int graceMarked = atomic_exchange_explicit(&page->gcGraceMarked, 0,
-                                                   memory_order_relaxed);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // ---- O(1) page decision (no per-slot walk). -------------------------------
         // A page is HOMOGENEOUS when every occupied slot is a dead-or-graced object
@@ -4751,26 +4647,12 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         page->freeList = fl;
         page->freeCount = freeCount;
         int sampledSlots = n - oldFreeCount;
-        // Survivors the policy may act on: slots at the current epoch MINUS the ones a
-        // grace pass put there. A grace mark says only "allocated since the last cycle
-        // and not proven dead", so counting it as a survivor makes the measured survival
-        // ratio a function of the ALLOCATION RATE. A pure-churn workload then reads as
-        // survivor-heavy and gets diverted onto the legacy heap by the bypass below --
-        // measured on the issue-5537 game-tree search as 190K of 700K 48-byte slots
-        // "surviving" against a real live set of a few hundred objects. Clamped rather
-        // than allowed to go negative: a page swept several cycles after its grace marks
-        // were taken can hold survivors that have since been proven live, and reading
-        // those as zero only makes the policy more conservative.
-        int policySurvivors = policyLiveCount - graceMarked;
-        if(policySurvivors < 0) {
-            policySurvivors = 0;
-        }
         if(!statsExcluded) {
             occupiedBytes += (long)sampledSlots * page->slotSize;
-            liveBytes += (long)policySurvivors * page->slotSize;
+            liveBytes += (long)policyLiveCount * page->slotSize;
             reclaimedBytes += (long)(sampledSlots - liveCount) * page->slotSize;
             classSlots[page->classIndex] += sampledSlots;
-            classLive[page->classIndex] += policySurvivors;
+            classLive[page->classIndex] += policyLiveCount;
         }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // The monitor (CN1ThreadData) no longer lives in the object header, so the
@@ -4981,25 +4863,14 @@ void cn1RefreshFreeMemCache(void) {
 //
 //   1. BiBOP objects (small, non-array): live in size-class pages held in a GROW-ONLY
 //      registry (bibopAllPages -- pages are never unlinked or reordered). A pointer is
-//      resolved by masking it to its 64KB page base, looking that base up in an
-//      open-addressed table (cn1ConsPg) that stores the page geometry inline, then
-//      indexing the slot arithmetically. Because the registry is grow-only, the table's
-//      KEYS are stable and it is rebuilt only when the registration COUNT changes; the
-//      geometry it caches is refreshed every cycle. See cn1ConsPgIndexedCount below.
+//      resolved by locating its containing page (binary search over the page bases) then
+//      its slot (O(1) from the page geometry). Because the registry is grow-only, the
+//      base-sorted page array (cn1ConsPgSorted) is CACHED and only re-sorted when the
+//      registration COUNT changes -- NOT every cycle. See cn1ConsPgSortedKey below.
 //
 //   2. Legacy objects (arrays + anything not BiBOP): tracked in allObjectsInHeap[]. These
 //      are resolved via cn1ConsExt[] -- a flat array of (lo,hi,base) extents sorted by lo
-//      address -- fronted by cn1ConsExtHash, an exact-base table that answers the common
-//      case in one probe. Only a genuine INTERIOR pointer reaches the sorted search.
-//
-// WHY EITHER INDEX IS A HASH RATHER THAN A BINARY SEARCH: the resolver's dominant caller
-//   is gcMarkObject's guard, which runs on every reference field the drain follows, and
-//   log2(N) dependent cache-missing loads per field makes the collector's cost scale with
-//   the SIZE OF THE HEAP instead of with the live set. On the issue-5537 game-tree search
-//   (6.7K pages, 35K extents) that put 75% of the GC thread's wall time inside this
-//   function: cycles stretched, the mutator allocated proportionally more during each one,
-//   and the footprint settled at whatever ceiling the pacing allowed rather than at
-//   anything related to the ~20MB that was actually live.
+//      address, binary-searched on lookup.
 //
 // WHY cn1ConsExt IS REBUILT + qsort()ed EVERY CYCLE (and the BiBOP pages are not):
 //   allObjectsInHeap[] is NOT grow-only. The sweep removes a dead object by TOMBSTONING
@@ -5031,183 +4902,21 @@ typedef struct { char* lo; char* hi; JAVA_OBJECT base; } CN1ConsExtent;
 static CN1ConsExtent* cn1ConsExt = 0;
 static int cn1ConsExtN = 0, cn1ConsExtCap = 0;
 
-// Pointer mix used by both O(1) indices below. Finalizer of the 64-bit MurmurHash3
-// mixer: the inputs are page bases (64KB-aligned, so their low 16 bits are always
-// zero) and malloc'd object bases (16-aligned and strongly clustered), and a plain
-// mask over either of those collides hard enough to turn linear probing back into
-// a scan. Multiplying and folding spreads both into the whole table.
-static inline unsigned cn1PtrMix(uintptr_t v) {
-    unsigned long long h = (unsigned long long)v;
-    h ^= h >> 33;
-    h *= 0xff51afd7ed558ccdULL;
-    h ^= h >> 29;
-    h *= 0xc4ceb9fe1a85ec53ULL;
-    h ^= h >> 32;
-    return (unsigned)h;
-}
-
-// EXACT-BASE index over cn1ConsExt (open addressing, load factor <= 1/2; 0 = empty).
-// Every extent's lo IS its object's base (cn1ConsExtAdd sets both from the same
-// pointer), so a hit on this table answers the whole query without touching
-// cn1ConsExt at all -- the resolved object is the probed pointer.
-//
-// It exists because the binary search below is the wrong shape for the caller that
-// dominates: gcMarkObject's resolve guard runs on EVERY reference field the drain
-// follows, and a Java reference is always an object BASE, never an interior pointer.
-// On a legacy-array-heavy heap that guard was paying ~log2(N) dependent, cache-missing
-// loads per field -- 15 on a 35K-extent heap -- and the collector spent most of its
-// time in the index rather than in marking (profiled at 75% of GC-thread wall on the
-// issue-5537 game-tree search). Interior pointers are real but rare: they come only
-// from the conservative stack/register scan, which still falls through to the sorted
-// binary search.
-static char** cn1ConsExtHash = 0;
-static int cn1ConsExtHashMask = -1;   // capacity-1, or -1 when unallocated
-
 #ifndef CN1_DISABLE_BIBOP
-// ---- BiBOP page snapshot: open-addressed on page base ----
-// Entry holds the geometry INLINE so a hit costs one cache line, and the registry
-// node so the per-cycle geometry refresh can walk the table linearly instead of
-// scattering writes across it. base == 0 marks an empty slot.
-typedef struct {
-    char* base;
-    CN1BibopPage* page;
-    int firstSlotOffset;
-    int slotSize;
-    int slotCount;
-    int bumpIndex;
-} CN1ConsPage;
-// Extra room the rebuild sizes for, over the registration count it read, so that
-// pages registered while it walks do not cost it the whole table.
-#ifndef CN1_CONS_PG_SLACK
-#define CN1_CONS_PG_SLACK 256
-#endif
-// How many times the rebuild re-sizes when the registry outgrows the size it picked.
-// Each attempt doubles, so losing this race three times running needs a mutator to
-// register faster than the collector can walk a list, sustained -- at which point a
-// cycle without a rebuild (the previous index, retried next cycle) is the right
-// answer anyway.
-#ifndef CN1_CONS_PG_REBUILD_ATTEMPTS
-#define CN1_CONS_PG_REBUILD_ATTEMPTS 3
-#endif
+// ---- BiBOP page snapshot: sorted by page base ----
+typedef struct { char* base; int firstSlotOffset; int slotSize; int slotCount; int bumpIndex; } CN1ConsPage;
 static CN1ConsPage* cn1ConsPg = 0;
-static int cn1ConsPgN = 0;            // occupied entries
-static int cn1ConsPgMask = -1;        // capacity-1, or -1 when unallocated
-// Number of pages the last rebuild indexed. The registry is grow-only, so the table
-// is valid until that count moves -- see cn1GcBuildRootSnapshots.
-static long long cn1ConsPgIndexedCount = -1;
+static int cn1ConsPgN = 0, cn1ConsPgCap = 0;
+// Cached base-sorted page pointers (GC thread only). The registry is grow-only,
+// so this order is valid until the registration count changes.
+static CN1BibopPage** cn1ConsPgSorted = 0;
+static int cn1ConsPgSortedN = 0, cn1ConsPgSortedCap = 0;
+static long long cn1ConsPgSortedKey = -1;
 
-// Find the entry for a page base, or 0. Terminates on the empty slot that the
-// <= 1/2 load factor guarantees exists.
-static inline CN1ConsPage* cn1ConsPgFind(char* cand) {
-    // A ZERO KEY IS THE EMPTY MARKER, so it must never be looked up. This function is
-    // handed arbitrary machine words off a conservative stack scan, and every word
-    // below CN1_BIBOP_PAGE_SIZE masks to page base 0 -- a small aligned integer left
-    // in a stack slot is enough. Probing for 0 matches the first empty entry and
-    // returns it as a hit: an all-zero CN1ConsPage whose slotSize the caller then
-    // divides by. arm64 answers integer division by zero with 0, so the word resolved
-    // to slot 0 of a page that does not exist and the damage stayed silent; x86-64
-    // raises SIGFPE, which is how CI found it while every local run passed. The sorted
-    // array this replaced could not be reached this way -- every element in it was a
-    // real page base -- so the hazard arrived with the table, not with the workload.
-    // No page can live at address 0, so rejecting the key outright loses nothing.
-    if(cand == 0 || cn1ConsPgN == 0) {
-        return 0;
-    }
-    unsigned mask = (unsigned)cn1ConsPgMask;
-    unsigned i = cn1PtrMix((uintptr_t)cand) & mask;
-    for(;;) {
-        CN1ConsPage* e = &cn1ConsPg[i];
-        if(e->base == cand) {
-            return e;
-        }
-        if(e->base == 0) {
-            return 0;
-        }
-        i = (i + 1) & mask;
-    }
-}
-
-// Rebuild the page index from the registry, into a table sized once up front.
-//
-// ALL OR NOTHING, and never in place. The live table is not touched until a COMPLETE
-// replacement exists, because a partial index is not a slow index -- it is a silently
-// wrong one. A page missing from it makes cn1ConservativeResolve reject every
-// reference into that page, gcMarkObject's guard then skips the object, and the sweep
-// frees it while it is still reachable. The registry is a prepend list, so a rebuild
-// that gave up part way through would keep the NEWEST pages and drop the oldest --
-// precisely the ones holding a long-lived live set -- and it would do so on
-// allocation failure, i.e. exactly when memory pressure makes a collection matter.
-//
-// So: size for the count we read (plus slack for pages registered while we walk),
-// allocate, fill, and publish only on success. On any failure the previous table
-// stays in place and cn1ConsPgIndexedCount is left alone, so the next cycle retries;
-// what that table is missing is pages registered since it was built, whose objects
-// are mark==-1 fresh and survive on the sweep's grace rule -- the same exposure a
-// page registered mid-snapshot has always had.
-//
-// Returns CN1_CONS_PG_OK, or which of the two ways it failed -- they are not the same
-// failure. Outgrowing the size picked is a lost race against a mutator registering
-// pages, harmless and self-correcting; being unable to allocate at all is not.
-#define CN1_CONS_PG_OK      0
-#define CN1_CONS_PG_RACED   1
-#define CN1_CONS_PG_NOMEM   2
-static int cn1ConsPgRebuild(long long pageCount) {
-    // Load factor <= 1/2, plus slack: the registry can grow between reading the count
-    // and loading the head, and running out of room means discarding the work. Retry
-    // at double the size if that happens anyway, so a burst of registrations costs a
-    // walk rather than a cycle without a rebuild.
-    long long want = (pageCount + CN1_CONS_PG_SLACK) * 2;
-    for(int attempt = 0 ; attempt < CN1_CONS_PG_REBUILD_ATTEMPTS ; attempt++) {
-        int cap = 256;
-        while((long long)cap < want && cap < (1 << 30)) {
-            cap *= 2;
-        }
-        CN1ConsPage* fresh = (CN1ConsPage*)calloc((size_t)cap, sizeof(CN1ConsPage));
-        if(fresh == 0) {
-            return CN1_CONS_PG_NOMEM;
-        }
-        unsigned mask = (unsigned)(cap - 1);
-        int limit = cap / 2;
-        int n = 0;
-        JAVA_BOOLEAN outgrew = JAVA_FALSE;
-        CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
-        while(p != 0) {
-            if(n >= limit) {
-                outgrew = JAVA_TRUE;
-                break;
-            }
-            char* base = (char*)p;
-            unsigned i = cn1PtrMix((uintptr_t)base) & mask;
-            while(fresh[i].base != 0) {
-                if(fresh[i].base == base) {
-                    break;          // already indexed (a registry cycle would be a bug)
-                }
-                i = (i + 1) & mask;
-            }
-            if(fresh[i].base == 0) {
-                fresh[i].base = base;
-                fresh[i].page = p;
-                // Geometry stays zero until the per-cycle refresh reads it from the
-                // page. bumpIndex zero is what makes the resolver reject every word
-                // into this page in the meantime.
-                n++;
-            }
-            p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
-        }
-        if(outgrew) {
-            // Publishing this would drop the TAIL of a prepend list, i.e. the oldest
-            // pages -- the ones most likely to hold the live set. Throw it away.
-            free(fresh);
-            want = (long long)cap * 2;
-            continue;
-        }
-        free(cn1ConsPg);
-        cn1ConsPg = fresh;
-        cn1ConsPgMask = cap - 1;
-        cn1ConsPgN = n;
-        return CN1_CONS_PG_OK;
-    }
-    return CN1_CONS_PG_RACED;
+static int cn1ConsPgPtrCmp(const void* a, const void* b) {
+    char* la = (char*)(*(CN1BibopPage* const*)a);
+    char* lb = (char*)(*(CN1BibopPage* const*)b);
+    return (la > lb) - (la < lb);
 }
 #endif
 
@@ -5309,86 +5018,41 @@ void cn1GcBuildRootSnapshots(void) {
     }
     unlockThreadHeapMutex();
     qsort(cn1ConsExt, cn1ConsExtN, sizeof(CN1ConsExtent), cn1ConsExtCmp);
-    // Index the extents by exact base for the resolver's dominant caller. Built AFTER
-    // the sort only because it must not be left describing a stale array; the table
-    // stores the base pointers themselves, so the sort order is irrelevant to it.
-    {
-        int cap = 256;
-        while(cap < cn1ConsExtN * 2) {
-            cap *= 2;
-        }
-        if(cap - 1 != cn1ConsExtHashMask) {
-            char** fresh = (char**)realloc(cn1ConsExtHash, (size_t)cap * sizeof(char*));
-            if(fresh != 0) {
-                cn1ConsExtHash = fresh;
-                cn1ConsExtHashMask = cap - 1;
-            }
-        }
-        if(cn1ConsExtHashMask >= 0) {
-            memset(cn1ConsExtHash, 0, (size_t)(cn1ConsExtHashMask + 1) * sizeof(char*));
-            unsigned mask = (unsigned)cn1ConsExtHashMask;
-            // Stop at half capacity even if that leaves entries unindexed. A failed
-            // realloc above leaves the table at its previous size, and filling one to
-            // capacity would remove the empty slot that terminates both probe loops --
-            // an infinite spin inside the collector. An unindexed extent is only
-            // slower: the sorted search below still finds it.
-            int limit = (cn1ConsExtHashMask + 1) / 2;
-            if(limit > cn1ConsExtN) {
-                limit = cn1ConsExtN;
-            }
-            for(int i = 0 ; i < limit ; i++) {
-                char* lo = cn1ConsExt[i].lo;
-                unsigned j = cn1PtrMix((uintptr_t)lo) & mask;
-                while(cn1ConsExtHash[j] != 0 && cn1ConsExtHash[j] != lo) {
-                    j = (j + 1) & mask;
-                }
-                cn1ConsExtHash[j] = lo;
-            }
-        }
-    }
 #ifndef CN1_DISABLE_BIBOP
-    // The page registry is GROW-ONLY (nodes never unlink or reorder), so the set of
-    // keys in the page index only changes when a page is registered. Rebuild it ONLY
-    // when the registration count moved -- the per-cycle indexing of thousands of
-    // pages was one of the largest GC costs on allocation-churn workloads (profiled:
-    // ~1/3 of the snapshot build). A page registered mid-snapshot is missed by this
-    // cycle exactly as it was by the old head-once walk (its objects are covered by
+    // The page registry is GROW-ONLY (nodes never unlink or reorder), so its
+    // base-sorted order only changes when a page is registered. Cache the
+    // sorted page-pointer array and rebuild+qsort ONLY when the registration
+    // count moved -- the per-cycle qsort of thousands of pages was one of the
+    // largest GC costs on allocation-churn workloads (profiled: ~1/3 of the
+    // snapshot build). A page registered mid-snapshot is missed by this cycle
+    // exactly as it was by the old head-once walk (its objects are covered by
     // the mark==-1 grace); the count mismatch rebuilds on the NEXT cycle.
     {
         long long pageCount = atomic_load_explicit(&bibopAllPagesCount, memory_order_acquire);
-        if(pageCount != cn1ConsPgIndexedCount) {
-            int rebuilt = cn1ConsPgRebuild(pageCount);
-            if(rebuilt == CN1_CONS_PG_OK) {
-                // key on the number we actually WALKED: if registrations raced past
-                // the count we read, the next cycle's count differs and rebuilds
-                cn1ConsPgIndexedCount = cn1ConsPgN;
-            } else if(rebuilt == CN1_CONS_PG_NOMEM && cn1ConsPgN == 0) {
-                // Out of memory with nothing to fall back on. Marking cannot proceed:
-                // with no page index every BiBOP reference fails to resolve,
-                // gcMarkObject's guard skips every one of them, and the sweep frees a
-                // heap that is still live. Say so and stop rather than corrupt it --
-                // this is a few hundred KB of calloc, so reaching here means the
-                // process is already finished. A LOST RACE never comes here: it leaves
-                // the previous index in place, and on the very first build there are
-                // no pages to lose.
-                fprintf(stderr, "CN1 GC: cannot build the page resolver index for %lld "
-                                "pages; refusing to mark a heap it cannot resolve\n",
-                        pageCount);
-                fflush(stderr);
-                abort();
+        if(pageCount != cn1ConsPgSortedKey) {
+            cn1ConsPgSortedN = 0;
+            CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+            while(p != 0) {
+                if(cn1ConsPgSortedN == cn1ConsPgSortedCap) {
+                    cn1ConsPgSortedCap = cn1ConsPgSortedCap ? cn1ConsPgSortedCap * 2 : 256;
+                    cn1ConsPgSorted = (CN1BibopPage**)realloc(cn1ConsPgSorted, cn1ConsPgSortedCap * sizeof(CN1BibopPage*));
+                }
+                cn1ConsPgSorted[cn1ConsPgSortedN++] = p;
+                p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
             }
-            // else: keep the previous complete index and retry next cycle.
+            qsort(cn1ConsPgSorted, cn1ConsPgSortedN, sizeof(CN1BibopPage*), cn1ConsPgPtrCmp);
+            // key on the number we actually WALKED: if registrations raced past
+            // the count we read, the next cycle's count differs and rebuilds
+            cn1ConsPgSortedKey = cn1ConsPgSortedN;
         }
     }
-    // Per-cycle geometry refresh. Walks the table LINEARLY rather than probing it
-    // page by page, so the refresh stays a sequential sweep over one array however
-    // scattered the page bases are.
-    for(int pgI = 0 ; pgI <= cn1ConsPgMask ; pgI++) {
-        CN1ConsPage* e = &cn1ConsPg[pgI];
-        if(e->base == 0) {
-            continue;
-        }
-        CN1BibopPage* p = e->page;
+    if(cn1ConsPgSortedN > cn1ConsPgCap) {
+        cn1ConsPgCap = cn1ConsPgSortedN * 2;
+        cn1ConsPg = (CN1ConsPage*)realloc(cn1ConsPg, cn1ConsPgCap * sizeof(CN1ConsPage));
+    }
+    cn1ConsPgN = cn1ConsPgSortedN;
+    for(int pgI = 0 ; pgI < cn1ConsPgSortedN ; pgI++) {
+        CN1BibopPage* p = cn1ConsPgSorted[pgI];
         // Load bumpIndex FIRST (acquire), then the geometry. A page popped from
         // freePool is reformatted by the acquiring MUTATOR (cn1BibopFormatPage
         // rewrites slotSize/firstSlotOffset/slotCount) concurrently with this walk;
@@ -5398,10 +5062,11 @@ void cn1GcBuildRootSnapshots(void) {
         // (geometry may be torn but is never used); bump>0 -> the acquire makes the
         // matching geometry visible. Reading geometry BEFORE the acquire could pair
         // old geometry with the new bump -> misresolved interior words.
-        e->bumpIndex = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
-        e->firstSlotOffset = p->firstSlotOffset;
-        e->slotSize = p->slotSize;
-        e->slotCount = p->slotCount;
+        cn1ConsPg[pgI].bumpIndex = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+        cn1ConsPg[pgI].base = (char*)p;
+        cn1ConsPg[pgI].firstSlotOffset = p->firstSlotOffset;
+        cn1ConsPg[pgI].slotSize = p->slotSize;
+        cn1ConsPg[pgI].slotCount = p->slotCount;
     }
 #endif
     if(getenv("CN1_SNAP_DEBUG")) {
@@ -5447,10 +5112,14 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
     if((v & (sizeof(void*) - 1)) != 0) return JAVA_NULL; // reject unaligned / tagged-Integer
 
 #ifndef CN1_DISABLE_BIBOP
-    {
+    if(cn1ConsPgN > 0) {
         char* cand = (char*)(v & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
-        CN1ConsPage* pg = cn1ConsPgFind(cand);
-        if(pg != 0) {
+        int lo = 0, hi = cn1ConsPgN - 1;
+        while(lo <= hi) {
+            int mid = (lo + hi) >> 1;
+            char* b = cn1ConsPg[mid].base;
+            if(b == cand) {
+                CN1ConsPage* pg = &cn1ConsPg[mid];
                 long off = (long)((char*)w - cand);
                 if(off < pg->firstSlotOffset) return JAVA_NULL;  // inside page header
                 int idx = (int)((off - pg->firstSlotOffset) / pg->slotSize);
@@ -5487,36 +5156,10 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 // word must still resolve to it or it would be missed as a root and swept.
                 if(o->__heapPosition != CN1_BIBOP_HEAP_POS && o->__heapPosition != CN1_BIBOP_ADOPTED) return JAVA_NULL;
                 return o;                                        // interior -> slot base
+            } else if(b < cand) lo = mid + 1; else hi = mid - 1;
         }
     }
 #endif
-
-    // EXACT BASE, O(1). Every caller that resolves a Java REFERENCE -- gcMarkObject's
-    // guard on every field the drain follows, which is the overwhelming majority of
-    // calls here -- hands us an object base, and a base is a key in this table. The
-    // sorted search below exists for the interior pointers only the conservative
-    // stack/register scan produces, and paying its ~log2(N) dependent cache misses on
-    // every reference field is what made the collector's cost grow with the heap
-    // rather than with the live set (issue #5537).
-    // Zero is this table's empty marker too, and the same collision applies -- but the
-    // key here is the word itself rather than a masked page base, and v == 0 was
-    // rejected at the top of this function. No extent has a zero base either
-    // (cn1ConsExtAdd drops JAVA_NULL), so a match is always a real key. Keep that
-    // early return if this is ever restructured.
-    if(cn1ConsExtHashMask >= 0 && cn1ConsExtN > 0) {
-        unsigned mask = (unsigned)cn1ConsExtHashMask;
-        unsigned i = cn1PtrMix(v) & mask;
-        for(;;) {
-            char* k = cn1ConsExtHash[i];
-            if(k == (char*)w) {
-                return (JAVA_OBJECT)w;   // lo == base for every extent (cn1ConsExtAdd)
-            }
-            if(k == 0) {
-                break;
-            }
-            i = (i + 1) & mask;
-        }
-    }
 
     if(cn1ConsExtN > 0) {
         int lo = 0, hi = cn1ConsExtN - 1, found = -1;
@@ -5781,26 +5424,31 @@ static int cn1GcVerifyClassify(JAVA_OBJECT o, CN1BibopPage** outPage, int* outId
     uintptr_t v = (uintptr_t)o;
     if(v == 0 || (v & (sizeof(void*) - 1)) != 0) return CN1_GC_VS_UNKNOWN;
 #ifndef CN1_DISABLE_BIBOP
-    {
+    if(cn1ConsPgN > 0) {
         char* cand = (char*)(v & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
-        if(cn1ConsPgFind(cand) != 0) {
-            // The index key IS the page pointer; read geometry live so a page
-            // reformatted since the snapshot is judged by its current shape
-            // rather than a stale one.
-            CN1BibopPage* p = (CN1BibopPage*)cand;
-            long off = (long)((char*)o - cand);
-            int first = p->firstSlotOffset;
-            int ss = p->slotSize;
-            if(ss <= 0 || off < first) return CN1_GC_VS_UNKNOWN;
-            int idx = (int)((off - first) / ss);
-            if(idx < 0 || idx >= p->slotCount) return CN1_GC_VS_UNKNOWN;
-            if(outPage != 0) *outPage = p;
-            if(outIdx != 0) *outIdx = idx;
-            int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
-            if(idx >= bump) return CN1_GC_VS_STALE_SLOT;
-            int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
-            if(m == CN1_BIBOP_FREE_MARK) return CN1_GC_VS_FREE_SLOT;
-            return CN1_GC_VS_OK;
+        int lo = 0, hi = cn1ConsPgN - 1;
+        while(lo <= hi) {
+            int mid = (lo + hi) >> 1;
+            char* b = cn1ConsPg[mid].base;
+            if(b == cand) {
+                // cn1ConsPg[].base IS the page pointer; read geometry live so a
+                // page reformatted since the snapshot is judged by its current
+                // shape rather than a stale one.
+                CN1BibopPage* p = (CN1BibopPage*)cand;
+                long off = (long)((char*)o - cand);
+                int first = p->firstSlotOffset;
+                int ss = p->slotSize;
+                if(ss <= 0 || off < first) return CN1_GC_VS_UNKNOWN;
+                int idx = (int)((off - first) / ss);
+                if(idx < 0 || idx >= p->slotCount) return CN1_GC_VS_UNKNOWN;
+                if(outPage != 0) *outPage = p;
+                if(outIdx != 0) *outIdx = idx;
+                int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+                if(idx >= bump) return CN1_GC_VS_STALE_SLOT;
+                int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+                if(m == CN1_BIBOP_FREE_MARK) return CN1_GC_VS_FREE_SLOT;
+                return CN1_GC_VS_OK;
+            } else if(b < cand) lo = mid + 1; else hi = mid - 1;
         }
     }
 #endif
@@ -7039,28 +6687,17 @@ struct JavaObjectPrototype cn1TaggedProxy = { .__codenameOneParentClsReference =
 // knows the page had a live slot THIS cycle (-> must full-walk, never O(1) all-dead).
 // Relaxed + idempotent: every parallel marker that newly marks a slot on this page stores
 // the same value; the GC-thread sweep reads it after the mark-pool join barrier.
-static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal, int graceOnly) {
+static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal) {
     // Stamp for a normal BiBOP slot AND a MATURED (-4) slot: a live matured object's
     // memory is still in this page, so its page must not be O(1) all-dead reclaimed.
     if(obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED) {
         CN1BibopPage* pg = (CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         atomic_store_explicit(&pg->gcLastMarkedEpoch, markVal, memory_order_relaxed);
-        // The page address is already in hand, which is the whole cost of this
-        // accounting -- see gcGraceMarked in cn1_globals.h for what it is for.
-        if(graceOnly) {
-            atomic_fetch_add_explicit(&pg->gcGraceMarked, 1, memory_order_relaxed);
-        }
     }
 }
-#define CN1_BIBOP_STAMP_MARKED(o, m) cn1BibopStampMarked((o), (m), 0)
-// A mark taken during a grace pass whose previous value was -1: the object survives
-// on the grace rule alone, since the root drain ran to completion before the pass and
-// did not reach it.
-#define CN1_BIBOP_STAMP_MARKED_GRACE(o, m, snap) \
-    cn1BibopStampMarked((o), (m), (cn1GcInGracePass != 0 && (snap) == -1))
+#define CN1_BIBOP_STAMP_MARKED(o, m) cn1BibopStampMarked((o), (m))
 #else
 #define CN1_BIBOP_STAMP_MARKED(o, m) do {} while(0)
-#define CN1_BIBOP_STAMP_MARKED_GRACE(o, m, snap) do {} while(0)
 #endif
 
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
@@ -7217,7 +6854,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
             return; // already marked this cycle
         }
         if(__sync_bool_compare_and_swap(&obj->__codenameOneGcMark, old, markVal)) {
-            CN1_BIBOP_STAMP_MARKED_GRACE(obj, markVal, old);
+            CN1_BIBOP_STAMP_MARKED(obj, markVal);
             if(__cls->markFunction != 0) {
                 gcMarkWorklistPush(obj, force);
             }
@@ -7332,7 +6969,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     }
 #endif
     obj->__codenameOneGcMark = markVal;
-    CN1_BIBOP_STAMP_MARKED_GRACE(obj, markVal, markSnapshot);
+    CN1_BIBOP_STAMP_MARKED(obj, markVal);
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
     gcMarkNewObjectCount++;   // SATB fixpoint detection (mark-thread only)
 #ifdef CN1_BIBOP_VALIDATE
