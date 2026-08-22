@@ -428,6 +428,18 @@ final class InterpLambdaDesugar {
             widen(il, source, to);
             return;
         }
+        if (to.getSort() == Type.ARRAY) {
+            // An array destination needs the same narrowing as a plain object
+            // one. `Consumer<String[]>` reaches `adapt` as Object -> [Ljava/
+            // lang/String;, and gating on OBJECT alone left the erased argument
+            // uncast: the synthesized accept(Object) forwarded any reference
+            // straight to the interpreted lambda body, so a raw
+            // `Consumer.accept("bad")` reached the lambda instead of throwing
+            // ClassCastException. `Type.getInternalName()` on an array returns
+            // its descriptor form, which is what CHECKCAST expects.
+            il.add(new TypeInsnNode(Opcodes.CHECKCAST, to.getInternalName()));
+            return;
+        }
         if (!"java/lang/Object".equals(to.getInternalName())
                 && to.getSort() == Type.OBJECT) {
             il.add(new TypeInsnNode(Opcodes.CHECKCAST, to.getInternalName()));

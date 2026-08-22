@@ -199,33 +199,76 @@ public class InterpAndroidLinker implements InterpLinker {
     }
 
     private Method findInInterfaces(Class c, String name, Class[] types) {
-        if (c == null) {
+        // Collect every inheritable interface declaration reachable through
+        // this class or any of its superclasses, then pick the maximally
+        // specific per JLS 5.4.3.3. Returning the first depth-first hit
+        // instead would pick I.m over J.m on a class declaring
+        // `implements I, J` where `J extends I` overrides the default -- and
+        // the same problem happens when the more-specific interface is
+        // inherited through a superclass, which is why the pool is drawn from
+        // the whole chain, not just this class's own interfaces.
+        java.util.ArrayList<Method> candidates = new java.util.ArrayList<Method>();
+        java.util.HashSet<Class> visited = new java.util.HashSet<Class>();
+        for (Class k = c; k != null; k = k.getSuperclass()) {
+            for (Class iface : k.getInterfaces()) {
+                collectInterfaceCandidates(iface, name, types, candidates, visited);
+            }
+        }
+        int count = candidates.size();
+        if (count == 0) {
             return null;
         }
-        Class[] ifaces = c.getInterfaces();
-        for (int i = 0; i < ifaces.length; i++) {
-            try {
-                Method m = ifaces[i].getDeclaredMethod(name, types);
-                // Only instance, non-private declarations are inherited
-                // through an interface. Reflection ignores the receiver for a
-                // static invoke, so returning `A.staticM()` when the caller
-                // was dispatching virtually through `B` (which declares a
-                // same-descriptor default) would silently run A's body. iOS
-                // filters this in its symbol table; here reflection carries
-                // the modifiers with the Method itself.
-                int mods = m.getModifiers();
-                if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
-                    return m;
+        if (count == 1) {
+            return candidates.get(0);
+        }
+        for (int i = 0; i < count; i++) {
+            Class declaringA = candidates.get(i).getDeclaringClass();
+            boolean maximal = true;
+            for (int j = 0; j < count; j++) {
+                if (i == j) {
+                    continue;
                 }
-            } catch (NoSuchMethodException ignore) {
-                // fall through to the recursive walk below
+                Class declaringB = candidates.get(j).getDeclaringClass();
+                // Some other candidate is on a proper subinterface of this
+                // one, so it is more specific and this one is not maximal.
+                if (!declaringA.equals(declaringB)
+                        && declaringA.isAssignableFrom(declaringB)) {
+                    maximal = false;
+                    break;
+                }
             }
-            Method deeper = findInInterfaces(ifaces[i], name, types);
-            if (deeper != null) {
-                return deeper;
+            if (maximal) {
+                return candidates.get(i);
             }
         }
-        return findInInterfaces(c.getSuperclass(), name, types);
+        // Several maximally specific and none dominates -- JLS leaves the
+        // choice arbitrary. Take the first candidate found so the answer is
+        // deterministic within a run.
+        return candidates.get(0);
+    }
+
+    private void collectInterfaceCandidates(Class iface, String name, Class[] types,
+                                            java.util.ArrayList<Method> candidates,
+                                            java.util.HashSet<Class> visited) {
+        if (!visited.add(iface)) {
+            return;
+        }
+        try {
+            Method m = iface.getDeclaredMethod(name, types);
+            int mods = m.getModifiers();
+            // Only instance, non-private declarations are inherited through
+            // an interface. Reflection ignores the receiver for a static
+            // invoke, so admitting `A.staticM()` when `B` declares a same-
+            // descriptor default would silently run A's body.
+            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
+                candidates.add(m);
+            }
+        } catch (NoSuchMethodException ignore) {
+            // Not declared here -- keep walking; a superinterface may declare it.
+        }
+        for (Class parent : iface.getInterfaces()) {
+            collectInterfaceCandidates(parent, name, types, candidates, visited);
+        }
     }
 
     private Field lookupField(String owner, String name)

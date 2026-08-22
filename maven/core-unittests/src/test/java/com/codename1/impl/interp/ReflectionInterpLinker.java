@@ -186,31 +186,68 @@ public class ReflectionInterpLinker implements InterpLinker {
     }
 
     private Method findInInterfaces(Class c, String name, Class[] types) {
-        if (c == null) {
+        // Every inheritable interface declaration reachable through this
+        // class or a superclass is a candidate; the maximally specific one
+        // per JLS 5.4.3.3 wins. Selecting the first depth-first hit picks a
+        // superinterface's default over a subinterface's override -- and the
+        // same happens when the more-specific interface is inherited through
+        // a superclass, which is why the pool is drawn from the whole chain.
+        java.util.ArrayList<Method> candidates = new java.util.ArrayList<Method>();
+        java.util.HashSet<Class> visited = new java.util.HashSet<Class>();
+        for (Class k = c; k != null; k = k.getSuperclass()) {
+            for (Class iface : k.getInterfaces()) {
+                collectInterfaceCandidates(iface, name, types, candidates, visited);
+            }
+        }
+        int count = candidates.size();
+        if (count == 0) {
             return null;
         }
-        Class[] ifaces = c.getInterfaces();
-        for (int i = 0; i < ifaces.length; i++) {
-            try {
-                Method m = ifaces[i].getDeclaredMethod(name, types);
-                // Skip static and private declarations: neither is inherited
-                // through an interface, and returning either from a virtual
-                // dispatch (reflection ignores the receiver for a static
-                // invoke) would run the wrong body when another interface
-                // declares a same-descriptor default.
-                int mods = m.getModifiers();
-                if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
-                    return m;
+        if (count == 1) {
+            return candidates.get(0);
+        }
+        for (int i = 0; i < count; i++) {
+            Class declaringA = candidates.get(i).getDeclaringClass();
+            boolean maximal = true;
+            for (int j = 0; j < count; j++) {
+                if (i == j) {
+                    continue;
                 }
-            } catch (NoSuchMethodException ignore) {
-                // fall through to the recursive walk below
+                Class declaringB = candidates.get(j).getDeclaringClass();
+                if (!declaringA.equals(declaringB)
+                        && declaringA.isAssignableFrom(declaringB)) {
+                    maximal = false;
+                    break;
+                }
             }
-            Method deeper = findInInterfaces(ifaces[i], name, types);
-            if (deeper != null) {
-                return deeper;
+            if (maximal) {
+                return candidates.get(i);
             }
         }
-        return findInInterfaces(c.getSuperclass(), name, types);
+        return candidates.get(0);
+    }
+
+    private void collectInterfaceCandidates(Class iface, String name, Class[] types,
+                                            java.util.ArrayList<Method> candidates,
+                                            java.util.HashSet<Class> visited) {
+        if (!visited.add(iface)) {
+            return;
+        }
+        try {
+            Method m = iface.getDeclaredMethod(name, types);
+            int mods = m.getModifiers();
+            // Static and private declarations are not inherited through an
+            // interface; skip them so an `A.staticM()` cannot be picked over
+            // a same-descriptor default on another superinterface.
+            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
+                candidates.add(m);
+            }
+        } catch (NoSuchMethodException ignore) {
+            // Not declared here -- a superinterface may declare it.
+        }
+        for (Class parent : iface.getInterfaces()) {
+            collectInterfaceCandidates(parent, name, types, candidates, visited);
+        }
     }
 
     private Field lookupField(String owner, String name)
