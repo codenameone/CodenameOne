@@ -964,7 +964,13 @@ public final class InterpRuntime {
                         // to look through the brackets -- `new Entry[1][]` names
                         // the component `[LEntry;`, and asking the host to load
                         // Entry is asking for a class only the bundle has.
-                        f.pushRef(isInterpretedLeaf(comp)
+                        // `new Class[n]` is Object[] for the same reason a
+                        // pushed type is: a class literal for a pushed type is
+                        // an InterpClass token, and storing that in a real
+                        // host Class[] would raise ArrayStoreException. The
+                        // arg-conversion path materialises a real Class[]
+                        // when handing one to a host method that wants it.
+                        f.pushRef(isInterpretedLeaf(comp) || isClassLeaf(comp)
                                 ? new Object[count]
                                 : linker.newArray(comp.startsWith("[") ? comp : "L" + comp + ";", count));
                         break;
@@ -977,7 +983,7 @@ public final class InterpRuntime {
                             checkNegativeSize(sizes[i]);
                         }
                         String arrayType = externOwnerName(code[pc + 1]);
-                        f.pushRef(isInterpretedLeaf(arrayType)
+                        f.pushRef(isInterpretedLeaf(arrayType) || isClassLeafArray(arrayType)
                                 ? nestedObjectArray(sizes, 0)
                                 : linker.newMultiArray(arrayType, sizes));
                         break;
@@ -1341,6 +1347,19 @@ public final class InterpRuntime {
     /// has ever heard of the type.
     private boolean isInterpretedLeaf(String descriptor) {
         return bundle.findClass(leafOf(descriptor)) != null;
+    }
+
+    /// Whether an ANEWARRAY's component descriptor is java.lang.Class.
+    /// Spelled in either the bare-name or L-wrapped form, matching how the
+    /// existing `isInterpretedLeaf` accepts an ANEWARRAY's component name.
+    private static boolean isClassLeaf(String comp) {
+        return "java/lang/Class".equals(comp) || "Ljava/lang/Class;".equals(comp);
+    }
+
+    /// Whether a MULTIANEWARRAY's array-type descriptor bottoms out at
+    /// java.lang.Class. `[Ljava/lang/Class;`, `[[Ljava/lang/Class;` and so on.
+    private static boolean isClassLeafArray(String arrayType) {
+        return "java/lang/Class".equals(leafOf(arrayType));
     }
 
     /// The token for an interpreted array type named by a descriptor.
@@ -2113,6 +2132,21 @@ public final class InterpRuntime {
         for (int i = 0; i < args.length && i < params.length; i++) {
             if (args[i] instanceof InterpClass && "Ljava/lang/Class;".equals(params[i])) {
                 args[i] = hostClassFor((InterpClass) args[i]);
+            } else if (args[i] instanceof Object[]
+                    && "[Ljava/lang/Class;".equals(params[i])) {
+                // A `Class<?>[]` argument -- ordinary `Class.getMethod(...,
+                // Type.class)` and any varargs `Class<?>...` call. We hand the
+                // interpreter an Object[] for `new Class[n]` (a Class[] would
+                // reject an InterpClass token at AASTORE), and a host method
+                // expecting a real Class[] needs one materialised at the
+                // boundary. Elements go through hostClassFor so pushed-only
+                // classes at least resolve to their nearest host ancestor,
+                // matching the scalar conversion above.
+                Object[] src = (Object[]) args[i];
+                Object[] converted = classArrayFor(src);
+                if (converted != null) {
+                    args[i] = converted;
+                }
             }
         }
         // Elements of a reference array cross the same way a scalar argument
@@ -2440,6 +2474,30 @@ public final class InterpRuntime {
         String[] answer = new String[out.size()];
         out.copyInto(answer);
         return answer;
+    }
+
+    /// A real `Class[]` built from an interpreter-owned Object[] used to
+    /// stand in for one. Elements go through {@link #hostClassFor}, so a
+    /// pushed-only leaf resolves to its nearest host ancestor -- matching how
+    /// a scalar `Class` argument is converted; a real host Class element is
+    /// left as-is. Returns null when the linker cannot produce a Class[] at
+    /// all, letting the caller keep the Object[] rather than fail loudly for
+    /// a host method it turns out never to have needed one.
+    private Object[] classArrayFor(Object[] src) throws Throwable {
+        Object array = linker.newArray("Ljava/lang/Class;", src.length);
+        if (!(array instanceof Object[])) {
+            return null;
+        }
+        Object[] dst = (Object[]) array;
+        for (int i = 0; i < src.length; i++) {
+            Object element = src[i];
+            if (element instanceof InterpClass) {
+                dst[i] = hostClassFor((InterpClass) element);
+            } else {
+                dst[i] = element;
+            }
+        }
+        return dst;
     }
 
     /// The host class standing in for an interpreted one: the nearest ancestor
