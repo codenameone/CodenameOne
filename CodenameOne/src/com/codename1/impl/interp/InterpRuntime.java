@@ -2151,8 +2151,17 @@ public final class InterpRuntime {
                     if (classArrayPairs == null) {
                         classArrayPairs = new Vector();
                     }
+                    // Snapshot of what we handed to the host, so the finally
+                    // block can tell which slots the host actually mutated
+                    // (identity change against this snapshot) and leave the
+                    // rest alone -- otherwise we would overwrite the caller's
+                    // InterpClass tokens with the nearest-host-ancestor
+                    // stand-ins we passed across, on every read-only call.
+                    Object[] snapshot = new Object[converted.length];
+                    System.arraycopy(converted, 0, snapshot, 0, converted.length);
                     classArrayPairs.addElement(src);
                     classArrayPairs.addElement(converted);
+                    classArrayPairs.addElement(snapshot);
                     args[i] = converted;
                 }
             }
@@ -2217,16 +2226,25 @@ public final class InterpRuntime {
             // Class[] parameters: mirror any writes the host made on the
             // materialised Class[] back to the interpreter-owned Object[] so
             // the caller sees mutations, in line with normal Java array-by-
-            // reference semantics. Host-supplied Class objects flow back as-is
-            // (an InterpClass token in that slot before the call is replaced
-            // only when the host actually overwrote it).
+            // reference semantics. Untouched slots keep the original element
+            // (an InterpClass token stays a token) -- otherwise a read-only
+            // host call would silently turn `{Pushed.class}` into
+            // `{NearestHostAncestor.class}` because dst was materialised
+            // through `hostClassFor`, and a later `types[0] == Pushed.class`
+            // would answer false for a callee that never wrote anything.
             if (classArrayPairs != null) {
-                for (int i = 0; i < classArrayPairs.size(); i += 2) {
+                for (int i = 0; i < classArrayPairs.size(); i += 3) {
                     Object[] src = (Object[]) classArrayPairs.elementAt(i);
                     Object[] dst = (Object[]) classArrayPairs.elementAt(i + 1);
+                    Object[] materialised = (Object[]) classArrayPairs.elementAt(i + 2);
                     int len = src.length < dst.length ? src.length : dst.length;
                     for (int k = 0; k < len; k++) {
-                        src[k] = dst[k];
+                        // Identity check against what we handed the host: if
+                        // the slot still holds that value, the host did not
+                        // touch it and the source's original token stays.
+                        if (dst[k] != materialised[k]) {  //NOPMD CompareObjectsWithEquals - identity is the whole point
+                            src[k] = dst[k];
+                        }
                     }
                 }
             }
