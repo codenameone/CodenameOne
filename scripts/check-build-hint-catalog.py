@@ -25,7 +25,8 @@ def catalog():
     for fn in sorted(os.listdir(src)):
         if not fn.startswith("BuildHints") or not fn.endswith(".java"):
             continue
-        text = open(os.path.join(src, fn), encoding="utf-8").read()
+        with open(os.path.join(src, fn), encoding="utf-8") as fh:
+            text = fh.read()
         for m in re.finditer(r'new Hint\("((?:[^"\\]|\\.)*)"\)', text):
             names.add(m.group(1))
         for m in re.finditer(r'\.dynamic\("((?:[^"\\]|\\.)*)"\)', text):
@@ -60,7 +61,8 @@ def documented_hints():
                     continue
                 path = os.path.join(dirpath, fn)
                 try:
-                    text = open(path, encoding="utf-8", errors="replace").read()
+                    with open(path, encoding="utf-8", errors="replace") as fh:
+                        text = fh.read()
                 except OSError:
                     continue
                 for m in re.finditer(r'codename1\.arg\.([A-Za-z][A-Za-z0-9_.]*)', text):
@@ -102,10 +104,11 @@ def main():
 
     baseline = set()
     if os.path.exists(BASELINE):
-        for line in open(BASELINE):
-            line = line.strip()
-            if line and not line.startswith("#"):
-                baseline.add(line.split("|")[0])
+        with open(BASELINE, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    baseline.add(line.split("|")[0])
 
     current = {f.split("|")[0]: f for f in findings}
     added = sorted(set(current) - baseline)

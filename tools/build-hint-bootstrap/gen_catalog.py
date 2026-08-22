@@ -5,9 +5,11 @@ import json, re, os, sys, collections
 ROOT = "/Users/shai/dev/cn6/CodenameOne"
 SC = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(ROOT, "maven/build-hint-catalog/src/main/java/com/codename1/build/shared")
-LICENSE = open(os.path.join(SC, "license.txt")).read()
+with open(os.path.join(SC, "license.txt"), encoding="utf-8") as _fh:
+    LICENSE = _fh.read()
 
-mined = json.load(open(os.path.join(SC, "mined.json")))
+with open(os.path.join(SC, "mined.json"), encoding="utf-8") as _fh:
+    mined = json.load(_fh)
 
 sys.path.insert(0, SC)
 from curation import CURATED, ENUMS, PRIVACY_PREFIX, DEFAULT_NOTES, DOC_OVERRIDES, TYPE_OVERRIDES
@@ -26,7 +28,8 @@ def load_docs():
     # This bootstrap is a one-off: the catalog is the source of truth now and is
     # edited directly.
     p = os.path.join(SC, "guide_old.asciidoc")
-    lines = open(p, encoding="utf-8").read().split("\n")[30:736]
+    with open(p, encoding="utf-8") as fh:
+        lines = fh.read().split("\n")[30:736]
     docs, i = {}, 0
     while i < len(lines):
         ln = lines[i]
@@ -261,7 +264,8 @@ final class {fname} {{
 
     static void register(List<Hint> h) {{
 ''' + "\n\n".join(body) + "\n    }\n}\n"
-    open(os.path.join(OUT, fname + ".java"), "w").write(src)
+    with open(os.path.join(OUT, fname + ".java"), "w", encoding="utf-8") as fh:
+        fh.write(src)
 
 print("entries per file:", dict(counts), file=sys.stderr)
 print("total:", sum(counts.values()), file=sys.stderr)

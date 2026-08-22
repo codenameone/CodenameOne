@@ -63,7 +63,7 @@ public @interface OnDeviceDebug {
     /// proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a
     /// physical device, set this to the developer laptop's LAN IP. Has no effect
     /// unless `ios.onDeviceDebug=true`.
-    String iosProxyHost() default "127.0.0.1";
+    String iosProxyHost() default "";
 
     /// TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for
     /// the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.

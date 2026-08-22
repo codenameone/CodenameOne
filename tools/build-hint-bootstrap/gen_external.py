@@ -10,9 +10,11 @@ import gen_catalog as G
 
 ROOT = "/Users/shai/dev/cn6/CodenameOne"
 OUT = os.path.join(ROOT, "maven/build-hint-catalog/src/main/java/com/codename1/build/shared")
-LICENSE = open(os.path.join(SC, "license.txt")).read()
+with open(os.path.join(SC, "license.txt"), encoding="utf-8") as _fh:
+    LICENSE = _fh.read()
 
-mined = set(json.load(open(SC + "/mined.json")))
+with open(SC + "/mined.json", encoding="utf-8") as _fh:
+    mined = set(json.load(_fh))
 PLACEHOLDER = re.compile(r'PERMISSION_NAME|[A-Z_]{4,}$|[<>]')
 
 names = sorted(k for k in G.DOCS
@@ -62,5 +64,6 @@ final class BuildHintsExternal {
 
     static void register(List<Hint> h) {
 ''' + "\n\n".join(body) + "\n    }\n}\n"
-open(os.path.join(OUT, "BuildHintsExternal.java"), "w").write(src)
+with open(os.path.join(OUT, "BuildHintsExternal.java"), "w", encoding="utf-8") as _fh:
+    _fh.write(src)
 print("external entries:", len(names), file=sys.stderr)

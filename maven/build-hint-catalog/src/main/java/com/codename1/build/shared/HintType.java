@@ -20,18 +20,38 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide;
-
-import com.codename1.system.Lifecycle;
-import com.codename1.annotations.buildhints.*;
+package com.codename1.build.shared;
 
 /**
- * Application entry point that launches the demo browser.
+ * The kind of value a build hint carries.
+ *
+ * <p>This is the single source of truth for hint typing. Three other
+ * vocabularies used to describe the same thing and drifted apart from each
+ * other; they are now derived from this one via
+ * {@link BuildHints#settingsType(HintType)} and
+ * {@link BuildHints#editorWidget(HintType)}.</p>
  */
-@Ios(newStorageLocation = true)
-public class DemoCode extends Lifecycle {
-    @Override
-    public void runApp() {
-        new DemoBrowserForm().show();
-    }
+public enum HintType {
+    /** {@code "true"} or {@code "false"}. Maps to a Java {@code boolean}. */
+    BOOLEAN,
+    /** A decimal integer. Maps to a Java {@code int}. */
+    INT,
+    /** Free text on a single line. */
+    STRING,
+    /** Free text that is expected to span lines. Same Java type as STRING. */
+    TEXT_BLOCK,
+    /** A delimited list. Maps to {@code String[]}; requires a separator. */
+    STRING_LIST,
+    /** A closed set of values. Maps to a generated Java enum. */
+    ENUM,
+    /** An XML fragment spliced into a manifest or plist. */
+    XML,
+    /** A filesystem path. */
+    PATH,
+    /** An absolute URL. */
+    URL,
+    /** A dotted version number. */
+    VERSION,
+    /** A credential. Never echoed in logs or diagnostics. */
+    SECRET
 }

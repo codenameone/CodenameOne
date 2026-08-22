@@ -67,7 +67,8 @@ for dirpath, _, files in os.walk(SRC):
         if not fn.endswith(".java"):
             continue
         path = os.path.join(dirpath, fn)
-        text = open(path, encoding="utf-8", errors="replace").read()
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
         rel = os.path.relpath(path, ROOT)
         for pat, prefixed in OPENERS:
             for m in pat.finditer(text):
@@ -97,4 +98,5 @@ if __name__ == "__main__":
     if out == "-":
         json.dump(payload, sys.stdout, indent=1)
     else:
-        json.dump(payload, open(out, "w"), indent=1)
+        with open(out, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=1)
