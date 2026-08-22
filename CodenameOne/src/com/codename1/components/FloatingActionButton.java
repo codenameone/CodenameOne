@@ -352,8 +352,11 @@ public class FloatingActionButton extends Button {
         FlowLayout flow = new FlowLayout(orientation);
         flow.setValign(valign);
 
-        Form f = cnt.getComponentForm();
-        if (f != null && (f.getContentPane() == cnt || f == cnt)) { //NOPMD CompareObjectsWithEquals
+        // The top level rather than the form: getComponentForm() is null by design in a
+        // Window, so binding to a window's content pane fell through to the wrapper
+        // below and returned it unattached -- the button simply never appeared.
+        com.codename1.ui.TopLevelContainer f = cnt.getTopLevelContainer();
+        if (f != null && (f.getContentPane() == cnt || f.asContainer() == cnt)) { //NOPMD CompareObjectsWithEquals
             // special case for content pane installs the button directly on the content pane
             Container layers = f.getLayeredPane(getClass(), true);
             layers.setSafeArea(true);
@@ -386,9 +389,18 @@ public class FloatingActionButton extends Button {
 
     @Override
     protected void fireActionEvent(int x, int y) {
-        Form current = Display.getInstance().getCurrent();
-        if (current instanceof Dialog) {
-            ((Dialog) current).dispose();
+        // This button's own top level, not the process-wide current form. A button in a
+        // secondary window would otherwise dispose a dialog showing on the main window
+        // -- activating a window does not change Display.getCurrent(), so the dialog it
+        // closed had nothing to do with the click.
+        com.codename1.ui.TopLevelContainer top = getTopLevelContainer();
+        if (top instanceof Dialog) {
+            ((Dialog) top).dispose();
+        } else if (top == null || top instanceof Form) {
+            Form current = Display.getInstance().getCurrent();
+            if (current instanceof Dialog) {
+                ((Dialog) current).dispose();
+            }
         }
         super.fireActionEvent(x, y);
     }

@@ -400,6 +400,29 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aFabBindsToAWindowsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("fab", new BorderLayout());
+        w.setWindowSize(300, 200);
+        com.codename1.components.FloatingActionButton fab =
+                com.codename1.components.FloatingActionButton.createFAB(
+                        com.codename1.ui.FontImage.MATERIAL_ADD);
+
+        Container wrapper = fab.bindFabToContainer(w.getContentPane());
+
+        // Binding to a top level's content pane installs the button on that top level's
+        // layered pane and answers null. Resolving through getComponentForm() -- null in
+        // a window by design -- fell through to the wrapper branch instead and returned
+        // an unattached container, so the button never appeared.
+        assertNull(wrapper,
+                "binding to a window's content pane installs the button, as it does on a Form");
+        assertSame(w, fab.getTopLevelContainer(),
+                "and the button ends up inside that window");
+
+        w.dispose();
+    }
+
+    @FormTest
     void monitorsDifferingOnlyInScaleAreNotEqual() {
         Rectangle bounds = new Rectangle(0, 0, 1920, 1080);
         Rectangle work = new Rectangle(0, 0, 1920, 1040);
