@@ -5498,6 +5498,11 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
     // stack/register scan produces, and paying its ~log2(N) dependent cache misses on
     // every reference field is what made the collector's cost grow with the heap
     // rather than with the live set (issue #5537).
+    // Zero is this table's empty marker too, and the same collision applies -- but the
+    // key here is the word itself rather than a masked page base, and v == 0 was
+    // rejected at the top of this function. No extent has a zero base either
+    // (cn1ConsExtAdd drops JAVA_NULL), so a match is always a real key. Keep that
+    // early return if this is ever restructured.
     if(cn1ConsExtHashMask >= 0 && cn1ConsExtN > 0) {
         unsigned mask = (unsigned)cn1ConsExtHashMask;
         unsigned i = cn1PtrMix(v) & mask;
