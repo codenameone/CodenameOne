@@ -1542,6 +1542,23 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         WindowManager wm = manager();
+        if (ownerWindow instanceof Window) {
+            Window owner = (Window) ownerWindow;
+            // An owned window cannot be on screen without its owner, and an owner the
+            // application hid has to come back through its own lifecycle: a port can
+            // map the native window, but only show() makes the component hierarchy
+            // visible again and reacquires the modality that hide() released, so
+            // restoring it natively alone would leave an unpainted, non-interactive
+            // window that no longer blocks input. Recursive, so a whole hidden chain
+            // comes back furthest owner first.
+            //
+            // An iconified owner is deliberately not included: it is still shown as
+            // far as the framework is concerned, and the port restores it natively and
+            // reports it back through showNotify().
+            if (!owner.isWindowShowing() && !owner.iconified) {
+                owner.show();
+            }
+        }
         if (nativePeer == null) {
             if (ownerWindow instanceof Window && ((Window) ownerWindow).nativePeer == null) {
                 // Showing a window whose owner has not been shown yet would create the

@@ -330,6 +330,78 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void showingAWindowRestoresAnOwnerTheApplicationHid() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        owner.hide();
+        child.hide();
+        assertFalse(owner.isWindowShowing(), "the owner starts this hidden");
+
+        child.show();
+
+        assertTrue(owner.isWindowShowing(),
+                "an owned window cannot be on screen without its owner, so showing it "
+                        + "has to bring the owner back");
+        assertTrue(child.isWindowShowing());
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void restoringAHiddenOwnerGoesThroughItsOwnLifecycle() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        owner.hide();
+        child.hide();
+
+        child.show();
+
+        // Mapping the owner's native window is not enough: hide() made the component
+        // hierarchy invisible, and only the framework show() path puts it back. A
+        // window restored by the port alone would repaint nothing and take no input.
+        assertTrue(owner.asContainer().isVisible(),
+                "the owner's component hierarchy has to be visible again, not merely "
+                        + "its native window mapped");
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void aWholeHiddenOwnerChainComesBack() {
+        implementation.setMultiWindowSupported(true);
+        Window grandparent = new Window("grandparent");
+        grandparent.show();
+        Window parent = new Window("parent");
+        parent.setOwnerWindow(grandparent);
+        parent.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(parent);
+        child.show();
+        grandparent.hide();
+        parent.hide();
+        child.hide();
+
+        child.show();
+
+        assertTrue(grandparent.isWindowShowing(),
+                "the restore has to walk the whole owner chain, not just one level: a "
+                        + "child cannot be on screen through a visible parent whose own "
+                        + "owner is hidden");
+        assertTrue(parent.isWindowShowing());
+        assertTrue(child.isWindowShowing());
+
+        grandparent.dispose();
+    }
+
+    @FormTest
     void theMinimumSizeReachesThePortAndClampsAResize() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("clamped", new BorderLayout());

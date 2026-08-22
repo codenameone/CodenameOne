@@ -179,6 +179,11 @@ public class MacWindowManager extends WindowManager {
     /// Maps every owner above the given window that is currently away, furthest first
     /// so an owner is never mapped before its own owner.
     ///
+    /// This is the iconified case only. An owner the application hid explicitly is
+    /// restored by `Window#show()` before the port is reached, because it needs its
+    /// component hierarchy made visible and its modality reacquired, which mapping the
+    /// native window cannot do.
+    ///
     /// A window owned by the main `Form` is mapped without this bringing the main
     /// scene back: un-minimizing the application's own scene is the window server's
     /// to do, not ours. Mapping anyway is the deliberate choice -- leaving the window

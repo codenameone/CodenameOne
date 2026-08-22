@@ -3034,7 +3034,7 @@ public final class Display extends CN1Constants {
 
     /// The most recent size reported for each open window that has not been delivered
     /// yet. See `#windowSizeChanged(int, int, int)`.
-    private final java.util.Hashtable pendingWindowSizes = new java.util.Hashtable();
+    private final Hashtable pendingWindowSizes = new Hashtable();
 
     /// Notifies Codename One that a native window became visible.
     ///
