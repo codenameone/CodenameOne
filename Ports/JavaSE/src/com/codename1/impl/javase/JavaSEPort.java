@@ -10976,6 +10976,57 @@ public class JavaSEPort extends CodenameOneImplementation {
      * desktop Window has to attach the Swing editor to that window's canvas, or the
      * caret appears on the main window instead.
      */
+    /**
+     * Places the Swing editor over the field it is editing.
+     *
+     * Divided by the owning canvas's backing scale, exactly as a native peer divides
+     * by peerScale(). Codename One coordinates are device pixels --
+     * getDisplayWidthImpl multiplies the canvas size by this same scale -- while Swing
+     * bounds are logical, so assigning one to the other left the editor oversized and
+     * offset from its field by the scale factor on any canvas whose monitor is not 1x.
+     *
+     * Computed here rather than inline so the same placement can be reapplied when the
+     * window moves to a display with a different scale; see reapplyEditorBounds.
+     */
+    private void applyEditorBounds(com.codename1.ui.Component cmp) {
+        if (textCmp == null || cmp == null) {
+            return;
+        }
+        int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
+        int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
+        int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
+        int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+        double editorScale = editorCanvasFor(cmp).canvasScale();
+        textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft) / editorScale),
+                (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + marginTop) / editorScale),
+                (int) ((cmp.getWidth() - marginRight - marginLeft) / editorScale),
+                (int) ((cmp.getHeight() - marginTop - marginBottom) / editorScale));
+    }
+
+    /**
+     * Reapplies the editor's placement after its window may have changed backing
+     * scale. The placement divides by the canvas's scale, and that divisor changes
+     * when a window is dragged to a display with a different one -- the Codename One
+     * hierarchy is re-laid out for the new scale, but nothing moved the Swing editor,
+     * leaving it offset and mis-sized over its field until editing restarted.
+     *
+     * Called on the AWT thread, where the move is reported and where Swing bounds may
+     * be set.
+     */
+    void reapplyEditorBounds(int windowId) {
+        com.codename1.ui.Component cmp = currentlyEditingField;
+        if (cmp == null || textCmp == null || getSkin() != null) {
+            return;
+        }
+        Object peer = Display.getInstance().getWindowPeerForComponent(cmp);
+        int owner = peer instanceof JavaSEWindowManager.Peer
+                ? ((JavaSEWindowManager.Peer) peer).windowId : 0;
+        if (owner != windowId) {
+            return;
+        }
+        applyEditorBounds(cmp);
+    }
+
     private C editorCanvasFor(com.codename1.ui.Component cmp) {
         Object peer = Display.getInstance().getWindowPeerForComponent(cmp);
         if (peer instanceof JavaSEWindowManager.Peer) {
@@ -11285,18 +11336,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
-            // Divided by the owning canvas's backing scale, exactly as a native peer
-            // divides by peerScale(). Codename One coordinates are device pixels --
-            // getDisplayWidthImpl multiplies the canvas size by this same scale -- while
-            // Swing bounds are logical, so assigning one to the other left the editor
-            // oversized and offset from its field by the scale factor on any canvas
-            // whose monitor is not 1x.
-            double editorScale = editorCanvasFor(cmp).canvasScale();
-            textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft) / editorScale),
-                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + marginTop) / editorScale),
-                    (int) ((cmp.getWidth() - marginRight - marginLeft) / editorScale),
-                    (int) ((cmp.getHeight() - marginTop - marginBottom) / editorScale));
-            //System.out.println("Set bounds to "+textCmp.getBounds());
+            applyEditorBounds(cmp);
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {

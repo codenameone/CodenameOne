@@ -327,6 +327,12 @@ public class JavaSEWindowManager extends WindowManager {
                             // another backing scale and has to be re-converted.
                             applyMinimumSize(p);
                             Display.getInstance().windowMonitorChanged(windowId);
+                            // The Swing editor is placed by dividing by the canvas's
+                            // backing scale, so a move to a display with another one
+                            // leaves it offset and mis-sized over its field. The
+                            // hierarchy is re-laid out for the new scale; nothing
+                            // moved the editor.
+                            port.reapplyEditorBounds(windowId);
                         }
                     }
                 });
