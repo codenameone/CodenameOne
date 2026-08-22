@@ -290,19 +290,42 @@ A window has the same layered panes a form does, and that's what an overlay atta
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava013Snippet.java[tag=desktop-windows-java-013,indent=0]
 ----
 
-The ready-made overlay components aren't window-aware yet. `Dialog`, `Sheet`,
-`InteractionDialog` and `ToastBar` all resolve their host through
-`CN.getCurrentForm()` or `getComponentForm()`, so from inside a window they either
-attach to the main form or find nothing at all - `getComponentForm()` returns null in a
-window by design. Showing one from a window puts it on the main window, which isn't what
-the calling code meant. Build the overlay against the window's own layered pane, as
-above, until those components gain a top-level-aware attachment path.
+`InteractionDialog` is window-aware. A dialog anchored to a component works with no
+extra ceremony, because `showPopupDialog(Component)` takes its host from the component
+you hand it - and it has to, since the rectangle it points at is in that component's
+coordinate space:
+
+[source,java]
+----
+dialog.showPopupDialog(buttonInsideTheWindow);
+----
+
+A dialog with no anchor can't infer anything, because it isn't attached to the hierarchy
+at the moment `show()` runs. Tell it which top level to appear on:
+
+[source,java]
+----
+dialog.setTopLevelHost(window);
+dialog.show(top, bottom, left, right);
+----
+
+Leave the host unset and the dialog uses the current form, which is the right answer for
+an application with one window and is what every existing single-window application
+already relies on.
+
+The other ready-made overlays aren't window-aware yet. `Dialog`, `Sheet` and `ToastBar`
+resolve their host through `CN.getCurrentForm()` or `getComponentForm()`, so from inside
+a window they either attach to the main form or find nothing at all - `getComponentForm()`
+returns null in a window by design. Showing one from a window puts it on the main window,
+which isn't what the calling code meant. Build the overlay against the window's own
+layered pane, as above, until those components gain a top-level-aware attachment path.
 
 === Unsupported inside a window
 
-* `Dialog`, `Sheet`, `InteractionDialog` and `ToastBar`, for the reason just described.
+* `Dialog`, `Sheet` and `ToastBar`, for the reason just described.
 * Tooltips. `TooltipManager` schedules against `getComponentForm()` and displays through
-  an `InteractionDialog` on the current form, so it has the same limitation.
+  an `InteractionDialog` on the current form, so it has the same limitation even though
+  the dialog it uses no longer does.
 * `Form` transitions into or out of a window.
 * `HTMLComponent`.
 * Accessibility on secondary windows.
