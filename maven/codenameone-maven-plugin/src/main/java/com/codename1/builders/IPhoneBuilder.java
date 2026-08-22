@@ -6973,7 +6973,13 @@ public class IPhoneBuilder extends Executor {
         // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
         // uses CarPlay; include the phone window role only under UIScene, and the CarPlay role only
         // when the app references com.codename1.car.
-        if ((useUISceneManifest || usesCar) && !inject.contains("UIApplicationSceneManifest")) {
+        // multiWindow is in the condition as well as the value below. A Catalyst build
+        // with ios.uiscene=false and no CarPlay skipped the whole block, so the bundle
+        // got neither UIApplicationSupportsMultipleScenes nor a scene configuration --
+        // and getWindowManager() reads that key back out of the bundle, so windows were
+        // reported unsupported and constructing one threw, in the very build that had
+        // just asked for them.
+        if ((useUISceneManifest || usesCar || multiWindow) && !inject.contains("UIApplicationSceneManifest")) {
             String carPlayScene = usesCar
                     ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
                     + "        <array>\n"
@@ -6985,7 +6991,11 @@ public class IPhoneBuilder extends Executor {
                     + "            </dict>\n"
                     + "        </array>\n"
                     : "";
-            String windowScene = useUISceneManifest
+            // A window is a second scene of the app role, so it needs the role declared
+            // and the delegate wired even where the application asked for the legacy
+            // lifecycle: without this the manifest would say multiple scenes are
+            // supported and then describe no configuration to create them with.
+            String windowScene = (useUISceneManifest || multiWindow)
                     ? "        <key>UIWindowSceneSessionRoleApplication</key>\n"
                     + "        <array>\n"
                     + "            <dict>\n"
