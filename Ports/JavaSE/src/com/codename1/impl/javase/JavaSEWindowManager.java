@@ -155,6 +155,16 @@ public class JavaSEWindowManager extends WindowManager {
         JavaSEPort.C canvas;
         int windowId;
         int monitorIndex;
+        /**
+         * True while the AWT peer is being torn down and rebuilt to apply a chrome
+         * change. That cycle calls setVisible(false) and setVisible(true) on a window
+         * the framework still considers shown, so the component listener would report
+         * it as a minimize and a restore -- firing Minimized and Restored events and
+         * cancelling pending input for the window and its owned children. Only ever
+         * touched on the AWT thread, which is where both the cycle and the callbacks
+         * run.
+         */
+        boolean reconfiguring;
         /// The application's own always-on-top setting, kept apart from the temporary
         /// elevation a modal window gets so releasing modality cannot clear it.
         boolean explicitAlwaysOnTop;
@@ -282,11 +292,17 @@ public class JavaSEWindowManager extends WindowManager {
                      */
                     @Override
                     public void componentHidden(ComponentEvent e) {
+                        if (p.reconfiguring) {
+                            return;
+                        }
                         Display.getInstance().windowHideNotify(windowId);
                     }
 
                     @Override
                     public void componentShown(ComponentEvent e) {
+                        if (p.reconfiguring) {
+                            return;
+                        }
                         Display.getInstance().windowShowNotify(windowId);
                     }
 
@@ -557,6 +573,10 @@ public class JavaSEWindowManager extends WindowManager {
         runOnAwt(new Runnable() {
             @Override
             public void run() {
+                // The hide and show below are an implementation detail of applying the
+                // change, not a visibility transition the framework should hear about.
+                p.reconfiguring = true;
+                try {
                 boolean wasVisible = p.frame.isVisible();
                 java.awt.Window[] owned = p.frame.getOwnedWindows();
                 java.util.List<java.awt.Window> wereVisible =
@@ -577,6 +597,9 @@ public class JavaSEWindowManager extends WindowManager {
                 }
                 for (java.awt.Window each : wereVisible) {
                     each.setVisible(true);
+                }
+                } finally {
+                    p.reconfiguring = false;
                 }
             }
         });

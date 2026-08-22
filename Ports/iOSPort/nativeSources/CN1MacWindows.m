@@ -1472,18 +1472,32 @@ int CN1MacMonitorDpi(int monitor) {
 
 int CN1MacMonitorForWindow(int slot) {
     CN1MacWindow* w = slotAt(slot);
-    NSArray<UIScreen*>* screens;
-    NSUInteger iter;
-    if (w == NULL || w->window == nil) {
+    UIWindow* window;
+    __block int found = -1;
+    if (w == NULL) {
         return CN1MacPrimaryMonitor();
     }
-    screens = [UIScreen screens];
-    for (iter = 0; iter < screens.count; iter++) {
-        if (screens[iter] == w->window.screen) {
-            return (int) iter;
-        }
+    /* Snapshotted and retained under the lock and inspected on the main queue, like
+     * the geometry reads: adoption replaces and releases this window, and UIScreen
+     * association is UIKit state that does not belong to the event dispatch thread. */
+    pthread_mutex_lock(&g_slotLock);
+    window = [w->window retain];
+    pthread_mutex_unlock(&g_slotLock);
+    if (window == nil) {
+        return CN1MacPrimaryMonitor();
     }
-    return CN1MacPrimaryMonitor();
+    CN1MacRunOnMainSync(^{
+        NSArray<UIScreen*>* screens = [UIScreen screens];
+        NSUInteger iter;
+        for (iter = 0; iter < screens.count; iter++) {
+            if (screens[iter] == window.screen) {
+                found = (int) iter;
+                break;
+            }
+        }
+    });
+    [window release];
+    return found >= 0 ? found : CN1MacPrimaryMonitor();
 }
 
 /* The screen the application's own scene is on. The main window has no slot, so
