@@ -1719,6 +1719,16 @@
       "medium": {
         "url": "https://medium.com/p/c456bbd6ac60/edit",
         "syndicated_at": "2026-08-22T15:01:34+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/app-hardening-one-obfuscation-pipeline-across-every-port",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a89f1bf74045c6031a39fd4",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-22T19:01:10+00:00"
       }
     }
   }
