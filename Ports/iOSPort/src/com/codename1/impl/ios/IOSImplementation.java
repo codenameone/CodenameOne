@@ -1967,6 +1967,42 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Catalyst is how minimizing and restoring one window is reported. Distinct from
     /// focus: an unfocused window is still on screen and still painted, a minimized
     /// one is neither.
+    /// Invoked once a Catalyst window's scene has been granted and its content view
+    /// exists.
+    ///
+    /// A peer created in the same event dispatch turn as `Window.show()` had nowhere
+    /// to go and stayed on the main surface. Rather than queue those natively -- which
+    /// means retained views to purge when a peer or its window goes away, a table to
+    /// size, and stale entries that could land in a recycled slot -- the window's own
+    /// component tree is walked here, which is the authoritative list of what belongs
+    /// in it.
+    public static void windowContentReadyCallback(final int windowId) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.ui.Window[] all = com.codename1.ui.Desktop.getInstance().getWindows();
+                for (int iter = 0; iter < all.length; iter++) {
+                    if (all[iter].getWindowId() == windowId) {
+                        reattachPeers(all[iter]);
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
+    private static void reattachPeers(com.codename1.ui.Container c) {
+        int count = c.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            com.codename1.ui.Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof NativeIPhoneView) {
+                ((NativeIPhoneView) cmp).attachToOwningWindow();
+            } else if (cmp instanceof com.codename1.ui.Container) {
+                reattachPeers((com.codename1.ui.Container) cmp);
+            }
+        }
+    }
+
     public static void windowVisibilityCallback(int windowId, boolean shown) {
         if (shown) {
             Display.getInstance().windowShowNotify(windowId);
@@ -9540,7 +9576,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         /// so without this a browser, camera or video view inside a Window appeared
         /// over the main surface and took its input there. A no-op for a component on
         /// the main surface, and on every platform that is not Catalyst.
-        private void attachToOwningWindow() {
+        void attachToOwningWindow() {
             int slot = MacWindowManager.slotForComponent(this);
             if (slot >= 0) {
                 // The result is false when the window's scene has not been granted

@@ -2450,7 +2450,12 @@ public final class Display extends CN1Constants {
             return null;
         }
         if (windowId > 0) {
-            return Desktop.getInstance().windowById(windowId);
+            // Hidden as well as blocked. A pinch or rotation callback queued before
+            // the window was hidden still finds it registered, and would drive the
+            // gesture handlers of an invisible tree -- the same stale-callback case
+            // the wheel path and the packed queue already reject.
+            Window w = Desktop.getInstance().windowById(windowId);
+            return w != null && w.isWindowShowing() ? w : null;
         }
         return getCurrent();
     }
