@@ -107,14 +107,17 @@ public class IOSWidgetExtensionBuilder {
     };
 
     /**
-     * Lowest watchOS the generated extension can target.
+     * Lowest watchOS the generated extension can target: WidgetKit's own floor.
      *
-     * <p>Not WidgetKit's own watchOS 9 floor: {@code containerBackground(for:)}, which every
-     * generated widget applies, is watchOS 10. Below 10.0 the availability check around it
-     * stops compiling, so 9.0 would not merely lose the background -- it would fail the
-     * build.</p>
+     * <p>This used to say 10.0, on the grounds that {@code containerBackground(for:)} is watchOS
+     * 10 and every generated widget applies it. That is true of the API and not of the code:
+     * {@code CN1DescriptorWidget} applies it inside {@code if #available(iOS 17.0, watchOS 10.0,
+     * *)}, and an availability check compiles below the version it names -- that is what it is
+     * for. Typechecking the whole extension against the watchOS 9 SDK confirms it, and holding
+     * the floor at 10.0 excluded every watch still on 9 from a complication that would have
+     * worked on it, losing only the background.</p>
      */
-    public static final String WATCH_MIN_DEPLOYMENT_TARGET = "10.0";
+    public static final String WATCH_MIN_DEPLOYMENT_TARGET = "9.0";
 
     /**
      * One widget kind declared in surfaces.json. Ids must match
@@ -369,9 +372,9 @@ public class IOSWidgetExtensionBuilder {
         }
         if (watchTarget && compareVersions(deploymentTarget, WATCH_MIN_DEPLOYMENT_TARGET) < 0) {
             throw new IllegalStateException("the watch widget extension cannot target watchOS "
-                    + deploymentTarget + ": containerBackground(for:), which every generated "
-                    + "widget applies, is watchOS " + WATCH_MIN_DEPLOYMENT_TARGET
-                    + " and its availability check does not compile below that");
+                    + deploymentTarget + ": WidgetKit's accessory families arrive in watchOS "
+                    + WATCH_MIN_DEPLOYMENT_TARGET + ", so there is no complication to build "
+                    + "below it");
         }
         for (Kind kind : kinds) {
             if (kind.getId() == null || !isKindId(kind.getId())) {

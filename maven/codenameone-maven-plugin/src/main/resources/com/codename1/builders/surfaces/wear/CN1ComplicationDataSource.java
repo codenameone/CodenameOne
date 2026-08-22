@@ -134,6 +134,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             return null;
         }
         List<TimelineEntry> entries = new ArrayList<TimelineEntry>();
+        CN1WatchSurface.Reading last = readings.get(0);
         for (int i = 1; i < readings.size(); i++) {
             CN1WatchSurface.Reading reading = readings.get(i);
             ComplicationData entry = build(type, reading);
@@ -148,6 +149,15 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                     new TimeInterval(Instant.ofEpochMilli(reading.getStart()),
                             end > reading.getStart() ? Instant.ofEpochMilli(end) : Instant.MAX),
                     entry));
+            last = reading;
+        }
+        // Exhausted, and the app asked to be woken when that happened. The system will hold the
+        // final entry indefinitely -- that is what handing it a timeline means -- and
+        // UPDATE_PERIOD_SECONDS is 0, so nothing else would ever ask. A widget and a Tile both
+        // make this throttled request; a complication that skipped it was the last surface that
+        // could freeze on its own last entry.
+        if (last.getNextFlipDate() <= 0 && last.isReloadAtEnd()) {
+            CN1WidgetProvider.requestAppRefresh(this, getKindId());
         }
         return new ComplicationDataTimeline(current, entries);
     }

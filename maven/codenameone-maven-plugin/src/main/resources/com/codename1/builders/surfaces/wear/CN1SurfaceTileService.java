@@ -787,7 +787,13 @@ public abstract class CN1SurfaceTileService extends TileService {
     private static String imageId(JSONObject node) {
         String name = node.optString("name", "");
         if (name.length() > 0) {
-            return name;
+            // The RENDERING, not just the registered name. CN1WatchSurface.bitmap pre-scales and
+            // may crop to the node's own size and scale mode, so two nodes sharing one registered
+            // image but sized differently need two resources -- with one id, imageNodes kept only
+            // the last node and both drew that one's bitmap. The size and mode are what change
+            // the bytes, so they are what the id has to include.
+            return name + "_" + node.optInt("w", 0) + "x" + node.optInt("h", 0)
+                    + "_" + node.optString("scale", "fit");
         }
         return ROOT_ID + "_vec" + Integer.toHexString(node.toString().hashCode());
     }

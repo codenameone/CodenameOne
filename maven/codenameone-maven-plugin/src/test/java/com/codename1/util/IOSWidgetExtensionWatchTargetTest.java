@@ -185,7 +185,7 @@ class IOSWidgetExtensionWatchTargetTest {
     void buildSettingsDescribeAWatchTargetAndNotAPhoneOne() throws IOException {
         String props = settingsOf(watchBuilder("watchCircular"));
 
-        assertTrue(props.contains("WATCHOS_DEPLOYMENT_TARGET=10.0"), props);
+        assertTrue(props.contains("WATCHOS_DEPLOYMENT_TARGET=9.0"), props);
         assertTrue(props.contains("SDKROOT=watchos"), props);
         assertTrue(props.contains("SUPPORTED_PLATFORMS=watchos watchsimulator"), props);
         assertTrue(props.contains("TARGETED_DEVICE_FAMILY=4"), props);
@@ -223,25 +223,28 @@ class IOSWidgetExtensionWatchTargetTest {
                 .contains("CN1LiveActivityWidget()"));
     }
 
-    /// containerBackground(for:) is watchOS 10, and every generated widget applies it. Below
-    /// that floor the availability check around it stops compiling, so a lower target does not
-    /// merely lose the background -- it fails the build.
+    /// WidgetKit's own floor is watchOS 9, and that is where this sits. The accessory families
+    /// arrived in 9; containerBackground(for:) is watchOS 10 but is applied inside an
+    /// availability check, which compiles below the version it names. Anything under 9 has no
+    /// WidgetKit to build against at all.
     @Test
     void aDeploymentTargetBelowTheWatchFloorIsRejected() {
-        final IOSWidgetExtensionBuilder b = watchBuilder("watchCircular").setDeploymentTarget("9.0");
+        final IOSWidgetExtensionBuilder b = watchBuilder("watchCircular").setDeploymentTarget("8.0");
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, new Executable() {
             public void execute() throws Throwable {
                 b.buildFileMap();
             }
         });
-        assertTrue(ex.getMessage().contains("containerBackground"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("9.0"), ex.getMessage());
     }
 
-    /// "10.0" orders above "9.0" only under a numeric comparison; string order says otherwise.
+    /// "10.0" orders above "9.0" only under a numeric comparison; string order says otherwise --
+    /// which is why a floor of 9.0 has to accept 10.0 and reject 8.0 rather than compare text.
     @Test
     void theFloorCheckComparesVersionsNumerically() throws IOException {
-        assertEquals("10.0", watchBuilder("watchCircular").getDeploymentTarget());
+        assertEquals("9.0", watchBuilder("watchCircular").getDeploymentTarget());
+        watchBuilder("watchCircular").setDeploymentTarget("10.0").buildFileMap();
         watchBuilder("watchCircular").setDeploymentTarget("11.2").buildFileMap();
     }
 }
