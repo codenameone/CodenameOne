@@ -983,7 +983,7 @@ public final class InterpRuntime {
                             checkNegativeSize(sizes[i]);
                         }
                         String arrayType = externOwnerName(code[pc + 1]);
-                        f.pushRef(isInterpretedLeaf(arrayType) || isClassLeafArray(arrayType)
+                        f.pushRef(isInterpretedLeaf(arrayType) || isClassLeaf(arrayType)
                                 ? nestedObjectArray(sizes, 0)
                                 : linker.newMultiArray(arrayType, sizes));
                         break;
@@ -1349,17 +1349,15 @@ public final class InterpRuntime {
         return bundle.findClass(leafOf(descriptor)) != null;
     }
 
-    /// Whether an ANEWARRAY's component descriptor is java.lang.Class.
-    /// Spelled in either the bare-name or L-wrapped form, matching how the
-    /// existing `isInterpretedLeaf` accepts an ANEWARRAY's component name.
-    private static boolean isClassLeaf(String comp) {
-        return "java/lang/Class".equals(comp) || "Ljava/lang/Class;".equals(comp);
-    }
-
-    /// Whether a MULTIANEWARRAY's array-type descriptor bottoms out at
-    /// java.lang.Class. `[Ljava/lang/Class;`, `[[Ljava/lang/Class;` and so on.
-    private static boolean isClassLeafArray(String arrayType) {
-        return "java/lang/Class".equals(leafOf(arrayType));
+    /// Whether the leaf of a component or array-type descriptor is
+    /// java.lang.Class. Accepts the bare name `java/lang/Class`, the
+    /// L-wrapped form `Ljava/lang/Class;`, and any level of bracketing:
+    /// ANEWARRAY names an outer `Class[][]` as `[Ljava/lang/Class;`, and the
+    /// inner `Class[]` allocation must round-trip to the same Object[]
+    /// representation or storing it into the outer array throws
+    /// ArrayStoreException.
+    private static boolean isClassLeaf(String descriptor) {
+        return "java/lang/Class".equals(leafOf(descriptor));
     }
 
     /// The token for an interpreted array type named by a descriptor.
@@ -2129,6 +2127,11 @@ public final class InterpRuntime {
             }
         }
         String[] params = paramDescriptors(desc);
+        // Pairs of (src, dst) for Class[] materialisations: kept so the finally
+        // block can copy any host mutations back to the interpreter-owned
+        // Object[], preserving Java's array-by-reference semantics for
+        // `Class<?>...` arguments the host method reorders, clears or replaces.
+        Vector classArrayPairs = null;
         for (int i = 0; i < args.length && i < params.length; i++) {
             if (args[i] instanceof InterpClass && "Ljava/lang/Class;".equals(params[i])) {
                 args[i] = hostClassFor((InterpClass) args[i]);
@@ -2145,6 +2148,11 @@ public final class InterpRuntime {
                 Object[] src = (Object[]) args[i];
                 Object[] converted = classArrayFor(src);
                 if (converted != null) {
+                    if (classArrayPairs == null) {
+                        classArrayPairs = new Vector();
+                    }
+                    classArrayPairs.addElement(src);
+                    classArrayPairs.addElement(converted);
                     args[i] = converted;
                 }
             }
@@ -2204,6 +2212,22 @@ public final class InterpRuntime {
             if (arrays != null) {
                 for (int i = 0; i < arrays.size(); i++) {
                     fromHostElements(arrays.elementAt(i), new Vector());
+                }
+            }
+            // Class[] parameters: mirror any writes the host made on the
+            // materialised Class[] back to the interpreter-owned Object[] so
+            // the caller sees mutations, in line with normal Java array-by-
+            // reference semantics. Host-supplied Class objects flow back as-is
+            // (an InterpClass token in that slot before the call is replaced
+            // only when the host actually overwrote it).
+            if (classArrayPairs != null) {
+                for (int i = 0; i < classArrayPairs.size(); i += 2) {
+                    Object[] src = (Object[]) classArrayPairs.elementAt(i);
+                    Object[] dst = (Object[]) classArrayPairs.elementAt(i + 1);
+                    int len = src.length < dst.length ? src.length : dst.length;
+                    for (int k = 0; k < len; k++) {
+                        src[k] = dst[k];
+                    }
                 }
             }
             st.hostCallDepth--;

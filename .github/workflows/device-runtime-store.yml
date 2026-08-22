@@ -262,15 +262,18 @@ jobs:
           retention-days: 7
 
   publish-android:
-    # Gated on both build jobs. A `needs` on a skipped job would normally
-    # skip this one too under the default `success()` check, so the guard
-    # spells out both platforms' results: Android must have succeeded, and
-    # iOS must have succeeded or been skipped (that platform is not
-    # configured). A failing iOS build blocks Android publish, which is
-    # what the workflow's opening comment promises.
+    # Gated on both build jobs. GitHub applies an implicit `success()` when
+    # the `if:` contains no status-check function, and that would skip this
+    # job whenever any `needs` was skipped -- including the iOS build when
+    # only Android is configured. `always()` is the documented way to opt
+    # out of that implicit gate so the explicit result comparisons below
+    # actually run: Android must have succeeded, iOS must have succeeded or
+    # been skipped, and a failing iOS build still blocks Android publish --
+    # which is what the workflow's opening comment promises.
     needs: [preflight, build-android, build-ios]
     if: >-
-      !inputs.dry_run
+      always()
+      && !inputs.dry_run
       && needs.preflight.outputs.android == 'true'
       && needs.build-android.result == 'success'
       && (needs.build-ios.result == 'success' || needs.build-ios.result == 'skipped')
@@ -294,10 +297,13 @@ jobs:
           whatsNewDirectory: scripts/cn1-device-runtime/fastlane/metadata/android/en-US/changelogs
 
   publish-ios:
-    # See publish-android for the gating rationale.
+    # See publish-android for the gating rationale (including why the
+    # explicit `always()` is required for the result comparisons below to
+    # be evaluated when the Android build is skipped).
     needs: [preflight, build-android, build-ios]
     if: >-
-      !inputs.dry_run
+      always()
+      && !inputs.dry_run
       && needs.preflight.outputs.ios == 'true'
       && needs.build-ios.result == 'success'
       && (needs.build-android.result == 'success' || needs.build-android.result == 'skipped')
