@@ -3446,4 +3446,39 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void aBackgroundResizeThenMoveKeepsBothChanges() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("resize then move", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        assertNotNull(wm.getLastWindow());
+
+        try {
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setWindowSize(800, 600);
+                    w.setWindowLocation(10, 10);
+                }
+            });
+            t.start();
+            t.join(5000);
+            flushSerialCalls();
+
+            // setWindowLocation used to read the bounds before entering the event
+            // dispatch thread, so it queued a full rectangle carrying the size from
+            // *before* the queued resize -- the resize was applied and then silently
+            // undone by the move.
+            Rectangle b = w.getWindowBounds();
+            assertEquals(10, b.getX());
+            assertEquals(10, b.getY());
+            assertEquals(800, b.getWidth(),
+                    "the move must not carry a size read before the queued resize");
+            assertEquals(600, b.getHeight());
+        } finally {
+            w.dispose();
+        }
+    }
 }

@@ -1282,7 +1282,21 @@ public class Window extends Container implements TopLevelContainer {
     /// - `x`: the new x position in desktop coordinates
     ///
     /// - `y`: the new y position in desktop coordinates
-    public void setWindowLocation(int x, int y) {
+    public void setWindowLocation(final int x, final int y) {
+        // The read has to happen on the event dispatch thread with the write, not
+        // before it. setWindowBounds marshals itself, but reading the bounds out here
+        // first meant a background caller that resized and then moved queued the move
+        // carrying the *old* size -- so the event dispatch thread applied the resize
+        // and then silently undid it.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setWindowLocation(x, y);
+                }
+            });
+            return;
+        }
         Rectangle current = getWindowBounds();
         setWindowBounds(x, y, current.getWidth(), current.getHeight());
     }

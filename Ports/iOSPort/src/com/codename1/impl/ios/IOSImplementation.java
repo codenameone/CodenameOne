@@ -1344,9 +1344,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
             final Style hintStyle = currentEditing.getHintLabel() != null ? currentEditing.getHintLabel().getStyle() : stl;
             
-            if (current != null) {
-                Component nextComponent = current.getNextComponent(cmp);
-                TextEditUtil.setNextEditComponent(nextComponent);
+            // Through the editing component's own top level, not the current form. In a
+            // Window cmp is absent from the main form's tab order, so TabIterator
+            // treated it as an unknown start and handed back the main form's first
+            // focusable component -- the keyboard's Next action jumped to an unrelated
+            // field, or in a window-only application left a stale destination in place.
+            // getNextComponent is Form-only but is defined as exactly this call, and
+            // getTabIterator is on TopLevelContainer.
+            if (parentTop != null) {
+                TextEditUtil.setNextEditComponent(parentTop.getTabIterator(cmp).getNext());
+            } else if (current != null) {
+                TextEditUtil.setNextEditComponent(current.getNextComponent(cmp));
             }
             Display.getInstance().callSerially(new Runnable() {
                 @Override

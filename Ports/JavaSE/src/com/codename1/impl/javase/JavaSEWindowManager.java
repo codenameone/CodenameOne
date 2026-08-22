@@ -569,6 +569,19 @@ public class JavaSEWindowManager extends WindowManager {
      * the old taskbar behaviour while {@code Window.isUtilityWindow()} reported the
      * requested value -- a setter that silently did nothing.
      */
+    /// Every window owned by the given one, at any depth.
+    ///
+    /// AWT's hide and show of owned windows is recursive, so anything less than the
+    /// full tree leaves descendants observing transitions that are an implementation
+    /// detail of a chrome change.
+    private static void collectOwnedWindows(java.awt.Window root,
+            java.util.List<java.awt.Window> out) {
+        for (java.awt.Window each : root.getOwnedWindows()) {
+            out.add(each);
+            collectOwnedWindows(each, out);
+        }
+    }
+
     /// The peer that owns the given AWT window, or null when it is not one of ours.
     private Peer peerFor(java.awt.Window frame) {
         synchronized (peers) {
@@ -591,7 +604,14 @@ public class JavaSEWindowManager extends WindowManager {
                 java.util.List<Peer> childrenSuppressed = new java.util.ArrayList<Peer>();
                 try {
                 boolean wasVisible = p.frame.isVisible();
-                java.awt.Window[] owned = p.frame.getOwnedWindows();
+                // The whole owned tree, not just the direct children. AWT hides and
+                // shows every descendant recursively, so a visible grandchild takes
+                // the same implicit hide and explicit reshow -- and collecting only
+                // getOwnedWindows() left it unsuppressed and reporting the spurious
+                // pair, which is the same mistake one level down.
+                java.util.List<java.awt.Window> owned =
+                        new java.util.ArrayList<java.awt.Window>();
+                collectOwnedWindows(p.frame, owned);
                 java.util.List<java.awt.Window> wereVisible =
                         new java.util.ArrayList<java.awt.Window>();
                 for (java.awt.Window each : owned) {
