@@ -1892,6 +1892,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// appear. Reported separately from a minimize because a modal window that never
     /// appeared has to release its blocker.
     public static void windowActivationFailedCallback(int windowId) {
+        // The port's own record first: show() marked the peer visible, and leaving it
+        // that way lets a later owner cascade "restore" a window that never appeared.
+        MacWindowManager.activationFailed(windowId);
         Display.getInstance().windowActivationFailed(windowId);
     }
 

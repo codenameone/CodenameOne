@@ -220,6 +220,20 @@ public class MacWindowManager extends WindowManager {
         cascadeFrom(owner, shown);
     }
 
+    /// Clears a window's visibility bookkeeping after the platform refused it a scene.
+    ///
+    /// `show()` had already recorded the window as visible. Left that way, hiding and
+    /// restoring its owner makes the cascade treat it as a window the owner took down
+    /// and map it again, reporting it shown without going through `Window#show()` --
+    /// so it would come back unpainted, taking no input and no longer modal.
+    static void activationFailed(int windowId) {
+        Peer w = peerForWindowId(windowId);
+        if (w != null) {
+            w.visible = false;
+            w.hiddenByOwner = false;
+        }
+    }
+
     private static Peer peerForWindowId(int windowId) {
         synchronized (peers) {
             for (Peer each : peers) {
