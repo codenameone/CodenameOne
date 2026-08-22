@@ -269,6 +269,26 @@ class WatchWidgetExtensionTargetTest {
         assertFalse(bridging.contains("cn1_watch_surface_url"), bridging);
     }
 
+    /// A complication supplies a cn1surface:// widgetURL, and the watch is a separate bundle
+    /// that inherits none of the phone's URL types -- so without this declaration watchOS has
+    /// nothing to route the tap to and onOpenURL never fires, however well the rest is wired.
+    @Test
+    void theWatchBundleDeclaresTheSurfaceUrlScheme(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        WatchNativeBuilder b = parse(req);
+        b.setWidgetExtension(extensionDir(tmp), "group.com.mycompany.myapp", "10.0");
+        File srcDir = new File(tmp.toFile(), "src");
+        srcDir.mkdirs();
+
+        b.writeWatchInfoPlist(req, srcDir);
+        String plist = new String(Files.readAllBytes(
+                new File(srcDir, "MyApp-Watch-Info.plist").toPath()), StandardCharsets.UTF_8);
+
+        assertTrue(plist.contains("<key>CFBundleURLTypes</key>"), plist);
+        assertTrue(plist.contains("<string>cn1surface</string>"), plist);
+    }
+
     /// A watch app that publishes nothing must not carry either key.
     @Test
     void aWatchThatPublishesNothingCarriesNoSurfacesKeys(@TempDir Path tmp) throws Exception {
@@ -284,5 +304,6 @@ class WatchWidgetExtensionTargetTest {
 
         assertFalse(plist.contains("CN1SurfacesAppGroup"), plist);
         assertFalse(plist.contains("CN1SurfacesMinOS"), plist);
+        assertFalse(plist.contains("cn1surface"), plist);
     }
 }

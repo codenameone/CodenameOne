@@ -82,6 +82,36 @@ class AndroidWatchSurfaceCodegenTest {
         assertNull(AndroidGradleBuilder.watchModuleName(req));
     }
 
+    // --- where the wear libraries land ------------------------------------------
+
+    /// The androidx.wear complication and Tile libraries declare minSdk 26, and only the WATCH
+    /// module is raised to it. In a companion build the phone module keeps its own floor, so a
+    /// shared dependency list makes its manifest merge fail against libraries it never uses --
+    /// which is exactly what happened: a phone app on API 24 stopped building the moment a watch
+    /// family was declared.
+    @Test
+    void theWearLibrariesNeverReachAPhoneModule() {
+        BuildRequest companion = request();
+        companion.putArgument("watchMain", "com.mycompany.myapp.Watch");
+
+        // The companion phone module is not the watch product, so nothing wear-specific may be
+        // added to the dependency hint it shares.
+        assertEquals("wear", AndroidGradleBuilder.watchModuleName(companion));
+        assertEquals("", companion.getArg("gradleDependencies", ""),
+                "a companion phone module must carry no androidx.wear dependency");
+    }
+
+    /// A standalone build is the other way round: that single module IS the watch, so the
+    /// libraries and the 26 floor both belong to it.
+    @Test
+    void aStandaloneModuleIsTheWatchProductAndTakesBoth() {
+        BuildRequest standalone = request();
+        standalone.putArgument("watchMain", "com.mycompany.myapp.Watch");
+        standalone.putArgument("watchStandalone", "true");
+
+        assertEquals("app", AndroidGradleBuilder.watchModuleName(standalone));
+    }
+
     // --- family to ComplicationData mapping ------------------------------------
 
     /// A watch face asks a data source for ONE type and gets nothing if the source does not

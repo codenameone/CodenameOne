@@ -319,6 +319,11 @@ public class AndroidGradleBuilder extends Executor {
     /// known, because where the generated services go -- the phone module or a separate wear one
     /// -- depends on the distribution and there is only one code path for both.
     private final List<String[]> watchSurfaceKinds = new ArrayList<String[]>();
+    /// The androidx.wear dependency block, which belongs to the WATCH module alone.
+    ///
+    /// These declare minSdk 26, so adding them to a companion build's shared dependency hint
+    /// fails the phone module's manifest merge against a library it never uses.
+    private String watchSurfaceDependencies = "";
     /// The generated phone stub's source, so the Wear module can derive its own from it.
     private String generatedStubSource;
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
@@ -3393,55 +3398,6 @@ public class AndroidGradleBuilder extends Executor {
         // into the generated project and add the dependency. The Android port itself cannot
         // reference play-services-wearable, which is why these ship as .java resources here and are
         // only added for apps that talk to a watch.
-        // The mirror rides the Data Layer, and the app that publishes a complication need never
-        // have written a line of com.codename1.wearable -- so the class scan alone would leave the
-        // mirror with no transport in exactly the apps that want one. Skipped under the legacy
-        // Play services monolith, where adding the wearable artifact is a hard conflict.
-        if (!usesWearable && !watchSurfaceKinds.isEmpty() && watchModuleName(request) != null
-                && !legacyGplayServicesMode) {
-            log("[wearable] Enabling the Wearable Data Layer glue: watch-bearing surface kinds "
-                    + "are declared, so a phone-side Surfaces.publish() of one is mirrored to the "
-                    + "watch. This adds play-services-wearable to the app.");
-            usesWearable = true;
-        }
-        if (usesWearable) {
-            File wearImpl = new File(srcDir, "com/codename1/impl/android");
-            wearImpl.mkdirs();
-            String[] glue = {"CN1WearableBridge.java", "CN1WearableListenerService.java"};
-            for (String g : glue) {
-                InputStream gin = getResourceAsStream("/com/codename1/builders/wearable/" + g);
-                if (gin == null) {
-                    throw new BuildException("Missing wearable glue resource " + g);
-                }
-                try {
-                    copy(gin, new FileOutputStream(new File(wearImpl, g)));
-                } catch (IOException ex) {
-                    throw new BuildException("Failed to write wearable glue " + g, ex);
-                }
-            }
-            playServicesWear = true;
-            // The capability the peer half advertises, so isCompanionAppInstalled() can tell a
-            // watch running this app from a watch that merely exists.
-            // resDir, NOT projectDir + "app/...". projectDir already IS the generated app module,
-            // so the extra segment put this at <app>/app/src/main/res/values -- a directory Gradle
-            // never packages. The failure is silent and total: the capability is never advertised,
-            // so after the first query isCompanionAppInstalled() and isReachable() answer false and
-            // message fan-out filters out every valid peer as "not running the app".
-            File wearValues = new File(resDir, "values");
-            wearValues.mkdirs();
-            try {
-                createFile(new File(wearValues, "cn1_wearable.xml"),
-                        ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                        + "<resources>\n"
-                        + "    <string-array name=\"android_wear_capabilities\">\n"
-                        + "        <item>cn1_wearable</item>\n"
-                        + "    </string-array>\n"
-                        + "</resources>\n").getBytes("UTF-8"));
-            } catch (IOException ex) {
-                throw new BuildException("Failed to write the wearable capability declaration", ex);
-            }
-        }
-
         // External surfaces (com.codename1.surfaces): parse the build-time kinds manifest,
         // generate one thin widget provider subclass per kind, copy the pre-baked RemoteViews
         // layout/drawable resources shipped with the plugin and emit the per-kind
@@ -3624,6 +3580,11 @@ public class AndroidGradleBuilder extends Executor {
             reportWatchSurfaces(request);
             watchSurfacesManifestEntries = generateWatchSurfaces(request, srcDir, resDir);
             if (watchSurfacesManifestEntries.length() > 0 && "app".equals(watchModuleName(request))) {
+                // Standalone: this module is the watch product, so its own dependency list and
+                // its own floor are the right places for both.
+                request.putArgument("gradleDependencies",
+                        request.getArg("gradleDependencies", "") + "\n"
+                                + watchSurfaceDependencies);
                 // Wear OS 3 is the floor for the complication data source and Tile APIs, and in a
                 // STANDALONE build the app module IS the watch product, so its floor has to rise.
                 //
@@ -3634,6 +3595,61 @@ public class AndroidGradleBuilder extends Executor {
                 minSDK = maxInt("26", minSDK);
             }
         }
+
+        // AFTER the surfaces manifest is parsed, because the decision below reads the kinds it
+        // produces. Run before it, watchSurfaceKinds was always empty -- so an app that publishes
+        // complications and never writes a line of com.codename1.wearable got no Data Layer glue,
+        // no dependency and an empty listener declaration, and the mirror it was meant to enable
+        // had no transport at either end.
+        // The mirror rides the Data Layer, and the app that publishes a complication need never
+        // have written a line of com.codename1.wearable -- so the class scan alone would leave the
+        // mirror with no transport in exactly the apps that want one. Skipped under the legacy
+        // Play services monolith, where adding the wearable artifact is a hard conflict.
+        if (!usesWearable && !watchSurfaceKinds.isEmpty() && watchModuleName(request) != null
+                && !legacyGplayServicesMode) {
+            log("[wearable] Enabling the Wearable Data Layer glue: watch-bearing surface kinds "
+                    + "are declared, so a phone-side Surfaces.publish() of one is mirrored to the "
+                    + "watch. This adds play-services-wearable to the app.");
+            usesWearable = true;
+        }
+        if (usesWearable) {
+            File wearImpl = new File(srcDir, "com/codename1/impl/android");
+            wearImpl.mkdirs();
+            String[] glue = {"CN1WearableBridge.java", "CN1WearableListenerService.java"};
+            for (String g : glue) {
+                InputStream gin = getResourceAsStream("/com/codename1/builders/wearable/" + g);
+                if (gin == null) {
+                    throw new BuildException("Missing wearable glue resource " + g);
+                }
+                try {
+                    copy(gin, new FileOutputStream(new File(wearImpl, g)));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to write wearable glue " + g, ex);
+                }
+            }
+            playServicesWear = true;
+            // The capability the peer half advertises, so isCompanionAppInstalled() can tell a
+            // watch running this app from a watch that merely exists.
+            // resDir, NOT projectDir + "app/...". projectDir already IS the generated app module,
+            // so the extra segment put this at <app>/app/src/main/res/values -- a directory Gradle
+            // never packages. The failure is silent and total: the capability is never advertised,
+            // so after the first query isCompanionAppInstalled() and isReachable() answer false and
+            // message fan-out filters out every valid peer as "not running the app".
+            File wearValues = new File(resDir, "values");
+            wearValues.mkdirs();
+            try {
+                createFile(new File(wearValues, "cn1_wearable.xml"),
+                        ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<resources>\n"
+                        + "    <string-array name=\"android_wear_capabilities\">\n"
+                        + "        <item>cn1_wearable</item>\n"
+                        + "    </string-array>\n"
+                        + "</resources>\n").getBytes("UTF-8"));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write the wearable capability declaration", ex);
+            }
+        }
+
 
 
         // We need to choose the correct PlayServices class file for the version of play services
@@ -6672,7 +6688,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         generateWearModule(request, studioProjectDir, gradleProps, watchSurfacesManifestEntries,
-                permissions + xPermissions, intVersion, wearableListenerService);
+                basePermissions + permissions + xPermissions, intVersion, wearableListenerService);
 
         String rootGradleProps = "// Top-level build file where you can add configuration options common to all sub-projects/modules.\n" +
                 "buildscript {\n" +
@@ -7187,8 +7203,12 @@ public class AndroidGradleBuilder extends Executor {
             deps.append("    ").append(compile)
                     .append(" 'androidx.concurrent:concurrent-futures:1.1.0'\n");
         }
-        request.putArgument("gradleDependencies",
-                request.getArg("gradleDependencies", "") + "\n" + deps);
+        // Held rather than pushed into the shared gradleDependencies hint, because in a
+        // COMPANION build that hint feeds the phone module too -- and these libraries declare
+        // minSdk 26. A phone app supporting API 24 then failed its manifest merge against a
+        // library it has no use for. Where they actually land is decided by the caller, which
+        // knows which module is the watch.
+        watchSurfaceDependencies = deps.toString();
         // These libraries are AndroidX-only, so a legacy support-library build cannot carry them.
         // Said here, naming the setting, rather than failing later inside Gradle with a manifest
         // merge error that names none of this.
@@ -7224,7 +7244,10 @@ public class AndroidGradleBuilder extends Executor {
      * @param studioProjectDir the generated project root, which holds settings.gradle
      * @param appGradle the app module's build.gradle, which this one is derived from
      * @param watchServices the complication and Tile manifest entries
-     * @param sharedPermissions the permissions the phone manifest declares
+     * @param sharedPermissions the permissions the phone manifest declares, base ones
+     *     included -- the watch compiles the same Codename One sources, so a watchMain making an
+     *     ordinary network request needs INTERNET as much as the phone does, and this manifest is
+     *     selected outright rather than merged with the phone's
      * @param intVersion the phone's version code, which the watch's must exceed
      * @param wearableListenerService the Data Layer listener declaration, which the watch needs
      *     as much as the phone does -- it is the half that RECEIVES a mirrored complication
@@ -7296,7 +7319,12 @@ public class AndroidGradleBuilder extends Executor {
                         + "    }\n")
                 // Libraries are shared from the app module rather than copied.
                 .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
-                .replace("dirs 'libs'", "dirs '../app/libs'");
+                .replace("dirs 'libs'", "dirs '../app/libs'")
+                // The androidx.wear libraries, HERE and not in the shared dependency hint. They
+                // declare minSdk 26, and this is the only module raised to it -- putting them in
+                // the hint failed the phone module's manifest merge against libraries it never
+                // uses.
+                .replace("dependencies {\n", "dependencies {\n" + watchSurfaceDependencies);
         try {
             createFile(new File(wearDir, "build.gradle"),
                     wearGradle.getBytes(StandardCharsets.UTF_8));

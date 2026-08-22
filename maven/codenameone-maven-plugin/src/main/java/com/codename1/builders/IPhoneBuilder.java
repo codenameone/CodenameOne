@@ -4173,7 +4173,14 @@ public class IPhoneBuilder extends Executor {
             // cloud builder's entitlement generator consumes; local Xcode builds supply the app
             // entitlements externally via $(APP_CODE_SIGN_ENTITLEMENTS), matching the wallet
             // extension flow.
-            if (surfacesExtensionEnabled) {
+            // surfacesWatchEnabled counts too. Without the entitlement the group container does
+            // not resolve on the phone, so areWidgetsSupported() answers false and
+            // Surfaces.publish() returns before the bridge is reached at all -- taking the watch
+            // mirror with it. A manifest of nothing but complications would then be unable to
+            // update the very complications it declares, which is the one case this feature is
+            // for. The group is genuinely part of the plumbing on both bundles, not an unused
+            // capability.
+            if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 String appGroups = request.getArg("ios.app_groups", "");
                 if (!appGroups.contains(surfacesAppGroup)) {
                     request.putArgument("ios.app_groups", appGroups.length() == 0

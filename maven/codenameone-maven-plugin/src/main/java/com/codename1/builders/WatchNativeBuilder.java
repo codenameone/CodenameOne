@@ -1442,6 +1442,17 @@ class WatchNativeBuilder {
             plistString(sb, IOSWidgetExtensionBuilder.APP_GROUP_PLIST_KEY, surfacesAppGroup);
             plistString(sb, "CN1SurfacesMinOS", surfacesMinOS == null
                     ? IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET : surfacesMinOS);
+            // The complication tap's own scheme. A widget supplies a cn1surface:// widgetURL and
+            // the generated CN1WatchApp scene waits for it in onOpenURL -- but the watch is a
+            // separate bundle and inherits none of the phone's URL types, so without this
+            // declaration watchOS has nothing to route the URL to and the tap dispatches nothing.
+            sb.append("    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n")
+              .append("            <key>CFBundleURLName</key>\n")
+              .append("            <string>").append(escapeXml(request.getPackageName()))
+              .append(".cn1surface</string>\n")
+              .append("            <key>CFBundleURLSchemes</key>\n")
+              .append("            <array>\n                <string>cn1surface</string>\n")
+              .append("            </array>\n        </dict>\n    </array>\n");
         }
         if (isStandalone()) {
             // A standalone bundle must SAY it is watch-only, not merely omit the companion key.
