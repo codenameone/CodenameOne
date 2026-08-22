@@ -386,6 +386,10 @@ public final class IOSNative {
     
     native void peerInitialized(long peer, int x, int y, int w, int h);
 
+    /// Attaches a peer to the Catalyst window that owns it. Returns false when the
+    /// window has no content view yet, so the caller keeps the peer where it is.
+    native boolean macWindowAttachPeer(long peer, int slot, int x, int y, int w, int h);
+
     native void peerDeinitialized(long peer);
     native void peerSetVisible(long peer, boolean v);
     native long createPeerImage(long peer, int[] wh);

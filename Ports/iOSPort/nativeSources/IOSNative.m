@@ -2472,6 +2472,15 @@ void com_codename1_impl_ios_IOSNative_macMainWindowSetInputEnabled___boolean(CN1
 #endif
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+#if TARGET_OS_MACCATALYST
+    UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+    return CN1MacWindowAttachPeer(slot, v, x, y, w, h) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowWatchScreens();

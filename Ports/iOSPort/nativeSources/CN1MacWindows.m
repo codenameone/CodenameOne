@@ -370,6 +370,9 @@ static CN1MacWindow g_macWindows[CN1_MAC_MAX_WINDOWS];
 
 /* Defined further down, beside the main-window helpers that first needed it. */
 static void CN1MacRunOnMainSync(void (^block)(void));
+extern void CN1MacWindowReattachEditor(UIView* host);
+/* Defined below, beside the editing host lookup. */
+static int g_editingSlot;
 
 static CN1MacWindow* slotAt(int slot) {
     if (slot < 0 || slot >= CN1_MAC_MAX_WINDOWS) {
@@ -873,6 +876,11 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
     CN1MacWindowApplyDecoration(scene, w->decorated);
 
     w->window.rootViewController = w->controller;
+    /* An editor that had to start before this scene existed went to the main view;
+     * now that there is a content view for the window it was meant for, move it. */
+    if (g_editingSlot == slot) {
+        CN1MacWindowReattachEditor(w->content);
+    }
     /* As with visibility: honour the input state last asked for. A window opened
      * while an application modal is already up has its blocking requested before the
      * scene exists, and without this the peers inside it stayed interactive. */
@@ -1326,6 +1334,52 @@ void CN1MacWindowSetState(int slot, int state) {
     if (state == 3) {
         CN1MacWindowFocus(slot);
     }
+}
+
+/*
+ * Puts a native peer inside the window that owns it, at the given Codename One
+ * rectangle.
+ *
+ * Peer attachment hard-coded the main controller's view, so a browser, camera or
+ * video view inside a Codename One window appeared over the main surface and took
+ * its input there -- while the developer guide promises peers live in the owning
+ * scene's hierarchy. The frame is converted with that window's own screen scale
+ * rather than the global one, since two scenes can sit on displays of different
+ * backing scale.
+ *
+ * Returns NO when the slot has no content view yet, so the caller can leave the peer
+ * where it is rather than lose it.
+ */
+BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int height) {
+    __block BOOL attached = NO;
+    if (peer == nil || slot < 0) {
+        return NO;
+    }
+    CN1MacRunOnMainSync(^{
+        CN1MacWindow* w;
+        UIView* host;
+        CGFloat scale;
+        pthread_mutex_lock(&g_slotLock);
+        w = slotAt(slot);
+        host = w == NULL ? nil : [w->content retain];
+        scale = (w != NULL && w->window != nil && w->window.screen != nil)
+                ? w->window.screen.scale : 1.0;
+        pthread_mutex_unlock(&g_slotLock);
+        if (host == nil) {
+            return;
+        }
+        if (peer.superview != host) {
+            [peer removeFromSuperview];
+            [host addSubview:peer];
+        }
+        if (width > 0 && height > 0) {
+            [peer setFrame:CGRectMake(x / scale, y / scale, width / scale, height / scale)];
+            [peer setNeedsDisplay];
+        }
+        [host release];
+        attached = YES;
+    });
+    return attached;
 }
 
 UIView* CN1MacWindowContentView(int slot) {

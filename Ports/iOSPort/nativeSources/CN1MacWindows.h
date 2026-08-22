@@ -74,6 +74,7 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height);
 
 /* The UIView a native peer or text editor should be added to. */
 UIView* CN1MacWindowContentView(int slot);
+BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int height);
 
 /* True when the app's Info.plist actually enables multiple scenes. This is the
  * single source of truth for whether windows can work: without the key the

@@ -286,6 +286,30 @@ JAVA_INT getSafeTop() {
 #if !TARGET_OS_WATCH
 UIView *editingComponent;
 
+#if TARGET_OS_MACCATALYST
+/*
+ * Moves an editor that had to start before its window's scene existed.
+ *
+ * Editing can begin in the same event dispatch turn as Window.show(), and the scene
+ * is granted asynchronously -- so CN1MacWindowEditingHostView() can be nil while a
+ * secondary window is genuinely the requested host. The editor went to the main
+ * controller's view and stayed there, visible and typeable in the wrong window,
+ * because adoption never revisited it. Called from CN1MacWindowSceneConnected.
+ */
+void CN1MacWindowReattachEditor(UIView* host) {
+    if (host == nil || editingComponent == nil) {
+        return;
+    }
+    if (editingComponent.superview == host) {
+        return;
+    }
+    [editingComponent removeFromSuperview];
+    [host addSubview:editingComponent];
+    [editingComponent becomeFirstResponder];
+    [editingComponent setNeedsDisplay];
+}
+#endif
+
 // Currently used only for datepicker but could be used for
 // other things.  A persistent reference to the action sheet
 // so that it can be resized and manipulated as necessary
@@ -1238,6 +1262,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             if (windowHost != nil) {
                 editHost = windowHost;
             }
+            /* windowHost can be nil for a window whose scene has not been granted
+             * yet, since editing can start in the same turn as show(). The editor
+             * goes to the main view for now and CN1MacWindowSceneConnected moves it
+             * across through CN1MacWindowReattachEditor once the content view
+             * exists -- without that it stayed on the main surface for good. */
         }
 #endif
         [editHost addSubview:editingComponent];

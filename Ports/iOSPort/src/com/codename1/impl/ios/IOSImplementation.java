@@ -9520,6 +9520,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected void onPositionSizeChange() {
             if(nativePeer != 0) {
                 nativeInstance.updatePeerPositionSize(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                // Re-applies the frame in the window's own scale as well as re-homing
+                // it, since updatePeerPositionSize converts with the global one.
+                attachToOwningWindow();
             }
         }
 
@@ -9527,6 +9530,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             super.initComponent();
             if(nativePeer != 0) {
                 nativeInstance.peerInitialized(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                attachToOwningWindow();
+            }
+        }
+
+        /// Moves this peer into the Catalyst window that owns it.
+        ///
+        /// peerInitialized attaches every native view to the main controller's view,
+        /// so without this a browser, camera or video view inside a Window appeared
+        /// over the main surface and took its input there. A no-op for a component on
+        /// the main surface, and on every platform that is not Catalyst.
+        private void attachToOwningWindow() {
+            int slot = MacWindowManager.slotForComponent(this);
+            if (slot >= 0) {
+                nativeInstance.macWindowAttachPeer(nativePeer, slot,
+                        getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
@@ -9543,10 +9561,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(lightweightMode != l) {
                     lightweightMode = l;
                     nativeInstance.peerSetVisible(nativePeer, !lightweightMode);
+                    if (!lightweightMode) {
+                        // peerSetVisible re-adds to the main view, so the peer has to
+                        // be put back in its own window each time it becomes heavy.
+                        attachToOwningWindow();
+                    }
                     // fix for https://groups.google.com/d/msg/codenameone-discussions/LKxy16PhYEY/bvusdq-ICwAJ
-                    Form f = getComponentForm();
+                    // Through the top level: getComponentForm() is null inside a Window,
+                    // so the repaint this fix exists for was skipped there.
+                    com.codename1.ui.TopLevelContainer f = getTopLevelContainer();
                     if(f != null) {
-                        f.repaint();
+                        f.asContainer().repaint();
                     }
                 }
             }
