@@ -601,4 +601,47 @@ class MultiWindowGraphicsRoutingTest {
         }
         return null;
     }
+
+    /**
+     * The registry that answers {@code isScreenGraphics} keys a {@code Graphics2D} to
+     * its owning canvas strongly, so a disposed window that never unregisters keeps its
+     * canvas and its {@code BufferedImage}s reachable for the life of the application.
+     * At a large window size that is tens of megabytes per window ever opened.
+     */
+    @Test
+    void disposingACanvasReleasesItsScreenGraphics() {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port, "the port should be booted by CodenameOneTest");
+
+        JavaSEWindowManager wm = new JavaSEWindowManager(port);
+        Object peer = wm.createWindow(41, "leak", 0, 0, 320, 240, true, true, null,
+                false, false);
+        assumeTrue(peer != null, "needs a native window");
+        JavaSEPort.C canvas = ((JavaSEWindowManager.Peer) peer).canvas;
+        assertNotNull(canvas, "the window should have a canvas");
+        canvas.setSize(320, 240);
+        Graphics2D g = port.getGraphics(port.getNativeGraphics(canvas));
+        assertNotNull(g);
+        assertTrue(port.isScreenGraphics(g),
+                "a painted canvas registers its screen graphics");
+
+        // Through the real dispose path, not the release method directly: what this
+        // guards is that disposal is wired to it at all.
+        wm.dispose(peer);
+        for (int i = 0; i < 100 && port.isScreenGraphics(g); i++) {
+            try {
+                java.awt.EventQueue.invokeAndWait(new Runnable() {
+                    public void run() {
+                    }
+                });
+            } catch (Exception err) {
+                break;
+            }
+        }
+
+        assertFalse(port.isScreenGraphics(g),
+                "a disposed window must not leave its canvas in the registry: the "
+                        + "registry holds it strongly, so it would never be collected");
+    }
 }

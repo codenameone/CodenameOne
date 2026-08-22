@@ -391,6 +391,10 @@ public class JavaSEWindowManager extends WindowManager {
                 // window ever opened.
                 if (p.canvas != null) {
                     p.canvas.disposeGestureListeners();
+                    // The screen graphics registry keys a Graphics2D to its canvas
+                    // strongly, so disposing only the frame left the canvas and its
+                    // buffers reachable for the life of the application.
+                    p.canvas.releaseScreenGraphics();
                 }
                 p.frame.dispose();
             }

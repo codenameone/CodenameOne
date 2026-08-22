@@ -3200,6 +3200,26 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
+        /**
+         * Drops this canvas's screen buffers and its entry in the screen graphics
+         * registry. The registry keys a Graphics2D to its owning canvas strongly, so
+         * without this a disposed window stayed reachable through it for the life of
+         * the application, holding its BufferedImages -- tens of megabytes at a large
+         * window size, and one set per window ever opened. A disposed window never
+         * paints again, so nothing here can be needed afterwards.
+         */
+        void releaseScreenGraphics() {
+            unregisterScreenGraphics(g2dInstance);
+            if (g2dInstance != null) {
+                g2dInstance.dispose();
+                g2dInstance = null;
+            }
+            synchronized (bufferLock) {
+                edtBuffer = null;
+            }
+            buffer = null;
+        }
+
         private void handleMagnification(final int x, final int y, double magnification) {
             magnificationAccumulator += magnification;
             while (magnificationAccumulator >= 0.08d) {
