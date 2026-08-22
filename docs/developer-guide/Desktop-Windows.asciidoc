@@ -297,7 +297,7 @@ coordinate space:
 
 [source,java]
 ----
-dialog.showPopupDialog(buttonInsideTheWindow);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava014Snippet.java[tag=desktop-windows-java-014,indent=0]
 ----
 
 A dialog with no anchor can't infer anything, because it isn't attached to the hierarchy
@@ -305,8 +305,7 @@ at the moment `show()` runs. Tell it which top level to appear on:
 
 [source,java]
 ----
-dialog.setTopLevelHost(window);
-dialog.show(top, bottom, left, right);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava015Snippet.java[tag=desktop-windows-java-015,indent=0]
 ----
 
 Leave the host unset and the dialog uses the current form, which is the right answer for
