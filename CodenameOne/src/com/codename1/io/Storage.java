@@ -471,22 +471,115 @@ public class Storage {
     public boolean writeObject(String name, Object o, boolean includeLogging) {
         name = fixFileName(name);
         cache.put(name, o);
+        OutputStream writing = null; //NOPMD CloseResource
         DataOutputStream d = null; //NOPMD CloseResource
         try {
-            d = new DataOutputStream(createOutputStream(name));
+            // the stream is kept, because that is what names the write to be given up
+            // if this one fails. Giving up by entry name would reach every write to
+            // that entry, and a second thread writing the same one would be told its
+            // value was stored after it had been discarded.
+            writing = createOutputStreamForWrite(name);
+            d = new DataOutputStream(writing);
             Util.writeObject(o, d);
+            // closed here rather than left to the finally, because closing is where
+            // an implementation that writes the entry in one step does the writing.
+            // From the finally the failure would reach cleanup(), which logs and
+            // swallows it, and this method would report a write that never landed.
+            // handed off so the finally does not close it a second time
+            DataOutputStream closing = d; //NOPMD CloseResource
+            d = null;
+            closing.close();
             return true;
+            // Errors are caught too, and rethrown. An OutOfMemoryError partway
+            // through a large object would otherwise leave the entry to the finally,
+            // which closes the stream, and an implementation that publishes an entry
+            // as it closes would put those few bytes in place of a good entry. The
+            // error still reaches the caller, it just does not take the entry with it.
+        } catch (Error err) {
+            failedWrite(name, writing, err, includeLogging);
+            throw err;
         } catch (Exception err) {
-            if (includeLogging) {
-                Log.e(err);
-                if (Log.isCrashBound()) {
-                    Log.sendLog();
-                }
-            }
-            Util.getImplementation().deleteStorageFile(name);
+            failedWrite(name, writing, err, includeLogging);
             return false;
         } finally {
             Util.getImplementation().cleanup(d);
+        }
+    }
+
+    /// Creates the stream that `writeObject` writes a whole value into.
+    ///
+    /// This is deliberately not `createOutputStream`. That one is the public
+    /// streaming API, where a caller may hold the stream open and read back what it
+    /// has flushed -- the log writer keeps one for the life of the application -- so
+    /// it goes on writing into the entry. A whole value has no such expectation, and
+    /// so can be given what streaming cannot: it is assembled away from the entry and
+    /// put in place as one step, where the platform is able to, so the entry is never
+    /// seen half written and a write that fails leaves what was stored alone.
+    ///
+    /// A `Storage` installed through `setStorageInstance` to wrap the bytes -- the
+    /// seamless encryption that extension point exists for -- has always had
+    /// `writeObject` go through its own `createOutputStream`, and still does:
+    /// bypassing it would write those bytes past the encryption while reads went on
+    /// expecting it. Such a subclass can override this method to take the stronger
+    /// guarantee as well, wrapping what the superclass returns.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name, already normalized
+    ///
+    /// #### Returns
+    ///
+    /// the stream to write the value into
+    protected OutputStream createOutputStreamForWrite(String name) throws IOException {
+        if (getClass() != Storage.class) {
+            return createOutputStream(name);
+        }
+        return Util.getImplementation().createStorageOutputStream(name, true);
+    }
+
+    /// Gives up on a write that failed partway through, leaving neither a partial
+    /// entry on the storage nor the object that never reached it in the cache.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name, already normalized
+    ///
+    /// - `writing`: the implementation's stream for this write, or null if it never
+    /// opened
+    ///
+    /// - `err`: what went wrong
+    ///
+    /// - `includeLogging`: whether the failure may be logged, which is unsafe during
+    /// app initialization
+    private void failedWrite(String name, OutputStream writing, Throwable err,
+            boolean includeLogging) {
+        // before the logging, which can fail in its own right. Reporting an
+        // OutOfMemoryError means building a message and a stack trace, so a second
+        // failure there would carry off the rest of this method, and the write left
+        // open would be published by the finally that closes it.
+        //
+        // The cached copy goes either way. Leaving it behind hid the failure for the
+        // rest of the session: every read was answered from memory with the object
+        // that never reached the storage, and the entry only turned up missing after
+        // the app was restarted.
+        //
+        // Whether the entry itself has to go depends on where the failed write went.
+        // An implementation that writes into the entry has left half an object there
+        // and deleting is the only way to be rid of it. One that assembles the value
+        // elsewhere and puts it in place in a single step never touched the entry, so
+        // deleting it would answer a write that failed by throwing away the value
+        // that was already stored -- which is worse than the failure itself, and is
+        // what running out of memory partway through a large object used to do.
+        if (Util.getImplementation().abandonStorageWrite(name, writing)) {
+            cache.delete(name);
+        } else {
+            deleteStorageFile(name);
+        }
+        if (includeLogging) {
+            Log.e(err);
+            if (Log.isCrashBound()) {
+                Log.sendLog();
+            }
         }
     }
 
