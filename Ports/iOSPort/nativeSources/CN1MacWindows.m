@@ -39,6 +39,7 @@ extern void CN1MacWindowDeliverClose(int windowId);
 extern void CN1MacWindowDeliverClosed(int windowId);
 extern void CN1MacWindowDeliverMonitorsChanged(void);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
+extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
 extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
@@ -651,6 +652,36 @@ static void dropPendingSlotLocked(int slot) {
 }
 
 /*
+ * A scene activation the system refused. The slot was queued before the request and
+ * scenes are matched to queued slots in arrival order, so leaving a failed slot in
+ * the queue hands the *next* window's scene to this one -- and that window then waits
+ * for a scene that has already been consumed. Dropping the slot keeps the queue
+ * aligned with the requests still outstanding.
+ *
+ * The framework is told the window is not up, so it stops painting a window with no
+ * scene behind it. Reported as not-visible rather than closed on purpose: the window
+ * is still registered and a later show() can ask for a scene again, where a close
+ * would dispose it and lose the application's window object.
+ */
+static void CN1MacWindowActivationFailed(int slot) {
+    int windowId = -1;
+    CN1MacWindow* w;
+    pthread_mutex_lock(&g_slotLock);
+    dropPendingSlotLocked(slot);
+    w = slotAt(slot);
+    if (w != NULL) {
+        windowId = w->windowId;
+        /* Otherwise a scene adopted later would map a window the framework has been
+         * told is down. */
+        w->pendingVisible = 0;
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    if (windowId >= 0) {
+        CN1MacWindowDeliverVisibility(windowId, NO);
+    }
+}
+
+/*
  * Scenes that a closed window gave back, kept alive for the next one.
  *
  * A scene session is not a cheap object and the system does not hand them out on
@@ -737,6 +768,7 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene activation failed: %@", error);
+                CN1MacWindowActivationFailed(slot);
             }];
             [options release];
         }
@@ -1046,6 +1078,7 @@ BOOL CN1MacWindowReopen(int slot) {
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene reopen failed: %@", error);
+                CN1MacWindowActivationFailed(slot);
             }];
             [options release];
         }
