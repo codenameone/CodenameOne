@@ -428,9 +428,15 @@ public class CN1WearableListenerService extends WearableListenerService {
                         .invoke(null, this, path);
                 return true;
             }
-            mirror.getMethod(method, android.content.Context.class, String.class, byte[].class)
+            Object answer = mirror
+                    .getMethod(method, android.content.Context.class, String.class, byte[].class)
                     .invoke(null, this, path, payload);
-            return true;
+            // The mirror's own answer where it has one. receiveFile catches its write failures
+            // internally and reports them by returning false, so a call that merely did not throw
+            // proves nothing -- and an acknowledgement made on that basis is durable, which loses
+            // the artwork rather than having it redelivered. A void method (receive) answers null
+            // and is taken at its word.
+            return !(answer instanceof Boolean) || ((Boolean) answer).booleanValue();
         } catch (Throwable t) {
             // Caught rather than propagated: a listener that throws takes the Data Layer
             // callback down with it, and mirror traffic is a refresh rather than something the

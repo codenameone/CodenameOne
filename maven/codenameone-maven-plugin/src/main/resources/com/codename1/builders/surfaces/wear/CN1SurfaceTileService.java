@@ -387,18 +387,18 @@ public abstract class CN1SurfaceTileService extends TileService {
             LayoutElementBuilders.Image.Builder image = new LayoutElementBuilders.Image.Builder()
                     .setResourceId(name)
                     .setModifiers(modifiers(node));
-            // Only the axes the node actually declared. setSize documents 0 as "natural", and the
-            // wire omits an axis left at it -- so a default of 24 shrank every unsized image to
-            // 24x24 and turned setSize(100, 0) into 100x24. An axis left unset keeps ProtoLayout's
-            // own sizing, which is the natural one.
-            int iw = node.optInt("w", 0);
-            int ih = node.optInt("h", 0);
-            if (iw > 0) {
-                image.setWidth(DimensionBuilders.dp(iw));
-            }
-            if (ih > 0) {
-                image.setHeight(DimensionBuilders.dp(ih));
-            }
+            // BOTH axes, always. setSize documents 0 as "natural" and the wire omits an axis left
+            // at it, but ProtoLayout has no natural size for an inline image to fall back on: the
+            // library says of the width that "if not defined, the image will not be rendered".
+            // Leaving an undeclared axis unset therefore does not preserve anything -- it makes
+            // the image disappear -- so an undeclared axis takes a default instead.
+            //
+            // That default is a real fidelity gap and not a preference: a Tile shows an unsized
+            // image at 24dp where the rasterizer would have used the bitmap's own size, and
+            // setSize(100, 0) becomes 100x24. There is no ProtoLayout expression for "as tall as
+            // the bitmap is", so the alternative is not a better size but no image at all.
+            image.setWidth(DimensionBuilders.dp(Math.max(1, node.optInt("w", 24))));
+            image.setHeight(DimensionBuilders.dp(Math.max(1, node.optInt("h", 24))));
             // The declared scale mode. "fill" crops to the bounds and "center" keeps the natural
             // size, which is what the rasterizer does with the same values -- left unset, every
             // image took ProtoLayout's default and a fill image was fitted instead of cropped.

@@ -319,24 +319,27 @@ public final class CN1SurfaceMirror {
      * @param ctx any context
      * @param path the reserved application path
      * @param payload the transfer payload
+     * @return true when the image was stored. The caller acknowledges delivery on this, and an
+     *         acknowledgement is durable -- a false answer gets the transfer redelivered, a
+     *         wrongly true one loses the artwork for good
      */
-    public static void receiveFile(Context ctx, String path, byte[] payload) {
+    public static boolean receiveFile(Context ctx, String path, byte[] payload) {
         try {
             String kindId = kindOf(path);
             if (kindId == null || payload == null) {
-                return;
+                return false;
             }
             WearableMessage transfer = WearableMessage.fromByteArray(path, payload);
             String name = transfer.getString("name", null);
             byte[] contents = transfer.getBytes("contents", null);
             if (name == null || contents == null) {
-                return;
+                return false;
             }
             if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0) {
                 // A name is a content hash, never a path. Refusing one that looks like a path
                 // keeps a malformed payload from writing outside the kind's own directory.
                 Log.w(TAG, "Refusing a mirrored image with a suspicious name: " + name);
-                return;
+                return false;
             }
             File dir = CN1SurfaceStore.kindDir(ctx, kindId);
             // Written whatever the descriptor on disk currently says, and deliberately so.
@@ -362,9 +365,14 @@ public final class CN1SurfaceMirror {
             // and nothing else would ask again until the next publish. So each arriving image
             // asks too.
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            return true;
         } catch (Throwable t) {
             Log.w(TAG, "Could not store a mirrored image from " + path, t);
         }
+        // The caller acknowledges delivery on the strength of this, and an acknowledgement is
+        // durable: a false answer gets the transfer redelivered, a wrongly true one loses the
+        // artwork for good.
+        return false;
     }
 
     /**
