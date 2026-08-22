@@ -1826,6 +1826,20 @@ public final class InterpRuntime {
             return;
         }
 
+        // `super.clone()` on an interpreted receiver reaches invokespecial
+        // Object.clone. Routing that to hostCall on the peer would shallow-
+        // clone the shim itself, and the clone keeps the same `$interp` back-
+        // reference to *this* InterpObject; `fromHost()` then converts it
+        // straight back and `copy == original`. Answer here instead, before
+        // the peer branch below can dispatch. `objectCall` catches the same
+        // method on a peerless receiver, but this covers the peer case that
+        // reaches host dispatch, and both paths route through
+        // `cloneInterpObject`.
+        if ("clone".equals(name) && args.length == 0 && target instanceof InterpObject) {
+            pushBoxed(f, returnKind, cloneInterpObject((InterpObject) target));
+            return;
+        }
+
         // The unimplemented half of a cn1lib. isSupported() is the question the
         // API tells callers to ask, and it answers false; everything else
         // answers the way an uninitialised field would, so a caller that
@@ -2623,7 +2637,69 @@ public final class InterpRuntime {
             io.notifyAll();
             return null;
         }
+        // clone() is handled earlier in dispatchInvoke, before the peer branch
+        // that would otherwise shallow-copy the shim and hand back an object
+        // whose $interp still points at this receiver.
         return NOT_OBJECT_METHOD;
+    }
+
+    /// Object.clone() for an interpreted receiver.
+    ///
+    /// The default host `Object.clone()` on the shim would shallow-copy the
+    /// shim itself, and the copy would keep the same `$interp` back-reference
+    /// to *this* InterpObject; `fromHost()` then converts the clone back to
+    /// the original interpreted object, so `copy == original` and any
+    /// mutation on the "copy" hits the original. Instead, build a distinct
+    /// InterpObject of the same type and shallow-copy the flat field array,
+    /// which is what `Object.clone` does on the JVM.
+    ///
+    /// Cloneable is enforced -- the JVM throws CloneNotSupportedException
+    /// when the receiver's class does not implement Cloneable, and pushed
+    /// code depending on that check has to see the same answer here. A
+    /// receiver that also has a host peer (an interpreted class extending
+    /// a host class that itself implements Cloneable) is refused with the
+    /// same exception rather than handed a peer-less half-clone -- rebuilding
+    /// the peer needs constructor arguments the runtime does not have here.
+    private Object cloneInterpObject(InterpObject io) throws Throwable {
+        if (!implementsCloneable(io.type)) {
+            throw new InterpThrowable(new CloneNotSupportedException(
+                    io.type.getName().replace('/', '.')), snapshotStack());
+        }
+        if (io.hostPeer != null) {
+            throw new InterpThrowable(new CloneNotSupportedException(
+                    io.type.getName().replace('/', '.')
+                    + " extends a host class; the runtime cannot rebuild its peer"),
+                    snapshotStack());
+        }
+        InterpObject copy = new InterpObject(io.type);
+        System.arraycopy(io.fields, 0, copy.fields, 0, io.fields.length);
+        copy.enumName = io.enumName;
+        copy.enumOrdinal = io.enumOrdinal;
+        copy.runtime = io.runtime;
+        return copy;
+    }
+
+    /// Whether an interpreted class implements `java.lang.Cloneable`, checked
+    /// through both interpreted and host interface sets and up the whole
+    /// class chain. A pushed data class typically declares
+    /// `implements Cloneable` -- a host interface -- directly.
+    private boolean implementsCloneable(InterpClass type) {
+        InterpClass c = type;
+        while (c != null) {
+            for (int i = 0; i < c.interpInterfaces.length; i++) {
+                InterpClass iface = c.interpInterfaces[i];
+                if (iface != null && "java/lang/Cloneable".equals(iface.name)) {
+                    return true;
+                }
+            }
+            for (int i = 0; i < c.hostInterfaces.length; i++) {
+                if ("java/lang/Cloneable".equals(externOwnerName(c.hostInterfaces[i]))) {
+                    return true;
+                }
+            }
+            c = c.superInterp;
+        }
+        return false;
     }
 
     /// Stands in for a native interface whose native half is not in this app.
