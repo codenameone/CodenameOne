@@ -95,6 +95,9 @@ public class MacWindowManager extends WindowManager {
         /// True while this window is hidden only because its owner is.
         boolean hiddenByOwner;
         boolean visible;
+        /// Bumped by every show request, so an activation failure a later show has
+        /// already superseded can be recognised and discarded.
+        int showSequence;
 
         Peer(int slot, int windowId) {
             this.slot = slot;
@@ -167,6 +170,7 @@ public class MacWindowManager extends WindowManager {
         // up and there is deliberately no second mechanism doing it again.
         w.visible = true;
         w.hiddenByOwner = false;
+        w.showSequence++;
         IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
         // Only the ones this owner took down. A child hidden by the application stays
         // hidden, exactly as AWT and GTK behave when an owner is shown again.
@@ -226,12 +230,22 @@ public class MacWindowManager extends WindowManager {
     /// restoring its owner makes the cascade treat it as a window the owner took down
     /// and map it again, reporting it shown without going through `Window#show()` --
     /// so it would come back unpainted, taking no input and no longer modal.
-    static void activationFailed(int windowId) {
+    static int showSequence(int windowId) {
         Peer w = peerForWindowId(windowId);
-        if (w != null) {
-            w.visible = false;
-            w.hiddenByOwner = false;
+        return w == null ? -1 : w.showSequence;
+    }
+
+    static boolean activationFailed(int windowId, int sequence) {
+        Peer w = peerForWindowId(windowId);
+        if (w == null || w.showSequence != sequence) {
+            // A show() has asked for another scene since this failure was raised. That
+            // request owns the window's state now, and applying the older failure would
+            // hide a window it may be about to bring up.
+            return false;
         }
+        w.visible = false;
+        w.hiddenByOwner = false;
+        return true;
     }
 
     private static Peer peerForWindowId(int windowId) {

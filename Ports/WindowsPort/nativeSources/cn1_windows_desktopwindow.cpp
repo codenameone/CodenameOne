@@ -61,6 +61,10 @@ typedef struct {
     int windowId;      /* framework assigned; 0 marks a free slot */
     int monitorIndex;
     int minimized;
+    /* Set when Windows took this window down with its owner, kept separate from
+     * `minimized` so an explicit hide can clear it: reusing one flag meant an owner
+     * restore resurrected a window the application had hidden itself. */
+    int ownerHidden;
     int minWidth;
     int minHeight;
     /* The resizable state the application asked for. Remembered because restoring
@@ -409,15 +413,26 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
              * came from ShowWindow, which is the framework's own show()/hide() -- it
              * already knows about those, and reporting them would be redundant. */
             if (lParam == SW_PARENTCLOSING) {
-                if (!w->minimized) {
-                    w->minimized = 1;
+                if (!w->ownerHidden && !w->minimized) {
+                    w->ownerHidden = 1;
                     cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_HIDDEN, 0, 0, 0);
                 }
             } else if (lParam == SW_PARENTOPENING) {
-                if (w->minimized) {
-                    w->minimized = 0;
+                /* Only what this owner took down. A window the application hid, or one
+                 * the user minimized on its own, cleared or never set this flag and so
+                 * is not brought back. */
+                if (w->ownerHidden) {
+                    w->ownerHidden = 0;
                     cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_SHOWN, 0, 0, 0);
                 }
+            } else if (lParam == 0) {
+                /* The framework's own show()/hide() through ShowWindow. Deliberately
+                 * not reported -- the framework already knows -- but it takes the
+                 * window's visibility over from any owner, so the owner's restore must
+                 * not resurrect it. Without this the flag stayed set through an
+                 * explicit hide and SW_PARENTOPENING reported the window shown again,
+                 * with its component hierarchy still invisible. */
+                w->ownerHidden = 0;
             }
             return DefWindowProcW(hwnd, msg, wParam, lParam);
         case WM_SIZE:

@@ -1891,11 +1891,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked when the platform refuses to give a window a scene, so it will never
     /// appear. Reported separately from a minimize because a modal window that never
     /// appeared has to release its blocker.
-    public static void windowActivationFailedCallback(int windowId) {
-        // The port's own record first: show() marked the peer visible, and leaving it
-        // that way lets a later owner cascade "restore" a window that never appeared.
-        MacWindowManager.activationFailed(windowId);
-        Display.getInstance().windowActivationFailed(windowId);
+    public static void windowActivationFailedCallback(final int windowId) {
+        // Sampled before anything is queued: a show() running after this point bumps
+        // the sequence, and the check below then discards this failure rather than
+        // hiding a window that request may be about to bring up.
+        final int sequence = MacWindowManager.showSequence(windowId);
+        // Both halves in one EDT unit. Updating the peer here on UIKit's thread while
+        // the framework half waited in the queue let a concurrent show() slip between
+        // them and be undone by a failure that no longer applied to it.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if (!MacWindowManager.activationFailed(windowId, sequence)) {
+                    return;
+                }
+                Display.getInstance().windowActivationFailed(windowId);
+            }
+        });
     }
 
     /// Invoked once the platform has destroyed a window's scene. Catalyst hands the
