@@ -3511,6 +3511,13 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_PACING_GROWTH_FLOOR_BYTES
 #define CN1_PACING_GROWTH_FLOOR_BYTES (512LL*1024*1024)
 #endif
+// How stale a below-floor footprint reading may be before the bound re-probes it. The
+// probe is task_info on Apple and one /proc read on Linux -- a microsecond or two -- and
+// it is taken at most once per interval across the whole process, and only when the bound
+// would otherwise bind. 25ms caps the overshoot at that much allocation.
+#ifndef CN1_PACING_FOOTPRINT_REFRESH_MS
+#define CN1_PACING_FOOTPRINT_REFRESH_MS 25
+#endif
 // A thread with more than this many legacy allocations since the last GC (heapAllocationSize,
 // reset each cycle) is treated as high-throughput and gets the deeper pacing headroom below.
 #ifndef CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS
@@ -3656,6 +3663,41 @@ static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
+// Monotonic stamp of the last footprint probe taken by cn1PacingPastGrowthFloor.
+static _Atomic JAVA_LONG cn1ProcFootprintStampMs = 0;
+
+// Is this process past the size at which the run-ahead bound applies?
+//
+// Answers from the once-per-cycle sample while that says YES -- the footprint of a
+// process that has crossed the floor does not fall back under it without a sweep, which
+// refreshes the sample anyway. While it says NO the sample is the one that can be stale
+// in the direction that matters, so re-probe it, rate-limited to one syscall per
+// CN1_PACING_FOOTPRINT_REFRESH_MS across all threads. That bounds how far the mutator can
+// run past the floor before the bound engages to one refresh interval's worth of
+// allocation, instead of one COLLECTION's worth.
+static JAVA_BOOLEAN cn1PacingPastGrowthFloor(void) {
+    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed)
+            > CN1_PACING_GROWTH_FLOOR_BYTES) {
+        return JAVA_TRUE;
+    }
+    JAVA_LONG now = cn1MonotonicMillis();
+    JAVA_LONG last = atomic_load_explicit(&cn1ProcFootprintStampMs, memory_order_relaxed);
+    if(now - last < CN1_PACING_FOOTPRINT_REFRESH_MS) {
+        return JAVA_FALSE;      // probed recently and it was under; believe that
+    }
+    if(!atomic_compare_exchange_strong_explicit(&cn1ProcFootprintStampMs, &last, now,
+                                                memory_order_relaxed,
+                                                memory_order_relaxed)) {
+        return JAVA_FALSE;      // another thread is taking this interval's probe
+    }
+    long long fp = (long long)cn1ProcFootprintBytes();
+    if(fp <= 0) {
+        return JAVA_FALSE;      // no probe on this platform; the bound stays off
+    }
+    atomic_store_explicit(&cn1CachedProcFootprint, fp, memory_order_relaxed);
+    return fp > CN1_PACING_GROWTH_FLOOR_BYTES;
+}
+
 static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     long trigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
     long base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER;
@@ -3677,13 +3719,20 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     // Bound the widening, once this process has shown it can grow. Never below the
     // static cap, which is what "never tighter than before" means once the multiplier is
     // applied to the same trigger.
-    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed)
-            > CN1_PACING_GROWTH_FLOOR_BYTES) {
+    //
+    // The footprint is READ FRESH here rather than off the once-per-cycle cache, and the
+    // order matters: ask whether the bound would bind at all first, so the probe is paid
+    // for only on the path that needs it. A cycle that starts just under the floor and
+    // then runs long would otherwise keep a below-floor reading for its whole duration --
+    // and a long cycle is exactly the runaway this bound exists to stop, so the clamp
+    // would sit disarmed through the one interval that matters. At a couple of GB/s a
+    // 750ms cycle is more than a gigabyte of that.
+    {
         long capCeiling = trigger * CN1_BIBOP_GC_MAX_CAP_MULTIPLIER;
         if(capCeiling < base) {
             capCeiling = base;
         }
-        if(cap > capCeiling) {
+        if(cap > capCeiling && cn1PacingPastGrowthFloor()) {
             cap = capCeiling;
         }
     }
