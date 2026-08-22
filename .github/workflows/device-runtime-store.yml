@@ -5,7 +5,10 @@
 # scripts/cn1-device-runtime/store/README.md for why that is deliberate.
 #
 # Without credentials the job reports what is missing and stops. It never
-# publishes half of a release.
+# publishes half of a release: the two build jobs run independently on their
+# own runners, but publishing is gated on both having reached success (or been
+# skipped because that platform is not configured), so a failing iOS archive
+# cannot leave Google Play with a lone Android upload for the week.
 name: Device runtime store build
 
 on:
@@ -80,7 +83,7 @@ jobs:
             echo "\`scripts/cn1-device-runtime/store/README.md\`." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  android:
+  build-android:
     needs: preflight
     if: needs.preflight.outputs.android == 'true'
     runs-on: ubuntu-latest
@@ -153,18 +156,19 @@ jobs:
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
-      - name: Upload to internal testing
-        if: ${{ !inputs.dry_run }}
-        uses: r0adkll/upload-google-play@v1
+      - name: Stage the signed AAB
+        # Uploaded here rather than published from this job: publishing waits
+        # until the iOS build has also succeeded (or is skipped because that
+        # platform is not configured), so a broken iOS archive cannot leave
+        # Google Play with a lone Android upload for the week.
+        uses: actions/upload-artifact@v4
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.codenameone.devruntime
-          releaseFiles: scripts/cn1-device-runtime/android/target/*-android-source/app/build/outputs/bundle/release/*.aab
-          track: internal
-          status: completed
-          whatsNewDirectory: scripts/cn1-device-runtime/fastlane/metadata/android/en-US/changelogs
+          name: android-aab
+          path: scripts/cn1-device-runtime/android/target/*-android-source/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 7
 
-  ios:
+  build-ios:
     needs: preflight
     if: needs.preflight.outputs.ios == 'true'
     runs-on: macos-14
@@ -246,8 +250,65 @@ jobs:
             -exportPath build/ipa \
             -exportOptionsPlist "$export_options"
 
+      - name: Stage the signed IPA
+        # Same reason as the Android stage step: publishing is deferred to a
+        # separate job that also gates on the other platform's outcome, so
+        # neither store can go live alone when the other build failed.
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: scripts/cn1-device-runtime/ios/target/*-ios-source/build/ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-android:
+    # Gated on both build jobs. A `needs` on a skipped job would normally
+    # skip this one too under the default `success()` check, so the guard
+    # spells out both platforms' results: Android must have succeeded, and
+    # iOS must have succeeded or been skipped (that platform is not
+    # configured). A failing iOS build blocks Android publish, which is
+    # what the workflow's opening comment promises.
+    needs: [preflight, build-android, build-ios]
+    if: >-
+      !inputs.dry_run
+      && needs.preflight.outputs.android == 'true'
+      && needs.build-android.result == 'success'
+      && (needs.build-ios.result == 'success' || needs.build-ios.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-aab
+          path: android-aab
+
+      - name: Upload to internal testing
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.codenameone.devruntime
+          releaseFiles: android-aab/*.aab
+          track: internal
+          status: completed
+          whatsNewDirectory: scripts/cn1-device-runtime/fastlane/metadata/android/en-US/changelogs
+
+  publish-ios:
+    # See publish-android for the gating rationale.
+    needs: [preflight, build-android, build-ios]
+    if: >-
+      !inputs.dry_run
+      && needs.preflight.outputs.ios == 'true'
+      && needs.build-ios.result == 'success'
+      && (needs.build-android.result == 'success' || needs.build-android.result == 'skipped')
+    runs-on: macos-14
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: ios-ipa
+
       - name: Upload to TestFlight
-        if: ${{ !inputs.dry_run }}
         env:
           ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
@@ -256,7 +317,5 @@ jobs:
           set -euo pipefail
           mkdir -p ~/private_keys
           echo "$ASC_PRIVATE_KEY" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
-          src="$(find scripts/cn1-device-runtime/ios/target -maxdepth 1 \
-            -name '*-ios-source' -type d | head -1)"
-          xcrun altool --upload-app -f "$src"/build/ipa/*.ipa -t ios \
+          xcrun altool --upload-app -f ios-ipa/*.ipa -t ios \
             --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
