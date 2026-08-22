@@ -120,6 +120,10 @@ public class WearGlueCompilesTest {
                         + "JSONObject s) { return null; }\n"
                         + "    static Intent watchActionIntent(Context c, String src, String id, "
                         + "JSONObject p) { return null; }\n"
+                        + "    static long resolveWatchDate(JSONObject n, JSONObject s) "
+                        + "{ return 0L; }\n"
+                        + "    static String formatWatchDynamicText(JSONObject n, JSONObject s) "
+                        + "{ return \"\"; }\n"
                         + "}\n").getBytes("UTF-8"));
         Files.write(shims.resolve("CN1SurfaceActionActivity.java"),
                 ("package com.codename1.impl.android.surfaces;\n"

@@ -238,6 +238,11 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                 images++;
             }
         }
+        if (hasDynamicNode(nodes)) {
+            Log.i(TAG, "Complication \"" + getKindId() + "\" renders a dynamic value as text, "
+                    + "formatted when the face asks and refreshed when the timeline flips. A "
+                    + "watch face slot takes a string, so it does not tick between updates.");
+        }
         if (texts.size() > 2 || images > 1) {
             Log.i(TAG, "Complication \"" + getKindId() + "\" reduces its layout to what a watch "
                     + "face slot can show: " + Math.min(texts.size(), 2) + " of " + texts.size()
@@ -252,6 +257,22 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             return "";
         }
         return text.length() <= SHORT_TEXT_MAX ? text : text.substring(0, SHORT_TEXT_MAX);
+    }
+
+    /**
+     * Whether a text came from a dynamic node, which a watch face can tick for itself.
+     *
+     * <p>Not used to choose the value -- {@link CN1WatchSurface#texts} already formats it -- but
+     * to say so in the log, because a frozen countdown in a slot is the one degradation a
+     * developer is most likely to mistake for a bug.</p>
+     */
+    private static boolean hasDynamicNode(List<JSONObject> nodes) {
+        for (JSONObject node : nodes) {
+            if ("dyn".equals(node.optString("t", ""))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String join(List<String> texts, int from) {

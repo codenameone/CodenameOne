@@ -298,15 +298,23 @@ public final class SurfaceRasterizer {
 
     // --- dynamic text ----------------------------------------------------------
 
-    /// Formats a dynamic-text value the way the OS-native views would show it. Package-private so
-    /// unit tests can cover the formatting without a `Display`.
+    /// Formats a dynamic-text value the way the OS-native views would show it.
+    ///
+    /// Public because a surface that cannot tick natively needs the text form: a Wear
+    /// complication slot takes a string, and a Tile freezes its value between timeline flips.
+    /// Both go through this rather than formatting for themselves, so a countdown reads the same
+    /// on a watch face as in the simulator preview and on a home screen.
     ///
     /// #### Parameters
     ///
     /// - `style`: the wire style name (`timerDown`, `timerUp`, `time`, `date`, `relative`)
     /// - `dateMillis`: the target epoch millis
     /// - `now`: the current epoch millis
-    static String formatDynamicText(String style, long dateMillis, long now) {
+    ///
+    /// #### Returns
+    ///
+    /// the formatted value
+    public static String formatDynamicText(String style, long dateMillis, long now) {
         if ("timerUp".equals(style)) {
             return formatTimer(now - dateMillis);
         }

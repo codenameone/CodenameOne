@@ -869,6 +869,60 @@ public final class CN1SurfaceRenderer {
         return rc.dark ? fallbackDark : fallbackLight;
     }
 
+    /**
+     * A dynamic node's resolved timestamp, for the Wear complication and Tile readers.
+     *
+     * <p>Those two do not render through RemoteViews and so have no RenderContext, but they must
+     * resolve {@code dateKey} against the entry state exactly as a widget does -- otherwise the
+     * same published timeline would show a different moment on a watch face than on a home
+     * screen.</p>
+     *
+     * @param node a {@code dyn} node
+     * @param state the entry state
+     * @return epoch millis, or 0 when the node names none
+     */
+    static long resolveWatchDate(JSONObject node, JSONObject state) {
+        String dateKey = node.optString("dateKey", null);
+        if (dateKey != null && dateKey.length() > 0 && state != null) {
+            Object v = state.opt(dateKey);
+            if (v instanceof Number) {
+                return ((Number) v).longValue();
+            }
+            if (v instanceof String) {
+                try {
+                    return Long.parseLong((String) v);
+                } catch (NumberFormatException ignore) {
+                    // Not a timestamp; fall through to the literal below.
+                }
+            }
+        }
+        return node.optLong("date", 0);
+    }
+
+    /**
+     * A dynamic node formatted as a plain string, for a surface that can only show one.
+     *
+     * <p>A complication slot takes a string and a Tile freezes its value, so both need the
+     * text form rather than the ticking Chronometer a home-screen widget gets. The styles map
+     * the way the guide describes: the two timer styles read as remaining or elapsed time, and
+     * everything else as the moment itself.</p>
+     *
+     * @param node a {@code dyn} node
+     * @param state the entry state
+     * @return the formatted value, never null
+     */
+    static String formatWatchDynamicText(JSONObject node, JSONObject state) {
+        long date = resolveWatchDate(node, state);
+        if (date <= 0) {
+            return "";
+        }
+        // The core's own formatter, not a second one here. It covers all five styles including
+        // "relative", and sharing it is what keeps a countdown reading the same on a watch face
+        // as in the simulator preview.
+        return com.codename1.surfaces.SurfaceRasterizer.formatDynamicText(
+                node.optString("style", "timerDown"), date, System.currentTimeMillis());
+    }
+
     private static long resolveDate(JSONObject node, RenderContext rc) {
         String dateKey = node.optString("dateKey", null);
         if (dateKey != null && dateKey.length() > 0 && rc.state != null) {

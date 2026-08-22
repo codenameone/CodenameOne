@@ -1,10 +1,18 @@
 package androidx.wear.protolayout;
 public final class ActionBuilders {
     public interface Action { }
+    public interface AndroidExtra { }
+    public static class AndroidStringExtra implements AndroidExtra {
+        public static class Builder {
+            public Builder setValue(String v) { return this; }
+            public AndroidStringExtra build() { return null; }
+        }
+    }
     public static class AndroidActivity {
         public static class Builder {
             public Builder setPackageName(String p) { return this; }
             public Builder setClassName(String c) { return this; }
+            public Builder addKeyToExtraMapping(String key, AndroidExtra value) { return this; }
             public AndroidActivity build() { return null; }
         }
     }

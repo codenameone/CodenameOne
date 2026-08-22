@@ -217,7 +217,10 @@ public final class CN1WatchSurface {
         if (node == null || depth > MAX_DEPTH) {
             return;
         }
-        JSONArray children = node.optJSONArray("c");
+        // "ch", which is what SurfaceContainer.serializeContent writes and what the RemoteViews
+        // renderer reads. Reading "c" found nothing, so every row, column and box looked empty
+        // and a complication mined a layout with no text, no progress and no imagery in it.
+        JSONArray children = node.optJSONArray("ch");
         if (children != null && children.length() > 0) {
             for (int i = 0; i < children.length(); i++) {
                 flattenInto(children.optJSONObject(i), out, depth + 1);
@@ -247,14 +250,57 @@ public final class CN1WatchSurface {
         List<String> out = new ArrayList<String>();
         for (JSONObject node : nodes) {
             String type = node.optString("t", "");
-            if ("text".equals(type) || "dyn".equals(type)) {
+            if ("text".equals(type)) {
                 String text = CN1SurfaceRenderer.interpolate(node.optString("text", ""), state);
+                if (text != null && text.length() > 0) {
+                    out.add(text);
+                }
+            } else if ("dyn".equals(type)) {
+                // A dynamic node has no "text" field at all -- it serializes a style plus a date
+                // or a dateKey, and the reader formats it. Interpolating "text" here resolved to
+                // an empty string, so every countdown, clock and relative date vanished from a
+                // complication rather than showing its value.
+                String text = dynamicText(node, state);
                 if (text != null && text.length() > 0) {
                     out.add(text);
                 }
             }
         }
         return out;
+    }
+
+    /**
+     * A dynamic node's value as a plain string.
+     *
+     * <p>A complication slot takes a string, so a countdown is formatted at render time and
+     * refreshed when the timeline flips -- there is no native ticking widget to hand a watch
+     * face. A caller that CAN tick natively, as the complication data source does for the timer
+     * styles, should read the style and date itself and build the ticking form instead.</p>
+     *
+     * @param node a {@code dyn} node
+     * @param state the entry state, which may supply the date by key
+     * @return the formatted value, never null
+     */
+    public static String dynamicText(JSONObject node, JSONObject state) {
+        if (node == null) {
+            return "";
+        }
+        return CN1SurfaceRenderer.formatWatchDynamicText(node, state);
+    }
+
+    /**
+     * A dynamic node's resolved timestamp, so a caller that can render it natively has the
+     * value rather than a formatted string.
+     *
+     * @param node a {@code dyn} node
+     * @param state the entry state, which may supply the date by key
+     * @return epoch millis, or 0 when the node names none
+     */
+    public static long dynamicDate(JSONObject node, JSONObject state) {
+        if (node == null) {
+            return 0;
+        }
+        return CN1SurfaceRenderer.resolveWatchDate(node, state);
     }
 
     /**

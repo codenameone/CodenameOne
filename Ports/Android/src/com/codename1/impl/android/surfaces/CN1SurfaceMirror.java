@@ -179,9 +179,9 @@ public final class CN1SurfaceMirror {
             if (json == null) {
                 return;
             }
-            CN1SurfaceStore.kindDir(ctx, kindId).mkdirs();
-            File out = new File(CN1SurfaceStore.kindDir(ctx, kindId), "timeline.json");
-            writeAtomically(out, json);
+            File kindDir = CN1SurfaceStore.kindDir(ctx, kindId);
+            mkdirs(kindDir);
+            writeAtomically(new File(kindDir, "timeline.json"), json);
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
         } catch (Throwable t) {
             Log.w(TAG, "Could not apply a mirrored surface from " + path, t);
@@ -218,8 +218,14 @@ public final class CN1SurfaceMirror {
                 return;
             }
             File dir = CN1SurfaceStore.kindDir(ctx, kindId);
-            dir.mkdirs();
+            mkdirs(dir);
             writeAtomically(new File(dir, name), contents);
+            // A file transfer is asynchronous and unordered against the descriptor, so artwork
+            // routinely lands AFTER the timeline that references it. The descriptor's own arrival
+            // already asked for a refresh, but that render saw a gap where this image belongs --
+            // and nothing else would ask again until the next publish. So each arriving image
+            // asks too.
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
         } catch (Throwable t) {
             Log.w(TAG, "Could not store a mirrored image from " + path, t);
         }
@@ -236,6 +242,20 @@ public final class CN1SurfaceMirror {
         }
         String kindId = path.substring(PATH_PREFIX.length());
         return kindId.length() == 0 ? null : kindId;
+    }
+
+    /**
+     * Creates a directory, failing loudly when it could not be.
+     *
+     * <p>The return value of {@code mkdirs()} alone is the wrong test: it answers false both when
+     * the directory could not be created AND when it already exists, which here is the common
+     * case. Existence afterwards is what the caller actually needs, and the callers turn a
+     * failure into a logged warning rather than a lost timeline.</p>
+     */
+    private static void mkdirs(File dir) throws IOException {
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("could not create " + dir);
+        }
     }
 
     private static void writeAtomically(File target, byte[] bytes) throws IOException {

@@ -259,7 +259,12 @@ public abstract class CN1SurfaceTileService extends TileService {
     }
 
     private LayoutElementBuilders.LayoutElement styledText(JSONObject node, JSONObject state) {
-        String value = CN1SurfaceRenderer.interpolate(node.optString("text", ""), state);
+        // A dynamic node serializes a style plus a date or dateKey and carries no "text" at all,
+        // so it has to be formatted rather than interpolated -- otherwise every countdown, clock
+        // and relative date rendered blank. Frozen at render; see the class comment.
+        String value = "dyn".equals(node.optString("t", ""))
+                ? CN1WatchSurface.dynamicText(node, state)
+                : CN1SurfaceRenderer.interpolate(node.optString("text", ""), state);
         LayoutElementBuilders.FontStyle.Builder font = new LayoutElementBuilders.FontStyle.Builder();
         int size = node.optInt("size", 0);
         if (size > 0) {
@@ -313,17 +318,45 @@ public abstract class CN1SurfaceTileService extends TileService {
         if (action != null && action.optString("id", "").length() > 0) {
             mods.setClickable(new ModifiersBuilders.Clickable.Builder()
                     .setId(action.optString("id"))
-                    .setOnClick(new androidx.wear.protolayout.ActionBuilders.LaunchAction.Builder()
-                            .setAndroidActivity(
-                                    new androidx.wear.protolayout.ActionBuilders.AndroidActivity
-                                            .Builder()
-                                            .setPackageName(getPackageName())
-                                            .setClassName(CN1SurfaceActionActivity.class.getName())
-                                            .build())
-                            .build())
+                    .setOnClick(launchAction(action))
                     .build());
         }
         return mods.build();
+    }
+
+    /**
+     * The launch action for a tapped node, carrying what the trampoline needs to dispatch.
+     *
+     * <p>A Clickable's id is ProtoLayout interaction metadata and never reaches the started
+     * activity, so an action built from it alone opened the app and dropped the action id,
+     * source and parameters on the floor. {@code CN1SurfaceActionActivity} dispatches only when
+     * {@code EXTRA_ACTION_ID} is present, so the extras are attached explicitly here -- the same
+     * three a widget tap sends.</p>
+     */
+    private androidx.wear.protolayout.ActionBuilders.LaunchAction launchAction(JSONObject action) {
+        androidx.wear.protolayout.ActionBuilders.AndroidActivity.Builder activity =
+                new androidx.wear.protolayout.ActionBuilders.AndroidActivity.Builder()
+                        .setPackageName(getPackageName())
+                        .setClassName(CN1SurfaceActionActivity.class.getName());
+        activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_SOURCE,
+                stringExtra(getKindId()));
+        activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_ACTION_ID,
+                stringExtra(action.optString("id", "")));
+        JSONObject params = action.optJSONObject("p");
+        if (params != null) {
+            activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_ACTION_PARAMS,
+                    stringExtra(params.toString()));
+        }
+        return new androidx.wear.protolayout.ActionBuilders.LaunchAction.Builder()
+                .setAndroidActivity(activity.build())
+                .build();
+    }
+
+    private static androidx.wear.protolayout.ActionBuilders.AndroidStringExtra stringExtra(
+            String value) {
+        return new androidx.wear.protolayout.ActionBuilders.AndroidStringExtra.Builder()
+                .setValue(value == null ? "" : value)
+                .build();
     }
 
     private static LayoutElementBuilders.LayoutElement text(String value) {
@@ -332,7 +365,9 @@ public abstract class CN1SurfaceTileService extends TileService {
 
     private static List<JSONObject> children(JSONObject node) {
         List<JSONObject> out = new ArrayList<JSONObject>();
-        JSONArray array = node.optJSONArray("c");
+        // "ch", which is what SurfaceContainer.serializeContent writes. Reading "c" found
+        // nothing, so every row, column and box rendered empty.
+        JSONArray array = node.optJSONArray("ch");
         if (array != null) {
             for (int i = 0; i < array.length(); i++) {
                 JSONObject child = array.optJSONObject(i);
