@@ -70,8 +70,19 @@ typedef NS_ENUM(int, CN1PathState) {
  * The raw lstat syscall number. Reaching past libc matters because the ObjC and
  * libc entry points are precisely what a jailbreak-bypass tweak hooks; the two
  * answers are then compared rather than trusted.
+ *
+ * Left undefined on watchOS and tvOS, where syscall() is marked unavailable in
+ * unistd.h and calling it is a hard compile error, not a warning. This file is
+ * built into the watch and TV targets as well as the phone one, which is how that
+ * turned up -- on the watch first, and on tvOS only because the platform matrix was
+ * widened afterwards rather than fixing the one platform CI had happened to reach.
+ * cn1RawLstat() then takes its documented "cannot answer" path, so the disagreement
+ * check simply has no second opinion there: a lost hook signal on two platforms
+ * nobody jailbreaks, rather than a build that does not compile.
  */
-#if defined(SYS_lstat64)
+#if TARGET_OS_WATCH || TARGET_OS_TV
+/* syscall() is unavailable; cn1RawLstat() answers CN1PathUnknown. */
+#elif defined(SYS_lstat64)
 #define CN1_SYS_LSTAT SYS_lstat64
 #elif defined(SYS_lstat)
 #define CN1_SYS_LSTAT SYS_lstat
