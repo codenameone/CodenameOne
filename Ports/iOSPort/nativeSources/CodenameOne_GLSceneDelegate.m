@@ -32,6 +32,7 @@ extern BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
 extern int CN1MacWindowIdForScene(UIWindowScene* scene);
 extern void CN1MacWindowSceneDisconnected(UIWindowScene* scene);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
+extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
 #endif
 
 #ifdef CN1_USE_UI_SCENE
@@ -166,9 +167,14 @@ static int cn1MacCodenameOneWindowScene(UIScene *scene) {
 #if TARGET_OS_MACCATALYST
     // A Codename One window coming back from minimized is not the application
     // returning to the foreground; running the global resume path here would
-    // resume an application that was never suspended.
-    if (cn1MacCodenameOneWindowScene(scene) >= 0) {
-        return;
+    // resume an application that was never suspended. The per-window restore is
+    // still reported, as the matching background branch reports the minimize.
+    {
+        int windowId = cn1MacCodenameOneWindowScene(scene);
+        if (windowId >= 0) {
+            CN1MacWindowDeliverVisibility(windowId, YES);
+            return;
+        }
     }
 #endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
@@ -183,8 +189,16 @@ static int cn1MacCodenameOneWindowScene(UIScene *scene) {
     // collector and notifies the application of suspension -- and if this scene is
     // then disconnected it never enters the foreground again to undo any of it,
     // leaving the still-visible main window suspended for good.
-    if (cn1MacCodenameOneWindowScene(scene) >= 0) {
-        return;
+    //
+    // Suppressing the global path is not the same as reporting nothing, though:
+    // without the per-window notification the framework kept the window visible,
+    // painting it and running its animations while it was minimized.
+    {
+        int windowId = cn1MacCodenameOneWindowScene(scene);
+        if (windowId >= 0) {
+            CN1MacWindowDeliverVisibility(windowId, NO);
+            return;
+        }
     }
 #endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;

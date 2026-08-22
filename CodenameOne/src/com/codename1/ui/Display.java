@@ -1498,12 +1498,25 @@ public final class Display extends CN1Constants {
         time = System.currentTimeMillis() - currentTime;
     }
 
-    /// Resolves the top level a repeat or long press should be delivered to.
+    /// Resolves the top level a repeat or long press should be delivered to, or null
+    /// when it must not receive one.
+    ///
+    /// These timers are armed when the press is accepted and fire from the paint loop,
+    /// which calls keyRepeated, longKeyPress and longPointerPress directly rather than
+    /// through the packed queue -- so they never meet the modality filter. A handler
+    /// that opens a modal window from the very press still being held would otherwise
+    /// go on receiving repeats and a long press behind that modal, which is the one
+    /// case where the press was legitimately accepted and the block arrived afterwards.
+    /// The same reasoning covers a window hidden while its press is held.
     private Container repeatTarget(int windowId, Form current) {
+        if (isBlockedByModal(windowId)) {
+            return null;
+        }
         if (windowId == 0) {
             return current;
         }
-        return Desktop.getInstance().windowById(windowId);
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.isWindowShowing() ? w : null;
     }
 
     boolean hasNoSerialCallsPending() {
@@ -2308,9 +2321,21 @@ public final class Display extends CN1Constants {
         if (isBlockedByModal(windowId)) {
             return true;
         }
-        Container root = windowId > 0
-                ? Desktop.getInstance().windowById(windowId)
-                : getCurrent();
+        Container root;
+        if (windowId > 0) {
+            Window w = Desktop.getInstance().windowById(windowId);
+            // The same hidden check the packed input path applies. A wheel callback
+            // queued before its window was hidden still finds the window registered,
+            // and would dispatch into an invisible tree -- an unconsumed listener that
+            // hides its own window is the immediate case, since the synthetic press,
+            // drag and release queued after it start against a window that is gone.
+            if (w == null || !w.isWindowShowing()) {
+                return false;
+            }
+            root = w;
+        } else {
+            root = getCurrent();
+        }
         if (root == null) {
             return false;
         }

@@ -2102,6 +2102,10 @@ void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
     com_codename1_impl_ios_IOSImplementation_windowFocusCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, gained ? JAVA_TRUE : JAVA_FALSE);
 }
 
+void CN1MacWindowDeliverVisibility(int windowId, BOOL shown) {
+    com_codename1_impl_ios_IOSImplementation_windowVisibilityCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, shown ? JAVA_TRUE : JAVA_FALSE);
+}
+
 void CN1MacWindowDeliverResize(int windowId, int width, int height) {
     com_codename1_impl_ios_IOSImplementation_windowSizeCallback___int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, width, height);
 }

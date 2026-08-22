@@ -3525,4 +3525,46 @@ class WindowTest extends UITestBase {
             }
         }
     }
+
+    @FormTest
+    void heldInputTimersStopAtAWindowThatBecameBlocked() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("target", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        flushSerialCalls();
+
+        java.lang.reflect.Method target = Display.class.getDeclaredMethod(
+                "repeatTarget", int.class, Form.class);
+        target.setAccessible(true);
+        Window modal = new Window("modal", new BorderLayout());
+        modal.setWindowSize(200, 150);
+        try {
+            assertSame(w, target.invoke(Display.getInstance(),
+                    Integer.valueOf(w.getWindowId()), main),
+                    "an unblocked window is a valid repeat target");
+
+            // A handler can open an application modal from the very press that is
+            // still being held. These timers are armed when the press is accepted and
+            // fire from the paint loop, which calls keyRepeated and longPointerPress
+            // directly -- so they never meet the modality filter the packed queue
+            // applies, and the held press went on driving the window behind the modal.
+            modal.setModalityType(Window.MODALITY_APPLICATION);
+            modal.show();
+            flushSerialCalls();
+
+            assertNull(target.invoke(Display.getInstance(),
+                    Integer.valueOf(w.getWindowId()), main),
+                    "a window blocked by a modal must not receive repeats or long presses");
+            assertNull(target.invoke(Display.getInstance(), Integer.valueOf(0), main),
+                    "nor must the main form");
+        } finally {
+            modal.dispose();
+            w.dispose();
+        }
+    }
 }

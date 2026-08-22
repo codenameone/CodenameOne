@@ -1963,6 +1963,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().windowFocusChanged(windowId, gained);
     }
 
+    /// Invoked when a window's scene enters or leaves the background, which on Mac
+    /// Catalyst is how minimizing and restoring one window is reported. Distinct from
+    /// focus: an unfocused window is still on screen and still painted, a minimized
+    /// one is neither.
+    public static void windowVisibilityCallback(int windowId, boolean shown) {
+        if (shown) {
+            Display.getInstance().windowShowNotify(windowId);
+        } else {
+            Display.getInstance().windowHideNotify(windowId);
+        }
+    }
+
     /// Invoked when a window's drawable area changes size.
     public static void windowSizeCallback(int windowId, int width, int height) {
         Display.getInstance().windowSizeChanged(windowId, width, height);
