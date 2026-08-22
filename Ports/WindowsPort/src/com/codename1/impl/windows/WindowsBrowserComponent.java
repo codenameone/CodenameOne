@@ -82,6 +82,11 @@ class WindowsBrowserComponent extends PeerComponent {
     @Override
     protected void initComponent() {
         super.initComponent();
+        // Resolved here rather than at construction: a BrowserComponent is routinely
+        // built while detached, and the WebView2 controller was created against the
+        // main window's HWND regardless, so the view appeared and took input over the
+        // main window instead of the one the browser is in.
+        WindowsNative.browserSetHost(peer, WindowsWindowManager.slotForComponent(this));
         WindowsNative.browserSetBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
         // The top level rather than the form: getComponentForm() is null by design
         // inside a Window, so this timer never started for a peer hosted in one.

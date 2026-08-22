@@ -46,7 +46,7 @@ extern "C" {
 
 using namespace Microsoft::WRL;
 
-enum { OP_NAV_HTML = 2, OP_NAV_URL = 3, OP_EXECUTE = 4, OP_BOUNDS = 5, OP_DESTROY = 6 };
+enum { OP_NAV_HTML = 2, OP_NAV_URL = 3, OP_EXECUTE = 4, OP_BOUNDS = 5, OP_DESTROY = 6, OP_SETHOST = 7 };
 
 struct CritLock {
     CRITICAL_SECTION* cs;
@@ -63,6 +63,7 @@ struct CN1Browser {
     std::deque<std::pair<int, std::wstring>> cmds; // queued ops (run on main thread)
     std::deque<std::string> events;                // UTF-8: "LOAD" | "NAV|<url>"
     std::string png;                               // last CapturePreview PNG bytes
+    int slot = -1;                                 // owning desktop window, -1 = main
     CN1Browser() { InitializeCriticalSection(&lock); }
     ~CN1Browser() { DeleteCriticalSection(&lock); }
 };
@@ -114,6 +115,14 @@ static void cn1BrowserCapture(CN1Browser* b) {
             }).Get());
 }
 
+/* The window this browser belongs to, falling back to the main one. A slot whose
+ * window has already gone answers NULL, and a WebView2 controller parented to NULL
+ * is an error, so the fallback is not merely for the -1 case. */
+static HWND cn1BrowserHostHwnd(CN1Browser* b) {
+    HWND host = b->slot >= 0 ? cn1WinDesktopHwnd(b->slot) : NULL;
+    return host ? host : cn1Win.hwnd;
+}
+
 static void cn1BrowserApplyBounds(CN1Browser* b) {
     if (!b->controller) return;
     RECT rc; rc.left = b->x; rc.top = b->y; rc.right = b->x + b->w; rc.bottom = b->y + b->h;
@@ -127,6 +136,14 @@ static void cn1BrowserRunCmd(CN1Browser* b, int op, const std::wstring& data) {
         case OP_NAV_URL:  if (b->webview) b->webview->Navigate(data.c_str()); break;
         case OP_EXECUTE:  if (b->webview) b->webview->ExecuteScript(data.c_str(), nullptr); break;
         case OP_BOUNDS:   cn1BrowserApplyBounds(b); break;
+        case OP_SETHOST:
+            // Only meaningful once the controller exists; when it does not, creation
+            // reads b->slot itself, so both orderings end up parented correctly.
+            if (b->controller) {
+                b->controller->put_ParentWindow(cn1BrowserHostHwnd(b));
+                cn1BrowserApplyBounds(b);
+            }
+            break;
         case OP_DESTROY:
             if (b->controller) { b->controller->Close(); }
             delete b;
@@ -153,7 +170,7 @@ static void cn1BrowserCreate(CN1Browser* b) {
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
             [b](HRESULT r, ICoreWebView2Environment* env) -> HRESULT {
                 if (FAILED(r) || !env) { cn1BrowserEnqueueEvent(b, "LOAD"); return S_OK; }
-                env->CreateCoreWebView2Controller(cn1Win.hwnd,
+                env->CreateCoreWebView2Controller(cn1BrowserHostHwnd(b),
                     Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                         [b](HRESULT r2, ICoreWebView2Controller* ctl) -> HRESULT {
                             if (FAILED(r2) || !ctl) { cn1BrowserEnqueueEvent(b, "LOAD"); return S_OK; }
@@ -226,6 +243,19 @@ static void cn1BrowserPost(CN1Browser* b, int op, const std::wstring& data) {
     PostMessageW(cn1Win.hwnd, WM_CN1_BROWSER, 0, (LPARAM) b);
 }
 
+/* Re-hosts the browser in the given window. A BrowserComponent is routinely built
+ * while detached, so the window it belongs to is only known once it is initialized. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_browserSetHost___long_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT slot) {
+    CN1Browser* b = (CN1Browser*) (intptr_t) peer;
+    if (!b) return;
+    {
+        CritLock g(&b->lock);
+        b->slot = slot;
+    }
+    cn1BrowserPost(b, OP_SETHOST, std::wstring());
+}
+
 JAVA_VOID com_codename1_impl_windows_WindowsNative_browserSetHtml___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_OBJECT html) {
     CN1Browser* b = (CN1Browser*) (intptr_t) peer; if (!b) return;
     cn1BrowserPost(b, OP_NAV_HTML, utf8ToWide(stringToUTF8(threadStateData, html)));
@@ -284,6 +314,7 @@ void cn1WinBrowserHandleMessage(WPARAM wParam, LPARAM lParam) {}
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_browserSupported___R_boolean(CODENAME_ONE_THREAD_STATE) { return JAVA_FALSE; }
 JAVA_LONG com_codename1_impl_windows_WindowsNative_browserCreate___int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT w, JAVA_INT h) { return 0; }
+JAVA_VOID com_codename1_impl_windows_WindowsNative_browserSetHost___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG p, JAVA_INT slot) {}
 JAVA_VOID com_codename1_impl_windows_WindowsNative_browserSetHtml___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG p, JAVA_OBJECT s) {}
 JAVA_VOID com_codename1_impl_windows_WindowsNative_browserSetUrl___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG p, JAVA_OBJECT s) {}
 JAVA_VOID com_codename1_impl_windows_WindowsNative_browserExecute___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG p, JAVA_OBJECT s) {}

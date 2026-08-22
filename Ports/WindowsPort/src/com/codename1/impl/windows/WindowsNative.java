@@ -97,6 +97,13 @@ public final class WindowsNative {
     /** Creates a WebView2-backed browser peer; returns an opaque native handle. */
     public static native long browserCreate(int width, int height);
 
+    /**
+     * Re-hosts the browser in the given window. A BrowserComponent is routinely
+     * constructed while detached, so the window it belongs to is only known once the
+     * component is initialized in its real hierarchy.
+     */
+    public static native void browserSetHost(long peer, int slot);
+
     public static native void browserSetHtml(long peer, String html);
 
     public static native void browserSetUrl(long peer, String url);
@@ -954,7 +961,7 @@ public final class WindowsNative {
      * {@code @NativeInterface}; these reparent it onto the host window and
      * move/size/show it to track the lightweight {@link com.codename1.ui.PeerComponent}.
      */
-    public static native void peerInitialized(long peer, int x, int y, int w, int h);
+    public static native void peerInitialized(long peer, int slot, int x, int y, int w, int h);
 
     /** Repositions / resizes the peer HWND to the component's absolute bounds. */
     public static native void peerSetBounds(long peer, int x, int y, int w, int h);

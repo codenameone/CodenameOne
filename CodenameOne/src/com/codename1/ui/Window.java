@@ -1381,8 +1381,39 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Restores this window from a minimized state.
     public void restore() {
+        // Same reason show() does it: bringing a window back while its owner is away
+        // puts it on screen without the owner, or lets the window system suppress it
+        // while the framework counts it back. The owner chain comes first.
+        showOwnerChain();
         if (nativePeer != null) {
             manager().restore(nativePeer);
+        }
+    }
+
+    /// Brings any owner above this window back before this one goes on screen.
+    ///
+    /// An owned window cannot be on screen without its owner, and an owner the
+    /// application hid has to come back through its own lifecycle: a port can map the
+    /// native window, but only `#show()` makes the component hierarchy visible again
+    /// and reacquires the modality that `#hide()` released, so restoring it natively
+    /// alone would leave an unpainted, non-interactive window that no longer blocks
+    /// input.
+    ///
+    /// A minimized owner is included: only one port restored one of those itself, so
+    /// everywhere else the child was mapped against an owner still minimized --
+    /// appearing without it, or suppressed by the window system while the framework
+    /// counted it visible and took its modal blocker, which strands an application
+    /// modal with all input blocked.
+    ///
+    /// `show()` recurses into this, so a whole hidden chain comes back furthest owner
+    /// first. The owner chain cannot cycle -- `#setOwnerWindow(TopLevelContainer)`
+    /// rejects that when the relation is established.
+    private void showOwnerChain() {
+        if (ownerWindow instanceof Window) {
+            Window owner = (Window) ownerWindow;
+            if (!owner.isWindowShowing()) {
+                owner.show();
+            }
         }
     }
 
@@ -1542,25 +1573,7 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         WindowManager wm = manager();
-        if (ownerWindow instanceof Window) {
-            Window owner = (Window) ownerWindow;
-            // An owned window cannot be on screen without its owner, and an owner the
-            // application hid has to come back through its own lifecycle: a port can
-            // map the native window, but only show() makes the component hierarchy
-            // visible again and reacquires the modality that hide() released, so
-            // restoring it natively alone would leave an unpainted, non-interactive
-            // window that no longer blocks input. Recursive, so a whole hidden chain
-            // comes back furthest owner first.
-            //
-            // An iconified owner is included: only the Catalyst port restored one of
-            // those itself, so everywhere else the child was mapped against an owner
-            // still minimized -- appearing without it, or suppressed by the window
-            // system while the framework counted it visible and took its modal
-            // blocker, which strands an application modal with all input blocked.
-            if (!owner.isWindowShowing()) {
-                owner.show();
-            }
-        }
+        showOwnerChain();
         if (nativePeer == null) {
             if (ownerWindow instanceof Window && ((Window) ownerWindow).nativePeer == null) {
                 // Showing a window whose owner has not been shown yet would create the

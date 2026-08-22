@@ -210,6 +210,36 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_browserCreate___int_int_int_R_lon
     return (JAVA_LONG) (intptr_t) req.result;
 }
 
+typedef struct { CN1Browser* b; int slot; } CN1BrowserHostReq;
+
+static void cn1BrowserSetHostOnMain(void* p) {
+    CN1BrowserHostReq* req = (CN1BrowserHostReq*) p;
+    CN1Browser* b = req->b;
+    if (b->slot == req->slot) {
+        return;
+    }
+    /* Moved between overlays rather than recreated: the view keeps its page, its load
+     * state and its script message handler, so a browser added to a window after it
+     * was constructed does not lose whatever it had already loaded. */
+    cn1LinuxOverlayRemove(b->slot, b->view);
+    b->slot = req->slot;
+    cn1LinuxOverlayAdd(b->slot, b->view, 0, 0, 1, 1);
+}
+
+/* Re-hosts the view in the given window's overlay. The real bounds arrive right
+ * after from browserSetBounds, so the 1x1 above is never displayed. */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_browserSetHost___long_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT slot) {
+    CN1Browser* b = (CN1Browser*) (intptr_t) peer;
+    CN1BrowserHostReq req;
+    if (!b) {
+        return;
+    }
+    req.b = b;
+    req.slot = slot;
+    cn1LinuxRunOnMainAndWait(cn1BrowserSetHostOnMain, &req);
+}
+
 typedef struct { CN1Browser* b; char* a; char* c; int x, y, w, h; } CN1BrowserOp;
 
 static void cn1BrowserSetHtmlOnMain(void* p) {

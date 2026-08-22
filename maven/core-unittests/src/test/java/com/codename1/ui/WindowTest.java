@@ -402,6 +402,29 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void restoringAWindowBringsItsHiddenOwnerBackToo() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        child.hideNotify();
+        owner.hide();
+        assertFalse(owner.isWindowShowing(), "the owner starts this hidden");
+
+        child.restore();
+
+        // restore() owes the same invariant show() does: un-minimizing a window while
+        // its owner is away puts it on screen without the owner, or lets the window
+        // system suppress it while the framework counts it back.
+        assertTrue(owner.isWindowShowing(),
+                "restoring an owned window has to bring its owner back as well");
+
+        owner.dispose();
+    }
+
+    @FormTest
     void showingAMinimizedWindowAsksThePortToRestoreIt() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("minimized");

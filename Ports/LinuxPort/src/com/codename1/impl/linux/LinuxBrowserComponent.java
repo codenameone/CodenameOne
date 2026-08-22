@@ -55,8 +55,9 @@ class LinuxBrowserComponent extends PeerComponent {
     LinuxBrowserComponent(BrowserComponent browser) {
         super(null);
         this.browser = browser;
-        // Slot resolved from the BrowserComponent, so the WebKit view is hosted by
-        // the window the component is in rather than always by the main window.
+        // A starting slot only. A BrowserComponent is routinely constructed while
+        // detached, and then this resolves to the main window; initComponent() re-hosts
+        // it once the component is in its real hierarchy.
         this.peer = LinuxNative.browserCreate(800, 600,
                 LinuxWindowManager.slotForComponent(browser));
     }
@@ -92,6 +93,11 @@ class LinuxBrowserComponent extends PeerComponent {
     @Override
     protected void initComponent() {
         super.initComponent();
+        // Resolved here rather than in the constructor: the constructor runs while the
+        // component is usually still detached, so the slot it picked was the main
+        // window's and the WebKit view stayed there permanently -- visible, and taking
+        // input, over the main window instead of the one the browser is in.
+        LinuxNative.browserSetHost(peer, LinuxWindowManager.slotForComponent(browser));
         LinuxNative.browserSetBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
         LinuxNative.browserSetVisible(peer, true);
         // The top level rather than the form: getComponentForm() is null by design

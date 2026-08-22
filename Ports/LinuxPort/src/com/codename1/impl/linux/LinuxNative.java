@@ -112,6 +112,13 @@ public final class LinuxNative {
 
     public static native void browserExecute(long peer, String js);
 
+    /**
+     * Re-hosts the browser in the given window's overlay. A BrowserComponent built
+     * while detached has no top level yet, so the slot chosen at construction is the
+     * main window's and would otherwise be permanent.
+     */
+    public static native void browserSetHost(long peer, int slot);
+
     public static native void browserSetBounds(long peer, int x, int y, int w, int h);
 
     /** Shows/hides the native WebKit widget. Hidden when the BrowserComponent's form

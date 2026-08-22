@@ -32,7 +32,11 @@ class WindowsGenericPeer extends PeerComponent {
     @Override
     protected void initComponent() {
         super.initComponent();
-        WindowsNative.peerInitialized(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+        // The owning window, resolved here rather than at construction: a peer is
+        // routinely built while detached, and every peer was previously reparented
+        // onto the main window's HWND regardless of the window it is in.
+        WindowsNative.peerInitialized(peer, WindowsWindowManager.slotForComponent(this),
+                getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
     }
 
     @Override
