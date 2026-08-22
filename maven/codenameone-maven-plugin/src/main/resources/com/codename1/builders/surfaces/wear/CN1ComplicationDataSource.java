@@ -39,11 +39,13 @@ import androidx.wear.watchface.complications.data.NoDataComplicationData;
 import androidx.wear.watchface.complications.data.PlainComplicationText;
 import androidx.wear.watchface.complications.data.RangedValueComplicationData;
 import androidx.wear.watchface.complications.data.ShortTextComplicationData;
+import androidx.wear.watchface.complications.data.TimeRange;
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService;
 import androidx.wear.watchface.complications.datasource.ComplicationRequest;
 
 import org.json.JSONObject;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -103,8 +105,9 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             Log.w(TAG, "Could not build preview data for kind " + getKindId(), t);
         }
         // The gallery shows this before the app has ever published, so a placeholder that names
-        // the kind beats an empty slot the user cannot identify.
-        return shortText(getKindId(), null, null);
+        // the kind beats an empty slot the user cannot identify. No validity: a placeholder does
+        // not go stale, and expiring it would ask the system to come back for the same answer.
+        return shortText(getKindId(), null, null, null);
     }
 
     /**
@@ -133,15 +136,27 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         List<String> texts = CN1WatchSurface.texts(nodes, reading.getState());
         PendingIntent tap = tapIntent(reading.getLayout());
         reportDroppedContent(nodes, texts);
+        // How long this answer is good for. A published timeline can hold entries that take over
+        // at stated times, and this service is asked once and then not again: UPDATE_PERIOD_SECONDS
+        // is deliberately 0, because polling a push-driven surface costs watch battery for nothing.
+        // Without a validity the face would keep the first entry for ever and the later ones would
+        // never appear. Saying when the data stops being true asks the system to come back at that
+        // moment and nowhere in between, which is the same bargain the Tile's freshness interval
+        // makes.
+        TimeRange validity = validityFor(reading.getNextFlipDate());
 
         if (ComplicationType.LONG_TEXT.equals(type)) {
             String title = texts.isEmpty() ? getKindId() : texts.get(0);
             String body = texts.size() > 1 ? join(texts, 1) : "";
-            return new LongTextComplicationData.Builder(plain(body.length() == 0 ? title : body),
-                    plain(title))
-                    .setTitle(body.length() == 0 ? null : plain(title))
-                    .setTapAction(tap)
-                    .build();
+            LongTextComplicationData.Builder builder =
+                    new LongTextComplicationData.Builder(plain(body.length() == 0 ? title : body),
+                            plain(title))
+                            .setTitle(body.length() == 0 ? null : plain(title))
+                            .setTapAction(tap);
+            if (validity != null) {
+                builder.setValidTimeRange(validity);
+            }
+            return builder.build();
         }
         if (ComplicationType.RANGED_VALUE.equals(type)) {
             JSONObject prog = CN1WatchSurface.firstOfType(nodes, "prog");
@@ -157,30 +172,64 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             if (!texts.isEmpty()) {
                 builder.setText(plain(shorten(texts.get(0))));
             }
-            return builder.setTapAction(tap).build();
+            builder.setTapAction(tap);
+            if (validity != null) {
+                builder.setValidTimeRange(validity);
+            }
+            return builder.build();
         }
         if (ComplicationType.MONOCHROMATIC_IMAGE.equals(type)) {
             Icon icon = monochromeIcon(nodes, reading.getState());
             if (icon == null) {
                 return null;
             }
-            return new MonochromaticImageComplicationData.Builder(
-                    new MonochromaticImage.Builder(icon).build(),
-                    plain(texts.isEmpty() ? getKindId() : texts.get(0)))
-                    .setTapAction(tap)
-                    .build();
+            MonochromaticImageComplicationData.Builder builder =
+                    new MonochromaticImageComplicationData.Builder(
+                            new MonochromaticImage.Builder(icon).build(),
+                            plain(texts.isEmpty() ? getKindId() : texts.get(0)))
+                            .setTapAction(tap);
+            if (validity != null) {
+                builder.setValidTimeRange(validity);
+            }
+            return builder.build();
         }
         if (ComplicationType.SHORT_TEXT.equals(type)) {
             if (texts.isEmpty()) {
                 return null;
             }
             return shortText(shorten(texts.get(0)), texts.size() > 1 ? shorten(texts.get(1)) : null,
-                    tap);
+                    tap, validity);
         }
         return null;
     }
 
-    private ShortTextComplicationData shortText(String text, String title, PendingIntent tap) {
+    /**
+     * The window this answer stays true for, or null when it is good indefinitely.
+     *
+     * <p>A flip date in the past or absent means the timeline has one entry and nothing is
+     * scheduled to replace it, and claiming an expiry then would make the face throw away good
+     * data and ask again for the same answer.</p>
+     *
+     * @param flip the next entry's start time, in epoch millis, or 0 when there is none
+     * @return the validity window, or null
+     */
+    private TimeRange validityFor(long flip) {
+        long now = System.currentTimeMillis();
+        if (flip <= now) {
+            return null;
+        }
+        try {
+            return TimeRange.between(Instant.ofEpochMilli(now), Instant.ofEpochMilli(flip));
+        } catch (Throwable t) {
+            // Never at the cost of the reading itself: data with no expiry is stale later,
+            // data that failed to build is absent now.
+            Log.w(TAG, "Could not bound the complication's validity for kind " + getKindId(), t);
+            return null;
+        }
+    }
+
+    private ShortTextComplicationData shortText(String text, String title, PendingIntent tap,
+            TimeRange validity) {
         // The untruncated string becomes the content description, so a screen reader still hears
         // what the layout said even where the slot shows seven characters.
         ShortTextComplicationData.Builder builder =
@@ -188,7 +237,11 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         if (title != null && title.length() > 0) {
             builder.setTitle(plain(title));
         }
-        return builder.setTapAction(tap).build();
+        builder.setTapAction(tap);
+        if (validity != null) {
+            builder.setValidTimeRange(validity);
+        }
+        return builder.build();
     }
 
     private Icon monochromeIcon(List<JSONObject> nodes, JSONObject state) {

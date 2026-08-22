@@ -182,6 +182,12 @@ public final class CN1SurfaceMirror {
             File kindDir = CN1SurfaceStore.kindDir(ctx, kindId);
             mkdirs(kindDir);
             writeAtomically(new File(kindDir, "timeline.json"), json);
+            // AFTER the replacement is safely on disk, and with the same reference set the
+            // publish path uses. Blob names are content hashes, so without this every changed
+            // image leaves its predecessor behind for ever in the watch app's storage. Artwork
+            // for the new descriptor that has not arrived yet is simply absent rather than
+            // unreferenced, so this cannot delete an image the timeline is waiting for.
+            CN1SurfaceStore.deleteUnreferencedImages(kindDir, new String(json, "UTF-8"));
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
         } catch (Throwable t) {
             Log.w(TAG, "Could not apply a mirrored surface from " + path, t);

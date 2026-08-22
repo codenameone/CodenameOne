@@ -124,6 +124,8 @@ public class WearGlueCompilesTest {
                         + "{ return 0L; }\n"
                         + "    static String formatWatchDynamicText(JSONObject n, JSONObject s) "
                         + "{ return \"\"; }\n"
+                        + "    static double resolveFraction(JSONObject n, JSONObject s) "
+                        + "{ return 0d; }\n"
                         + "}\n").getBytes("UTF-8"));
         Files.write(shims.resolve("CN1SurfaceActionActivity.java"),
                 ("package com.codename1.impl.android.surfaces;\n"

@@ -31,6 +31,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// The decisions the Wear complication codegen makes, as pure functions so they can be pinned
@@ -220,12 +221,12 @@ class AndroidWatchSurfaceCodegenTest {
     /// supports by version code; on a phone the required watch feature filters the wear one out
     /// entirely, so the phone APK still wins there.
     @Test
-    void theWearArtifactOutranksThePhoneOne() {
+    void theWearArtifactOutranksThePhoneOne() throws BuildException {
         assertEquals(101, AndroidGradleBuilder.wearVersionCode(request(), 100));
     }
 
     @Test
-    void theWearVersionCodeCanBeSetOutright() {
+    void theWearVersionCodeCanBeSetOutright() throws BuildException {
         BuildRequest req = request();
         req.putArgument("android.watchVersionCode", "5000");
 
@@ -233,7 +234,7 @@ class AndroidWatchSurfaceCodegenTest {
     }
 
     @Test
-    void theOffsetCanBeWidenedForAProjectThatNumbersItsBuildsTightly() {
+    void theOffsetCanBeWidenedForAProjectThatNumbersItsBuildsTightly() throws BuildException {
         BuildRequest req = request();
         req.putArgument("android.watchVersionCodeOffset", "50");
 
@@ -242,11 +243,36 @@ class AndroidWatchSurfaceCodegenTest {
 
     /// A malformed hint must not produce a version code that silently reorders the two artifacts.
     @Test
-    void aMalformedVersionHintFallsBackToTheDefault() {
+    void aMalformedVersionHintFallsBackToTheDefault() throws BuildException {
         BuildRequest req = request();
         req.putArgument("android.watchVersionCodeOffset", "not a number");
 
         assertEquals(101, AndroidGradleBuilder.wearVersionCode(req, 100));
+    }
+
+    /// A hint that puts the watch at or below the phone cannot be honoured: on a watch that also
+    /// supports the phone APK, Play would install the phone build and the user would see it
+    /// running on their wrist. That is not a build error anyone would trace back to a hint, so
+    /// the build refuses it instead.
+    @Test
+    void aWearVersionCodeThatDoesNotOutrankThePhoneIsRefused() {
+        BuildRequest tooLow = request();
+        tooLow.putArgument("android.watchVersionCode", "99");
+        assertThrows(BuildException.class, () -> AndroidGradleBuilder.wearVersionCode(tooLow, 100));
+
+        BuildRequest equal = request();
+        equal.putArgument("android.watchVersionCode", "100");
+        assertThrows(BuildException.class, () -> AndroidGradleBuilder.wearVersionCode(equal, 100));
+
+        BuildRequest zeroOffset = request();
+        zeroOffset.putArgument("android.watchVersionCodeOffset", "0");
+        assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.wearVersionCode(zeroOffset, 100));
+
+        BuildRequest negativeOffset = request();
+        negativeOffset.putArgument("android.watchVersionCodeOffset", "-5");
+        assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.wearVersionCode(negativeOffset, 100));
     }
 
     // --- tiles ------------------------------------------------------------------

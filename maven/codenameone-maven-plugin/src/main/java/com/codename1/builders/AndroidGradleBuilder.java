@@ -3556,9 +3556,12 @@ public class AndroidGradleBuilder extends Executor {
             }
             // the invisible trampoline that turns a widget/live-activity tap into a
             // Surfaces.dispatchAction call and brings the main activity forward
+            // Exported only for a Tile, and only when this module is the watch product; see
+            // anyWatchTile. A phone build keeps it private, which is what it has always been.
+            boolean tileTrampoline = "app".equals(watchModuleName(request)) && anyWatchTile();
             surfaceReceivers.append("        <activity android:name=\"com.codename1.impl.android.surfaces.CN1SurfaceActionActivity\"\n")
                     .append("                  android:theme=\"@android:style/Theme.NoDisplay\"\n")
-                    .append("                  android:exported=\"false\"\n")
+                    .append("                  android:exported=\"" + tileTrampoline + "\"\n")
                     .append("                  android:excludeFromRecents=\"true\"\n")
                     .append("                  android:noHistory=\"true\"\n")
                     .append("                  android:taskAffinity=\"\" />\n");
@@ -7191,6 +7194,32 @@ public class AndroidGradleBuilder extends Executor {
      * Java-only route.</p>
      */
     /**
+     * Whether any declared kind earns a Tile, and so whether the tap trampoline has to be
+     * reachable from outside this app.
+     *
+     * <p>A complication's tap is a {@code PendingIntent} the app itself created, which the
+     * system can fire into a private activity. A Tile's is not: ProtoLayout's
+     * {@code LaunchAction} names a component and the TILE HOST starts it, from its own process,
+     * so a non-exported trampoline fails the permission check and the tap does nothing at all.
+     * Nothing in the build warns about it, because the manifest is valid.</p>
+     *
+     * <p>Exporting an activity is not free -- any installed app can then start it with extras of
+     * its choosing, and this one dispatches an action id to the app's listeners -- so it is asked
+     * per build rather than granted once: a project with complications and no Tile keeps the
+     * trampoline private.</p>
+     *
+     * @return true when at least one kind declares a Tile
+     */
+    private boolean anyWatchTile() {
+        for (String[] kind : watchSurfaceKinds) {
+            if (declaresTile(kind[2])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * The androidx.wear dependency block for the Wear module.
      *
      * <p>Pure so it can be pinned directly. What has to stay true is a pairing rather than a
@@ -7389,6 +7418,7 @@ public class AndroidGradleBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to write the Wear module build.gradle", ex);
         }
+        copyMobileServiceConfig(studioProjectDir, wearDir);
 
         String wearManifest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                 + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
@@ -7415,11 +7445,12 @@ public class AndroidGradleBuilder extends Executor {
                 // it is the half that RECEIVES a mirrored complication. Without it Play services
                 // has nothing to bind in the watch APK, and every mirrored descriptor is dropped.
                 + wearableListenerService
-                // A complication or Tile tap still needs the trampoline.
+                // A complication or Tile tap still needs the trampoline, and a TILE tap needs it
+                // reachable from the tile host's process -- see anyWatchTile.
                 + "        <activity android:name=\"com.codename1.impl.android.surfaces."
                 + "CN1SurfaceActionActivity\"\n"
                 + "                  android:theme=\"@android:style/Theme.NoDisplay\"\n"
-                + "                  android:exported=\"false\"\n"
+                + "                  android:exported=\"" + anyWatchTile() + "\"\n"
                 + "                  android:excludeFromRecents=\"true\"\n"
                 + "                  android:noHistory=\"true\"\n"
                 + "                  android:taskAffinity=\"\" />\n"
@@ -7465,13 +7496,32 @@ public class AndroidGradleBuilder extends Executor {
      * @param intVersion the phone's version code
      * @return the wear module's version code
      */
-    static int wearVersionCode(BuildRequest request, int intVersion) {
+    static int wearVersionCode(BuildRequest request, int intVersion) throws BuildException {
         String explicit = request.getArg("android.watchVersionCode", "");
+        int resolved;
+        String setting;
         if (explicit.length() > 0) {
-            return parseIntSafe(explicit, intVersion + 1);
+            resolved = parseIntSafe(explicit, intVersion + 1);
+            setting = "android.watchVersionCode=" + explicit;
+        } else {
+            resolved = intVersion + parseIntSafe(
+                    request.getArg("android.watchVersionCodeOffset", "1"), 1);
+            setting = "android.watchVersionCodeOffset="
+                    + request.getArg("android.watchVersionCodeOffset", "1");
         }
-        return intVersion + parseIntSafe(
-                request.getArg("android.watchVersionCodeOffset", "1"), 1);
+        // The whole multi-APK arrangement rests on this ordering. A watch picks among the APKs it
+        // supports by version code, so a Wear artifact that does not outrank the phone one loses
+        // to a phone APK the watch also happens to support -- and the failure is not a build
+        // error but a watch quietly running the phone build, which nobody would trace back to a
+        // hint. Refuse it here, naming the setting, rather than shipping an arrangement that
+        // cannot work.
+        if (resolved <= intVersion) {
+            throw new BuildException("The Wear version code must be higher than the phone's. "
+                    + setting + " resolves to " + resolved + ", and the phone build is "
+                    + intVersion + ". Play picks among the APKs a device supports by version "
+                    + "code, so a watch would install the phone build instead of the Wear one.");
+        }
+        return resolved;
     }
 
     private static int parseIntSafe(String value, int fallback) {
@@ -7526,6 +7576,43 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return out;
+    }
+
+    /**
+     * Gives the Wear module the mobile-services config the phone module already has.
+     *
+     * <p>The Wear build.gradle is derived from the phone's, so an app using FCM or Firebase
+     * Analytics carries {@code apply plugin: 'com.google.gms.google-services'} into it, and that
+     * plugin fails the whole multi-module build when it cannot find its config file -- which is
+     * written only under {@code app}. The phone artifact goes down with the watch one, which is
+     * the worst shape this failure could take.</p>
+     *
+     * <p>Copying rather than dropping the plugin, because the derived dependency block already
+     * carries the Firebase libraries: with the plugin gone they would be present and
+     * unconfigured, and FirebaseApp initialization fails at runtime on the watch instead of at
+     * build time on the desk. The two modules share an applicationId, so the same file is the
+     * right one.</p>
+     *
+     * @param studioProjectDir the generated project root
+     * @param wearDir the Wear module directory
+     */
+    private void copyMobileServiceConfig(File studioProjectDir, File wearDir)
+            throws BuildException {
+        String[] configs = {"google-services.json", "agconnect-services.json"};
+        for (String config : configs) {
+            File from = new File(new File(studioProjectDir, "app"), config);
+            if (!from.exists()) {
+                continue;
+            }
+            try {
+                copy(new FileInputStream(from), new FileOutputStream(new File(wearDir, config)));
+                log("[wearable] Copied " + config + " into the Wear module; the derived "
+                        + "build.gradle applies the same plugin the phone module does.");
+            } catch (IOException ex) {
+                throw new BuildException("Failed to copy " + config
+                        + " into the Wear module, which the google-services plugin needs", ex);
+            }
+        }
     }
 
     /**

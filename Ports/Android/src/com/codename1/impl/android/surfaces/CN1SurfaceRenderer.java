@@ -941,11 +941,21 @@ public final class CN1SurfaceRenderer {
     }
 
     private static double resolveFraction(JSONObject node, RenderContext rc) {
+        return resolveFraction(node, rc == null ? null : rc.state);
+    }
+
+    /// The fraction a `prog` node is showing, in 0..1.
+    ///
+    /// Package-private and taking the state map directly rather than a RenderContext, because
+    /// the watch reader needs the same answer and has no RenderContext to give. One
+    /// implementation: a complication and a home-screen widget disagreeing about what a progress
+    /// node means is a bug nobody would look for.
+    static double resolveFraction(JSONObject node, JSONObject state) {
         double fraction;
         String valueKey = node.optString("valueKey", null);
-        if (valueKey != null && valueKey.length() > 0 && rc.state != null
-                && rc.state.opt(valueKey) instanceof Number) {
-            fraction = ((Number) rc.state.opt(valueKey)).doubleValue();
+        if (valueKey != null && valueKey.length() > 0 && state != null
+                && state.opt(valueKey) instanceof Number) {
+            fraction = ((Number) state.opt(valueKey)).doubleValue();
         } else if (node.has("start") && node.has("end")) {
             // Date-interval progress freezes at render time on Android; the next widget
             // update recomputes it.

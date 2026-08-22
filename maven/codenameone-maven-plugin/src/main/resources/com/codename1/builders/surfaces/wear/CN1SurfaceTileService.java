@@ -120,9 +120,9 @@ public abstract class CN1SurfaceTileService extends TileService {
             if (reading == null) {
                 root = text("No data yet");
             } else {
-                root = render(reading.getLayout(), reading.getState(), 0);
+                root = render(reading.getLayout(), reading.getState(), 0, false);
                 freshness = freshnessFor(reading.getNextFlipDate());
-                version = String.valueOf(imageNames(reading.getLayout()).hashCode());
+                version = resourcesVersion(reading);
             }
         } catch (Throwable t) {
             // A Tile that throws is removed from the carousel, so a malformed descriptor must
@@ -162,6 +162,28 @@ public abstract class CN1SurfaceTileService extends TileService {
         return Math.min(delta, MAX_FRESHNESS_MILLIS);
     }
 
+    /**
+     * The version the Tile advertises for its resource set.
+     *
+     * <p>ONE computation, called from both the Tile and the resources it names: Wear caches
+     * resources by this string and only asks for them again when it changes, so the two sides
+     * disagreeing is either a stale bitmap or a rebuild on every frame.</p>
+     *
+     * <p>The entry state is part of it, not just the resource ids. A vector's id already covers
+     * its own definition -- {@code imageId} hashes the node -- but not the state its ops read.
+     * A timeline flip to an entry that only moves a hand or fills a gauge leaves every id
+     * identical while the rasterizer would now draw something else, and the Tile kept showing
+     * the previous entry's artwork. Folding the state in costs a resource rebuild on a flip that
+     * did not need one, which is the harmless direction to be wrong in.</p>
+     *
+     * @param reading the timeline entry being rendered
+     * @return the resources version
+     */
+    private static String resourcesVersion(CN1WatchSurface.Reading reading) {
+        return String.valueOf((imageNames(reading.getLayout()).toString()
+                + "|" + String.valueOf(reading.getState())).hashCode());
+    }
+
     private ResourceBuilders.Resources buildResources() {
         ResourceBuilders.Resources.Builder builder = new ResourceBuilders.Resources.Builder();
         String version = "0";
@@ -169,7 +191,7 @@ public abstract class CN1SurfaceTileService extends TileService {
             CN1WatchSurface.Reading reading =
                     CN1WatchSurface.read(this, getKindId(), "watchRectangular");
             if (reading != null) {
-                version = String.valueOf(imageNames(reading.getLayout()).hashCode());
+                version = resourcesVersion(reading);
                 for (Map.Entry<String, JSONObject> e
                         : imageNodes(reading.getLayout()).entrySet()) {
                     Bitmap bitmap = CN1WatchSurface.bitmap(this, getKindId(), e.getValue(),
@@ -200,7 +222,7 @@ public abstract class CN1SurfaceTileService extends TileService {
     // --- node tree to ProtoLayout ------------------------------------------------
 
     private LayoutElementBuilders.LayoutElement render(JSONObject node, JSONObject state,
-            int depth) {
+            int depth, boolean inRow) {
         if (node == null || depth > 8) {
             return text("");
         }
@@ -208,28 +230,42 @@ public abstract class CN1SurfaceTileService extends TileService {
         if ("col".equals(type)) {
             LayoutElementBuilders.Column.Builder col = new LayoutElementBuilders.Column.Builder();
             for (JSONObject child : children(node)) {
-                col.addContent(render(child, state, depth + 1));
+                col.addContent(render(child, state, depth + 1, false));
             }
             return col.setModifiers(modifiers(node)).build();
         }
         if ("row".equals(type)) {
             LayoutElementBuilders.Row.Builder row = new LayoutElementBuilders.Row.Builder();
             for (JSONObject child : children(node)) {
-                row.addContent(render(child, state, depth + 1));
+                row.addContent(render(child, state, depth + 1, true));
             }
             return row.setModifiers(modifiers(node)).build();
         }
         if ("box".equals(type)) {
             LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder();
             for (JSONObject child : children(node)) {
-                box.addContent(render(child, state, depth + 1));
+                box.addContent(render(child, state, depth + 1, inRow));
             }
             return box.setModifiers(modifiers(node)).build();
         }
         if ("spacer".equals(type)) {
+            // A spacer carries "min" and never "w"/"h" -- SurfaceSpacer.serializeContent writes
+            // the one key, and only when it is non-zero -- so reading w/h turned every declared
+            // spacer into the same 4dp stub and every flexible one along with it.
+            //
+            // The measurement belongs to the PARENT's axis, which is why the axis is threaded
+            // down: the same node is a width in a row and a height in a column. A spacer with no
+            // minimum is the flexible kind that absorbs what is left over, which is expand()
+            // rather than a few dips -- rendering it as 4dp collapsed exactly the push-apart
+            // layouts it exists for. The cross axis stays at 1dp: a spacer never has a size of
+            // its own there.
+            int min = node.optInt("min", 0);
+            DimensionBuilders.SpacerDimension along = min > 0
+                    ? DimensionBuilders.dp(min) : DimensionBuilders.expand();
+            DimensionBuilders.SpacerDimension across = DimensionBuilders.dp(1);
             return new LayoutElementBuilders.Spacer.Builder()
-                    .setWidth(DimensionBuilders.dp(Math.max(1, node.optInt("w", 4))))
-                    .setHeight(DimensionBuilders.dp(Math.max(1, node.optInt("h", 4))))
+                    .setWidth(inRow ? along : across)
+                    .setHeight(inRow ? across : along)
                     .build();
         }
         if ("img".equals(type) || "vec".equals(type)) {

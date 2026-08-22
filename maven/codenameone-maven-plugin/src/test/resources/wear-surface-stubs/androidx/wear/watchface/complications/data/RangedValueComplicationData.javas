@@ -2,6 +2,7 @@ package androidx.wear.watchface.complications.data;
 import android.app.PendingIntent;
 public class RangedValueComplicationData extends ComplicationData {
     public static class Builder {
+            public Builder setValidTimeRange(TimeRange r) { return this; }
         public Builder(float value, float min, float max, ComplicationText contentDescription) { }
         public Builder setText(ComplicationText t) { return this; }
         public Builder setTapAction(PendingIntent p) { return this; }

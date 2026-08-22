@@ -128,10 +128,16 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
         }
         if (kindId != null) {
             broadcastUpdate(ctx, kindId);
+            // broadcastUpdate reaches home-screen providers and nothing else, so without this a
+            // reload of a watch-only kind did nothing at all and a mixed kind refreshed only its
+            // phone half. Same pairing as the publish path above, and the same no-op unless this
+            // build declared watch families.
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
             return;
         }
         for (String kind : CN1SurfaceStore.getRememberedKinds(ctx)) {
             broadcastUpdate(ctx, kind);
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kind);
         }
     }
 

@@ -306,8 +306,21 @@ public final class CN1WatchSurface {
     /**
      * A progress node's value, clamped to 0..1.
      *
-     * <p>Either literal or read from the entry's state by key, matching what the renderer does
-     * for a progress bar on every other platform.</p>
+     * <p>Literal, read from the entry's state by key, or computed from a date interval --
+     * whichever the node carries. The arithmetic is the renderer's own
+     * {@code resolveFraction}, not a second copy of it, because a complication and a
+     * home-screen widget disagreeing about what a progress node shows is a bug nobody would
+     * think to look for.</p>
+     *
+     * <p>What is decided HERE rather than there is emptiness. The renderer always has a bar to
+     * draw and treats an unusable node as zero; a ranged complication would then read as a
+     * gauge pinned at the bottom, which is a claim about the value rather than an absence of
+     * one. So a node carrying no value, no resolvable key and no interval answers -1, and the
+     * caller offers the slot nothing.</p>
+     *
+     * <p>A date interval freezes at read time, exactly as it does for a widget: the value is
+     * recomputed on the next refresh. Wear has no ticking ranged-value complication to use
+     * instead.</p>
      *
      * @param prog a {@code prog} node
      * @param state the entry state
@@ -317,20 +330,14 @@ public final class CN1WatchSurface {
         if (prog == null) {
             return -1f;
         }
-        double value;
-        if (prog.has("value")) {
-            value = prog.optDouble("value", -1);
-        } else {
-            String key = prog.optString("valueKey", "");
-            if (key.length() == 0 || state == null || !state.has(key)) {
-                return -1f;
-            }
-            value = state.optDouble(key, -1);
-        }
-        if (value < 0) {
+        String key = prog.optString("valueKey", "");
+        boolean resolvableKey = key.length() > 0 && state != null
+                && state.opt(key) instanceof Number;
+        if (!prog.has("value") && !resolvableKey
+                && !(prog.has("start") && prog.has("end"))) {
             return -1f;
         }
-        return (float) Math.min(1.0, value);
+        return (float) CN1SurfaceRenderer.resolveFraction(prog, state);
     }
 
     /**

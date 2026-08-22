@@ -42,8 +42,8 @@ public final class LayoutElementBuilders {
     }
     public static class Spacer implements LayoutElement {
         public static class Builder {
-            public Builder setWidth(DimensionBuilders.DpProp d) { return this; }
-            public Builder setHeight(DimensionBuilders.DpProp d) { return this; }
+            public Builder setWidth(DimensionBuilders.SpacerDimension d) { return this; }
+            public Builder setHeight(DimensionBuilders.SpacerDimension d) { return this; }
             public Spacer build() { return null; }
         }
     }
