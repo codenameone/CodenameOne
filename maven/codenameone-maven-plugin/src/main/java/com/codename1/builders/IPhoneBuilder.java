@@ -146,6 +146,76 @@ public class IPhoneBuilder extends Executor {
     // pull in HealthKit or its entitlement.
     private boolean usesHealth;
     private boolean usesHealthStore;
+    /// The URL schemes a jailbreak's package managers and file browsers register.
+    /// Probed by IOSImplementation.getCompromiseReasons(), and dead weight without the
+    /// declaration below: since iOS 9, canOpenURL: answers false for any scheme the app
+    /// has not listed, whatever is installed. Cydia was the only one the runtime asked
+    /// about, and Cydia belongs to a rootful jailbreak nobody ships for current iOS --
+    /// a rootless device runs Sileo, so the probe looked for the one front end certain
+    /// not to be there.
+    static final String[] JAILBREAK_QUERY_SCHEMES = {
+        "cydia", "sileo", "zbra", "filza", "undecimus", "activator"
+    };
+
+    /// Adds `schemes` to ios.applicationQueriesSchemes, entry by entry.
+    ///
+    /// Entry by entry rather than as a substring, because a project that already queries
+    /// `sileo-installer` contains "sileo", and skipping on that basis leaves the exact
+    /// scheme canOpenURL: is asked about undeclared -- which is the failure this exists
+    /// to prevent, and it fails silently.
+    ///
+    /// A project that declares the array through ios.plistInject is left alone and told
+    /// so. The plist renderer emits its own LSApplicationQueriesSchemes key for this hint
+    /// without looking at the injected fragment, so writing the hint as well would put
+    /// the key in the plist twice -- and a plist with a duplicate key is not a plist that
+    /// reliably keeps either value.
+    private void declareApplicationQueriesSchemes(BuildRequest request,
+            String[] schemes, String why) {
+        java.util.List<String> alreadyInjected =
+                WatchNativeBuilder.injectedPlistKeys(request)
+                        .contains("LSApplicationQueriesSchemes")
+                        ? WatchNativeBuilder.injectedPlistStringArray(request,
+                                "LSApplicationQueriesSchemes")
+                        : null;
+        String queries = request.getArg("ios.applicationQueriesSchemes", "");
+        java.util.List<String> declared = new ArrayList<String>();
+        for (String entry : queries.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.length() > 0) {
+                declared.add(trimmed);
+            }
+        }
+        java.util.List<String> missing = new ArrayList<String>();
+        for (String scheme : schemes) {
+            if (declared.contains(scheme)) {
+                continue;
+            }
+            if (alreadyInjected != null) {
+                if (!alreadyInjected.contains(scheme)) {
+                    missing.add(scheme);
+                }
+                continue;
+            }
+            declared.add(scheme);
+        }
+        if (alreadyInjected != null) {
+            if (!missing.isEmpty()) {
+                log("ios.plistInject already declares LSApplicationQueriesSchemes, so "
+                        + missing + " was not added for you. Add those entries to that "
+                        + "array or " + why);
+            }
+            return;
+        }
+        StringBuilder joined = new StringBuilder();
+        for (String entry : declared) {
+            if (joined.length() > 0) {
+                joined.append(",");
+            }
+            joined.append(entry);
+        }
+        request.putArgument("ios.applicationQueriesSchemes", joined.toString());
+    }
+
     /// Treats a blank hint as missing.
     private static String trimToNull(String v) {
         if (v == null) {
@@ -2968,6 +3038,13 @@ public class IPhoneBuilder extends Executor {
             File jailbreakH = new File(buildinRes, "CN1JailbreakDetector.h");
             if (jailbreakH.exists() && detectJailbreak) {
                 replaceInFile(jailbreakH, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
+                // The native probes in that header need nothing from the plist. The
+                // URL-scheme probe on the Java side does, and gets no error when the
+                // declaration is missing -- canOpenURL: simply answers false, so the
+                // check reports a clean device and nobody finds out.
+                declareApplicationQueriesSchemes(request, JAILBREAK_QUERY_SCHEMES,
+                        "DeviceIntegrity.getCompromiseReasons() will not see a "
+                        + "jailbreak that only its package manager reveals.");
             }
 
             // ios.appAttest compiles the DeviceCheck-backed App Attest native code
