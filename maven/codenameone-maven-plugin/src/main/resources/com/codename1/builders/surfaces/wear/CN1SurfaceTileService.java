@@ -314,9 +314,16 @@ public abstract class CN1SurfaceTileService extends TileService {
             DimensionBuilders.SpacerDimension along = min > 0
                     ? DimensionBuilders.dp(min) : DimensionBuilders.expand();
             DimensionBuilders.SpacerDimension across = DimensionBuilders.dp(1);
-            return new LayoutElementBuilders.Spacer.Builder()
+            // Wrapped so the node's shared modifiers apply. Padding, a background with its
+            // corner radius and an action all come from modifiers(node), and a Spacer has no
+            // setModifiers of its own -- so returning the bare element dropped them on Tiles
+            // alone, where the widget and SwiftUI renderers apply the same pass to a spacer.
+            return new LayoutElementBuilders.Box.Builder()
+                    .addContent(new LayoutElementBuilders.Spacer.Builder()
                     .setWidth(inRow ? along : across)
                     .setHeight(inRow ? across : along)
+                    .build())
+                    .setModifiers(modifiers(node))
                     .build();
         }
         if ("img".equals(type) || "vec".equals(type)) {

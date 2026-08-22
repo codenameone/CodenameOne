@@ -106,7 +106,13 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             return;
         }
         nativeInstance.surfacesReloadTimelines(kindId);
-        mirrorToWatch(kindId, timelineJson, images);
+        // The STORE's artwork, not the side-map this publish happened to carry. A SurfaceImage
+        // built from a previously registered name references a blob without shipping it, so the
+        // map is empty while the descriptor still names art -- and a watch installed since that
+        // art was first published rendered a gap until something else forced a full re-send. The
+        // container write above has already run, so what is on disk is exactly the referenced
+        // set.
+        mirrorToWatch(kindId, timelineJson, storedImages(container + "/cn1surfaces/" + kindId));
     }
 
     /// The image blobs a kind has in its container, keyed by the name its descriptor references.
