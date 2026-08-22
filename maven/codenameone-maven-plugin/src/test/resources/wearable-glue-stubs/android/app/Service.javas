@@ -1,0 +1,6 @@
+package android.app;
+public class Service extends android.content.Context {
+    public void onCreate() { }
+    public void onDestroy() { }
+    public int onStartCommand(android.content.Intent i, int f, int id) { return 0; }
+}

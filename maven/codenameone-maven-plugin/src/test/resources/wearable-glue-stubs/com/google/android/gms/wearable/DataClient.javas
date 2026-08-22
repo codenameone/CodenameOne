@@ -1,0 +1,16 @@
+package com.google.android.gms.wearable;
+import com.google.android.gms.tasks.Task;
+public abstract class DataClient {
+    public abstract Task<DataItem> putDataItem(PutDataRequest request);
+    public abstract Task<DataItem> getDataItem(android.net.Uri uri);
+    public abstract Task<DataItemBuffer> getDataItems();
+    public abstract Task<DataItemBuffer> getDataItems(android.net.Uri uri);
+    public abstract Task<DataItemBuffer> getDataItems(android.net.Uri uri, int filter);
+    public abstract Task<Integer> deleteDataItems(android.net.Uri uri);
+    public abstract Task<Integer> deleteDataItems(android.net.Uri uri, int filter);
+    public abstract Task<GetFdForAssetResponse> getFdForAsset(Asset asset);
+    public abstract Task<GetFdForAssetResponse> getFdForAsset(DataItemAsset asset);
+    public interface GetFdForAssetResponse {
+        java.io.InputStream getInputStream();
+    }
+}

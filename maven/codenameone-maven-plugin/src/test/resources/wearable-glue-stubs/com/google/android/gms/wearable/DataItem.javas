@@ -1,0 +1,8 @@
+package com.google.android.gms.wearable;
+import com.google.android.gms.common.data.Freezable;
+public interface DataItem extends Freezable<DataItem> {
+    android.net.Uri getUri();
+    DataItem setData(byte[] data);
+    java.util.Map<String, DataItemAsset> getAssets();
+    byte[] getData();
+}

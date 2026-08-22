@@ -26,6 +26,7 @@ import com.codename1.wearable.WearableConnection;
 
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.WearableListenerService;
 
@@ -152,7 +153,11 @@ public class CN1WearableListenerService extends WearableListenerService {
     @Override
     public void onMessageReceived(final MessageEvent event) {
         // Same reasoning as onDataChanged: isFromAKnownNode can block on a cold start.
-        final MessageEvent frozen = event.freeze();
+        // Copied field by field rather than frozen: DataEvent is Freezable and MessageEvent is
+        // not -- it is a plain four-method interface -- so there is no freeze() to call here. The
+        // copy is what makes the hand-off safe, because Play services may recycle the event once
+        // onMessageReceived returns and the worker below reads it after that.
+        final MessageEvent frozen = new FrozenMessageEvent(event);
         MESSAGE_WORKER.execute(new Runnable() {
             public void run() {
                 handleMessageReceived(frozen);
@@ -301,6 +306,54 @@ public class CN1WearableListenerService extends WearableListenerService {
                 handleDataChanged(frozen, removalGeneration, openRemovals);
             }
         });
+    }
+
+    /**
+     * An immutable copy of a delivered {@link MessageEvent}.
+     *
+     * <p>{@link com.google.android.gms.wearable.DataEvent} extends {@code Freezable} and hands out
+     * a detached copy through {@code freeze()}; {@code MessageEvent} does not, so a hand-off to a
+     * worker thread has to copy the four accessors by hand. Play services documents the delivered
+     * event as valid only for the duration of the callback, and every read below happens after it
+     * has returned.</p>
+     *
+     * <p>Implementing the interface, rather than passing the fields separately, keeps
+     * {@code handleMessageReceived} typed against {@code MessageEvent}. If Play services ever adds
+     * a fifth method this stops compiling, which is the intended way to find out.</p>
+     */
+    private static final class FrozenMessageEvent implements MessageEvent {
+        private final int requestId;
+        private final String path;
+        private final String sourceNodeId;
+        private final byte[] data;
+
+        FrozenMessageEvent(MessageEvent event) {
+            requestId = event.getRequestId();
+            path = event.getPath();
+            sourceNodeId = event.getSourceNodeId();
+            byte[] payload = event.getData();
+            data = payload == null ? null : (byte[]) payload.clone();
+        }
+
+        @Override
+        public int getRequestId() {
+            return requestId;
+        }
+
+        @Override
+        public String getPath() {
+            return path;
+        }
+
+        @Override
+        public String getSourceNodeId() {
+            return sourceNodeId;
+        }
+
+        @Override
+        public byte[] getData() {
+            return data;
+        }
     }
 
     /**
