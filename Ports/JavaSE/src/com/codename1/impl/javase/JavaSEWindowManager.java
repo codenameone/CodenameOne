@@ -76,6 +76,9 @@ public class JavaSEWindowManager extends WindowManager {
      * {@code Desktop.addMonitorListener()} never fires and windows keep stale
      * per-monitor scale after a display is unplugged.</p>
      */
+    /** Returned by {@link #topologySignature()} when the sample itself failed. */
+    private static final String TOPOLOGY_UNAVAILABLE = "unavailable";
+
     private void watchMonitorTopology() {
         final java.util.Timer timer = new java.util.Timer("cn1-monitor-watch", true);
         timer.schedule(new java.util.TimerTask() {
@@ -84,6 +87,14 @@ public class JavaSEWindowManager extends WindowManager {
             @Override
             public void run() {
                 String now = topologySignature();
+                if (TOPOLOGY_UNAVAILABLE.equals(now)) {
+                    // A failed sample is not a topology change, and the comment on
+                    // that branch already said so. Recording it fired a notification
+                    // for the failure and a second one when the next sample
+                    // succeeded, and the first pass could rebuild monitor data from
+                    // fallbacks and relayout every window against them.
+                    return;
+                }
                 if (!now.equals(last)) {
                     last = now;
                     Display.getInstance().monitorsChanged();
@@ -121,7 +132,7 @@ public class JavaSEWindowManager extends WindowManager {
         } catch (Throwable err) {
             // A display being reconfigured mid-query throws in AWT; the next tick sees
             // the settled state, so a failed sample is not worth reporting.
-            return "unavailable";
+            return TOPOLOGY_UNAVAILABLE;
         }
         return sb.toString();
     }
@@ -256,6 +267,29 @@ public class JavaSEWindowManager extends WindowManager {
                     }
                 });
                 frame.addComponentListener(new ComponentAdapter() {
+                    /**
+                     * AWT hides a window's owned dialogs along with it and shows them
+                     * again with it, without any window event of its own. Nothing told
+                     * the framework, so an owned window kept nativeVisible true with no
+                     * native surface behind it: isWindowShowing() went on reporting it,
+                     * and it went on painting and animating, which also keeps the event
+                     * dispatch thread awake.
+                     *
+                     * <p>Safe for the explicit path too. Window.hide() and show()
+                     * clear or set nativeVisible before calling this manager, so the
+                     * notification they trigger here finds the state already correct
+                     * and does nothing.</p>
+                     */
+                    @Override
+                    public void componentHidden(ComponentEvent e) {
+                        Display.getInstance().windowHideNotify(windowId);
+                    }
+
+                    @Override
+                    public void componentShown(ComponentEvent e) {
+                        Display.getInstance().windowShowNotify(windowId);
+                    }
+
                     @Override
                     public void componentResized(ComponentEvent e) {
                         Display.getInstance().windowSizeChanged(windowId,

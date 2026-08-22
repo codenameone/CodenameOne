@@ -532,4 +532,73 @@ class MultiWindowGraphicsRoutingTest {
         }
         return out;
     }
+
+    @Test
+    void aFrameReportsAutomaticVisibilityChangesToTheFramework() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        assumeTrue(com.codename1.ui.Desktop.isSupported(), "needs a windowing system");
+
+        com.codename1.ui.Window w = new com.codename1.ui.Window("owned visibility");
+        w.setWindowSize(320, 240);
+        w.show();
+        com.codename1.ui.Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+            }
+        });
+        try {
+            java.awt.Window frame = findAwtWindowTitled("owned visibility");
+            assertNotNull(frame, "the window manager should have created a native frame");
+
+            // AWT hides a window's owned dialogs with it and shows them again with it,
+            // reporting only componentHidden/componentShown on the child -- no window
+            // event. Listening for those is what tells the framework; without it an
+            // owned window kept reporting itself shown with no surface behind it.
+            java.awt.event.ComponentEvent hidden = new java.awt.event.ComponentEvent(
+                    frame, java.awt.event.ComponentEvent.COMPONENT_HIDDEN);
+            boolean delivered = false;
+            for (java.awt.event.ComponentListener l : frame.getComponentListeners()) {
+                l.componentHidden(hidden);
+                delivered = true;
+            }
+            assertTrue(delivered, "the frame must carry a component listener");
+            // The notification is marshalled to the event dispatch thread.
+            com.codename1.ui.Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                }
+            });
+            assertFalse(w.isWindowShowing(),
+                    "a componentHidden from the platform must reach the framework");
+
+            java.awt.event.ComponentEvent shown = new java.awt.event.ComponentEvent(
+                    frame, java.awt.event.ComponentEvent.COMPONENT_SHOWN);
+            for (java.awt.event.ComponentListener l : frame.getComponentListeners()) {
+                l.componentShown(shown);
+            }
+            com.codename1.ui.Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                }
+            });
+            assertTrue(w.isWindowShowing(), "and componentShown must bring it back");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    /// The AWT window with the given title, or null.
+    private static java.awt.Window findAwtWindowTitled(String title) {
+        for (java.awt.Window each : java.awt.Window.getWindows()) {
+            if (each instanceof java.awt.Frame
+                    && title.equals(((java.awt.Frame) each).getTitle())) {
+                return each;
+            }
+            if (each instanceof java.awt.Dialog
+                    && title.equals(((java.awt.Dialog) each).getTitle())) {
+                return each;
+            }
+        }
+        return null;
+    }
 }
