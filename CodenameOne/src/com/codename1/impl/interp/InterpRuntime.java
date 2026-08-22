@@ -2039,6 +2039,21 @@ public final class InterpRuntime {
                     return;
                 }
             }
+            // Object's default methods on an interface-only peer: the shim's
+            // Object.toString/hashCode/equals prints the shim class's own
+            // name (`Interp_Runnable@...`), which is neither the pushed
+            // class's name nor consistent with `getClass()` above. Answer
+            // through `objectCall` instead, which already delegates to
+            // interpreted overrides when the class has one and falls back to
+            // the pushed class's own name otherwise.
+            if (io.hostPeer != null && io.hostPeerFromInterfacesOnly
+                    && "java/lang/Object".equals(owner)) {
+                Object early = objectCall(io, name, args, op == InterpOpcodes.INVOKESPECIAL);
+                if (early != NOT_OBJECT_METHOD) {
+                    pushBoxed(f, returnKind, early);
+                    return;
+                }
+            }
             if (io.hostPeer != null) {
                 // The peer's own class name, recorded when the factory built it
                 // rather than read back from getClass(). ParparVM derives
@@ -2168,6 +2183,13 @@ public final class InterpRuntime {
         interfaces.copyInto(ifaceArray);
         io.hostPeer = factory.createPeer(io, hostSuperclassName, ifaceArray, superDesc, superArgs);
         io.hostPeerOwner = factory.peerClassName(io.hostPeer);
+        // Interface-only peer: no host superclass in the chain, so Object's
+        // own default methods still belong to the interpreter. The dispatch
+        // path below routes toString/hashCode/equals to `objectCall` in that
+        // case rather than calling the shim, which inherits Object.toString
+        // from the shim class and prints `Interp_Runnable@...` instead of
+        // the pushed class's own name.
+        io.hostPeerFromInterfacesOnly = hostSuperclassName == null;
     }
 
     private Object hostCall(String owner, String name, String desc, Object target,

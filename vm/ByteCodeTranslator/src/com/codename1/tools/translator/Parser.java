@@ -308,6 +308,18 @@ public class Parser extends ClassVisitor {
             // has. The ids are the ones cn1_array_N_id_ defines, computed the
             // same way: a fixed start, 100 reserved for primitive arrays, then
             // three ranks per class in class order.
+            //
+            // Three is a ParparVM constraint: every reference-array id in the
+            // AOT build is packed into three slots per class, `cn1_array_1_id_X`
+            // through `cn1_array_3_id_X`, and cn1_globals.m arithmetic (see
+            // `castImpl`) leans on that fixed step. Extending it means widening
+            // that layout across the whole runtime and every C symbol that
+            // names a rank-3 array. Pushed code using a rank 4+ array
+            // (`String[][][][]`, exceptionally rare in practice) resolves the
+            // outer descriptor to class id -1 and falls back to an untyped
+            // Object[] cascade -- functional, but reflection on the outer type
+            // reports Object[] rather than the source array type. Kept as a
+            // known limitation until ParparVM's array layout is generalised.
             if (BytecodeMethod.isInterpHost()) {
                 int arrayId = classes.size() + 1 + 100;
                 for (ByteCodeClass bc : classes) {

@@ -53,6 +53,15 @@ public final class InterpObject {
     /// `Interp/Form` and matches no symbol at all.
     String hostPeerOwner;
 
+    /// True when the peer exists only because the interpreted class
+    /// implements a host interface -- the interpreted class's superclass is
+    /// still `java.lang.Object`. Object's own default methods
+    /// (`toString`/`hashCode`/`equals`) then belong to the interpreter, not
+    /// to the shim: the shim's `Object.toString()` would name the shim class
+    /// (`Interp_Runnable@...`) instead of the pushed class the program
+    /// wrote.
+    boolean hostPeerFromInterfacesOnly;
+
     /// Name and position of an interpreted enum constant, or null and -1.
     ///
     /// An enum constant has no peer. `java.lang.Enum` cannot be subclassed from
