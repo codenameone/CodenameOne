@@ -25,8 +25,8 @@ package bsh.cn1.gen;
 
 import bsh.cn1.CN1AccessException;
 
-public final class GeneratedAccess_com_codename1_crash {
-    private GeneratedAccess_com_codename1_crash() {
+public final class GeneratedAccess_com_codename1_security_hardening {
+    private GeneratedAccess_com_codename1_security_hardening() {
     }
 
     public static Class<?> findClass(String name) {
@@ -52,104 +52,48 @@ public final class GeneratedAccess_com_codename1_crash {
 
 
     private static Class<?> findClassChunk0(String simpleName) {
-        if ("CrashProtection".equals(simpleName)) {
-            return com.codename1.crash.CrashProtection.class;
-        }
-        if ("PiiScrubber".equals(simpleName)) {
-            return com.codename1.crash.PiiScrubber.class;
+        if ("Hardening".equals(simpleName)) {
+            return com.codename1.security.hardening.Hardening.class;
         }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.crash.PiiScrubber.class) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return new com.codename1.crash.PiiScrubber();
-            }
-        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.crash.CrashProtection.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.security.hardening.Hardening.class) return invokeStatic0(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
-        if ("capture".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
-                com.codename1.crash.CrashProtection.capture((java.lang.Throwable) adaptedArgs[0]); return null;
-            }
-        }
-        if ("getScrubber".equals(name)) {
+        if ("getLevel".equals(name)) {
             if (safeArgs.length == 0) {
-                return com.codename1.crash.CrashProtection.getScrubber();
+                return com.codename1.security.hardening.Hardening.getLevel();
             }
         }
-        if ("install".equals(name)) {
+        if ("getMappingId".equals(name)) {
             if (safeArgs.length == 0) {
-                com.codename1.crash.CrashProtection.install(); return null;
+                return com.codename1.security.hardening.Hardening.getMappingId();
             }
         }
-        if ("isEnabled".equals(name)) {
+        if ("isHardened".equals(name)) {
             if (safeArgs.length == 0) {
-                return com.codename1.crash.CrashProtection.isEnabled();
+                return com.codename1.security.hardening.Hardening.isHardened();
             }
         }
-        if ("setEnabled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
-                com.codename1.crash.CrashProtection.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
-            }
-        }
-        if ("setScrubber".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.crash.PiiScrubber.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.crash.PiiScrubber.class}, false);
-                com.codename1.crash.CrashProtection.setScrubber((com.codename1.crash.PiiScrubber) adaptedArgs[0]); return null;
-            }
-        }
-        throw unsupportedStatic(com.codename1.crash.CrashProtection.class, name, safeArgs);
+        throw unsupportedStatic(com.codename1.security.hardening.Hardening.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
-        if (target instanceof com.codename1.crash.PiiScrubber) {
-            try {
-                return invoke0((com.codename1.crash.PiiScrubber) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
         if (unsupported != null) {
             throw unsupported;
         }
         throw unsupportedInstance(target, name, safeArgs);
-    }
-
-    private static Object invoke0(com.codename1.crash.PiiScrubber typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("scrubFrame".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.scrubFrame((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
-            }
-        }
-        if ("scrubMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.scrubMessage((java.lang.String) adaptedArgs[0]);
-            }
-        }
-        if ("scrubRawStack".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.scrubRawStack((java.lang.String) adaptedArgs[0]);
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {

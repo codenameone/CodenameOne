@@ -25,8 +25,8 @@ package bsh.cn1.gen;
 
 import bsh.cn1.CN1AccessException;
 
-public final class GeneratedAccess_com_codename1_crash {
-    private GeneratedAccess_com_codename1_crash() {
+public final class GeneratedAccess_com_codename1_home_commissioning {
+    private GeneratedAccess_com_codename1_home_commissioning() {
     }
 
     public static Class<?> findClass(String name) {
@@ -52,20 +52,35 @@ public final class GeneratedAccess_com_codename1_crash {
 
 
     private static Class<?> findClassChunk0(String simpleName) {
-        if ("CrashProtection".equals(simpleName)) {
-            return com.codename1.crash.CrashProtection.class;
+        if ("Commissioner".equals(simpleName)) {
+            return com.codename1.home.commissioning.Commissioner.class;
         }
-        if ("PiiScrubber".equals(simpleName)) {
-            return com.codename1.crash.PiiScrubber.class;
+        if ("CommissioningRequest".equals(simpleName)) {
+            return com.codename1.home.commissioning.CommissioningRequest.class;
+        }
+        if ("CommissioningResult".equals(simpleName)) {
+            return com.codename1.home.commissioning.CommissioningResult.class;
+        }
+        if ("CommissioningStyle".equals(simpleName)) {
+            return com.codename1.home.commissioning.CommissioningStyle.class;
+        }
+        if ("SetupPayload".equals(simpleName)) {
+            return com.codename1.home.commissioning.SetupPayload.class;
         }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.crash.PiiScrubber.class) {
+        if (type == com.codename1.home.commissioning.CommissioningRequest.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return new com.codename1.crash.PiiScrubber();
+                return new com.codename1.home.commissioning.CommissioningRequest();
+            }
+        }
+        if (type == com.codename1.home.commissioning.CommissioningResult.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Boolean.class}, false);
+                return new com.codename1.home.commissioning.CommissioningResult((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -73,53 +88,53 @@ public final class GeneratedAccess_com_codename1_crash {
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.crash.CrashProtection.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.home.commissioning.SetupPayload.class) return invokeStatic0(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
-        if ("capture".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
-                com.codename1.crash.CrashProtection.capture((java.lang.Throwable) adaptedArgs[0]); return null;
+        if ("isValid".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.home.commissioning.SetupPayload.isValid((java.lang.String) adaptedArgs[0]);
             }
         }
-        if ("getScrubber".equals(name)) {
-            if (safeArgs.length == 0) {
-                return com.codename1.crash.CrashProtection.getScrubber();
+        if ("parse".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.home.commissioning.SetupPayload.parse((java.lang.String) adaptedArgs[0]);
             }
         }
-        if ("install".equals(name)) {
-            if (safeArgs.length == 0) {
-                com.codename1.crash.CrashProtection.install(); return null;
-            }
-        }
-        if ("isEnabled".equals(name)) {
-            if (safeArgs.length == 0) {
-                return com.codename1.crash.CrashProtection.isEnabled();
-            }
-        }
-        if ("setEnabled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
-                com.codename1.crash.CrashProtection.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
-            }
-        }
-        if ("setScrubber".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.crash.PiiScrubber.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.crash.PiiScrubber.class}, false);
-                com.codename1.crash.CrashProtection.setScrubber((com.codename1.crash.PiiScrubber) adaptedArgs[0]); return null;
-            }
-        }
-        throw unsupportedStatic(com.codename1.crash.CrashProtection.class, name, safeArgs);
+        throw unsupportedStatic(com.codename1.home.commissioning.SetupPayload.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
-        if (target instanceof com.codename1.crash.PiiScrubber) {
+        if (target instanceof com.codename1.home.commissioning.Commissioner) {
             try {
-                return invoke0((com.codename1.crash.PiiScrubber) target, name, safeArgs);
+                return invoke0((com.codename1.home.commissioning.Commissioner) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.home.commissioning.CommissioningRequest) {
+            try {
+                return invoke1((com.codename1.home.commissioning.CommissioningRequest) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.home.commissioning.CommissioningResult) {
+            try {
+                return invoke2((com.codename1.home.commissioning.CommissioningResult) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.home.commissioning.SetupPayload) {
+            try {
+                return invoke3((com.codename1.home.commissioning.SetupPayload) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -130,30 +145,230 @@ public final class GeneratedAccess_com_codename1_crash {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(com.codename1.crash.PiiScrubber typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("scrubFrame".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.scrubFrame((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+    private static Object invoke0(com.codename1.home.commissioning.Commissioner typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("commission".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.home.commissioning.CommissioningRequest.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.home.commissioning.CommissioningRequest.class}, false);
+                return typedTarget.commission((com.codename1.home.commissioning.CommissioningRequest) adaptedArgs[0]);
             }
         }
-        if ("scrubMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.scrubMessage((java.lang.String) adaptedArgs[0]);
+        if ("getStyle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStyle();
             }
         }
-        if ("scrubRawStack".equals(name)) {
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSupported();
+            }
+        }
+        if ("openEcosystemApp".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.openEcosystemApp();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.home.commissioning.CommissioningRequest typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getRawSetupPayload".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRawSetupPayload();
+            }
+        }
+        if ("getRoomId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRoomId();
+            }
+        }
+        if ("getSetupPayload".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSetupPayload();
+            }
+        }
+        if ("getStructureId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStructureId();
+            }
+        }
+        if ("getSuggestedName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSuggestedName();
+            }
+        }
+        if ("getTimeoutMillis".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTimeoutMillis();
+            }
+        }
+        if ("isCommissionToThisApp".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCommissionToThisApp();
+            }
+        }
+        if ("setCommissionToThisApp".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.setCommissionToThisApp(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("setRawSetupPayload".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.scrubRawStack((java.lang.String) adaptedArgs[0]);
+                return typedTarget.setRawSetupPayload((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setRoom".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.home.HomeRoom.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.home.HomeRoom.class}, false);
+                return typedTarget.setRoom((com.codename1.home.HomeRoom) adaptedArgs[0]);
+            }
+        }
+        if ("setRoomId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setRoomId((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setSetupPayload".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.home.commissioning.SetupPayload.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.home.commissioning.SetupPayload.class}, false);
+                return typedTarget.setSetupPayload((com.codename1.home.commissioning.SetupPayload) adaptedArgs[0]);
+            }
+        }
+        if ("setStructure".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.home.HomeStructure.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.home.HomeStructure.class}, false);
+                return typedTarget.setStructure((com.codename1.home.HomeStructure) adaptedArgs[0]);
+            }
+        }
+        if ("setStructureId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setStructureId((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setSuggestedName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setSuggestedName((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setTimeoutMillis".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.setTimeoutMillis(toIntValue(adaptedArgs[0]));
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.home.commissioning.CommissioningResult typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getAccessoryId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessoryId();
+            }
+        }
+        if ("getAccessoryName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessoryName();
+            }
+        }
+        if ("getStructureId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStructureId();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        if ("wasCommissionedToThisApp".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.wasCommissionedToThisApp();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.home.commissioning.SetupPayload typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getCustomFlow".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCustomFlow();
+            }
+        }
+        if ("getDiscoveryCapabilities".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDiscoveryCapabilities();
+            }
+        }
+        if ("getDiscriminator".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDiscriminator();
+            }
+        }
+        if ("getPasscode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPasscode();
+            }
+        }
+        if ("getProductId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getProductId();
+            }
+        }
+        if ("getRaw".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRaw();
+            }
+        }
+        if ("getVendorId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getVendorId();
+            }
+        }
+        if ("getVersion".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getVersion();
+            }
+        }
+        if ("isFromQrCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isFromQrCode();
+            }
+        }
+        if ("isShortDiscriminator".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isShortDiscriminator();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.home.commissioning.CommissioningStyle.class) return getStaticField0(name);
+        if (type == com.codename1.home.commissioning.SetupPayload.class) return getStaticField1(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("ECOSYSTEM_APP_HANDOFF".equals(name)) return com.codename1.home.commissioning.CommissioningStyle.ECOSYSTEM_APP_HANDOFF;
+        if ("NONE".equals(name)) return com.codename1.home.commissioning.CommissioningStyle.NONE;
+        if ("OS_OWNED_UI".equals(name)) return com.codename1.home.commissioning.CommissioningStyle.OS_OWNED_UI;
+        throw unsupportedStaticField(com.codename1.home.commissioning.CommissioningStyle.class, name);
+    }
+
+    private static Object getStaticField1(String name) throws Exception {
+        if ("DISCOVERY_BLE".equals(name)) return com.codename1.home.commissioning.SetupPayload.DISCOVERY_BLE;
+        if ("DISCOVERY_ON_NETWORK".equals(name)) return com.codename1.home.commissioning.SetupPayload.DISCOVERY_ON_NETWORK;
+        if ("DISCOVERY_SOFT_AP".equals(name)) return com.codename1.home.commissioning.SetupPayload.DISCOVERY_SOFT_AP;
+        throw unsupportedStaticField(com.codename1.home.commissioning.SetupPayload.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

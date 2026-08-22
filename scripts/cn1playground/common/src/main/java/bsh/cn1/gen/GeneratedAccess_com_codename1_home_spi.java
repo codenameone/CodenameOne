@@ -25,8 +25,8 @@ package bsh.cn1.gen;
 
 import bsh.cn1.CN1AccessException;
 
-public final class GeneratedAccess_com_codename1_crash {
-    private GeneratedAccess_com_codename1_crash() {
+public final class GeneratedAccess_com_codename1_home_spi {
+    private GeneratedAccess_com_codename1_home_spi() {
     }
 
     public static Class<?> findClass(String name) {
@@ -52,74 +52,27 @@ public final class GeneratedAccess_com_codename1_crash {
 
 
     private static Class<?> findClassChunk0(String simpleName) {
-        if ("CrashProtection".equals(simpleName)) {
-            return com.codename1.crash.CrashProtection.class;
-        }
-        if ("PiiScrubber".equals(simpleName)) {
-            return com.codename1.crash.PiiScrubber.class;
+        if ("HomeBridge".equals(simpleName)) {
+            return com.codename1.home.spi.HomeBridge.class;
         }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.crash.PiiScrubber.class) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return new com.codename1.crash.PiiScrubber();
-            }
-        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.crash.CrashProtection.class) return invokeStatic0(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
-    }
-
-    private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
-        if ("capture".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
-                com.codename1.crash.CrashProtection.capture((java.lang.Throwable) adaptedArgs[0]); return null;
-            }
-        }
-        if ("getScrubber".equals(name)) {
-            if (safeArgs.length == 0) {
-                return com.codename1.crash.CrashProtection.getScrubber();
-            }
-        }
-        if ("install".equals(name)) {
-            if (safeArgs.length == 0) {
-                com.codename1.crash.CrashProtection.install(); return null;
-            }
-        }
-        if ("isEnabled".equals(name)) {
-            if (safeArgs.length == 0) {
-                return com.codename1.crash.CrashProtection.isEnabled();
-            }
-        }
-        if ("setEnabled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
-                com.codename1.crash.CrashProtection.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
-            }
-        }
-        if ("setScrubber".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.crash.PiiScrubber.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.crash.PiiScrubber.class}, false);
-                com.codename1.crash.CrashProtection.setScrubber((com.codename1.crash.PiiScrubber) adaptedArgs[0]); return null;
-            }
-        }
-        throw unsupportedStatic(com.codename1.crash.CrashProtection.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
-        if (target instanceof com.codename1.crash.PiiScrubber) {
+        if (target instanceof com.codename1.home.spi.HomeBridge) {
             try {
-                return invoke0((com.codename1.crash.PiiScrubber) target, name, safeArgs);
+                return invoke0((com.codename1.home.spi.HomeBridge) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -130,23 +83,200 @@ public final class GeneratedAccess_com_codename1_crash {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(com.codename1.crash.PiiScrubber typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("scrubFrame".equals(name)) {
+    private static Object invoke0(com.codename1.home.spi.HomeBridge typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("areIdsPersistent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.areIdsPersistent();
+            }
+        }
+        if ("commission".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false);
+                typedTarget.commission(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], toIntValue(adaptedArgs[5])); return null;
+            }
+        }
+        if ("createScene".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class, int[].class, double[].class, java.lang.String[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class, int[].class, double[].class, java.lang.String[].class, int[].class}, false);
+                typedTarget.createScene(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String[]) adaptedArgs[3], (java.lang.String[]) adaptedArgs[4], (java.lang.String[]) adaptedArgs[5], (int[]) adaptedArgs[6], (double[]) adaptedArgs[7], (java.lang.String[]) adaptedArgs[8], (int[]) adaptedArgs[9]); return null;
+            }
+        }
+        if ("deleteScene".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.deleteScene(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
+            }
+        }
+        if ("drainChanges".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.drainChanges(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("executeScene".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.executeScene(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
+            }
+        }
+        if ("getAccessories".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getAccessories((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getAuthorizationStatus".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAuthorizationStatus();
+            }
+        }
+        if ("getAvailability".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAvailability();
+            }
+        }
+        if ("getBackendId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBackendId();
+            }
+        }
+        if ("getCommissioningStyle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCommissioningStyle();
+            }
+        }
+        if ("getConfigurationProblems".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getConfigurationProblems();
+            }
+        }
+        if ("getMaxReadBatchSize".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMaxReadBatchSize();
+            }
+        }
+        if ("getMaxWriteBatchSize".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMaxWriteBatchSize();
+            }
+        }
+        if ("getRooms".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getRooms((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getSceneActions".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.scrubFrame((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+                return typedTarget.getSceneActions((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
-        if ("scrubMessage".equals(name)) {
+        if ("getScenes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.scrubMessage((java.lang.String) adaptedArgs[0]);
+                return typedTarget.getScenes((java.lang.String) adaptedArgs[0]);
             }
         }
-        if ("scrubRawStack".equals(name)) {
+        if ("getServices".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.scrubRawStack((java.lang.String) adaptedArgs[0]);
+                return typedTarget.getServices((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getStructures".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStructures();
+            }
+        }
+        if ("getTraits".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.getTraits((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("getZones".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getZones((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("identify".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
+                typedTarget.identify(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]); return null;
+            }
+        }
+        if ("isPushDelivery".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPushDelivery();
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSupported();
+            }
+        }
+        if ("openEcosystemApp".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.openEcosystemApp();
+            }
+        }
+        if ("openHomeSettings".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.openHomeSettings();
+            }
+        }
+        if ("openProviderSetup".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.openProviderSetup();
+            }
+        }
+        if ("readTraits".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class, java.lang.Boolean.class}, false);
+                typedTarget.readTraits(toIntValue(adaptedArgs[0]), (java.lang.String[]) adaptedArgs[1], (java.lang.String[]) adaptedArgs[2], (java.lang.String[]) adaptedArgs[3], ((Boolean) adaptedArgs[4]).booleanValue()); return null;
+            }
+        }
+        if ("refresh".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.refresh(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("requestAuthorization".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.requestAuthorization(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("start".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.start(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("stop".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.stop(); return null;
+            }
+        }
+        if ("subscribe".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class}, false);
+                typedTarget.subscribe(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1], (java.lang.String[]) adaptedArgs[2], (java.lang.String[]) adaptedArgs[3], (java.lang.String[]) adaptedArgs[4]); return null;
+            }
+        }
+        if ("unsubscribe".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.unsubscribe((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("writeTraits".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class, int[].class, double[].class, java.lang.String[].class, int[].class, java.lang.String[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String[].class, java.lang.String[].class, java.lang.String[].class, int[].class, double[].class, java.lang.String[].class, int[].class, java.lang.String[].class}, false);
+                typedTarget.writeTraits(toIntValue(adaptedArgs[0]), (java.lang.String[]) adaptedArgs[1], (java.lang.String[]) adaptedArgs[2], (java.lang.String[]) adaptedArgs[3], (int[]) adaptedArgs[4], (double[]) adaptedArgs[5], (java.lang.String[]) adaptedArgs[6], (int[]) adaptedArgs[7], (java.lang.String[]) adaptedArgs[8]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);

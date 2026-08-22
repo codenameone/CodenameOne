@@ -96,6 +96,9 @@ public class CodenameOneSettings extends Lifecycle {
     private ProjectBinding binding;
     private SettingsProperties settings;
     private BuildHintCatalog buildHints = BuildHintCatalog.load();
+    /// hint name -> the annotation attribute that declares it, e.g. "@Ios(pods)".
+    /// Empty when the project has not been built, or declares none.
+    private java.util.Map<String, String> annotationOwnedHints = new java.util.HashMap<>();
     private Section section = Section.BASIC;
     private Form form;
     private Container page;
@@ -227,6 +230,7 @@ public class CodenameOneSettings extends Lifecycle {
                 Log.e(ex);
             }
             buildHints = BuildHintCatalog.load();
+            annotationOwnedHints = loadAnnotationOwnedHints();
         }
     }
 
@@ -655,6 +659,7 @@ public class CodenameOneSettings extends Lifecycle {
     private Component hintRow(BuildHintMetadata meta) {
         Container row = new Container(BoxLayout.y());
         row.setUIID(uiid("SettingsRow"));
+        String ownedBy = annotationOwnedHints.get(meta.name());
         boolean active = hasBuildHint(meta.name());
         String value = active ? settings.getBuildHint(meta.name()) : "";
         BuildHintType effectiveType = effectiveHintType(meta, value);
@@ -667,8 +672,22 @@ public class CodenameOneSettings extends Lifecycle {
         if (active) {
             metaLine.add(new Label("Active", uiid("SettingsActiveBadge")));
         }
+        if (ownedBy != null) {
+            metaLine.add(new Label(ownedBy, uiid("SettingsRowMeta")));
+        }
         text.add(name).add(metaLine);
-        if (active) {
+        if (ownedBy != null) {
+            // Set by an annotation on the main class. Editing it here would write a
+            // second declaration and the next build would refuse the project, so the
+            // value is shown and the controls are withheld.
+            TextArea owned = new TextArea("Set by " + ownedBy + " on the main class. "
+                    + "Change it there -- declaring it here as well fails the build.");
+            owned.setUIID(uiid("SettingsRowText"));
+            owned.setEditable(false);
+            owned.setFocusable(false);
+            text.add(owned);
+            row.add(text);
+        } else if (active) {
             text.add(activeHintEditor(meta, value, effectiveType));
         } else {
             Container controls = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
@@ -686,7 +705,7 @@ public class CodenameOneSettings extends Lifecycle {
             header.add(BorderLayout.EAST, controls);
             row.add(header);
         }
-        if (active) {
+        if (active && ownedBy == null) {
             row.add(text);
         }
         TextArea details = new TextArea(meta.description());
@@ -2048,5 +2067,54 @@ public class CodenameOneSettings extends Lifecycle {
         public boolean isScrollableY() {
             return false;
         }
+    }
+
+    /// Reads the hints the main class's annotations declare.
+    ///
+    /// The annotation processor writes this file into `target/classes` on every
+    /// build and deletes it when the last annotation goes away, so it is the
+    /// authoritative statement of what the annotations currently declare -- and
+    /// it carries `cn1.buildHints.origin.<name>`, which names the attribute.
+    ///
+    /// This matters because a hint declared by an annotation must not also be
+    /// written into `codenameone_settings.properties`: the next build fails with
+    /// the duplicate-declaration error. Without this the Add button would create
+    /// exactly that, silently, for any hint the generated project ships as an
+    /// annotation.
+    ///
+    /// An unbuilt project has no file and no annotation-owned hints, which is the
+    /// same conservative answer this tool gave before.
+    private java.util.Map<String, String> loadAnnotationOwnedHints() {
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        if (binding == null || binding.projectDir() == null) {
+            return out;
+        }
+        String path = binding.projectDir() + "/target/classes/META-INF/codenameone/build-hints.properties";
+        InputStream in = null;
+        try {
+            String url = ProjectIO.fsUrl(path);
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            if (!fs.exists(url)) {
+                return out;
+            }
+            in = fs.openInputStream(url);
+            String text = Util.readToString(in, "ISO-8859-1");
+            String originPrefix = "cn1.buildHints.origin.";
+            for (String line : com.codename1.util.StringUtil.tokenize(text, "\n")) {
+                String t = line.trim();
+                if (!t.startsWith(originPrefix)) {
+                    continue;
+                }
+                int eq = t.indexOf('=');
+                if (eq > originPrefix.length()) {
+                    out.put(t.substring(originPrefix.length(), eq).trim(), t.substring(eq + 1).trim());
+                }
+            }
+        } catch (Exception ex) {
+            Log.e(ex);
+        } finally {
+            Util.cleanup(in);
+        }
+        return out;
     }
 }

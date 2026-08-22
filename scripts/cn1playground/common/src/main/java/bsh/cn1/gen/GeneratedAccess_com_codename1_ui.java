@@ -13139,6 +13139,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.addPointerReleasedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addProtectedEditListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addProtectedEditListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("addPullToRefresh".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
@@ -14437,6 +14443,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.removePointerReleasedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
+        if ("removeProtectedEditListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeProtectedEditListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("removeReadyListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -14589,6 +14601,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setCursor(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setCursorPosition".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCursorPosition(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDiagnostics".equals(name)) {
@@ -14869,6 +14887,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
                 return typedTarget.setPropertyValue((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        if ("setProtectedRegionMarkers".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setProtectedRegionMarkers((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("setPullToRefresh".equals(name)) {
@@ -73790,6 +73814,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.addPostureListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addTapjackingListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addTapjackingListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("addVirtualKeyboardListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -74028,6 +74058,24 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false);
                 return typedTarget.createThread((java.lang.Runnable) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("databaseIdentityForEngineFile".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.databaseIdentityForEngineFile((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("databaseManagedKeyIdentity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.databaseManagedKeyIdentity((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("databaseRegistryIdentity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.databaseRegistryIdentity((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("delete".equals(name)) {
@@ -74336,6 +74384,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getHealth();
             }
         }
+        if ("getHomeBridge".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHomeBridge();
+            }
+        }
         if ("getImageIO".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getImageIO();
@@ -74353,6 +74406,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getInitialWindowSizeHintPercent".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getInitialWindowSizeHintPercent();
+            }
+        }
+        if ("getIntentBridge".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getIntentBridge();
             }
         }
         if ("getInvisibleAreaUnderVKB".equals(name)) {
@@ -74545,6 +74603,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getSurfaceBridge();
             }
         }
+        if ("getTapjackingPolicy".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTapjackingPolicy();
+            }
+        }
         if ("getUdid".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUdid();
@@ -74709,6 +74772,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.isBidiAlgorithm();
             }
         }
+        if ("isBlobQueryParameterSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isBlobQueryParameterSupported();
+            }
+        }
         if ("isBoldTextEnabled".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isBoldTextEnabled();
@@ -74758,6 +74826,22 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("isDatabaseCustomPathSupported".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isDatabaseCustomPathSupported();
+            }
+        }
+        if ("isDatabaseEncryptionSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDatabaseEncryptionSupported();
+            }
+        }
+        if ("isDatabaseFileEncrypted".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.isDatabaseFileEncrypted((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("isDatabaseManagedKeyHardwareBacked".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDatabaseManagedKeyHardwareBacked();
             }
         }
         if ("isDebuggableBuild".equals(name)) {
@@ -74839,6 +74923,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("isGrayscaleEnabled".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isGrayscaleEnabled();
+            }
+        }
+        if ("isHideOverlayWindowsSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHideOverlayWindowsSupported();
             }
         }
         if ("isHighContrastEnabled".equals(name)) {
@@ -74988,9 +75077,19 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.isReduceTransparencyEnabled();
             }
         }
+        if ("isRelativeAttachmentNameResolvable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRelativeAttachmentNameResolvable();
+            }
+        }
         if ("isRightMouseButtonDown".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isRightMouseButtonDown();
+            }
+        }
+        if ("isScreenObscured".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isScreenObscured();
             }
         }
         if ("isScreenReaderEnabled".equals(name)) {
@@ -75133,6 +75232,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.onEditingComplete((com.codename1.ui.Component) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
+        if ("openDatabaseConnections".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.openDatabaseConnections((java.lang.String) adaptedArgs[0]);
+            }
+        }
         if ("openFileChooser".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class, java.lang.String.class}, false);
@@ -75165,6 +75270,16 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.openOrCreate((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false);
+                return typedTarget.openOrCreate((java.lang.String) adaptedArgs[0], (com.codename1.db.DatabaseConfig) adaptedArgs[1]);
+            }
+        }
+        if ("openOrCreateForRekey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.openOrCreateForRekey((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("platformUsesInputMode".equals(name)) {
@@ -75287,6 +75402,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.removePostureListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeTapjackingListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeTapjackingListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
         if ("removeVirtualKeyboardListener".equals(name)) {
@@ -75461,6 +75582,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.setFramerate(toIntValue(adaptedArgs[0])); return null;
             }
         }
+        if ("setHideOverlayWindows".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setHideOverlayWindows(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
         if ("setInitialWindowSizeHintPercent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
@@ -75549,6 +75676,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.setShowVirtualKeyboard(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setTapjackingProtection".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.security.TapjackingPolicy.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.security.TapjackingPolicy.class}, false);
+                typedTarget.setTapjackingProtection((com.codename1.security.TapjackingPolicy) adaptedArgs[0]); return null;
             }
         }
         if ("setThirdSoftButton".equals(name)) {
@@ -90559,10 +90692,25 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.containsOrOwns(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
+        if ("copySelection".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.copySelection(); return null;
+            }
+        }
         if ("createStyleAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
                 return typedTarget.createStyleAnimation((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("cutSelection".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.cutSelection(); return null;
+            }
+        }
+        if ("deleteBackward".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.deleteBackward(); return null;
             }
         }
         if ("deleteSurroundingText".equals(name)) {
@@ -91450,6 +91598,11 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.paintShadows((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
+            }
+        }
+        if ("pasteClipboard".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.pasteClipboard(); return null;
             }
         }
         if ("performRedo".equals(name)) {

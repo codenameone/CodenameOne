@@ -104,6 +104,27 @@ public class BuildHintCatalogTest {
         }
     }
 
+    /**
+     * The generated project ships hints like ios.themeMode as annotations, not
+     * properties lines. The catalog has to say which hints have an annotation
+     * form so the Build Hints UI can refuse to write a second declaration --
+     * doing so would fail the very next build with a duplicate-hint error.
+     */
+    @Test
+    public void everyAnnotatedHintNamesItsAttribute() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        int annotated = 0;
+        for (BuildHintMetadata h : catalog.all()) {
+            if (h.annotation() == null) {
+                continue;
+            }
+            annotated++;
+            assertTrue(h.annotation().startsWith("@"), h.name() + " -> " + h.annotation());
+            assertTrue(h.annotation().endsWith(")"), h.name() + " -> " + h.annotation());
+        }
+        assertTrue(annotated > 50, "expected the curated set, got " + annotated);
+    }
+
     @Test
     public void searchStillMatchesOnNameAndDescription() {
         BuildHintCatalog catalog = BuildHintCatalog.load();

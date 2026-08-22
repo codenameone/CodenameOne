@@ -323,6 +323,12 @@ public final class GeneratedAccess_com_codename1_surfaces {
                 return com.codename1.surfaces.SurfaceSerializer.serializeLiveActivity((com.codename1.surfaces.LiveActivityDescriptor) adaptedArgs[0], (java.util.Map) adaptedArgs[1], (java.util.Map) adaptedArgs[2]);
             }
         }
+        if ("serializeNodeToMap".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.surfaces.SurfaceNode.class, java.util.Map.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.surfaces.SurfaceNode.class, java.util.Map.class}, false);
+                return com.codename1.surfaces.SurfaceSerializer.serializeNodeToMap((com.codename1.surfaces.SurfaceNode) adaptedArgs[0], (java.util.Map) adaptedArgs[1]);
+            }
+        }
         if ("serializeState".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
