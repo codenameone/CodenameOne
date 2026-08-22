@@ -7042,15 +7042,28 @@ public class AndroidGradleBuilder extends Executor {
      */
     private String generateWatchSurfaces(BuildRequest request, File srcDir, File resDir)
             throws BuildException {
-        if (watchSurfaceKinds.isEmpty() || watchModuleName(request) == null) {
+        String module = watchModuleName(request);
+        if (watchSurfaceKinds.isEmpty() || module == null) {
             return "";
         }
-        File implDir = new File(srcDir, "com/codename1/impl/android");
+        // The WATCH module's own roots, which in a companion build are NOT the phone's.
+        //
+        // The wear module shares the phone's source directory, so anything written to srcDir is
+        // compiled by both -- and these import androidx.wear, whose dependencies belong to the
+        // wear module alone. A companion build therefore failed compiling the PHONE module
+        // against imports it has no libraries for. Writing them into the wear module's own root
+        // keeps them on the one side that can compile them; the shared source set still carries
+        // everything else.
+        File watchSrcDir = watchSourceRoot(module, srcDir);
+        File implDir = new File(watchSrcDir, "com/codename1/impl/android");
         implDir.mkdirs();
-        File surfacesDir = new File(srcDir, "com/codename1/impl/android/surfaces");
+        File surfacesDir = new File(watchSrcDir, "com/codename1/impl/android/surfaces");
         surfacesDir.mkdirs();
-        for (String resource : new String[] {"CN1ComplicationDataSource.java",
-                "CN1SurfaceTileService.java"}) {
+        // The Tile service only when a Tile is actually declared. Gradle compiles every source in
+        // the tree whether or not a subclass names it, and its androidx.wear.tiles and
+        // protolayout dependencies are added only for a rectangular family -- so copying it
+        // unconditionally failed a complication-only build on unresolved imports.
+        for (String resource : watchSurfaceSources(watchSurfaceKinds)) {
             InputStream in = getResourceAsStream(
                     "/com/codename1/builders/surfaces/wear/" + resource);
             if (in == null) {
@@ -7086,6 +7099,10 @@ public class AndroidGradleBuilder extends Executor {
         // Read by CN1WatchSurface.isWatchKind and by the mirror, so it has to land in the watch
         // module's OWN res dir -- the same trap the wearable capability declaration documents
         // just above, where an extra "app/" segment made the resource silently unpackaged.
+        // The PHONE's res dir, deliberately, even in a companion build. CN1SurfaceMirror reads
+        // this list on the PHONE to decide which kinds are worth sending, so putting it only in
+        // the wear module would leave the sender unable to see it and nothing would ever mirror.
+        // The wear module shares the phone's res directory, so writing it here gives it to both.
         File values = new File(resDir, "values");
         values.mkdirs();
         try {
@@ -7302,29 +7319,8 @@ public class AndroidGradleBuilder extends Executor {
         int wearVersion = wearVersionCode(request, intVersion);
         log("[wearable] Wear module version code " + wearVersion + " (phone " + intVersion + ")");
 
-        String wearGradle = appGradle
-                // Same namespace and applicationId; see the method comment.
-                .replace("versionCode " + intVersion, "versionCode " + wearVersion)
-                .replaceFirst("minSdkVersion \\d+", "minSdkVersion 26")
-                // Share the app module's tree instead of duplicating it, and add this module's
-                // own generated sources on top.
-                .replace("android {\n",
-                        "android {\n"
-                        + "    sourceSets.main {\n"
-                        + "        java.srcDirs = ['../app/src/main/java', 'src/main/java']\n"
-                        + "        res.srcDirs = ['../app/src/main/res', 'src/main/res']\n"
-                        + "        assets.srcDirs = ['../app/src/main/assets']\n"
-                        + "        aidl.srcDirs = ['../app/src/main/aidl']\n"
-                        + "        manifest.srcFile 'src/main/AndroidManifest.xml'\n"
-                        + "    }\n")
-                // Libraries are shared from the app module rather than copied.
-                .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
-                .replace("dirs 'libs'", "dirs '../app/libs'")
-                // The androidx.wear libraries, HERE and not in the shared dependency hint. They
-                // declare minSdk 26, and this is the only module raised to it -- putting them in
-                // the hint failed the phone module's manifest merge against libraries it never
-                // uses.
-                .replace("dependencies {\n", "dependencies {\n" + watchSurfaceDependencies);
+        String wearGradle = deriveWearGradle(appGradle, intVersion, wearVersion,
+                watchSurfaceDependencies);
         try {
             createFile(new File(wearDir, "build.gradle"),
                     wearGradle.getBytes(StandardCharsets.UTF_8));
@@ -7422,6 +7418,103 @@ public class AndroidGradleBuilder extends Executor {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+
+    /**
+     * The source root the generated Wear services belong in.
+     *
+     * <p>In a companion build that is the wear module's own, NOT the phone's. The wear module
+     * shares the phone's source directory, so anything written to the phone's root is compiled by
+     * both -- and these import {@code androidx.wear}, whose dependencies belong to the wear module
+     * alone. A companion build therefore failed compiling the PHONE module against imports it has
+     * no libraries for.</p>
+     *
+     * @param module the watch module name, from {@link #watchModuleName(BuildRequest)}
+     * @param appSrcDir the phone module's java source root
+     * @return where to generate the services
+     */
+    static File watchSourceRoot(String module, File appSrcDir) {
+        if (!"wear".equals(module)) {
+            return appSrcDir;
+        }
+        // appSrcDir is <studio>/app/src/main/java, so four levels up is the project root.
+        File wearModule = new File(appSrcDir.getParentFile().getParentFile()
+                .getParentFile().getParentFile(), "wear");
+        return new File(wearModule, "src/main/java");
+    }
+
+    /**
+     * Which injected Wear sources to copy for a set of kinds.
+     *
+     * <p>The Tile service only when a Tile is actually declared. Gradle compiles every source in
+     * the tree whether or not a generated subclass names it, and the tiles/protolayout
+     * dependencies are added only for a rectangular family -- so copying it unconditionally
+     * failed a complication-only build on unresolved imports.</p>
+     *
+     * @param kinds the watch-bearing kinds, as {id, label, families}
+     * @return the resource names to copy
+     */
+    static List<String> watchSurfaceSources(List<String[]> kinds) {
+        List<String> out = new ArrayList<String>();
+        out.add("CN1ComplicationDataSource.java");
+        for (String[] kind : kinds) {
+            if (declaresTile(kind[2])) {
+                out.add("CN1SurfaceTileService.java");
+                break;
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Derives the Wear module's build.gradle from the phone module's.
+     *
+     * <p>Textual substitution, which is cheap and total -- and every one of these has been wrong
+     * at least once in a way no compiler could see. A generated Gradle file only fails when
+     * Gradle evaluates it, which on CI is twenty minutes after the mistake, so this is separated
+     * from writing it and pinned by WearModuleGradleTest.</p>
+     *
+     * @param appGradle the phone module's build.gradle
+     * @param intVersion the phone's version code
+     * @param wearVersion the watch's version code, which must outrank it
+     * @param wearDependencies the androidx.wear block, which belongs to this module alone
+     * @return the wear module's build.gradle
+     */
+    static String deriveWearGradle(String appGradle, int intVersion, int wearVersion,
+            String wearDependencies) {
+        return appGradle
+                // Same namespace and applicationId; see the method comment.
+                .replace("versionCode " + intVersion, "versionCode " + wearVersion)
+                .replaceFirst("minSdkVersion \\d+", "minSdkVersion 26")
+                // Share the app module's tree instead of duplicating it, and add this module's
+                // own generated sources on top.
+                .replace("android {\n",
+                        "android {\n"
+                        + "    sourceSets.main {\n"
+                        + "        java.srcDirs = ['../app/src/main/java', 'src/main/java']\n"
+                        + "        res.srcDirs = ['../app/src/main/res', 'src/main/res']\n"
+                        + "        assets.srcDirs = ['../app/src/main/assets']\n"
+                        + "        aidl.srcDirs = ['../app/src/main/aidl']\n"
+                        + "        manifest.srcFile 'src/main/AndroidManifest.xml'\n"
+                        + "    }\n")
+                // Libraries are shared from the app module rather than copied.
+                .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
+                .replace("dirs 'libs'", "dirs '../app/libs'")
+                // The signing key lives in the app module and nowhere else, and Gradle resolves
+                // file("keyStore") relative to the project it appears in -- so a verbatim copy
+                // sent the wear module looking for a keystore beside itself. A release build then
+                // failed to CONFIGURE, taking the phone artifact down with it: this is not the
+                // watch half degrading, it is the whole multi-module build not starting.
+                .replace("storeFile file(\"keyStore\")", "storeFile file(\"../app/keyStore\")")
+                // The androidx.wear libraries, HERE and not in the shared dependency hint. They
+                // declare minSdk 26, and this is the only module raised to it -- putting them in
+                // the hint failed the phone module's manifest merge against libraries it never
+                // uses.
+                // "\ndependencies {" and not "dependencies {": the buildscript block is indented
+                // and comes FIRST, and String.replace hits every occurrence -- so the plain form
+                // put an implementation() call inside buildscript's dependency handler, where the
+                // method does not exist and the whole :wear project failed to evaluate.
+                .replace("\ndependencies {\n", "\ndependencies {\n" + wearDependencies);
     }
 
     /** Joins declared families for the codegen tables, normalized to the portable spelling. */

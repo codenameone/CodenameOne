@@ -24,6 +24,10 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -110,6 +114,57 @@ class AndroidWatchSurfaceCodegenTest {
         standalone.putArgument("watchStandalone", "true");
 
         assertEquals("app", AndroidGradleBuilder.watchModuleName(standalone));
+    }
+
+    // --- where the generated services land --------------------------------------
+
+    /// The wear module shares the phone's source directory, so a service written to the phone's
+    /// root is compiled by BOTH -- and these import androidx.wear, whose dependencies belong to
+    /// the wear module alone. A companion build therefore failed compiling the phone module
+    /// against imports it has no libraries for.
+    @Test
+    void aCompanionBuildGeneratesTheServicesInTheWearModule() {
+        File appSrc = new File("/tmp/proj/app/src/main/java");
+
+        File watchSrc = AndroidGradleBuilder.watchSourceRoot("wear", appSrc);
+
+        assertEquals(new File("/tmp/proj/wear/src/main/java"), watchSrc);
+    }
+
+    /// A standalone build has one module, which IS the watch, so they belong where they are.
+    @Test
+    void aStandaloneBuildGeneratesThemInPlace() {
+        File appSrc = new File("/tmp/proj/app/src/main/java");
+
+        assertEquals(appSrc, AndroidGradleBuilder.watchSourceRoot("app", appSrc));
+    }
+
+    // --- which services get copied ----------------------------------------------
+
+    /// Gradle compiles every source in the tree whether or not a generated subclass names it,
+    /// and the tiles/protolayout dependencies are added only for a rectangular family -- so a
+    /// complication-only build that copied the Tile service failed on unresolved imports.
+    @Test
+    void aComplicationOnlyBuildDoesNotCopyTheTileService() {
+        List<String[]> kinds = new ArrayList<String[]>();
+        kinds.add(new String[] {"a", "A", "watchCircular,watchInline,watchCorner"});
+
+        List<String> sources = AndroidGradleBuilder.watchSurfaceSources(kinds);
+
+        assertEquals(1, sources.size(), sources.toString());
+        assertEquals("CN1ComplicationDataSource.java", sources.get(0));
+    }
+
+    @Test
+    void aRectangularFamilyBringsTheTileServiceWithIt() {
+        List<String[]> kinds = new ArrayList<String[]>();
+        kinds.add(new String[] {"a", "A", "watchCircular"});
+        kinds.add(new String[] {"b", "B", "watchRectangular"});
+
+        List<String> sources = AndroidGradleBuilder.watchSurfaceSources(kinds);
+
+        assertEquals(2, sources.size(), sources.toString());
+        assertTrue(sources.contains("CN1SurfaceTileService.java"), sources.toString());
     }
 
     // --- family to ComplicationData mapping ------------------------------------
