@@ -146,6 +146,7 @@ public class SimulatorWindowModeVerifier {
             BufferedImage image = captureDesktop();
             Instant renderDeadline = Instant.now().plusSeconds(30);
             while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image)
+                        || isSingleWindowDeviceUnpainted(parsed, image)
                         || isComponentInspectorDetailsUnsettled(parsed, image))
                     && Instant.now().isBefore(renderDeadline)) {
                 Thread.sleep(500);
@@ -214,6 +215,10 @@ public class SimulatorWindowModeVerifier {
             throw new AssertionError("Single-window simulator device content did not appear before capture; darkPixels="
                     + darkPixels);
         }
+        if (isSingleWindowDeviceUnpainted(args, image)) {
+            throw new AssertionError("Simulated device screen had not painted before capture; darkPixels="
+                    + countSingleWindowDevicePixels(args, image) + " of " + singleWindowDeviceArea(image));
+        }
         if (isComponentInspectorDetailsUnsettled(args, image)) {
             throw new AssertionError("Component inspector details panel had not settled before capture; textPixels="
                     + countComponentDetailsPixels(image));
@@ -227,6 +232,38 @@ public class SimulatorWindowModeVerifier {
     private static boolean isSingleWindowDeviceMissing(Args args, BufferedImage image) {
         int darkPixels = countSingleWindowDevicePixels(args, image);
         return darkPixels >= 0 && darkPixels < minimumSingleWindowDevicePixels(args);
+    }
+
+    /**
+     * True when the simulated device is on screen but its screen area has not painted.
+     *
+     * <p>The dark-pixel floor below proves the device bezel is drawn, and a device
+     * whose screen is still black satisfies it easily -- black is exactly what it
+     * counts. That is how an unpainted capture got through: the run failed on a
+     * screenshot showing the phone with a solid black screen, twice, byte for byte
+     * identical both times, with passing runs in between.</p>
+     *
+     * <p>Every stored single-window baseline sits between 0.7% and 10.8% dark in this
+     * region; the unpainted capture is 43.6%. The ceiling is set at 25%, which is
+     * clear of both by a wide margin.</p>
+     */
+    private static boolean isSingleWindowDeviceUnpainted(Args args, BufferedImage image) {
+        int darkPixels = countSingleWindowDevicePixels(args, image);
+        if (darkPixels < 0) {
+            return false;
+        }
+        int area = singleWindowDeviceArea(image);
+        return area > 0 && darkPixels * 100L / area > 25L;
+    }
+
+    private static int singleWindowDeviceArea(BufferedImage image) {
+        int xMax = Math.min(image.getWidth(), 560);
+        int yMin = Math.min(image.getHeight(), 70);
+        int yMax = Math.min(image.getHeight(), 560);
+        if (xMax <= 0 || yMax <= yMin) {
+            return 0;
+        }
+        return xMax * (yMax - yMin);
     }
 
     private static int countSingleWindowDevicePixels(Args args, BufferedImage image) {
