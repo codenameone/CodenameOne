@@ -83,6 +83,14 @@ public final class Float extends Number implements Comparable<Float> {
         return 0; //TODO codavaj!!
     }
 
+    /// Returns the raw IEEE 754 single-precision bit pattern of a float, without
+    /// collapsing NaN payloads to the canonical 0x7fc00000. Present so pushed
+    /// programs can round-trip a noncanonical NaN payload the JVM preserves --
+    /// the device runtime uses this to write float slots and read them back.
+    public static int floatToRawIntBits(float value){
+        return 0; //TODO codavaj!!
+    }
+
     /// Returns the float value of this Float object.
     public float floatValue(){
         return 0.0f; //TODO codavaj!!

@@ -27,6 +27,15 @@
 #ifdef CN1_ON_DEVICE_DEBUG
 
 #include "cn1_globals.h"
+// The translator-generated metadata ABI -- cn1_field_entry, cn1_invoke_arg,
+// cn1_invoke_result, cn1_invoke_thunk_t and the three register_* entry points.
+// These used to be declared here, which meant generated code could only be
+// compiled by a target that shipped this iOS-port header, and tied the invoke
+// thunks to the notion of a debugger session. The on-device interpreter binds
+// through the same thunks with no proxy attached, so the translator owns them
+// now; cn1_debugger.m still provides the real registry implementations, whose
+// strong definitions override the weak sinks in cn1_reflect.
+#include "cn1_reflect.h"
 
 
 /**
@@ -44,47 +53,24 @@
  */
 extern void cn1_debugger_start(void);
 
-/**
- * Per-class instance-field descriptor emitted by the translator (one
- * static array per generated class), then registered with the debugger
- * runtime by a __attribute__((constructor)) shim that the translator also
- * emits. The runtime uses these to answer CMD_GET_OBJECT_FIELDS without
- * any reflection / RTTI from ParparVM.
- *
- * offset is from the start of the object struct (i.e. offsetof). type is
- * a JVM type-char ('I','J','F','D','Z','B','S','C','L' — 'L' covers
- * arrays too since arrays are JAVA_OBJECT in the struct).
+/*
+ * cn1_field_entry and cn1_debugger_register_fields are declared in
+ * cn1_reflect.h, included above. The runtime uses the field tables to answer
+ * CMD_GET_OBJECT_FIELDS without any reflection / RTTI from ParparVM.
  */
-typedef struct cn1_field_entry {
-    int fieldId;
-    int offset;
-    char type;
-    const char* name;
-} cn1_field_entry;
 
-/**
- * Translator-generated constructors call this once at process load to
- * publish the class's field table to the debugger runtime. classId is
- * the cn1_class_id_XXX constant.
- */
-extern void cn1_debugger_register_fields(int classId,
-                                         const cn1_field_entry* table,
-                                         int count);
-
-/**
- * Publishes a class's {@code clazz} address under its classId, from the same
- * translator-generated constructor that registers the field table.
+/*
+ * cn1_debugger_register_class is declared in cn1_reflect.h, included above.
  *
  * Everything the debugger is handed as an object reference is untrusted: the
  * IDE echoes back ids it was given earlier, and a local slot can hold a value
- * the frame never initialised on the branch it stopped in. With this registry
+ * the frame never initialised on the branch it stopped in. With that registry
  * the runtime can decide whether a candidate pointer really is a Java object
  * by checking that its class word is the registered clazz for the classId it
  * claims — an exact identity test, not a range guess. Before it existed, a
  * bogus reference was dereferenced directly and took the app down mid-session
  * (issue #5333).
  */
-extern void cn1_debugger_register_class(int classId, struct clazz* cls);
 
 /**
  * Copies {@code len} bytes from a possibly-invalid address, returning 0
@@ -177,54 +163,20 @@ extern int cn1_debugger_var_in_scope(const struct cn1_var_entry* v, int line);
 
 /* --- Method invocation -------------------------------------------------- */
 
-/**
- * Argument or scratch slot for a debugger-driven method invocation. All
- * args travel as a flat array of these; the thunk reads the right field
- * for each declared parameter. Floats/doubles round-trip through the bit
- * width of their integer counterparts since debug clients pass them as
- * raw 32/64-bit values.
- */
-typedef union cn1_invoke_arg {
-    JAVA_INT     i;
-    JAVA_LONG    j;
-    JAVA_FLOAT   f;
-    JAVA_DOUBLE  d;
-    JAVA_OBJECT  o;
-} cn1_invoke_arg;
-
-/**
- * Result of a debugger-driven method invocation. {@code type} is a JVM
- * type-char ('V', 'I', 'J', 'F', 'D', 'L', 'Z', 'B', 'S', 'C') or 'X'
- * if the call threw — in which case {@code value.o} carries the
- * Throwable.
- */
-typedef struct cn1_invoke_result {
-    char type;
-    cn1_invoke_arg value;
-} cn1_invoke_result;
-
-/**
- * Translator-emitted per-method shim. The thunk unpacks {@code args}
- * into the typed C parameters the underlying translated function
- * expects, dispatches through {@code virtual_<sym>(...)} (instance) or
- * the static symbol (static), and packs the return into {@code result}.
- * Exceptions are caught and surfaced as result.type='X'.
+/*
+ * cn1_invoke_arg, cn1_invoke_result, cn1_invoke_thunk_t and
+ * cn1_debugger_register_invoke_thunk are declared in cn1_reflect.h, included
+ * above.
  *
- * Runs on the suspended Java thread so it has a valid
- * {@code threadStateData} context.
+ * When the debugger drives a call, the thunk runs on the suspended Java thread
+ * so it has a valid threadStateData context and no collection can race it. The
+ * interpreter calls the same thunks on a live thread instead, which is why the
+ * constructor thunks hold their freshly allocated receiver in a C local -- the
+ * collector's conservative native-stack scan is what keeps it alive there.
+ *
+ * methodId matches the value the symbol sidecar carries, so a consumer can look
+ * up by name -> methodId and dispatch with no further mapping.
  */
-typedef void (*cn1_invoke_thunk_t)(struct ThreadLocalData* threadStateData,
-                                   JAVA_OBJECT thisObj,
-                                   const cn1_invoke_arg* args,
-                                   cn1_invoke_result* result);
-
-/**
- * Translator-emitted constructor registers each method's thunk at
- * process load. methodId matches the same value the sidecar carries,
- * so the proxy can look up by name → methodId and forward to the
- * device with no further mapping.
- */
-extern void cn1_debugger_register_invoke_thunk(int methodId, cn1_invoke_thunk_t thunk);
 
 #ifdef __BLOCKS__
 /**

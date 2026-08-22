@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A project to open in an IDE and push at a device runtime.
+
+  There is no Codename One build here and no platform module: the app is never
+  compiled for the phone. It is compiled to ordinary class files, packaged into
+  a bundle, and interpreted by the runtime app already installed on the device.
+  That is why this pom is short.
+
+  Run `mvn package` (or your IDE's build) and then the `push` or `push-lan`
+  profile; see README.md.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>myapp-devruntime</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <cn1.version>8.0-SNAPSHOT</cn1.version>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Which port the device dials. Change it in both places or neither. -->
+        <devruntime.port>18234</devruntime.port>
+    </properties>
+
+    <!--
+      The framework and push tool are resolved from the build tree next door
+      rather than from ~/.m2, so this project works against a Codename One you
+      built yourself without first installing anything into your own repository.
+      Delete this block if you are using a released version from Maven Central.
+    -->
+    <repositories>
+        <repository>
+            <id>cn1-local-build</id>
+            <url>file://${project.basedir}/../../.m2-local</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!--
+          The framework, to compile against. `provided` because it is already on
+          the device: the bundle carries your classes and nothing else, and
+          every com.codename1 reference is resolved against the installed app.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- The push tool. Not part of your app; it runs on this machine. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-parparvm</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.0</version>
+                <configuration>
+                    <compilerArgs>
+                        <!--
+                          Not optional. From JDK 9 javac turns "a" + b into an
+                          invokedynamic against StringConcatFactory, and neither
+                          mobile target has a runtime invokedynamic to resolve
+                          it with. Lambdas are handled for you — they are
+                          rewritten into real classes when the bundle is built
+                          — but this one has to be a compiler flag.
+                        -->
+                        <arg>-XDstringConcat=inline</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- The device is on USB. Requires `adb reverse tcp:18234 tcp:18234`. -->
+        <profile>
+            <id>push</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals><goal>java</goal></goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <mainClass>com.codename1.tools.translator.DevicePush</mainClass>
+                            <includeProjectDependencies>true</includeProjectDependencies>
+                            <includePluginDependencies>false</includePluginDependencies>
+                            <classpathScope>compile</classpathScope>
+                            <arguments>
+                                <argument>--classes</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                                <!-- Both roots: a Kotlin project compiles
+                                     `src/main/kotlin` to the same target/classes
+                                     but the SourceFile attributes still name .kt
+                                     files, and the bundle needs those on hand.
+                                     Passing a root that does not exist is a
+                                     no-op inside DevicePush. -->
+                                <argument>--source</argument>
+                                <argument>${project.basedir}/src/main/java</argument>
+                                <argument>--source</argument>
+                                <argument>${project.basedir}/src/main/kotlin</argument>
+                                <argument>--port</argument>
+                                <argument>${devruntime.port}</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- The device is on Wi-Fi. Pairs first; see README.md. -->
+        <profile>
+            <id>push-lan</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals><goal>java</goal></goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <mainClass>com.codename1.tools.translator.DevicePush</mainClass>
+                            <includeProjectDependencies>true</includeProjectDependencies>
+                            <includePluginDependencies>false</includePluginDependencies>
+                            <classpathScope>compile</classpathScope>
+                            <arguments>
+                                <argument>--classes</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                                <!-- Both roots: a Kotlin project compiles
+                                     `src/main/kotlin` to the same target/classes
+                                     but the SourceFile attributes still name .kt
+                                     files, and the bundle needs those on hand.
+                                     Passing a root that does not exist is a
+                                     no-op inside DevicePush. -->
+                                <argument>--source</argument>
+                                <argument>${project.basedir}/src/main/java</argument>
+                                <argument>--source</argument>
+                                <argument>${project.basedir}/src/main/kotlin</argument>
+                                <argument>--port</argument>
+                                <argument>${devruntime.port}</argument>
+                                <argument>--lan</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

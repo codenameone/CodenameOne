@@ -4468,6 +4468,13 @@ public class IPhoneBuilder extends Executor {
             boolean isReleaseBuild = !request.getArg("ios.buildType", "debug").equals("debug");
             String onDeviceDebug = !isReleaseBuild
                     && Boolean.valueOf(request.getArg("ios.onDeviceDebug", "false")) ? "true" : "false";
+            // The device runtime host app -- the one that interprets bytecode
+            // bundles pushed from a developer's machine. Unlike onDeviceDebug
+            // this is NOT forced off for release builds: the host app ships to
+            // the App Store, and the interpreter is the product. It is opt-in
+            // per project and no ordinary app sets it.
+            String interpHost =
+                    Boolean.valueOf(request.getArg("ios.interpHost", "false")) ? "true" : "false";
 
 
             if (enableGalleryMultiselect && photoLibraryUsage) {
@@ -4498,6 +4505,7 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-Dcn1.sqlite=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
+                parparCmd.add("-Dcn1.interpHost=" + interpHost);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
                 // The UNION of every enabled product's list, in ONE argument. These used to be
                 // mutually exclusive branches on the claim that the Mac list already covered the

@@ -131,10 +131,39 @@ class ParserTest {
         );
         cls.setClassOffset(17);
 
+        // The seventh column lists the implemented interfaces' ids, empty here.
+        // The device runtime reads it to resolve a default method, which lives
+        // on an interface and nowhere in the superclass chain. The eighth says
+        // whether this class is an interface declaring one -- 0 for a class.
         assertEquals(
-                "class\t17\tcom_example_my_app_Main_1\tMain.java\t-1\tcom/example/my_app/Main$1\n",
+                "class\t17\tcom_example_my_app_Main_1\tMain.java\t-1\tcom/example/my_app/Main$1\t\t0\n",
                 Parser.classSymbolRow(cls, "Main.java")
         );
+    }
+
+    /**
+     * JLS 12.4.1 initializes an interface along with a class implementing it
+     * only when the interface declares a default method, and nothing else in
+     * the symbol table records access flags -- a method row carries name,
+     * descriptor and staticness. Without this column the iOS linker had no way
+     * to tell the two apart and left the ordering to first use.
+     */
+    @Test
+    void symbolClassRowsMarkDefaultBearingInterfaces() throws Exception {
+        Parser.cleanup();
+
+        Parser.parse(createGreeterInterfaceWithDefaultMethod().toFile());
+        Parser.parse(createGreeterImplementation().toFile());
+
+        ByteCodeClass greeter = Parser.getClassObject("com_example_Greeter");
+        ByteCodeClass impl = Parser.getClassObject("com_example_GreeterImpl");
+        greeter.setBaseInterfacesObject(Collections.emptyList());
+        impl.setBaseInterfacesObject(Collections.singletonList(greeter));
+
+        assertTrue(Parser.classSymbolRow(greeter, "Greeter.java").endsWith("\t1\n"),
+                "an interface declaring a default method should be marked");
+        assertTrue(Parser.classSymbolRow(impl, "GreeterImpl.java").endsWith("\t0\n"),
+                "a class implementing it is not itself default-bearing");
     }
 
     @Test

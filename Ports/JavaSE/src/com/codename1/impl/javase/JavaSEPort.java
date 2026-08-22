@@ -9806,6 +9806,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         inInit = true;
         installGeneratedSvgRegistry();
 
+        // The device runtime's reflection-backed linker. Registered here for
+        // the same reason iOS registers its own in IOSImplementation.init:
+        // pushed code cannot bind without a linker, and the JavaSE simulator
+        // is the documented target for `cn1-push.sh --lan` during
+        // development. Reflection is always present on the JVM, so this
+        // linker has no availability check like the iOS one does.
+        com.codename1.impl.interp.InterpPlatform.register(new InterpJavaSELinker());
+
         // Make the desktop stdio and loopback socket MCP transports available to
         // com.codename1.mcp.MCP.
         MCPStdioTransport.register();
@@ -16707,6 +16715,12 @@ public class JavaSEPort extends CodenameOneImplementation {
    
 
     public InputStream getResourceAsStream(Class cls, String resource) {
+        // A resource pushed by the device runtime wins over the app's own,
+        // so a pushed program shows its own theme rather than the host's.
+        InputStream local = localResource(resource);
+        if (local != null) {
+            return local;
+        }
         if (!resource.startsWith("/")) {
             System.out.println("ERROR: resources must reside in the root directory thus must start with a '/' character in Codename One! Invalid resource: " + resource);
             return null;

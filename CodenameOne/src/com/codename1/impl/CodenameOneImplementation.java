@@ -4547,10 +4547,57 @@ public abstract class CodenameOneImplementation {
     ///
     /// input stream for the resource or null if not found
     public InputStream getResourceAsStream(Class cls, String resource) {
+        InputStream local = localResource(resource);
+        if (local != null) {
+            return local;
+        }
         if (cls != null) {
             return cls.getResourceAsStream(resource);
         }
         return CodenameOneImplementation.class.getResourceAsStream(resource);
+    }
+
+    /// Resources supplied at run time rather than compiled into the app.
+    ///
+    /// The device runtime pushes a program's own `theme.res`, CSS and images
+    /// here. They have to be visible from this layer rather than from
+    /// `Display`, because the calls that matter never pass through `Display`:
+    /// `Resources.openLayered("/theme")` and `UIManager.initFirstTheme` resolve
+    /// inside the framework, which asks the implementation directly.
+    ///
+    /// Empty in an ordinary app, and one emptiness check on a path that
+    /// already touches the file system. Allocated eagerly rather than lazily:
+    /// a push arrives on a socket thread while the event thread may be reading,
+    /// and lazily creating a shared static under that is how entries go missing.
+    private static final Hashtable localResources = new Hashtable();
+
+    /// Publishes a resource under the path an application would load it by,
+    /// e.g. `/theme.res`. A null value removes it.
+    public static void setLocalResource(String path, byte[] data) {
+        if (data == null) {
+            localResources.remove(path);
+        } else {
+            localResources.put(path, data);
+        }
+    }
+
+    /// Drops every published resource, so a newly pushed program does not
+    /// inherit the previous one's theme.
+    public static void clearLocalResources() {
+        localResources.clear();
+    }
+
+    /// A published resource as a stream, or null. Platform implementations call
+    /// this before falling back to the classpath.
+    protected static InputStream localResource(String resource) {
+        if (resource == null || localResources.isEmpty()) {
+            return null;
+        }
+        byte[] data = (byte[]) localResources.get(resource);
+        if (data == null && !resource.startsWith("/")) {
+            data = (byte[]) localResources.get("/" + resource);
+        }
+        return data == null ? null : new java.io.ByteArrayInputStream(data);
     }
 
     /// Animations should return true to allow the native image animation to update

@@ -32,6 +32,7 @@ import com.codename1.car.CarRow
 import com.codename1.car.CarScreen
 import com.codename1.car.CarTemplate
 import com.codename1.system.Lifecycle
+import com.codename1.system.NativeLookup
 import com.codename1.testing.TestReporting
 import com.codename1.ui.CN
 import com.codename1.ui.Display
@@ -113,6 +114,7 @@ open class HelloCodenameOne : Lifecycle() {
         // shared suite destabilises the screenshot baselines (the JS/iOS suites are timing-sensitive).
         TestReporting.setInstance(Cn1ssDeviceRunnerReporter())
     }
+
 
     override fun runApp() {
         // HTML5 runs inside a Web Worker whose single thread hosts the EDT —

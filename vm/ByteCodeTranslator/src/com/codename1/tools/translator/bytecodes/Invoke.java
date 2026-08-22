@@ -159,6 +159,16 @@ public class Invoke extends Instruction {
         if (ownerClass == null || ownerClass.getConcreteClass() == null) {
             return null;
         }
+        if (BytecodeMethod.isInterpHost() && !ownerClass.isFinalClass()
+                && !BytecodeMethod.isInterpOpaqueClass(ownerClass.getClsName())) {
+            // "Exactly one concrete implementor" is a closed-world fact, and an
+            // interp-host build has no closed world -- an interpreted subclass
+            // synthesized at runtime is a second implementor the translator
+            // cannot see. Collapsing the call to the single known concrete
+            // owner would bypass the vtable the override is patched into.
+            // A genuinely final class is exempt; nothing can subclass it.
+            return null;
+        }
         String currentClass = getMethod() != null ? getMethod().getClsName() : null;
         if (currentClass == null && !allowMissingMethodContext) {
             return null;

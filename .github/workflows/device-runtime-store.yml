@@ -1,0 +1,327 @@
+# Weekly build of the device runtime for testers.
+#
+# Uploads to Google Play internal testing and to TestFlight. It does not promote
+# to production and does not submit for App Store review -- see
+# scripts/cn1-device-runtime/store/README.md for why that is deliberate.
+#
+# Without credentials the job reports what is missing and stops. It never
+# publishes half of a release: the two build jobs run independently on their
+# own runners, but publishing is gated on both having reached success (or been
+# skipped because that platform is not configured), so a failing iOS archive
+# cannot leave Google Play with a lone Android upload for the week.
+name: Device runtime store build
+
+on:
+  schedule:
+    # Monday morning, so a failure has a working week in front of it.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and check credentials without uploading'
+        type: boolean
+        default: false
+
+concurrency:
+  group: device-runtime-store
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.check.outputs.android }}
+      ios: ${{ steps.check.outputs.ios }}
+    steps:
+      - id: check
+        name: Which stores are configured
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          IOS_CERT: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          ASC_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        run: |
+          # Every secret the job will actually consume, not just the two that
+          # name the store. A partial configuration used to pass here, spend
+          # half an hour building, and then fail in the signing step -- which is
+          # the opposite of what a preflight is for.
+          android=true
+          ios=true
+          missing=""
+          for name in PLAY_JSON KEYSTORE KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then android=false; missing="$missing android:$name"; fi
+          done
+          for name in IOS_CERT IOS_CERT_PASSWORD IOS_PROFILE ASC_KEY ASC_KEY_ID ASC_ISSUER_ID; do
+            if [ -z "${!name}" ]; then ios=false; missing="$missing ios:$name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "missing secrets:$missing"
+          fi
+          echo "android=$android" >> "$GITHUB_OUTPUT"
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
+          echo "### Device runtime store build" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Store | Configured |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Google Play | $android |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| App Store | $ios |" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$missing" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Secrets that are absent:\`$missing\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "$android" = false ] && [ "$ios" = false ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No publishing credentials are present, so nothing was uploaded." >> "$GITHUB_STEP_SUMMARY"
+            echo "The secrets each store needs are listed in" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`scripts/cn1-device-runtime/store/README.md\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  build-android:
+    needs: preflight
+    if: needs.preflight.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 8 for the framework, JDK 17 for the Android port
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            17
+
+      - name: Build the framework and the Android port
+        env:
+          # setup-java makes the LAST version listed the default, so JAVA_HOME
+          # is 17 here despite the step name. The framework build wants 8 -- the
+          # newer JDK trips JaCoCo -- and the Android port wants 17, so each
+          # command names its own.
+          JAVA8: ${{ env.JAVA_HOME_8_X64 }}
+        run: |
+          export JAVA_HOME="$JAVA8"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          cd maven
+          mvn -B -q -DskipTests install -pl core,parparvm -am
+          mvn -B -q -DskipTests -Pcompile-android install -pl android
+
+      - name: Verify the shim generator
+        # The app build generates the shims; this asserts the properties that
+        # build takes on faith. It fails if a shim will not compile, if a
+        # load-bearing shim is missing, or if generating twice differs -- all of
+        # which are release blockers.
+        run: scripts/generate-interp-shims.sh
+
+      - name: Build the app bundle
+        env:
+          JAVA17_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          # A store rejects an upload that reuses a version code, and the app's
+          # version is a fixed 1.0 -- so every scheduled run after the first
+          # would be refused. The run number is monotonic and unique per repo,
+          # which is exactly what a build number has to be. It has to travel as
+          # codename1.arg.*: that is the prefix CN1BuildMojo copies into the
+          # BuildRequest, and android.versionCode is what the Gradle builder
+          # reads from it.
+          cd scripts/cn1-device-runtime
+          mvn -B -q package -DskipTests \
+            -Dcodename1.platform=android \
+            -Dcodename1.buildTarget=android-source \
+            -Dcodename1.arg.android.versionCode=${{ github.run_number }} \
+            -Dopen=false
+
+      - name: Sign and assemble
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          gradle_dir="$(find scripts/cn1-device-runtime/android/target -maxdepth 1 \
+            -name '*-android-source' -type d | head -1)"
+          [ -n "$gradle_dir" ] || { echo "no gradle project was generated" >&2; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$gradle_dir/upload.keystore"
+          cd "$gradle_dir"
+          ./gradlew --no-daemon bundleRelease \
+            -Pandroid.injected.signing.store.file=upload.keystore \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      - name: Stage the signed AAB
+        # Uploaded here rather than published from this job: publishing waits
+        # until the iOS build has also succeeded (or is skipped because that
+        # platform is not configured), so a broken iOS archive cannot leave
+        # Google Play with a lone Android upload for the week.
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: scripts/cn1-device-runtime/android/target/*-android-source/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 7
+
+  build-ios:
+    needs: preflight
+    if: needs.preflight.outputs.ios == 'true'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 8 for the framework, JDK 17 for the translator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            17
+
+      - name: Build the framework, translator and iOS port
+        env:
+          JAVA8: ${{ env.JAVA_HOME_8_X64 }}
+        run: |
+          # As above: the last JDK listed to setup-java is the default, and the
+          # framework build wants 8.
+          export JAVA_HOME="$JAVA8"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          cd maven
+          mvn -B -q -DskipTests install -pl core,parparvm,ios -am
+
+      - name: Verify the shim generator
+        run: scripts/generate-interp-shims.sh
+
+      - name: Translate to Xcode
+        env:
+          JAVA17_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          cd scripts/cn1-device-runtime
+          # As on Android: TestFlight refuses a build number it has seen, and
+          # the app's version stays 1.0 between releases. ios.bundleVersion is
+          # the argument IPhoneBuilder reads for CFBundleVersion, and it has to
+          # be dotted numerics, so the run number becomes the third component.
+          mvn -B -q package -DskipTests \
+            -Dcodename1.platform=ios \
+            -Dcodename1.buildTarget=ios-source \
+            -Dcodename1.arg.ios.interpHost=true \
+            -Dcodename1.arg.ios.bundleVersion=1.0.${{ github.run_number }} \
+            -Dopen=false
+
+      - name: Import signing material
+        env:
+          CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          keychain=build.keychain
+          security create-keychain -p actions "$keychain"
+          security default-keychain -s "$keychain"
+          security unlock-keychain -p actions "$keychain"
+          echo "$CERT_P12" | base64 -d > cert.p12
+          security import cert.p12 -k "$keychain" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions "$keychain"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE" | base64 -d > \
+            ~/Library/MobileDevice/Provisioning\ Profiles/devruntime.mobileprovision
+
+      - name: Archive and export
+        run: |
+          set -euo pipefail
+          src="$(find scripts/cn1-device-runtime/ios/target -maxdepth 1 \
+            -name '*-ios-source' -type d | head -1)"
+          [ -n "$src" ] || { echo "no Xcode project was generated" >&2; exit 1; }
+          # Resolved before the cd: the export options live at a fixed place in
+          # the repo, and the generated project's depth is not ours to predict.
+          export_options="$PWD/scripts/cn1-device-runtime/store/ExportOptions.plist"
+          cd "$src"
+          xcodebuild -workspace CN1DeviceRuntime.xcworkspace \
+            -scheme CN1DeviceRuntime -configuration Release \
+            -archivePath build/CN1DeviceRuntime.xcarchive archive
+          xcodebuild -exportArchive \
+            -archivePath build/CN1DeviceRuntime.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist "$export_options"
+
+      - name: Stage the signed IPA
+        # Same reason as the Android stage step: publishing is deferred to a
+        # separate job that also gates on the other platform's outcome, so
+        # neither store can go live alone when the other build failed.
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: scripts/cn1-device-runtime/ios/target/*-ios-source/build/ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-android:
+    # Gated on both build jobs. GitHub applies an implicit `success()` when
+    # the `if:` contains no status-check function, and that would skip this
+    # job whenever any `needs` was skipped -- including the iOS build when
+    # only Android is configured. `always()` is the documented way to opt
+    # out of that implicit gate so the explicit result comparisons below
+    # actually run: Android must have succeeded, iOS must have succeeded or
+    # been skipped, and a failing iOS build still blocks Android publish --
+    # which is what the workflow's opening comment promises.
+    needs: [preflight, build-android, build-ios]
+    if: >-
+      always()
+      && !inputs.dry_run
+      && needs.preflight.outputs.android == 'true'
+      && needs.build-android.result == 'success'
+      && (needs.build-ios.result == 'success' || needs.build-ios.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-aab
+          path: android-aab
+
+      - name: Upload to internal testing
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.codenameone.devruntime
+          releaseFiles: android-aab/*.aab
+          track: internal
+          status: completed
+          whatsNewDirectory: scripts/cn1-device-runtime/fastlane/metadata/android/en-US/changelogs
+
+  publish-ios:
+    # See publish-android for the gating rationale (including why the
+    # explicit `always()` is required for the result comparisons below to
+    # be evaluated when the Android build is skipped).
+    needs: [preflight, build-android, build-ios]
+    if: >-
+      always()
+      && !inputs.dry_run
+      && needs.preflight.outputs.ios == 'true'
+      && needs.build-ios.result == 'success'
+      && (needs.build-android.result == 'success' || needs.build-android.result == 'skipped')
+    runs-on: macos-14
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: ios-ipa
+
+      - name: Upload to TestFlight
+        env:
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/private_keys
+          echo "$ASC_PRIVATE_KEY" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
+          xcrun altool --upload-app -f ios-ipa/*.ipa -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"

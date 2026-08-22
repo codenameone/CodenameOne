@@ -5427,6 +5427,11 @@ bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function
 bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
 bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
 bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function(v) { return intBitsFromFloat(v); });
+// Raw bit conversion: same underlying representation as intBitsFromFloat --
+// no NaN canonicalisation is performed here either, since the JS runtime does
+// not have a native NaN payload distinction; the entry point exists so the
+// device runtime's non-canonicalising path resolves.
+bindNative(["cn1_java_lang_Float_floatToRawIntBits_float_R_int"], function(v) { return intBitsFromFloat(v); });
 bindNative(["cn1_java_lang_Float_intBitsToFloat_int_R_float"], function(bits) { return floatFromIntBits(bits); });
 function formatJavaFloating(value, scientificNotation) {
   value = Number(value);
@@ -5449,6 +5454,8 @@ bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"]
   return createJavaString(formatJavaFloating(v, !!scientificNotation));
 });
 bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function(v) { return longBitsFromDouble(v); });
+// Raw bit conversion, same rationale as floatToRawIntBits above.
+bindNative(["cn1_java_lang_Double_doubleToRawLongBits_double_R_long"], function(v) { return longBitsFromDouble(v); });
 bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function(bits) { return doubleFromLongBits(bits); });
 bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function(v, scientificNotation) {
   return createJavaString(formatJavaFloating(v, !!scientificNotation));

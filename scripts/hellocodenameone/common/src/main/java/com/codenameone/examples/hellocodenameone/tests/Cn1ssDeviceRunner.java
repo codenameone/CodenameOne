@@ -558,6 +558,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// name the last announced test whatever state the app is in, and cannot
     /// perturb it. See lastStarted in CleanTargetLinuxIntegrationTest.
 
+
     private void runNextTest(int index) {
         int offset = prependedTest != null ? 1 : 0;
         boolean includeJavaSeReferences = "SE".equals(
