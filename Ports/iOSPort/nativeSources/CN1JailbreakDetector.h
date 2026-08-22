@@ -27,11 +27,37 @@
 /**
  * Runs every jailbreak / hooking probe and returns the ones that fired as a
  * comma separated list of stable codes, or an empty string on a clean device.
- * Codes: dyldInsert, hookLib, jailbreakFile, restrictedWrite, traced.
+ *
+ * Codes, in the order they are probed:
+ *
+ * - `dyldInsert`      DYLD_INSERT_LIBRARIES is set, the classic injection route.
+ * - `hookLib`         a known hooking / tweak-injection library is loaded into
+ *                     the process, or Substrate safe mode is signalled.
+ * - `hookedApi`       the probes below disagree with each other, or a path that
+ *                     exists on every stock device reports absent. Both mean a
+ *                     jailbreak-bypass tweak is filtering our answers, which is
+ *                     itself stronger evidence than any single path hit.
+ * - `jailbreakFile`   a rootful jailbreak artifact is present on disk.
+ * - `rootlessPath`    a rootless bootstrap (`/var/jb`, Procursus) is present.
+ *                     Rootless jailbreaks -- palera1n, Dopamine, XinaA15 -- leave
+ *                     the sealed system volume untouched and install everything
+ *                     under `/var/jb`, so none of the rootful paths exist and
+ *                     `restrictedWrite` cannot fire. This code is what sees them.
+ * - `mountRW`         the root filesystem is mounted writable, or an extra
+ *                     jailbreak filesystem is mounted.
+ * - `restrictedWrite` a write outside the sandbox succeeded.
+ * - `traced`          a debugger is attached to the process.
  *
  * Always compiled, independent of CN1_DETECT_JAILBREAK, because
  * DeviceIntegrity.getCompromiseReasons() surfaces these at runtime without
- * terminating the app. Returns an empty string on the simulator.
+ * terminating the app. Nothing is cached, so a caller may re-probe before a
+ * sensitive operation and see an instrumentation framework that attached after
+ * launch. Returns an empty string on the simulator.
+ *
+ * None of this is a guarantee. Every probe runs on hardware the attacker owns
+ * and can therefore be patched out; the value is in costing more to bypass than
+ * the previous version did, not in being unbypassable. The control that does not
+ * run on hostile hardware is server-verified attestation.
  */
 NSString *cn1JailbreakSignals(void);
 
