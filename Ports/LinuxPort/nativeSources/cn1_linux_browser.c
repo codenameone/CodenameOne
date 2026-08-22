@@ -188,6 +188,11 @@ static void cn1BrowserCreateOnMain(void* p) {
         }
     }
     b->view = p_webkit_web_view_new_with_user_content_manager(mgr);
+    /* A reference of our own, held for the life of the CN1Browser. Without it the
+     * overlay holds the only one, so the widget goes away with whichever window
+     * happens to be hosting it -- while Java still has the peer and can re-host it,
+     * navigate it or destroy it. */
+    g_object_ref_sink(b->view);
     g_signal_connect(b->view, "load-changed", G_CALLBACK(cn1BrowserLoadChanged), b);
     cn1LinuxOverlayAdd(b->slot, b->view, 0, 0, req->w > 0 ? req->w : 1, req->h > 0 ? req->h : 1);
     req->result = b;
@@ -222,14 +227,11 @@ static void cn1BrowserSetHostOnMain(void* p) {
      * state and its script message handler, so a browser added to a window after it
      * was constructed does not lose whatever it had already loaded.
      *
-     * Held across the move. The overlay owns the reference GTK took when the widget
-     * was put in it, and b->view is a raw pointer, so removing it can finalize the
-     * view and the add below would then be reading freed memory. */
-    g_object_ref(b->view);
+     * Safe to unparent because the CN1Browser holds a reference of its own from
+     * creation; the overlay's is not the only one. */
     cn1LinuxOverlayRemove(b->slot, b->view);
     b->slot = req->slot;
     cn1LinuxOverlayAdd(b->slot, b->view, 0, 0, 1, 1);
-    g_object_unref(b->view);
 }
 
 /* Re-hosts the view in the given window's overlay. The real bounds arrive right
@@ -355,13 +357,10 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_browserCapturePng___long_R_byte
 static void cn1BrowserDestroyOnMain(void* p) {
     CN1Browser* b = (CN1Browser*) p;
     if (b->view) {
-        /* Referenced across the teardown for the same reason the re-host holds one:
-         * gtk_container_remove drops the overlay's reference, and if that is the last
-         * one the widget is finalized -- so the destroy below would be operating on
-         * freed memory. */
-        g_object_ref(b->view);
         cn1LinuxOverlayRemove(b->slot, b->view);
         gtk_widget_destroy(b->view);
+        /* The reference taken at creation. Dropping it last is what finally finalizes
+         * the view, and only when the application asked for the browser to go. */
         g_object_unref(b->view);
         b->view = 0;
     }

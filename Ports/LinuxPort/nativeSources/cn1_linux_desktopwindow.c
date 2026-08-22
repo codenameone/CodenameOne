@@ -694,6 +694,23 @@ static void cn1DesktopDestroyOnMain(void* arg) {
     w->pendingResize = 0;
     pthread_mutex_unlock(&w->bufferLock);
     if (w->window != 0) {
+        /* Peers hosted in this window -- a browser, a native editor -- are children of
+         * the overlay, and destroying the window destroys its children with it. The
+         * Java objects behind them outlive the window: BrowserComponent keeps its
+         * peer, and deinitialize() only hides the widget, so a later destroy() or a
+         * re-host would touch a widget that had already gone. Detached first, so what
+         * happens to them stays their owner's decision.
+         *
+         * Each owner holds its own reference, so removing them here cannot finalize
+         * them; without that this would swap a destroyed child for a freed one. */
+        if (w->fixed != 0) {
+            GList* hosted = gtk_container_get_children(GTK_CONTAINER(w->fixed));
+            GList* each;
+            for (each = hosted; each != 0; each = each->next) {
+                gtk_container_remove(GTK_CONTAINER(w->fixed), GTK_WIDGET(each->data));
+            }
+            g_list_free(hosted);
+        }
         gtk_widget_destroy(w->window);
         w->window = 0;
     }

@@ -165,6 +165,11 @@ static void cn1EditCreateOnMain(void* p) {
     }
 
     e->slot = req->slot;
+    /* A reference of our own, held for the life of the CN1Edit, for the same reason
+     * the browser takes one: the overlay's reference disappears with the window that
+     * hosts the editor, and Java can still close or re-host it afterwards. */
+    g_object_ref_sink(e->container);
+
     cn1LinuxOverlayAdd(req->slot, e->container, req->x, req->y, req->w, req->h);
     gtk_widget_grab_focus(e->container);
     req->result = e;
@@ -212,12 +217,9 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_editGetText___long_R_java_lang_
 static void cn1EditCloseOnMain(void* p) {
     CN1Edit* e = (CN1Edit*) p;
     if (e->container) {
-        /* Referenced across the teardown: gtk_container_remove drops the overlay's
-         * reference, and if that is the last one the widget is finalized before the
-         * destroy below runs. */
-        g_object_ref(e->container);
         cn1LinuxOverlayRemove(e->slot, e->container);
         gtk_widget_destroy(e->container);
+        /* The reference taken at creation, dropped last. */
         g_object_unref(e->container);
         e->container = 0;
     }
