@@ -5076,6 +5076,11 @@ typedef struct {
     int slotCount;
     int bumpIndex;
 } CN1ConsPage;
+// Extra room the rebuild sizes for, over the registration count it read, so that
+// pages registered while it walks do not cost it the whole table.
+#ifndef CN1_CONS_PG_SLACK
+#define CN1_CONS_PG_SLACK 256
+#endif
 static CN1ConsPage* cn1ConsPg = 0;
 static int cn1ConsPgN = 0;            // occupied entries
 static int cn1ConsPgMask = -1;        // capacity-1, or -1 when unallocated
@@ -5086,7 +5091,18 @@ static long long cn1ConsPgIndexedCount = -1;
 // Find the entry for a page base, or 0. Terminates on the empty slot that the
 // <= 1/2 load factor guarantees exists.
 static inline CN1ConsPage* cn1ConsPgFind(char* cand) {
-    if(cn1ConsPgN == 0) {
+    // A ZERO KEY IS THE EMPTY MARKER, so it must never be looked up. This function is
+    // handed arbitrary machine words off a conservative stack scan, and every word
+    // below CN1_BIBOP_PAGE_SIZE masks to page base 0 -- a small aligned integer left
+    // in a stack slot is enough. Probing for 0 matches the first empty entry and
+    // returns it as a hit: an all-zero CN1ConsPage whose slotSize the caller then
+    // divides by. arm64 answers integer division by zero with 0, so the word resolved
+    // to slot 0 of a page that does not exist and the damage stayed silent; x86-64
+    // raises SIGFPE, which is how CI found it while every local run passed. The sorted
+    // array this replaced could not be reached this way -- every element in it was a
+    // real page base -- so the hazard arrived with the table, not with the workload.
+    // No page can live at address 0, so rejecting the key outright loses nothing.
+    if(cand == 0 || cn1ConsPgN == 0) {
         return 0;
     }
     unsigned mask = (unsigned)cn1ConsPgMask;
@@ -5103,50 +5119,72 @@ static inline CN1ConsPage* cn1ConsPgFind(char* cand) {
     }
 }
 
-// Insert one page into the table, growing (and rehashing) if it would pass the load
-// factor. Rebuild-time only, so the rehash cost is paid once per registry growth.
-static void cn1ConsPgInsert(CN1BibopPage* p) {
-    if(cn1ConsPgMask < 0 || (cn1ConsPgN + 1) * 2 > cn1ConsPgMask + 1) {
-        int oldCap = cn1ConsPgMask + 1;
-        CN1ConsPage* old = cn1ConsPg;
-        int newCap = oldCap > 0 ? oldCap * 2 : 256;
-        CN1ConsPage* fresh = (CN1ConsPage*)calloc((size_t)newCap, sizeof(CN1ConsPage));
-        if(fresh == 0) {
-            return;   // out of memory: leave the table as it is; the missing page's
-                      // objects are mark==-1 fresh and survive on the grace rule
+// Rebuild the page index from the registry, into a table sized once up front.
+//
+// ALL OR NOTHING, and never in place. The live table is not touched until a COMPLETE
+// replacement exists, because a partial index is not a slow index -- it is a silently
+// wrong one. A page missing from it makes cn1ConservativeResolve reject every
+// reference into that page, gcMarkObject's guard then skips the object, and the sweep
+// frees it while it is still reachable. The registry is a prepend list, so a rebuild
+// that gave up part way through would keep the NEWEST pages and drop the oldest --
+// precisely the ones holding a long-lived live set -- and it would do so on
+// allocation failure, i.e. exactly when memory pressure makes a collection matter.
+//
+// So: size for the count we read (plus slack for pages registered while we walk),
+// allocate, fill, and publish only on success. On any failure the previous table
+// stays in place and cn1ConsPgIndexedCount is left alone, so the next cycle retries;
+// what that table is missing is pages registered since it was built, whose objects
+// are mark==-1 fresh and survive on the sweep's grace rule -- the same exposure a
+// page registered mid-snapshot has always had.
+//
+// Returns JAVA_FALSE if the index could not be rebuilt.
+static JAVA_BOOLEAN cn1ConsPgRebuild(long long pageCount) {
+    // Load factor <= 1/2, plus slack: the registry can grow between reading the count
+    // and finishing the walk, and running out of room means discarding the work.
+    long long want = (pageCount + CN1_CONS_PG_SLACK) * 2;
+    int cap = 256;
+    while((long long)cap < want && cap < (1 << 30)) {
+        cap *= 2;
+    }
+    CN1ConsPage* fresh = (CN1ConsPage*)calloc((size_t)cap, sizeof(CN1ConsPage));
+    if(fresh == 0) {
+        return JAVA_FALSE;
+    }
+    unsigned mask = (unsigned)(cap - 1);
+    int limit = cap / 2;
+    int n = 0;
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        if(n >= limit) {
+            // The registry outgrew the size we picked. Keep the old table rather than
+            // publish one that is missing the tail of the walk, and retry next cycle
+            // against the larger count.
+            free(fresh);
+            return JAVA_FALSE;
         }
-        cn1ConsPg = fresh;
-        cn1ConsPgMask = newCap - 1;
-        cn1ConsPgN = 0;
-        for(int i = 0 ; i < oldCap ; i++) {
-            if(old[i].base != 0) {
-                unsigned j = cn1PtrMix((uintptr_t)old[i].base) & (unsigned)cn1ConsPgMask;
-                while(cn1ConsPg[j].base != 0) {
-                    j = (j + 1) & (unsigned)cn1ConsPgMask;
-                }
-                cn1ConsPg[j] = old[i];
-                cn1ConsPgN++;
+        char* base = (char*)p;
+        unsigned i = cn1PtrMix((uintptr_t)base) & mask;
+        while(fresh[i].base != 0) {
+            if(fresh[i].base == base) {
+                break;              // already indexed (registry cycle would be a bug)
             }
+            i = (i + 1) & mask;
         }
-        free(old);
-    }
-    char* base = (char*)p;
-    unsigned mask = (unsigned)cn1ConsPgMask;
-    unsigned i = cn1PtrMix((uintptr_t)base) & mask;
-    while(cn1ConsPg[i].base != 0) {
-        if(cn1ConsPg[i].base == base) {
-            return;   // already indexed
+        if(fresh[i].base == 0) {
+            fresh[i].base = base;
+            fresh[i].page = p;
+            // Geometry stays zero until the per-cycle refresh reads it from the page.
+            // bumpIndex zero is what makes the resolver reject every word into this
+            // page in the meantime.
+            n++;
         }
-        i = (i + 1) & mask;
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
     }
-    cn1ConsPg[i].base = base;
-    cn1ConsPg[i].page = p;
-    cn1ConsPg[i].firstSlotOffset = 0;
-    cn1ConsPg[i].slotSize = 0;
-    cn1ConsPg[i].slotCount = 0;
-    cn1ConsPg[i].bumpIndex = 0;   // rejects every word into the page until the
-                                  // geometry refresh below publishes the real shape
-    cn1ConsPgN++;
+    free(cn1ConsPg);
+    cn1ConsPg = fresh;
+    cn1ConsPgMask = cap - 1;
+    cn1ConsPgN = n;
+    return JAVA_TRUE;
 }
 #endif
 
@@ -5296,18 +5334,23 @@ void cn1GcBuildRootSnapshots(void) {
     {
         long long pageCount = atomic_load_explicit(&bibopAllPagesCount, memory_order_acquire);
         if(pageCount != cn1ConsPgIndexedCount) {
-            if(cn1ConsPgMask >= 0) {
-                memset(cn1ConsPg, 0, (size_t)(cn1ConsPgMask + 1) * sizeof(CN1ConsPage));
+            if(cn1ConsPgRebuild(pageCount)) {
+                // key on the number we actually WALKED: if registrations raced past
+                // the count we read, the next cycle's count differs and rebuilds
+                cn1ConsPgIndexedCount = cn1ConsPgN;
+            } else if(cn1ConsPgN == 0) {
+                // Nothing to fall back on. Marking cannot proceed: with no page index
+                // every BiBOP reference fails to resolve, gcMarkObject's guard skips
+                // every one of them, and the sweep frees a heap that is still live.
+                // Say so and stop rather than corrupt it -- this is a few hundred KB
+                // of calloc, so reaching here means the process is already finished.
+                fprintf(stderr, "CN1 GC: cannot build the page resolver index for %lld "
+                                "pages; refusing to mark a heap it cannot resolve\n",
+                        pageCount);
+                fflush(stderr);
+                abort();
             }
-            cn1ConsPgN = 0;
-            CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
-            while(p != 0) {
-                cn1ConsPgInsert(p);
-                p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
-            }
-            // key on the number we actually WALKED: if registrations raced past
-            // the count we read, the next cycle's count differs and rebuilds
-            cn1ConsPgIndexedCount = cn1ConsPgN;
+            // else: keep the previous complete index and retry next cycle.
         }
     }
     // Per-cycle geometry refresh. Walks the table LINEARLY rather than probing it
