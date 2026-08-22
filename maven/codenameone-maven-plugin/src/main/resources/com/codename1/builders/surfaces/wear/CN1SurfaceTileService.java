@@ -83,15 +83,19 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// value CN1SurfaceRenderer tints a widget's progress bar with.
     private static final int ACCENT = 0xff007aff;
 
+    /// How many recent readings stay available for a resources callback; see `served`.
+    private static final int MAX_REMEMBERED_READINGS = 8;
+
     /**
      * The entries recent Tiles were built from, keyed by the version each advertised.
      *
-     * <p>A map and not one slot: two tile requests can be handled before the first one's resource
-     * callback arrives, and a single slot would then have been overwritten by the second -- the
-     * first layout falling back to whatever is current and its image ids going unresolved, which
-     * is the failure this remembering exists to prevent. Two entries are enough for that
-     * interleaving and the oldest is dropped, so a long-lived Tile process does not accumulate
-     * readings.</p>
+     * <p>A map and not one slot: tile requests can be handled before an earlier one's resource
+     * callback arrives, and a single slot would be overwritten -- the earlier layout falling back
+     * to whatever is current and its image ids going unresolved, which is the failure this
+     * remembering exists to prevent. Two was not enough either, because nothing bounds how many
+     * requests the host has outstanding; the cap is now generous enough that eviction is a
+     * theoretical concern rather than a two-deep interleaving, while still bounding a long-lived
+     * Tile process. A reading is a layout and a state, not a bitmap, so holding a few is cheap.</p>
      *
      * <p>Synchronized rather than volatile because the two callbacks arrive on different threads
      * and this is now a read-modify-write.</p>
@@ -102,7 +106,7 @@ public abstract class CN1SurfaceTileService extends TileService {
     /** Remembers the entry a Tile of this version was built from. */
     private synchronized void remember(String version, CN1WatchSurface.Reading reading) {
         served.put(version, reading);
-        while (served.size() > 2) {
+        while (served.size() > MAX_REMEMBERED_READINGS) {
             java.util.Iterator<String> oldest = served.keySet().iterator();
             oldest.next();
             oldest.remove();

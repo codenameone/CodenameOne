@@ -278,7 +278,11 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             if (texts.isEmpty()) {
                 return null;
             }
-            return shortText(shorten(texts.get(0)), texts.size() > 1 ? shorten(texts.get(1)) : null,
+            // UNTRUNCATED. shortText shortens what it displays and keeps what it is given as the
+            // content description, so shortening first handed a screen reader the same seven
+            // characters the slot already shows -- losing exactly the text the description exists
+            // to supply.
+            return shortText(texts.get(0), texts.size() > 1 ? shorten(texts.get(1)) : null,
                     tap);
         }
         return null;

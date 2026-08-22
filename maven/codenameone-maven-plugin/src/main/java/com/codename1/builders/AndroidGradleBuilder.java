@@ -348,6 +348,9 @@ public class AndroidGradleBuilder extends Executor {
 
     /** The background-fetch handler and trampoline the Wear manifest needs too. */
     private String watchBackgroundFetchService = "";
+
+    /** Location, geofence and foreground-service declarations the Wear manifest needs too. */
+    private String watchFeatureComponents = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -4358,6 +4361,14 @@ public class AndroidGradleBuilder extends Executor {
             foregroundServiceEntry = "<service android:name=\"com.codename1.impl.android.CodenameOneForegroundService\" android:exported=\"false\" android:foregroundServiceType=\"" + foregroundServiceType + "\" />\n";
         }
 
+        // The Wear manifest needs these too. A watch lifecycle using background location,
+        // geofencing or ForegroundService reaches the same components through the same shared
+        // implementation, and the wear module compiles them either way -- so the declarations
+        // are the only thing missing, and a component the manifest does not declare cannot be
+        // started at all.
+        watchFeatureComponents = locationServices + backgroundLocationReceiver
+                + foregroundServiceEntry;
+
         // Receive-shared-content: register the share receiver activity with SEND /
         // SEND_MULTIPLE intent filters for the mime types named by android.shareFilter
         // (comma separated). When the app references SharedContent but sets no explicit
@@ -7656,6 +7667,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "  " + watchAlarmReceiver
                 + "  " + watchBackgroundWorkService
                 + "  " + watchBackgroundFetchService
+                + "  " + watchFeatureComponents
                 // A complication or Tile tap still needs the trampoline, and a TILE tap needs it
                 // reachable from the tile host's process -- see anyWatchTile.
                 + "        <activity android:name=\"com.codename1.impl.android.surfaces."

@@ -68,7 +68,11 @@ public class PatchGradleFiles {
                 System.out.println("Skipping absent module build.gradle " + module);
                 continue;
             }
-            if (patchAppBuildGradle(module, arguments.compileSdk, arguments.targetSdk)) {
+            // The FIRST --app is the module the instrumentation suite runs against; anything
+            // after it is a companion that only needs its SDK levels pinned.
+            boolean instrumented = module.equals(arguments.apps.get(0));
+            if (patchAppBuildGradle(module, arguments.compileSdk, arguments.targetSdk,
+                    instrumented)) {
                 System.out.println("Patched " + module);
                 modifiedAny = true;
             }
@@ -126,7 +130,19 @@ public class PatchGradleFiles {
         return changed;
     }
 
-    private static boolean patchAppBuildGradle(Path path, int compileSdk, int targetSdk) throws IOException {
+    /**
+     * Patches one application module.
+     *
+     * <p>{@code instrumented} tells the SDK pins apart from the test harness. Every application
+     * module needs the pins -- an unpinned one takes the newest platform on the runner, which is
+     * how a Wear module ended up compiling against an API that had dropped a class the port
+     * uses. None of the rest belongs anywhere but the module the suite actually runs against: a
+     * companion Wear module has no instrumentation sources, so a runner, test dependencies and a
+     * coverage report task there are configuration for tests that do not exist, and the report
+     * finalizer fails on a module with nothing to report.</p>
+     */
+    private static boolean patchAppBuildGradle(Path path, int compileSdk, int targetSdk,
+            boolean instrumented) throws IOException {
         String content = Files.readString(path, StandardCharsets.UTF_8);
         boolean changed = false;
 
@@ -134,21 +150,23 @@ public class PatchGradleFiles {
         content = r.content();
         changed |= r.changed();
 
-        r = ensureInstrumentationRunner(content);
-        content = r.content();
-        changed |= r.changed();
-
         r = removeLegacyUseLibrary(content);
         content = r.content();
         changed |= r.changed();
 
-        r = ensureTestDependencies(content);
-        content = r.content();
-        changed |= r.changed();
+        if (instrumented) {
+            r = ensureInstrumentationRunner(content);
+            content = r.content();
+            changed |= r.changed();
 
-        r = ensureJacocoConfiguration(content);
-        content = r.content();
-        changed |= r.changed();
+            r = ensureTestDependencies(content);
+            content = r.content();
+            changed |= r.changed();
+
+            r = ensureJacocoConfiguration(content);
+            content = r.content();
+            changed |= r.changed();
+        }
 
         if (changed) {
             Files.writeString(path, ensureTrailingNewline(content), StandardCharsets.UTF_8);
