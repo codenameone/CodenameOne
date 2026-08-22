@@ -4599,6 +4599,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void deinitialize() {
+        // The window manager's monitor poller is a daemon timer that outlives the port
+        // otherwise. A simulator session that restarts through deinitialize()/init()
+        // builds a new manager each time, and every previous poller kept waking every
+        // two seconds and reporting the same topology change independently.
+        if (windowManager != null) {
+            windowManager.stopWatchingMonitorTopology();
+            windowManager = null;
+        }
         if (canvas != null) {
             canvas.disposeGestureListeners();
         }

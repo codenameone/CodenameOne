@@ -79,8 +79,24 @@ public class JavaSEWindowManager extends WindowManager {
     /** Returned by {@link #topologySignature()} when the sample itself failed. */
     private static final String TOPOLOGY_UNAVAILABLE = "unavailable";
 
+    /// The topology poller, kept so a port restart can stop it. A simulator session
+    /// that cycles through Display.deinitialize()/init() builds a new window manager
+    /// each time, and every previous poller went on waking every two seconds for the
+    /// life of the process -- each of them reporting the same topology change.
+    private java.util.Timer monitorWatch;
+
+    /// Stops the topology poller. Called when the port is torn down.
+    void stopWatchingMonitorTopology() {
+        java.util.Timer timer = monitorWatch;
+        monitorWatch = null;
+        if (timer != null) {
+            timer.cancel();
+        }
+    }
+
     private void watchMonitorTopology() {
         final java.util.Timer timer = new java.util.Timer("cn1-monitor-watch", true);
+        monitorWatch = timer;
         timer.schedule(new java.util.TimerTask() {
             private String last = topologySignature();
 
