@@ -212,8 +212,13 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_editGetText___long_R_java_lang_
 static void cn1EditCloseOnMain(void* p) {
     CN1Edit* e = (CN1Edit*) p;
     if (e->container) {
+        /* Referenced across the teardown: gtk_container_remove drops the overlay's
+         * reference, and if that is the last one the widget is finalized before the
+         * destroy below runs. */
+        g_object_ref(e->container);
         cn1LinuxOverlayRemove(e->slot, e->container);
         gtk_widget_destroy(e->container);
+        g_object_unref(e->container);
         e->container = 0;
     }
 }

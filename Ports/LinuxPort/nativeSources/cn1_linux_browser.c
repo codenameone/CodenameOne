@@ -355,8 +355,14 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_browserCapturePng___long_R_byte
 static void cn1BrowserDestroyOnMain(void* p) {
     CN1Browser* b = (CN1Browser*) p;
     if (b->view) {
+        /* Referenced across the teardown for the same reason the re-host holds one:
+         * gtk_container_remove drops the overlay's reference, and if that is the last
+         * one the widget is finalized -- so the destroy below would be operating on
+         * freed memory. */
+        g_object_ref(b->view);
         cn1LinuxOverlayRemove(b->slot, b->view);
         gtk_widget_destroy(b->view);
+        g_object_unref(b->view);
         b->view = 0;
     }
 }
