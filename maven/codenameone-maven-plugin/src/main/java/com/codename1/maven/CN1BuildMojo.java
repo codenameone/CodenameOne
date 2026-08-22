@@ -2480,7 +2480,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * keeps the plain {@code <finalName><extension>} name it has always had, so adding a
      * role here is the only way to change where a file lands.</p>
      */
-    private static final String[] ARTIFACT_ROLE_SUFFIXES = {"-wear"};
+    // Longest first: "-wear-debug" ends with neither "-wear" nor anything else here, but a
+    // future suffix that is a tail of another would match the shorter one if it came first.
+    private static final String[] ARTIFACT_ROLE_SUFFIXES = {"-wear-debug", "-wear"};
 
     /**
      * The role suffix carried by a result entry's base name, or an empty string when it is
