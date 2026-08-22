@@ -167,7 +167,14 @@ public class InterpBundleWriter {
     }
 
     /**
-     * Adds every {@code .java} under a directory, recursively.
+     * Adds every source file under a directory, recursively.
+     *
+     * <p>Both {@code .java} and {@code .kt} are collected: the pushed bundle's
+     * source lookup keys on the {@code SourceFile} attribute javac and kotlinc
+     * emit, so a Kotlin class advertises {@code MyApp.kt} and the runtime
+     * refuses the whole push as missing source if only {@code .java} is
+     * gathered here. Any other language producing JVM classes would need its
+     * extension added the same way.</p>
      *
      * <p>Keyed by package rather than by file name. A bare name collides the
      * moment a project has two {@code Util.java} in different packages, and the
@@ -184,11 +191,19 @@ public class InterpBundleWriter {
         for (File f : kids) {
             if (f.isDirectory()) {
                 addSourceTree(f);
-            } else if (f.getName().endsWith(".java")) {
+            } else if (isSourceFile(f.getName())) {
                 String text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
                 addSource(sourceKey(packageOf(text), f.getName()), text);
             }
         }
+    }
+
+    /// Whether a filename is a source extension that produces bundled classes.
+    /// Java and Kotlin only; both are compiled to the same class files the
+    /// interpreter runs, and their `SourceFile` attributes name a file with
+    /// one of these extensions.
+    private static boolean isSourceFile(String name) {
+        return name.endsWith(".java") || name.endsWith(".kt");
     }
 
     /**
@@ -227,8 +242,21 @@ public class InterpBundleWriter {
                 }
                 String token = code.substring(start, i);
                 if ("package".equals(token)) {
-                    int end = code.indexOf(';', i);
-                    return end < 0 ? "" : code.substring(i, end).replaceAll("\\s", "");
+                    // Terminated by `;` (Java) or end-of-line (Kotlin, whose
+                    // package declaration has no semicolon). Falling back to
+                    // the next `;` in the file would land inside the class
+                    // body for a Kotlin source, so the key would be a garbled
+                    // "com.example fun ..." and the reader would look up a
+                    // key nobody wrote.
+                    int end = i;
+                    while (end < code.length()) {
+                        char t = code.charAt(end);
+                        if (t == ';' || t == '\n' || t == '\r' || t == '{') {
+                            break;
+                        }
+                        end++;
+                    }
+                    return code.substring(i, end).replaceAll("\\s", "");
                 }
                 if ("import".equals(token) || "class".equals(token)
                         || "interface".equals(token) || "enum".equals(token)) {

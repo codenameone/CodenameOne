@@ -226,8 +226,14 @@ public final class DevicePush {
             new ClassReader(Files.readAllBytes(f.toPath())).accept(cn, ClassReader.SKIP_CODE);
             for (Object mo : cn.methods) {
                 MethodNode m = (MethodNode) mo;
+                // Java's entry-point rule is `public static void main(String[])`
+                // exactly -- a package-private or private helper of the same
+                // signature is not a program entry, and picking one up here
+                // preferred an inaccessible method over a valid Lifecycle
+                // subclass and had the runtime try to invoke it.
                 if ("main".equals(m.name) && "([Ljava/lang/String;)V".equals(m.desc)
-                        && (m.access & Opcodes.ACC_STATIC) != 0) {
+                        && (m.access & Opcodes.ACC_STATIC) != 0
+                        && (m.access & Opcodes.ACC_PUBLIC) != 0) {
                     mains.add(cn.name);
                 }
             }

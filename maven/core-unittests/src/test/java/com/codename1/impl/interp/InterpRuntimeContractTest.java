@@ -93,6 +93,13 @@ class InterpRuntimeContractTest {
         assertEquals("com.example",
                 packageOf("\\u0070ackage com.example;\npublic class A {}\n"));
         assertEquals("", packageOf("\\\\u0070ackage com.example;\npublic class A {}\n"));
+        // Kotlin's package declaration has no semicolon; a `;`-only terminator
+        // used to skip through the class body and return a garbled key that
+        // the reader looked up against nothing.
+        assertEquals("com.example",
+                packageOf("package com.example\n\nclass A { fun f() {} }\n"));
+        assertEquals("com.example",
+                packageOf("/* license */\npackage com.example\n\nfun main() {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {
