@@ -335,6 +335,18 @@ public final class InterpRuntime {
         }
         InterpMethod m = object.getType().resolve(name, descriptor);
         if (m == null || m.isAbstract()) {
+            // The pushed class did not override the method, but Enum defines
+            // some of them itself. `Collections.sort` on a list of interpreted
+            // enum constants casts to Comparable and calls compareTo -- and
+            // Enum.compareTo is not on the enum class's own method table.
+            // Route the Enum-inherited methods through `enumCall` here so
+            // host sorting works on peers that advertise Comparable.
+            if (object.enumOrdinal >= 0) {
+                Object early = enumCall(object, name, args);
+                if (early != NOT_ENUM_METHOD) {
+                    return early;
+                }
+            }
             return NOT_OVERRIDDEN;
         }
         try {
@@ -2206,6 +2218,17 @@ public final class InterpRuntime {
                 interfaces.addElement(n);
             }
         }
+        // Interfaces Enum implements are not in the pushed class's own
+        // interface list, but they still belong on the peer -- an enum
+        // sorted through Collections.sort casts to Comparable, and Enum
+        // supplies that. `enumCall` answers `compareTo`, so the shim only
+        // needs to advertise the interface; the interpreter routes the
+        // call back. Comparable and Serializable are the two Enum brings
+        // in on every JDK.
+        if (io.enumOrdinal >= 0) {
+            addIfPresent(interfaces, "java/lang/Comparable");
+            addIfPresent(interfaces, "java/io/Serializable");
+        }
 
         if (hostSuperclassName == null && interfaces.isEmpty()) {
             return;   // nothing in the host needs to see this object
@@ -2495,7 +2518,16 @@ public final class InterpRuntime {
             InterpMethod superMethod = findClassMethodInSuperchain(receiver, name, desc);
             if (superMethod != null && isPackagePrivate(superMethod)
                     && !samePackage(receiver.getName(), superMethod.owner.getName())) {
-                throw new InterpThrowable(new IllegalAccessError(
+                // IncompatibleClassChangeError rather than the strict
+                // IllegalAccessError, for the same reason the abstract-method
+                // path uses it: the CLDC11 subset does not carry
+                // IllegalAccessError, and a message naming the inaccessible
+                // method and the wrong package is worth more here than the
+                // exactly right type. IllegalAccessError is a subtype of
+                // IncompatibleClassChangeError on the JVM, so a `catch
+                // (IncompatibleClassChangeError)` in pushed code sees the
+                // same shape either way.
+                throw new InterpThrowable(new IncompatibleClassChangeError(
                         superMethod.owner.getName().replace('/', '.') + "." + name + desc
                         + " is package-private and " + receiver.getName().replace('/', '.')
                         + " is in a different package"), snapshotStack());
@@ -2518,6 +2550,16 @@ public final class InterpRuntime {
             }
         }
         return declared;
+    }
+
+    /// Adds an interface name to `interfaces` if the linker can resolve it and
+    /// the list does not already have it. Used to attach `Enum`-inherited
+    /// interfaces (Comparable, Serializable) to an enum's peer without a
+    /// second copy when the pushed class also happens to declare one.
+    private void addIfPresent(Vector interfaces, String name) {
+        if (!interfaces.contains(name) && linker.findClass(name) != null) {
+            interfaces.addElement(name);
+        }
     }
 
     /// The nearest class-declared method up {@code receiver}'s interpreted
@@ -3030,7 +3072,12 @@ public final class InterpRuntime {
         }
         if ("equals".equals(name) && args.length == 1) {
             // Enum identity is object identity: constants are singletons.
-            return args[0] == io ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Object.equals default is identity
+            // popBoxed converted a peer-backed argument to the peer, so a
+            // self-equals for an interface-only-peer enum arrived here as
+            // the peer against the InterpObject wrapper; normalise through
+            // fromHost so both representations resolve to the same object.
+            Object other = fromHost(args[0]);
+            return other == io ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Object.equals default is identity
         }
         if ("hashCode".equals(name)) {
             return Integer.valueOf(System.identityHashCode(io));
@@ -3040,8 +3087,9 @@ public final class InterpRuntime {
             // including for null and for something that is not an enum at all,
             // which a raw Comparable call can supply. Returning an ordering
             // instead quietly corrupts any sorted collection the two ended up
-            // in together.
-            Object other = args[0];
+            // in together. `fromHost` normalises for the same reason as
+            // `equals` above: a peer-backed enum arrives as its peer.
+            Object other = fromHost(args[0]);
             if (other == null) {
                 // Enum.compareTo(null) is a NullPointerException, not a
                 // ClassCastException: code that tells the two apart is code
@@ -3055,9 +3103,7 @@ public final class InterpRuntime {
                 throw new ClassCastException(describeForCompare(other)
                         + " is not comparable to " + io.type.getName().replace('/', '.'));
             }
-        }
-        if ("compareTo".equals(name) && args.length == 1 && args[0] instanceof InterpObject) {
-            return Integer.valueOf(io.enumOrdinal - ((InterpObject) args[0]).enumOrdinal);
+            return Integer.valueOf(io.enumOrdinal - ((InterpObject) other).enumOrdinal);
         }
         return NOT_ENUM_METHOD;
     }
