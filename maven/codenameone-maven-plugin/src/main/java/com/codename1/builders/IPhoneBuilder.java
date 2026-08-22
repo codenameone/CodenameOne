@@ -4870,8 +4870,16 @@ public class IPhoneBuilder extends Executor {
                             // build cannot resolve is not judged at all.
                             Map<String, String> declaredSettings = appExtensionBuildSettings(appExtension);
                             String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
-                            String resolvedBundleId = resolveSettingsInValue(declaredId != null
-                                    ? declaredId : request.getPackageName() + "." + extensionName,
+                            // The identifier THIS archive gets: a qualified setting overrides the
+                            // plain one, so a stale base beside a right device value is not a
+                            // reason to refuse a build Xcode would have got right.
+                            String governingId = winningSetting(declaredSettings,
+                                    "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos", "Release");
+                            String resolvedBundleId = resolveSettingsInValue(
+                                    governingId != null && governingId.trim().length() > 0
+                                            ? governingId.trim()
+                                            : (declaredId != null ? declaredId
+                                                    : request.getPackageName() + "." + extensionName),
                                     extensionSettingsWithBuiltIns(appExtension, declaredSettings));
                             String outOfNamespace = resolvedBundleId.length() == 0 ? null
                                     : outOfNamespaceExtensionIdMessage(extensionName, resolvedBundleId,
@@ -4930,12 +4938,17 @@ public class IPhoneBuilder extends Executor {
                             // necessarily the one picked by name: buildSettings.properties may set
                             // CODE_SIGN_ENTITLEMENTS at another file, and it is that file's
                             // payment-pass-provisioning that decides whether iOS 14 is the floor.
-                            List<File> signingEntitlements = appExtensionEntitlementsCandidates(
-                                    appExtension, buildSettingsMap, extEntitlementsFile, "iphoneos",
-                                    request.getArg("ios.buildType", "debug").equals("debug")
-                                            ? "Debug" : "Release");
+                            // The configuration this build hands to xcodebuild is Release for a
+                            // device archive whatever ios.buildType says, so that is what a
+                            // [config=...] condition must be matched against.
+                            String archiveSdk = "iphoneos";
+                            String archiveConfiguration = "Release";
+                            File signingEntitlements = appExtensionSigningEntitlements(appExtension,
+                                    buildSettingsMap, extEntitlementsFile, archiveSdk,
+                                    archiveConfiguration);
                             String extDeploymentTarget = appExtensionDeploymentTarget(
-                                    buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
+                                    winningSetting(buildSettingsMap, "IPHONEOS_DEPLOYMENT_TARGET",
+                                            archiveSdk, archiveConfiguration),
                                     signingEntitlements,
                                     request.getArg("ios.deployment_target", null),
                                     appExtension, buildSettingsMap);
@@ -6695,6 +6708,16 @@ public class IPhoneBuilder extends Executor {
         return appExtensionEntitlementsCandidates(extensionFolder, settings, byName, null, null);
     }
 
+    /// The one entitlements file this archive is signed with.
+    static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
+            File byName, String sdk, String configuration) {
+        String winner = winningSetting(settings, "CODE_SIGN_ENTITLEMENTS", sdk, configuration);
+        if (winner == null || winner.trim().length() == 0) {
+            return byName;
+        }
+        return appExtensionSignedEntitlements(extensionFolder, winner, byName, settings);
+    }
+
     /// @param sdk the SDK this build archives against ("iphoneos" or "iphonesimulator"), and
     /// {@code configuration} its configuration ("Release" or "Debug"); a qualified setting whose
     /// condition names a different one is not part of THIS archive and does not decide its floor.
@@ -6789,6 +6812,47 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return notes;
+    }
+
+    /// The value of {@code name} that governs THIS archive.
+    ///
+    /// Xcode does not merge a qualified setting with the plain one, it OVERRIDES it: with both
+    /// CODE_SIGN_ENTITLEMENTS and CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] present, the device
+    /// archive is signed with the qualified file alone. Reading both and taking the stricter
+    /// answer raised an extension to iOS 14 for an entitlement in a file it is not signed with;
+    /// reading only the plain one missed the entitlement that is. The most specific applicable
+    /// condition wins, which is Xcode's own rule, and the plain setting is the least specific
+    /// thing there is.
+    ///
+    /// @return the winning value, or null when nothing applicable is declared
+    static String winningSetting(Map<String, String> settings, String name, String sdk,
+            String configuration) {
+        if (settings == null) {
+            return null;
+        }
+        String winner = null;
+        int winningSpecificity = -1;
+        for (Map.Entry<String, String> setting : settings.entrySet()) {
+            String key = setting.getKey();
+            boolean qualified = isQualified(key, name);
+            if (!qualified && !name.equals(key)) {
+                continue;
+            }
+            if (qualified && !conditionApplies(key, sdk, configuration)) {
+                continue;
+            }
+            int specificity = 0;
+            for (int i = 0; qualified && i < key.length(); i++) {
+                if (key.charAt(i) == '=') {
+                    specificity++;
+                }
+            }
+            if (specificity > winningSpecificity) {
+                winningSpecificity = specificity;
+                winner = setting.getValue();
+            }
+        }
+        return winner;
     }
 
     /// Whether a qualified setting's condition can apply to the build being made.

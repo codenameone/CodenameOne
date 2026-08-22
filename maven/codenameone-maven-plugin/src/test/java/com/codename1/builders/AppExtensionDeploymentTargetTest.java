@@ -452,4 +452,66 @@ public class AppExtensionDeploymentTargetTest {
         assertTrue(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]",
                 null, null));
     }
+
+    @Test
+    public void aQualifiedEntitlementsFileOverridesTheBaseRatherThanAddingToIt() throws Exception {
+        File extension = tmp.newFolder("dist16", "WalletUIExtension");
+        File base = new File(extension, "Base.entitlements");
+        write(base, "<plist><dict>\n<key>com.apple.developer.payment-pass-provisioning</key>\n"
+                + "<true/>\n</dict></plist>");
+        File device = new File(extension, "Device.entitlements");
+        write(device, "<plist><dict/></plist>");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("CODE_SIGN_ENTITLEMENTS", "WalletUIExtension/Base.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "WalletUIExtension/Device.entitlements");
+
+        File signing = IPhoneBuilder.appExtensionSigningEntitlements(extension, settings, null,
+                "iphoneos", "Release");
+
+        // Xcode signs the device archive with the qualified file ALONE. Reading both and taking
+        // the stricter answer raised the extension to iOS 14 for an entitlement it never carries.
+        assertEquals(device, signing);
+        assertEquals("12.0", IPhoneBuilder.appExtensionDeploymentFloor(signing));
+    }
+
+    @Test
+    public void theWinningEntitlementsFileStillRaisesTheFloorWhenItGrants() throws Exception {
+        File extension = tmp.newFolder("dist17", "WalletUIExtension");
+        File base = new File(extension, "Base.entitlements");
+        write(base, "<plist><dict/></plist>");
+        File device = new File(extension, "Device.entitlements");
+        write(device, "<plist><dict>\n<key>com.apple.developer.payment-pass-provisioning</key>\n"
+                + "<true/>\n</dict></plist>");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("CODE_SIGN_ENTITLEMENTS", "WalletUIExtension/Base.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "WalletUIExtension/Device.entitlements");
+
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentFloor(
+                IPhoneBuilder.appExtensionSigningEntitlements(extension, settings, null,
+                        "iphoneos", "Release")));
+    }
+
+    @Test
+    public void theMostSpecificApplicableConditionWins() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.old.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]", "com.example.app.Sim");
+
+        // The device archive uses the device value, so a stale base is not a reason to refuse it.
+        assertEquals("com.example.app.Ext", IPhoneBuilder.winningSetting(settings,
+                "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos", "Release"));
+        assertEquals("com.example.app.Sim", IPhoneBuilder.winningSetting(settings,
+                "PRODUCT_BUNDLE_IDENTIFIER", "iphonesimulator", "Release"));
+        assertNull(IPhoneBuilder.winningSetting(settings, "SOMETHING_ELSE", "iphoneos", "Release"));
+    }
+
+    @Test
+    public void withNoApplicableConditionThePlainSettingGoverns() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]", "com.example.app.Ext.debug");
+        assertEquals("com.example.app.Ext", IPhoneBuilder.winningSetting(settings,
+                "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos", "Release"));
+    }
 }
