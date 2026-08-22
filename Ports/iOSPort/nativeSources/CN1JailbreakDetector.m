@@ -189,39 +189,41 @@ static void cn1AddSignal(NSMutableArray *signals, NSString *code) {
  * bootstrap is conclusive regardless of what it is called.
  */
 static NSArray *cn1HookingImageNames(void) {
-    static NSArray *names = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        names = @[
-            @"/var/jb/",
-            @"substrate.dylib",          // also MobileSubstrate/CydiaSubstrate
-            @"substrateinserter.dylib",
-            @"substrateloader.dylib",
-            @"libsubstrate.dylib",
-            @"libsubstitute.dylib",      // Substitute, the Electra-era injector
-            @"libhooker.dylib",          // libhooker, the Chimera/Odyssey injector
-            @"libblackjack",             // libhooker's loader
-            @"ellekit",                  // the rootless injector palera1n ships
-            @"tweakinject",              // ElleKit's dylib list / loader
-            @"libertylite.dylib",
-            @"tsprotector",
-            @"fridagadget",
-            @"frida-agent",
-            @"libcycript",
-            @"cynject",
-            @"rocketbootstrap",
-            @"sslkillswitch",
-            @"shadow.dylib",             // the bypass tweak, not a system name
-            @"choicy",
-            @"libsandy",
-            @"flyjb",
-            @"preferenceloader"
-        ];
-    });
-    return names;
+    // Autoreleased and rebuilt per scan, deliberately. This file is compiled
+    // without ARC -- the app target sets CLANG_ENABLE_OBJC_ARC = NO -- so caching
+    // the literal in a dispatch_once static stores an object nobody retained, and
+    // iosJailbreakSignals() wraps its call in POOL_BEGIN/POOL_END. The first call
+    // would leave the static dangling and the foreground recheck would scan the
+    // loaded images through freed memory. The cost this avoids is one array per
+    // scan, not per image: the scan hoists it and passes it down.
+    return @[
+        @"/var/jb/",
+        @"substrate.dylib",          // also MobileSubstrate/CydiaSubstrate
+        @"substrateinserter.dylib",
+        @"substrateloader.dylib",
+        @"libsubstrate.dylib",
+        @"libsubstitute.dylib",      // Substitute, the Electra-era injector
+        @"libhooker.dylib",          // libhooker, the Chimera/Odyssey injector
+        @"libblackjack",             // libhooker's loader
+        @"ellekit",                  // the rootless injector palera1n ships
+        @"tweakinject",              // ElleKit's dylib list / loader
+        @"libertylite.dylib",
+        @"tsprotector",
+        @"fridagadget",
+        @"frida-agent",
+        @"libcycript",
+        @"cynject",
+        @"rocketbootstrap",
+        @"sslkillswitch",
+        @"shadow.dylib",             // the bypass tweak, not a system name
+        @"choicy",
+        @"libsandy",
+        @"flyjb",
+        @"preferenceloader"
+    ];
 }
 
-static BOOL cn1ImagePathIsHooking(const char *imagePath) {
+static BOOL cn1ImagePathIsHooking(const char *imagePath, NSArray *needles) {
     if (imagePath == NULL) {
         return NO;
     }
@@ -230,7 +232,7 @@ static BOOL cn1ImagePathIsHooking(const char *imagePath) {
         return NO;
     }
     NSString *lowered = [path lowercaseString];
-    for (NSString *needle in cn1HookingImageNames()) {
+    for (NSString *needle in needles) {
         if ([lowered containsString:needle]) {
             return YES;
         }
@@ -254,9 +256,10 @@ static BOOL cn1ImagePathIsHooking(const char *imagePath) {
  * other -- so a count check is a false positive waiting for the next iOS release.
  */
 static void cn1ScanLoadedImages(NSMutableArray *signals) {
+    NSArray *needles = cn1HookingImageNames();
     BOOL publicFound = NO;
     for (uint32_t i = 0; i < _dyld_image_count(); i++) {
-        if (cn1ImagePathIsHooking(_dyld_get_image_name(i))) {
+        if (cn1ImagePathIsHooking(_dyld_get_image_name(i), needles)) {
             publicFound = YES;
             break;
         }
@@ -273,7 +276,7 @@ static void cn1ScanLoadedImages(NSMutableArray *signals) {
         // normal transient state and not a signal.
         if (all != NULL && all->infoArray != NULL) {
             for (uint32_t i = 0; i < all->infoArrayCount; i++) {
-                if (cn1ImagePathIsHooking(all->infoArray[i].imageFilePath)) {
+                if (cn1ImagePathIsHooking(all->infoArray[i].imageFilePath, needles)) {
                     rawFound = YES;
                     break;
                 }
