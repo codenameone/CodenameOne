@@ -75,6 +75,7 @@ import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import com.codename1.annotations.buildhints.*;
 
 /// The Codename One game builder: a visual level / map editor for the
 /// `com.codename1.gaming` engine, adapted from the "GameForge" design.
@@ -82,6 +83,10 @@ import java.util.Set;
 /// Every control is wired; the live preview plays in-place (toggle, no navigation) so
 /// there is never a dead-end screen. Behavior and structure are covered by tests
 /// (EditorControllerTest, GameBuilderStructureHarness).
+@Android(themeMode = AndroidThemeMode.MODERN)
+@Build(nativeTheme = NativeThemeMode.MODERN)
+@Desktop(height = 800, titleBar = DesktopTitleBar.NATIVE, width = 1280)
+@Ios(themeMode = IosThemeMode.MODERN)
 public class GameBuilder extends Lifecycle {
 
     private EditorController controller;

@@ -116,7 +116,7 @@ The EDT/UI-thread rule is identical in spirit to Android: never touch a componen
 | `Retrofit` / `OkHttp` | Not in the JDK subset. | `Rest.get/post(...).fetchAsJsonMap(...)` — see `references/java-api-subset.md`. |
 | `Coroutines` / `RxJava` | No coroutines runtime; no RxJava in the subset. | `Display.startThread(...)` + `Display.callSerially(...)`; chain callbacks. |
 | `R.string.xxx`, `R.drawable.xxx` | No resources system. | `UIManager.getInstance().localize("name", "default")` for strings (reads `messages.properties` bundles); load images by file name `Image.createImage("/foo.png")`. |
-| `Permission` manifest entries | Different mechanism. | `Display.requestPermission(...)` at runtime + `codename1.arg.android.xPermissions` build hint (see `references/build-hints.md`). |
+| `Permission` manifest entries | Different mechanism. | `Display.requestPermission(...)` at runtime + `@Android(xpermissions = ...)` build hint annotation (see `references/build-hints.md`). |
 | `Activity onCreate/onResume/onPause` | No Activity lifecycle. | Override `Lifecycle.init/start/stop` (app-level) and react to `Form.show()` (per-screen). |
 | `AsyncTask` | Deprecated upstream too. | `Display.startThread(...)` + `callSerially(...)`. |
 | `BroadcastReceiver` | No analog at the CN1 level. | For lifecycle-related events (`Lifecycle.start()` etc.) use the CN1 lifecycle. For external system events use a native interface. |

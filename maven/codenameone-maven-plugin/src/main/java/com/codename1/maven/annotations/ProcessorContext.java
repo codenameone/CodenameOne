@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.maven.plugin.logging.Log;
 
@@ -45,6 +46,9 @@ import org.apache.maven.plugin.logging.Log;
 /// - A **stub source directory** in `target/generated-sources/cn1-annotations`
 ///   used by the GENERATE_SOURCES Mojo; the PROCESS_CLASSES path doesn't write
 ///   to it but the directory may exist either way.
+/// - The **project settings** exactly as `codenameone_settings.properties`
+///   holds them, plus the main class those settings name. A processor that
+///   validates against project configuration needs both.
 public final class ProcessorContext {
 
     private final File outputClassDir;
@@ -55,16 +59,47 @@ public final class ProcessorContext {
     private final Map<String, byte[]> emittedClasses = new LinkedHashMap<String, byte[]>();
     private final Map<String, String> emittedStubSources = new LinkedHashMap<String, String>();
     private final Map<String, byte[]> emittedResources = new LinkedHashMap<String, byte[]>();
+    private final File projectDir;
+    private final Properties projectSettings;
+    private final String mainClassBinaryName;
 
     public ProcessorContext(File outputClassDir, File stubSourceDir,
                              Map<String, AnnotatedClass> classIndex, Log log) {
+        this(outputClassDir, stubSourceDir, classIndex, log, null, null, null);
+    }
+
+    /// Full form, adding the project configuration.
+    ///
+    /// `projectSettings` must be the **raw** contents of
+    /// `codenameone_settings.properties`, without any `-D` overlay: a hint given
+    /// on the command line is the documented way to override one for a single
+    /// build, so it must never be mistaken for something the project declares.
+    public ProcessorContext(File outputClassDir, File stubSourceDir,
+                             Map<String, AnnotatedClass> classIndex, Log log,
+                             File projectDir, Properties projectSettings,
+                             String mainClassBinaryName) {
         this.outputClassDir = outputClassDir;
         this.stubSourceDir = stubSourceDir;
         this.classIndex = classIndex == null
                 ? Collections.<String, AnnotatedClass>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, AnnotatedClass>(classIndex));
         this.log = log;
+        this.projectDir = projectDir;
+        this.projectSettings = projectSettings;
+        this.mainClassBinaryName = mainClassBinaryName;
     }
+
+    /// The Codename One project directory -- the one holding
+    /// `codenameone_settings.properties` -- or null when it could not be found.
+    public File getProjectDir() { return projectDir; }
+
+    /// The raw `codenameone_settings.properties`, or null when absent. Never
+    /// carries a `-D` overlay; see the constructor.
+    public Properties getProjectSettings() { return projectSettings; }
+
+    /// Fully qualified name of the class named by `codename1.mainName`, or null
+    /// when the project does not declare one (a cn1lib, for instance).
+    public String getMainClassBinaryName() { return mainClassBinaryName; }
 
     /// `target/classes` for the project, or the equivalent output directory.
     public File getOutputClassDir() { return outputClassDir; }

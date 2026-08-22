@@ -1481,6 +1481,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         try (FileInputStream fis = new FileInputStream(codenameOneSettingsCopy)) {
             cn1SettingsProps.load(fis);
         }
+        // Build hints declared as annotations on the main class. Merged here, before
+        // everything that consumes the effective configuration: the command-line
+        // overlay below (so -D still wins), the CN1Lib appended/required merges (so a
+        // library appends onto an annotation-supplied value exactly as it would onto a
+        // file-supplied one), the gradle sanity check, both preflights, and the copy
+        // that is written back out and uploaded.
+        mergeAnnotationBuildHints(cn1SettingsProps, cpElements);
         // The build request is assembled from this copy, not from the mojo's
         // own properties, so the command-line overlay has to be applied here
         // too -- otherwise a hint passed with -D is read by the mojo and still
@@ -2520,5 +2527,105 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         return merged;
 
+    }
+
+    /**
+     * Name of the resource {@code BuildHintAnnotationProcessor} emits into
+     * {@code target/classes} at PROCESS_CLASSES.
+     */
+    private static final String ANNOTATION_HINTS_RESOURCE =
+            "META-INF/codenameone/build-hints.properties";
+
+    /**
+     * Overlays the build hints that came from annotations onto the settings the
+     * build request is assembled from.
+     *
+     * <p>Read from the compile classpath rather than from the staged fat jar.
+     * {@code mergeJars} builds that jar with Ant's {@code Zip} in update mode,
+     * which adds and overwrites entries but never removes one, and the jar is
+     * reused when it is not stale &mdash; so a project that had its annotations
+     * deleted would keep shipping yesterday's hints. The classpath directory is
+     * written by the annotation processor on every build and deleted by it when
+     * the last annotation goes away, so it always reflects the current source.</p>
+     */
+    private void mergeAnnotationBuildHints(Properties target, List<String> classpathElements) {
+        if (target == null || classpathElements == null) {
+            return;
+        }
+        String expectedMain = null;
+        if (properties != null) {
+            String main = properties.getProperty("codename1.mainName");
+            String pkg = properties.getProperty("codename1.packageName");
+            if (main != null && main.trim().length() > 0) {
+                expectedMain = (pkg == null || pkg.trim().length() == 0)
+                        ? main.trim() : pkg.trim() + "." + main.trim();
+            }
+        }
+        for (String element : classpathElements) {
+            Properties found = readAnnotationHints(new File(element));
+            if (found == null) {
+                continue;
+            }
+            String stamped = found.getProperty("cn1.buildHints.mainClass");
+            if (expectedMain != null && stamped != null && !expectedMain.equals(stamped)) {
+                // A cn1lib that bound the goal itself, or a stale artifact. Merging it
+                // would apply another project's build configuration to this one.
+                getLog().debug("cn1: ignoring build hints from " + element
+                        + " -- they were generated for " + stamped);
+                continue;
+            }
+            int applied = 0;
+            for (String key : found.stringPropertyNames()) {
+                if (!key.startsWith("codename1.arg.")) {
+                    continue;
+                }
+                target.setProperty(key, found.getProperty(key));
+                applied++;
+            }
+            if (applied > 0) {
+                getLog().info("cn1: applied " + applied + " build hint(s) from annotations");
+                return;
+            }
+        }
+    }
+
+    /**
+     * Reads the emitted hints out of a classpath element, which is either the
+     * module's output directory or a jar.
+     *
+     * @return the properties, or null when this element carries none
+     */
+    private Properties readAnnotationHints(File element) {
+        if (element == null || !element.exists()) {
+            return null;
+        }
+        try {
+            if (element.isDirectory()) {
+                File f = new File(element, ANNOTATION_HINTS_RESOURCE);
+                if (!f.isFile()) {
+                    return null;
+                }
+                try (FileInputStream in = new FileInputStream(f)) {
+                    Properties p = new Properties();
+                    p.load(in);
+                    return p;
+                }
+            }
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
+                java.util.zip.ZipEntry entry = zip.getEntry(ANNOTATION_HINTS_RESOURCE);
+                if (entry == null) {
+                    return null;
+                }
+                try (InputStream in = zip.getInputStream(entry)) {
+                    Properties p = new Properties();
+                    p.load(in);
+                    return p;
+                }
+            }
+        } catch (IOException ex) {
+            getLog().warn("cn1: could not read build hints from " + element + ": "
+                    + ex.getMessage());
+            return null;
+        }
     }
 }

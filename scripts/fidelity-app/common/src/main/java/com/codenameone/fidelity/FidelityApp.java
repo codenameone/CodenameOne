@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- *
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation. Codename One designates this
+ * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
- * by Codename One in the LICENSE file that accompanied this code.
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -23,6 +23,7 @@
 package com.codenameone.fidelity;
 
 import com.codename1.system.Lifecycle;
+import com.codename1.annotations.buildhints.*;
 
 /**
  * Entry point for the native-theme fidelity test app. It is not an interactive
@@ -31,6 +32,8 @@ import com.codename1.system.Lifecycle;
  * screenshots to the host over the CN1SS WebSocket, then prints
  * CN1SS:SUITE:FINISHED and exits.
  */
+@Android(gradleDep = {"implementation 'com.google.android.material:material:1.12.0'"}, useAndroidX = true)
+@Ios(newStorageLocation = true, uiscene = true)
 public class FidelityApp extends Lifecycle {
     @Override
     public void runApp() {

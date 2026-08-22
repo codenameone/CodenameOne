@@ -21,7 +21,7 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 `SKILL.md` (this file) is the top-level cheat sheet. Deeper reference material lives under `references/` — pull the relevant file in **only when you need it**:
 
 - `references/build-and-run.md` — Local vs cloud builds, JDK matrix, Maven goals, `codenameone_settings.properties`, running the simulator, building for iOS/Android/Web, automated (Enterprise) cloud builds in CI.
-- `references/build-hints.md` — Curated index of `codename1.arg.*` build hints (iOS, Android, push, web).
+- `references/build-hints.md` — Build hints: the typed `@Ios` / `@Android` / `@Desktop` annotations that the compiler checks, and the `codename1.arg.*` properties form for everything they do not cover yet.
 - `references/java-api-subset.md` — How to inspect the supported Java API subset, IO (`Storage`, `FileSystemStorage`), networking (`ConnectionRequest`, `Rest`), OAuth/OpenID Connect (`OidcClient`), WebSockets (cn1lib), concurrency, dates, SQLite. **Read this whenever the compliance check fails or when you reach for a `java.*` API.**
 - `references/api-clients.md` — The three "spec to typed client" code generators that share one architecture: REST/OpenAPI (`cn1:generate-openapi` + `@RestClient`), gRPC (`cn1:generate-grpc` + `@GrpcClient`), and GraphQL (`cn1:generate-graphql` + `@GraphQLClient`). Read this when the backend has an OpenAPI spec, a `.proto`, or a GraphQL schema and you want a generated, annotated client instead of hand-rolling calls.
 - `references/ui-components.md` — Form, Toolbar, Container layouts (Border/Box/Flow/Grid/Layered), common components, navigation, dialogs.

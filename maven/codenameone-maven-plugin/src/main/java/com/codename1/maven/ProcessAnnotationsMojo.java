@@ -35,13 +35,16 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -103,7 +106,7 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         }
 
         ProcessorContext ctx = new ProcessorContext(outputDirectory, stubSourceDirectory,
-                index, getLog());
+                index, getLog(), getCN1ProjectDir(), rawProjectSettings(), mainClassBinaryName());
 
         // start()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
@@ -237,5 +240,56 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         List<AnnotationProcessor> out = new ArrayList<AnnotationProcessor>();
         for (AnnotationProcessor p : sl) out.add(p);
         return Collections.unmodifiableList(out);
+    }
+
+    /// Loads `codenameone_settings.properties` exactly as it sits on disk.
+    ///
+    /// Deliberately not the inherited `properties` field: that one has the
+    /// `-D` command line overlaid on top of it, and a hint passed with `-D` is
+    /// the documented way to override one for a single build. A processor that
+    /// compared annotations against the overlaid view would report a conflict
+    /// for the one case that is supposed to win.
+    private Properties rawProjectSettings() {
+        File f = getProjectPropertiesFile();
+        if (f == null || !f.exists()) {
+            return null;
+        }
+        Properties p = new Properties();
+        InputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            p.load(in);
+        } catch (IOException ex) {
+            getLog().warn("cn1: could not read " + f + ": " + ex.getMessage());
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // nothing useful to do on close failure of a read-only stream
+                }
+            }
+        }
+        return p;
+    }
+
+    /// `codename1.packageName` + `codename1.mainName`, or null when the project
+    /// declares no main class.
+    private String mainClassBinaryName() {
+        Properties p = rawProjectSettings();
+        if (p == null) {
+            return null;
+        }
+        String main = p.getProperty("codename1.mainName");
+        String pkg = p.getProperty("codename1.packageName");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        main = main.trim();
+        if (pkg == null || pkg.trim().length() == 0) {
+            return main;
+        }
+        return pkg.trim() + "." + main;
     }
 }
