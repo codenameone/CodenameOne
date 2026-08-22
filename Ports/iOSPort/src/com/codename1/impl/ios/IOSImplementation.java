@@ -1888,6 +1888,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().windowCloseRequested(windowId);
     }
 
+    /// Invoked when the platform refuses to give a window a scene, so it will never
+    /// appear. Reported separately from a minimize because a modal window that never
+    /// appeared has to release its blocker.
+    public static void windowActivationFailedCallback(int windowId) {
+        Display.getInstance().windowActivationFailed(windowId);
+    }
+
     /// Invoked once the platform has destroyed a window's scene. Catalyst hands the
     /// disconnect over after the fact, so there is nothing left to veto.
     public static void windowClosedNativelyCallback(int windowId) {

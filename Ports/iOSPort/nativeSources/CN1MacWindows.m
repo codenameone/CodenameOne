@@ -40,6 +40,7 @@ extern void CN1MacWindowDeliverClosed(int windowId);
 extern void CN1MacWindowDeliverMonitorsChanged(void);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
+extern void CN1MacWindowDeliverActivationFailed(int windowId);
 extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
@@ -668,10 +669,12 @@ static BOOL isPendingSlotLocked(int slot) {
  * for a scene that has already been consumed. Dropping the slot keeps the queue
  * aligned with the requests still outstanding.
  *
- * The framework is told the window is not up, so it stops painting a window with no
- * scene behind it. Reported as not-visible rather than closed on purpose: the window
- * is still registered and a later show() can ask for a scene again, where a close
- * would dispose it and lose the application's window object.
+ * The framework is told the activation failed, which is not the same as reporting a
+ * minimize: the minimize path keeps a modal window's registration on purpose, so a
+ * modal that never appeared would go on blocking input to every other window while
+ * showModal() waited for it. It is not a close either -- the window stays registered
+ * so a later show() can ask for a scene again, where a close would dispose the
+ * application's window object.
  */
 static void CN1MacWindowActivationFailed(int slot, int generation) {
     int windowId;
@@ -693,7 +696,7 @@ static void CN1MacWindowActivationFailed(int slot, int generation) {
      * told is down. */
     w->pendingVisible = 0;
     pthread_mutex_unlock(&g_slotLock);
-    CN1MacWindowDeliverVisibility(windowId, NO);
+    CN1MacWindowDeliverActivationFailed(windowId);
 }
 
 /*

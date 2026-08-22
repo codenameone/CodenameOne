@@ -292,6 +292,34 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aFailedActivationReleasesTheWindowsModality() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("never appears");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertTrue(peer.isModal(), "it starts this blocking");
+
+        Display.getInstance().windowActivationFailed(w.getWindowId());
+        DisplayTest.flushEdt();
+
+        // Not the minimize path: that keeps the modal registration on purpose, because
+        // a minimized window is still open. A window that never appeared would then
+        // block input everywhere while showModal() waited for a window nobody can see.
+        assertFalse(peer.isModal(),
+                "a window the platform could not create must stop blocking the others");
+        assertFalse(w.isWindowShowing(),
+                "and must not be reported as showing");
+        assertFalse(w.isWindowDisposed(),
+                "but it stays registered, so a later show() can ask the platform again");
+
+        // Disposed here rather than left behind: a window that outlives its test stays
+        // in the desktop registry, and the next test to paint reaches it without a
+        // window manager configured.
+        w.dispose();
+    }
+
+    @FormTest
     void closeListenersFireOnceForOneClose() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("closes");

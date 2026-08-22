@@ -3058,6 +3058,23 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `windowId`: the id the port was given when the window was created
+    /// Notifies Codename One that the platform refused to create a window's native
+    /// surface, so the window will never appear.
+    ///
+    /// Separate from `#windowHideNotify(int)` because that one means "minimized",
+    /// which keeps a modal window's registration: a modal that never appeared would
+    /// otherwise block input to every other window while `showModal()` waited for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window whose native surface could not be created
+    public void windowActivationFailed(int windowId) {
+        if (windowId > 0) {
+            // Not droppable, for the same reason as the other lifecycle notifications.
+            callSerially(new WindowCallback(windowId, WindowCallback.ACTIVATION_FAILED));
+        }
+    }
+
     public void windowHideNotify(int windowId) {
         if (windowId > 0) {
             // See windowShowNotify: not droppable.
@@ -3538,6 +3555,7 @@ public final class Display extends CN1Constants {
         private static final int CLOSED_NATIVELY = 6;
         private static final int SHOWN = 7;
         private static final int HIDDEN = 8;
+        private static final int ACTIVATION_FAILED = 9;
 
         private final int windowId;
         private final int kind;
@@ -3618,6 +3636,11 @@ public final class Display extends CN1Constants {
                 case HIDDEN:
                     if (w != null) {
                         w.hideNotify();
+                    }
+                    break;
+                case ACTIVATION_FAILED:
+                    if (w != null) {
+                        w.activationFailed();
                     }
                     break;
                 case CLOSED_NATIVELY:

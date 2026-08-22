@@ -1390,6 +1390,30 @@ public class Window extends Container implements TopLevelContainer {
         }
     }
 
+    /// The platform refused to create this window's native surface, so it will never
+    /// appear.
+    ///
+    /// Deliberately not routed through `#hideNotify()`, which is the minimize path:
+    /// that keeps the modal registration on purpose, because a minimized window is
+    /// still open. A modal window that never appeared would then go on blocking input
+    /// to every other window while `#showModal()` waited for a window nobody can see.
+    /// This releases modality the way an explicit `#hide()` does.
+    ///
+    /// The window stays registered rather than being disposed, so the application's
+    /// object survives and a later `#show()` can ask the platform again.
+    void activationFailed() {
+        if (!nativeVisible && !iconified) {
+            return;
+        }
+        nativeVisible = false;
+        iconified = false;
+        cancelPendingInput();
+        releaseModal();
+        setVisible(false);
+        Display.impl.clearPaintSurface(paintSurface);
+        fireWindowEvent(WindowEvent.Type.Hidden);
+    }
+
     /// Brings any owner above this window back before this one goes on screen.
     ///
     /// An owned window cannot be on screen without its owner, and an owner the
