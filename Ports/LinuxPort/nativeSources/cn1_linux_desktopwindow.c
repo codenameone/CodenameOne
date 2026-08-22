@@ -110,8 +110,12 @@ CN1Graphics* cn1LinuxDesktopGraphics(int slot) {
         /* Re-checked under the lock: GTK can report another resize between the
          * test above and here. */
         if (w->pendingResize) {
-            cn1DesktopResizeBuffer(w, w->pendingW, w->pendingH);
+            /* Claimed before the buffer work, not cleared after it, so a configure
+             * that arrives meanwhile re-arms rather than being erased. */
+            int width = w->pendingW;
+            int height = w->pendingH;
             w->pendingResize = 0;
+            cn1DesktopResizeBuffer(w, width, height);
         }
         pthread_mutex_unlock(&w->bufferLock);
     }
@@ -211,10 +215,19 @@ static gboolean cn1DesktopOnConfigure(GtkWidget* widget, GdkEventConfigure* e, g
         w->height = e->height;
         /* Recorded, not applied: this runs on the GTK thread and the event
          * dispatch thread may be part way through a frame on the current buffer.
-         * cn1LinuxDesktopGraphics applies it between frames. */
+         * cn1LinuxDesktopGraphics applies it between frames.
+         *
+         * Under bufferLock, which is the lock the consumer already re-checks the
+         * flag under. Written unlocked, a configure arriving while the consumer was
+         * inside cn1DesktopResizeBuffer had its request cleared on the way out: the
+         * framework still got the SIZE_CHANGED below and laid the window out at the
+         * new size, while the cairo surface stayed at the old one -- clipped or
+         * blank until the next resize. */
+        pthread_mutex_lock(&w->bufferLock);
         w->pendingW = w->width;
         w->pendingH = w->height;
         w->pendingResize = 1;
+        pthread_mutex_unlock(&w->bufferLock);
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_SIZE_CHANGED, w->width, w->height, 0);
     }
     /* Position and monitor are handled by cn1DesktopOnWindowConfigure, on the top

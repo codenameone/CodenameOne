@@ -667,10 +667,16 @@ extern "C" void cn1WinDesktopApplyPendingResize(int slot) {
     CN1DesktopWindow* w = slotAt(slot);
     if (w != NULL && w->pendingResize && w->target != NULL) {
         D2D1_SIZE_U size;
+        /* Claimed before the dimensions are read and before the Direct2D call, not
+         * cleared afterwards. WM_SIZE runs on the window thread and can arm a newer
+         * request while ID2D1HwndRenderTarget_Resize is still running; clearing at
+         * the end discarded it. The framework still received the matching
+         * SIZE_CHANGED, so layout advanced to the new size while the render target
+         * stayed at the old one -- clipped or black until something resized again. */
+        w->pendingResize = 0;
         size.width = (UINT32) (w->pendingW > 0 ? w->pendingW : 1);
         size.height = (UINT32) (w->pendingH > 0 ? w->pendingH : 1);
         ID2D1HwndRenderTarget_Resize(w->target, &size);
-        w->pendingResize = 0;
     }
 }
 

@@ -303,14 +303,26 @@ public class MacWindowManager extends WindowManager {
     @Override
     public Object capture(Object p) {
         // The window's content already lives in a mutable image -- that is how it is
-        // rendered on this platform -- so a capture is simply that raster. The live
-        // image is returned rather than a copy, so a caller that wants a stable frame
-        // should capture between paints, which is what the screenshot harness does.
+        // rendered on this platform -- but that raster is the live one the next frame
+        // paints into, so it cannot be handed out directly. Returning it made a
+        // retained capture change under the caller as the window repainted, and let
+        // anyone who asked it for a Graphics paint straight into what the window
+        // presents. Every other port returns an independent readback and
+        // Window.capture() is documented as the contents at the moment it is called.
         Peer w = peer(p);
-        if (w == null) {
+        if (w == null || w.mutableImage == null) {
             return null;
         }
-        return w.mutableImage;
+        int width = w.rasterWidth;
+        int height = w.rasterHeight;
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        // Read the pixels out and build a separate image from them. Immutable on
+        // purpose: a snapshot has no writable graphics, so the previous failure mode
+        // cannot come back through the copy either.
+        Image live = Image.createImage(w.mutableImage);
+        return Image.createImage(live.getRGB(), width, height).getImage();
     }
 
     // ---- monitors ----------------------------------------------------------------------
