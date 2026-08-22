@@ -413,20 +413,24 @@ public class CN1WearableListenerService extends WearableListenerService {
      * @param method {@code receive}, {@code receiveFile} or {@code remove}
      * @param path the reserved application path
      * @param payload the payload, or null for {@code remove}
+     * @return true when the mirror took it; false when there is no mirror or it threw. A caller
+     *         that acknowledges delivery has to know the difference, because an acknowledgement
+     *         is durable and stops the sender retrying
      */
-    private void surfaceMirror(String method, String path, byte[] payload) {
+    private boolean surfaceMirror(String method, String path, byte[] payload) {
         Class<?> mirror = mirrorClass();
         if (mirror == null) {
-            return;
+            return false;
         }
         try {
             if (payload == null && "remove".equals(method)) {
                 mirror.getMethod(method, android.content.Context.class, String.class)
                         .invoke(null, this, path);
-                return;
+                return true;
             }
             mirror.getMethod(method, android.content.Context.class, String.class, byte[].class)
                     .invoke(null, this, path, payload);
+            return true;
         } catch (Throwable t) {
             // Caught rather than propagated: a listener that throws takes the Data Layer
             // callback down with it, and mirror traffic is a refresh rather than something the
@@ -434,6 +438,7 @@ public class CN1WearableListenerService extends WearableListenerService {
             // failures the mirror reports itself.
             android.util.Log.w("CN1Surfaces",
                     "Could not hand " + path + " to the surface mirror", t);
+            return false;
         }
     }
 
@@ -615,8 +620,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                     if (surfaceMirrorHandles(transfer.logicalPath)) {
                         // Mirrored complication artwork. Stored beside the descriptor that names
                         // it, without waking the app: see the data-item branch above.
-                        surfaceMirror("receiveFile", transfer.logicalPath, transfer.payload);
-                        CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq, true);
+                        // Confirmed only if it was actually stored. The helper catches whatever
+                        // the mirror throws -- a directory that is momentarily unwritable, say --
+                        // and a claim made anyway is durable: the sender stops retrying and the
+                        // artwork is gone for good. An unconfirmed transfer is redelivered, which
+                        // is the whole point of the acknowledgement.
+                        CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq,
+                                surfaceMirror("receiveFile", transfer.logicalPath,
+                                        transfer.payload));
                         continue;
                     }
                     if (!started) {

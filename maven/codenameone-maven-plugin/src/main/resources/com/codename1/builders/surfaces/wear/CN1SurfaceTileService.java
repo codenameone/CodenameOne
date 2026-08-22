@@ -162,6 +162,12 @@ public abstract class CN1SurfaceTileService extends TileService {
                 version = resourcesVersion(reading);
                 // Kept for the resources request that follows, which asks about THIS version.
                 remember(version, reading);
+                // Exhausted, and the app asked to be woken when that happened. A widget makes the
+                // same throttled request; a Tile that skipped it froze on its final entry until
+                // something else published. RELOAD_NEVER means what it says and is left alone.
+                if (reading.getNextFlipDate() <= 0 && reading.isReloadAtEnd()) {
+                    CN1WidgetProvider.requestAppRefresh(this, getKindId());
+                }
             }
         } catch (Throwable t) {
             // A Tile that throws is removed from the carousel, so a malformed descriptor must

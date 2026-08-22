@@ -15380,8 +15380,29 @@ BOOL cn1HandleSurfaceURL(NSURL *url) {
 }
 
 #if TARGET_OS_WATCH
+/// A lock object for the pending-URL slot, which the SwiftUI scene and the VM bootstrap thread
+/// both touch.
+@interface CN1WatchSurfaceURLLock : NSObject
+@end
+@implementation CN1WatchSurfaceURLLock
+@end
+
 // Called from the generated CN1WatchApp.swift scene's onOpenURL. A complication tap launches the
 // watch app with the URL rather than delivering it to a delegate, so this is the whole path.
+
+// The tap that arrived before the VM did.
+//
+// A complication tap on a terminated watch app launches it WITH the URL, and SwiftUI delivers
+// onOpenURL as soon as the scene exists -- which is before cn1_watch_runtime_start has finished
+// bringing the VM up, because it starts it on a pthread and returns. Handling the URL then reaches
+// into a half-built runtime to make Java strings and call into Java. So it waits: one pending URL,
+// handed over by cn1_watch_runtime_markJavaReady, which is the same readiness the lifecycle phases
+// queue behind.
+//
+// One slot and not a queue. A launch carries one URL, and if a second somehow arrived first the
+// newest is the one the user just tapped.
+static NSString *cn1WatchPendingSurfaceURL = nil;
+
 void cn1_watch_surface_url(const char *url) {
     if (url == NULL) {
         return;
@@ -15389,9 +15410,34 @@ void cn1_watch_surface_url(const char *url) {
     POOL_BEGIN();
     NSString *str = [NSString stringWithUTF8String:url];
     if (str != nil) {
-        cn1HandleSurfaceURL([NSURL URLWithString:str]);
+        extern int cn1_watch_runtime_isJavaReady(void);
+        if (cn1_watch_runtime_isJavaReady()) {
+            cn1HandleSurfaceURL([NSURL URLWithString:str]);
+        } else {
+            @synchronized ([CN1WatchSurfaceURLLock class]) {
+                [cn1WatchPendingSurfaceURL release];
+                cn1WatchPendingSurfaceURL = [str retain];
+            }
+        }
     }
     POOL_END();
+}
+
+/// Hands over a tap that arrived before the runtime was ready. Called from
+/// cn1_watch_runtime_markJavaReady, and defined whatever this build carries so that call needs no
+/// guard of its own.
+void cn1_watch_surface_drainPending(void) {
+    NSString *pending = nil;
+    @synchronized ([CN1WatchSurfaceURLLock class]) {
+        pending = cn1WatchPendingSurfaceURL;
+        cn1WatchPendingSurfaceURL = nil;
+    }
+    if (pending != nil) {
+        POOL_BEGIN();
+        cn1HandleSurfaceURL([NSURL URLWithString:pending]);
+        POOL_END();
+        [pending release];
+    }
 }
 #endif
 

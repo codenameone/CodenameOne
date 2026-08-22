@@ -129,6 +129,12 @@ public class WearGlueCompilesTest {
                         + "    static int resolveColor(JSONObject c, boolean d, int fl, int fd) "
                         + "{ return 0; }\n"
                         + "}\n").getBytes("UTF-8"));
+        Files.write(shims.resolve("CN1WidgetProvider.java"),
+                ("package com.codename1.impl.android.surfaces;\n"
+                        + "import android.content.Context;\n"
+                        + "public class CN1WidgetProvider {\n"
+                        + "    static void requestAppRefresh(Context c, String k) { }\n"
+                        + "}\n").getBytes("UTF-8"));
         Files.write(shims.resolve("CN1SurfaceActionActivity.java"),
                 ("package com.codename1.impl.android.surfaces;\n"
                         + "public class CN1SurfaceActionActivity {\n"

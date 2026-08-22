@@ -69,16 +69,36 @@ public final class CN1WatchSurface {
         private final long nextFlipDate;
 
         private final long start;
+        private final boolean reloadAtEnd;
 
         Reading(JSONObject layout, JSONObject state, long nextFlipDate) {
             this(layout, state, nextFlipDate, 0L);
         }
 
         Reading(JSONObject layout, JSONObject state, long nextFlipDate, long start) {
+            this(layout, state, nextFlipDate, start, true);
+        }
+
+        Reading(JSONObject layout, JSONObject state, long nextFlipDate, long start,
+                boolean reloadAtEnd) {
             this.layout = layout;
             this.state = state;
             this.nextFlipDate = nextFlipDate;
             this.start = start;
+            this.reloadAtEnd = reloadAtEnd;
+        }
+
+        /**
+         * Whether the app asked to be woken when the timeline runs out.
+         *
+         * <p>{@code WidgetTimeline.RELOAD_AT_END} is the default and means the last entry stays on
+         * screen while the app is asked -- throttled -- to publish fresh content. A widget already
+         * honours it; a Tile that ignored it froze on its final entry for ever.</p>
+         *
+         * @return true for the default at-end policy, false for {@code RELOAD_NEVER}
+         */
+        public boolean isReloadAtEnd() {
+            return reloadAtEnd;
         }
 
         /**
@@ -138,7 +158,8 @@ public final class CN1WatchSurface {
             JSONObject entry = pickActiveEntry(entries, now);
             JSONObject state = entry == null ? new JSONObject() : entry.optJSONObject("state");
             return new Reading(layout, state == null ? new JSONObject() : state,
-                    nextFlipDate(entries, now));
+                    nextFlipDate(entries, now), 0L,
+                    !"never".equals(doc.optString("reload", "atEnd")));
         } catch (Throwable t) {
             // A malformed descriptor must leave the face showing whatever it had, not crash the
             // data source -- which on Wear takes the whole watch face down with it.
@@ -179,7 +200,8 @@ public final class CN1WatchSurface {
             if (active != null) {
                 JSONObject state = active.optJSONObject("state");
                 out.add(new Reading(layout, state == null ? new JSONObject() : state,
-                        nextFlipDate(entries, now), 0L));
+                        nextFlipDate(entries, now), 0L,
+                        !"never".equals(doc.optString("reload", "atEnd"))));
             }
             for (int i = 0; entries != null && i < entries.length(); i++) {
                 JSONObject e = entries.optJSONObject(i);
@@ -193,7 +215,8 @@ public final class CN1WatchSurface {
                 }
                 JSONObject state = e.optJSONObject("state");
                 out.add(new Reading(layout, state == null ? new JSONObject() : state,
-                        nextFlipDate(entries, date), date));
+                        nextFlipDate(entries, date), date,
+                        !"never".equals(doc.optString("reload", "atEnd"))));
             }
         } catch (Throwable t) {
             // Same contract as read(): a malformed descriptor leaves the face showing whatever it
