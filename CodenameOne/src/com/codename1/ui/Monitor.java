@@ -135,6 +135,13 @@ public final class Monitor {
     }
 
     /// {@inheritDoc}
+    ///
+    /// Every property counts, not just the index and the bounds. A monitor can be
+    /// reconfigured without either changing -- display scaling adjusted, a taskbar
+    /// switched to auto-hide, a monitor promoted to primary -- and `Desktop` reports
+    /// that and hands out fresh snapshots. Comparing only index and bounds made the
+    /// new snapshot equal to the old one, so anything that caches `getMonitors()` and
+    /// uses equality to spot what changed kept the stale scale or work area.
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -144,13 +151,29 @@ public final class Monitor {
             return false;
         }
         Monitor o = (Monitor) other;
-        return index == o.index && bounds.equals(o.bounds);
+        return index == o.index
+                && density == o.density
+                && dotsPerInch == o.dotsPerInch
+                && primary == o.primary
+                && Double.compare(scale, o.scale) == 0
+                && bounds.equals(o.bounds)
+                && workArea.equals(o.workArea)
+                && (name == null ? o.name == null : name.equals(o.name));
     }
 
     /// {@inheritDoc}
     @Override
     public int hashCode() {
-        return index * 31 + bounds.hashCode();
+        int result = index;
+        result = result * 31 + bounds.hashCode();
+        result = result * 31 + workArea.hashCode();
+        result = result * 31 + density;
+        result = result * 31 + dotsPerInch;
+        result = result * 31 + (name == null ? 0 : name.hashCode());
+        result = result * 31 + (primary ? 1 : 0);
+        long scaleBits = Double.doubleToLongBits(scale);
+        result = result * 31 + (int) (scaleBits ^ (scaleBits >>> 32));
+        return result;
     }
 
     /// {@inheritDoc}

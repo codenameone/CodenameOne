@@ -400,6 +400,29 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void monitorsDifferingOnlyInScaleAreNotEqual() {
+        Rectangle bounds = new Rectangle(0, 0, 1920, 1080);
+        Rectangle work = new Rectangle(0, 0, 1920, 1040);
+        Monitor at1x = new Monitor(0, bounds, work, 160, 1.0, 96, "primary", true);
+        Monitor at2x = new Monitor(0, bounds, work, 320, 2.0, 192, "primary", true);
+
+        // Neither the index nor the bounds move when a display is rescaled, which is
+        // exactly what Desktop reports as a reconfiguration. Comparing only those two
+        // made the new snapshot equal to the old one, so anything caching
+        // getMonitors() and diffing by equality kept the stale scale.
+        assertNotEquals(at1x, at2x, "a rescaled monitor is not the same snapshot");
+        assertNotEquals(at1x.hashCode(), at2x.hashCode(),
+                "and its hash has to move with it");
+
+        // A taskbar switching to auto-hide changes only the work area.
+        Monitor fullWork = new Monitor(0, bounds, bounds, 160, 1.0, 96, "primary", true);
+        assertNotEquals(at1x, fullWork, "a changed work area is a changed snapshot");
+
+        // Same values means same snapshot, so equality stays useful.
+        assertEquals(at1x, new Monitor(0, bounds, work, 160, 1.0, 96, "primary", true));
+    }
+
+    @FormTest
     void aPickerInAWindowUsesItsLightweightPopup() {
         implementation.setMultiWindowSupported(true);
         // A platform that does have a native picker: without the window check the
