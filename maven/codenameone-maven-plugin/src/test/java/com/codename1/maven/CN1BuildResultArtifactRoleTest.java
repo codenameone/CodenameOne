@@ -50,4 +50,36 @@ class CN1BuildResultArtifactRoleTest {
         assertEquals("", CN1BuildMojo.roleSuffixOf(""));
         assertEquals("", CN1BuildMojo.roleSuffixOf(null));
     }
+
+    /// A role suffix is a claim about a set. An app named "fitness-wear" returns one APK whose
+    /// base ends in "-wear" and it IS the primary artifact -- reading the name alone copied it to
+    /// <finalName>-wear.apk under a classifier and left the artifact the build was for missing.
+    @Test
+    void aLoneArtifactIsPrimaryWhateverItIsCalled() {
+        java.util.Set<String> none = new java.util.HashSet<String>();
+
+        assertEquals("", CN1BuildMojo.roleSuffixFor("fitness-wear", ".apk", none));
+        assertEquals("", CN1BuildMojo.roleSuffixFor("fitness-wear-debug", ".apk", none));
+    }
+
+    /// ...and when the phone artifact did come back, the suffixed one is the companion.
+    @Test
+    void aSuffixedArtifactBesideAPrimaryOneIsTheCompanion() {
+        java.util.Set<String> apk = new java.util.HashSet<String>();
+        apk.add(".apk");
+
+        assertEquals("-wear", CN1BuildMojo.roleSuffixFor("myapp-wear", ".apk", apk));
+        assertEquals("-wear-debug", CN1BuildMojo.roleSuffixFor("myapp-wear-debug", ".apk", apk));
+        assertEquals("", CN1BuildMojo.roleSuffixFor("myapp", ".apk", apk));
+    }
+
+    /// Per extension, because a build can return a primary APK and no primary AAB.
+    @Test
+    void theQuestionIsAskedPerExtension() {
+        java.util.Set<String> apkOnly = new java.util.HashSet<String>();
+        apkOnly.add(".apk");
+
+        assertEquals("-wear", CN1BuildMojo.roleSuffixFor("myapp-wear", ".apk", apkOnly));
+        assertEquals("", CN1BuildMojo.roleSuffixFor("myapp-wear", ".aab", apkOnly));
+    }
 }

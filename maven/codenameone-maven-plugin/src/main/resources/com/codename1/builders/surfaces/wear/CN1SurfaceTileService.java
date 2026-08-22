@@ -329,14 +329,25 @@ public abstract class CN1SurfaceTileService extends TileService {
             // circular bar to a linear one -- but reaching for it unconditionally turned every
             // default SurfaceProgress into a ring, which is a different shape from the one the
             // same descriptor draws in the simulator, in WidgetKit and in an Android widget.
+            // Wrapped in a Box so the node's own modifiers apply. Returning the Arc or the bar
+            // directly skipped modifiers(node), which is the only place a ProtoLayout Clickable is
+            // built -- so a progress node with setAction on it rendered and then ignored the tap,
+            // alone among the actionable node types, and lost its padding and background with it.
+            // Arc and Row have no setModifiers of their own to use instead.
+            LayoutElementBuilders.LayoutElement bar;
             if (!"circular".equals(node.optString("style", "linear"))) {
-                return linearProgress(fraction);
+                bar = linearProgress(fraction);
+            } else {
+                bar = new LayoutElementBuilders.Arc.Builder()
+                        .addContent(new LayoutElementBuilders.ArcLine.Builder()
+                                .setLength(DimensionBuilders.degrees(360f * fraction))
+                                .setThickness(DimensionBuilders.dp(6))
+                                .build())
+                        .build();
             }
-            return new LayoutElementBuilders.Arc.Builder()
-                    .addContent(new LayoutElementBuilders.ArcLine.Builder()
-                            .setLength(DimensionBuilders.degrees(360f * fraction))
-                            .setThickness(DimensionBuilders.dp(6))
-                            .build())
+            return new LayoutElementBuilders.Box.Builder()
+                    .addContent(bar)
+                    .setModifiers(modifiers(node))
                     .build();
         }
         // text, dyn and anything unknown: whatever string the node resolves to. A dyn value is

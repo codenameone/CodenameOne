@@ -1729,7 +1729,25 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             resultDir.mkdir();
             unzip.setDest(resultDir);
             unzip.execute();
-            for (File child : resultDir.listFiles()) {
+            File[] resultFiles = resultDir.listFiles();
+            // Which extensions actually came back with a primary artifact, decided BEFORE any
+            // entry is classified. A role suffix is a claim about a set, not about a name: an app
+            // called "fitness-wear" returns one APK whose base ends in "-wear" and it is the
+            // primary artifact, not a companion. Treating the name alone as the answer copied the
+            // only APK to <finalName>-wear.apk and attached it under a classifier, leaving the
+            // artifact the build was for missing entirely.
+            java.util.Set<String> extensionsWithPrimary = new java.util.HashSet<String>();
+            for (File child : resultFiles) {
+                String name = child.getName();
+                int dot = name.lastIndexOf(".");
+                if (dot < 0) {
+                    continue;
+                }
+                if (roleSuffixOf(name.substring(0, dot)).length() == 0) {
+                    extensionsWithPrimary.add(name.substring(dot));
+                }
+            }
+            for (File child : resultFiles) {
                 String name = child.getName();
                 int dotpos = name.lastIndexOf(".");
                 if (dotpos < 0) {
@@ -1742,7 +1760,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 // returns two artifacts of the same kind -- a phone APK and its companion Wear APK
                 // -- collapsed both onto one path and the last one written won. That is silent and
                 // it corrupts the primary artifact, not merely the secondary one.
-                String roleSuffix = roleSuffixOf(base);
+                String roleSuffix = roleSuffixFor(base, extension, extensionsWithPrimary);
                 File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + roleSuffix + extension);
                 FileUtils.copyFile(child, copyTo);
                 if (roleSuffix.length() > 0) {
@@ -2482,6 +2500,29 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     // Longest first: "-wear-debug" ends with neither "-wear" nor anything else here, but a
     // future suffix that is a tail of another would match the shorter one if it came first.
+    /**
+     * The role a result entry plays, given what else came back.
+     *
+     * <p>A role suffix is a claim about a SET, not about a name. An app called
+     * {@code fitness-wear} returns one APK whose base ends in {@code -wear} and it is the primary
+     * artifact, not a companion -- reading the name alone copied it to
+     * {@code <finalName>-wear.apk}, attached it under a classifier, and left the artifact the
+     * build was actually for missing. So a suffix only counts when something else of the same
+     * kind came back to be the primary one.</p>
+     *
+     * @param base the entry's name with its extension removed
+     * @param extension the entry's extension, including the dot
+     * @param extensionsWithPrimary extensions for which an unsuffixed entry was returned
+     * @return the role suffix including its leading dash, or an empty string
+     */
+    static String roleSuffixFor(String base, String extension,
+            java.util.Set<String> extensionsWithPrimary) {
+        if (extensionsWithPrimary == null || !extensionsWithPrimary.contains(extension)) {
+            return "";
+        }
+        return roleSuffixOf(base);
+    }
+
     private static final String[] ARTIFACT_ROLE_SUFFIXES = {"-wear-debug", "-wear"};
 
     /**

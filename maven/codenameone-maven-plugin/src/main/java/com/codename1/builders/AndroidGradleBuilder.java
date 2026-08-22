@@ -333,6 +333,9 @@ public class AndroidGradleBuilder extends Executor {
      * anything the phone half computes locally has to be carried across by hand.</p>
      */
     private String watchSharedPermissions = "";
+
+    /** Push service declarations the Wear manifest needs too; see the phone manifest. */
+    private String watchPushManifestEntries = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -4831,6 +4834,13 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // Held for the companion Wear manifest, which is generated independently. The wear
+        // module compiles the same generated CN1FirebaseMessagingService, resolves the same
+        // Firebase dependencies and now carries the same google-services.json -- everything but
+        // the declaration that lets Play services bind it, so a push arriving on the watch had
+        // nothing to deliver to.
+        watchPushManifestEntries = pushManifestEntries;
+
         String launchMode = request.getArg("android.activity.launchMode", "singleTop");
         String xActivity = request.getArg("android.xactivity", "");
         if (!xActivity.contains("android:exported")) {
@@ -7543,6 +7553,8 @@ public class AndroidGradleBuilder extends Executor {
                 // it is the half that RECEIVES a mirrored complication. Without it Play services
                 // has nothing to bind in the watch APK, and every mirrored descriptor is dropped.
                 + wearableListenerService
+                // Push, when the project uses it. See watchPushManifestEntries.
+                + watchPushManifestEntries
                 // A complication or Tile tap still needs the trampoline, and a TILE tap needs it
                 // reachable from the tile host's process -- see anyWatchTile.
                 + "        <activity android:name=\"com.codename1.impl.android.surfaces."
