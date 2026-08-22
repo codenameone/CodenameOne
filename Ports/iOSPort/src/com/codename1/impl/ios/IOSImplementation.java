@@ -853,7 +853,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             Style contentPaneStyle = contentPane.getStyle();
 
             int minY = contentPane.getAbsoluteY() + contentPane.getScrollY() + contentPaneStyle.getPaddingTop();
-            int maxH = Display.getInstance().getDisplayHeight() - minY - nativeInstance.getVKBHeight();
+            // A window's coordinates are its own, so the main surface height is the
+            // wrong ceiling to measure one against: a field lower than the main window
+            // is tall clipped to a negative height and stopped editing outright, and a
+            // window shorter than the main surface got an editor running past its
+            // bottom edge. Same resolution as Container.snapToSafeAreaInternal, and the
+            // main window keeps reading the display exactly as before.
+            int surfaceHeight = top instanceof com.codename1.ui.Window
+                    ? top.asContainer().getHeight()
+                    : Display.getInstance().getDisplayHeight();
+            int maxH = surfaceHeight - minY - nativeInstance.getVKBHeight();
             
             if (y < minY) {
                 h -= (minY - y);
