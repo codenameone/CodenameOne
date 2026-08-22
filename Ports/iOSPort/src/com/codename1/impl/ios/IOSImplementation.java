@@ -12925,6 +12925,11 @@ public class IOSImplementation extends CodenameOneImplementation {
      * jailbreak nobody has shipped for current iOS. A rootless device runs Sileo, so the
      * probe looked for the one front end that was certain not to be there.</p>
      *
+     * <p>Most valuable first, matching {@code IPhoneBuilder.JAILBREAK_QUERY_SCHEMES},
+     * which declares only as many as the app's scheme budget has room for and takes them
+     * from the front. Reordering one list without the other means probing for a scheme
+     * that was never declared, which answers false and looks like a clean device.</p>
+     *
      * <p>Kept deliberately short, and it must stay that way. Every entry is spent out of
      * the app's LSApplicationQueriesSchemes budget, which iOS caps at 25 for an app linked
      * against the iOS 27 SDK -- a secondary probe is not entitled to a quarter of it.
@@ -12937,10 +12942,10 @@ public class IOSImplementation extends CodenameOneImplementation {
      * CN1JailbreakDetector are the ones to invest in.</p>
      */
     private static final String[] JAILBREAK_URL_SCHEMES = {
-        "cydia://package/com.example.package",
         "sileo://package/com.example.package",
+        "filza://view",
         "zbra://packages/com.example.package",
-        "filza://view"
+        "cydia://package/com.example.package"
     };
 
     private boolean packageManagerProbe() {

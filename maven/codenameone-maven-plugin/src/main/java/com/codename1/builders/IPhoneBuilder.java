@@ -159,10 +159,17 @@ public class IPhoneBuilder extends Executor {
     /// the iOS 27 SDK -- so a secondary probe taking a quarter of it is not a reasonable
     /// trade. `undecimus` and `activator` were dropped on that basis: unc0ver is the
     /// iOS 11-14 era and Activator is a tweak rather than evidence of one. What is left
-    /// covers rootful (cydia), rootless (sileo), the alternative package manager (zbra)
-    /// and the file browser almost every jailbroken device carries (filza).
+    /// covers rootless (sileo), the file browser almost every jailbroken device carries
+    /// (filza), the alternative package manager (zbra) and rootful (cydia).
+    ///
+    /// THE ORDER IS LOAD-BEARING, most valuable first. When the cap below leaves room for
+    /// only some of these, the ones at the front are the ones declared. Cydia was first
+    /// and it is the worst of the four: it belongs to a rootful jailbreak nobody ships
+    /// for current iOS, so an app with one slot left spent it on the obsolete probe and
+    /// dropped Sileo -- silently reproducing, in the fix, the exact rootless blind spot
+    /// the fix is for.
     static final String[] JAILBREAK_QUERY_SCHEMES = {
-        "cydia", "sileo", "zbra", "filza"
+        "sileo", "filza", "zbra", "cydia"
     };
 
     /// How many LSApplicationQueriesSchemes entries iOS honours.

@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
@@ -179,22 +180,56 @@ class IPhoneBuilderJailbreakSchemesTest {
     @Test
     void theCapTightensForTheIos27Sdk() throws Exception {
         assertTrue(declare(request("ios.applicationQueriesSchemes", ownSchemes(24)), 26)
-                .contains("filza"));
+                .contains("cydia"));
         List<String> got = declare(request("ios.applicationQueriesSchemes", ownSchemes(24)), 27);
         assertEquals(25, got.size());
-        assertTrue(got.contains("cydia"));
-        assertFalse(got.contains("filza"));
+        assertFalse(got.contains("cydia"));
     }
 
-    /// Partial room is used, not discarded: the first entries fit and the rest are
-    /// reported. Priority order matters here -- cydia and sileo come first.
+    /// The single most important property of the order. An app with one slot left must
+    /// spend it on the rootless package manager, because rootless is the case that goes
+    /// undetected without it. Cydia held this position once, which meant the narrowest
+    /// builds kept the obsolete rootful probe and dropped the one this change exists for.
+    @Test
+    void sileoSurvivesWhenOnlyOneSlotIsLeft() throws Exception {
+        List<String> got = declare(request("ios.applicationQueriesSchemes", ownSchemes(24)), 27);
+        assertTrue(got.contains("sileo"));
+    }
+
+    /// Partial room is used, not discarded: the entries at the front fit and the rest
+    /// are reported.
     @Test
     void asManyAsFitAreAdded() throws Exception {
         List<String> got = declare(request("ios.applicationQueriesSchemes", ownSchemes(48)), 26);
         assertEquals(50, got.size());
-        assertTrue(got.contains("cydia"));
         assertTrue(got.contains("sileo"));
-        assertFalse(got.contains("zbra"));
+        assertTrue(got.contains("filza"));
+        assertFalse(got.contains("cydia"));
+    }
+
+    /// The builder declares the schemes and IOSImplementation probes them, from two
+    /// hand-maintained lists. They have to carry the same schemes in the same order:
+    /// only as many as fit are declared, taken from the front, so a probe whose scheme
+    /// sits further down the runtime list than the builder's is asking about something
+    /// that was never declared -- and canOpenURL: answers false for that, which reads
+    /// as a clean device.
+    @Test
+    void theRuntimeProbeListMatchesTheDeclaredOne() throws Exception {
+        File f = new File("../../Ports/iOSPort/src/com/codename1/impl/ios/"
+                + "IOSImplementation.java");
+        assertTrue(f.exists(), "the iOS port must be readable: " + f.getAbsolutePath());
+        String src = new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+        int at = src.indexOf("JAILBREAK_URL_SCHEMES = {");
+        assertTrue(at > 0, "JAILBREAK_URL_SCHEMES not found in IOSImplementation");
+        String body = src.substring(at, src.indexOf("};", at));
+        java.util.List<String> runtime = new java.util.ArrayList<String>();
+        java.util.regex.Matcher m =
+                java.util.regex.Pattern.compile("\"([a-z0-9]+)://").matcher(body);
+        while (m.find()) {
+            runtime.add(m.group(1));
+        }
+        assertEquals(Arrays.asList(IPhoneBuilder.JAILBREAK_QUERY_SCHEMES), runtime);
     }
 
     /// A project already over the cap on its own is left exactly as it is.
