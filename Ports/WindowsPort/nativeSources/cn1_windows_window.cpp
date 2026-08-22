@@ -346,9 +346,25 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
     cn1WinPushWindowEvent(0, type, x, y, keyCode);
 }
 
+/* Events the framework cannot reconstruct if they are lost. Input can be dropped on
+ * overflow -- a missing move is invisible and a missing press affects one gesture --
+ * but a lost hide leaves a window the framework believes is on screen, painting and
+ * animating until something else happens to it, and a lost close leaves it registered
+ * with no native window behind it. */
+static int cn1WinIsLifecycleEvent(CN1EventType type) {
+    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
+            || type == CN1_EVENT_WINDOW_CLOSE;
+}
+
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode) {
     EnterCriticalSection(&cn1Win.eventLock);
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    if (next == cn1Win.eventHead && cn1WinIsLifecycleEvent(type)) {
+        /* Full, and this one must not be the casualty. Drop the oldest entry to make
+         * room: losing an input event that is already 1,024 events stale is the better
+         * trade. */
+        cn1Win.eventHead = (cn1Win.eventHead + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
     if (next != cn1Win.eventHead) {
         CN1Event* e = &cn1Win.events[cn1Win.eventTail];
         e->windowId = windowId;

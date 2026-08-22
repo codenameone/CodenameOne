@@ -68,9 +68,25 @@ void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
     cn1LinuxPushWindowEvent(0, type, x, y, keyCode);
 }
 
+/* Events the framework cannot reconstruct if they are lost. Input can be dropped on
+ * overflow -- a missing move is invisible and a missing press affects one gesture --
+ * but a lost hide leaves a window the framework believes is on screen, painting and
+ * animating until something else happens to it, and a lost close leaves it registered
+ * with no native window behind it. */
+static int cn1LinuxIsLifecycleEvent(int type) {
+    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
+            || type == CN1_EVENT_WINDOW_CLOSE;
+}
+
 void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
+    if (next == cn1EventHead && cn1LinuxIsLifecycleEvent(type)) {
+        /* Full, and this one must not be the casualty. Drop the oldest entry to make
+         * room: losing an input event that is already a whole ring stale is the better
+         * trade. */
+        cn1EventHead = (cn1EventHead + 1) % CN1_EVENT_RING;
+    }
     if (next != cn1EventHead) {
         cn1EventRing[cn1EventTail].type = type;
         cn1EventRing[cn1EventTail].x = x;
