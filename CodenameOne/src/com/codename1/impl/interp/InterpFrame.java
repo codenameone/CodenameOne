@@ -75,11 +75,18 @@ final class InterpFrame {
     }
 
     void pushFloat(float v) {
-        pushInt(Float.floatToIntBits(v));
+        // Raw bits, not canonicalising: `Float.floatToIntBits` collapses every
+        // NaN pattern into 0x7fc00000, so a value the program built with
+        // `Float.intBitsToFloat(0x7fc00001)` would round-trip through the
+        // stack as the canonical NaN. Programs that inspect NaN payloads (rare
+        // but legal) would then observe a different bit pattern here than the
+        // JVM does elsewhere.
+        pushInt(Float.floatToRawIntBits(v));
     }
 
     void pushDouble(double v) {
-        pushLong(Double.doubleToLongBits(v));
+        // Raw bits for the same reason as pushFloat.
+        pushLong(Double.doubleToRawLongBits(v));
     }
 
     void pushRef(Object v) {

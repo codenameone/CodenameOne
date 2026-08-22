@@ -180,9 +180,15 @@ final class InterpValues {
             case InterpOpcodes.RET_LONG:
                 return ((Long) value).longValue();
             case InterpOpcodes.RET_FLOAT:
-                return Float.floatToIntBits(((Float) value).floatValue()) & 0xffffffffL;
+                // Raw bits, not canonicalising: `floatToIntBits` collapses
+                // every NaN pattern into 0x7fc00000, so a program that read a
+                // noncanonical NaN back with `floatToRawIntBits` after the
+                // host returned it would see the canonical pattern instead of
+                // the payload the JVM preserves. Rare, but legal.
+                return Float.floatToRawIntBits(((Float) value).floatValue()) & 0xffffffffL;
             case InterpOpcodes.RET_DOUBLE:
-                return Double.doubleToLongBits(((Double) value).doubleValue());
+                // Raw bits for the same reason as the float case above.
+                return Double.doubleToRawLongBits(((Double) value).doubleValue());
             default:
                 return 0;
         }

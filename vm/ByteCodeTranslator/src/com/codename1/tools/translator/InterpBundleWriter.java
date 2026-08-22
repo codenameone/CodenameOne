@@ -795,7 +795,11 @@ public class InterpBundleWriter {
             enc.code.add(Integer.valueOf(intern(cst.toString())));
         } else if (cst instanceof Float) {
             enc.code.add(Integer.valueOf(LDC_FLOAT));
-            enc.code.add(Integer.valueOf(Float.floatToIntBits(((Float) cst).floatValue())));
+            // Raw bits, not canonicalising: `floatToIntBits` collapses every
+            // NaN pattern into 0x7fc00000, so an LDC of a noncanonical NaN
+            // constant would arrive at the interpreter as the canonical one
+            // and lose the payload the JVM preserves.
+            enc.code.add(Integer.valueOf(Float.floatToRawIntBits(((Float) cst).floatValue())));
         } else if (cst instanceof Double) {
             enc.code.add(Integer.valueOf(LDC_DOUBLE));
             enc.code.add(Integer.valueOf(intern(cst.toString())));
