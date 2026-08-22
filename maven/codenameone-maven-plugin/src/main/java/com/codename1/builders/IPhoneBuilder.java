@@ -5995,7 +5995,7 @@ public class IPhoneBuilder extends Executor {
             out.put("Info.plist",
                     insideProjectDir(byDefault, extensionFolder.getParentFile()) ? byDefault : null);
         } else {
-            out.put(base.trim(), resolveInfoPlistPath(base.trim(), extensionFolder));
+            out.put(base.trim(), resolveInfoPlistPath(base.trim(), extensionFolder, settings));
         }
         for (Map.Entry<String, String> setting : settings.entrySet()) {
             String key = setting.getKey();
@@ -6008,7 +6008,7 @@ public class IPhoneBuilder extends Executor {
             }
             String value = setting.getValue() == null ? "" : setting.getValue().trim();
             if (value.length() > 0 && !out.containsKey(value)) {
-                out.put(value, resolveInfoPlistPath(value, extensionFolder));
+                out.put(value, resolveInfoPlistPath(value, extensionFolder, settings));
             }
         }
         return out;
@@ -6543,7 +6543,10 @@ public class IPhoneBuilder extends Executor {
             return false;
         }
         if (rootDictAt(text) < 0) {
-            return false;
+            // Not XML we can walk -- most often a binary plist, which Xcode writes as readily as
+            // it writes XML and which signs exactly the same. Answering "no entitlement" here puts
+            // an issuer-provisioning extension back on the 12.0 floor Apple rejects it for.
+            return binaryEntitlementGrants(entitlements, key);
         }
         int afterKey = topLevelKeyEnd(text, key);
         if (afterKey < 0) {
@@ -6551,6 +6554,54 @@ public class IPhoneBuilder extends Executor {
         }
         int element = nextMarkupAt(text, afterKey);
         return element >= 0 && "true".equals(WatchNativeBuilder.tagAt(text, element));
+    }
+
+    /// A binary entitlements plist, read through plutil where there is one.
+    ///
+    /// The fallback is a search of the bytes, which is what this used to do to every entitlements
+    /// file and which was wrong for XML: there a mention inside a comment or an unrelated value
+    /// reads as a grant. A binary plist has no comments, and these entitlement names do not appear
+    /// as ordinary text, so on the file kind that is left it is a fair answer -- and erring toward
+    /// the 14.0 floor costs iOS 12 and 13 availability, while erring the other way costs the
+    /// upload.
+    private static boolean binaryEntitlementGrants(File entitlements, String key) {
+        String xml = plutilAsXml(entitlements);
+        if (xml != null && rootDictAt(xml) >= 0) {
+            int afterKey = topLevelKeyEnd(xml, key);
+            if (afterKey < 0) {
+                return false;
+            }
+            int element = nextMarkupAt(xml, afterKey);
+            return element >= 0 && "true".equals(WatchNativeBuilder.tagAt(xml, element));
+        }
+        return fileContains(entitlements, key);
+    }
+
+    /// The file as XML through /usr/bin/plutil, or null where that is not available or it refuses.
+    private static String plutilAsXml(File file) {
+        File plutil = new File("/usr/bin/plutil");
+        if (!plutil.canExecute()) {
+            return null;
+        }
+        try {
+            Process p = new ProcessBuilder(plutil.getAbsolutePath(), "-convert", "xml1", "-o", "-",
+                    file.getAbsolutePath()).redirectErrorStream(false).start();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            InputStream in = p.getInputStream();
+            try {
+                byte[] buffer = new byte[4096];
+                int read = in.read(buffer);
+                while (read > 0) {
+                    out.write(buffer, 0, read);
+                    read = in.read(buffer);
+                }
+            } finally {
+                try { in.close(); } catch (Throwable t) {}
+            }
+            return p.waitFor() == 0 ? new String(out.toByteArray(), StandardCharsets.UTF_8) : null;
+        } catch (Exception cannotRun) {
+            return null;
+        }
     }
 
     /// The minimum iOS version a brought-in app extension declares.
@@ -6774,6 +6825,25 @@ public class IPhoneBuilder extends Executor {
         File projectDir = extensionFolder.getParentFile();
         String projectPath = projectDir == null ? "." : projectDir.getAbsolutePath();
         String out = path;
+        // The archive's own settings first, and to a fixed point: INFOPLIST_FILE may be written as
+        // $(PLIST_DIR)/Info.plist with PLIST_DIR defined two lines above it in the same properties
+        // file. Both are copied onto the target, so Xcode resolves that path -- and expanding only
+        // the four names below called it unresolvable and left the plist Xcode actually builds
+        // unstamped.
+        Map<String, String> declared = settings != null ? settings
+                : appExtensionBuildSettings(extensionFolder);
+        for (int pass = 0; pass < MAX_SETTING_EXPANSIONS
+                && BUILD_SETTING_REFERENCE.matcher(out).find(); pass++) {
+            String before = out;
+            for (Map.Entry<String, String> setting : declared.entrySet()) {
+                if (setting.getValue() != null) {
+                    out = replaceBuildSetting(out, setting.getKey(), setting.getValue().trim());
+                }
+            }
+            if (out.equals(before)) {
+                break;
+            }
+        }
         out = replaceBuildSetting(out, "SRCROOT", projectPath);
         out = replaceBuildSetting(out, "PROJECT_DIR", projectPath);
         out = replaceBuildSetting(out, "TARGET_NAME", targetName);

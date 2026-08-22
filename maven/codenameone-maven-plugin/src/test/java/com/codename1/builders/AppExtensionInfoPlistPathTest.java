@@ -140,6 +140,27 @@ public class AppExtensionInfoPlistPathTest {
     }
 
     @Test
+    public void theArchivesOwnSettingsExpandInThePath() throws Exception {
+        File extension = extension();
+        // Both settings are copied onto the target, so Xcode resolves this path; expanding only
+        // the built-in four called it unresolvable and left the real plist unstamped.
+        write(new File(extension, "buildSettings.properties"),
+                "PLIST_DIR = WalletUIExtension\nINFOPLIST_FILE = $(PLIST_DIR)/Info.plist\n");
+        assertEquals(new File(extension, "Info.plist"),
+                IPhoneBuilder.appExtensionInfoPlist(extension));
+    }
+
+    @Test
+    public void aSettingThatNamesAnotherSettingExpandsToo() throws Exception {
+        File extension = extension();
+        write(new File(extension, "buildSettings.properties"),
+                "ROOT = $(SRCROOT)/WalletUIExtension\nPLIST_DIR = $(ROOT)\n"
+                + "INFOPLIST_FILE = $(PLIST_DIR)/Custom-Info.plist\n");
+        assertEquals(new File(extension, "Custom-Info.plist"),
+                IPhoneBuilder.appExtensionInfoPlist(extension));
+    }
+
+    @Test
     public void anUnresolvableReferenceIsRefusedRatherThanGuessed() throws Exception {
         File extension = extension();
         write(new File(extension, "buildSettings.properties"),

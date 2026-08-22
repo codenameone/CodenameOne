@@ -186,4 +186,30 @@ public class AppExtensionDeploymentTargetTest {
                 + "</dict></plist>");
         assertEquals("12.0", IPhoneBuilder.appExtensionDeploymentTarget(null, nested, "11"));
     }
+
+    @Test
+    public void aBinaryEntitlementsPlistIsStillRead() throws Exception {
+        File file = new File(tmp.getRoot(), "binary.entitlements");
+        // A real binary plist on a machine with plutil, and on one without it the byte fallback
+        // sees the same key. Either way an issuer-provisioning extension must not fall back to
+        // the 12.0 floor Apple rejects it for.
+        java.io.OutputStream out = new java.io.FileOutputStream(file);
+        try {
+            out.write("bplist00".getBytes("UTF-8"));
+            out.write("com.apple.developer.payment-pass-provisioning".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentTarget(null, file, "11"));
+    }
+
+    @Test
+    public void anXmlPlistIsStillJudgedByItsKeys() throws Exception {
+        // The byte fallback is for binary files only: XML still goes through the parser, where a
+        // mention in a comment is not a grant.
+        File commented = new File(tmp.getRoot(), "xml-comment.entitlements");
+        write(commented, "<plist><dict>\n<!-- com.apple.developer.payment-pass-provisioning -->\n"
+                + "</dict></plist>");
+        assertEquals("12.0", IPhoneBuilder.appExtensionDeploymentTarget(null, commented, "11"));
+    }
 }
