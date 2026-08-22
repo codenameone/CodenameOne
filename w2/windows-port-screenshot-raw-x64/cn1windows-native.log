@@ -1,0 +1,3 @@
+initDisplay: render target created
+initDisplay: offscreen capture target created
+initDisplay: offscreen capture -- window kept hidden

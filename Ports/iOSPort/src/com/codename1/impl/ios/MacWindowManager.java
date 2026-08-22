@@ -249,6 +249,12 @@ public class MacWindowManager extends WindowManager {
         }
         w.visible = false;
         w.hiddenByOwner = false;
+        // The windows this one owns go down with it. Catalyst has no scene-level owner
+        // relation, so this cascade is the only thing keeping an owned window with its
+        // owner -- and an owner whose scene was refused while a child's succeeded would
+        // otherwise leave the child on screen, and painting, with nothing behind it.
+        // Runs on the EDT, like every other cascade, because the caller queues it there.
+        cascadeFrom(w, false);
         return true;
     }
 
