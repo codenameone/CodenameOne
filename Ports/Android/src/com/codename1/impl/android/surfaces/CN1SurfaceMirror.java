@@ -84,7 +84,9 @@ public final class CN1SurfaceMirror {
      * @param ctx any context
      * @param kindId the widget kind
      * @param timelineJson the serialized timeline
-     * @param images the imagery the timeline references
+     * @param images the imagery this publish shipped, kept in the signature because the bridge
+     *        has it and a future change may want it; the artwork actually sent is read from the
+     *        store, which is the complete set the descriptor references
      */
     public static void onPublished(Context ctx, String kindId, String timelineJson,
             Map<String, byte[]> images) {
@@ -111,8 +113,18 @@ public final class CN1SurfaceMirror {
                         + "previous timeline");
                 return;
             }
-            // Imagery first, so the descriptor is never live against art that has not landed.
-            sendImages(kindId, images);
+            // Imagery first, so the descriptor is never live against art that has not landed --
+            // and the STORE's copy, not the side-map this publish happened to carry. A
+            // SurfaceImage built from a previously registered name references a blob without
+            // shipping it, so the map is empty while the descriptor still names art, and a watch
+            // installed since that art was first published would have rendered a gap for ever.
+            // onPublished runs after the store write, so what is on disk is exactly the set the
+            // descriptor references.
+            //
+            // It does mean a publish that changed only text re-sends unchanged art. Nothing here
+            // deduplicated before either, the caps below still bound it, and a transfer that was
+            // not needed costs a background stream while a missing one costs a hole in the face.
+            sendImages(kindId, storedImages(ctx, kindId));
             WearableMessage message = new WearableMessage(PATH_PREFIX + kindId);
             message.put("v", 1);
             message.put("json", json);
@@ -137,8 +149,8 @@ public final class CN1SurfaceMirror {
      * applies exactly as it applies a fresh one -- and its notifier runs THERE, where the
      * generated services are. The nonce is what makes it arrive: the Data Layer suppresses a
      * DataItem whose payload is unchanged, which is the behaviour a publish wants and the one a
-     * reload has to defeat. No images: their names are content hashes, so whatever the descriptor
-     * references is already beside it.</p>
+     * reload has to defeat. The artwork goes with it: a reload is also how a watch app installed
+     * after the publish gets its first copy of anything.</p>
      *
      * @param ctx any context
      * @param kindId the widget kind to re-render

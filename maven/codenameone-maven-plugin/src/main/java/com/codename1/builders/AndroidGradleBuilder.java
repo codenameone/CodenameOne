@@ -336,6 +336,12 @@ public class AndroidGradleBuilder extends Executor {
 
     /** Push service declarations the Wear manifest needs too; see the phone manifest. */
     private String watchPushManifestEntries = "";
+
+    /** The FileProvider declaration the Wear manifest needs too. */
+    private String watchProviderTag = "";
+
+    /** The local-notification receiver the Wear manifest needs too. */
+    private String watchAlarmReceiver = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -4303,6 +4309,7 @@ public class AndroidGradleBuilder extends Executor {
             mediabuttonReceiver = "";
         }
         String alarmRecevier = "<receiver android:name=\"com.codename1.impl.android.LocalNotificationPublisher\" android:exported=\"false\"></receiver>\n";
+        watchAlarmReceiver = alarmRecevier;
         String backgroundLocationReceiver = "<receiver android:name=\"com.codename1.location.BackgroundLocationBroadcastReceiver\" android:exported=\"true\"></receiver>\n";
         if (!playServicesLocation) {
             backgroundLocationReceiver = "";
@@ -4779,6 +4786,12 @@ public class AndroidGradleBuilder extends Executor {
                 "              android:resource=\"@xml/file_paths\">\n" +
                 "          </meta-data>\n" +
                 "      </provider>";
+        // Held for the companion Wear manifest, which is generated independently. The wear module
+        // compiles the same shared implementation and packages the same file_paths.xml, so a
+        // watch that shares or opens a local file on API 24+ needs the same provider -- and a
+        // watch that schedules a local notification needs the receiver that delivers it when the
+        // app is not running.
+        watchProviderTag = providerTag;
 
         if (!providerTag.isEmpty()) {
             File filePathsFile = new File(xmlDir, "file_paths.xml");
@@ -7555,6 +7568,12 @@ public class AndroidGradleBuilder extends Executor {
                 + wearableListenerService
                 // Push, when the project uses it. See watchPushManifestEntries.
                 + watchPushManifestEntries
+                // The FileProvider and the local-notification receiver, for the same reason: the
+                // wear module compiles the same sources and packages the same file_paths.xml, and
+                // a scheduled notification is delivered by a manifest-declared receiver or not at
+                // all.
+                + "  " + watchProviderTag + "\n"
+                + "  " + watchAlarmReceiver
                 // A complication or Tile tap still needs the trampoline, and a TILE tap needs it
                 // reachable from the tile host's process -- see anyWatchTile.
                 + "        <activity android:name=\"com.codename1.impl.android.surfaces."
