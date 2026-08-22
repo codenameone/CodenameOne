@@ -11046,6 +11046,32 @@ public class JavaSEPort extends CodenameOneImplementation {
                 ? ((JavaSEWindowManager.Peer) peer).windowId : 0;
     }
 
+    /// Recomputes the Swing bounds of every native peer hosted by the given window.
+    ///
+    /// A monitor move changes the backing scale the peer bounds divide by, but the
+    /// Codename One bounds behind them often do not change at all, so nothing would
+    /// ask the peer to re-place itself. The scale is part of the cache key as well;
+    /// this is what makes something consult that key after a move.
+    void reapplyPeerBounds(int windowId) {
+        com.codename1.ui.Window w = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+        if (w == null) {
+            return;
+        }
+        refreshPeers(w.asContainer());
+    }
+
+    private void refreshPeers(com.codename1.ui.Container c) {
+        int count = c.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            com.codename1.ui.Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Peer) {
+                ((Peer) cmp).onPositionSizeChange();
+            } else if (cmp instanceof com.codename1.ui.Container) {
+                refreshPeers((com.codename1.ui.Container) cmp);
+            }
+        }
+    }
+
     private C editorCanvasFor(com.codename1.ui.Component cmp) {
         Object peer = Display.getInstance().getWindowPeerForComponent(cmp);
         if (peer instanceof JavaSEWindowManager.Peer) {
@@ -20335,6 +20361,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         int lastX, lastY, lastW, lastH;
         double lastZoom;
+        /// The backing scale the cached bounds were computed with. Part of the key
+        /// because the Swing bounds divide by it: without it a window moved to a
+        /// display of another scale skipped the update whenever its Codename One
+        /// bounds happened to be unchanged, and the native control kept the old
+        /// divisor -- wrong size and wrong place.
+        double lastPeerScale = -1;
 
         @Override
         protected void onPositionSizeChange() {
@@ -20356,9 +20388,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int w = getWidth();
             final int h = getHeight();
             double zoom_ = instance.zoomLevel;
-            if (lastZoom == zoom_ && x == lastX && y == lastY && w == lastW && h == lastH) {
+            double peerScale_ = peerScale();
+            if (lastZoom == zoom_ && lastPeerScale == peerScale_
+                    && x == lastX && y == lastY && w == lastW && h == lastH) {
                 return;
             }
+            lastPeerScale = peerScale_;
             final int screenX;
             final int screenY;
             if (instance.getScreenCoordinates() != null) {

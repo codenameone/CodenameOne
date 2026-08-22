@@ -333,6 +333,10 @@ public class JavaSEWindowManager extends WindowManager {
                             // hierarchy is re-laid out for the new scale; nothing
                             // moved the editor.
                             port.reapplyEditorBounds(windowId);
+                            // Native peers divide by the same scale and cache the
+                            // result, and a move often leaves the Codename One bounds
+                            // untouched, so nothing else would ask them to re-place.
+                            port.reapplyPeerBounds(windowId);
                         }
                     }
                 });
