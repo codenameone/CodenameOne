@@ -324,6 +324,16 @@ typedef struct {
      * disposed cannot enqueue or adopt a scene for whoever took the slot next. */
     int generation;
     int inUse;
+    /* A scene request is outstanding for this slot. Set before the request is made
+     * rather than when the slot reaches the pending queue: the queueing happens on
+     * the main queue, so between creation returning and that block running the slot
+     * looked like it had no request at all, and a show() in that gap asked for a
+     * second scene. Two adoptions then raced for one window. */
+    int scenePending;
+    /* Identifies which request an asynchronous failure belongs to. The error handler
+     * captures the value at request time, so a retry that has already replaced the
+     * request makes the older failure recognisable and droppable. */
+    int requestSeq;
     int pendingWidth;
     int pendingHeight;
     /* The origin asked for, in pixels, and whether one was asked for at all. The
@@ -676,11 +686,19 @@ static BOOL isPendingSlotLocked(int slot) {
  * so a later show() can ask for a scene again, where a close would dispose the
  * application's window object.
  */
-static void CN1MacWindowActivationFailed(int slot, int generation) {
+static void CN1MacWindowActivationFailed(int slot, int generation, int requestSeq) {
     int windowId;
     CN1MacWindow* w;
     pthread_mutex_lock(&g_slotLock);
     w = slotAt(slot);
+    if (w != NULL && w->generation == generation && w->requestSeq != requestSeq) {
+        /* A later request has replaced the one that failed. It owns the slot now, and
+         * applying this failure would take down a window that request may be about to
+         * bring up. Captured with the request rather than read here, because the
+         * replacement can be started before this handler runs. */
+        pthread_mutex_unlock(&g_slotLock);
+        return;
+    }
     if (w == NULL || w->generation != generation) {
         /* The window was disposed and the slot handed to another one before this
          * arrived. The failure belongs to a window that no longer exists, and
@@ -695,6 +713,8 @@ static void CN1MacWindowActivationFailed(int slot, int generation) {
     /* Otherwise a scene adopted later would map a window the framework has been
      * told is down. */
     w->pendingVisible = 0;
+    /* No request outstanding any more, so a later show() may ask again. */
+    w->scenePending = 0;
     pthread_mutex_unlock(&g_slotLock);
     CN1MacWindowDeliverActivationFailed(windowId);
 }
@@ -753,8 +773,14 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     /* Set explicitly because the slot was just memset to zero, and zero here would
      * mean "input disabled" -- every new window would come up inert. */
     g_macWindows[slot].inputEnabled = 1;
+    /* Before this function returns, not inside the block below: the block runs on the
+     * main queue, and a show() in the gap saw a slot with no scene and nothing pending
+     * and asked for a second one. */
+    g_macWindows[slot].scenePending = 1;
+    g_macWindows[slot].requestSeq++;
 
     const int generation = g_macWindows[slot].generation;
+    const int requestSeq = g_macWindows[slot].requestSeq;
     dispatch_async(dispatch_get_main_queue(), ^{
         pthread_mutex_lock(&g_slotLock);
         if (!g_macWindows[slot].inUse || g_macWindows[slot].generation != generation) {
@@ -786,7 +812,7 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene activation failed: %@", error);
-                CN1MacWindowActivationFailed(slot, generation);
+                CN1MacWindowActivationFailed(slot, generation, requestSeq);
             }];
             [options release];
         }
@@ -886,6 +912,9 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
         return;
     }
     w = &g_macWindows[slot];
+    /* The request this scene answers is done. A later show() may ask again if the
+     * window is closed and reopened. */
+    w->scenePending = 0;
     w->scene = [scene retain];
     /* Held across the rest of the adoption so a dispose cannot clear the slot
      * from under it. Only UIKit calls follow -- nothing re-enters Codename One --
@@ -1071,8 +1100,12 @@ BOOL CN1MacWindowReopen(int slot) {
      * reads this field while holding it. */
     pthread_mutex_lock(&g_slotLock);
     w->pendingVisible = 1;
+    /* Marked in flight here for the same reason creation does it. */
+    w->scenePending = 1;
+    w->requestSeq++;
     pthread_mutex_unlock(&g_slotLock);
     const int generation = w->generation;
+    const int requestSeq = w->requestSeq;
     dispatch_async(dispatch_get_main_queue(), ^{
         pthread_mutex_lock(&g_slotLock);
         if (!g_macWindows[slot].inUse || g_macWindows[slot].generation != generation) {
@@ -1096,7 +1129,7 @@ BOOL CN1MacWindowReopen(int slot) {
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene reopen failed: %@", error);
-                CN1MacWindowActivationFailed(slot, generation);
+                CN1MacWindowActivationFailed(slot, generation, requestSeq);
             }];
             [options release];
         }
@@ -1181,7 +1214,8 @@ void CN1MacWindowShow(int slot, BOOL visible) {
      * window that can never appear, while the framework painted it as visible. The
      * pending-queue test is what keeps this from firing during a normal first show,
      * where the scene is simply still in flight. */
-    needsScene = visible && w->scene == nil && !isPendingSlotLocked(slot);
+    needsScene = visible && w->scene == nil && !w->scenePending
+            && !isPendingSlotLocked(slot);
     pthread_mutex_unlock(&g_slotLock);
     if (needsScene) {
         [window release];
