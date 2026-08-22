@@ -90,8 +90,15 @@ public class AppBarTheme {
         this.shape = v;
     }
 
+    /**
+     * The bar's fill. {@code color} is Flutter's older name for the same slot and
+     * apps still use it — the gallery themes every demo page's bar with
+     * {@code AppBarTheme(color: colorScheme.primary)}, so reading only
+     * {@code backgroundColor} left every demo bar the default grey instead of
+     * Material purple.
+     */
     public Color backgroundColor() {
-        return backgroundColor;
+        return backgroundColor != null ? backgroundColor : color;
     }
 
     public Double elevation() {

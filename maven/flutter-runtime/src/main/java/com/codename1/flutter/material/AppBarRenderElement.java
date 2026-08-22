@@ -173,27 +173,63 @@ public class AppBarRenderElement extends RenderElement {
     }
 
     /**
-     * The bar background actually in effect: the explicit
-     * {@code AppBar.backgroundColor} when given, else the M3 ThemeData
-     * default — colorScheme.surface (matching Flutter's Material 3 AppBar,
-     * which sits on the surface with an elevation tint rather than a
-     * saturated fill).
+     * The bar background actually in effect — Flutter's resolution order:
+     * {@code AppBar.backgroundColor}, then the ambient {@code AppBarTheme},
+     * then the M3 default of colorScheme.surface (an AppBar sitting on the
+     * surface with an elevation tint rather than a saturated fill).
+     *
+     * <p>The AppBarTheme step was missing, and the gallery leans on it hard: it
+     * themes every demo page's bar with {@code AppBarTheme(color: primary)} and
+     * its own chrome with {@code AppBarTheme(backgroundColor: background)}, so
+     * both came out the same default grey and the demos lost their purple bar.</p>
      */
     private com.codename1.flutter.Color effectiveBackground() {
         if (appBar().getBackgroundColor() != null) {
             return appBar().getBackgroundColor();
         }
         try {
-            return Theme.of(this).colorScheme().surface();
+            ThemeData theme = Theme.of(this);
+            AppBarTheme bar = theme.appBarTheme();
+            if (bar != null && bar.backgroundColor() != null) {
+                return bar.backgroundColor();
+            }
+            return theme.colorScheme().surface();
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /**
+     * The colour for the bar's title and icons: {@code AppBar.foregroundColor},
+     * then the ambient {@code AppBarTheme}'s icon theme, then null for the
+     * default. The gallery pairs its purple bar with white icons this way.
+     */
+    com.codename1.flutter.Color effectiveForeground() {
+        if (appBar().getForegroundColor() != null) {
+            return appBar().getForegroundColor();
+        }
+        try {
+            AppBarTheme bar = Theme.of(this).appBarTheme();
+            if (bar != null && bar.iconTheme() != null) {
+                return bar.iconTheme().color();
+            }
+        } catch (Throwable t) {
+            // no ambient theme
+        }
+        return null;
     }
 
     private void applyStripStyle(Component strip) {
         com.codename1.flutter.Color bg = effectiveBackground();
         if (bg != null) {
             ThemeDataAdapter.paintColor(strip.getAllStyles(), bg);
+        }
+        // The default ink for anything in the bar that does not pick its own.
+        // A purple bar with black-by-default glyphs on it is unreadable, and
+        // that is exactly what the demo pages' AppBarTheme asks for.
+        com.codename1.flutter.Color fg = effectiveForeground();
+        if (fg != null) {
+            strip.getAllStyles().setFgColor(fg.value() & 0xFFFFFF);
         }
     }
 

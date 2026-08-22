@@ -88,32 +88,15 @@ public class ButtonRenderElement extends RenderElement {
      */
     private Widget unwrapToLeaf(Widget content) {
         Widget cur = content;
-        for (int depth = 0; depth < 4 && cur != null; depth++) {
+        for (int depth = 0; depth < 6 && cur != null; depth++) {
             if (cur instanceof Text || cur instanceof Icon) {
                 return cur;
             }
-            try {
-                if (cur instanceof com.codename1.flutter.widgets.HasChild) {
-                    cur = ((com.codename1.flutter.widgets.HasChild) cur).getChild();
-                } else if (cur instanceof com.codename1.flutter.StatelessWidget) {
-                    cur = ((com.codename1.flutter.StatelessWidget) cur).build(this);
-                } else if (cur instanceof com.codename1.flutter.StatefulWidget) {
-                    // A stateful wrapper is built through a THROWAWAY state, purely to see
-                    // what it renders. The gallery wraps a demo page's options icon in a
-                    // FeatureDiscovery, which is stateful, and without this the button drew
-                    // the class name instead of the glyph.
-                    com.codename1.flutter.State<?> s =
-                            ((com.codename1.flutter.StatefulWidget) cur).createState();
-                    if (s == null) {
-                        return content;
-                    }
-                    cur = s.build(this);
-                } else {
-                    return content;
-                }
-            } catch (Throwable t) {
+            Widget next = com.codename1.flutter.WidgetPreview.step(cur, this);
+            if (next == null) {
                 return content;
             }
+            cur = next;
         }
         return cur == null ? content : cur;
     }

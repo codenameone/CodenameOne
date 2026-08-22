@@ -81,10 +81,26 @@ public class AppBar extends Widget {
         return toolbarHeight;
     }
 
+    private IconThemeData iconTheme;
+    private Color foregroundColor;
+
     public void iconTheme(IconThemeData v) {
+        this.iconTheme = v;
+    }
+
+    /** {@code AppBar.iconTheme} — the style for the bar's leading and action icons. */
+    public IconThemeData getIconTheme() {
+        return iconTheme;
     }
 
     public void foregroundColor(Color v) {
+        this.foregroundColor = v;
+    }
+
+    /** {@code AppBar.foregroundColor} — the colour of the title and the icons. */
+    public Color getForegroundColor() {
+        return foregroundColor != null ? foregroundColor
+                : (iconTheme != null ? iconTheme.color() : null);
     }
 
     /** Flutter's {@code AppBar.flexibleSpace} — a widget stacked behind the toolbar. */
