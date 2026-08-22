@@ -254,7 +254,7 @@ public class MacWindowManager extends WindowManager {
         // owner -- and an owner whose scene was refused while a child's succeeded would
         // otherwise leave the child on screen, and painting, with nothing behind it.
         // Runs on the EDT, like every other cascade, because the caller queues it there.
-        cascadeFrom(w, false);
+        cascadeFrom(w, false, true);
         return true;
     }
 
@@ -275,6 +275,18 @@ public class MacWindowManager extends WindowManager {
     /// Ownership is only ever assigned when a window is created, so the graph is a
     /// tree and this cannot cycle.
     private static void cascadeFrom(Object owner, boolean shown) {
+        cascadeFrom(owner, shown, false);
+    }
+
+    /// As above, but `activationFailed` marks the case where the owner never appeared
+    /// at all rather than being taken down.
+    ///
+    /// The distinction matters to the framework: the hide notification is the minimize
+    /// path, which keeps a modal window's blocker on purpose because a minimized window
+    /// is still open. A modal child of an owner whose scene was refused would then go on
+    /// blocking input to every other window, with both it and its owner off screen and
+    /// `showModal()` parked forever.
+    private static void cascadeFrom(Object owner, boolean shown, boolean activationFailed) {
         for (Peer child : ownedBy(owner)) {
             boolean changed = false;
             if (shown) {
@@ -296,6 +308,8 @@ public class MacWindowManager extends WindowManager {
                 // event. macWindowShow reports nothing back, so report it here.
                 if (shown) {
                     com.codename1.ui.Display.getInstance().windowShowNotify(child.windowId);
+                } else if (activationFailed) {
+                    com.codename1.ui.Display.getInstance().windowActivationFailed(child.windowId);
                 } else {
                     com.codename1.ui.Display.getInstance().windowHideNotify(child.windowId);
                 }
@@ -304,7 +318,7 @@ public class MacWindowManager extends WindowManager {
             // already hidden by the application. Coming back up, only a child that
             // actually reappeared may restore the windows it owns.
             if (!shown || child.visible) {
-                cascadeFrom(child, shown);
+                cascadeFrom(child, shown, activationFailed);
             }
         }
     }

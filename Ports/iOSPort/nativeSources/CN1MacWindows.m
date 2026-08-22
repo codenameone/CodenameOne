@@ -672,6 +672,11 @@ static void dropPendingSlotLocked(int slot) {
  * the request's slot and its generation, so a request left over from a disposed window
  * is recognised as stale rather than matched to whoever holds the slot now.
  */
+/* No token of ours on the connection: the request queue decides, as it always did. */
+#define CN1_MAC_SLOT_NO_TOKEN (-1)
+/* Our token, for a window that has since gone. The scene belongs to nobody. */
+#define CN1_MAC_SLOT_STALE (-2)
+
 static NSString* const CN1_MAC_WINDOW_ACTIVITY = @"com.codenameone.window.activation";
 static NSString* const CN1_MAC_WINDOW_SLOT_KEY = @"cn1WindowSlot";
 static NSString* const CN1_MAC_WINDOW_GENERATION_KEY = @"cn1WindowGeneration";
@@ -692,8 +697,9 @@ static NSUserActivity* CN1MacWindowRequestActivity(int slot, int generation) {
  * always did.
  */
 static int CN1MacWindowSlotForActivities(NSSet<NSUserActivity*>* activities) {
+    BOOL stale = NO;
     if (activities == nil) {
-        return -1;
+        return CN1_MAC_SLOT_NO_TOKEN;
     }
     for (NSUserActivity* activity in activities) {
         if (![activity.activityType isEqualToString:CN1_MAC_WINDOW_ACTIVITY]) {
@@ -709,14 +715,18 @@ static int CN1MacWindowSlotForActivities(NSSet<NSUserActivity*>* activities) {
         if (s < 0 || s >= CN1_MAC_MAX_WINDOWS) {
             continue;
         }
-        /* Stale token: the window that asked is gone and the slot may belong to
-         * another one now, so the queue decides rather than this. */
+        /* Ours, but the window that asked has been disposed -- and the slot may belong
+         * to another window now, so this scene is not for it either. Reported as stale
+         * rather than as no token at all: falling back to the queue would hand this
+         * scene to an unrelated pending window, and with an empty queue the delegate
+         * would install a second copy of the application's main root into it. */
         if (!g_macWindows[s].inUse || g_macWindows[s].generation != g) {
+            stale = YES;
             continue;
         }
         return s;
     }
-    return -1;
+    return stale ? CN1_MAC_SLOT_STALE : CN1_MAC_SLOT_NO_TOKEN;
 }
 
 static BOOL isPendingSlotLocked(int slot) {
@@ -890,10 +900,23 @@ BOOL CN1MacWindowAdoptScene(UIWindowScene* scene, NSSet<NSUserActivity*>* activi
     BOOL claimed;
     int requested;
     pthread_mutex_lock(&g_slotLock);
-    // The slot this scene was actually requested for, when the system handed our
-    // token back. -1 means it did not, and the request queue decides instead --
-    // which is what this always did.
+    // The slot this scene was actually requested for, when the system handed our token
+    // back. NO_TOKEN means it did not, and the request queue decides instead -- which
+    // is what this always did.
     requested = CN1MacWindowSlotForActivities(activities);
+    if (requested == CN1_MAC_SLOT_STALE) {
+        /* Ours, for a window that no longer exists. Claimed so the delegate does not
+         * treat it as the application's own scene and install a second main root into
+         * it, and parked rather than dropped, for the same reason a scene whose slot
+         * has gone is parked below: it is a live scene and the system will not hand
+         * out unlimited numbers of them. */
+        if (scene != nil && g_freeSceneCount < CN1_MAC_MAX_WINDOWS) {
+            scene.title = @"";
+            g_freeScenes[g_freeSceneCount++] = [scene retain];
+        }
+        pthread_mutex_unlock(&g_slotLock);
+        return YES;
+    }
     // Nothing is waiting, or this scene was already adopted: it belongs to the
     // application's main form.
     claimed = (requested >= 0 || g_pendingCount > 0) && slotForSceneLocked(scene) < 0;
