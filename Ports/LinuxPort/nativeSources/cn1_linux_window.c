@@ -92,21 +92,29 @@ static int cn1LinuxIsVisibilityEvent(int type) {
 static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
         int keyCode) {
     int idx = cn1EventHead;
+    int newest = -1;
     if (!cn1LinuxIsVisibilityEvent(type)) {
         return 0;
     }
+    /* The *newest* match, not the first one found. A window can already have more than
+     * one transition queued -- a hide then a show -- and replacing the older of the two
+     * leaves the newer one as the last word, so the framework would end up believing a
+     * window that is natively hidden is on screen, and go on painting it. */
     while (idx != cn1EventTail) {
         if (cn1EventRing[idx].windowId == windowId
                 && cn1LinuxIsVisibilityEvent(cn1EventRing[idx].type)) {
-            cn1EventRing[idx].type = type;
-            cn1EventRing[idx].x = x;
-            cn1EventRing[idx].y = y;
-            cn1EventRing[idx].key = keyCode;
-            return 1;
+            newest = idx;
         }
         idx = (idx + 1) % CN1_EVENT_RING;
     }
-    return 0;
+    if (newest < 0) {
+        return 0;
+    }
+    cn1EventRing[newest].type = type;
+    cn1EventRing[newest].x = x;
+    cn1EventRing[newest].y = y;
+    cn1EventRing[newest].key = keyCode;
+    return 1;
 }
 
 /* Removes the oldest input event, closing the gap. Used to make room for a lifecycle

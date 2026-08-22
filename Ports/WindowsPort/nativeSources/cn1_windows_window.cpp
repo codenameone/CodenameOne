@@ -370,21 +370,29 @@ static int cn1WinIsVisibilityEvent(CN1EventType type) {
 static int cn1WinCoalesceLifecycleLocked(int windowId, CN1EventType type, int x, int y,
         int keyCode) {
     LONG idx = cn1Win.eventHead;
+    LONG newest = -1;
     if (!cn1WinIsVisibilityEvent(type)) {
         return 0;
     }
+    /* The *newest* match, not the first one found. A window can already have more than
+     * one transition queued -- a hide then a show -- and replacing the older of the two
+     * leaves the newer one as the last word, so the framework would end up believing a
+     * window that is natively hidden is on screen, and go on painting it. */
     while (idx != cn1Win.eventTail) {
         CN1Event* e = &cn1Win.events[idx];
         if (e->windowId == windowId && cn1WinIsVisibilityEvent((CN1EventType) e->type)) {
-            e->type = (JAVA_INT) type;
-            e->x = x;
-            e->y = y;
-            e->keyCode = keyCode;
-            return 1;
+            newest = idx;
         }
         idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
     }
-    return 0;
+    if (newest < 0) {
+        return 0;
+    }
+    cn1Win.events[newest].type = (JAVA_INT) type;
+    cn1Win.events[newest].x = x;
+    cn1Win.events[newest].y = y;
+    cn1Win.events[newest].keyCode = keyCode;
+    return 1;
 }
 
 /* Removes the oldest input event, closing the gap. Used to make room for a lifecycle
