@@ -1211,7 +1211,21 @@ public class Window extends Container implements TopLevelContainer {
         setWindowBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
     }
 
-    private void setWindowBounds(int x, int y, int w, int h) {
+    private void setWindowBounds(final int x, final int y, final int w, final int h) {
+        // Marshalled exactly as show(), hide() and dispose() are, and as the developer
+        // guide promises for moving a window. Without it a background caller mutated
+        // the pending geometry and the cached monitor while the event dispatch thread
+        // was reading them, and drove the window manager concurrently with the
+        // platform callbacks that report the result.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setWindowBounds(x, y, w, h);
+                }
+            });
+            return;
+        }
         pendingX = x;
         pendingY = y;
         pendingPositionSet = true;
@@ -1236,7 +1250,18 @@ public class Window extends Container implements TopLevelContainer {
     /// - `width`: the new width
     ///
     /// - `height`: the new height
-    public void setWindowSize(int width, int height) {
+    public void setWindowSize(final int width, final int height) {
+        // As setWindowBounds: the no-peer branch below writes the pending size, which
+        // the event dispatch thread reads when the window is shown.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setWindowSize(width, height);
+                }
+            });
+            return;
+        }
         if (nativePeer == null) {
             // Only the size. Routing through setWindowBounds before the window exists
             // would hand the port the placeholder (0,0) as though the application had

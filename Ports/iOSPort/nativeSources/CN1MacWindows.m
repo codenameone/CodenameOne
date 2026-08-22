@@ -1415,22 +1415,39 @@ BOOL CN1MacMultiWindowSupported(void) {
 
 /* ------------------------------------------------------------- monitors */
 
+/*
+ * Every one of these is called from the Codename One event dispatch thread and every
+ * one of them reads UIKit state -- the screen list, its members and their geometry.
+ * UIScreen is main-thread state and the collection mutates as displays connect and
+ * disconnect, so each takes its whole answer inside one CN1MacRunOnMainSync rather
+ * than reading across the boundary.
+ */
 int CN1MacMonitorCount(void) {
-    /* UIKit on Catalyst reports the screens the app can see. */
-    return (int) [UIScreen screens].count;
+    __block int count = 0;
+    CN1MacRunOnMainSync(^{
+        /* UIKit on Catalyst reports the screens the app can see. */
+        count = (int) [UIScreen screens].count;
+    });
+    return count;
 }
 
 int CN1MacPrimaryMonitor(void) {
-    NSArray<UIScreen*>* screens = [UIScreen screens];
-    NSUInteger iter;
-    for (iter = 0; iter < screens.count; iter++) {
-        if (screens[iter] == [UIScreen mainScreen]) {
-            return (int) iter;
+    __block int primary = 0;
+    CN1MacRunOnMainSync(^{
+        NSArray<UIScreen*>* screens = [UIScreen screens];
+        NSUInteger iter;
+        for (iter = 0; iter < screens.count; iter++) {
+            if (screens[iter] == [UIScreen mainScreen]) {
+                primary = (int) iter;
+                break;
+            }
         }
-    }
-    return 0;
+    });
+    return primary;
 }
 
+/* Callers must already be on the main queue: the screen it returns is only valid
+ * there, and reading a property off it later would move the race rather than fix it. */
 static UIScreen* screenAt(int monitor) {
     NSArray<UIScreen*>* screens = [UIScreen screens];
     if (monitor >= 0 && monitor < (int) screens.count) {
@@ -1440,11 +1457,16 @@ static UIScreen* screenAt(int monitor) {
 }
 
 void CN1MacMonitorBounds(int monitor, BOOL workArea, int* out) {
-    UIScreen* screen = screenAt(monitor);
-    CGRect r = screen.bounds;
+    __block CGRect r = CGRectZero;
+    __block CGFloat scale = 1.0;
     if (out == NULL) {
         return;
     }
+    CN1MacRunOnMainSync(^{
+        UIScreen* screen = screenAt(monitor);
+        r = screen.bounds;
+        scale = screen.scale;
+    });
     /* UIScreen has no work-area concept; the menu bar and dock are excluded from
      * a Catalyst app's usable area by the window server rather than reported, so
      * the bounds are the best available answer for both. */
@@ -1453,7 +1475,6 @@ void CN1MacMonitorBounds(int monitor, BOOL workArea, int* out) {
      * combined by centerOnDesktop() and compared when a position is persisted, so
      * two coordinate systems would silently place windows wrong on a Retina
      * display. */
-    CGFloat scale = screen.scale;
     out[0] = (int) (r.origin.x * scale);
     out[1] = (int) (r.origin.y * scale);
     out[2] = (int) (r.size.width * scale);
@@ -1461,13 +1482,21 @@ void CN1MacMonitorBounds(int monitor, BOOL workArea, int* out) {
 }
 
 double CN1MacMonitorScale(int monitor) {
-    return (double) screenAt(monitor).scale;
+    __block double scale = 1.0;
+    CN1MacRunOnMainSync(^{
+        scale = (double) screenAt(monitor).scale;
+    });
+    return scale;
 }
 
 int CN1MacMonitorDpi(int monitor) {
     /* Catalyst reports a backing scale rather than a physical resolution; 72
      * points per inch times that scale is the conventional macOS mapping. */
-    return (int) (72.0 * screenAt(monitor).scale + 0.5);
+    __block double scale = 1.0;
+    CN1MacRunOnMainSync(^{
+        scale = (double) screenAt(monitor).scale;
+    });
+    return (int) (72.0 * scale + 0.5);
 }
 
 int CN1MacMonitorForWindow(int slot) {
@@ -1742,31 +1771,41 @@ void CN1MacMainWindowSetInputEnabled(BOOL enabled) {
 }
 
 int CN1MacMonitorForMainWindow(void) {
-    NSArray<UIScreen*>* screens = [UIScreen screens];
-    UIScreen* main = nil;
-    NSUInteger iter;
-    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
+    __block int found = -1;
+    /* connectedScenes and the screen list are both main-thread state, and both
+     * mutate as scenes and displays come and go -- so the scene lookup and the
+     * screen match happen inside one pass rather than across the boundary. Nesting
+     * is safe: CN1MacRunOnMainSync runs the block inline when already on the main
+     * thread, which is also why the CN1MacPrimaryMonitor() fallbacks below cannot
+     * deadlock. */
+    CN1MacRunOnMainSync(^{
+        UIScreen* main = nil;
+        NSArray<UIScreen*>* screens;
+        NSUInteger iter;
+        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            /* Skip the scenes belonging to Codename One windows; what is left is the
+             * application's own. */
+            if (CN1MacWindowIdForScene((UIWindowScene*) scene) >= 0) {
+                continue;
+            }
+            main = ((UIWindowScene*) scene).screen;
+            break;
         }
-        /* Skip the scenes belonging to Codename One windows; what is left is the
-         * application's own. */
-        if (CN1MacWindowIdForScene((UIWindowScene*) scene) >= 0) {
-            continue;
+        if (main == nil) {
+            return;
         }
-        main = ((UIWindowScene*) scene).screen;
-        break;
-    }
-    if (main == nil) {
-        return CN1MacPrimaryMonitor();
-    }
-    screens = [UIScreen screens];
-    for (iter = 0; iter < screens.count; iter++) {
-        if (screens[iter] == main) {
-            return (int) iter;
+        screens = [UIScreen screens];
+        for (iter = 0; iter < screens.count; iter++) {
+            if (screens[iter] == main) {
+                found = (int) iter;
+                return;
+            }
         }
-    }
-    return CN1MacPrimaryMonitor();
+    });
+    return found >= 0 ? found : CN1MacPrimaryMonitor();
 }
 
 #endif /* TARGET_OS_MACCATALYST */

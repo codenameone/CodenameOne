@@ -3398,4 +3398,52 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void geometryChangedOffTheEdtIsMarshalled() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("marshalled", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        try {
+            // The developer guide promises that moving a window from a background
+            // thread is marshalled the way Form.show() is. Unmarshalled, this mutated
+            // the pending geometry and the cached monitor while the event dispatch
+            // thread was reading them, and drove the window manager concurrently with
+            // the callbacks reporting the result.
+            final boolean[] onEdt = new boolean[]{true};
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    onEdt[0] = Display.getInstance().isEdt();
+                    w.setWindowLocation(120, 90);
+                    w.setWindowSize(640, 480);
+                }
+            });
+            t.start();
+            t.join(5000);
+            assertFalse(onEdt[0], "the mutation has to be made off the EDT to prove anything");
+
+            // The point of the fix is that the work is *deferred*, so that is what is
+            // asserted. Checking only the end state proves nothing: an unmarshalled
+            // mutation reaches the same numbers, just on the wrong thread.
+            Rectangle before = w.getWindowBounds();
+            assertEquals(400, before.getWidth(),
+                    "the background call must not have touched the window yet");
+            assertEquals(300, before.getHeight());
+
+            flushSerialCalls();
+
+            Rectangle b = w.getWindowBounds();
+            assertEquals(120, b.getX(), "the queued move must have been applied");
+            assertEquals(90, b.getY());
+            assertEquals(640, b.getWidth(), "and the queued resize with it");
+            assertEquals(480, b.getHeight());
+        } finally {
+            w.dispose();
+        }
+    }
 }
