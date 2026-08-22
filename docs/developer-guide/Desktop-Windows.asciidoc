@@ -141,9 +141,14 @@ That veto isn't available on Mac Catalyst. UIKit hands a scene disconnection ove
 after the scene is already gone, so there is nothing left to refuse: the window is
 disposed, the close listeners don't run, and `HIDE_ON_CLOSE` and
 `DO_NOTHING_ON_CLOSE` have no effect for the title-bar control. Don't rely on a save
-prompt there. An application that has to intervene should close the window itself --
-calling `dispose()` from a menu item or a button is a request, and that's vetoable
-on every platform.
+prompt there. An application that has to intervene should drive the close itself: ask
+the user from its own menu item or button, and call `dispose()` once they've answered.
+
+Note that `dispose()` isn't a close request on any platform. It destroys the window
+directly and doesn't run the close listeners, so a listener can't veto it - the
+confirmation belongs in the code that decides to call `dispose()`, not in a listener
+behind it. Close listeners fire for the platform's own close control, which is exactly
+the control Catalyst doesn't let anyone refuse.
 
 Every open window is disposed when the application shuts down, so a window can't outlive
 the event dispatch thread that paints it.
@@ -335,6 +340,10 @@ layered pane, as above, until those components gain a top-level-aware attachment
 * `ComboBox`. Its popup is a `Dialog`, so it inherits that limitation: clicking one
   inside a window has no effect at all rather than opening the list. Use a
   `Picker`, or a button that opens your own overlay on the window's layered pane.
+* `FloatingActionButton` with sub-buttons, for the same reason - the submenu is a
+  `Dialog` too. A plain floating action button with no submenu works normally;
+  only the submenu form is affected, and releasing one in a window opens nothing
+  rather than throwing.
 * Tooltips. `TooltipManager` schedules against `getComponentForm()` and displays through
   an `InteractionDialog` on the current form, so it has the same limitation even though
   the dialog it uses no longer does.

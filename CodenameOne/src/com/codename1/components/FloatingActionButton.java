@@ -404,6 +404,15 @@ public class FloatingActionButton extends Button {
         }
         //if this fab has sub fab's display them
         if (subMenu != null) {
+            // The submenu is shown in a Dialog, which is not top-level-aware: inside a
+            // Window getComponentForm() is null by design, and the tint calls below
+            // dereferenced it without checking, so releasing a sub-menu FAB in a window
+            // threw out of the button press. There is nothing to show there until
+            // Dialog itself becomes window-aware, but a standard component must not
+            // throw to say so -- see the unsupported list in the desktop windows guide.
+            if (getComponentForm() == null) {
+                return;
+            }
             final Container con = createPopupContent(subMenu);
             Dialog d = new Dialog();
             d.setDialogUIID("Container");
