@@ -228,17 +228,21 @@ public final class CN1SurfaceMirror {
                 return;
             }
             File dir = CN1SurfaceStore.kindDir(ctx, kindId);
-            // Only if the descriptor currently on disk still names it. File transfers are
-            // asynchronous and unordered, so an image belonging to publication N can arrive after
-            // the descriptor for N+1 has already collected it -- and writing it back unconditionally
-            // resurrected a blob nothing references, with no later collection guaranteed to
-            // remove it. Storage would grow for ever under exactly the rapid republishing the
-            // ordering hazard needs.
-            if (!referencedByCurrentTimeline(ctx, kindId, name)) {
-                Log.w(TAG, "Ignoring a mirrored image no longer referenced by " + kindId + ": "
-                        + name);
-                return;
-            }
+            // Written whatever the descriptor on disk currently says, and deliberately so.
+            //
+            // onPublished sends the images BEFORE the descriptor that names them, precisely so a
+            // descriptor is never live against art that has not landed -- so the normal case is an
+            // image arriving while the PREVIOUS descriptor is still stored, and refusing anything
+            // it does not name rejects exactly the art the next descriptor is waiting for. The
+            // transfer is then acknowledged and gone, and the new descriptor references a blob
+            // that will never exist.
+            //
+            // The opposite hazard -- art from publication N arriving after N+1's descriptor has
+            // already collected -- leaves an orphan, but a bounded one: every descriptor collects
+            // what it does not reference, so the next publish removes it, and only the art in
+            // flight during the last publish of all can linger. That is a fixed cost, not the
+            // unbounded growth it looks like at first glance, and it is the cheaper of the two
+            // failures by a wide margin.
             mkdirs(dir);
             writeAtomically(new File(dir, name), contents);
             // A file transfer is asynchronous and unordered against the descriptor, so artwork
@@ -249,42 +253,6 @@ public final class CN1SurfaceMirror {
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
         } catch (Throwable t) {
             Log.w(TAG, "Could not store a mirrored image from " + path, t);
-        }
-    }
-
-    /**
-     * Whether the descriptor currently on disk still names an image.
-     *
-     * <p>Answered from the stored timeline rather than from the transfer, because the transfer is
-     * the thing that may be stale. A kind with no descriptor yet answers true: the artwork
-     * legitimately arrives first in that case, and the descriptor's own collection will remove it
-     * a moment later if it turns out to be unwanted.</p>
-     *
-     * @param ctx any context
-     * @param kindId the widget kind
-     * @param name the blob name, without its extension
-     * @return true when the image should be written
-     */
-    private static boolean referencedByCurrentTimeline(Context ctx, String kindId, String name) {
-        String json = CN1SurfaceStore.readWidgetTimeline(ctx, kindId);
-        if (json == null || json.length() == 0) {
-            return true;
-        }
-        try {
-            org.json.JSONArray images = new org.json.JSONObject(json).optJSONArray("images");
-            if (images == null) {
-                return true;
-            }
-            String bare = name.endsWith(".png") ? name.substring(0, name.length() - 4) : name;
-            for (int i = 0; i < images.length(); i++) {
-                if (bare.equals(images.optString(i))) {
-                    return true;
-                }
-            }
-            return false;
-        } catch (Throwable t) {
-            // An unreadable descriptor is not evidence against the image.
-            return true;
         }
     }
 
