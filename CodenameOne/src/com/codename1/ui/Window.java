@@ -1407,7 +1407,22 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     /// Restores this window from a minimized state.
+    ///
+    /// A window the application hid is not minimized and is not brought back by this.
+    /// `#hide()` leaves the peer alive with the hierarchy invisible, so handing that
+    /// peer to the platform's restore puts the native window back on screen while the
+    /// framework still counts it as hidden -- and nothing ever repaints it, because the
+    /// paint loop skips a window that is not showing. The result is a blank or stale
+    /// window that `#isWindowShowing()` denies is there. Bringing a hidden window back
+    /// is `#show()`'s job, which restores the whole lifecycle rather than just the
+    /// native state.
     public void restore() {
+        // Deliberately not "iconified only": between minimize() and the platform
+        // reporting it, a window is still nativeVisible, and an application that
+        // minimizes and immediately restores has to get its window back.
+        if (!nativeVisible && !iconified) {
+            return;
+        }
         // Same reason show() does it: bringing a window back while its owner is away
         // puts it on screen without the owner, or lets the window system suppress it
         // while the framework counts it back. The owner chain comes first.

@@ -3500,7 +3500,14 @@ public final class Display extends CN1Constants {
 
     /// Records which top level saw a key press, so its release can be matched to it.
     /// Called on the event dispatch thread only.
-    private void rememberKeyPress(int keyCode, Container target) {
+    /// Records which top level is holding this key, and answers the one the press
+    /// belongs to.
+    ///
+    /// #### Returns
+    ///
+    /// the top level that saw this key go down, which is `target` for a fresh press
+    /// and the remembered one for a repeat
+    private Container rememberKeyPress(int keyCode, Container target) {
         int free = -1;
         for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
             if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
@@ -3509,7 +3516,7 @@ public final class Display extends CN1Constants {
                 // window had focus when the repeat arrived -- and the eventual key-up
                 // then went there instead of to the window that saw the original
                 // press, leaving a fire-key-activated Button stuck down.
-                return;
+                return keyPressTargets[iter];
             }
             if (free < 0 && keyPressTargets[iter] == null) {
                 free = iter;
@@ -3519,6 +3526,7 @@ public final class Display extends CN1Constants {
             keyPressCodes[free] = keyCode;
             keyPressTargets[free] = target;
         }
+        return target;
     }
 
     /// Returns and forgets the top level that saw this key's press, or null when
@@ -3873,8 +3881,14 @@ public final class Display extends CN1Constants {
 
             switch (type) {
                 case KEY_PRESSED:
-                    rememberKeyPress(inputEventStackTmp[offset], f);
-                    f.keyPressed(inputEventStackTmp[offset]);
+                    // Dispatched to the top level that saw the key go down, not to the
+                    // one this packet names -- the same rule the release already
+                    // follows. A repeat names whichever window has focus now, so once
+                    // focus moves mid-hold the repeats landed in the new window while
+                    // the key-up still went to the old one: the new window entered its
+                    // pressed state and no release was ever coming for it.
+                    Container pressTarget = rememberKeyPress(inputEventStackTmp[offset], f);
+                    pressTarget.keyPressed(inputEventStackTmp[offset]);
                     offset++;
                     break;
                 case KEY_RELEASED:

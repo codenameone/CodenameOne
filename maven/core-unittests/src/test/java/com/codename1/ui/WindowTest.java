@@ -4111,4 +4111,82 @@ class WindowTest extends UITestBase {
             w.dispose();
         }
     }
+
+    @FormTest
+    void restoringAWindowTheApplicationHidDoesNotPutItBackOnScreen() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("Hidden", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        w.hide();
+        assertFalse(w.isWindowShowing(), "hide() leaves the window not showing");
+
+        w.restore();
+        // The native window would come back with the framework still counting it
+        // hidden: the hierarchy stays invisible and the paint loop skips it, so the
+        // platform would show a blank or stale window that isWindowShowing() denies.
+        assertEquals(0, peer.getRestoreCount(),
+                "restore() must not put back a window the application hid -- that is "
+                        + "show()'s job, which restores the whole lifecycle");
+        assertFalse(w.isWindowShowing(),
+                "and the framework's own view of it must not change either");
+        w.dispose();
+    }
+
+    @FormTest
+    void restoringAMinimizedWindowStillReachesThePlatform() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("Minimized", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        w.minimize();
+        // The guard is deliberately not "iconified only": the platform has not reported
+        // the minimize yet at this point, and an application that minimizes and
+        // immediately restores still has to get its window back.
+        w.restore();
+        assertEquals(1, peer.getRestoreCount(),
+                "a minimized window must still be restorable, including before the "
+                        + "platform has reported the minimize");
+        w.dispose();
+    }
+
+    @FormTest
+    void aKeyRepeatFollowsTheWindowThatSawThePressNotTheFocusedOne() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        final KeyCountingComponent windowKeys = new KeyCountingComponent();
+        w.add(BorderLayout.CENTER, windowKeys);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(windowKeys);
+
+        // Hold a key on the main form, then let the autorepeat arrive tagged with the
+        // window, which is what happens when focus moves while the key is still down --
+        // the platform sends every repeat to whatever is focused now.
+        Display.getInstance().keyPressed(-93);
+        Display.getInstance().windowKeyPressed(w.getWindowId(), -93);
+        Display.getInstance().windowKeyPressed(w.getWindowId(), -93);
+        DisplayTest.flushEdt();
+
+        assertEquals(3, mainKeys.pressed,
+                "every repeat of a held key belongs to the top level that saw it go down");
+        assertEquals(0, windowKeys.pressed,
+                "the newly focused window must not enter a pressed state for a key it "
+                        + "never saw go down -- no release is coming for it");
+
+        // And the release still resolves to the same place, so nothing is left latched.
+        Display.getInstance().windowKeyReleased(w.getWindowId(), -93);
+        DisplayTest.flushEdt();
+        assertEquals(1, mainKeys.released);
+        assertEquals(0, windowKeys.released);
+        w.dispose();
+    }
 }
