@@ -68,10 +68,29 @@ public final class CN1WatchSurface {
         private final JSONObject state;
         private final long nextFlipDate;
 
+        private final long start;
+
         Reading(JSONObject layout, JSONObject state, long nextFlipDate) {
+            this(layout, state, nextFlipDate, 0L);
+        }
+
+        Reading(JSONObject layout, JSONObject state, long nextFlipDate, long start) {
             this.layout = layout;
             this.state = state;
             this.nextFlipDate = nextFlipDate;
+            this.start = start;
+        }
+
+        /**
+         * When this entry takes over, or 0 for the one that is current already.
+         *
+         * <p>Only meaningful for a reading that came from {@link #readTimeline}: a single
+         * resolved reading is by definition the one showing now.</p>
+         *
+         * @return the entry's start in epoch millis, or 0
+         */
+        public long getStart() {
+            return start;
         }
 
         public JSONObject getLayout() {
@@ -126,6 +145,62 @@ public final class CN1WatchSurface {
             Log.w(TAG, "Could not read the published timeline for watch kind " + kindId, t);
             return null;
         }
+    }
+
+    /**
+     * Reads every entry a kind published that is still ahead of it, resolved for one family.
+     *
+     * <p>A complication answers with a whole timeline rather than one value, and the system swaps
+     * entries at the stated moments without waking anything -- so the entries the app published
+     * for the hours ahead have to survive the read rather than being collapsed to whichever one
+     * is current. The first element is the entry showing now; each later one carries the moment
+     * it takes over in {@link Reading#getStart}.</p>
+     *
+     * @param ctx any context
+     * @param kindId the widget kind
+     * @param family the portable family name, e.g. {@code watchCircular}
+     * @return the entries from now onward, or an empty list when nothing has been published
+     */
+    public static List<Reading> readTimeline(Context ctx, String kindId, String family) {
+        List<Reading> out = new ArrayList<Reading>();
+        String json = CN1SurfaceStore.readWidgetTimeline(ctx, kindId);
+        if (json == null || json.length() == 0) {
+            return out;
+        }
+        try {
+            JSONObject doc = new JSONObject(json);
+            JSONObject layout = pickLayout(doc.optJSONObject("layouts"), family);
+            if (layout == null) {
+                return out;
+            }
+            JSONArray entries = doc.optJSONArray("entries");
+            long now = System.currentTimeMillis();
+            JSONObject active = pickActiveEntry(entries, now);
+            if (active != null) {
+                JSONObject state = active.optJSONObject("state");
+                out.add(new Reading(layout, state == null ? new JSONObject() : state,
+                        nextFlipDate(entries, now), 0L));
+            }
+            for (int i = 0; entries != null && i < entries.length(); i++) {
+                JSONObject e = entries.optJSONObject(i);
+                if (e == null) {
+                    continue;
+                }
+                long date = e.optLong("date", 0);
+                if (date <= now) {
+                    // Already superseded, or the one already added above.
+                    continue;
+                }
+                JSONObject state = e.optJSONObject("state");
+                out.add(new Reading(layout, state == null ? new JSONObject() : state,
+                        nextFlipDate(entries, date), date));
+            }
+        } catch (Throwable t) {
+            // Same contract as read(): a malformed descriptor leaves the face showing whatever it
+            // had rather than taking the watch face down with the data source.
+            Log.w(TAG, "Could not read the published timeline for watch kind " + kindId, t);
+        }
+        return out;
     }
 
     /**

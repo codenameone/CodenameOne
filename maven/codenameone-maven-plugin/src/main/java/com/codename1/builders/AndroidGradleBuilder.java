@@ -326,6 +326,8 @@ public class AndroidGradleBuilder extends Executor {
     private String watchSurfaceDependencies = "";
     /// The generated phone stub's source, so the Wear module can derive its own from it.
     private String generatedStubSource;
+    /** READ_MEDIA_* declarations the Wear manifest needs too; see the phone manifest. */
+    private String watchReadMediaPermissions = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -4693,6 +4695,11 @@ public class AndroidGradleBuilder extends Executor {
                     "    <uses-permission android:name=\"" + p
                             + "\" android:required=\"false\" />\n");
         }
+        // Held for the companion Wear manifest, which is generated independently and would
+        // otherwise never see these. A watchMain that reads media on Wear OS 4 needs the same
+        // READ_MEDIA_* declarations the phone half gets, or the runtime permission cannot be
+        // granted and every read fails on the watch alone.
+        watchReadMediaPermissions = readMediaPermissions;
         String xmlizedDisplayName = xmlize(request.getDisplayName());
 
         String applicationAttr = request.getArg("android.xapplication_attr", "");
@@ -6688,7 +6695,8 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         generateWearModule(request, studioProjectDir, gradleProps, watchSurfacesManifestEntries,
-                basePermissions + permissions + xPermissions, intVersion, wearableListenerService);
+                basePermissions + permissions + xPermissions + watchReadMediaPermissions,
+                intVersion, wearableListenerService);
 
         String rootGradleProps = "// Top-level build file where you can add configuration options common to all sub-projects/modules.\n" +
                 "buildscript {\n" +
@@ -7442,6 +7450,11 @@ public class AndroidGradleBuilder extends Executor {
 
         String wearManifest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                 + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
+                // The tools namespace, because the application hints copied below routinely use
+                // it: tools:replace and tools:node are how a project resolves a manifest-merger
+                // conflict, and a root that declares only xmlns:android makes the copy a document
+                // that will not parse at all.
+                + "          xmlns:tools=\"http://schemas.android.com/tools\"\n"
                 + "          package=\"" + request.getPackageName() + "\">\n"
                 + "    <uses-feature android:name=\"android.hardware.type.watch\" "
                 + "android:required=\"true\" />\n"
@@ -7676,7 +7689,13 @@ public class AndroidGradleBuilder extends Executor {
                 // sent the wear module looking for a keystore beside itself. A release build then
                 // failed to CONFIGURE, taking the phone artifact down with it: this is not the
                 // watch half degrading, it is the whole multi-module build not starting.
-                .replace("storeFile file(\"keyStore\")", "storeFile file(\"../app/keyStore\")");
+                .replace("storeFile file(\"keyStore\")", "storeFile file(\"../app/keyStore\")")
+                // Same trap as the keystore, one line further on. The generated proguard.cfg is
+                // written into the app module and nowhere else, and Gradle resolves a bare
+                // proguardFiles path against the project it appears in -- so the default
+                // release build had the Wear R8 task looking for a file beside itself and
+                // failing, which takes the phone artifact down with it.
+                .replace("'proguard.cfg'", "'../app/proguard.cfg'");
         // Share the app module's tree instead of duplicating it, and add this module's own
         // generated sources on top. insertAfterFirst and not replace: an "android {" block can
         // appear more than once -- a coverage harness appends a second one to add a build type --

@@ -57,6 +57,12 @@ class WearModuleGradleTest {
             + "        minSdkVersion 24\n"
             + "        versionCode 100\n"
             + "    }\n"
+            + "    buildTypes {\n"
+            + "        release {\n"
+            + "            minifyEnabled true\n"
+            + "            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard.cfg'\n"
+            + "        }\n"
+            + "    }\n"
             + "    signingConfigs {\n"
             + "        release {\n"
             + "            storeFile file(\"keyStore\")\n"
@@ -176,6 +182,19 @@ class WearModuleGradleTest {
                 "nothing here needs API 26:\n" + wear);
         assertTrue(wear.contains("versionCode 101"),
                 "the version code still has to outrank the phone:\n" + wear);
+    }
+
+    /// Gradle resolves a bare proguardFiles path against the project it appears in, and the
+    /// generated proguard.cfg is written into the app module alone -- so a verbatim copy had the
+    /// Wear R8 task looking for a file beside itself. Exactly the trap the keystore line records,
+    /// one line further on, and it fails the release build rather than the watch half of it.
+    @Test
+    void proguardIsReadFromTheAppModule() {
+        String wear = deriveWearGradle();
+
+        assertTrue(wear.contains("'../app/proguard.cfg'"), wear);
+        assertFalse(wear.contains(", 'proguard.cfg'"),
+                "the bare path resolves against the wear module:\n" + wear);
     }
 
     /// TileService.onTileRequest returns a ListenableFuture, whose class ships in

@@ -39,13 +39,16 @@ import androidx.wear.watchface.complications.data.NoDataComplicationData;
 import androidx.wear.watchface.complications.data.PlainComplicationText;
 import androidx.wear.watchface.complications.data.RangedValueComplicationData;
 import androidx.wear.watchface.complications.data.ShortTextComplicationData;
-import androidx.wear.watchface.complications.data.TimeRange;
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService;
+import androidx.wear.watchface.complications.datasource.ComplicationDataTimeline;
 import androidx.wear.watchface.complications.datasource.ComplicationRequest;
+import androidx.wear.watchface.complications.datasource.TimeInterval;
+import androidx.wear.watchface.complications.datasource.TimelineEntry;
 
 import org.json.JSONObject;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -81,23 +84,78 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
     @Override
     public void onComplicationRequest(ComplicationRequest request,
             ComplicationRequestListener listener) {
+        ComplicationType type = request.getComplicationType();
+        ComplicationDataTimeline timeline = null;
         ComplicationData data = null;
         try {
-            data = build(request.getComplicationType());
+            timeline = buildTimeline(type);
+            if (timeline == null) {
+                data = build(type, null);
+            }
         } catch (Throwable t) {
             Log.w(TAG, "Could not build complication data for kind " + getKindId(), t);
         }
         try {
+            if (timeline != null) {
+                // The whole timeline, not the entry showing now. This service is asked once and
+                // UPDATE_PERIOD_SECONDS is deliberately 0, because polling a push-driven surface
+                // costs watch battery for nothing -- so an answer of one value stayed on the face
+                // for ever and the entries the app published for the hours ahead never appeared.
+                //
+                // setValidTimeRange does NOT solve that: it says when a value may be DISPLAYED and
+                // schedules no further request, so on its own it replaced a stale complication
+                // with an empty one. Handing the system the entries lets it swap them itself, at
+                // the stated moments, without waking this process at all -- which is the same
+                // bargain WidgetKit makes on the other platform, and what the published document
+                // was shaped for.
+                listener.onComplicationDataTimeline(timeline);
+                return;
+            }
             listener.onComplicationData(data == null ? noData() : data);
         } catch (Throwable t) {
             Log.w(TAG, "Could not deliver complication data for kind " + getKindId(), t);
         }
     }
 
+    /**
+     * Every published entry as a complication timeline, or null when there is nothing to serve.
+     *
+     * @param type the type the face asked for
+     * @return the timeline, or null
+     */
+    private ComplicationDataTimeline buildTimeline(ComplicationType type) {
+        List<CN1WatchSurface.Reading> readings =
+                CN1WatchSurface.readTimeline(this, getKindId(), familyFor(type));
+        if (readings.isEmpty()) {
+            return null;
+        }
+        ComplicationData current = build(type, readings.get(0));
+        if (current == null) {
+            return null;
+        }
+        List<TimelineEntry> entries = new ArrayList<TimelineEntry>();
+        for (int i = 1; i < readings.size(); i++) {
+            CN1WatchSurface.Reading reading = readings.get(i);
+            ComplicationData entry = build(type, reading);
+            if (entry == null) {
+                // A later entry this type cannot render is skipped rather than ending the
+                // timeline: the entries after it may well be renderable, and the face falls back
+                // to the default in the gap.
+                continue;
+            }
+            long end = reading.getNextFlipDate();
+            entries.add(new TimelineEntry(
+                    new TimeInterval(Instant.ofEpochMilli(reading.getStart()),
+                            end > reading.getStart() ? Instant.ofEpochMilli(end) : Instant.MAX),
+                    entry));
+        }
+        return new ComplicationDataTimeline(current, entries);
+    }
+
     @Override
     public ComplicationData getPreviewData(ComplicationType type) {
         try {
-            ComplicationData data = build(type);
+            ComplicationData data = build(type, null);
             if (data != null) {
                 return data;
             }
@@ -138,7 +196,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // no honest placeholder to give. Null lets the picker fall back to another type.
             return null;
         }
-        return shortText(shorten(label), null, null, null);
+        return shortText(shorten(label), null, null);
     }
 
     /**
@@ -158,8 +216,9 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         return "watchCircular";
     }
 
-    private ComplicationData build(ComplicationType type) {
-        CN1WatchSurface.Reading reading = CN1WatchSurface.read(this, getKindId(), familyFor(type));
+    private ComplicationData build(ComplicationType type, CN1WatchSurface.Reading given) {
+        CN1WatchSurface.Reading reading = given != null ? given
+                : CN1WatchSurface.read(this, getKindId(), familyFor(type));
         if (reading == null) {
             return null;
         }
@@ -167,14 +226,6 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         List<String> texts = CN1WatchSurface.texts(nodes, reading.getState());
         PendingIntent tap = tapIntent(reading.getLayout());
         reportDroppedContent(nodes, texts);
-        // How long this answer is good for. A published timeline can hold entries that take over
-        // at stated times, and this service is asked once and then not again: UPDATE_PERIOD_SECONDS
-        // is deliberately 0, because polling a push-driven surface costs watch battery for nothing.
-        // Without a validity the face would keep the first entry for ever and the later ones would
-        // never appear. Saying when the data stops being true asks the system to come back at that
-        // moment and nowhere in between, which is the same bargain the Tile's freshness interval
-        // makes.
-        TimeRange validity = validityFor(reading.getNextFlipDate());
 
         if (ComplicationType.LONG_TEXT.equals(type)) {
             String title = texts.isEmpty() ? getKindId() : texts.get(0);
@@ -184,9 +235,6 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                             plain(title))
                             .setTitle(body.length() == 0 ? null : plain(title))
                             .setTapAction(tap);
-            if (validity != null) {
-                builder.setValidTimeRange(validity);
-            }
             return builder.build();
         }
         if (ComplicationType.RANGED_VALUE.equals(type)) {
@@ -204,9 +252,6 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                 builder.setText(plain(shorten(texts.get(0))));
             }
             builder.setTapAction(tap);
-            if (validity != null) {
-                builder.setValidTimeRange(validity);
-            }
             return builder.build();
         }
         if (ComplicationType.MONOCHROMATIC_IMAGE.equals(type)) {
@@ -219,9 +264,6 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                             new MonochromaticImage.Builder(icon).build(),
                             plain(texts.isEmpty() ? getKindId() : texts.get(0)))
                             .setTapAction(tap);
-            if (validity != null) {
-                builder.setValidTimeRange(validity);
-            }
             return builder.build();
         }
         if (ComplicationType.SHORT_TEXT.equals(type)) {
@@ -229,38 +271,13 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                 return null;
             }
             return shortText(shorten(texts.get(0)), texts.size() > 1 ? shorten(texts.get(1)) : null,
-                    tap, validity);
+                    tap);
         }
         return null;
     }
 
-    /**
-     * The window this answer stays true for, or null when it is good indefinitely.
-     *
-     * <p>A flip date in the past or absent means the timeline has one entry and nothing is
-     * scheduled to replace it, and claiming an expiry then would make the face throw away good
-     * data and ask again for the same answer.</p>
-     *
-     * @param flip the next entry's start time, in epoch millis, or 0 when there is none
-     * @return the validity window, or null
-     */
-    private TimeRange validityFor(long flip) {
-        long now = System.currentTimeMillis();
-        if (flip <= now) {
-            return null;
-        }
-        try {
-            return TimeRange.between(Instant.ofEpochMilli(now), Instant.ofEpochMilli(flip));
-        } catch (Throwable t) {
-            // Never at the cost of the reading itself: data with no expiry is stale later,
-            // data that failed to build is absent now.
-            Log.w(TAG, "Could not bound the complication's validity for kind " + getKindId(), t);
-            return null;
-        }
-    }
-
-    private ShortTextComplicationData shortText(String text, String title, PendingIntent tap,
-            TimeRange validity) {
+    private ShortTextComplicationData shortText(String text, String title,
+            PendingIntent tap) {
         // The untruncated string becomes the content description, so a screen reader still hears
         // what the layout said even where the slot shows seven characters.
         ShortTextComplicationData.Builder builder =
@@ -269,9 +286,6 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             builder.setTitle(plain(title));
         }
         builder.setTapAction(tap);
-        if (validity != null) {
-            builder.setValidTimeRange(validity);
-        }
         return builder.build();
     }
 

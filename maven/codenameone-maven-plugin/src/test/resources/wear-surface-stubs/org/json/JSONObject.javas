@@ -8,6 +8,7 @@ public class JSONObject {
     public int optInt(String k, int d) { return d; }
     public int optInt(String k) { return 0; }
     public long optLong(String k) { return 0L; }
+    public long optLong(String k, long d) { return d; }
     public double optDouble(String k, double d) { return d; }
     public Object opt(String k) { return null; }
     public JSONObject optJSONObject(String k) { return null; }

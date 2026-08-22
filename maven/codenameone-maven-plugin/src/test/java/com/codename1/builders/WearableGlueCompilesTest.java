@@ -110,6 +110,9 @@ public class WearableGlueCompilesTest {
                         + "public class CN1SurfaceStore {\n"
                         + "    public static File kindDir(Context c, String k) { return null; }\n"
                         + "    static void deleteUnreferencedImages(File d, String t) { }\n"
+                        + "    public static String readWidgetTimeline(Context c, String k) "
+                        + "{ return null; }\n"
+                        + "    public static void rememberKind(Context c, String k) { }\n"
                         + "}\n").getBytes("UTF-8"));
         Files.write(shims.resolve("CN1WatchSurface.java"),
                 ("package com.codename1.impl.android.surfaces;\n"
