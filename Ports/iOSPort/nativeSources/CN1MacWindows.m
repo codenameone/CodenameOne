@@ -651,6 +651,16 @@ static void dropPendingSlotLocked(int slot) {
     g_pendingCount = write;
 }
 
+static BOOL isPendingSlotLocked(int slot) {
+    int iter;
+    for (iter = 0; iter < g_pendingCount; iter++) {
+        if (g_pendingSlots[iter] == slot) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 /*
  * A scene activation the system refused. The slot was queued before the request and
  * scenes are matched to queued slots in arrival order, so leaving a failed slot in
@@ -663,22 +673,27 @@ static void dropPendingSlotLocked(int slot) {
  * is still registered and a later show() can ask for a scene again, where a close
  * would dispose it and lose the application's window object.
  */
-static void CN1MacWindowActivationFailed(int slot) {
-    int windowId = -1;
+static void CN1MacWindowActivationFailed(int slot, int generation) {
+    int windowId;
     CN1MacWindow* w;
     pthread_mutex_lock(&g_slotLock);
-    dropPendingSlotLocked(slot);
     w = slotAt(slot);
-    if (w != NULL) {
-        windowId = w->windowId;
-        /* Otherwise a scene adopted later would map a window the framework has been
-         * told is down. */
-        w->pendingVisible = 0;
+    if (w == NULL || w->generation != generation) {
+        /* The window was disposed and the slot handed to another one before this
+         * arrived. The failure belongs to a window that no longer exists, and
+         * applying it here would drop the *replacement's* pending request and report
+         * the replacement hidden -- the same corruption this function exists to
+         * prevent, one window along. */
+        pthread_mutex_unlock(&g_slotLock);
+        return;
     }
+    dropPendingSlotLocked(slot);
+    windowId = w->windowId;
+    /* Otherwise a scene adopted later would map a window the framework has been
+     * told is down. */
+    w->pendingVisible = 0;
     pthread_mutex_unlock(&g_slotLock);
-    if (windowId >= 0) {
-        CN1MacWindowDeliverVisibility(windowId, NO);
-    }
+    CN1MacWindowDeliverVisibility(windowId, NO);
 }
 
 /*
@@ -768,7 +783,7 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene activation failed: %@", error);
-                CN1MacWindowActivationFailed(slot);
+                CN1MacWindowActivationFailed(slot, generation);
             }];
             [options release];
         }
@@ -1078,7 +1093,7 @@ BOOL CN1MacWindowReopen(int slot) {
                                                                      options:options
                                                                 errorHandler:^(NSError* error) {
                 NSLog(@"CN1: window scene reopen failed: %@", error);
-                CN1MacWindowActivationFailed(slot);
+                CN1MacWindowActivationFailed(slot, generation);
             }];
             [options release];
         }
@@ -1154,10 +1169,22 @@ void CN1MacWindowShow(int slot, BOOL visible) {
     /* Recorded whether or not a scene exists yet, so adoption can honour it, and
      * under the slot lock for the same reason as the input state: adoption reads
      * pendingVisible while holding it. */
+    BOOL needsScene;
     pthread_mutex_lock(&g_slotLock);
     w->pendingVisible = visible ? 1 : 0;
     window = [w->window retain];
+    /* An earlier activation was refused, so this window has no scene and none is on
+     * the way. Without asking again, showing it would only set pendingVisible on a
+     * window that can never appear, while the framework painted it as visible. The
+     * pending-queue test is what keeps this from firing during a normal first show,
+     * where the scene is simply still in flight. */
+    needsScene = visible && w->scene == nil && !isPendingSlotLocked(slot);
     pthread_mutex_unlock(&g_slotLock);
+    if (needsScene) {
+        [window release];
+        CN1MacWindowReopen(slot);
+        return;
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
         if (window != nil) {
             window.hidden = visible ? NO : YES;
