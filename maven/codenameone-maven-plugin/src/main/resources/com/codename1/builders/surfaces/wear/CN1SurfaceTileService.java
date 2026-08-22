@@ -83,9 +83,36 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// value CN1SurfaceRenderer tints a widget's progress bar with.
     private static final int ACCENT = 0xff007aff;
 
-    /// The entry the last Tile was built from, so its resources can still be served after the
-    /// timeline has moved on. Volatile because the two callbacks arrive on different threads.
-    private volatile CN1WatchSurface.Reading lastServed;
+    /**
+     * The entries recent Tiles were built from, keyed by the version each advertised.
+     *
+     * <p>A map and not one slot: two tile requests can be handled before the first one's resource
+     * callback arrives, and a single slot would then have been overwritten by the second -- the
+     * first layout falling back to whatever is current and its image ids going unresolved, which
+     * is the failure this remembering exists to prevent. Two entries are enough for that
+     * interleaving and the oldest is dropped, so a long-lived Tile process does not accumulate
+     * readings.</p>
+     *
+     * <p>Synchronized rather than volatile because the two callbacks arrive on different threads
+     * and this is now a read-modify-write.</p>
+     */
+    private final java.util.LinkedHashMap<String, CN1WatchSurface.Reading> served =
+            new java.util.LinkedHashMap<String, CN1WatchSurface.Reading>();
+
+    /** Remembers the entry a Tile of this version was built from. */
+    private synchronized void remember(String version, CN1WatchSurface.Reading reading) {
+        served.put(version, reading);
+        while (served.size() > 2) {
+            java.util.Iterator<String> oldest = served.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+    }
+
+    /** The entry a Tile of this version was built from, or null. */
+    private synchronized CN1WatchSurface.Reading recall(String version) {
+        return version == null ? null : served.get(version);
+    }
 
     /** The widget kind this Tile serves. Supplied by the generated subclass. */
     protected abstract String getKindId();
@@ -134,7 +161,7 @@ public abstract class CN1SurfaceTileService extends TileService {
                         hasDynamicText(reading.getLayout()));
                 version = resourcesVersion(reading);
                 // Kept for the resources request that follows, which asks about THIS version.
-                lastServed = reading;
+                remember(version, reading);
             }
         } catch (Throwable t) {
             // A Tile that throws is removed from the carousel, so a malformed descriptor must
@@ -236,11 +263,8 @@ public abstract class CN1SurfaceTileService extends TileService {
         ResourceBuilders.Resources.Builder builder = new ResourceBuilders.Resources.Builder();
         String version = "0";
         try {
-            CN1WatchSurface.Reading remembered = lastServed;
-            CN1WatchSurface.Reading reading =
-                    remembered != null && requested != null
-                            && requested.equals(resourcesVersion(remembered))
-                    ? remembered
+            CN1WatchSurface.Reading remembered = recall(requested);
+            CN1WatchSurface.Reading reading = remembered != null ? remembered
                     : CN1WatchSurface.read(this, getKindId(), "watchRectangular");
             if (reading != null) {
                 version = resourcesVersion(reading);

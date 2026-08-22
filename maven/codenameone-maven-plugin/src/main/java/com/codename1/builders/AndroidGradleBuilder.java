@@ -342,6 +342,9 @@ public class AndroidGradleBuilder extends Executor {
 
     /** The local-notification receiver the Wear manifest needs too. */
     private String watchAlarmReceiver = "";
+
+    /** The JobScheduler service declaration the Wear manifest needs too. */
+    private String watchBackgroundWorkService = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -3647,6 +3650,20 @@ public class AndroidGradleBuilder extends Executor {
                     + "are declared, so a phone-side Surfaces.publish() of one is mirrored to the "
                     + "watch. This adds play-services-wearable to the app.");
             usesWearable = true;
+        } else if (!usesWearable && !watchSurfaceKinds.isEmpty()
+                && watchModuleName(request) != null && legacyGplayServicesMode) {
+            // Said out loud rather than skipped in silence. The complication services still
+            // generate and a watch-side publish still works, but a phone-side one does not reach
+            // the watch, and nothing else in the build would tell the developer that -- they
+            // would be looking at a complication that never updates from the phone and no reason
+            // for it. Not a hard failure, because adding the wearable artifact under the legacy
+            // Play services monolith is a dependency conflict this build would lose.
+            log("[wearable] android.includeGPlayServices=true, so the Wearable Data Layer glue "
+                    + "cannot be added -- the wearable artifact conflicts with the legacy Play "
+                    + "services monolith. The complication and Tile services are still generated "
+                    + "and the watch app's own Surfaces.publish() still feeds them, but a "
+                    + "PHONE-side publish will NOT be mirrored to the watch. Drop "
+                    + "android.includeGPlayServices to get the mirror.");
         }
         if (usesWearable) {
             File wearImpl = new File(srcDir, "com/codename1/impl/android");
@@ -4321,6 +4338,10 @@ public class AndroidGradleBuilder extends Executor {
         // (harmless when unused). The foreground service entry is emitted only when the
         // app references com.codename1.background.ForegroundService.
         String backgroundWorkService = "<service android:name=\"com.codename1.impl.android.CodenameOneJobService\" android:permission=\"android.permission.BIND_JOB_SERVICE\" android:exported=\"false\" />\n";
+        // The Wear manifest needs it too: the watch lifecycle can call
+        // Display.scheduleBackgroundWork, which schedules this component through JobScheduler, and
+        // a component the manifest does not declare cannot be scheduled.
+        watchBackgroundWorkService = backgroundWorkService;
         String foregroundServiceEntry = "";
         if (usesForegroundService) {
             foregroundServicePermission = true;
@@ -7314,8 +7335,13 @@ public class AndroidGradleBuilder extends Executor {
     private String wearApplicationTag(BuildRequest request) {
         String attrs = request.getArg("android.xapplication_attr", "");
         StringBuilder sb = new StringBuilder("    <application");
-        if (!attrs.contains("android:label")) {
-            sb.append(" android:label=\"").append(xmlize(request.getDisplayName())).append("\"");
+        // android.blockLabel honoured, as the phone tag honours it, and escaped for an ATTRIBUTE:
+        // xmlize leaves the double quote alone, so a display name like Acme "Watch" closed the
+        // attribute early and the manifest stopped parsing.
+        if (!attrs.contains("android:label")
+                && !"true".equalsIgnoreCase(request.getArg("android.blockLabel", "false"))) {
+            sb.append(" android:label=\"")
+              .append(xmlizeAttribute(request.getDisplayName())).append("\"");
         }
         if (!attrs.contains("android:icon")) {
             sb.append(" android:icon=\"@drawable/icon\"");
@@ -7619,6 +7645,7 @@ public class AndroidGradleBuilder extends Executor {
                 // all.
                 + "  " + watchProviderTag + "\n"
                 + "  " + watchAlarmReceiver
+                + "  " + watchBackgroundWorkService
                 // A complication or Tile tap still needs the trampoline, and a TILE tap needs it
                 // reachable from the tile host's process -- see anyWatchTile.
                 + "        <activity android:name=\"com.codename1.impl.android.surfaces."
