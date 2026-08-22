@@ -275,19 +275,32 @@ public final class InterpClass {
 
     private void buildVtable() {
         Hashtable t = new Hashtable();
-        // Supertypes first so an override replaces the inherited entry.
-        // Interfaces before the superclass: a default method is only reached
-        // when no class in the chain provides an implementation, and the
-        // superclass pass below overwrites anything it does declare.
-        // Least specific first, so a sub-interface's override lands on top of
-        // the one it overrides. `class C implements B, A` where `B extends A`
+        // Interfaces from every class in the chain, not just this one's own.
+        // A subclass that implements J extends I (which overrides I.m as a
+        // default) must dispatch new C().m() to J.m even when the superclass
+        // implements only I. Copying just the superclass's vtable would clobber
+        // J.m with the I.m entry the superclass inherited, because both live at
+        // the same key in the superclass's table and its origin is lost by then.
+        // Sorted so a less-specific interface is copied first and a more-specific
+        // override lands on top -- `class C implements B, A` where `B extends A`
         // is legal and declaration order says nothing about which default wins
-        // -- Java says the most specific one does.
-        for (InterpClass iface : sortBySpecificity(interpInterfaces)) {
-            copyInto(t, iface);
+        // -- Java takes the most specific.
+        Vector allIfaces = collectAllInterfaces();
+        InterpClass[] ifaceArr = new InterpClass[allIfaces.size()];
+        for (int i = 0; i < ifaceArr.length; i++) {
+            ifaceArr[i] = (InterpClass) allIfaces.elementAt(i);
         }
+        for (InterpClass iface : sortBySpecificity(ifaceArr)) {
+            copyInto(t, iface, true);
+        }
+        // Superclass class-declared entries next: JLS gives every class method
+        // precedence over an interface default at the same key, so overwriting
+        // interface entries here is right. Interface-owned entries in the
+        // superclass's vtable are skipped because the pass above already
+        // covered every interface in the chain -- copying them would just
+        // reintroduce the same clobber the reviewer flagged.
         if (superInterp != null) {
-            copyInto(t, superInterp);
+            copyInto(t, superInterp, false);
         }
         for (InterpMethod m : methods) {
             if (!m.isStatic()) {
@@ -297,7 +310,30 @@ public final class InterpClass {
         vtable = t;
     }
 
-    private static void copyInto(Hashtable target, InterpClass source) {
+    /// Every interpreted interface reachable through this class or any of its
+    /// interpreted superclasses, deduplicated, preserving encounter order so
+    /// the specificity sort has something to work with.
+    private Vector collectAllInterfaces() {
+        Vector out = new Vector();
+        for (InterpClass c = this; c != null; c = c.superInterp) {
+            for (int i = 0; i < c.interpInterfaces.length; i++) {
+                InterpClass iface = c.interpInterfaces[i];
+                if (iface != null && !out.contains(iface)) {  //NOPMD CompareObjectsWithEquals - class-object identity, not equal-by-value
+                    out.addElement(iface);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Copies non-private entries from {@code source.vtable} into {@code target}.
+    /// {@code interfaceOwnedToo} controls whether entries whose owner is an
+    /// interface are copied. Called with {@code true} for the interface pass and
+    /// {@code false} for the superclass pass -- the latter avoids reintroducing
+    /// an interface default the superclass merely inherited, which the interface
+    /// pass has already selected across the whole class chain.
+    private static void copyInto(Hashtable target, InterpClass source,
+                                 boolean interfaceOwnedToo) {
         if (source.vtable == null) {
             source.buildVtable();
         }
@@ -310,6 +346,9 @@ public final class InterpClass {
             // which Java would have reported as a compile error and which here
             // silently runs code the subclass cannot even name.
             if (m.isPrivate()) {
+                continue;
+            }
+            if (!interfaceOwnedToo && m.owner.isInterface()) {
                 continue;
             }
             target.put(k, m);

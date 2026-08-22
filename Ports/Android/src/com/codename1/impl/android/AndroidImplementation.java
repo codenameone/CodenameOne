@@ -13434,9 +13434,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // dummy0, whose only address is an IPv6 link-local, and callers get
             // "fe80::...%dummy0" -- which is not an address anything can be
             // reached on and cannot even say which network this device is on.
-            // Prefer a real IPv4 on a live interface, and take a routable one
-            // over a link-local.
-            String linkLocal = null;
+            // Prefer a real IPv4 on a live interface, take a routable one over a
+            // link-local, and keep a non-link-local IPv6 as a fallback so an
+            // IPv6-only network (where getLocalHost resolves to loopback and no
+            // interface has an IPv4 at all) still reports a reachable address
+            // instead of localhost.
+            String linkLocalV4 = null;
+            String routableV6 = null;
+            String linkLocalV6 = null;
             Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
             while(nie.hasMoreElements()) {
                 NetworkInterface current = nie.nextElement();
@@ -13446,20 +13451,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 Enumeration<InetAddress> iae = current.getInetAddresses();
                 while(iae.hasMoreElements()) {
                     InetAddress currentI = iae.nextElement();
-                    if(currentI.isLoopbackAddress() || !(currentI instanceof java.net.Inet4Address)) {
+                    if(currentI.isLoopbackAddress()) {
                         continue;
+                    }
+                    if(currentI instanceof java.net.Inet4Address) {
+                        if(currentI.isLinkLocalAddress()) {
+                            if(linkLocalV4 == null) {
+                                linkLocalV4 = currentI.getHostAddress();
+                            }
+                            continue;
+                        }
+                        return currentI.getHostAddress();
                     }
                     if(currentI.isLinkLocalAddress()) {
-                        if(linkLocal == null) {
-                            linkLocal = currentI.getHostAddress();
+                        if(linkLocalV6 == null) {
+                            linkLocalV6 = currentI.getHostAddress();
                         }
-                        continue;
+                    } else if(routableV6 == null) {
+                        routableV6 = currentI.getHostAddress();
                     }
-                    return currentI.getHostAddress();
                 }
             }
-            if(linkLocal != null) {
-                return linkLocal;
+            if(linkLocalV4 != null) {
+                return linkLocalV4;
+            }
+            if(routableV6 != null) {
+                return routableV6;
+            }
+            if(linkLocalV6 != null) {
+                return linkLocalV6;
             }
             return i.getHostAddress();
         } catch(Throwable t) {
