@@ -1056,7 +1056,22 @@ JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE,
         JAVA_FLOAT  f;
         JAVA_INT    i;
     } u;
-    
+
+    u.f = n1;
+    return u.i;
+}
+
+JAVA_INT java_lang_Float_floatToRawIntBits___float_R_int(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT n1)
+{
+    // Same as floatToIntBits on ParparVM: the union-based type-pun already
+    // preserves every NaN payload verbatim. The two entry points differ only
+    // in that this one is what a program calls when it explicitly does not
+    // want NaN canonicalisation, matching the JVM's convention.
+    union {
+        JAVA_FLOAT  f;
+        JAVA_INT    i;
+    } u;
+
     u.f = n1;
     return u.i;
 }
