@@ -2489,6 +2489,17 @@ void com_codename1_impl_ios_IOSNative_macWindowSetBounds___int_int_int_int_int(C
 #endif
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+#if TARGET_OS_MACCATALYST
+    if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
+        return JAVA_FALSE;
+    }
+    return CN1MacMainWindowGetBounds((int*) ((JAVA_ARRAY) out)->data) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_macWindowGetBounds___int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT out) {
 #if TARGET_OS_MACCATALYST
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {

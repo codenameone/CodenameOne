@@ -230,6 +230,8 @@ public final class IOSNative {
 
     native void macWindowGetBounds(int slot, int[] out);
 
+    native boolean macMainWindowGetBounds(int[] out);
+
     native int macWindowGetWidth(int slot);
 
     native int macWindowGetHeight(int slot);

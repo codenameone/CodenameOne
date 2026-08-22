@@ -191,6 +191,8 @@ public final class LinuxNative {
     /** Fills {@code out} with x, y, width and height in desktop coordinates. */
     public static native void desktopWindowGetBounds(int slot, int[] out);
 
+    public static native boolean mainWindowGetBounds(int[] out);
+
     public static native int desktopWindowGetWidth(int slot);
 
     public static native int desktopWindowGetHeight(int slot);

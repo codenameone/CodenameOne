@@ -759,6 +759,35 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowGetBounds___int_
     }
 }
 
+/*
+ * The application's own top-level window in desktop coordinates.
+ *
+ * centerOn(Form) needs this: a Form lives in the main window, so centring a window
+ * over a Form means centring over that window. Without it the framework falls back
+ * to the monitor work area, which is a different place whenever the main window has
+ * been moved, resized or simply does not fill the screen.
+ */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_mainWindowGetBounds___int_1ARRAY_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+    RECT r;
+    JAVA_ARRAY_INT* data;
+    if (out == JAVA_NULL || cn1Win.hwnd == NULL) {
+        return JAVA_FALSE;
+    }
+    if ((*(JAVA_ARRAY) out).length < 4) {
+        return JAVA_FALSE;
+    }
+    if (!GetWindowRect(cn1Win.hwnd, &r)) {
+        return JAVA_FALSE;
+    }
+    data = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) out).data;
+    data[0] = r.left;
+    data[1] = r.top;
+    data[2] = r.right - r.left;
+    data[3] = r.bottom - r.top;
+    return JAVA_TRUE;
+}
+
 JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowGetWidth___int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT slot) {
     CN1DesktopWindow* w = slotAt(slot);

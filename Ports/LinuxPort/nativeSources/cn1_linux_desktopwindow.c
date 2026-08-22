@@ -731,6 +731,19 @@ static void cn1DesktopGetBoundsOnMain(void* arg) {
     }
 }
 
+/* The application's own GTK window. cn1LinuxWindowWidget() is the main window, the
+ * one a Form renders into. */
+static void cn1MainWindowGetBoundsOnMain(void* arg) {
+    CN1DesktopOp* op = (CN1DesktopOp*) arg;
+    GtkWidget* main = cn1LinuxWindowWidget();
+    op->a = 0;
+    if (main != 0) {
+        gtk_window_get_position(GTK_WINDOW(main), &op->out[0], &op->out[1]);
+        gtk_window_get_size(GTK_WINDOW(main), &op->out[2], &op->out[3]);
+        op->a = 1;
+    }
+}
+
 static void cn1DesktopFlagOnMain(void* arg) {
     CN1DesktopOp* op = (CN1DesktopOp*) arg;
     CN1LinuxWindow* w = slotAt(op->slot);
@@ -898,6 +911,37 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowGetBounds___int_int_
         arr[2] = op.out[2];
         arr[3] = op.out[3];
     }
+}
+
+/*
+ * The application's own top-level window in desktop coordinates.
+ *
+ * centerOn(Form) needs this: a Form lives in the main window, so centring a window
+ * over a Form means centring over that window. Without it the framework falls back
+ * to the monitor work area, which is a different place whenever the main window has
+ * been moved, resized or simply does not fill the screen.
+ */
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_mainWindowGetBounds___int_1ARRAY_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+    CN1DesktopOp op;
+    JAVA_INT* arr;
+    if (out == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    if ((int) (*(JAVA_ARRAY) out).length < 4) {
+        return JAVA_FALSE;
+    }
+    memset(&op, 0, sizeof(op));
+    cn1LinuxRunOnMainAndWait(cn1MainWindowGetBoundsOnMain, &op);
+    if (!op.a) {
+        return JAVA_FALSE;
+    }
+    arr = (JAVA_INT*) (*(JAVA_ARRAY) out).data;
+    arr[0] = op.out[0];
+    arr[1] = op.out[1];
+    arr[2] = op.out[2];
+    arr[3] = op.out[3];
+    return JAVA_TRUE;
 }
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowGetWidth___int_R_int(

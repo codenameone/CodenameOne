@@ -172,6 +172,8 @@ public final class WindowsNative {
     /** Fills {@code out} with x, y, width and height in desktop coordinates. */
     public static native void desktopWindowGetBounds(int slot, int[] out);
 
+    public static native boolean mainWindowGetBounds(int[] out);
+
     /** Width of the window's drawable area in pixels. */
     public static native int desktopWindowGetWidth(int slot);
 

@@ -1261,9 +1261,16 @@ void CN1MacWindowFocus(int slot) {
     if (w == NULL) {
         return;
     }
-    UIWindow* window = w->window;
+    UIWindow* window;
+    /* Under the lock and retained, like every other snapshot handed to a block in
+     * this file: scene re-adoption replaces and releases the window, and the block
+     * would otherwise message a deallocated object. */
+    pthread_mutex_lock(&g_slotLock);
+    window = [w->window retain];
+    pthread_mutex_unlock(&g_slotLock);
     dispatch_async(dispatch_get_main_queue(), ^{
         [window makeKeyAndVisible];
+        [window release];
     });
 }
 
@@ -1292,7 +1299,12 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height) {
     if (w == NULL || argb == NULL || width <= 0 || height <= 0) {
         return;
     }
-    CN1MacWindowView* view = w->content;
+    CN1MacWindowView* view;
+    /* Retained for the block below for the same reason as the window and the scene:
+     * adoption releases the previous content view when it builds a new one. */
+    pthread_mutex_lock(&g_slotLock);
+    view = [w->content retain];
+    pthread_mutex_unlock(&g_slotLock);
     if (view == nil) {
         return;
     }
@@ -1310,6 +1322,7 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height) {
          * Java-side reuse was there to remove. */
         void* pixels = malloc(bytes);
         if (pixels == NULL) {
+            [view release];
             return;
         }
         memcpy(pixels, argb, bytes);
@@ -1341,7 +1354,10 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [view presentImage:image];
                     CGImageRelease(image);
+                    [view release];
                 });
+            } else {
+                [view release];
             }
         }
     }
@@ -1605,6 +1621,59 @@ UIView* CN1MacWindowEditingHostView(void) {
  * The main scene is the connected window scene that no Codename One window claims,
  * the same way CN1MacMonitorForMainWindow finds it.
  */
+/* Runs a block on the main queue and waits. Reads that have to return a value
+ * cannot dispatch_async, and UIKit geometry must be read on the main thread. */
+static void CN1MacRunOnMainSync(void (^block)(void)) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+
+/*
+ * The application's own window in pixels, or NO when it cannot be found.
+ *
+ * centerOn(Form) needs this: a Form lives in the main window, so centring over one
+ * means centring over that window. Without it the framework falls back to the
+ * monitor work area, which is a different place whenever the main window has been
+ * moved, resized or simply does not fill the screen.
+ *
+ * The main scene is the connected window scene no Codename One window claims, the
+ * same way CN1MacMonitorForMainWindow finds it.
+ */
+BOOL CN1MacMainWindowGetBounds(int* out) {
+    __block BOOL found = NO;
+    if (out == NULL) {
+        return NO;
+    }
+    CN1MacRunOnMainSync(^{
+        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            UIWindowScene* windowScene = (UIWindowScene*) scene;
+            if (CN1MacWindowIdForScene(windowScene) >= 0) {
+                continue;
+            }
+            for (UIWindow* window in windowScene.windows) {
+                CGFloat scale = window.screen != nil ? window.screen.scale : 1.0;
+                CGRect f = window.frame;
+                out[0] = (int) (f.origin.x * scale);
+                out[1] = (int) (f.origin.y * scale);
+                out[2] = (int) (f.size.width * scale);
+                out[3] = (int) (f.size.height * scale);
+                found = YES;
+                break;
+            }
+            if (found) {
+                break;
+            }
+        }
+    });
+    return found;
+}
+
 void CN1MacMainWindowSetInputEnabled(BOOL enabled) {
     dispatch_async(dispatch_get_main_queue(), ^{
         for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {

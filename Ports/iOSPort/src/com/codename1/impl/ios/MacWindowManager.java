@@ -224,6 +224,20 @@ public class MacWindowManager extends WindowManager {
     /// a native editor, a web view, a media control -- is handed its touches
     /// directly by the window server and never passes through that filter, so the
     /// main window's peers stayed interactive under an application modal.
+    /// {@inheritDoc}
+    ///
+    /// A Form lives in the application's own window, so centring a window over a
+    /// Form means centring over that window. Left unimplemented the framework fell
+    /// back to the monitor work area, which is a different place whenever the main
+    /// window has been moved, resized or simply does not fill the screen.
+    @Override
+    public int[] getMainWindowBounds(int[] out) {
+        if (out == null || out.length < 4) {
+            return null;
+        }
+        return IOSImplementation.nativeInstance.macMainWindowGetBounds(out) ? out : null;
+    }
+
     @Override
     public void setMainWindowInputEnabled(boolean enabled) {
         IOSImplementation.nativeInstance.macMainWindowSetInputEnabled(enabled);

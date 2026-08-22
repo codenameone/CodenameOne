@@ -120,6 +120,7 @@ BOOL CN1MacWindowReopen(int slot);
 /** Enables or disables touch input for a window, used while a modal blocks it. */
 void CN1MacWindowSetInputEnabled(int slot, BOOL enabled);
 void CN1MacMainWindowSetInputEnabled(BOOL enabled);
+BOOL CN1MacMainWindowGetBounds(int* out);
 
 /** Starts reporting display attach/remove/mode changes; idempotent. */
 void CN1MacWindowWatchScreens(void);

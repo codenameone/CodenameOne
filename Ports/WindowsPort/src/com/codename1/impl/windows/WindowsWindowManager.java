@@ -133,6 +133,20 @@ public class WindowsWindowManager extends WindowManager {
         }
     }
 
+    /// {@inheritDoc}
+    ///
+    /// A Form lives in the application's own window, so centring a window over a
+    /// Form means centring over that window. Left unimplemented the framework fell
+    /// back to the monitor work area, which is a different place whenever the main
+    /// window has been moved, resized or simply does not fill the screen.
+    @Override
+    public int[] getMainWindowBounds(int[] out) {
+        if (out == null || out.length < 4) {
+            return null;
+        }
+        return WindowsNative.mainWindowGetBounds(out) ? out : null;
+    }
+
     @Override
     public int[] getBounds(Object peerObj, int[] out) {
         int s = slot(peerObj);
