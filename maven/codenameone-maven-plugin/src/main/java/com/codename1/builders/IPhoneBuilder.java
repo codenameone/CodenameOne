@@ -4182,7 +4182,7 @@ public class IPhoneBuilder extends Executor {
             // capability.
             if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 String appGroups = request.getArg("ios.app_groups", "");
-                if (!appGroups.contains(surfacesAppGroup)) {
+                if (!declaresAppGroup(appGroups, surfacesAppGroup)) {
                     request.putArgument("ios.app_groups", appGroups.length() == 0
                             ? surfacesAppGroup : appGroups + "," + surfacesAppGroup);
                 }
@@ -8252,6 +8252,36 @@ public class IPhoneBuilder extends Executor {
                 set.add(trimmed);
             }
         }
+    }
+
+    /**
+     * Whether a declared app-group list already contains a group, compared as a whole token.
+     *
+     * <p>The same trap the profile check documents, one layer up: a project already declaring
+     * {@code group.com.example.shared} contains the string {@code group.com.example}, so a
+     * substring test read the surfaces group as present and left the entitlement out. The
+     * container then fails to resolve, {@code areWidgetsSupported()} answers false, and
+     * {@code Surfaces.publish()} returns before the bridge -- taking the watch mirror with it, in
+     * the watch-only configuration this entitlement was widened for.</p>
+     *
+     * <p>Split on both separators because the two builders spell the list differently -- comma
+     * here, space on the build server -- and a value pasted from one into the other should not
+     * change the answer.</p>
+     *
+     * @param declared the existing ios.app_groups value
+     * @param group the group being added
+     * @return true when the group is already declared
+     */
+    static boolean declaresAppGroup(String declared, String group) {
+        if (declared == null || group == null || group.length() == 0) {
+            return false;
+        }
+        for (String token : declared.split("[,\\s]+")) {
+            if (group.equals(token.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

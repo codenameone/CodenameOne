@@ -150,6 +150,61 @@ final class IOSSurfaceBridge implements SurfaceBridge {
 
     public void reloadWidgets(String kindId) {
         nativeInstance.surfacesReloadTimelines(kindId == null ? "" : kindId);
+        // ...and the paired watch, which surfacesReloadTimelines does not reach: it drives
+        // WidgetCenter, and a complication lives in another bundle on another device with its own
+        // copy of the descriptor. A reload means "draw what you already hold again", and the only
+        // way to ask for that across the pairing is to hand the descriptor over again. No images:
+        // their names are content hashes, so whatever it references is already beside it.
+        String container = containerPath();
+        if (container == null) {
+            return;
+        }
+        if (kindId != null) {
+            remirror(container, kindId);
+            return;
+        }
+        try {
+            String[] kinds = fs.listFiles(container + "/cn1surfaces");
+            if (kinds == null) {
+                return;
+            }
+            for (String kind : kinds) {
+                if (kind == null) {
+                    continue;
+                }
+                // listFiles returns child names; a directory carries a trailing slash on some
+                // ports.
+                String bare = kind.endsWith("/") ? kind.substring(0, kind.length() - 1) : kind;
+                if (bare.length() > 0) {
+                    remirror(container, bare);
+                }
+            }
+        } catch (IOException e) {
+            // Nothing published yet, most likely. A reload-all that cannot enumerate has nothing
+            // to forward.
+            Log.e(e);
+        }
+    }
+
+    /// Sends a kind's stored descriptor to the watch again. Silent when nothing was published:
+    /// there is then nothing for the watch to redraw.
+    private void remirror(String container, String kindId) {
+        try {
+            String path = container + "/cn1surfaces/" + kindId + "/timeline.json";
+            if (!fs.exists(path)) {
+                return;
+            }
+            java.io.InputStream in = fs.openInputStream(path);
+            byte[] json = com.codename1.io.Util.readInputStream(in);
+            in.close();
+            if (json.length > 0) {
+                mirrorToWatch(kindId, new String(json, "UTF-8"), null);
+            }
+        } catch (Throwable t) {
+            // A watch that does not hear about a reload keeps showing the same content, which is
+            // what a reload would have redrawn: this is a refresh, not a change.
+            Log.e(t);
+        }
     }
 
     public int getInstalledWidgetCount(String kindId) {

@@ -268,7 +268,7 @@ public abstract class CN1SurfaceTileService extends TileService {
                     col.addContent(gap(spacing, false));
                 }
                 first = false;
-                col.addContent(render(child, state, depth + 1, false));
+                col.addContent(weighted(render(child, state, depth + 1, false), child, false));
             }
             return col.setModifiers(modifiers(node)).build();
         }
@@ -281,7 +281,7 @@ public abstract class CN1SurfaceTileService extends TileService {
                     row.addContent(gap(spacing, true));
                 }
                 first = false;
-                row.addContent(render(child, state, depth + 1, true));
+                row.addContent(weighted(render(child, state, depth + 1, true), child, true));
             }
             return row.setModifiers(modifiers(node)).build();
         }
@@ -353,6 +353,32 @@ public abstract class CN1SurfaceTileService extends TileService {
         // text, dyn and anything unknown: whatever string the node resolves to. A dyn value is
         // frozen here; see the class comment.
         return styledText(node, state);
+    }
+
+    /// A child sized to its share of the parent's leftover space, when it asked for one.
+    ///
+    /// SurfaceNode.setWeight serializes as "weight", and adding the rendered child straight onto
+    /// the container ignored it -- so two children weighted 1 and 2 came out naturally sized here
+    /// while every other renderer split the row between them. ProtoLayout expresses the share as
+    /// a dimension rather than a property of the child, and a built LayoutElement has no size to
+    /// set after the fact, so the child goes inside a Box that carries it.
+    ///
+    /// A weight of 0 is the default and means natural sizing, which is what the bare element
+    /// already does.
+    private static LayoutElementBuilders.LayoutElement weighted(
+            LayoutElementBuilders.LayoutElement element, JSONObject child, boolean horizontal) {
+        int weight = child == null ? 0 : child.optInt("weight", 0);
+        if (weight <= 0) {
+            return element;
+        }
+        LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder()
+                .addContent(element);
+        if (horizontal) {
+            box.setWidth(DimensionBuilders.weight(weight));
+        } else {
+            box.setHeight(DimensionBuilders.weight(weight));
+        }
+        return box.build();
     }
 
     /// The gap a row or column puts between adjacent children.
