@@ -134,7 +134,6 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             return null;
         }
         List<TimelineEntry> entries = new ArrayList<TimelineEntry>();
-        CN1WatchSurface.Reading last = readings.get(0);
         for (int i = 1; i < readings.size(); i++) {
             CN1WatchSurface.Reading reading = readings.get(i);
             ComplicationData entry = build(type, reading);
@@ -149,14 +148,20 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                     new TimeInterval(Instant.ofEpochMilli(reading.getStart()),
                             end > reading.getStart() ? Instant.ofEpochMilli(end) : Instant.MAX),
                     entry));
-            last = reading;
         }
-        // Exhausted, and the app asked to be woken when that happened. The system will hold the
-        // final entry indefinitely -- that is what handing it a timeline means -- and
-        // UPDATE_PERIOD_SECONDS is 0, so nothing else would ever ask. A widget and a Tile both
-        // make this throttled request; a complication that skipped it was the last surface that
-        // could freeze on its own last entry.
-        if (last.getNextFlipDate() <= 0 && last.isReloadAtEnd()) {
+        // Exhausted NOW -- the entry being shown is the last one -- and the app asked to be woken
+        // when that happened. Asked from the ACTIVE reading and not the final one: with future
+        // entries still to come the final one also has no flip date, so reading it here made the
+        // request hours early and never again at the moment it was for.
+        //
+        // What this cannot do is notice the end arriving later. A complication is asked once and
+        // handed the whole timeline; the system then swaps entries itself and never comes back,
+        // and UPDATE_PERIOD_SECONDS is 0 by design. So a timeline published with future entries
+        // is refreshed when the app next publishes or when something asks this service again --
+        // which for a push-driven surface is the normal course, and is why the widget's
+        // background-fetch request is the same throttled one rather than a schedule of its own.
+        CN1WatchSurface.Reading active = readings.get(0);
+        if (active.getNextFlipDate() <= 0 && active.isReloadAtEnd()) {
             CN1WidgetProvider.requestAppRefresh(this, getKindId());
         }
         return new ComplicationDataTimeline(current, entries);

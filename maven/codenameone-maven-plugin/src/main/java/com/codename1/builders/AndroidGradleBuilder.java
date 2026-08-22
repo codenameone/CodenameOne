@@ -351,6 +351,9 @@ public class AndroidGradleBuilder extends Executor {
 
     /** Location, geofence and foreground-service declarations the Wear manifest needs too. */
     private String watchFeatureComponents = "";
+
+    /** Audio and remote-control declarations the Wear manifest needs too. */
+    private String watchMediaComponents = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -4331,6 +4334,12 @@ public class AndroidGradleBuilder extends Executor {
             remoteControlService = "";
             mediabuttonReceiver = "";
         }
+        // The Wear manifest needs these too. A watch lifecycle that plays audio reaches the same
+        // AudioService through the same shared implementation, and remote controls need the same
+        // service and media-button receiver -- all of which the wear module compiles either way,
+        // so the declarations are the only thing missing.
+        watchMediaComponents = mediaService + "\n" + remoteControlService + "\n"
+                + mediabuttonReceiver + "\n";
         String alarmRecevier = "<receiver android:name=\"com.codename1.impl.android.LocalNotificationPublisher\" android:exported=\"false\"></receiver>\n";
         watchAlarmReceiver = alarmRecevier;
         String backgroundLocationReceiver = "<receiver android:name=\"com.codename1.location.BackgroundLocationBroadcastReceiver\" android:exported=\"true\"></receiver>\n";
@@ -7668,6 +7677,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "  " + watchBackgroundWorkService
                 + "  " + watchBackgroundFetchService
                 + "  " + watchFeatureComponents
+                + "  " + watchMediaComponents
                 // A complication or Tile tap still needs the trampoline, and a TILE tap needs it
                 // reachable from the tile host's process -- see anyWatchTile.
                 + "        <activity android:name=\"com.codename1.impl.android.surfaces."
