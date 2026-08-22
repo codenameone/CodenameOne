@@ -833,6 +833,28 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
      * from under it. Only UIKit calls follow -- nothing re-enters Codename One --
      * so this cannot deadlock against the event dispatch thread. */
 
+    /* A slot can be adopted more than once. A close that a modal blocks is put
+     * back through CN1MacWindowReopen, and disconnection releases only the scene:
+     * the window, controller and view built for the previous scene are still
+     * here. Overwriting the three pointers below without releasing them leaks an
+     * entire native window and view hierarchy on every blocked close. Nothing in
+     * this file implements dealloc, so none of these releases re-enters Codename
+     * One and they are safe under the lock. */
+    if (w->window != nil || w->controller != nil || w->content != nil) {
+        UIWindow* staleWindow = w->window;
+        CN1MacWindowController* staleController = w->controller;
+        CN1MacWindowView* staleContent = w->content;
+        w->window = nil;
+        w->controller = nil;
+        w->content = nil;
+        [staleContent removeFromSuperview];
+        staleWindow.rootViewController = nil;
+        staleWindow.hidden = YES;
+        [staleContent release];
+        [staleController release];
+        [staleWindow release];
+    }
+
     w->window = [[UIWindow alloc] initWithWindowScene:scene];
     w->controller = [[CN1MacWindowController alloc] init];
     w->controller.windowId = w->windowId;
@@ -971,7 +993,11 @@ BOOL CN1MacWindowReopen(int slot) {
     if (w == NULL || w->scene != nil) {
         return NO;
     }
+    /* Under the lock for the same reason as the other pending state: adoption
+     * reads this field while holding it. */
+    pthread_mutex_lock(&g_slotLock);
     w->pendingVisible = 1;
+    pthread_mutex_unlock(&g_slotLock);
     const int generation = w->generation;
     dispatch_async(dispatch_get_main_queue(), ^{
         pthread_mutex_lock(&g_slotLock);
@@ -1106,8 +1132,12 @@ void CN1MacWindowSetTitle(int slot, NSString* title) {
     w->pendingTitle = retained;
     scene = w->scene;
     /* An extra reference for the block: the slot's reference belongs to the slot,
-     * and a later setTitle can replace and release it before the block runs. */
+     * and a later setTitle can replace and release it before the block runs. The
+     * scene needs the same treatment -- CN1MacWindowSceneDisconnected can clear and
+     * release it between this snapshot and the block, and the block would then
+     * message a deallocated UIWindowScene. */
     forBlock = [retained retain];
+    scene = [scene retain];
     pthread_mutex_unlock(&g_slotLock);
     /* Released outside the lock, because -release can run arbitrary teardown. */
     [old release];
@@ -1116,6 +1146,7 @@ void CN1MacWindowSetTitle(int slot, NSString* title) {
             scene.title = forBlock == nil ? @"" : forBlock;
         }
         [forBlock release];
+        [scene release];
     });
 }
 
@@ -1145,8 +1176,11 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
     w->awaitingWidth = width;
     w->awaitingHeight = height;
     w->staleLayoutDropped = 0;
-    scene = w->scene;
-    window = w->window;
+    /* Retained for the block: a native disconnection can clear and release the
+     * scene between this snapshot and the block running on the main queue, and the
+     * block would then message a deallocated object. */
+    scene = [w->scene retain];
+    window = [w->window retain];
     pthread_mutex_unlock(&g_slotLock);
     dispatch_async(dispatch_get_main_queue(), ^{
         /* Codename One geometry is in pixels, UIKit's is in points. */
@@ -1156,6 +1190,8 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
         // on a content size here would silently redefine the API.
         CN1MacWindowRequestGeometry(scene,
                 CGRectMake(x / scale, y / scale, width / scale, height / scale));
+        [scene release];
+        [window release];
     });
 }
 
@@ -1412,7 +1448,8 @@ void CN1MacWindowSetResizable(int slot, BOOL resizable) {
     }
     pthread_mutex_lock(&g_slotLock);
     w->resizable = resizable ? 1 : 0;
-    UIWindowScene* scene = w->scene;
+    /* Retained for the block, as elsewhere in this file. */
+    UIWindowScene* scene = [w->scene retain];
     int pixelWidth = w->pendingWidth;
     int pixelHeight = w->pendingHeight;
     /* Snapshotted under the lock with the rest: re-enabling resize has to put the
@@ -1427,6 +1464,7 @@ void CN1MacWindowSetResizable(int slot, BOOL resizable) {
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         if (scene.sizeRestrictions == nil) {
+            [scene release];
             return;
         }
         CGFloat scale = scene.screen != nil ? scene.screen.scale : 1.0;
@@ -1449,6 +1487,7 @@ void CN1MacWindowSetResizable(int slot, BOOL resizable) {
             scene.sizeRestrictions.minimumSize = CGSizeMake(pointWidth, pointHeight);
             scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
         }
+        [scene release];
     });
 }
 
@@ -1482,13 +1521,15 @@ void CN1MacWindowSetDecorated(int slot, BOOL decorated) {
     }
     pthread_mutex_lock(&g_slotLock);
     w->decorated = decorated ? 1 : 0;
-    UIWindowScene* scene = w->scene;
+    /* Retained for the block, as elsewhere in this file. */
+    UIWindowScene* scene = [w->scene retain];
     pthread_mutex_unlock(&g_slotLock);
     if (scene == nil) {
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         CN1MacWindowApplyDecoration(scene, decorated ? 1 : 0);
+        [scene release];
     });
 }
 
@@ -1502,16 +1543,19 @@ void CN1MacWindowSetMinimumSize(int slot, int width, int height) {
     pthread_mutex_lock(&g_slotLock);
     w->minWidth = width > 0 ? width : 0;
     w->minHeight = height > 0 ? height : 0;
-    UIWindowScene* scene = w->scene;
+    /* Retained for the block, as elsewhere in this file. */
+    UIWindowScene* scene = [w->scene retain];
     int resizable = w->resizable;
     pthread_mutex_unlock(&g_slotLock);
     if (scene == nil || !resizable) {
+        [scene release];
         /* A fixed window's restrictions are pinned to its size; a minimum would
          * fight that. */
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         if (scene.sizeRestrictions == nil) {
+            [scene release];
             return;
         }
         CGFloat scale = scene.screen != nil ? scene.screen.scale : 1.0;
@@ -1524,6 +1568,7 @@ void CN1MacWindowSetMinimumSize(int slot, int width, int height) {
              * CGSizeZero is what a scene starts with. */
             scene.sizeRestrictions.minimumSize = CGSizeZero;
         }
+        [scene release];
     });
 }
 

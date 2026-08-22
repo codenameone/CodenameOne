@@ -926,6 +926,9 @@ public class Picker extends Button {
                 int hostHeight = form instanceof com.codename1.ui.Window
                         ? form.asContainer().getHeight()
                         : Display.getInstance().getDisplayHeight();
+                int hostWidth = form instanceof com.codename1.ui.Window
+                        ? form.asContainer().getWidth()
+                        : Display.getInstance().getDisplayWidth();
                 int bottomInset = hostHeight - (safeArea.getY() + safeArea.getHeight());
                 if (bottomInset > 0) {
                     Container insetTarget = bottomCustomButtons != null ? bottomCustomButtons : dlg.getContentPane();
@@ -942,9 +945,13 @@ public class Picker extends Button {
                 final int left = 0;
                 final int right = 0;
                 final int bottom = 0;
-                dlg.setWidth(Display.getInstance().getDisplayWidth());
+                // The host's geometry, not the display's. Reposition animation is off,
+                // so these are the popup's starting bounds: taken from the display, a
+                // window of a different size got a bottom sheet that was the wrong
+                // width and started its slide from the wrong place.
+                dlg.setWidth(hostWidth);
                 dlg.setHeight(dlg.getPreferredH());
-                dlg.setY(Display.getInstance().getDisplayHeight());
+                dlg.setY(hostHeight);
                 dlg.setX(0);
                 dlg.setRepositionAnimation(false);
                 registerAsInputDevice(dlg, spinner);
@@ -1681,9 +1688,12 @@ public class Picker extends Button {
                         final int left = 0;
                         final int right = 0;
                         final int bottom = 0;
-                        dlg.setWidth(Display.getInstance().getDisplayWidth());
+                        // As at the point of opening: the host's geometry rather than
+                        // the display's, so a resize re-lays the sheet out against the
+                        // window it lives in.
+                        dlg.setWidth(f.asContainer().getWidth());
                         dlg.setHeight(dlg.getPreferredH());
-                        dlg.setY(Display.getInstance().getDisplayHeight());
+                        dlg.setY(f.asContainer().getHeight());
                         dlg.setX(0);
                         f.getAnimationManager().flushAnimation(new Runnable() {
 

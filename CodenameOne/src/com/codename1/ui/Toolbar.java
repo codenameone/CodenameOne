@@ -2023,7 +2023,14 @@ public class Toolbar extends Container {
     }
 
     void showOnTopSidemenu(final int draggedX, final boolean fromCurrent) {
-        Form f = Display.getInstance().getCurrent();
+        // The toolbar's own top level, not the current form. A side menu opened while
+        // a field in the same Window was being edited left that window's native editor
+        // active above the menu and still taking input, because the search and the
+        // stop below were aimed at the unrelated main form.
+        TopLevelContainer f = getTopLevelContainer();
+        if (f == null) {
+            f = Display.getInstance().getCurrent();
+        }
         if (f != null) {
             Component currEditing = f.findCurrentlyEditingComponent();
             if (currEditing != null) {
@@ -2160,7 +2167,14 @@ public class Toolbar extends Container {
     }
 
     void showOnTopRightSidemenu(final int draggedX, final boolean fromCurrent) {
-        Form f = Display.getInstance().getCurrent();
+        // The toolbar's own top level, not the current form. A side menu opened while
+        // a field in the same Window was being edited left that window's native editor
+        // active above the menu and still taking input, because the search and the
+        // stop below were aimed at the unrelated main form.
+        TopLevelContainer f = getTopLevelContainer();
+        if (f == null) {
+            f = Display.getInstance().getCurrent();
+        }
         if (f != null) {
             Component currEditing = f.findCurrentlyEditingComponent();
             if (currEditing != null) {

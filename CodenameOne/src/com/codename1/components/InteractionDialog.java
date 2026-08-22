@@ -675,10 +675,14 @@ public class InteractionDialog extends Container implements AbstractDialog {
                         setY(-getHeight());
                         break;
                     case Component.RIGHT:
-                        setX(Display.getInstance().getDisplayWidth());
+                        // Off the edge of the host, not of the main display. A window
+                        // larger than the main surface left this target still inside
+                        // the window, so the dialog sat there until it was removed
+                        // outright instead of animating out.
+                        setX(f.asContainer().getWidth());
                         break;
                     case Component.BOTTOM:
-                        setY(Display.getInstance().getDisplayHeight());
+                        setY(f.asContainer().getHeight());
                         break;
                     default:
                         break;
@@ -1523,8 +1527,16 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// Shows this interaction dialog and blocks until it is disposed.
     @Override
     public Command showDialog() {
-        int width = Display.getInstance().getDisplayWidth();
-        int height = Display.getInstance().getDisplayHeight();
+        // The host's dimensions, not the display's. These margins centre the dialog,
+        // and show() below places it on the host -- so measuring the main surface
+        // centred it in the wrong coordinate space, and on a window smaller than the
+        // display the margins could exceed the host outright and leave the dialog
+        // clipped or off screen.
+        TopLevelContainer host = resolveHost();
+        int width = host == null
+                ? Display.getInstance().getDisplayWidth() : host.asContainer().getWidth();
+        int height = host == null
+                ? Display.getInstance().getDisplayHeight() : host.asContainer().getHeight();
         revalidate();
         int prefWidth = Math.min(width, getPreferredW());
         int prefHeight = Math.min(height, getPreferredH());
