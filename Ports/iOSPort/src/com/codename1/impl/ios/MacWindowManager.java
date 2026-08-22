@@ -110,10 +110,6 @@ public class MacWindowManager extends WindowManager {
     /// cascade below can start from.
     private static final Object MAIN_WINDOW = new Object();
 
-    /// The main scene's visibility. Tracked because the main scene has no `Peer` to
-    /// hold it, and a window owned by the main `Form` must not be mapped while the
-    /// main scene is minimized.
-    private static boolean mainWindowVisible = true;
 
     private static Peer peer(Object p) {
         return p instanceof Peer ? (Peer) p : null;
@@ -164,18 +160,14 @@ public class MacWindowManager extends WindowManager {
         if (w == null) {
             return;
         }
-        if (ownerHidden(w)) {
-            // An owned window cannot be on screen while its owner is not, and the
-            // cascade only reacts to the owner *changing* visibility -- it would never
-            // revisit a window mapped independently while the owner was already away.
-            // Recording the request as owner-hidden makes the owner's restore bring
-            // this window up with the rest, and reporting it keeps the framework from
-            // painting a window that is not on screen.
-            w.visible = false;
-            w.hiddenByOwner = true;
-            com.codename1.ui.Display.getInstance().windowHideNotify(w.windowId);
-            return;
-        }
+        // An owned window cannot be on screen while its owner is not, and the cascade
+        // only reacts to an owner *changing* visibility -- it would never revisit a
+        // window shown while its owner was already away. The owner is brought back
+        // rather than this window left pending: Window.show() has already taken the
+        // modal blocker by the time this runs, so a window that is never mapped would
+        // block input to every other window and leave showModal() waiting for a window
+        // nobody can see.
+        showOwnerChain(w);
         w.visible = true;
         w.hiddenByOwner = false;
         IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
@@ -184,22 +176,25 @@ public class MacWindowManager extends WindowManager {
         cascadeFrom(w, true);
     }
 
-    /// Whether any owner above the given window is currently away, so the window may
-    /// not be mapped.
-    private static boolean ownerHidden(Peer w) {
-        Object owner = w.owner;
-        while (owner != null) {
-            if (!(owner instanceof Peer)) {
-                // The main scene, which keeps its visibility in mainWindowVisible.
-                return !mainWindowVisible;
-            }
-            Peer above = (Peer) owner;
-            if (!above.visible) {
-                return true;
-            }
-            owner = above.owner;
+    /// Maps every owner above the given window that is currently away, furthest first
+    /// so an owner is never mapped before its own owner.
+    ///
+    /// A window owned by the main `Form` is mapped without this bringing the main
+    /// scene back: un-minimizing the application's own scene is the window server's
+    /// to do, not ours. Mapping anyway is the deliberate choice -- leaving the window
+    /// pending instead would deadlock a modal, which is the worse of the two.
+    private static void showOwnerChain(Peer w) {
+        if (!(w.owner instanceof Peer)) {
+            return;
         }
-        return false;
+        Peer above = (Peer) w.owner;
+        showOwnerChain(above);
+        if (!above.visible) {
+            above.visible = true;
+            above.hiddenByOwner = false;
+            IOSImplementation.nativeInstance.macWindowShow(above.slot, true);
+            com.codename1.ui.Display.getInstance().windowShowNotify(above.windowId);
+        }
     }
 
     /// The live windows owned by the given peer.
@@ -234,9 +229,6 @@ public class MacWindowManager extends WindowManager {
         Object owner = windowId == 0 ? MAIN_WINDOW : peerForWindowId(windowId);
         if (owner == null) {
             return;
-        }
-        if (windowId == 0) {
-            mainWindowVisible = shown;
         }
         if (owner instanceof Peer) {
             // Record what the platform just did to this window before cascading from
