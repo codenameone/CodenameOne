@@ -1552,10 +1552,12 @@ public class Window extends Container implements TopLevelContainer {
             // window that no longer blocks input. Recursive, so a whole hidden chain
             // comes back furthest owner first.
             //
-            // An iconified owner is deliberately not included: it is still shown as
-            // far as the framework is concerned, and the port restores it natively and
-            // reports it back through showNotify().
-            if (!owner.isWindowShowing() && !owner.iconified) {
+            // An iconified owner is included: only the Catalyst port restored one of
+            // those itself, so everywhere else the child was mapped against an owner
+            // still minimized -- appearing without it, or suppressed by the window
+            // system while the framework counted it visible and took its modal
+            // blocker, which strands an application modal with all input blocked.
+            if (!owner.isWindowShowing()) {
                 owner.show();
             }
         }
@@ -1622,6 +1624,10 @@ public class Window extends Container implements TopLevelContainer {
         revalidateWithAnimationSafety();
         initFocused();
         nativeVisible = true;
+        // A window being shown is by definition no longer minimized. Only hide() and
+        // showNotify() cleared this before, so restoring an iconified window through
+        // show() left it marked iconified while it was on screen.
+        iconified = false;
         acquireModal();
         // Only meaningful when this window is *not* modal, which is why acquireModal()
         // above cannot cover it: a window shown while someone else's application modal

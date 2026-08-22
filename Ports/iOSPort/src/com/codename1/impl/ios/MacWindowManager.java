@@ -160,46 +160,17 @@ public class MacWindowManager extends WindowManager {
         if (w == null) {
             return;
         }
-        // An owned window cannot be on screen while its owner is not, and the cascade
-        // only reacts to an owner *changing* visibility -- it would never revisit a
-        // window shown while its owner was already away. The owner is brought back
-        // rather than this window left pending: Window.show() has already taken the
-        // modal blocker by the time this runs, so a window that is never mapped would
-        // block input to every other window and leave showModal() waiting for a window
-        // nobody can see.
-        showOwnerChain(w);
+        // An owned window cannot be on screen while its owner is not. Window.show()
+        // restores a non-showing owner through its own lifecycle before reaching any
+        // port, which is the only thing that can make the owner's component hierarchy
+        // visible again and reacquire its modality, so by here the owner is already
+        // up and there is deliberately no second mechanism doing it again.
         w.visible = true;
         w.hiddenByOwner = false;
         IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
         // Only the ones this owner took down. A child hidden by the application stays
         // hidden, exactly as AWT and GTK behave when an owner is shown again.
         cascadeFrom(w, true);
-    }
-
-    /// Maps every owner above the given window that is currently away, furthest first
-    /// so an owner is never mapped before its own owner.
-    ///
-    /// This is the iconified case only. An owner the application hid explicitly is
-    /// restored by `Window#show()` before the port is reached, because it needs its
-    /// component hierarchy made visible and its modality reacquired, which mapping the
-    /// native window cannot do.
-    ///
-    /// A window owned by the main `Form` is mapped without this bringing the main
-    /// scene back: un-minimizing the application's own scene is the window server's
-    /// to do, not ours. Mapping anyway is the deliberate choice -- leaving the window
-    /// pending instead would deadlock a modal, which is the worse of the two.
-    private static void showOwnerChain(Peer w) {
-        if (!(w.owner instanceof Peer)) {
-            return;
-        }
-        Peer above = (Peer) w.owner;
-        showOwnerChain(above);
-        if (!above.visible) {
-            above.visible = true;
-            above.hiddenByOwner = false;
-            IOSImplementation.nativeInstance.macWindowShow(above.slot, true);
-            com.codename1.ui.Display.getInstance().windowShowNotify(above.windowId);
-        }
     }
 
     /// The live windows owned by the given peer.

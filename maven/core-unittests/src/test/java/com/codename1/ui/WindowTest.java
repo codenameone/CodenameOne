@@ -402,6 +402,58 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void showingAWindowRestoresAnIconifiedOwner() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        child.hide();
+        // Native minimization arrives through hideNotify, not hide().
+        owner.hideNotify();
+        assertFalse(owner.isWindowShowing(), "the owner starts this minimized");
+
+        child.show();
+
+        assertTrue(owner.isWindowShowing(),
+                "a minimized owner has to be restored too: only one port did it "
+                        + "itself, so everywhere else the child was mapped against an "
+                        + "owner still minimized");
+        assertTrue(child.isWindowShowing());
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void aRestoredWindowIsNoLongerMarkedMinimized() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("restored");
+        w.show();
+        w.hideNotify();
+
+        w.show();
+
+        // Only hide() and showNotify() cleared this before, so a window restored
+        // through show() stayed marked minimized while it was on screen. There is no
+        // public predicate for it, so the field is read directly, as the timer test
+        // above reads animatableComponents.
+        assertTrue(w.isWindowShowing());
+        boolean stillIconified;
+        try {
+            java.lang.reflect.Field f = Window.class.getDeclaredField("iconified");
+            f.setAccessible(true);
+            stillIconified = f.getBoolean(w);
+        } catch (Exception err) {
+            throw new RuntimeException(err);
+        }
+        assertFalse(stillIconified,
+                "a window that is on screen cannot still be marked minimized");
+
+        w.dispose();
+    }
+
+    @FormTest
     void theMinimumSizeReachesThePortAndClampsAResize() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("clamped", new BorderLayout());

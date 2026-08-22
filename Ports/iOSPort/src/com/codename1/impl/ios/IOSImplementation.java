@@ -2024,12 +2024,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // the cascade is emulated here. Doing it for the user-driven minimize
                 // as well as for hide() is what makes the two paths agree -- an owner
                 // becomes hidden both ways.
-                MacWindowManager.windowVisibilityChanged(windowId, shown);
+                // The owner's own transition is delivered first. Both notify methods
+                // queue through callSerially rather than running here, so cascading
+                // first would put every descendant ahead of the owner in that queue
+                // and a child listener asking whether its owner is showing would read
+                // stale state.
                 if (shown) {
                     Display.getInstance().windowShowNotify(windowId);
                 } else {
                     Display.getInstance().windowHideNotify(windowId);
                 }
+                MacWindowManager.windowVisibilityChanged(windowId, shown);
             }
         });
     }
