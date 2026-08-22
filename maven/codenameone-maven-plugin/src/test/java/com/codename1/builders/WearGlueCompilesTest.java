@@ -126,6 +126,8 @@ public class WearGlueCompilesTest {
                         + "{ return \"\"; }\n"
                         + "    static double resolveFraction(JSONObject n, JSONObject s) "
                         + "{ return 0d; }\n"
+                        + "    static int resolveColor(JSONObject c, boolean d, int fl, int fd) "
+                        + "{ return 0; }\n"
                         + "}\n").getBytes("UTF-8"));
         Files.write(shims.resolve("CN1SurfaceActionActivity.java"),
                 ("package com.codename1.impl.android.surfaces;\n"

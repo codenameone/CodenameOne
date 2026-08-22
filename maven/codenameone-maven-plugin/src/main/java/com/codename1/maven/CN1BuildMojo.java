@@ -1730,22 +1730,24 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             unzip.setDest(resultDir);
             unzip.execute();
             File[] resultFiles = resultDir.listFiles();
-            // Which extensions actually came back with a primary artifact, decided BEFORE any
-            // entry is classified. A role suffix is a claim about a set, not about a name: an app
-            // called "fitness-wear" returns one APK whose base ends in "-wear" and it is the
-            // primary artifact, not a companion. Treating the name alone as the answer copied the
-            // only APK to <finalName>-wear.apk and attached it under a classifier, leaving the
-            // artifact the build was for missing entirely.
-            java.util.Set<String> extensionsWithPrimary = new java.util.HashSet<String>();
+            // Every returned base, by extension, collected BEFORE anything is classified: see
+            // roleSuffixFor, which needs to know whether a suffixed entry names an artifact that
+            // is also here.
+            java.util.Map<String, java.util.Set<String>> basesByExtension =
+                    new java.util.HashMap<String, java.util.Set<String>>();
             for (File child : resultFiles) {
                 String name = child.getName();
                 int dot = name.lastIndexOf(".");
                 if (dot < 0) {
                     continue;
                 }
-                if (roleSuffixOf(name.substring(0, dot)).length() == 0) {
-                    extensionsWithPrimary.add(name.substring(dot));
+                String ext = name.substring(dot);
+                java.util.Set<String> bases = basesByExtension.get(ext);
+                if (bases == null) {
+                    bases = new java.util.HashSet<String>();
+                    basesByExtension.put(ext, bases);
                 }
+                bases.add(name.substring(0, dot));
             }
             for (File child : resultFiles) {
                 String name = child.getName();
@@ -1760,7 +1762,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 // returns two artifacts of the same kind -- a phone APK and its companion Wear APK
                 // -- collapsed both onto one path and the last one written won. That is silent and
                 // it corrupts the primary artifact, not merely the secondary one.
-                String roleSuffix = roleSuffixFor(base, extension, extensionsWithPrimary);
+                String roleSuffix = roleSuffixFor(base, extension, basesByExtension);
                 File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + roleSuffix + extension);
                 FileUtils.copyFile(child, copyTo);
                 if (roleSuffix.length() > 0) {
@@ -2503,24 +2505,34 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     /**
      * The role a result entry plays, given what else came back.
      *
-     * <p>A role suffix is a claim about a SET, not about a name. An app called
+     * <p>A role suffix is a claim about a SET, not about a name, and the question it answers is
+     * "is there something here that this one is the companion TO". An app called
      * {@code fitness-wear} returns one APK whose base ends in {@code -wear} and it is the primary
-     * artifact, not a companion -- reading the name alone copied it to
-     * {@code <finalName>-wear.apk}, attached it under a classifier, and left the artifact the
-     * build was actually for missing. So a suffix only counts when something else of the same
-     * kind came back to be the primary one.</p>
+     * artifact; the same app with a companion returns {@code fitness-wear} and
+     * {@code fitness-wear-wear}, where the second is not. Neither reading the name alone nor
+     * asking whether any unsuffixed entry exists separates those two cases -- in the second, no
+     * entry is unsuffixed at all.</p>
+     *
+     * <p>What does separate them is the artifact the suffix points at: strip it, and a companion
+     * names something else in the set while a primary names nothing.</p>
      *
      * @param base the entry's name with its extension removed
      * @param extension the entry's extension, including the dot
-     * @param extensionsWithPrimary extensions for which an unsuffixed entry was returned
+     * @param basesByExtension every returned base, keyed by extension
      * @return the role suffix including its leading dash, or an empty string
      */
     static String roleSuffixFor(String base, String extension,
-            java.util.Set<String> extensionsWithPrimary) {
-        if (extensionsWithPrimary == null || !extensionsWithPrimary.contains(extension)) {
+            java.util.Map<String, java.util.Set<String>> basesByExtension) {
+        String suffix = roleSuffixOf(base);
+        if (suffix.length() == 0 || basesByExtension == null) {
             return "";
         }
-        return roleSuffixOf(base);
+        java.util.Set<String> siblings = basesByExtension.get(extension);
+        if (siblings == null) {
+            return "";
+        }
+        return siblings.contains(base.substring(0, base.length() - suffix.length()))
+                ? suffix : "";
     }
 
     private static final String[] ARTIFACT_ROLE_SUFFIXES = {"-wear-debug", "-wear"};

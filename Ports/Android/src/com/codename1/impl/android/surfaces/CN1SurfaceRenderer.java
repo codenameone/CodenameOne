@@ -847,28 +847,38 @@ public final class CN1SurfaceRenderer {
 
     private static int resolveColor(JSONObject color, RenderContext rc, int fallbackLight,
             int fallbackDark) {
+        return resolveColor(color, rc != null && rc.dark, fallbackLight, fallbackDark);
+    }
+
+    /// The colour a `color` node resolves to, in ARGB.
+    ///
+    /// Package-private and taking the appearance directly rather than a RenderContext, because
+    /// the Tile renderer needs the same answer and has none to give. One implementation: a
+    /// semantic role meaning one thing on a home screen and another on a watch face is a bug
+    /// nobody would look for.
+    static int resolveColor(JSONObject color, boolean dark, int fallbackLight, int fallbackDark) {
         String role = color.optString("role", null);
         if (role != null && role.length() > 0) {
             if ("label".equals(role)) {
-                return rc.dark ? LABEL_DARK : LABEL_LIGHT;
+                return dark ? LABEL_DARK : LABEL_LIGHT;
             }
             if ("secondaryLabel".equals(role)) {
-                return rc.dark ? SECONDARY_LABEL_DARK : SECONDARY_LABEL_LIGHT;
+                return dark ? SECONDARY_LABEL_DARK : SECONDARY_LABEL_LIGHT;
             }
             if ("background".equals(role)) {
-                return rc.dark ? BACKGROUND_DARK : BACKGROUND_LIGHT;
+                return dark ? BACKGROUND_DARK : BACKGROUND_LIGHT;
             }
             if ("accent".equals(role)) {
                 return ACCENT;
             }
-            return rc.dark ? fallbackDark : fallbackLight;
+            return dark ? fallbackDark : fallbackLight;
         }
         if (color.has("l") || color.has("d")) {
             long l = color.optLong("l", fallbackLight);
             long d = color.optLong("d", l);
-            return (int) (rc.dark ? d : l);
+            return (int) (dark ? d : l);
         }
-        return rc.dark ? fallbackDark : fallbackLight;
+        return dark ? fallbackDark : fallbackLight;
     }
 
     /**

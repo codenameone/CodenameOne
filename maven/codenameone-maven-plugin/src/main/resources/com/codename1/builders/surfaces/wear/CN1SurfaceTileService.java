@@ -288,7 +288,7 @@ public abstract class CN1SurfaceTileService extends TileService {
         if ("box".equals(type)) {
             LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder();
             for (JSONObject child : children(node)) {
-                box.addContent(render(child, state, depth + 1, inRow));
+                box.addContent(aligned(render(child, state, depth + 1, inRow), child));
             }
             return box.setModifiers(modifiers(node)).build();
         }
@@ -353,6 +353,45 @@ public abstract class CN1SurfaceTileService extends TileService {
         // text, dyn and anything unknown: whatever string the node resolves to. A dyn value is
         // frozen here; see the class comment.
         return styledText(node, state);
+    }
+
+    /// A box child placed where its own node asked to be placed.
+    ///
+    /// SurfaceNode.setAlignment serializes as "align" on the CHILD, and a ProtoLayout Box carries
+    /// the alignment of its contents rather than a child carrying its own -- so adding children
+    /// straight onto one shared Box gave every documented position the same default placement.
+    /// Each child therefore gets a Box of its own, which is also what lets siblings in the same
+    /// SurfaceBox sit in different corners.
+    ///
+    /// Centre is the default and is what a bare element already gets.
+    private static LayoutElementBuilders.LayoutElement aligned(
+            LayoutElementBuilders.LayoutElement element, JSONObject child) {
+        String align = child == null ? "" : child.optString("align", "");
+        if (align.length() == 0 || "center".equals(align)) {
+            return element;
+        }
+        int horizontal = LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER;
+        if ("leading".equals(align) || "topLeading".equals(align)
+                || "bottomLeading".equals(align)) {
+            horizontal = LayoutElementBuilders.HORIZONTAL_ALIGN_START;
+        } else if ("trailing".equals(align) || "topTrailing".equals(align)
+                || "bottomTrailing".equals(align)) {
+            horizontal = LayoutElementBuilders.HORIZONTAL_ALIGN_END;
+        }
+        int vertical = LayoutElementBuilders.VERTICAL_ALIGN_CENTER;
+        if ("top".equals(align) || "topLeading".equals(align) || "topTrailing".equals(align)) {
+            vertical = LayoutElementBuilders.VERTICAL_ALIGN_TOP;
+        } else if ("bottom".equals(align) || "bottomLeading".equals(align)
+                || "bottomTrailing".equals(align)) {
+            vertical = LayoutElementBuilders.VERTICAL_ALIGN_BOTTOM;
+        }
+        return new LayoutElementBuilders.Box.Builder()
+                .addContent(element)
+                .setWidth(DimensionBuilders.expand())
+                .setHeight(DimensionBuilders.expand())
+                .setHorizontalAlignment(horizontal)
+                .setVerticalAlignment(vertical)
+                .build();
     }
 
     /// A child sized to its share of the parent's leftover space, when it asked for one.
@@ -446,8 +485,15 @@ public abstract class CN1SurfaceTileService extends TileService {
             font.setWeight(LayoutElementBuilders.FONT_WEIGHT_BOLD);
         }
         JSONObject color = node.optJSONObject("color");
-        if (color != null && color.has("d")) {
-            font.setColor(ColorBuilders.argb(color.optInt("d")));
+        if (color != null) {
+            // Through the renderer's own resolution, not a "d" lookup. A semantic colour --
+            // ACCENT, SECONDARY_LABEL and the rest -- serializes as {"role": ...} with no light
+            // or dark value at all, so testing for "d" discarded every one of them and left the
+            // ProtoLayout default. Always the dark appearance: a watch face composites over
+            // black and has no light one, which is the same answer CN1SurfaceModel gives on the
+            // Apple side.
+            font.setColor(ColorBuilders.argb(CN1SurfaceRenderer.resolveColor(color, true,
+                    0xFFFFFFFF, 0xFFFFFFFF)));
         }
         LayoutElementBuilders.Text.Builder text = new LayoutElementBuilders.Text.Builder()
                 .setText(value == null ? "" : value)
