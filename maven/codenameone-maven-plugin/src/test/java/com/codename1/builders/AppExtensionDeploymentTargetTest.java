@@ -337,4 +337,54 @@ public class AppExtensionDeploymentTargetTest {
         assertTrue(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
         assertTrue(notes.isEmpty());
     }
+
+    @Test
+    public void aBaseTargetWrittenThroughAnotherSettingIsKept() throws Exception {
+        File extension = tmp.newFolder("dist9", "WalletUIExtension");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_MIN", "16.0");
+        // The reference parsed as no version at all, so the floor overwrote an iOS 16 target.
+        assertEquals("$(EXTENSION_MIN)", IPhoneBuilder.appExtensionDeploymentTarget(
+                "$(EXTENSION_MIN)", (File) null, "11", extension, settings));
+    }
+
+    @Test
+    public void aBaseTargetResolvingBelowTheFloorIsStillClamped() throws Exception {
+        File extension = tmp.newFolder("dist10", "WalletUIExtension");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_MIN", "10.0");
+        assertEquals("12.0", IPhoneBuilder.appExtensionDeploymentTarget(
+                "$(EXTENSION_MIN)", (File) null, "11", extension, settings));
+    }
+
+    @Test
+    public void anIdentifierThroughTargetNameResolvesRatherThanTruncating() throws Exception {
+        File extension = tmp.newFolder("dist11", "WalletUIExtension");
+        java.util.Map<String, String> settings = IPhoneBuilder.extensionSettingsWithBuiltIns(
+                extension, new java.util.LinkedHashMap<String, String>());
+        // Deleting $(TARGET_NAME) recorded "com.example.app." as the export-options key, matching
+        // nothing in the archive.
+        assertEquals("WalletUIExtension", settings.get("TARGET_NAME"));
+        assertEquals("WalletUIExtension", settings.get("PRODUCT_NAME"));
+    }
+
+    @Test
+    public void aQualifiedEntitlementsFileCanRaiseTheFloor() throws Exception {
+        File extension = tmp.newFolder("dist12", "WalletUIExtension");
+        File plain = new File(extension, "Plain.entitlements");
+        write(plain, "<plist><dict/></plist>");
+        File device = new File(extension, "Device.entitlements");
+        write(device, "<plist><dict>\n<key>com.apple.developer.payment-pass-provisioning</key>\n"
+                + "<true/>\n</dict></plist>");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("CODE_SIGN_ENTITLEMENTS", "WalletUIExtension/Plain.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "WalletUIExtension/Device.entitlements");
+
+        java.util.List<File> candidates = IPhoneBuilder.appExtensionEntitlementsCandidates(
+                extension, settings, null);
+
+        // The device archive is signed with the qualified file, so its entitlement decides.
+        assertEquals(2, candidates.size());
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentFloor(candidates));
+    }
 }

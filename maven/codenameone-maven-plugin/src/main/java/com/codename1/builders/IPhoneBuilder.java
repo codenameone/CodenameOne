@@ -4872,7 +4872,7 @@ public class IPhoneBuilder extends Executor {
                             String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
                             String resolvedBundleId = resolveSettingsInValue(declaredId != null
                                     ? declaredId : request.getPackageName() + "." + extensionName,
-                                    declaredSettings);
+                                    extensionSettingsWithBuiltIns(appExtension, declaredSettings));
                             String outOfNamespace = resolvedBundleId.length() == 0 ? null
                                     : outOfNamespaceExtensionIdMessage(extensionName, resolvedBundleId,
                                             request.getPackageName());
@@ -4930,17 +4930,17 @@ public class IPhoneBuilder extends Executor {
                             // necessarily the one picked by name: buildSettings.properties may set
                             // CODE_SIGN_ENTITLEMENTS at another file, and it is that file's
                             // payment-pass-provisioning that decides whether iOS 14 is the floor.
-                            File signedEntitlements = appExtensionSignedEntitlements(appExtension,
-                                    buildSettingsMap.get("CODE_SIGN_ENTITLEMENTS"), extEntitlementsFile,
-                                    buildSettingsMap);
+                            List<File> signingEntitlements = appExtensionEntitlementsCandidates(
+                                    appExtension, buildSettingsMap, extEntitlementsFile);
                             String extDeploymentTarget = appExtensionDeploymentTarget(
                                     buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
-                                    signedEntitlements,
-                                    request.getArg("ios.deployment_target", null));
+                                    signingEntitlements,
+                                    request.getArg("ios.deployment_target", null),
+                                    appExtension, buildSettingsMap);
                             buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
                             for (String note : repairQualifiedExtensionSettings(buildSettingsMap,
                                     request.getPackageName(),
-                                    appExtensionDeploymentFloor(signedEntitlements))) {
+                                    appExtensionDeploymentFloor(signingEntitlements))) {
                                 debug("The " + extensionName + " app extension: " + note + ".");
                             }
 
@@ -6648,6 +6648,78 @@ public class IPhoneBuilder extends Executor {
                 + "." + extensionName + ".";
     }
 
+    /// The archive's settings plus the ones Xcode defines for this target itself.
+    ///
+    /// A value written through TARGET_NAME or PRODUCT_NAME -- com.example.app.$(TARGET_NAME) is
+    /// an ordinary way to write an extension's identifier -- resolves on the build machine and
+    /// must resolve here too. Without them the reference is simply deleted, and what was recorded
+    /// for the export-options dictionary was "com.example.app.", a key matching nothing in the
+    /// archive.
+    static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
+            Map<String, String> settings) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        if (settings != null) {
+            out.putAll(settings);
+        }
+        String targetName = extensionFolder.getName();
+        out.put("TARGET_NAME", targetName);
+        String productName = out.get("PRODUCT_NAME");
+        if (productName == null || productName.indexOf('$') >= 0) {
+            // PRODUCT_NAME is $(TARGET_NAME) unless the archive says otherwise, which is what this
+            // builder writes onto the target.
+            out.put("PRODUCT_NAME", targetName);
+        }
+        File projectDir = extensionFolder.getParentFile();
+        String projectPath = projectDir == null ? "." : projectDir.getAbsolutePath();
+        if (!out.containsKey("SRCROOT")) {
+            out.put("SRCROOT", projectPath);
+        }
+        if (!out.containsKey("PROJECT_DIR")) {
+            out.put("PROJECT_DIR", projectPath);
+        }
+        return out;
+    }
+
+    /// Every entitlements file this target may be signed with: the plain CODE_SIGN_ENTITLEMENTS
+    /// and each qualified one.
+    ///
+    /// Xcode honours CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] over the plain setting for the device
+    /// archive, so an archive that grants payment-pass-provisioning only in its device
+    /// entitlements was read as granting nothing and kept the 12.0 floor Apple rejects it for.
+    static List<File> appExtensionEntitlementsCandidates(File extensionFolder,
+            Map<String, String> settings, File byName) {
+        List<File> out = new ArrayList<File>();
+        if (settings != null) {
+            for (Map.Entry<String, String> setting : settings.entrySet()) {
+                String key = setting.getKey();
+                if (!"CODE_SIGN_ENTITLEMENTS".equals(key)
+                        && !isQualified(key, "CODE_SIGN_ENTITLEMENTS")) {
+                    continue;
+                }
+                File resolved = appExtensionSignedEntitlements(extensionFolder, setting.getValue(),
+                        null, settings);
+                if (resolved != null && !out.contains(resolved)) {
+                    out.add(resolved);
+                }
+            }
+        }
+        if (out.isEmpty() && byName != null) {
+            out.add(byName);
+        }
+        return out;
+    }
+
+    /// The floor for an extension that may be signed with any of these: the highest any of them
+    /// asks for. An extension whose DEVICE entitlements need iOS 14 needs iOS 14.
+    static String appExtensionDeploymentFloor(List<File> entitlements) {
+        for (File file : entitlements) {
+            if (entitlementIsTrue(file, PAYMENT_PASS_PROVISIONING)) {
+                return "14.0";
+            }
+        }
+        return "12.0";
+    }
+
     /// The lowest iOS an extension with these entitlements may declare.
     static String appExtensionDeploymentFloor(File entitlements) {
         return entitlementIsTrue(entitlements, PAYMENT_PASS_PROVISIONING) ? "14.0" : "12.0";
@@ -6724,6 +6796,22 @@ public class IPhoneBuilder extends Executor {
     /// @param entitlements the extension's .entitlements, or null when it has none
     /// @param appTarget the ios.deployment_target build hint, or null
     static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget) {
+        return appExtensionDeploymentTarget(declared, entitlements, appTarget, null, null);
+    }
+
+    /// @param extensionFolder and {@code settings}, so a declared target written as
+    /// $(EXTENSION_MIN) is judged by the version it resolves to rather than parsed as none
+    static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget,
+            File extensionFolder, Map<String, String> settings) {
+        return appExtensionDeploymentTarget(declared,
+                entitlements == null ? new ArrayList<File>() : Arrays.asList(entitlements),
+                appTarget, extensionFolder, settings);
+    }
+
+    /// @param entitlements every file this target may be signed with, since a qualified
+    /// CODE_SIGN_ENTITLEMENTS can be the one that carries the Wallet entitlement
+    static String appExtensionDeploymentTarget(String declared, List<File> entitlements,
+            String appTarget, File extensionFolder, Map<String, String> settings) {
         // The floor is a floor, not a default. An archive exported from an old project may carry
         // IPHONEOS_DEPLOYMENT_TARGET = 10.0 of its own, and honouring that unconditionally would
         // reproduce the very rejection this exists to prevent -- 10.0 does not even build against
@@ -6732,6 +6820,15 @@ public class IPhoneBuilder extends Executor {
         String chosen = declared != null && declared.trim().length() > 0
                 ? declared.trim()
                 : appTarget;
+        if (chosen != null && chosen.indexOf('$') >= 0) {
+            // Written through another setting. What it resolves to decides whether it clears the
+            // floor; the declared text is what the target keeps, because Xcode resolves it there
+            // and a reference this build cannot evaluate is not one to overwrite with a guess.
+            String resolved = extensionFolder == null ? "" : resolveSettingsInValue(chosen,
+                    extensionSettingsWithBuiltIns(extensionFolder, settings));
+            return resolved.length() > 0 && isDeploymentTargetBelow(resolved, floor)
+                    ? floor : chosen;
+        }
         return isDeploymentTargetBelow(chosen, floor) ? floor : normalizeVersion(chosen.trim());
     }
 
