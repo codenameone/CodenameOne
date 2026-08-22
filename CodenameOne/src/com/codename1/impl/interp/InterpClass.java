@@ -62,6 +62,41 @@ public final class InterpClass {
     /// getfield.
     String[] fieldNames = new String[0];
     String[] fieldDescs = new String[0];
+    /// Field access flags, one entry per {@code fieldNames} slot. Only
+    /// {@link #ACC_VOLATILE} is consulted at run time -- to give a `volatile`
+    /// field's read and write a happens-before barrier -- but the full flags
+    /// word is stored so a future consumer can honour other modifiers without
+    /// another bundle-format bump.
+    int[] fieldAccess = new int[0];
+
+    /// JVM `ACC_VOLATILE` bit, from the class-file spec. Mirrored here so
+    /// this file has no dependency on ASM: the reader stores raw access
+    /// words the writer copied out of ASM and the runtime tests against
+    /// this constant only.
+    public static final int ACC_VOLATILE = 0x0040;
+
+    /// Names of static fields declared volatile, so a `getstatic` / `putstatic`
+    /// through the interpreter can synchronise on the declaring class the way
+    /// the JVM synchronises on the field's memory location.
+    private final Hashtable volatileStatics = new Hashtable();
+
+    /// Marks a static field as `volatile`. Called from the bundle reader
+    /// when the access word for a static carries `ACC_VOLATILE`.
+    void markStaticVolatile(String fieldName) {
+        volatileStatics.put(fieldName, Boolean.TRUE);
+    }
+
+    /// Whether the named static field is `volatile`.
+    boolean isStaticVolatile(String fieldName) {
+        return volatileStatics.get(fieldName) != null;
+    }
+
+    /// Whether an instance-field slot (in this class's own declared range)
+    /// is `volatile`.
+    boolean isInstanceFieldVolatile(int slotInThisClass) {
+        return slotInThisClass >= 0 && slotInThisClass < fieldAccess.length
+                && (fieldAccess[slotInThisClass] & ACC_VOLATILE) != 0;
+    }
 
     /// Stands in for a null static value.
     ///
@@ -275,30 +310,30 @@ public final class InterpClass {
 
     private void buildVtable() {
         Hashtable t = new Hashtable();
-        // Interfaces from every class in the chain, not just this one's own.
-        // A subclass that implements J extends I (which overrides I.m as a
-        // default) must dispatch new C().m() to J.m even when the superclass
-        // implements only I. Copying just the superclass's vtable would clobber
-        // J.m with the I.m entry the superclass inherited, because both live at
-        // the same key in the superclass's table and its origin is lost by then.
-        // Sorted so a less-specific interface is copied first and a more-specific
-        // override lands on top -- `class C implements B, A` where `B extends A`
-        // is legal and declaration order says nothing about which default wins
-        // -- Java takes the most specific.
+        // Every interface transitively reachable through this class or any
+        // interpreted superclass. The subinterface pass on the sorted set
+        // deposits directly-declared methods so an override lands on top of
+        // its superinterface's default at the same key -- and *only* the
+        // directly-declared methods, so an unrelated interface `K extends I`
+        // that inherits `I.m` does not reintroduce `I.m` on top of a
+        // sibling `J extends I` that overrode it. Copying each interface's
+        // whole vtable did that clobber, because the vtable already merged
+        // in every inherited default and cannot distinguish declared from
+        // inherited by the time it is read.
         Vector allIfaces = collectAllInterfaces();
         InterpClass[] ifaceArr = new InterpClass[allIfaces.size()];
         for (int i = 0; i < ifaceArr.length; i++) {
             ifaceArr[i] = (InterpClass) allIfaces.elementAt(i);
         }
         for (InterpClass iface : sortBySpecificity(ifaceArr)) {
-            copyInto(t, iface, true);
+            copyDeclaredMethods(t, iface);
         }
         // Superclass class-declared entries next: JLS gives every class method
         // precedence over an interface default at the same key, so overwriting
         // interface entries here is right. Interface-owned entries in the
         // superclass's vtable are skipped because the pass above already
         // covered every interface in the chain -- copying them would just
-        // reintroduce the same clobber the reviewer flagged.
+        // reintroduce the same clobber.
         if (superInterp != null) {
             copyInto(t, superInterp, false);
         }
@@ -310,20 +345,46 @@ public final class InterpClass {
         vtable = t;
     }
 
-    /// Every interpreted interface reachable through this class or any of its
-    /// interpreted superclasses, deduplicated, preserving encounter order so
-    /// the specificity sort has something to work with.
+    /// Every interpreted interface transitively reachable through this class
+    /// or any of its interpreted superclasses, deduplicated, preserving
+    /// encounter order so the specificity sort has something to work with.
+    /// Walks each interface's own superinterfaces so an interface reached only
+    /// through a subinterface still contributes its declared defaults.
     private Vector collectAllInterfaces() {
         Vector out = new Vector();
         for (InterpClass c = this; c != null; c = c.superInterp) {
             for (int i = 0; i < c.interpInterfaces.length; i++) {
-                InterpClass iface = c.interpInterfaces[i];
-                if (iface != null && !out.contains(iface)) {  //NOPMD CompareObjectsWithEquals - class-object identity, not equal-by-value
-                    out.addElement(iface);
-                }
+                addInterfaceRecursive(c.interpInterfaces[i], out);
             }
         }
         return out;
+    }
+
+    private static void addInterfaceRecursive(InterpClass iface, Vector out) {
+        if (iface == null || out.contains(iface)) {  //NOPMD CompareObjectsWithEquals - class-object identity, not equal-by-value
+            return;
+        }
+        out.addElement(iface);
+        for (int i = 0; i < iface.interpInterfaces.length; i++) {
+            addInterfaceRecursive(iface.interpInterfaces[i], out);
+        }
+    }
+
+    /// Copies non-static, non-private, non-abstract methods that {@code source}
+    /// declares directly into {@code target}. Only used for interfaces: an
+    /// interface's `methods` list gives the default methods it defines
+    /// itself, cleanly separated from anything inherited from a
+    /// superinterface -- unlike {@code source.vtable}, which merges them.
+    /// This is what lets the interface pass in {@link #buildVtable} keep a
+    /// sibling's more-specific override intact when an unrelated interface
+    /// with the same superinterface is also in the pool.
+    private static void copyDeclaredMethods(Hashtable target, InterpClass source) {
+        for (InterpMethod m : source.methods) {
+            if (m.isStatic() || m.isPrivate() || m.isAbstract()) {
+                continue;
+            }
+            target.put(m.name + m.desc, m);
+        }
     }
 
     /// Copies non-private entries from {@code source.vtable} into {@code target}.

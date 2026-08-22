@@ -62,7 +62,12 @@ import java.util.Map;
  */
 public class InterpBundleWriter {
     private static final int MAGIC = 0x434E3149;
-    private static final int VERSION = 3;
+    // Bumped to 4 with the field-access flags and LDC_DOUBLE raw-long-bits
+    // changes: an older reader would call `Double.parseDouble` on a raw-bit
+    // string like "4607182418800017408" and fail on the number, and would
+    // also lose the volatile flag the runtime now needs to fence field
+    // accesses. Kept in sync with InterpBundle.VERSION on the reader side.
+    private static final int VERSION = 4;
 
     private static final int EXTERN_CLASS = 0;
     private static final int EXTERN_METHOD = 1;
@@ -543,11 +548,19 @@ public class InterpBundleWriter {
         for (FieldNode fn : instanceFields) {
             out.writeInt(intern(fn.name));
             out.writeInt(intern(fn.desc));
+            // Access flags carry `ACC_VOLATILE`, which the interpreter needs
+            // to give the read/write a memory barrier -- otherwise a worker-
+            // thread handoff through a `volatile boolean ready` would let a
+            // reader observe `ready` while the writes it publishes are still
+            // stale. Older bundles dropped this; older readers ignore it
+            // because they read only the pairs they were built for.
+            out.writeInt(fn.access);
         }
         out.writeInt(staticFields.size());
         for (FieldNode fn : staticFields) {
             out.writeInt(intern(fn.name));
             out.writeInt(intern(fn.desc));
+            out.writeInt(fn.access);
         }
 
         out.writeInt(cn.methods.size());
@@ -802,7 +815,14 @@ public class InterpBundleWriter {
             enc.code.add(Integer.valueOf(Float.floatToRawIntBits(((Float) cst).floatValue())));
         } else if (cst instanceof Double) {
             enc.code.add(Integer.valueOf(LDC_DOUBLE));
-            enc.code.add(Integer.valueOf(intern(cst.toString())));
+            // Raw long bits, interned as the same "long-as-string" format
+            // LDC_LONG uses. Encoding via `Double.toString` reduced every NaN
+            // to "NaN" and the reader's `Double.parseDouble("NaN")` handed
+            // back the canonical 0x7ff8000000000000L, so a bytecode LDC of a
+            // noncanonical NaN would round-trip as the canonical one -- and
+            // `doubleToRawLongBits` would then see the wrong bits.
+            enc.code.add(Integer.valueOf(intern(
+                    Long.toString(Double.doubleToRawLongBits(((Double) cst).doubleValue())))));
         } else if (cst instanceof String) {
             enc.code.add(Integer.valueOf(LDC_STRING));
             enc.code.add(Integer.valueOf(intern((String) cst)));

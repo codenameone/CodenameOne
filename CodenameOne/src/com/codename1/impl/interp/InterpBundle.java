@@ -48,7 +48,12 @@ public final class InterpBundle {
     /// Bundle format version. The runtime refuses anything it does not know,
     /// because a bundle is pushed from a machine whose SDK moves independently
     /// of the installed app.
-    public static final int VERSION = 3;
+    ///
+    /// Bumped to 4 when LDC_DOUBLE constants switched from a `Double.toString`
+    /// encoding to raw long bits: an older reader would call
+    /// `Double.parseDouble` on the new encoding and fail on a value like
+    /// "4607182418800017408" (the bits of 1.0).
+    public static final int VERSION = 4;
 
     /// Extern kinds -- what a reference into the host app names.
     public static final int EXTERN_CLASS = 0;

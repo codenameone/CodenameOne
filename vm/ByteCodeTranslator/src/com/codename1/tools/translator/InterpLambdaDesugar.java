@@ -67,6 +67,16 @@ final class InterpLambdaDesugar {
      */
     static List<ClassNode> desugar(List<ClassNode> classes) {
         List<ClassNode> generated = new ArrayList<ClassNode>();
+        // Every already-known name, so a synthesised lambda cannot pick one --
+        // a user class literally called `Owner$$Lambda$0` (unlikely but legal)
+        // would otherwise be overwritten in `classesByName` by the first
+        // lambda in `Owner`, silently redirecting allocations of the user
+        // class to the lambda body. The set grows as generation goes so a
+        // later `Owner$$Lambda$1` cannot collide either.
+        java.util.HashSet<String> takenNames = new java.util.HashSet<String>();
+        for (ClassNode cn : classes) {
+            takenNames.add(cn.name);
+        }
         for (ClassNode cn : classes) {
             int counter = 0;
             for (MethodNode mn : cn.methods) {
@@ -79,7 +89,9 @@ final class InterpLambdaDesugar {
                     if (insn instanceof InvokeDynamicInsnNode) {
                         InvokeDynamicInsnNode indy = (InvokeDynamicInsnNode) insn;
                         if (isLambda(indy)) {
+                            counter = advancePastTaken(cn.name, counter, takenNames);
                             ClassNode lambda = synthesize(cn, indy, counter++);
+                            takenNames.add(lambda.name);
                             generated.add(lambda);
                             mn.instructions.set(insn, new MethodInsnNode(Opcodes.INVOKESTATIC,
                                     lambda.name, "create", indy.desc, false));
@@ -112,6 +124,17 @@ final class InterpLambdaDesugar {
      * a class carrying only B and only B's method fails the call site's own
      * cast and cannot answer a call through A.</p>
      */
+    /// Returns the next counter value whose synthesised lambda name is not
+    /// already taken by an input class or a previously generated lambda.
+    private static int advancePastTaken(String ownerName, int start,
+                                        java.util.HashSet<String> takenNames) {
+        int at = start;
+        while (takenNames.contains(ownerName + "$$Lambda$" + at)) {
+            at++;
+        }
+        return at;
+    }
+
     private static ClassNode synthesize(ClassNode owner, InvokeDynamicInsnNode indy, int index) {
         Type[] captured = Type.getArgumentTypes(indy.desc);
         Type functionalInterface = Type.getReturnType(indy.desc);

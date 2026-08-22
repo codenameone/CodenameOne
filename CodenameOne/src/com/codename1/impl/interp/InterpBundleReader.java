@@ -227,15 +227,24 @@ public final class InterpBundleReader {
         int instanceFieldCount = in.readInt();
         c.fieldNames = new String[instanceFieldCount];
         c.fieldDescs = new String[instanceFieldCount];
+        c.fieldAccess = new int[instanceFieldCount];
         for (int i = 0; i < instanceFieldCount; i++) {
             c.fieldNames[i] = b.strings[in.readInt()];
             c.fieldDescs[i] = b.strings[in.readInt()];
+            // Access flags: only `ACC_VOLATILE` matters at run time -- the
+            // interpreter wraps a volatile get/put in a `synchronized (io)`
+            // so happens-before ordering matches Java's contract.
+            c.fieldAccess[i] = in.readInt();
         }
         int staticFieldCount = in.readInt();
         for (int i = 0; i < staticFieldCount; i++) {
             String fname = b.strings[in.readInt()];
             String fdesc = b.strings[in.readInt()];
+            int faccess = in.readInt();
             c.setStaticValue(fname, InterpValues.defaultValue(fdesc));
+            if ((faccess & InterpClass.ACC_VOLATILE) != 0) {
+                c.markStaticVolatile(fname);
+            }
         }
 
         int methodCount = in.readInt();

@@ -1212,7 +1212,13 @@ public final class InterpRuntime {
                 f.pushFloat(Float.intBitsToFloat(operand));
                 break;
             case InterpOpcodes.LDC_DOUBLE:
-                f.pushDouble(Double.parseDouble(bundle.string(operand)));
+                // Raw long bits, matching the writer's format. Reading via
+                // `Double.parseDouble` collapsed every noncanonical NaN back
+                // to the canonical `0x7ff8000000000000L` -- because "NaN" is
+                // the only spelling `Double.toString` produces for any NaN --
+                // and a program that read the LDC constant back with
+                // `doubleToRawLongBits` would see the wrong bits.
+                f.pushDouble(Double.longBitsToDouble(Long.parseLong(bundle.string(operand))));
                 break;
             case InterpOpcodes.LDC_STRING:
                 f.pushRef(bundle.string(operand));
@@ -1557,6 +1563,36 @@ public final class InterpRuntime {
         return io.indexOf(declaring, name);
     }
 
+    /// Whether the named instance field is declared `volatile`. Walks up the
+    /// declared owner's chain to reach the class that actually declares the
+    /// field, matching `indexOf`.
+    private boolean isInstanceFieldVolatile(String owner, String name) {
+        InterpClass declaring = bundle.findClass(owner);
+        while (declaring != null) {
+            for (int i = 0; i < declaring.fieldNames.length; i++) {
+                if (declaring.fieldNames[i].equals(name)) {
+                    return declaring.isInstanceFieldVolatile(i);
+                }
+            }
+            declaring = declaring.superInterp;
+        }
+        return false;
+    }
+
+    /// Whether the named static field is declared `volatile` -- walked up the
+    /// class chain because javac names the access-site type as the owner,
+    /// which may be a subclass that inherits the field.
+    private boolean isStaticFieldVolatile(String owner, String name) {
+        InterpClass declaring = bundle.findClass(owner);
+        while (declaring != null) {
+            if (declaring.isStaticVolatile(name)) {
+                return true;
+            }
+            declaring = declaring.superInterp;
+        }
+        return false;
+    }
+
     /// The nearest host ancestor's internal name, or null when there is none.
     ///
     /// A static that no interpreted class in the chain declares belongs to the
@@ -1744,7 +1780,23 @@ public final class InterpRuntime {
             InterpObject io = (InterpObject) target;
             int idx = fieldIndex(io, owner, name);
             if (idx >= 0) {
-                pushBoxed(f, InterpValues.kindOf(desc), io.fields[idx]);
+                Object v;
+                if (isInstanceFieldVolatile(owner, name)) {
+                    // `volatile` needs the read to happen-after every write
+                    // this field's writer performed before publishing. A
+                    // plain `io.fields[idx]` is a lock-free access with no
+                    // barrier, so a `volatile boolean ready` coordinating a
+                    // worker-thread handoff would let the reader observe
+                    // `ready` while the writes it announced remained stale.
+                    // Synchronising on the object gives the pair the same
+                    // happens-before ordering the JVM does.
+                    synchronized (io) {
+                        v = io.fields[idx];
+                    }
+                } else {
+                    v = io.fields[idx];
+                }
+                pushBoxed(f, InterpValues.kindOf(desc), v);
                 return;
             }
             // Declared by a host superclass, so it lives on the peer -- and
@@ -1772,7 +1824,15 @@ public final class InterpRuntime {
             InterpObject io = (InterpObject) target;
             int idx = fieldIndex(io, owner, name);
             if (idx >= 0) {
-                io.fields[idx] = value;
+                if (isInstanceFieldVolatile(owner, name)) {
+                    // Same rationale as getField above: the reader waits on
+                    // the same monitor, and both entries share happens-before.
+                    synchronized (io) {
+                        io.fields[idx] = value;
+                    }
+                } else {
+                    io.fields[idx] = value;
+                }
                 return;
             }
             linker.setField(io.hostPeer, hostFieldOwner(io, owner), name, desc, value);
