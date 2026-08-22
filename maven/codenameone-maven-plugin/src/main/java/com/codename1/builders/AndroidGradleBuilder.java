@@ -6982,6 +6982,22 @@ public class AndroidGradleBuilder extends Executor {
                 : "";
     }
 
+    /**
+     * {@link #xmlize} plus the quote escape an ATTRIBUTE value needs.
+     *
+     * <p>xmlize handles the three characters that matter in element content and leaves the double
+     * quote alone, which is right there and wrong inside {@code android:label="..."} -- a display
+     * name containing one closed the attribute early and the manifest stopped parsing, failing
+     * the build on a name the developer was entitled to choose. Single quotes go too, so the
+     * result is safe in either delimiter.</p>
+     *
+     * @param s the value to place inside an XML attribute
+     * @return the escaped value
+     */
+    static String xmlizeAttribute(String s) {
+        return xmlize(s).replace("\"", "&quot;").replace("'", "&apos;");
+    }
+
     static String xmlize(String s) {
         s = s.replace("&", "&amp;");
         s = s.replace("<", "&lt;");
@@ -7017,11 +7033,13 @@ public class AndroidGradleBuilder extends Executor {
      */
     static String surfaceKindClassSuffix(String kindId) {
         StringBuilder sb = new StringBuilder(kindId.length());
+        StringBuilder positions = new StringBuilder();
         boolean upper = true;
         for (int i = 0; i < kindId.length(); i++) {
             char c = kindId.charAt(i);
             if (c == '_') {
                 upper = true;
+                positions.append('_').append(i);
                 continue;
             }
             if (upper) {
@@ -7031,7 +7049,17 @@ public class AndroidGradleBuilder extends Executor {
                 sb.append(c);
             }
         }
-        return sb.toString();
+        // Folding away underscores is not injective: "status" and "status_" both read as Status,
+        // and two kinds sharing a suffix share a generated class -- the second overwrites the
+        // first and both manifest entries point at it, so one kind serves the other kind's data.
+        // Both ids are legal, so they have to be kept apart rather than one refused.
+        //
+        // The positions and not a count: a count separates "status" from "status_" but not
+        // "a__b" from "a_b_", which both discard two. Ids are [a-z][a-z0-9_]*, so the folded
+        // name plus where the underscores were is the whole original -- nothing else can produce
+        // the same pair. Absent for an id without underscores, so every name in an existing
+        // project is unchanged.
+        return sb.append(positions).toString();
     }
 
     /**
@@ -7206,7 +7234,7 @@ public class AndroidGradleBuilder extends Executor {
             String supportedTypes) {
         return "        <service android:name=\"com.codename1.impl.android." + className + "\"\n"
                 + "                 android:exported=\"true\"\n"
-                + "                 android:label=\"" + label + "\"\n"
+                + "                 android:label=\"" + xmlizeAttribute(label) + "\"\n"
                 + "                 android:permission=\"com.google.android.wearable.permission."
                 + "BIND_COMPLICATION_PROVIDER\">\n"
                 + "            <intent-filter>\n"
@@ -7224,7 +7252,7 @@ public class AndroidGradleBuilder extends Executor {
     private String tileServiceEntry(String className, String label) {
         return "        <service android:name=\"com.codename1.impl.android." + className + "\"\n"
                 + "                 android:exported=\"true\"\n"
-                + "                 android:label=\"" + label + "\"\n"
+                + "                 android:label=\"" + xmlizeAttribute(label) + "\"\n"
                 + "                 android:permission=\"com.google.android.wearable.permission."
                 + "BIND_TILE_PROVIDER\">\n"
                 + "            <intent-filter>\n"
@@ -7294,6 +7322,20 @@ public class AndroidGradleBuilder extends Executor {
         }
         return sb.append(">\n").toString();
     }
+
+    /**
+     * How far above the phone's the Wear artifact's version code sits by default.
+     *
+     * <p>Large enough to partition the space rather than merely satisfy the ordering rule. Play
+     * refuses a version code it has already seen for an applicationId, and the two artifacts
+     * share one -- so an offset of 1 makes the Wear artifact consume the code the next phone
+     * release needs. A hundred million is beyond any hand-maintained sequence and still leaves
+     * room under Play's ceiling for a project numbering in the millions.</p>
+     */
+    static final int DEFAULT_WATCH_VERSION_CODE_OFFSET = 100000000;
+
+    /** Play's ceiling for a version code. */
+    static final int MAX_PLAY_VERSION_CODE = 2100000000;
 
     /**
      * Whether any declared kind earns a Tile, and so whether the tap trampoline has to be
@@ -7633,10 +7675,24 @@ public class AndroidGradleBuilder extends Executor {
             resolved = parseIntSafe(explicit, intVersion + 1);
             setting = "android.watchVersionCode=" + explicit;
         } else {
-            resolved = intVersion + parseIntSafe(
-                    request.getArg("android.watchVersionCodeOffset", "1"), 1);
-            setting = "android.watchVersionCodeOffset="
-                    + request.getArg("android.watchVersionCodeOffset", "1");
+            String offset = request.getArg("android.watchVersionCodeOffset",
+                    String.valueOf(DEFAULT_WATCH_VERSION_CODE_OFFSET));
+            resolved = intVersion + parseIntSafe(offset, DEFAULT_WATCH_VERSION_CODE_OFFSET);
+            setting = "android.watchVersionCodeOffset=" + offset;
+        }
+        // Play never accepts a version code twice for one application, and the two artifacts share
+        // an applicationId. An offset of 1 satisfies the ordering rule and then collides with the
+        // NEXT release: ship phone 100 with Wear 101, and the release after it cannot upload phone
+        // 101 at all. A project on sequential codes hits that on its second release, which is
+        // where this would have been found. The default offset partitions the space instead, so a
+        // Wear code can only collide with a phone code the project will never reach.
+        if (resolved > MAX_PLAY_VERSION_CODE) {
+            throw new BuildException("The Wear version code " + resolved
+                    + " exceeds the " + MAX_PLAY_VERSION_CODE + " Play allows. " + setting
+                    + " is added to the phone's " + intVersion + "; a project whose own codes are "
+                    + "already this large -- a date-derived code, usually -- needs a smaller "
+                    + "android.watchVersionCodeOffset, chosen so it cannot collide with a code "
+                    + "the project will use later.");
         }
         // The whole multi-APK arrangement rests on this ordering. A watch picks among the APKs it
         // supports by version code, so a Wear artifact that does not outrank the phone one loses

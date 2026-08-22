@@ -222,7 +222,8 @@ class AndroidWatchSurfaceCodegenTest {
     /// entirely, so the phone APK still wins there.
     @Test
     void theWearArtifactOutranksThePhoneOne() throws BuildException {
-        assertEquals(101, AndroidGradleBuilder.wearVersionCode(request(), 100));
+        assertEquals(100 + AndroidGradleBuilder.DEFAULT_WATCH_VERSION_CODE_OFFSET,
+                AndroidGradleBuilder.wearVersionCode(request(), 100));
     }
 
     @Test
@@ -247,7 +248,8 @@ class AndroidWatchSurfaceCodegenTest {
         BuildRequest req = request();
         req.putArgument("android.watchVersionCodeOffset", "not a number");
 
-        assertEquals(101, AndroidGradleBuilder.wearVersionCode(req, 100));
+        assertEquals(100 + AndroidGradleBuilder.DEFAULT_WATCH_VERSION_CODE_OFFSET,
+                AndroidGradleBuilder.wearVersionCode(req, 100));
     }
 
     /// A hint that puts the watch at or below the phone cannot be honoured: on a watch that also
@@ -273,6 +275,55 @@ class AndroidWatchSurfaceCodegenTest {
         negativeOffset.putArgument("android.watchVersionCodeOffset", "-5");
         assertThrows(BuildException.class,
                 () -> AndroidGradleBuilder.wearVersionCode(negativeOffset, 100));
+    }
+
+    /// Play refuses a version code it has already seen for an applicationId, and the two
+    /// artifacts share one -- so an offset of 1 hands the Wear artifact the code the NEXT phone
+    /// release needs, and a project on sequential codes cannot upload its second release at all.
+    /// The default partitions the space instead.
+    @Test
+    void theDefaultOffsetDoesNotConsumeTheNextReleasesCode() throws BuildException {
+        int phone = 100;
+        int wear = AndroidGradleBuilder.wearVersionCode(request(), phone);
+
+        assertTrue(wear > phone + 1000,
+                "an offset a sequential project would reach is not a partition: " + wear);
+        assertTrue(wear <= AndroidGradleBuilder.MAX_PLAY_VERSION_CODE, "over Play's ceiling");
+    }
+
+    /// A project whose own codes are already enormous -- a date-derived code -- would be pushed
+    /// over Play's ceiling, and is told to choose its own offset rather than having one silently
+    /// truncated.
+    @Test
+    void aVersionCodeOverPlaysCeilingIsRefused() {
+        assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.wearVersionCode(request(), 2090000000));
+    }
+
+    /// The generated class name has to tell two kinds apart. Folding away underscores does not:
+    /// "status" and "status_" both read as Status, so the second generated class overwrote the
+    /// first and both manifest entries pointed at it -- one kind serving the other kind's data.
+    /// A count is not enough either, because "a__b" and "a_b_" discard the same number.
+    @Test
+    void twoKindsNeverShareAGeneratedClassName() {
+        assertEquals("Status", AndroidGradleBuilder.surfaceKindClassSuffix("status"));
+        assertEquals("BatteryLevel", AndroidGradleBuilder.surfaceKindClassSuffix("battery_level")
+                .replaceAll("_\\d+", ""));
+
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        String[] ids = {"status", "status_", "_status", "a_b", "ab_", "a__b", "a_b_", "_a_b"};
+        for (String id : ids) {
+            assertTrue(seen.add(AndroidGradleBuilder.surfaceKindClassSuffix(id)),
+                    "two ids produced the same class suffix, one of them '" + id + "'");
+        }
+    }
+
+    /// An id without underscores keeps the name it has always had, so no existing project is
+    /// renamed by this.
+    @Test
+    void anIdWithoutUnderscoresIsUnchanged() {
+        assertEquals("Status", AndroidGradleBuilder.surfaceKindClassSuffix("status"));
+        assertEquals("Weather2", AndroidGradleBuilder.surfaceKindClassSuffix("weather2"));
     }
 
     // --- tiles ------------------------------------------------------------------

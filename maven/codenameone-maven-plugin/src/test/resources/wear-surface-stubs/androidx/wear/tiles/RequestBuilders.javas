@@ -1,5 +1,7 @@
 package androidx.wear.tiles;
 public final class RequestBuilders {
     public static class TileRequest { }
-    public static class ResourcesRequest { }
+    public static class ResourcesRequest {
+        public String getVersion() { return null; }
+    }
 }

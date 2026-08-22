@@ -83,6 +83,10 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// value CN1SurfaceRenderer tints a widget's progress bar with.
     private static final int ACCENT = 0xff007aff;
 
+    /// The entry the last Tile was built from, so its resources can still be served after the
+    /// timeline has moved on. Volatile because the two callbacks arrive on different threads.
+    private volatile CN1WatchSurface.Reading lastServed;
+
     /** The widget kind this Tile serves. Supplied by the generated subclass. */
     protected abstract String getKindId();
 
@@ -109,7 +113,7 @@ public abstract class CN1SurfaceTileService extends TileService {
                     public Object attachCompleter(
                             CallbackToFutureAdapter.Completer<ResourceBuilders.Resources>
                                     completer) {
-                        completer.set(buildResources());
+                        completer.set(buildResources(request.getVersion()));
                         return "cn1TileResources";
                     }
                 });
@@ -129,6 +133,8 @@ public abstract class CN1SurfaceTileService extends TileService {
                 freshness = freshnessFor(reading.getNextFlipDate(),
                         hasDynamicText(reading.getLayout()));
                 version = resourcesVersion(reading);
+                // Kept for the resources request that follows, which asks about THIS version.
+                lastServed = reading;
             }
         } catch (Throwable t) {
             // A Tile that throws is removed from the carousel, so a malformed descriptor must
@@ -210,12 +216,32 @@ public abstract class CN1SurfaceTileService extends TileService {
                 + "|" + String.valueOf(reading.getState())).hashCode());
     }
 
-    private ResourceBuilders.Resources buildResources() {
+    /**
+     * The resources for the version the host asked about.
+     *
+     * <p>The host asks for the version the LAYOUT it is showing advertised, and that layout may
+     * be one entry old: a timeline flip or a publish can land between the tile request and this
+     * one. Re-reading whatever is current then answered with a different version and a different
+     * resource map, leaving the displayed layout's image ids unresolved -- a blank where a glyph
+     * should be, on a Tile that had just been refreshed.</p>
+     *
+     * <p>So the reading the last tile was built from is kept, and used when the host asks for its
+     * version. Anything else falls back to the current entry, which is the best available answer
+     * for a version this process has no memory of.</p>
+     *
+     * @param requested the version the host is asking for, possibly null
+     * @return the resources, whose version is the one being served
+     */
+    private ResourceBuilders.Resources buildResources(String requested) {
         ResourceBuilders.Resources.Builder builder = new ResourceBuilders.Resources.Builder();
         String version = "0";
         try {
+            CN1WatchSurface.Reading remembered = lastServed;
             CN1WatchSurface.Reading reading =
-                    CN1WatchSurface.read(this, getKindId(), "watchRectangular");
+                    remembered != null && requested != null
+                            && requested.equals(resourcesVersion(remembered))
+                    ? remembered
+                    : CN1WatchSurface.read(this, getKindId(), "watchRectangular");
             if (reading != null) {
                 version = resourcesVersion(reading);
                 for (Map.Entry<String, JSONObject> e
