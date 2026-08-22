@@ -326,6 +326,21 @@ public abstract class CN1SurfaceTileService extends TileService {
                     .setWidth(DimensionBuilders.dp(Math.max(1, node.optInt("w", 24))))
                     .setHeight(DimensionBuilders.dp(Math.max(1, node.optInt("h", 24))))
                     .setModifiers(modifiers(node));
+            // The declared scale mode. "fill" crops to the bounds and "center" keeps the natural
+            // size, which is what the rasterizer does with the same values -- left unset, every
+            // image took ProtoLayout's default and a fill image was fitted instead of cropped.
+            // FILL_BOUNDS is not the match for "fill": it stretches, while the other renderers
+            // preserve the aspect ratio and crop.
+            String scale = node.optString("scale", "fit");
+            if ("fill".equals(scale)) {
+                image.setContentScaleMode(LayoutElementBuilders.CONTENT_SCALE_MODE_CROP);
+            } else {
+                // "center" has no ProtoLayout equivalent -- there is no "do not resize" mode --
+                // so it takes FIT, which at least does not crop what a centred image was meant to
+                // show whole. Recorded rather than silently mapped: this is the one scale mode a
+                // Tile cannot reproduce.
+                image.setContentScaleMode(LayoutElementBuilders.CONTENT_SCALE_MODE_FIT);
+            }
             // setTint was dropped entirely: the bitmap is produced by the port's decoder, which
             // does not tint -- CN1SurfaceRenderer applies the tint at the ImageView instead --
             // so reusing only that decoder left every tinted glyph its original colour.

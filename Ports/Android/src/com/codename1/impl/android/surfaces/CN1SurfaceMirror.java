@@ -158,6 +158,12 @@ public final class CN1SurfaceMirror {
             if (bytes.length > MAX_JSON_BYTES) {
                 return;
             }
+            // The artwork too, and not as an optimisation to skip. A reload is also how a watch
+            // app installed AFTER the publish gets its first copy of anything, and a descriptor
+            // whose content-hash images have never existed on that device renders as permanent
+            // gaps until the app happens to publish again. Sent before the descriptor, for the
+            // same reason a publish does.
+            sendImages(kindId, storedImages(ctx, kindId));
             WearableMessage message = new WearableMessage(PATH_PREFIX + kindId);
             message.put("v", 1);
             message.put("json", bytes);
@@ -168,6 +174,53 @@ public final class CN1SurfaceMirror {
             // same content: this is a refresh, not a change.
             Log.w(TAG, "Could not ask the watch to reload widget kind " + kindId, t);
         }
+    }
+
+    /**
+     * The image blobs a kind has on disk, keyed by the name its descriptor references.
+     *
+     * <p>Read back rather than remembered, because a reload can be minutes or restarts away from
+     * the publish that produced them, and the store is where they live in the meantime.</p>
+     *
+     * @param ctx any context
+     * @param kindId the widget kind
+     * @return the blobs, possibly empty
+     */
+    private static Map<String, byte[]> storedImages(Context ctx, String kindId) {
+        Map<String, byte[]> out = new java.util.LinkedHashMap<String, byte[]>();
+        File dir = CN1SurfaceStore.kindDir(ctx, kindId);
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return out;
+        }
+        for (File f : files) {
+            String name = f.getName();
+            if (!name.endsWith(".png")) {
+                continue;
+            }
+            try {
+                java.io.FileInputStream in = new java.io.FileInputStream(f);
+                try {
+                    byte[] blob = new byte[(int) f.length()];
+                    int read = 0;
+                    while (read < blob.length) {
+                        int n = in.read(blob, read, blob.length - read);
+                        if (n < 0) {
+                            break;
+                        }
+                        read += n;
+                    }
+                    if (read == blob.length) {
+                        out.put(name.substring(0, name.length() - 4), blob);
+                    }
+                } finally {
+                    in.close();
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not read " + f + " to re-send it to the watch", t);
+            }
+        }
+        return out;
     }
 
     private static void sendImages(String kindId, Map<String, byte[]> images) {

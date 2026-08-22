@@ -109,6 +109,36 @@ final class IOSSurfaceBridge implements SurfaceBridge {
         mirrorToWatch(kindId, timelineJson, images);
     }
 
+    /// The image blobs a kind has in its container, keyed by the name its descriptor references.
+    ///
+    /// Read back rather than remembered, because a reload can be far from the publish that
+    /// produced them and the container is where they live in the meantime.
+    private Map<String, byte[]> storedImages(String kindDir) {
+        Map<String, byte[]> out = new java.util.LinkedHashMap<String, byte[]>();
+        try {
+            String[] files = fs.listFiles(kindDir);
+            if (files == null) {
+                return out;
+            }
+            for (String name : files) {
+                if (name == null || !name.endsWith(".png")) {
+                    continue;
+                }
+                java.io.InputStream in = fs.openInputStream(kindDir + "/" + name);
+                try {
+                    byte[] blob = com.codename1.io.Util.readInputStream(in);
+                    out.put(name.substring(0, name.length() - 4), blob);
+                } finally {
+                    in.close();
+                }
+            }
+        } catch (Throwable t) {
+            // A blob that cannot be read is a gap in the mirrored surface, not a failed reload.
+            Log.e(t);
+        }
+        return out;
+    }
+
     /// Forwards a published timeline to the paired watch, when this build has a watch app and
     /// the kind declares a complication family.
     ///
@@ -198,7 +228,12 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             byte[] json = com.codename1.io.Util.readInputStream(in);
             in.close();
             if (json.length > 0) {
-                mirrorToWatch(kindId, new String(json, "UTF-8"), null);
+                // With the artwork, not without it. A reload is also how a watch app installed
+                // AFTER the publish gets its first copy of anything, and a descriptor whose
+                // content-hash images have never existed on that device renders as permanent gaps
+                // until the app happens to publish again.
+                mirrorToWatch(kindId, new String(json, "UTF-8"),
+                        storedImages(container + "/cn1surfaces/" + kindId));
             }
         } catch (Throwable t) {
             // A watch that does not hear about a reload keeps showing the same content, which is
