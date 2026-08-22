@@ -261,14 +261,26 @@ public abstract class CN1SurfaceTileService extends TileService {
         String type = node.optString("t", "");
         if ("col".equals(type)) {
             LayoutElementBuilders.Column.Builder col = new LayoutElementBuilders.Column.Builder();
+            int spacing = node.optInt("spacing", 0);
+            boolean first = true;
             for (JSONObject child : children(node)) {
+                if (!first && spacing > 0) {
+                    col.addContent(gap(spacing, false));
+                }
+                first = false;
                 col.addContent(render(child, state, depth + 1, false));
             }
             return col.setModifiers(modifiers(node)).build();
         }
         if ("row".equals(type)) {
             LayoutElementBuilders.Row.Builder row = new LayoutElementBuilders.Row.Builder();
+            int spacing = node.optInt("spacing", 0);
+            boolean first = true;
             for (JSONObject child : children(node)) {
+                if (!first && spacing > 0) {
+                    row.addContent(gap(spacing, true));
+                }
+                first = false;
                 row.addContent(render(child, state, depth + 1, true));
             }
             return row.setModifiers(modifiers(node)).build();
@@ -310,13 +322,19 @@ public abstract class CN1SurfaceTileService extends TileService {
                     .build();
         }
         if ("prog".equals(type)) {
-            // A ProtoLayout arc renders the ring natively -- the one place a Tile beats the phone
-            // widget, which has to degrade a circular bar to a linear one.
             float value = CN1WatchSurface.progressValue(node, state);
+            float fraction = value < 0 ? 0f : value;
+            // The style the app asked for, not an arc for everything. A ProtoLayout arc renders a
+            // ring natively -- the one place a Tile beats the phone widget, which has to degrade a
+            // circular bar to a linear one -- but reaching for it unconditionally turned every
+            // default SurfaceProgress into a ring, which is a different shape from the one the
+            // same descriptor draws in the simulator, in WidgetKit and in an Android widget.
+            if (!"circular".equals(node.optString("style", "linear"))) {
+                return linearProgress(fraction);
+            }
             return new LayoutElementBuilders.Arc.Builder()
                     .addContent(new LayoutElementBuilders.ArcLine.Builder()
-                            .setLength(DimensionBuilders.degrees(
-                                    360f * (value < 0 ? 0f : value)))
+                            .setLength(DimensionBuilders.degrees(360f * fraction))
                             .setThickness(DimensionBuilders.dp(6))
                             .build())
                     .build();
@@ -324,6 +342,53 @@ public abstract class CN1SurfaceTileService extends TileService {
         // text, dyn and anything unknown: whatever string the node resolves to. A dyn value is
         // frozen here; see the class comment.
         return styledText(node, state);
+    }
+
+    /// The gap a row or column puts between adjacent children.
+    ///
+    /// SurfaceRow and SurfaceColumn serialize setSpacing(n) as "spacing", and adding the children
+    /// straight onto the builder packed them together -- the same descriptor spaced correctly
+    /// everywhere else. ProtoLayout containers have no spacing property, so the gap is an
+    /// explicit element, sized along the container's own axis.
+    private static LayoutElementBuilders.LayoutElement gap(int dips, boolean horizontal) {
+        DimensionBuilders.SpacerDimension along = DimensionBuilders.dp(dips);
+        DimensionBuilders.SpacerDimension across = DimensionBuilders.dp(1);
+        return new LayoutElementBuilders.Spacer.Builder()
+                .setWidth(horizontal ? along : across)
+                .setHeight(horizontal ? across : along)
+                .build();
+    }
+
+    /// A linear progress bar, built from two boxes because ProtoLayout has no bar element: a
+    /// track that fills the width and a filled portion weighted to the fraction. Degrading a
+    /// linear bar into a ring would be the reverse of the phone widget's own compromise and
+    /// would not look like the surface the app described.
+    private static LayoutElementBuilders.LayoutElement linearProgress(float fraction) {
+        float filled = Math.max(0f, Math.min(1f, fraction));
+        LayoutElementBuilders.Row.Builder bar = new LayoutElementBuilders.Row.Builder();
+        if (filled > 0f) {
+            bar.addContent(new LayoutElementBuilders.Box.Builder()
+                    .setWidth(DimensionBuilders.weight(filled))
+                    .setHeight(DimensionBuilders.dp(6))
+                    .setModifiers(new ModifiersBuilders.Modifiers.Builder()
+                            .setBackground(new ModifiersBuilders.Background.Builder()
+                                    .setColor(ColorBuilders.argb(0xFFFFFFFF))
+                                    .build())
+                            .build())
+                    .build());
+        }
+        if (filled < 1f) {
+            bar.addContent(new LayoutElementBuilders.Box.Builder()
+                    .setWidth(DimensionBuilders.weight(1f - filled))
+                    .setHeight(DimensionBuilders.dp(6))
+                    .setModifiers(new ModifiersBuilders.Modifiers.Builder()
+                            .setBackground(new ModifiersBuilders.Background.Builder()
+                                    .setColor(ColorBuilders.argb(0x40FFFFFF))
+                                    .build())
+                            .build())
+                    .build());
+        }
+        return bar.build();
     }
 
     private LayoutElementBuilders.LayoutElement styledText(JSONObject node, JSONObject state) {

@@ -133,11 +133,17 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
             // phone half. Same pairing as the publish path above, and the same no-op unless this
             // build declared watch families.
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            // ...and the paired watch, which the notifier above cannot reach in a companion
+            // build: its complication and Tile services live in the wear module, so a reflective
+            // lookup from the phone process finds nothing. Both calls are no-ops unless this
+            // build declared watch families.
+            CN1SurfaceMirror.requestWatchReload(ctx, kindId);
             return;
         }
         for (String kind : CN1SurfaceStore.getRememberedKinds(ctx)) {
             broadcastUpdate(ctx, kind);
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kind);
+            CN1SurfaceMirror.requestWatchReload(ctx, kind);
         }
     }
 

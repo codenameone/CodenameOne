@@ -326,8 +326,13 @@ public class AndroidGradleBuilder extends Executor {
     private String watchSurfaceDependencies = "";
     /// The generated phone stub's source, so the Wear module can derive its own from it.
     private String generatedStubSource;
-    /** READ_MEDIA_* declarations the Wear manifest needs too; see the phone manifest. */
-    private String watchReadMediaPermissions = "";
+    /**
+     * Permission declarations the Wear manifest needs but is not otherwise given.
+     *
+     * <p>The companion manifest is generated independently rather than merged, so
+     * anything the phone half computes locally has to be carried across by hand.</p>
+     */
+    private String watchSharedPermissions = "";
     /// True when the app references com.codename1.intents. Gates the shortcut resources, the
     /// trampoline activity and the headless service, so an app that exposes nothing to the
     /// launcher carries none of them.
@@ -4715,8 +4720,10 @@ public class AndroidGradleBuilder extends Executor {
         // Held for the companion Wear manifest, which is generated independently and would
         // otherwise never see these. A watchMain that reads media on Wear OS 4 needs the same
         // READ_MEDIA_* declarations the phone half gets, or the runtime permission cannot be
-        // granted and every read fails on the watch alone.
-        watchReadMediaPermissions = readMediaPermissions;
+        // granted and every read fails on the watch alone -- and the same is true of external
+        // storage on API 26 to 29, where the watch would be refused an operation the phone
+        // artifact is permitted.
+        watchSharedPermissions = readMediaPermissions + externalStoragePermission;
         String xmlizedDisplayName = xmlize(request.getDisplayName());
 
         String applicationAttr = request.getArg("android.xapplication_attr", "");
@@ -6712,7 +6719,7 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         generateWearModule(request, studioProjectDir, gradleProps, watchSurfacesManifestEntries,
-                basePermissions + permissions + xPermissions + watchReadMediaPermissions,
+                basePermissions + permissions + xPermissions + watchSharedPermissions,
                 intVersion, wearableListenerService);
 
         String rootGradleProps = "// Top-level build file where you can add configuration options common to all sub-projects/modules.\n" +
@@ -7239,6 +7246,33 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     /**
+     * The Wear manifest's {@code <application>} opening tag.
+     *
+     * <p>Written the way the phone manifest writes its own: a default is emitted only when
+     * {@code android.xapplication_attr} has not already said it. Emitting both produced the same
+     * attribute twice, and a duplicate attribute is not a merge conflict but an XML document that
+     * does not parse -- so a companion project that customised its label or icon failed before
+     * packaging, which is the whole build rather than the watch half of it.</p>
+     *
+     * @param request the build being generated
+     * @return the opening tag, ending with the closing angle bracket and a newline
+     */
+    private String wearApplicationTag(BuildRequest request) {
+        String attrs = request.getArg("android.xapplication_attr", "");
+        StringBuilder sb = new StringBuilder("    <application");
+        if (!attrs.contains("android:label")) {
+            sb.append(" android:label=\"").append(xmlize(request.getDisplayName())).append("\"");
+        }
+        if (!attrs.contains("android:icon")) {
+            sb.append(" android:icon=\"@drawable/icon\"");
+        }
+        if (attrs.length() > 0) {
+            sb.append(" ").append(attrs);
+        }
+        return sb.append(">\n").toString();
+    }
+
+    /**
      * Whether any declared kind earns a Tile, and so whether the tap trampoline has to be
      * reachable from outside this app.
      *
@@ -7485,9 +7519,7 @@ public class AndroidGradleBuilder extends Executor {
                 // ones that describe the application ITSELF; phone-only components stay behind
                 // deliberately, and a project that needs a watch-only difference can still say so
                 // by keeping the phone-only parts out of these hints.
-                + "    <application android:label=\"" + xmlize(request.getDisplayName()) + "\"\n"
-                + "                 android:icon=\"@drawable/icon\"\n"
-                + "                 " + request.getArg("android.xapplication_attr", "") + ">\n"
+                + wearApplicationTag(request)
                 + "  " + request.getArg("android.xapplication", "") + "\n"
                 // Says the watch app needs its phone half, which is what a companion IS. A
                 // standalone build says the opposite, in the phone manifest.

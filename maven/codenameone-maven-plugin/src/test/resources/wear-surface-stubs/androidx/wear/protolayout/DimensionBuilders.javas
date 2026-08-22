@@ -5,13 +5,16 @@ public final class DimensionBuilders {
     // a SpacerDimension, which is what lets a flexible spacer say expand() where a sized one
     // says dp(min).
     public interface SpacerDimension { }
+    public interface ContainerDimension { }
     public interface ImageDimension { }
-    public static class DpProp implements SpacerDimension, ImageDimension { }
-    public static class ExpandedDimensionProp implements SpacerDimension, ImageDimension { }
+    public static class DpProp implements SpacerDimension, ImageDimension, ContainerDimension { }
+    public static class ExpandedDimensionProp
+            implements SpacerDimension, ImageDimension, ContainerDimension { }
     public static class SpProp { }
     public static class DegreesProp { }
     public static DpProp dp(float v) { return null; }
     public static ExpandedDimensionProp expand() { return null; }
+    public static ExpandedDimensionProp weight(float w) { return null; }
     public static SpProp sp(float v) { return null; }
     public static DegreesProp degrees(float v) { return null; }
 }

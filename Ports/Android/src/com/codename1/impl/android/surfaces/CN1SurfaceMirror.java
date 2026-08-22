@@ -124,6 +124,52 @@ public final class CN1SurfaceMirror {
         }
     }
 
+    /**
+     * Asks a paired watch to re-render a kind it already has.
+     *
+     * <p>{@code reloadWidgets} means "draw the descriptor you already hold again", and on the
+     * watch that is a watch-local operation -- but in a COMPANION build the call runs in the phone
+     * APK, and the complication and Tile services live in the wear module, so the notifier's
+     * reflective lookups find nothing and the reload was a no-op for every mirrored surface. The
+     * phone cannot reach into the other process; it can only ask.</p>
+     *
+     * <p>Asking is a re-send of the descriptor the watch already stored, which its receiver
+     * applies exactly as it applies a fresh one -- and its notifier runs THERE, where the
+     * generated services are. The nonce is what makes it arrive: the Data Layer suppresses a
+     * DataItem whose payload is unchanged, which is the behaviour a publish wants and the one a
+     * reload has to defeat. No images: their names are content hashes, so whatever the descriptor
+     * references is already beside it.</p>
+     *
+     * @param ctx any context
+     * @param kindId the widget kind to re-render
+     */
+    public static void requestWatchReload(Context ctx, String kindId) {
+        try {
+            if (com.codename1.ui.CN.isWatch() || !CN1WatchSurface.isWatchKind(ctx, kindId)
+                    || !WearableConnection.isSupported()) {
+                return;
+            }
+            String json = CN1SurfaceStore.readWidgetTimeline(ctx, kindId);
+            if (json == null || json.length() == 0) {
+                // Nothing published yet, so there is nothing for the watch to redraw.
+                return;
+            }
+            byte[] bytes = json.getBytes("UTF-8");
+            if (bytes.length > MAX_JSON_BYTES) {
+                return;
+            }
+            WearableMessage message = new WearableMessage(PATH_PREFIX + kindId);
+            message.put("v", 1);
+            message.put("json", bytes);
+            message.put("nonce", System.currentTimeMillis());
+            WearableConnection.putData(message);
+        } catch (Throwable t) {
+            // A watch that does not hear about a reload keeps showing what it had, which is the
+            // same content: this is a refresh, not a change.
+            Log.w(TAG, "Could not ask the watch to reload widget kind " + kindId, t);
+        }
+    }
+
     private static void sendImages(String kindId, Map<String, byte[]> images) {
         if (images == null || images.isEmpty()) {
             return;
