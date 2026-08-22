@@ -107,9 +107,18 @@ public class CN1SurfaceActionActivity extends Activity {
         super.onCreate(savedInstanceState);
         try {
             Intent intent = getIntent();
+            if (intent != null && !trusted(intent)) {
+                // Nothing at all, not merely no dispatch. Bringing the app forward is itself the
+                // interesting half of what this activity does: an app that cannot forge an action
+                // could still start the trampoline in a loop and foreground this application over
+                // and over, which is a nuisance the user would blame on us. Checked before the
+                // action is read, so an intent carrying no action id is treated the same way.
+                finish();
+                return;
+            }
             if (intent != null) {
                 String actionId = intent.getStringExtra(EXTRA_ACTION_ID);
-                if (actionId != null && trusted(intent)) {
+                if (actionId != null) {
                     AndroidSurfaceBridge.postAction(intent.getStringExtra(EXTRA_SOURCE),
                             actionId, intent.getStringExtra(EXTRA_ACTION_PARAMS));
                 }

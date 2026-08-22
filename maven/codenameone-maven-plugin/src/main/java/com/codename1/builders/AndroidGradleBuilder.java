@@ -7722,7 +7722,12 @@ public class AndroidGradleBuilder extends Executor {
                 + "        java.srcDirs = ['../app/src/main/java', 'src/main/java']\n"
                 + "        res.srcDirs = ['../app/src/main/res', 'src/main/res']\n"
                 + "        assets.srcDirs = ['../app/src/main/assets']\n"
-                + "        aidl.srcDirs = ['../app/src/main/aidl']\n"
+                // ../app/src/main/JAVA, matching what the phone module declares. The generated
+                // in-app billing interface for a pre-v8 port is written next to the Java it
+                // serves, which is why the phone gradle names src/main/java as an AIDL root --
+                // and pointing this at a src/main/aidl that no build creates left the wear module
+                // compiling the billing sources with no IInAppBillingService to compile against.
+                + "        aidl.srcDirs = ['../app/src/main/java']\n"
                 + "        manifest.srcFile 'src/main/AndroidManifest.xml'\n"
                 + "    }\n");
         // The androidx.wear libraries, HERE and not in the shared dependency hint. They declare

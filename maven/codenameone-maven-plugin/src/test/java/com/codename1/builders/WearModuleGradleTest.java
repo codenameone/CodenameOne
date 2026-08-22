@@ -184,6 +184,19 @@ class WearModuleGradleTest {
                 "the version code still has to outrank the phone:\n" + wear);
     }
 
+    /// The generated in-app billing interface for a pre-v8 port is written next to the Java it
+    /// serves, which is why the phone gradle names src/main/java as an AIDL root. Pointing the
+    /// wear module at a src/main/aidl that no build creates left it compiling the billing sources
+    /// with no IInAppBillingService to compile against.
+    @Test
+    void aidlIsReadFromTheSameTreeAsTheJava() {
+        String wear = deriveWearGradle();
+
+        assertTrue(wear.contains("aidl.srcDirs = ['../app/src/main/java']"), wear);
+        assertFalse(wear.contains("'../app/src/main/aidl'"),
+                "no build writes that directory:\n" + wear);
+    }
+
     /// Gradle resolves a bare proguardFiles path against the project it appears in, and the
     /// generated proguard.cfg is written into the app module alone -- so a verbatim copy had the
     /// Wear R8 task looking for a file beside itself. Exactly the trap the keystore line records,

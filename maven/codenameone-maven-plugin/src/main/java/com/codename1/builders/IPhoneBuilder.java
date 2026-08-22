@@ -6576,6 +6576,21 @@ public class IPhoneBuilder extends Executor {
                 // shared reader picks between them so Android resolves a kind's families the
                 // same way rather than parsing a key with "ios" in its name.
                 List<String> families = com.codename1.util.SurfaceKindFamilies.read(kindMap);
+                // Refused here as well as on Android, and for a worse failure than the one there.
+                // A name this framework does not know is not a watch family, so the kind reads as
+                // an iPhone surface -- and familiesSwift cannot map it either, so it falls back to
+                // all three home-screen sizes. A typo therefore SHIPS three widgets the manifest
+                // never asked for, rather than shipping none.
+                for (String declared : families) {
+                    if (!com.codename1.util.SurfaceKindFamilies.isKnown(declared)) {
+                        throw new BuildException("Widget kind '" + kind.getId()
+                                + "' in surfaces.json declares the family '" + declared
+                                + "', which is not one this framework knows. The watch families "
+                                + "are watchCircular, watchRectangular, watchInline and "
+                                + "watchCorner; the phone families are small, medium, large and "
+                                + "lockscreen.");
+                    }
+                }
                 if (!families.isEmpty()) {
                     kind.setIosFamilies(families);
                 }
