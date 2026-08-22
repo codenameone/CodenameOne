@@ -664,4 +664,38 @@ class MultiWindowGraphicsRoutingTest {
         assertEquals(JavaSEPort.retinaScale, main.canvasScale(), 0.0001,
                 "window 0 is the main window and must keep using the global scale");
     }
+
+    /**
+     * hide() has to complete before it returns, exactly as show() does. Queued, a
+     * hide followed by a show in the same event dispatch thread turn ran after the
+     * show had already put the window back, so the frame's componentHidden arrived
+     * with the window visible and was reported as a minimize -- firing minimize
+     * listeners for a window that is on screen.
+     */
+    @Test
+    void hidingAWindowCompletesBeforeItReturns() {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        assumeFalse(java.awt.EventQueue.isDispatchThread(),
+                "the point of this is the cross-thread hand-off");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port, "the port should be booted by CodenameOneTest");
+
+        JavaSEWindowManager wm = new JavaSEWindowManager(port);
+        Object peer = wm.createWindow(57, "sync hide", 0, 0, 320, 240, true, true, null,
+                false, false);
+        assumeTrue(peer != null, "needs a native window");
+        try {
+            wm.show(peer);
+            java.awt.Window frame = ((JavaSEWindowManager.Peer) peer).frame;
+            assumeTrue(frame.isVisible(), "the window has to be up for this to mean anything");
+
+            wm.hide(peer);
+
+            assertFalse(frame.isVisible(),
+                    "hide must have taken effect by the time it returns, or a show in "
+                            + "the same turn races the queued hide");
+        } finally {
+            wm.dispose(peer);
+        }
+    }
 }

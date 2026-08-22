@@ -369,7 +369,13 @@ public class JavaSEWindowManager extends WindowManager {
         if (p == null) {
             return;
         }
-        runOnAwt(new Runnable() {
+        // Waits, exactly as show() does. Queued, a hide followed by a show in the same
+        // EDT turn ran after the show had already put nativeVisible back: the frame's
+        // componentHidden then arrived with the window visible and was reported as a
+        // minimize, and the show's componentShown as a restore -- a spurious
+        // Minimized/Restored pair after the real Hidden/Shown, with minimize listeners
+        // firing for a window that is on screen.
+        runOnAwtAndWait(new Runnable() {
             @Override
             public void run() {
                 p.frame.setVisible(false);
