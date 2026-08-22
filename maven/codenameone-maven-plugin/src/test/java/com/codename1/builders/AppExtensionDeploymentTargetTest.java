@@ -31,6 +31,7 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class AppExtensionDeploymentTargetTest {
@@ -211,5 +212,55 @@ public class AppExtensionDeploymentTargetTest {
         write(commented, "<plist><dict>\n<!-- com.apple.developer.payment-pass-provisioning -->\n"
                 + "</dict></plist>");
         assertEquals("12.0", IPhoneBuilder.appExtensionDeploymentTarget(null, commented, "11"));
+    }
+
+    @Test
+    public void aQualifiedDeploymentTargetIsClampedToo() throws Exception {
+        // Xcode picks the qualified value for the device build, so clamping only the base left the
+        // archive shipping 10.0 -- the very rejection the floor exists to prevent.
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET", "14.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "10.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]", "15.0");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0");
+
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals("15.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]"));
+        assertEquals(1, notes.size());
+    }
+
+    @Test
+    public void aQualifiedIdentifierFromAnotherProjectIsDropped() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "com.old.project.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]", "com.example.app.Ext.sim");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0");
+
+        // Dropped, so the base value -- the one this builder set -- governs the device build.
+        assertFalse(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+        assertEquals("com.example.app.Ext.sim",
+                settings.get("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]"));
+        assertEquals("com.example.app.Ext", settings.get("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals(1, notes.size());
+    }
+
+    @Test
+    public void settingsThatAreAlreadyFineAreLeftAlone() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "16.0");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "com.example.app.Ext");
+        // and a mangled key, which Xcode does not honour and which nothing here should touch
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk", "10.0");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0");
+
+        assertTrue(notes.toString(), notes.isEmpty());
+        assertEquals("10.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk"));
     }
 }

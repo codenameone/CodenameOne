@@ -4918,6 +4918,11 @@ public class IPhoneBuilder extends Executor {
                                     signedEntitlements,
                                     request.getArg("ios.deployment_target", null));
                             buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
+                            for (String note : repairQualifiedExtensionSettings(buildSettingsMap,
+                                    request.getPackageName(),
+                                    appExtensionDeploymentFloor(signedEntitlements))) {
+                                debug("The " + extensionName + " app extension: " + note + ".");
+                            }
 
                             // Guarded so the post-dependency re-run of fix_xcode_schemes.rb
                             // doesn't create duplicate extension targets.
@@ -6604,6 +6609,53 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /// The lowest iOS an extension with these entitlements may declare.
+    static String appExtensionDeploymentFloor(File entitlements) {
+        return entitlementIsTrue(entitlements, PAYMENT_PASS_PROVISIONING) ? "14.0" : "12.0";
+    }
+
+    /// Brings the archive's CONDITIONAL settings in line with the ones computed above, and says
+    /// what it changed.
+    ///
+    /// Xcode honours IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] over the plain setting for the
+    /// build it matches, and every entry in buildSettings.properties is copied onto the target
+    /// verbatim -- so an archive that pins a qualified 10.0, or a qualified identifier from the
+    /// project it was exported from, gets exactly that on the device archive while the values
+    /// computed for the base key sit unused beside them. Clamping the base alone fixed the build
+    /// nobody was shipping.
+    ///
+    /// A qualified deployment target below the floor is raised to it; a qualified identifier that
+    /// cannot be an extension of this app is dropped, which leaves the base value -- the one this
+    /// builder set -- to govern.
+    ///
+    /// @return a note per change, for the log
+    static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
+            String hostPackage, String floor) {
+        List<String> notes = new ArrayList<String>();
+        for (Map.Entry<String, String> setting : new ArrayList<Map.Entry<String, String>>(
+                settings.entrySet())) {
+            String key = setting.getKey();
+            String value = setting.getValue() == null ? "" : setting.getValue().trim();
+            if (isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
+                    && isDeploymentTargetBelow(value, floor)) {
+                settings.put(key, floor);
+                notes.add(key + " raised from " + value + " to " + floor);
+            } else if (isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER") && hostPackage != null
+                    && value.length() > 0 && !value.startsWith(hostPackage + ".")) {
+                settings.remove(key);
+                notes.add(key + " = " + value + " dropped, since an embedded extension must be "
+                        + "under " + hostPackage);
+            }
+        }
+        return notes;
+    }
+
+    /// Whether a settings key is the conditional form of {@code name}, as Xcode writes it and as
+    /// Properties preserves it only when the '=' inside the brackets is escaped.
+    private static boolean isQualified(String key, String name) {
+        return key.startsWith(name + "[") && key.endsWith("]");
+    }
+
     /// The minimum iOS version a brought-in app extension declares.
     ///
     /// Xcode writes the target's IPHONEOS_DEPLOYMENT_TARGET into the built .appex as
@@ -6626,7 +6678,7 @@ public class IPhoneBuilder extends Executor {
         // IPHONEOS_DEPLOYMENT_TARGET = 10.0 of its own, and honouring that unconditionally would
         // reproduce the very rejection this exists to prevent -- 10.0 does not even build against
         // the current SDK, and an issuer-provisioning Wallet extension is refused below 14.
-        String floor = entitlementIsTrue(entitlements, PAYMENT_PASS_PROVISIONING) ? "14.0" : "12.0";
+        String floor = appExtensionDeploymentFloor(entitlements);
         String chosen = declared != null && declared.trim().length() > 0
                 ? declared.trim()
                 : appTarget;
