@@ -32,7 +32,7 @@ Most of the commonly used hints also have a compiler-checked form: an annotation
 in `com.codename1.annotations.buildhints` that you put on the application's main
 class. Written that way a misspelled name is an unknown symbol and an
 unsupported value is an unknown enum constant, instead of a properties line that
-is accepted, never read, and silently does nothing. The Annotation column below
+is accepted, never read, and has no effect. The Annotation column below
 names that form where one exists. Setting the same hint both ways fails the
 build.
 

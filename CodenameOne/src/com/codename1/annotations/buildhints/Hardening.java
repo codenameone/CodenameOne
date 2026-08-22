@@ -43,21 +43,21 @@ public @interface Hardening {
 
     /// Permits a local or source build to run with hardening requested but not
     /// applied. Without it such a build is refused, so a hardened app is never
-    /// shipped from a target that cannot actually harden it.
+    /// shipped from a target that can't actually harden it.
     boolean allowUnhardenedLocalBuild() default false;
 
     /// Overrides control-flow obfuscation independently of harden.level.
     HardenControlFlow controlFlow() default HardenControlFlow.OFF;
 
     /// Keep rules in ProGuard syntax, one per line, for classes that are resolved
-    /// by name at runtime and so cannot be found by the automatic analysis. Same
+    /// by name at runtime and so can't be found by the automatic analysis. Same
     /// syntax as android.proguardKeep, so existing rules port directly. Rules are
     /// separated by newlines only, because a semicolon is legal inside a rule body
     /// such as { *; }.
     String keep() default "";
 
     /// Master switch for app hardening: off, standard, aggressive or paranoid. An
-    /// unrecognized value fails the build rather than being quietly treated as off.
+    /// unrecognized value fails the build rather than being treated as off.
     HardenLevel level() default HardenLevel.OFF;
 
     /// Overrides symbol renaming independently of harden.level.

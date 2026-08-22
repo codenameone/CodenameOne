@@ -48,8 +48,8 @@ public @interface OnDeviceDebug {
     /// release-signed APK that's `debuggable="true"`. Pair with the
     /// `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run
     /// configs) to install, launch, forward JDWP, and stream logcat through adb.
-    /// Has no effect on builds that don't carry it — release builds are unaffected.
-    /// See the On-Device Debugging (Android) chapter for the full flow.
+    /// Has no effect on builds that don't carry it -- release builds are
+    /// unaffected. See the On-Device Debugging (Android) chapter for the full flow.
     boolean android() default false;
 
     /// Boolean true/false defaults to false. When `true`, the iOS build links a

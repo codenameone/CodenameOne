@@ -206,8 +206,8 @@ final class BuildHintsGeneral {
                 .platform("general")
                 .consumedBy("CN1BuildMojo")
                 .doc("Permits a local or source build to run with hardening requested but not applied. Without "
-                        + "it such a build is refused, so a hardened app is never shipped from a target that cannot "
-                        + "actually harden it."));
+                        + "it such a build is refused, so a hardened app is never shipped from a target that "
+                        + "can't actually harden it."));
 
         h.add(new Hint("harden.controlFlow")
                 .annotatedAs(HintGroup.HARDENING, "controlFlow")
@@ -229,7 +229,7 @@ final class BuildHintsGeneral {
                 .platform("general")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Keep rules in ProGuard syntax, one per line, for classes that are resolved by name at "
-                        + "runtime and so cannot be found by the automatic analysis. Same syntax as "
+                        + "runtime and so can't be found by the automatic analysis. Same syntax as "
                         + "android.proguardKeep, so existing rules port directly. Rules are separated by newlines "
                         + "only, because a semicolon is legal inside a rule body such as { *; }."));
 
@@ -240,7 +240,7 @@ final class BuildHintsGeneral {
                 .platform("general")
                 .consumedBy("AndroidGradleBuilder", "CN1BuildMojo", "Executor")
                 .doc("Master switch for app hardening: off, standard, aggressive or paranoid. An unrecognized "
-                        + "value fails the build rather than being quietly treated as off."));
+                        + "value fails the build rather than being treated as off."));
 
         h.add(new Hint("harden.mac.enabled")
                 .group(HintGroup.HARDENING)

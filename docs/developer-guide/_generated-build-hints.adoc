@@ -278,7 +278,7 @@
 |string
 |_(none)_
 |_(properties file only)_
-|Numbered custom layout resources: android.cusom_layout1, 2, and so on. The misspelling is load-bearing -- it is the key the builder actually reads, so correcting it would silently drop the layout.
+|Numbered custom layout resources: android.cusom_layout1, android.cusom_layout2 and upward. The misspelling is load-bearing: it's the key the builder actually reads, so correcting it drops the layout with no warning.
 
 |android.cusom_layout1
 |string
@@ -366,13 +366,15 @@
 
 |android.facebook_permissions
 |string
-|`\"public_profile\",\"email\",\"user_friends\"`
+// vale-skip: Microsoft.Quotes: this is a literal default value, not prose -- the quotes belong to the value.
+|`"public_profile","email","user_friends"`
 |_(none)_
 |Permissions for Facebook used in the Android build target, applicable only if Facebook native integration is used.
 
 |android.file_paths
 |string
-|`    <files-path name=\"app_files\" path=\".\" />`
+// vale-skip: Microsoft.Quotes: this is a literal default value, not prose -- the quotes belong to the value.
+|`    <files-path name="app_files" path="." />`
 |_(none)_
 |
 
@@ -1454,7 +1456,7 @@
 |boolean
 |`false`
 |`@Hardening(allowUnhardenedLocalBuild)`
-|Permits a local or source build to run with hardening requested but not applied. Without it such a build is refused, so a hardened app is never shipped from a target that cannot actually harden it.
+|Permits a local or source build to run with hardening requested but not applied. Without it such a build is refused, so a hardened app is never shipped from a target that can't actually harden it.
 
 |harden.controlFlow
 |`off`, `on`
@@ -1472,13 +1474,13 @@
 |text_block
 |_(none)_
 |`@Hardening(keep)`
-|Keep rules in ProGuard syntax, one per line, for classes that are resolved by name at runtime and so cannot be found by the automatic analysis. Same syntax as android.proguardKeep, so existing rules port directly. Rules are separated by newlines only, because a semicolon is legal inside a rule body such as { *; }.
+|Keep rules in ProGuard syntax, one per line, for classes that are resolved by name at runtime and so can't be found by the automatic analysis. Same syntax as android.proguardKeep, so existing rules port directly. Rules are separated by newlines only, because a semicolon is legal inside a rule body such as { *; }.
 
 |harden.level
 |`off`, `standard`, `aggressive`, `paranoid`
 |`off`
 |`@Hardening(level)`
-|Master switch for app hardening: off, standard, aggressive or paranoid. An unrecognized value fails the build rather than being quietly treated as off.
+|Master switch for app hardening: off, standard, aggressive or paranoid. An unrecognized value fails the build rather than being treated as off.
 
 |harden.mac.enabled
 |boolean
@@ -2486,7 +2488,7 @@
 |list (`;` delimited)
 |_(none)_
 |`@Ios(spmPackages)`
-|Swift Package Manager packages to link, one per entry, each written as identity|url|requirement.
+|Swift Package Manager packages to link, one per entry, each written as identity\|url\|requirement.
 
 |ios.spm.products.*
 |string

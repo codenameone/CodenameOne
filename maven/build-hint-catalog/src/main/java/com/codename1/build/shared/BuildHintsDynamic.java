@@ -63,9 +63,10 @@ final class BuildHintsDynamic {
                 "Opts a single Google Play service in or out. The sibling "
                         + "<name>.minPlayServicesVersion pins its version.");
         family(h, "android.cusom_layout*", "android", "AndroidGradleBuilder",
-                "Numbered custom layout resources: android.cusom_layout1, 2, and so on. "
-                        + "The misspelling is load-bearing -- it is the key the builder "
-                        + "actually reads, so correcting it would silently drop the layout.");
+                "Numbered custom layout resources: android.cusom_layout1, android.cusom_layout2 "
+                        + "and upward. The misspelling is load-bearing: it's the key the "
+                        + "builder actually reads, so correcting it drops the layout with "
+                        + "no warning.");
         family(h, "ios.NS*UsageDescription", "ios", "IPhoneBuilder",
                 "Info.plist privacy strings. The commonly used keys are catalogued "
                         + "individually and exposed through @IosPrivacy; this entry covers the "

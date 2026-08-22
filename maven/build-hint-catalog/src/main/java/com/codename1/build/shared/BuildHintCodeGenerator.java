@@ -494,7 +494,7 @@ public final class BuildHintCodeGenerator {
         for (Map.Entry<HintGroup, List<BuildHints.Hint>> e : byGroup.entrySet()) {
             String group = e.getKey().annotationSimpleName();
             sb.append("\n        set(\"{{@").append(group).append("}}.label\", ")
-              .append(quote(groupLabel(e.getKey()))).append(");\n");
+              .append(quote(toAscii(groupLabel(e.getKey())))).append(");\n");
             for (BuildHints.Hint h : e.getValue()) {
                 String key = "{{#" + group + "#" + h.name() + "}}";
                 sb.append("        set(\"").append(key).append(".label\", ")
@@ -514,7 +514,7 @@ public final class BuildHintCodeGenerator {
                 }
                 if (h.doc() != null && h.doc().length() > 0) {
                     sb.append("        set(\"").append(key).append(".description\", ")
-                      .append(quote(h.doc())).append(");\n");
+                      .append(quote(toAscii(h.doc()))).append(");\n");
                 }
             }
         }
@@ -558,10 +558,19 @@ public final class BuildHintCodeGenerator {
         for (BuildHints.Hint h : all) {
             // Dynamic families are listed too: their names are patterns rather than
             // keys, but they are real settings a reader needs to find.
-            sb.append('|').append(h.name()).append('\n');
-            sb.append('|').append(adocType(h)).append('\n');
+            sb.append('|').append(cell(h.name())).append('\n');
+            sb.append('|').append(cell(adocType(h))).append('\n');
+            // A default is a literal value, not prose. One containing a quote --
+            // android.file_paths defaults to an XML fragment -- trips Vale's
+            // Microsoft.Quotes rule, which the developer guide enforces as an
+            // error. Protect just that line using the mechanism .vale.ini
+            // documents for individual false positives.
+            if (h.def() != null && h.def().indexOf('"') >= 0) {
+                sb.append("// vale-skip: Microsoft.Quotes: this is a literal default value, ")
+                  .append("not prose -- the quotes belong to the value.\n");
+            }
             sb.append('|').append(h.def() == null || h.def().length() == 0
-                    ? "_(none)_" : "`" + h.def() + "`").append('\n');
+                    ? "_(none)_" : "`" + cell(h.def()) + "`").append('\n');
             sb.append('|').append(h.isAnnotated()
                     ? "`@" + h.group().annotationSimpleName() + "(" + h.attr() + ")`"
                     : (h.isDynamic() ? "_(properties file only)_" : "_(none)_")).append('\n');
@@ -572,10 +581,23 @@ public final class BuildHintCodeGenerator {
                           + "repository, so there is no in-repo reference for it."
                         : "";
             }
-            sb.append('|').append(doc).append("\n\n");
+            sb.append('|').append(cell(doc)).append("\n\n");
         }
         sb.append("|===\n");
         return sb.toString();
+    }
+
+    /**
+     * Escapes a value for an AsciiDoc table cell.
+     *
+     * <p>A bare {@code |} starts a new cell, so a hint whose documentation
+     * contains one -- {@code ios.spm.packages} is written
+     * {@code identity|url|requirement} -- silently shifts every following column
+     * and asciidoctor reports "dropping cells from incomplete row" for the whole
+     * table.</p>
+     */
+    private static String cell(String text) {
+        return text == null ? "" : text.replace("|", "\\|");
     }
 
     private static String adocType(BuildHints.Hint h) {
@@ -698,9 +720,56 @@ public final class BuildHintCodeGenerator {
         return javaType(h);
     }
 
+    /**
+     * Folds text to ASCII.
+     *
+     * <p>The prose is imported from the developer guide, which uses typographic
+     * punctuation. {@code CodenameOne/src} is also compiled by an Ant javac step
+     * with ASCII encoding, where a single em dash is
+     * {@code error: unmappable character for encoding ASCII} -- a build failure,
+     * not a warning. A Unicode escape would not help: javac processes
+     * {@code \\uXXXX} before it strips comments, so the character would simply
+     * reappear.</p>
+     */
+    static String toAscii(String text) {
+        if (text == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '\u2014': sb.append("--"); break;      // em dash
+                case '\u2013': sb.append('-'); break;       // en dash
+                case '\u2018':
+                case '\u2019': sb.append('\''); break;      // curly single quotes
+                case '\u201c':
+                case '\u201d': sb.append('"'); break;       // curly double quotes
+                case '\u2026': sb.append("..."); break;     // ellipsis
+                case '\u2192': sb.append("->"); break;      // right arrow
+                case '\u00d7': sb.append('x'); break;       // multiplication sign
+                case '\u00a0': sb.append(' '); break;       // non-breaking space
+                default:
+                    if (c < 0x80) {
+                        sb.append(c);
+                        break;
+                    }
+                    // Refuse rather than drop it. Silently deleting a character
+                    // from a hint's documentation is a worse outcome than telling
+                    // whoever edited the catalog to add a mapping here.
+                    throw new IllegalArgumentException("Build hint documentation contains '"
+                            + c + "' (U+" + Integer.toHexString(c).toUpperCase()
+                            + "), which has no ASCII equivalent in toAscii(). The Ant javac step "
+                            + "compiles CodenameOne/src as ASCII and rejects it as unmappable. "
+                            + "Add a mapping, or reword the text.");
+            }
+        }
+        return sb.toString();
+    }
+
     /** Wraps text as /// markdown doc comment lines. */
     private static String doc(String text, String indent) {
-        String clean = text.replace("@since", "since").replaceAll("\\s+", " ").trim();
+        String clean = toAscii(text).replace("@since", "since").replaceAll("\\s+", " ").trim();
         StringBuilder sb = new StringBuilder();
         StringBuilder line = new StringBuilder();
         for (String word : clean.split(" ")) {
@@ -732,6 +801,17 @@ public final class BuildHintCodeGenerator {
     }
 
     private static void write(File f, String content) throws IOException {
+        if (f.getName().endsWith(".java")) {
+            for (int i = 0; i < content.length(); i++) {
+                if (content.charAt(i) >= 0x80) {
+                    throw new IOException(f.getName() + " would contain the non-ASCII character '"
+                            + content.charAt(i) + "' (U+"
+                            + Integer.toHexString(content.charAt(i)).toUpperCase()
+                            + "), which the Ant javac step rejects as unmappable. Add it to "
+                            + "toAscii().");
+                }
+            }
+        }
         File parent = f.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
             throw new IOException("Could not create " + parent);

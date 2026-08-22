@@ -483,7 +483,7 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.facebook_permissions")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
-                .def("\\\"public_profile\\\",\\\"email\\\",\\\"user_friends\\\"")
+                .def("\"public_profile\",\"email\",\"user_friends\"")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Permissions for Facebook used in the Android build target, applicable only if Facebook "
@@ -492,7 +492,7 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.file_paths")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
-                .def("    <files-path name=\\\"app_files\\\" path=\\\".\\\" />")
+                .def("    <files-path name=\"app_files\" path=\".\" />")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 

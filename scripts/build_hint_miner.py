@@ -22,13 +22,28 @@ OPENERS = [
     (re.compile(r'\bgetProperty\(\s*"codename1\.arg\.'), True),
 ]
 
+_ESCAPES = {'n': '\n', 't': '\t', 'r': '\r', 'b': '\b', 'f': '\f',
+            '"': '"', "'": "'", '\\': '\\'}
+
+
 def read_literal(text, i):
-    """Read a Java string literal body starting just after the opening quote."""
+    """Read a Java string literal starting just after the opening quote.
+
+    Escape sequences are decoded, not preserved. Keeping them verbatim recorded
+    android.file_paths' default as `<files-path name=\\"app_files\\" .../>` --
+    backslashes the build never sees -- which then reached the developer guide.
+    """
     out = []
     while i < len(text):
         c = text[i]
         if c == '\\':
-            out.append(text[i:i+2]); i += 2; continue
+            nxt = text[i + 1] if i + 1 < len(text) else ''
+            if nxt == 'u':
+                try:
+                    out.append(chr(int(text[i + 2:i + 6], 16))); i += 6; continue
+                except ValueError:
+                    pass
+            out.append(_ESCAPES.get(nxt, nxt)); i += 2; continue
         if c == '"':
             return "".join(out), i + 1
         out.append(c); i += 1
@@ -41,7 +56,9 @@ def split_args(text, i):
         c = text[i]
         if c == '"':
             lit, j = read_literal(text, i + 1)
-            cur.append('"' + (lit or "") + '"'); i = j; continue
+            # Re-quote with proper escaping so a decoded inner quote does not
+            # break the literal-default check below.
+            cur.append(json.dumps(lit or "", ensure_ascii=False)); i = j; continue
         if c == "'":
             j = i + 1
             while j < len(text) and text[j] != "'":

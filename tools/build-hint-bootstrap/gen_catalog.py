@@ -105,7 +105,9 @@ def infer(name, defaults, doc):
     lit = None
     for x in d:
         if x.startswith('"') and x.endswith('"'):
-            lit = x[1:-1]; break
+            # json.loads, not a slice: the miner re-quotes with real escaping, so
+            # a naive strip would leave backslashes the build never sees.
+            lit = json.loads(x); break
         if x in ("true", "false") or re.fullmatch(r'-?\d+', x):
             lit = x; break
     dl = doc.lower()
