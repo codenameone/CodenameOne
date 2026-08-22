@@ -235,6 +235,19 @@ public class BuildHintAnnotationProcessorTest {
         assertFalse(ctx.hasErrors());
     }
 
+    /// A hint's deprecated alias names the same setting, so declaring the alias
+    /// in the properties file collides with the annotation just as the canonical
+    /// name would. Without this one value silently wins: AndroidGradleBuilder
+    /// reads `and.themeMode` and falls back to `cn1.androidTheme`.
+    @Test
+    public void aDeprecatedAliasOfAnAnnotatedHintIsAConflict() throws Exception {
+        Properties s = settings();
+        s.setProperty("codename1.arg.cn1.androidTheme", "legacy");
+        File classes = compile("@Android(themeMode = AndroidThemeMode.MODERN)");
+        ProcessorContext ctx = run(classes, s, MAIN, false);
+        assertErrorContaining(ctx, "codename1.arg.cn1.androidTheme is declared twice");
+    }
+
     /// A commented-out line is not a declaration, and the archetype ships
     /// several. Properties.load skips them, so this is really a guard against
     /// anyone reintroducing a hand-rolled line scan.

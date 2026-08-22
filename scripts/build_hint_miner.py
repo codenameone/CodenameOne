@@ -42,6 +42,10 @@ def read_literal(text, i):
                 try:
                     out.append(chr(int(text[i + 2:i + 6], 16))); i += 6; continue
                 except ValueError:
+                    # Not a well-formed \uXXXX after all. Fall through and treat
+                    # the backslash as a plain escape rather than guessing at a
+                    # code point; a malformed escape in a builder source is not
+                    # this script's problem to diagnose.
                     pass
             out.append(_ESCAPES.get(nxt, nxt)); i += 2; continue
         if c == '"':

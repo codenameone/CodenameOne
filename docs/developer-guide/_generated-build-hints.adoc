@@ -1324,7 +1324,7 @@
 |string
 |_(none)_
 |_(none)_
-|
+|Deprecated alias for and.themeMode (AndroidGradleBuilder.java:4097). Both names configure one setting, so declaring this alongside @Android(themeMode) is a conflict.
 
 |cn1.buildKey
 |string
@@ -1372,7 +1372,7 @@
 |string
 |_(none)_
 |_(none)_
-|
+|Deprecated alias for nativeTheme (AndroidGradleBuilder.java:4099, IPhoneBuilder.java:947). Both names configure one setting, so declaring this alongside @Build(nativeTheme) is a conflict.
 
 |codename1.mac.appid
 |string

@@ -91,10 +91,15 @@ final class BuildHintsGeneral {
                 .consumedBy("CN1BuildMojo"));
 
         h.add(new Hint("cn1.androidTheme")
+                .aliasOf("and.themeMode")
+                .deprecated("Use and.themeMode, or @Android(themeMode = ...).")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("AndroidGradleBuilder"));
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Deprecated alias for and.themeMode (AndroidGradleBuilder.java:4097). "
+                        + "Both names configure one setting, so declaring this alongside "
+                        + "@Android(themeMode) is a conflict."));
 
         h.add(new Hint("cn1.buildKey")
                 .group(HintGroup.GENERAL)
@@ -142,10 +147,15 @@ final class BuildHintsGeneral {
                 .consumedBy("Executor"));
 
         h.add(new Hint("cn1.nativeTheme")
+                .aliasOf("nativeTheme")
+                .deprecated("Use nativeTheme, or @Build(nativeTheme = ...).")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder"));
+                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder")
+                .doc("Deprecated alias for nativeTheme (AndroidGradleBuilder.java:4099, "
+                        + "IPhoneBuilder.java:947). Both names configure one setting, so "
+                        + "declaring this alongside @Build(nativeTheme) is a conflict."));
 
         h.add(new Hint("db.legacy")
                 .group(HintGroup.GENERAL)

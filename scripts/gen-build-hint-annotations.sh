@@ -25,10 +25,12 @@ CATALOG_SRC="$CATALOG/src/main/java"
 check=0
 [ "${1:-}" = "--check" ] && check=1
 
-if [ ! -f "$CLASSES/com/codename1/build/shared/BuildHintCodeGenerator.class" ]; then
-  echo "gen-build-hint-annotations: building the catalog" >&2
-  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog package -DskipTests)
-fi
+# Always rebuild. Skipping when the class merely exists meant that editing a
+# BuildHints*.java source and rerunning this script regenerated every view from
+# the previous build's bytecode -- reporting success while silently ignoring the
+# edit, and in --check mode passing a tree that is genuinely out of date.
+echo "gen-build-hint-annotations: building the catalog" >&2
+(cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog package -DskipTests)
 
 SKILL_REF="$REPO_ROOT/scripts/initializr/common/src/main/resources/skill/references/build-hints.md"
 JAVASE_SRC="$REPO_ROOT/Ports/JavaSE/src"

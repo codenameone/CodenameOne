@@ -99,6 +99,25 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             throw new MojoExecutionException("No codenameone_settings.properties in " + projectDir);
         }
 
+        // Nothing turns an annotation back into a build hint except the
+        // process-annotations goal, and a mojo's defaultPhase does not bind it to
+        // a project -- the project's own POM has to. Migrating without that
+        // binding deletes working properties and replaces them with annotations no
+        // goal ever reads, so the hints disappear from the build silently.
+        if (!processAnnotationsIsBound()) {
+            throw new MojoFailureException("This project does not run the cn1 process-annotations "
+                    + "goal, so build hint annotations would never be turned back into the "
+                    + "codename1.arg.* pairs the builders read, and migrating would silently drop "
+                    + "them.\n\nAdd it to the common module's POM first:\n"
+                    + "    <execution>\n"
+                    + "      <id>cn1-process-classes</id>\n"
+                    + "      <phase>process-classes</phase>\n"
+                    + "      <goals>\n"
+                    + "        <goal>process-annotations</goal>\n"
+                    + "      </goals>\n"
+                    + "    </execution>");
+        }
+
         // The annotations ship in codenameone-core. A project pinned to a release
         // that predates them would migrate cleanly here and then fail to compile,
         // so refuse rather than hand back a broken project.
@@ -209,6 +228,38 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
         getLog().info("cn1: migrated " + migratedKeys.size() + " build hint(s) into "
                 + new File(mainSource).getName());
+    }
+
+    /**
+     * Whether any module in the reactor binds the {@code process-annotations}
+     * goal.
+     *
+     * <p>Checked across the reactor rather than on {@code project} because this
+     * goal is an aggregator, so {@code project} is the root POM while the binding
+     * lives in the common module.</p>
+     */
+    private boolean processAnnotationsIsBound() {
+        java.util.List<org.apache.maven.project.MavenProject> projects = reactorProjects;
+        if (projects == null || projects.isEmpty()) {
+            projects = java.util.Collections.singletonList(project);
+        }
+        for (org.apache.maven.project.MavenProject p : projects) {
+            java.util.List<org.apache.maven.model.Plugin> plugins = p.getBuildPlugins();
+            if (plugins == null) {
+                continue;
+            }
+            for (org.apache.maven.model.Plugin plugin : plugins) {
+                if (!"codenameone-maven-plugin".equals(plugin.getArtifactId())) {
+                    continue;
+                }
+                for (org.apache.maven.model.PluginExecution e : plugin.getExecutions()) {
+                    if (e.getGoals() != null && e.getGoals().contains("process-annotations")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -445,10 +496,27 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * Deletes the migrated lines, leaving every other line -- comments,
      * ordering, unrelated settings -- byte for byte as it was.
      */
+    /**
+     * Deletes the migrated declarations, leaving every other line -- comments,
+     * ordering, unrelated settings -- byte for byte as it was.
+     *
+     * <p>Keys are recognised the way {@code Properties.load} defines them, not
+     * just {@code key=value}: {@code key:value} and {@code key value} are equally
+     * valid, and a line ending in an odd number of backslashes continues onto the
+     * next. A declaration this pass fails to recognise is left behind while the
+     * annotation is added, and the very next build fails with the duplicate-hint
+     * error this goal exists to avoid.</p>
+     *
+     * <p>Written back as ISO-8859-1 because that is what {@code Properties.load}
+     * reads a {@code .properties} stream as. Rewriting the file as UTF-8 would
+     * turn any non-ASCII byte elsewhere in it -- an accented
+     * {@code codename1.displayName}, say -- into mojibake, even though it has
+     * nothing to do with the hint being migrated.</p>
+     */
     private void removeMigratedLines(File settingsFile, List<String> keys) throws IOException {
         List<String> lines = new ArrayList<String>();
         BufferedReader r = new BufferedReader(
-                new InputStreamReader(new FileInputStream(settingsFile), "ISO-8859-1"));
+                new InputStreamReader(new FileInputStream(settingsFile), PROPERTIES_ENCODING));
         try {
             String line;
             while ((line = r.readLine()) != null) {
@@ -457,27 +525,92 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         } finally {
             r.close();
         }
+
         Map<String, Boolean> wanted = new LinkedHashMap<String, Boolean>();
         for (String k : keys) {
             wanted.put(k, Boolean.TRUE);
         }
+
         StringBuilder out = new StringBuilder();
-        for (String line : lines) {
-            String t = line.trim();
-            boolean drop = false;
-            if (t.length() > 0 && t.charAt(0) != '#' && t.charAt(0) != '!') {
-                int eq = t.indexOf('=');
-                int colon = t.indexOf(':');
-                int split = eq < 0 ? colon : (colon < 0 ? eq : Math.min(eq, colon));
-                if (split > 0 && wanted.containsKey(t.substring(0, split).trim())) {
-                    drop = true;
-                }
+        for (int i = 0; i < lines.size(); i++) {
+            // Gather the whole logical line: continuations belong to the same
+            // declaration and have to go with it.
+            int last = i;
+            StringBuilder logical = new StringBuilder(lines.get(i));
+            while (continues(lines.get(last)) && last + 1 < lines.size()) {
+                last++;
+                logical.append(lines.get(last).replaceFirst("^\\s+", ""));
             }
-            if (!drop) {
-                out.append(line).append('\n');
+            String key = propertyKeyOf(logical.toString());
+            if (key != null && wanted.containsKey(key)) {
+                i = last;
+                continue;
             }
+            for (int j = i; j <= last; j++) {
+                out.append(lines.get(j)).append('\n');
+            }
+            i = last;
         }
-        write(settingsFile, out.toString());
+        writeProperties(settingsFile, out.toString());
+    }
+
+    /** Whether a physical line ends in an odd number of backslashes. */
+    private static boolean continues(String line) {
+        int backslashes = 0;
+        for (int i = line.length() - 1; i >= 0 && line.charAt(i) == '\\'; i--) {
+            backslashes++;
+        }
+        return backslashes % 2 == 1;
+    }
+
+    /**
+     * The key a logical properties line declares, or null when the line is blank
+     * or a comment.
+     *
+     * <p>Follows {@code java.util.Properties}: the key runs to the first
+     * unescaped {@code =}, {@code :} or whitespace.</p>
+     */
+    static String propertyKeyOf(String logicalLine) {
+        int i = 0;
+        while (i < logicalLine.length() && isPropertySpace(logicalLine.charAt(i))) {
+            i++;
+        }
+        if (i >= logicalLine.length()) {
+            return null;
+        }
+        char first = logicalLine.charAt(i);
+        if (first == '#' || first == '!') {
+            return null;
+        }
+        StringBuilder key = new StringBuilder();
+        for (; i < logicalLine.length(); i++) {
+            char c = logicalLine.charAt(i);
+            if (c == '\\' && i + 1 < logicalLine.length()) {
+                key.append(logicalLine.charAt(++i));
+                continue;
+            }
+            if (c == '=' || c == ':' || isPropertySpace(c)) {
+                break;
+            }
+            key.append(c);
+        }
+        return key.length() == 0 ? null : key.toString();
+    }
+
+    private static boolean isPropertySpace(char c) {
+        return c == ' ' || c == '\t' || c == '\f';
+    }
+
+    /** The encoding {@code Properties.load(InputStream)} reads. */
+    private static final String PROPERTIES_ENCODING = "ISO-8859-1";
+
+    private static void writeProperties(File f, String content) throws IOException {
+        Writer w = new OutputStreamWriter(new FileOutputStream(f), PROPERTIES_ENCODING);
+        try {
+            w.write(content);
+        } finally {
+            w.close();
+        }
     }
 
     private static String read(File f) throws IOException {
