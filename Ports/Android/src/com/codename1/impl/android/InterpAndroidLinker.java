@@ -205,12 +205,24 @@ public class InterpAndroidLinker implements InterpLinker {
         Class[] ifaces = c.getInterfaces();
         for (int i = 0; i < ifaces.length; i++) {
             try {
-                return ifaces[i].getDeclaredMethod(name, types);
-            } catch (NoSuchMethodException ignore) {
-                Method m = findInInterfaces(ifaces[i], name, types);
-                if (m != null) {
+                Method m = ifaces[i].getDeclaredMethod(name, types);
+                // Only instance, non-private declarations are inherited
+                // through an interface. Reflection ignores the receiver for a
+                // static invoke, so returning `A.staticM()` when the caller
+                // was dispatching virtually through `B` (which declares a
+                // same-descriptor default) would silently run A's body. iOS
+                // filters this in its symbol table; here reflection carries
+                // the modifiers with the Method itself.
+                int mods = m.getModifiers();
+                if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
                     return m;
                 }
+            } catch (NoSuchMethodException ignore) {
+                // fall through to the recursive walk below
+            }
+            Method deeper = findInInterfaces(ifaces[i], name, types);
+            if (deeper != null) {
+                return deeper;
             }
         }
         return findInInterfaces(c.getSuperclass(), name, types);

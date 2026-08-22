@@ -192,12 +192,22 @@ public class ReflectionInterpLinker implements InterpLinker {
         Class[] ifaces = c.getInterfaces();
         for (int i = 0; i < ifaces.length; i++) {
             try {
-                return ifaces[i].getDeclaredMethod(name, types);
-            } catch (NoSuchMethodException ignore) {
-                Method m = findInInterfaces(ifaces[i], name, types);
-                if (m != null) {
+                Method m = ifaces[i].getDeclaredMethod(name, types);
+                // Skip static and private declarations: neither is inherited
+                // through an interface, and returning either from a virtual
+                // dispatch (reflection ignores the receiver for a static
+                // invoke) would run the wrong body when another interface
+                // declares a same-descriptor default.
+                int mods = m.getModifiers();
+                if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
                     return m;
                 }
+            } catch (NoSuchMethodException ignore) {
+                // fall through to the recursive walk below
+            }
+            Method deeper = findInInterfaces(ifaces[i], name, types);
+            if (deeper != null) {
+                return deeper;
             }
         }
         return findInInterfaces(c.getSuperclass(), name, types);
