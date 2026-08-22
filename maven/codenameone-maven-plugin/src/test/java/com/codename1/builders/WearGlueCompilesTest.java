@@ -133,6 +133,9 @@ public class WearGlueCompilesTest {
                         + "    public static final String EXTRA_SOURCE = \"s\";\n"
                         + "    public static final String EXTRA_ACTION_ID = \"a\";\n"
                         + "    public static final String EXTRA_ACTION_PARAMS = \"p\";\n"
+                        + "    public static final String EXTRA_TOKEN = \"t\";\n"
+                        + "    public static String token(android.content.Context c) "
+                        + "{ return \"\"; }\n"
                         + "}\n").getBytes("UTF-8"));
         collectJava(shims.getParent().getParent().getParent().getParent().toFile(), sources);
 

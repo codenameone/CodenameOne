@@ -23,9 +23,14 @@
 package com.codename1.impl.android.surfaces;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
+
+import java.math.BigInteger;
+import java.security.SecureRandom;
 
 /// Invisible trampoline receiving surface taps (widget nodes, live activity notifications).
 /// Registered by the build with `Theme.NoDisplay`, it decodes the action extras, queues the
@@ -40,7 +45,62 @@ public class CN1SurfaceActionActivity extends Activity {
     public static final String EXTRA_ACTION_ID = "CN1SurfaceActionId";
     /// Intent extra carrying the action parameters as a JSON object string.
     public static final String EXTRA_ACTION_PARAMS = "CN1SurfaceActionParams";
+    /// Intent extra proving the tap came from a surface this app rendered. See [#token].
+    public static final String EXTRA_TOKEN = "CN1SurfaceActionToken";
     private static final String TAG = "CN1Surfaces";
+    private static final String TOKEN_PREFS = "cn1_surface_action";
+    private static final String TOKEN_KEY = "token";
+
+    /// A per-install secret shared between the code that renders a surface and this trampoline.
+    ///
+    /// A Tile's tap is not a `PendingIntent`. ProtoLayout's `LaunchAction` names a component and
+    /// the TILE HOST starts it, from its own process, so the trampoline has to be exported for a
+    /// Tile tap to arrive at all -- and an exported activity can be started by any app on the
+    /// watch, with extras of its choosing. Without this, another app could name any action id it
+    /// liked and this class would forward it to `Surfaces.dispatchAction` as though the user had
+    /// tapped it.
+    ///
+    /// The value never leaves the device: it is generated on first use, kept in the app's own
+    /// private preferences, and travels only through the layout the app hands the tile host,
+    /// which no other app can read. A caller that cannot produce it did not get here from a
+    /// surface this app drew.
+    ///
+    /// - `ctx`: any context
+    ///
+    /// Returns the token, generating it on first use.
+    public static synchronized String token(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(TOKEN_PREFS, Context.MODE_PRIVATE);
+        String existing = prefs.getString(TOKEN_KEY, null);
+        if (existing != null && existing.length() > 0) {
+            return existing;
+        }
+        String fresh = new BigInteger(130, new SecureRandom()).toString(32);
+        prefs.edit().putString(TOKEN_KEY, fresh).commit();
+        return fresh;
+    }
+
+    /// Attaches the token to an action intent. Every producer of these extras calls this, so the
+    /// check below can be unconditional wherever it applies.
+    ///
+    /// - `ctx`: any context
+    /// - `intent`: the action intent being built
+    static void authenticate(Context ctx, Intent intent) {
+        intent.putExtra(EXTRA_TOKEN, token(ctx));
+    }
+
+    /// Whether this activity is reachable from outside the app, which is true exactly when a
+    /// Tile was generated. Read from the merged manifest rather than assumed, so the check
+    /// follows what was actually declared.
+    private boolean isExported() {
+        try {
+            return getPackageManager().getActivityInfo(getComponentName(), 0).exported;
+        } catch (Throwable t) {
+            // The manifest says what it says; a failed lookup is not a reason to start trusting
+            // callers. Non-exported is the historical shape and the safe answer for the phone.
+            Log.w(TAG, "Could not read this activity's export state; treating taps as trusted", t);
+            return false;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,7 +109,7 @@ public class CN1SurfaceActionActivity extends Activity {
             Intent intent = getIntent();
             if (intent != null) {
                 String actionId = intent.getStringExtra(EXTRA_ACTION_ID);
-                if (actionId != null) {
+                if (actionId != null && trusted(intent)) {
                     AndroidSurfaceBridge.postAction(intent.getStringExtra(EXTRA_SOURCE),
                             actionId, intent.getStringExtra(EXTRA_ACTION_PARAMS));
                 }
@@ -59,6 +119,26 @@ public class CN1SurfaceActionActivity extends Activity {
         }
         launchMainActivity();
         finish();
+    }
+
+    /// Whether this tap may be dispatched.
+    ///
+    /// Only asked where it can matter. While the trampoline is private -- every build without a
+    /// Tile -- nothing outside the app can start it, and an intent that arrives is one this app
+    /// built; requiring a token there would break a `PendingIntent` a widget handed the launcher
+    /// before the app was updated, for no gain.
+    private boolean trusted(Intent intent) {
+        if (!isExported()) {
+            return true;
+        }
+        String presented = intent.getStringExtra(EXTRA_TOKEN);
+        if (presented != null && presented.equals(token(this))) {
+            return true;
+        }
+        // Loud, because the honest cases are an app update that rotated nothing and a genuinely
+        // hostile caller, and the two look identical from here.
+        Log.w(TAG, "Refusing a surface action that did not come from a surface this app drew");
+        return false;
     }
 
     private void launchMainActivity() {

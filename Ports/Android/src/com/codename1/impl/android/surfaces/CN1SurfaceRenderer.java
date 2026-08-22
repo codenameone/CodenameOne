@@ -784,6 +784,7 @@ public final class CN1SurfaceRenderer {
             JSONObject params) {
         String paramsJson = params == null ? null : params.toString();
         Intent intent = new Intent(ctx, CN1SurfaceActionActivity.class);
+        CN1SurfaceActionActivity.authenticate(ctx, intent);
         intent.putExtra(CN1SurfaceActionActivity.EXTRA_SOURCE, source);
         intent.putExtra(CN1SurfaceActionActivity.EXTRA_ACTION_ID, actionId);
         if (paramsJson != null) {
@@ -804,6 +805,7 @@ public final class CN1SurfaceRenderer {
         JSONObject params = action.optJSONObject("p");
         String paramsJson = params == null ? null : params.toString();
         Intent intent = new Intent(rc.ctx, CN1SurfaceActionActivity.class);
+        CN1SurfaceActionActivity.authenticate(rc.ctx, intent);
         intent.putExtra(CN1SurfaceActionActivity.EXTRA_SOURCE, rc.source);
         intent.putExtra(CN1SurfaceActionActivity.EXTRA_ACTION_ID, actionId);
         if (paramsJson != null) {

@@ -377,6 +377,12 @@ public abstract class CN1SurfaceTileService extends TileService {
                 new androidx.wear.protolayout.ActionBuilders.AndroidActivity.Builder()
                         .setPackageName(getPackageName())
                         .setClassName(CN1SurfaceActionActivity.class.getName());
+        // The trampoline is exported so the tile host can start it, which means any app on the
+        // watch can too. This says the tap came from a surface THIS app drew; see
+        // CN1SurfaceActionActivity.token. The layout carrying it goes to the tile host and
+        // nowhere else.
+        activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_TOKEN,
+                stringExtra(CN1SurfaceActionActivity.token(this)));
         activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_SOURCE,
                 stringExtra(getKindId()));
         activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_ACTION_ID,

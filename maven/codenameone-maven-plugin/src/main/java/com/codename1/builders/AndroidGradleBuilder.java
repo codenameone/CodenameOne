@@ -7426,8 +7426,19 @@ public class AndroidGradleBuilder extends Executor {
                 + "    <uses-feature android:name=\"android.hardware.type.watch\" "
                 + "android:required=\"true\" />\n"
                 + sharedPermissions
+                // android.xapplication_attr and android.xapplication carried across. This
+                // manifest is selected outright by the module's sourceSets rather than merged
+                // with the phone's, so a project that names a custom android:name Application --
+                // the usual way to initialise a native SDK -- or declares application-level
+                // meta-data got the stock Application and no meta-data on the watch, while the
+                // watch module compiles the very sources that expect them. The two hints are the
+                // ones that describe the application ITSELF; phone-only components stay behind
+                // deliberately, and a project that needs a watch-only difference can still say so
+                // by keeping the phone-only parts out of these hints.
                 + "    <application android:label=\"" + xmlize(request.getDisplayName()) + "\"\n"
-                + "                 android:icon=\"@drawable/icon\">\n"
+                + "                 android:icon=\"@drawable/icon\"\n"
+                + "                 " + request.getArg("android.xapplication_attr", "") + ">\n"
+                + "  " + request.getArg("android.xapplication", "") + "\n"
                 // Says the watch app needs its phone half, which is what a companion IS. A
                 // standalone build says the opposite, in the phone manifest.
                 + "        <meta-data android:name=\"com.google.android.wearable.standalone\" "
@@ -7634,7 +7645,6 @@ public class AndroidGradleBuilder extends Executor {
         String gradle = appGradle
                 // Same namespace and applicationId; see the method comment.
                 .replace("versionCode " + intVersion, "versionCode " + wearVersion)
-                .replaceFirst("minSdkVersion \\d+", "minSdkVersion 26")
                 // Libraries are shared from the app module rather than copied.
                 .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
                 .replace("dirs 'libs'", "dirs '../app/libs'")
@@ -7666,6 +7676,14 @@ public class AndroidGradleBuilder extends Executor {
         // to evaluate. insertAfterFirst for the same reason one level up -- the generated file
         // also carries an androidTest dependency block, which has no use for these.
         gradle = insertAfterFirst(gradle, "\ndependencies {\n", wearDependencies);
+        // The floor rises only for the libraries that demand it. Wear OS 3 is where the
+        // complication and Tile APIs start, so a module carrying them cannot support less --
+        // but a companion watch app that only uses the lifecycle or the Data Layer has always
+        // run on the Wear OS 2 baseline, and raising it unconditionally took API 23 to 25
+        // watches away from projects that declared no surface at all.
+        if (wearDependencies != null && wearDependencies.length() > 0) {
+            gradle = gradle.replaceFirst("minSdkVersion \\d+", "minSdkVersion 26");
+        }
         return gradle;
     }
 
