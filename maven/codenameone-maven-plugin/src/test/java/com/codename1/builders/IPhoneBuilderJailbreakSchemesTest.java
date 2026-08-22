@@ -207,6 +207,50 @@ class IPhoneBuilderJailbreakSchemesTest {
         assertFalse(got.contains("cydia"));
     }
 
+    /// Ours are declared LAST, after every other scheme the builder adds.
+    ///
+    /// Not a style preference. iOS honours a limited number of entries and ignores the
+    /// rest, so whoever claims a slot last is whoever loses it. These schemes are the
+    /// lowest priority thing in the array -- a secondary security probe -- while the
+    /// others are features the app asked for. Declared beside the jailbreak header, this
+    /// ran before the Smart Home block appended com.apple.Home, so a project at the cap
+    /// got sileo as its last honoured entry and com.apple.Home as an ignored one, and
+    /// SmartHome.openEcosystemApp() then reported Home missing on a device that had it.
+    ///
+    /// Checked against the source because the invariant is an ordering inside one long
+    /// method, which no amount of unit testing the merge itself can pin.
+    @Test
+    void ourSchemesAreDeclaredAfterEveryOtherSchemeAddition() throws Exception {
+        File f = new File("src/main/java/com/codename1/builders/IPhoneBuilder.java");
+        assertTrue(f.exists(), "builder source must be readable: " + f.getAbsolutePath());
+        String src = new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        int ours = src.indexOf(
+                "declareApplicationQueriesSchemes(request, JAILBREAK_QUERY_SCHEMES");
+        assertTrue(ours > 0, "the jailbreak schemes must be declared somewhere");
+        int render = src.indexOf("injectToPlist(tmpFile, resDir, request)");
+        assertTrue(ours < render, "declared before the plist is rendered");
+
+        // Every other writer of the hint has to have had its say already. The one
+        // inside declareApplicationQueriesSchemes itself is this merge writing its own
+        // result, so it is not a competitor.
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "putArgument\\(\"ios\\.applicationQueriesSchemes\"[,\\s]*([^;]*);")
+                .matcher(src);
+        int others = 0;
+        while (m.find()) {
+            if (m.group(1).contains("joined.toString()")) {
+                continue;
+            }
+            others++;
+            assertTrue(m.start() < ours, "a scheme added at offset " + m.start()
+                    + " claims its slot after the jailbreak schemes at " + ours
+                    + "; move it above that call or it is the one iOS drops");
+        }
+        assertTrue(others > 0, "expected to find the Smart Home addition to compare against");
+    }
+
     /// The builder declares the schemes and IOSImplementation probes them, from two
     /// hand-maintained lists. They have to carry the same schemes in the same order:
     /// only as many as fit are declared, taken from the front, so a probe whose scheme

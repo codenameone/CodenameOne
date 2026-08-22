@@ -3099,12 +3099,9 @@ public class IPhoneBuilder extends Executor {
             if (jailbreakH.exists() && detectJailbreak) {
                 replaceInFile(jailbreakH, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
                 // The native probes in that header need nothing from the plist. The
-                // URL-scheme probe on the Java side does, and gets no error when the
-                // declaration is missing -- canOpenURL: simply answers false, so the
-                // check reports a clean device and nobody finds out.
-                declareApplicationQueriesSchemes(request, JAILBREAK_QUERY_SCHEMES,
-                        "DeviceIntegrity.getCompromiseReasons() will not see a "
-                        + "jailbreak that only its package manager reveals.");
+                // URL-scheme probe on the Java side does, and its declaration is made
+                // further down, just before the plist is rendered -- see the call beside
+                // injectToPlist().
             }
 
             // ios.appAttest compiles the DeviceCheck-backed App Attest native code
@@ -5475,6 +5472,25 @@ public class IPhoneBuilder extends Executor {
                         replaceAllInFile(pbx, "SDKROOT = iphoneos;", "OTHER_LDFLAGS = \"-ObjC\";\n				SDKROOT = iphoneos;");
 
                     }
+                }
+
+                // Last, deliberately, and this is the only correct place for it.
+                //
+                // These schemes exist so canOpenURL: can answer honestly about a
+                // jailbroken device; without the declaration iOS answers false
+                // whatever is installed. But they are also the LOWEST priority thing
+                // in the array, because iOS honours a limited number of entries and
+                // ignores the rest -- so everything the app actually needs has to
+                // claim its slots first. Declared beside the jailbreak header
+                // instead, this ran before the Smart Home block appended
+                // com.apple.Home, and a project at the cap got sileo as its last
+                // honoured entry and com.apple.Home as an ignored one: a security
+                // probe silently costing the app a feature it asked for. Anything
+                // else that adds a scheme belongs above this line.
+                if (detectJailbreak) {
+                    declareApplicationQueriesSchemes(request, JAILBREAK_QUERY_SCHEMES,
+                            "DeviceIntegrity.getCompromiseReasons() will not see a "
+                            + "jailbreak that only its package manager reveals.");
                 }
 
                 injectToPlist(tmpFile, resDir, request);
