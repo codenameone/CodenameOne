@@ -31,6 +31,7 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -262,5 +263,24 @@ public class AppExtensionDeploymentTargetTest {
 
         assertTrue(notes.toString(), notes.isEmpty());
         assertEquals("10.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk"));
+    }
+
+    @Test
+    public void anIdentifierOutsideTheAppStopsTheBuild() throws Exception {
+        // The message is the build's last word on it, so it has to say what to change.
+        String message = IPhoneBuilder.outOfNamespaceExtensionIdMessage("WalletUIExtension",
+                "com.old.project.WalletUIExtension", "com.example.app");
+        assertTrue(message, message.contains("com.old.project.WalletUIExtension"));
+        assertTrue(message, message.contains("buildSettings.properties"));
+        assertTrue(message, message.contains("com.example.app.WalletUIExtension"));
+    }
+
+    @Test
+    public void anIdentifierUnderTheAppIsNoProblem() throws Exception {
+        assertNull(IPhoneBuilder.outOfNamespaceExtensionIdMessage("WalletUIExtension",
+                "com.example.app.WalletUIExtension", "com.example.app"));
+        // and with no package to judge against, this is not the check that should fail the build
+        assertNull(IPhoneBuilder.outOfNamespaceExtensionIdMessage("WalletUIExtension",
+                "com.anything.Ext", null));
     }
 }

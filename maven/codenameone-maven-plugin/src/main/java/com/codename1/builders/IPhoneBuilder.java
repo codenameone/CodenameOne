@@ -4863,6 +4863,18 @@ public class IPhoneBuilder extends Executor {
 
 
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
+                            String outOfNamespace = outOfNamespaceExtensionIdMessage(extensionName,
+                                    appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER") != null
+                                            ? appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER")
+                                            : request.getPackageName() + "." + extensionName,
+                                    request.getPackageName());
+                            if (outOfNamespace != null) {
+                                // Refused rather than logged: Apple requires an embedded bundle to
+                                // sit under its container's identifier, no profile of this app's
+                                // can sign one that does not, and building on costs a full archive
+                                // and upload to be told the same thing later.
+                                throw new BuildException(outOfNamespace);
+                            }
                             stampAppExtensionInfoPlist(appExtension, request);
                             buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
                             buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
@@ -6607,6 +6619,25 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception cannotRun) {
             return null;
         }
+    }
+
+    /// Why an extension's identifier cannot ship, or null when it can.
+    ///
+    /// An embedded bundle must sit under the identifier of the app that carries it -- Apple's
+    /// rule, checked on upload -- so an archive whose PRODUCT_BUNDLE_IDENTIFIER points somewhere
+    /// else describes an extension this app can never ship, whatever the rest of the build does.
+    static String outOfNamespaceExtensionIdMessage(String extensionName, String effectiveId,
+            String hostPackage) {
+        if (hostPackage == null || hostPackage.length() == 0 || effectiveId == null
+                || effectiveId.startsWith(hostPackage + ".")) {
+            return null;
+        }
+        return "The " + extensionName + " app extension is set to build as '" + effectiveId
+                + "', which is not under the app's own '" + hostPackage + "'. An embedded "
+                + "extension must be, or Apple refuses the upload and no profile of this app's "
+                + "can sign it. Fix PRODUCT_BUNDLE_IDENTIFIER in " + extensionName
+                + "/buildSettings.properties, or remove it to take the default of " + hostPackage
+                + "." + extensionName + ".";
     }
 
     /// The lowest iOS an extension with these entitlements may declare.
