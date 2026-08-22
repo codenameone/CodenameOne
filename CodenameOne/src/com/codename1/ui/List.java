@@ -618,11 +618,11 @@ public class List<T> extends Component implements ActionSource {
             accessibilityChanged(AccessibilityManager.CHANGE_STATE | AccessibilityManager.CHANGE_VALUE);
         }
         if (!isInitialized()) {
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
             if (f == null) {
                 return;
             }
-            f.revalidate();
+            f.asContainer().revalidate();
         }
         if (scrollToSelection/* && isInitialized() */) {
             selectElement(index);
@@ -966,7 +966,7 @@ public class List<T> extends Component implements ActionSource {
     /// {@inheritDoc}
     @Override
     public void setHandlesInput(boolean b) {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             // prevent the list from losing focus if its the only element
             // or when the user presses fire and there is no other component
@@ -1154,9 +1154,9 @@ public class List<T> extends Component implements ActionSource {
     }
 
     private void initListMotion() {
-        Form p = getComponentForm();
+        TopLevelContainer p = getTopLevelContainer();
         if (p != null) {
-            p.registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(p, this);
         }
         listMotion = Motion.createSplineMotion(0, destination, getScrollAnimationSpeed());
         listMotion.start();
@@ -1666,7 +1666,13 @@ public class List<T> extends Component implements ActionSource {
     protected void fireActionEvent(ActionEvent a) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             if (disposeDialogOnSelection) {
-                getComponentForm().dispose();
+                // Form only on purpose: this disposes the enclosing Dialog, and Dialog
+                // is documented as unsupported inside a Window. Form.dispose() means
+                // "pop back to the previous form", which a Window has no notion of.
+                Form disposing = getComponentForm();
+                if (disposing != null) {
+                    disposing.dispose();
+                }
             }
             super.fireActionEvent();
             dispatcher.fireActionEvent(a);
@@ -1675,9 +1681,16 @@ public class List<T> extends Component implements ActionSource {
                 if (i != null && i instanceof Command && ((Command) i).isEnabled()) {
                     ((Command) i).actionPerformed(a);
                     if (!a.isConsumed()) {
-                        Form f = getComponentForm();
-                        if (f != null) {
-                            f.actionCommandImpl((Command) i);
+                        // The top level rather than the form: getComponentForm() is null
+                        // by design inside a Window, so a command list there invoked the
+                        // command and then told nobody -- the window's command listeners
+                        // never saw the activation. Neither branch re-invokes the
+                        // command, which has just run above.
+                        TopLevelContainer top = getTopLevelContainer();
+                        if (top instanceof Form) {
+                            ((Form) top).actionCommandImpl((Command) i);
+                        } else if (top instanceof Window) {
+                            ((Window) top).dispatchCommandNoRecurse((Command) i, a);
                         }
                     }
                 }
@@ -2086,9 +2099,9 @@ public class List<T> extends Component implements ActionSource {
                 fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
                         Integer.MAX_VALUE, speed, 0.0007f);
                 fixedDraggedPosition = fixedDraggedAnimationPosition;
-                Form p = getComponentForm();
+                TopLevelContainer p = getTopLevelContainer();
                 if (p != null) {
-                    p.registerAnimatedInternal(this);
+                    TopLevelSupport.registerAnimatedInternal(p, this);
                 }
                 fixedDraggedMotion.start();
             }

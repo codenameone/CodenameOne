@@ -756,6 +756,21 @@
         "Media360PanoramaScreenshotTest",
         "VRStereoSceneScreenshotTest"
       ]
+    },
+    {
+      "id": "multi-window",
+      "category": "Desktop integration",
+      "name": "Multiple native windows",
+      "description": "Opens additional native operating-system windows, each rendering its own component hierarchy, and checks layout, scrolling, graphics, layered overlays, native text editing and modality inside one.",
+      "tests": [
+        "MultiWindowApiTest",
+        "WindowLayoutTest",
+        "WindowScrollTest",
+        "WindowGraphicsTest",
+        "WindowEditingTest",
+        "WindowOverlayTest",
+        "WindowModalTest"
+      ]
     }
   ],
   "screenshot_mappings": [
@@ -1302,6 +1317,30 @@
     {
       "pattern": "Media360Panorama",
       "test": "Media360PanoramaScreenshotTest"
+    },
+    {
+      "pattern": "Window-Layout*",
+      "test": "WindowLayoutTest"
+    },
+    {
+      "pattern": "Window-Scroll*",
+      "test": "WindowScrollTest"
+    },
+    {
+      "pattern": "Window-Graphics*",
+      "test": "WindowGraphicsTest"
+    },
+    {
+      "pattern": "Window-Editing*",
+      "test": "WindowEditingTest"
+    },
+    {
+      "pattern": "Window-Overlay*",
+      "test": "WindowOverlayTest"
+    },
+    {
+      "pattern": "Window-Modal*",
+      "test": "WindowModalTest"
     }
   ]
 }

@@ -119,12 +119,23 @@ int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outData, int*
  * sits in a pass-through GtkOverlay over the Cairo drawing area; these place /
  * move / remove a native widget tracking a lightweight PeerComponent. Must run
  * on the GTK main thread. */
-void cn1LinuxOverlayAdd(GtkWidget* w, int x, int y, int width, int height);
-void cn1LinuxOverlayMove(GtkWidget* w, int x, int y, int width, int height);
-void cn1LinuxOverlayRemove(GtkWidget* w);
+/* Slot of the application's main window, for the overlay calls below. A secondary
+ * desktop window passes its own slot so its peers land in its overlay. */
+#define CN1_MAIN_WINDOW_SLOT (-1)
+
+void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int height);
+void cn1LinuxOverlayMove(int slot, GtkWidget* w, int x, int y, int width, int height);
+void cn1LinuxOverlayRemove(int slot, GtkWidget* w);
 
 /* The top-level GtkWindow (NULL in headless mode). */
 GtkWidget* cn1LinuxWindowWidget(void);
+
+/* Additional desktop windows (cn1_linux_desktopwindow.c). A secondary window
+ * carries its own GtkWindow, drawing area, peer overlay and cairo back buffer;
+ * the main window's statics are untouched. */
+CN1Graphics* cn1LinuxDesktopGraphics(int slot);
+GtkWidget* cn1LinuxDesktopWidget(int slot);
+GtkWidget* cn1LinuxDesktopFixed(int slot);
 
 /* Runs fn(arg) on the GTK main loop and blocks the caller until done (inline in
  * headless mode). For GTK calls the EDT must not make directly. */

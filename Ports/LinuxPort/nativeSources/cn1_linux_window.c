@@ -55,6 +55,9 @@
 #define CN1_EVENT_RING 1024
 typedef struct {
     int type, x, y, key;
+    /* Which window the event came from. Zero is the application's main window,
+     * which is every event this port produced before desktop windows existed. */
+    int windowId;
 } CN1Event;
 static CN1Event cn1EventRing[CN1_EVENT_RING];
 static int cn1EventHead = 0;
@@ -62,13 +65,131 @@ static int cn1EventTail = 0;
 static pthread_mutex_t cn1EventLock = PTHREAD_MUTEX_INITIALIZER;
 
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
+    cn1LinuxPushWindowEvent(0, type, x, y, keyCode);
+}
+
+/* Events the framework cannot reconstruct if they are lost. Input can be dropped on
+ * overflow -- a missing move is invisible and a missing press affects one gesture --
+ * but a lost hide leaves a window the framework believes is on screen, painting and
+ * animating until something else happens to it, and a lost close leaves it registered
+ * with no native window behind it. */
+static int cn1LinuxIsLifecycleEvent(int type) {
+    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
+            || type == CN1_EVENT_WINDOW_CLOSE;
+}
+
+/* Visibility only. A close request is protected from eviction like any other
+ * lifecycle event, but it is not a state that a later one supersedes: the delete
+ * signal does not destroy the window, so a close that a subsequent minimize overwrote
+ * would take the close listener and the close operation with it. */
+static int cn1LinuxIsVisibilityEvent(int type) {
+    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN;
+}
+
+/* Replaces a queued visibility event for the same window with this newer one. The
+ * latest state is the one that matters -- a hide followed by a show leaves the window
+ * shown -- so superseding costs nothing and needs no room. */
+static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
+        int keyCode) {
+    int idx = cn1EventHead;
+    int newest = -1;
+    if (!cn1LinuxIsVisibilityEvent(type)) {
+        return 0;
+    }
+    /* The *newest* match, not the first one found. A window can already have more than
+     * one transition queued -- a hide then a show -- and replacing the older of the two
+     * leaves the newer one as the last word, so the framework would end up believing a
+     * window that is natively hidden is on screen, and go on painting it. */
+    while (idx != cn1EventTail) {
+        if (cn1EventRing[idx].windowId == windowId
+                && cn1LinuxIsVisibilityEvent(cn1EventRing[idx].type)) {
+            newest = idx;
+        }
+        idx = (idx + 1) % CN1_EVENT_RING;
+    }
+    if (newest < 0) {
+        return 0;
+    }
+    cn1EventRing[newest].type = type;
+    cn1EventRing[newest].x = x;
+    cn1EventRing[newest].y = y;
+    cn1EventRing[newest].key = keyCode;
+    return 1;
+}
+
+/* Removes the oldest input event, closing the gap. Used to make room for a lifecycle
+ * event: advancing the head instead would evict whatever is oldest, and that can be a
+ * lifecycle event itself -- which is the very thing being protected. */
+static void cn1LinuxRemoveAtLocked(int idx) {
+    int cur = idx;
+    int follow = (cur + 1) % CN1_EVENT_RING;
+    while (follow != cn1EventTail) {
+        cn1EventRing[cur] = cn1EventRing[follow];
+        cur = follow;
+        follow = (follow + 1) % CN1_EVENT_RING;
+    }
+    cn1EventTail = cur;
+}
+
+static int cn1LinuxEvictInputLocked(void) {
+    int idx = cn1EventHead;
+    while (idx != cn1EventTail) {
+        if (!cn1LinuxIsLifecycleEvent(cn1EventRing[idx].type)) {
+            cn1LinuxRemoveAtLocked(idx);
+            return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_RING;
+    }
+    return 0;
+}
+
+/* Last resort when the ring holds nothing but lifecycle events and so has no input to
+ * give up. A window that toggled visibility several times before the framework drained
+ * anything has more than one transition queued, and every one but its last is already
+ * superseded, so dropping the oldest of them frees a slot without changing what any
+ * window ends up as. Without this a close arriving for a *different* window has nowhere
+ * to go and is dropped, which is the one outcome this whole path exists to prevent. */
+static int cn1LinuxEvictSupersededVisibilityLocked(void) {
+    int idx = cn1EventHead;
+    while (idx != cn1EventTail) {
+        if (cn1LinuxIsVisibilityEvent(cn1EventRing[idx].type)) {
+            int scan = (idx + 1) % CN1_EVENT_RING;
+            while (scan != cn1EventTail) {
+                if (cn1EventRing[scan].windowId == cn1EventRing[idx].windowId
+                        && cn1LinuxIsVisibilityEvent(cn1EventRing[scan].type)) {
+                    cn1LinuxRemoveAtLocked(idx);
+                    return 1;
+                }
+                scan = (scan + 1) % CN1_EVENT_RING;
+            }
+        }
+        idx = (idx + 1) % CN1_EVENT_RING;
+    }
+    return 0;
+}
+
+void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
+    if (next == cn1EventHead && cn1LinuxIsLifecycleEvent(type)) {
+        /* Full, and this one must not be the casualty. Supersede this window's own
+         * queued transition if it has one, otherwise take the room from an input event,
+         * and failing that from a transition that a later one already supersedes. Never
+         * from a transition that is still some window's last word. */
+        if (cn1LinuxCoalesceLifecycleLocked(windowId, type, x, y, keyCode)) {
+            pthread_mutex_unlock(&cn1EventLock);
+            return;
+        }
+        if (cn1LinuxEvictInputLocked() || cn1LinuxEvictSupersededVisibilityLocked()) {
+            next = (cn1EventTail + 1) % CN1_EVENT_RING;
+        }
+    }
     if (next != cn1EventHead) {
         cn1EventRing[cn1EventTail].type = type;
         cn1EventRing[cn1EventTail].x = x;
         cn1EventRing[cn1EventTail].y = y;
         cn1EventRing[cn1EventTail].key = keyCode;
+        cn1EventRing[cn1EventTail].windowId = windowId;
         cn1EventTail = next;
     }
     pthread_mutex_unlock(&cn1EventLock);
@@ -82,6 +203,7 @@ int cn1LinuxPopEvent(int* out) {
         out[1] = cn1EventRing[cn1EventHead].x;
         out[2] = cn1EventRing[cn1EventHead].y;
         out[3] = cn1EventRing[cn1EventHead].key;
+        out[4] = cn1EventRing[cn1EventHead].windowId;
         cn1EventHead = (cn1EventHead + 1) % CN1_EVENT_RING;
         has = 1;
     }
@@ -97,6 +219,22 @@ static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native wid
 static GtkWidget* cn1Fixed = 0;         /* GtkFixed overlay hosting positioned native peers */
 static GtkWidget* cn1AccessibilityFixed = 0; /* transparent GTK/ATK semantic hierarchy */
 static CN1Graphics cn1WindowG;          /* the on-screen / headless back buffer */
+/* Back-buffer replacement is deferred to the drawing thread. GTK reports a resize
+ * on its own thread, while the event dispatch thread paints through cn1WindowG.cr
+ * for the whole frame -- destroying the context or surface underneath it is a use
+ * after free, not merely a torn frame. cn1OnConfigure records the new size and
+ * flushGraphics applies it between frames, the same shape the secondary desktop
+ * windows and the Windows port use. */
+static volatile int cn1PendingResize;
+static int cn1PendingW;
+static int cn1PendingH;
+/* Held while GTK blits the surface and while the drawing thread swaps it: those
+ * are the two places one thread can destroy what the other is reading. */
+static pthread_mutex_t cn1BufferLock = PTHREAD_MUTEX_INITIALIZER;
+
+/* Applies a resize recorded by cn1OnConfigure. Must run on the drawing thread,
+ * between frames. */
+static void cn1ApplyPendingResize(void);
 static int cn1DisplayWidth = 800;
 static int cn1DisplayHeight = 600;
 static int cn1WindowOpen = 0;
@@ -108,28 +246,44 @@ CN1Graphics* cn1LinuxWindowGraphics(void) {
     return &cn1WindowG;
 }
 
+/* The GtkFixed a peer belongs in: a secondary desktop window's own overlay, or the
+ * main window's. CN1_MAIN_WINDOW_SLOT means the application's main window.
+ *
+ * Peers used to go into cn1Fixed unconditionally, so a BrowserComponent or native
+ * editor inside a Window appeared over the *main* window while the window it
+ * belonged to stayed empty. */
+static GtkWidget* cn1LinuxOverlayHost(int slot) {
+    if (slot == CN1_MAIN_WINDOW_SLOT) {
+        return cn1Fixed;
+    }
+    return cn1LinuxDesktopFixed(slot);
+}
+
 /* Native-peer overlay management (edit / browser / video / generic peers). All
  * must run on the GTK main thread (callers marshal via gdk_threads_add_idle). */
-void cn1LinuxOverlayAdd(GtkWidget* w, int x, int y, int width, int height) {
-    if (cn1Fixed == 0 || w == 0) {
+void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int height) {
+    GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (host == 0 || w == 0) {
         return;
     }
     gtk_widget_set_size_request(w, width, height);
-    gtk_fixed_put(GTK_FIXED(cn1Fixed), w, x, y);
+    gtk_fixed_put(GTK_FIXED(host), w, x, y);
     gtk_widget_show_all(w);
 }
 
-void cn1LinuxOverlayMove(GtkWidget* w, int x, int y, int width, int height) {
-    if (cn1Fixed == 0 || w == 0) {
+void cn1LinuxOverlayMove(int slot, GtkWidget* w, int x, int y, int width, int height) {
+    GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (host == 0 || w == 0) {
         return;
     }
     gtk_widget_set_size_request(w, width, height);
-    gtk_fixed_move(GTK_FIXED(cn1Fixed), w, x, y);
+    gtk_fixed_move(GTK_FIXED(host), w, x, y);
 }
 
-void cn1LinuxOverlayRemove(GtkWidget* w) {
-    if (cn1Fixed != 0 && w != 0 && gtk_widget_get_parent(w) == cn1Fixed) {
-        gtk_container_remove(GTK_CONTAINER(cn1Fixed), w);
+void cn1LinuxOverlayRemove(int slot, GtkWidget* w) {
+    GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (host != 0 && w != 0 && gtk_widget_get_parent(w) == host) {
+        gtk_container_remove(GTK_CONTAINER(host), w);
     }
 }
 
@@ -206,15 +360,33 @@ static void cn1ResizeBackBuffer(int w, int h) {
     cairo_matrix_init_identity(&cn1WindowG.transform);
 }
 
+static void cn1ApplyPendingResize(void) {
+    if (!cn1PendingResize) {
+        return;
+    }
+    pthread_mutex_lock(&cn1BufferLock);
+    /* Re-checked under the lock: GTK can record another resize between the test
+     * above and here. */
+    if (cn1PendingResize) {
+        cn1ResizeBackBuffer(cn1PendingW, cn1PendingH);
+        cn1PendingResize = 0;
+    }
+    pthread_mutex_unlock(&cn1BufferLock);
+}
+
 /* ------------------------------------------------------ GTK callbacks */
 
 static gboolean cn1OnDraw(GtkWidget* widget, cairo_t* cr, gpointer data) {
     (void) widget;
     (void) data;
+    /* Locked so the drawing thread cannot swap the surface out from under this
+     * blit. */
+    pthread_mutex_lock(&cn1BufferLock);
     if (cn1WindowG.surface) {
         cairo_set_source_surface(cr, cn1WindowG.surface, 0, 0);
         cairo_paint(cr);
     }
+    pthread_mutex_unlock(&cn1BufferLock);
     return FALSE;
 }
 
@@ -224,7 +396,13 @@ static gboolean cn1OnConfigure(GtkWidget* widget, GdkEventConfigure* e, gpointer
     if (e->width != cn1DisplayWidth || e->height != cn1DisplayHeight) {
         cn1DisplayWidth = e->width;
         cn1DisplayHeight = e->height;
-        cn1ResizeBackBuffer(cn1DisplayWidth, cn1DisplayHeight);
+        /* Recorded, not applied: this is the GTK thread and the event dispatch
+         * thread may be part way through a frame on the current buffer. */
+        pthread_mutex_lock(&cn1BufferLock);
+        cn1PendingW = cn1DisplayWidth;
+        cn1PendingH = cn1DisplayHeight;
+        cn1PendingResize = 1;
+        pthread_mutex_unlock(&cn1BufferLock);
         cn1LinuxPushEvent(CN1_EVENT_SIZE_CHANGED, cn1DisplayWidth, cn1DisplayHeight, 0);
     }
     return FALSE;
@@ -717,10 +895,15 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_flushGraphics___long_int_int_int_
         r->x = x; r->y = y; r->w = width; r->h = height;
         gdk_threads_add_idle(cn1QueueDrawIdle, r);
     }
+    /* The frame is finished and the next has not started, which is the only point
+     * on this thread where replacing the buffer cannot pull it out from under a
+     * paint in progress. Cairo is immediate mode, so there is no frame-open hook
+     * to hang this on the way the Direct2D port does. */
+    cn1ApplyPendingResize();
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pollEvent___int_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
-    int scratch[4];
+    int scratch[5];
     if (out == JAVA_NULL) {
         return JAVA_FALSE;
     }
@@ -732,6 +915,9 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pollEvent___int_1ARRAY_R_boole
             arr[1] = scratch[1];
             arr[2] = scratch[2];
             arr[3] = scratch[3];
+            if (len >= 5) {
+                arr[4] = scratch[4];
+            }
             return JAVA_TRUE;
         }
     }

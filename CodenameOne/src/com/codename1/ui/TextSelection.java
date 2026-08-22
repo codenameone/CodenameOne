@@ -60,6 +60,25 @@ import static com.codename1.ui.ComponentSelector.$;
 public class TextSelection {
 
     /// Comparator used for ordering components in left-to-right mode.
+
+    /// Revalidates the surface a component lives in, whether that is a form or a
+    /// window. Resolving the form directly is null inside a Window, and text selection
+    /// is supported there.
+    private static void revalidateTopLevel(Component c) {
+        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().revalidate();
+        }
+    }
+
+    /// The deferred counterpart to `#revalidateTopLevel(Component)`.
+    private static void revalidateLaterTopLevel(Component c) {
+        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().revalidateLater();
+        }
+    }
+
     private static final Comparator<Component> LTRComparator = new Comparator<Component>() {
 
         /// We can't just use component's AbsoluteY coordinates for ordering because of scrolling,
@@ -200,7 +219,7 @@ public class TextSelection {
                         selectionMask.remove();
                         getLayeredPane().remove();
                         selectionMask = null;
-                        root.getComponentForm().revalidate();
+                        revalidateTopLevel(root);
                     }
                     startX = evt.getX();
                     startY = evt.getY();
@@ -242,7 +261,7 @@ public class TextSelection {
                         getLayeredPane().add(selectionMask);
 
                     }
-                    root.getComponentForm().revalidate();
+                    revalidateTopLevel(root);
                     if (selectionRoot.isScrollableX() && evt.getX() > selectionRoot.getAbsoluteX() + selectionRoot.getScrollX() + selectionRoot.getWidth() - ONE_MM * 5) {
                         Component.setDisableSmoothScrolling(true);
                         int scrollX = selectionRoot.getScrollX();
@@ -252,9 +271,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
@@ -269,9 +292,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
@@ -286,9 +313,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
@@ -303,9 +334,13 @@ public class TextSelection {
                             CN.callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Form f = selectionRoot.getComponentForm();
+                                    // The top level, not the form: this synthetic drag
+                                    // is what continues the auto-scroll, and resolving
+                                    // a null form in a Window stopped selection dead at
+                                    // the edge of the visible area.
+                                    TopLevelContainer f = selectionRoot.getTopLevelContainer();
                                     if (f != null) {
-                                        f.pointerDragged(evt.getX(), evt.getY());
+                                        f.asContainer().pointerDragged(evt.getX(), evt.getY());
                                     }
                                 }
                             });
@@ -345,12 +380,12 @@ public class TextSelection {
                             selectedBounds.setHeight(startSelectedBounds.getHeight() + offY);
                         }
                         update();
-                        root.getComponentForm().revalidate();
+                        revalidateTopLevel(root);
                     } else if (inSelectionDrag && evt.getEventType() == ActionEvent.Type.PointerReleased || evt.getEventType() == ActionEvent.Type.DragFinished) {
                         evt.consume();
                         inSelectionDrag = false;
                         update();
-                        root.getComponentForm().revalidate();
+                        revalidateTopLevel(root);
                         textSelectionListeners.fireActionEvent(new ActionEvent(TextSelection.this, Type.Change));
                     }
                 } else {
@@ -386,7 +421,7 @@ public class TextSelection {
                                 layeredPane.add(selectionMask);
 
                             }
-                            root.getComponentForm().revalidate();
+                            revalidateTopLevel(root);
 
 
                         }
@@ -413,7 +448,7 @@ public class TextSelection {
                             selectionMask.remove();
                             getLayeredPane().remove();
                             selectionMask = null;
-                            root.getComponentForm().revalidate();
+                            revalidateTopLevel(root);
                         }
                     }
                 }
@@ -485,11 +520,20 @@ public class TextSelection {
     /// - `enabled`
     public void setEnabled(boolean enabled) {
         if (enabled != this.enabled) {
+            // The top level rather than the form. getComponentForm() is null by design
+            // inside a Window, and this dereferenced it immediately -- so enabling text
+            // selection, which TopLevelContainer exposes on every top level, threw in
+            // every secondary window.
+            TopLevelContainer top = root.getTopLevelContainer();
+            if (top == null) {
+                // Not in a hierarchy: nothing to wire to, and the flag stays as it was
+                // rather than claiming a setup that did not happen.
+                return;
+            }
             this.enabled = enabled;
-            Component f = root.getComponentForm();
+            Component f = top.asContainer();
             if (enabled) {
-                Form form = f.getComponentForm();
-                form.setEnableCursors(true);
+                top.setEnableCursors(true);
                 f.addPointerPressedListener(pressListener);
                 f.addPointerDraggedListener(pressListener);
                 f.addPointerReleasedListener(pressListener);
@@ -677,7 +721,8 @@ public class TextSelection {
 
     private Container getLayeredPane() {
         //return root.getComponentForm().getLayeredPane(TextSelection.class, true);
-        return root.getComponentForm().getFormLayeredPane(TextSelection.class, true);
+        TopLevelContainer top = root.getTopLevelContainer();
+        return top == null ? null : top.getFormLayeredPane(TextSelection.class, true);
     }
 
     /// Copies the current selection to the system clipboard.
@@ -697,7 +742,7 @@ public class TextSelection {
         selectionRoot = root;
         selectedBounds.setBounds(0, 0, selectionRoot.getWidth(), selectionRoot.getHeight());
         update();
-        selectionRoot.getComponentForm().revalidateLater();
+        revalidateLaterTopLevel(selectionRoot);
         textSelectionListeners.fireActionEvent(new ActionEvent(this, Type.Change));
     }
 

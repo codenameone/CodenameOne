@@ -24,11 +24,11 @@
 package com.codename1.components;
 
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.TopLevelContainer;
 
 /// Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
 /// on a label but more convenient for some special circumstances. One major difference is that preferred size
@@ -104,7 +104,13 @@ public class ScaleImageLabel extends Label {
         if (i == null) {
             return new Dimension();
         }
-        int dw = Display.getInstance().getDisplayWidth();
+        // The surface this label lives on rather than the main display, so the
+        // oversized-preferred-width clamp below is measured against the window the
+        // label is actually in.
+        TopLevelContainer scaleTop = getTopLevelContainer();
+        int dw = scaleTop != null && scaleTop.asContainer().getWidth() > 0
+                ? scaleTop.asContainer().getWidth()
+                : Display.getInstance().getDisplayWidth();
         int iw = i.getWidth();
         int ih = i.getHeight();
 
@@ -131,7 +137,7 @@ public class ScaleImageLabel extends Label {
 
     void checkAnimation(Image icon) {
         if (icon != null && icon.isAnimation()) {
-            Form parent = getComponentForm();
+            TopLevelContainer parent = getTopLevelContainer();
             if (parent != null) {
                 // animations are always running so the internal animation isn't
                 // good enough. We never want to stop this sort of animation

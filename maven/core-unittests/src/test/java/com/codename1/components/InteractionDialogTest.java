@@ -29,6 +29,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.Window;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
@@ -607,5 +608,66 @@ class InteractionDialogTest extends UITestBase {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
         return type.cast(field.get(target));
+    }
+
+    /// Builds a shown window holding a single laid-out anchor button.
+    private Window windowWithAnchor(String title, Button anchor) {
+        Window w = new Window(title, new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.add(BorderLayout.CENTER, anchor);
+        w.show();
+        w.asContainer().revalidate();
+        return w;
+    }
+
+    @FormTest
+    void popupHostInferredFromItsAnchorDoesNotOutliveThePopup() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        implementation.setCurrentForm(main);
+
+        Button anchor = new Button("anchor");
+        Window w = windowWithAnchor("secondary", anchor);
+
+        InteractionDialog dialog = new InteractionDialog("popup");
+        dialog.add(new Label("body"));
+        dialog.showPopupDialog(anchor);
+        assertSame(w, dialog.getTopLevelHost(),
+                "the popup is anchored inside the window, so the window is what it shows on");
+
+        dialog.dispose();
+        assertNull(dialog.getTopLevelHost(),
+                "a host worked out from the anchor must not outlive the popup -- showing this "
+                        + "dialog again would target a window the application may have disposed");
+        // A window left registered outlives the manager the next test resets, and
+        // paintOpenWindows then runs every tick against a window with no manager.
+        w.dispose();
+    }
+
+    @FormTest
+    void popupDoesNotDiscardAHostTheApplicationSetItself() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        implementation.setCurrentForm(main);
+
+        Button anchor = new Button("anchor");
+        Window anchorWindow = windowWithAnchor("anchor window", anchor);
+        Window chosen = new Window("chosen", new BorderLayout());
+        chosen.setWindowSize(300, 200);
+        chosen.show();
+
+        InteractionDialog dialog = new InteractionDialog("popup");
+        dialog.add(new Label("body"));
+        dialog.setTopLevelHost(chosen);
+        dialog.showPopupDialog(anchor);
+        assertSame(anchorWindow, dialog.getTopLevelHost(),
+                "while the popup is up the anchor's own top level wins, since the rectangle is "
+                        + "in that coordinate space");
+
+        dialog.dispose();
+        assertSame(chosen, dialog.getTopLevelHost(),
+                "the host the application set explicitly comes back once the popup is gone");
+        anchorWindow.dispose();
+        chosen.dispose();
     }
 }

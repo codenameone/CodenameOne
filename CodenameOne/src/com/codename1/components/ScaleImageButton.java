@@ -25,10 +25,10 @@ package com.codename1.components;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.TopLevelContainer;
 
 /// Button that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
 /// on a button but more convenient for some special circumstances. One major difference is that preferred size
@@ -153,7 +153,7 @@ public class ScaleImageButton extends Button {
 
     void checkAnimation(Image icon) {
         if (icon != null && icon.isAnimation()) {
-            Form parent = getComponentForm();
+            TopLevelContainer parent = getTopLevelContainer();
             if (parent != null) {
                 // animations are always running so the internal animation isn't
                 // good enough. We never want to stop this sort of animation

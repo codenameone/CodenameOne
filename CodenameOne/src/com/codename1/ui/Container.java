@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
@@ -1146,7 +1147,7 @@ public class Container extends Component implements Iterable<Component> {
         if (!contains(current)) {
             throw new IllegalArgumentException("Component " + current + " is not contained in this Container");
         }
-        if (t == null || !isVisible() || getComponentForm() == null) {
+        if (t == null || !isVisible() || getTopLevelContainer() == null) {
             next.setX(current.getX());
             next.setY(current.getY());
             next.setWidth(current.getWidth());
@@ -1219,7 +1220,10 @@ public class Container extends Component implements Iterable<Component> {
             Component c = getComponentAt(iter);
             if (c.isFocusable()) {
                 if (avoidRepaint) {
-                    getComponentForm().setFocusedInternal(c);
+                    Container top = TopLevelSupport.rootOf(this);
+                    if (top != null) {
+                        top.setFocusedInternal(c);
+                    }
                 } else {
                     c.requestFocus();
                 }
@@ -1250,8 +1254,9 @@ public class Container extends Component implements Iterable<Component> {
     void replace(final Component current, final Component next, boolean avoidRepaint) {
         int index = components.indexOf(current);
         boolean currentFocused = false;
-        if (current.getComponentForm() != null) {
-            Component currentF = current.getComponentForm().getFocused();
+        Container currentTop = TopLevelSupport.rootOf(current);
+        if (currentTop != null) {
+            Component currentF = currentTop.getFocused();
             currentFocused = currentF == current; //NOPMD CompareObjectsWithEquals
             if (!currentFocused && current instanceof Container && currentF != null && ((Container) current).isParentOf(currentF)) {
                 currentFocused = true;
@@ -1273,7 +1278,10 @@ public class Container extends Component implements Iterable<Component> {
         if (currentFocused) {
             if (next.isFocusable()) {
                 if (avoidRepaint) {
-                    getComponentForm().setFocusedInternal(next);
+                    Container top = TopLevelSupport.rootOf(this);
+                    if (top != null) {
+                        top.setFocusedInternal(next);
+                    }
                 } else {
                     next.requestFocus();
                 }
@@ -1407,7 +1415,7 @@ public class Container extends Component implements Iterable<Component> {
     ///
     /// - `cmp`: the removed component
     void removeComponentImplNoAnimationSafety(Component cmp) {
-        Form parentForm = getComponentForm();
+        Container parentForm = TopLevelSupport.rootOf(this);
         layout.removeLayoutComponent(cmp);
 
         // the deinitizlize contract expects the component to be in a container but if this is a part of an animation
@@ -1480,7 +1488,7 @@ public class Container extends Component implements Iterable<Component> {
     /// such an issue. Notice that this method doesn't recurse and only removes from
     /// the current container.
     public void removeAll() {
-        Form parentForm = getComponentForm();
+        TopLevelContainer parentForm = getTopLevelContainer();
         if (parentForm != null) {
             Component focus = parentForm.getFocused();
             if (focus != null && contains(focus)) {
@@ -1581,11 +1589,11 @@ public class Container extends Component implements Iterable<Component> {
     /// - `fromRoot`
     void revalidateInternal(boolean fromRoot) {
         setShouldCalcPreferredSize(true);
-        Form root = getComponentForm();
+        Container root = TopLevelSupport.rootOf(this);
 
         if (root != null && root != this) { //NOPMD CompareObjectsWithEquals
             root.removeFromRevalidateQueue(this);
-            if (fromRoot && root.revalidateFromRoot) {
+            if (fromRoot && root.isRevalidateFromRoot()) {
                 root.layoutContainer();
                 root.repaint();
 
@@ -1614,11 +1622,225 @@ public class Container extends Component implements Iterable<Component> {
     /// of containers that require revalidation, so that the system doesn't end up
     /// revalidating the same container multiple times between paints.
     public void revalidateLater() {
-        Form root = getComponentForm();
+        Container root = TopLevelSupport.rootOf(this);
         if (root != null) {
             root.revalidateLater(this);
         }
 
+    }
+
+    // ---------------------------------------------------------------------------
+    // Top level hooks.
+    //
+    // These are the internals that Component, Container and Toolbar need to drive
+    // whichever top level they sit in -- a Form on the main surface, or a Window on
+    // the desktop. They live here rather than on an interface because they must stay
+    // package private: every method of a Java interface is implicitly public, so
+    // putting them on one would silently widen Form's public API.
+    //
+    // Container is the nearest common supertype of Form and Window, so declaring
+    // them here dispatches virtually with no instanceof. The defaults are inert;
+    // Form and Window override the ones that mean something to them.
+    // ---------------------------------------------------------------------------
+
+    /// Registers an animation not exposed through the public animation registry.
+    /// Inert unless this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the animation to register
+    void registerAnimatedInternal(Animation cmp) {
+    }
+
+    /// Removes an internally registered animation. Inert unless this container is a
+    /// top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the animation to remove
+    void deregisterAnimatedInternal(Animation cmp) {
+    }
+
+    /// Moves focus without the side effects of the public setter. Inert unless this
+    /// container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `focused`: the new focus owner
+    void setFocusedInternal(Component focused) {
+    }
+
+    /// Returns the component owning focus within this top level. Overridden as a
+    /// public method by the top levels themselves.
+    ///
+    /// #### Returns
+    ///
+    /// the focus owner, or null unless this container is a top level
+    Component getFocused() {
+        return null;
+    }
+
+    /// Indicates whether revalidating any container should lay out the whole top
+    /// level rather than only that container.
+    ///
+    /// #### Returns
+    ///
+    /// true to revalidate from the root
+    boolean isRevalidateFromRoot() {
+        return false;
+    }
+
+    /// Returns the component below the focus owner in traversal order.
+    ///
+    /// #### Returns
+    ///
+    /// the next component down, or null unless this container is a top level
+    Component findNextFocusDown() {
+        return null;
+    }
+
+    /// Returns the component above the focus owner in traversal order.
+    ///
+    /// #### Returns
+    ///
+    /// the next component up, or null unless this container is a top level
+    Component findNextFocusUp() {
+        return null;
+    }
+
+    /// Returns the component right of the focus owner in traversal order.
+    ///
+    /// #### Returns
+    ///
+    /// the next component right, or null unless this container is a top level
+    Component findNextFocusRight() {
+        return null;
+    }
+
+    /// Returns the component left of the focus owner in traversal order.
+    ///
+    /// #### Returns
+    ///
+    /// the next component left, or null unless this container is a top level
+    Component findNextFocusLeft() {
+        return null;
+    }
+
+    /// Reacts to the surface this top level occupies changing size. Inert unless
+    /// this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the new width
+    ///
+    /// - `h`: the new height
+    void sizeChangedInternal(int w, int h) {
+    }
+
+    /// Invoked when this top level stops being visible. Inert unless this container
+    /// is a top level.
+    void hideNotify() {
+    }
+
+    /// Invoked when this top level becomes visible. Inert unless this container is a
+    /// top level.
+    void showNotify() {
+    }
+
+    /// Indicates that this top level wants a pointer release even when the matching
+    /// press went somewhere else.
+    ///
+    /// #### Returns
+    ///
+    /// false unless a top level opts in
+    boolean shouldSendPointerReleaseToOtherForm() {
+        return false;
+    }
+
+    /// Requests focus for a component. Inert unless this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component requesting focus
+    void requestFocus(Component cmp) {
+    }
+
+    /// Returns the container that hit testing and focus traversal treat as the root.
+    ///
+    /// #### Returns
+    ///
+    /// this container, unless a top level overrides it
+    Container getActualPane() {
+        return this;
+    }
+
+    /// Schedules a container to be revalidated before the next paint. Inert unless
+    /// this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container to revalidate later
+    void revalidateLater(Container cnt) {
+    }
+
+    /// Drops a container from the pending revalidate queue. Inert unless this
+    /// container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container to drop
+    void removeFromRevalidateQueue(Container cnt) {
+    }
+
+    /// Revalidates everything queued by `#revalidateLater(Container)`. Inert unless
+    /// this container is a top level.
+    void flushRevalidateQueue() {
+    }
+
+    /// Returns the token identifying the current pointer press, used to stop a drag
+    /// from outliving the press that started it.
+    ///
+    /// #### Returns
+    ///
+    /// the press token, or null unless this container is a top level
+    Object getCurrentPointerPress() {
+        return null;
+    }
+
+    /// Returns the x coordinate at which the current press began.
+    ///
+    /// #### Returns
+    ///
+    /// the initial press x, or zero unless this container is a top level
+    int getInitialPressX() {
+        return 0;
+    }
+
+    /// Returns the y coordinate at which the current press began.
+    ///
+    /// #### Returns
+    ///
+    /// the initial press y, or zero unless this container is a top level
+    int getInitialPressY() {
+        return 0;
+    }
+
+    /// Returns the component currently being dragged.
+    ///
+    /// #### Returns
+    ///
+    /// the dragged component, or null unless this container is a top level
+    Component getDraggedComponent() {
+        return null;
+    }
+
+    /// Sets the component currently being dragged. Inert unless this container is a
+    /// top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dragged`: the dragged component, or null to clear it
+    void setDraggedComponent(Component dragged) {
     }
 
     /// A more powerful form of revalidate that recursively lays out the full hierarchy
@@ -2403,11 +2625,31 @@ public class Container extends Component implements Iterable<Component> {
         if (safeAreaRoot == null) {
             return false;
         }
-        Rectangle rect = Display.impl.getDisplaySafeArea(new Rectangle());
+        Rectangle rect;
+        int surfaceWidth;
+        int surfaceHeight;
+        TopLevelContainer top = getTopLevelContainer();
+        if (top instanceof Window) {
+            // The enclosing window's safe area and size, not the main surface's. A
+            // desktop window has no notch or rounded corner, so this yields zero
+            // margins and no snapping -- where reading the display's insets applied
+            // the main surface's notch to every secondary window on a device that has
+            // one. Copied rather than used directly, so the arithmetic below cannot
+            // write into whatever the top level handed back.
+            Rectangle windowSafe = top.getSafeArea();
+            rect = new Rectangle(windowSafe.getX(), windowSafe.getY(),
+                    windowSafe.getWidth(), windowSafe.getHeight());
+            surfaceWidth = top.asContainer().getWidth();
+            surfaceHeight = top.asContainer().getHeight();
+        } else {
+            rect = Display.impl.getDisplaySafeArea(new Rectangle());
+            surfaceWidth = CN.getDisplayWidth();
+            surfaceHeight = CN.getDisplayHeight();
+        }
         int safeLeftMargin = rect.getX();
-        int safeRightMargin = CN.getDisplayWidth() - rect.getWidth() - rect.getX();
+        int safeRightMargin = surfaceWidth - rect.getWidth() - rect.getX();
         int safeTopMargin = rect.getY();
-        int safeBottomMargin = CN.getDisplayHeight() - rect.getHeight() - rect.getY();
+        int safeBottomMargin = surfaceHeight - rect.getHeight() - rect.getY();
         if (safeLeftMargin == 0 && safeRightMargin == 0 && safeBottomMargin == 0 && safeTopMargin == 0) {
             return false;
         }
@@ -2638,9 +2880,9 @@ public class Container extends Component implements Iterable<Component> {
                 if (c.getParent() != null) {
                     // special case for the first component to allow the user to scroll all the
                     // way to the top
-                    Form f = getComponentForm();
+                    TopLevelContainer f = getTopLevelContainer();
                     if (f != null && f.getInvisibleAreaUnderVKB() == 0 &&
-                            f.findFirstFocusable() == c) { //NOPMD CompareObjectsWithEquals
+                            f.asContainer().findFirstFocusable() == c) { //NOPMD CompareObjectsWithEquals
                         // support this use case only if the component doesn't explicitly declare visible bounds
                         if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) { //NOPMD CompareObjectsWithEquals
                             scrollRectToVisible(new Rectangle(0, 0,
@@ -2696,7 +2938,10 @@ public class Container extends Component implements Iterable<Component> {
     boolean moveScrollTowards(int direction, Component next) {
         if (isScrollable()) {
             Component current = null;
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
+            if (f == null) {
+                return false;
+            }
             current = f.getFocused();
 
             boolean cyclic = f.isCyclicFocus();
@@ -2716,7 +2961,7 @@ public class Container extends Component implements Iterable<Component> {
                         return true;
                     }
                     y = getScrollY() - scrollIncrement;
-                    edge = f.findNextFocusUp() == null;
+                    edge = f.asContainer().findNextFocusUp() == null;
                     currentLarge = (current != null && current.getVisibleBounds().getSize().getHeight() > getHeight());
                     scrollOutOfBounds = y < 0;
                     if (scrollOutOfBounds) {
@@ -2725,7 +2970,7 @@ public class Container extends Component implements Iterable<Component> {
                     break;
                 case Display.GAME_DOWN:
                     y = getScrollY() + scrollIncrement;
-                    edge = f.findNextFocusDown() == null;
+                    edge = f.asContainer().findNextFocusDown() == null;
                     currentLarge = (current != null && current.getVisibleBounds().getSize().getHeight() > getHeight());
                     scrollOutOfBounds = y > getScrollDimension().getHeight() - getHeight();
                     if (scrollOutOfBounds) {
@@ -2734,7 +2979,7 @@ public class Container extends Component implements Iterable<Component> {
                     break;
                 case Display.GAME_RIGHT:
                     x = getScrollX() + scrollIncrement;
-                    edge = f.findNextFocusRight() == null;
+                    edge = f.asContainer().findNextFocusRight() == null;
                     currentLarge = (current != null && current.getVisibleBounds().getSize().getWidth() > getWidth());
                     scrollOutOfBounds = x > getScrollDimension().getWidth() - getWidth();
                     if (scrollOutOfBounds) {
@@ -2743,7 +2988,7 @@ public class Container extends Component implements Iterable<Component> {
                     break;
                 case Display.GAME_LEFT:
                     x = getScrollX() - scrollIncrement;
-                    edge = f.findNextFocusLeft() == null;
+                    edge = f.asContainer().findNextFocusLeft() == null;
                     currentLarge = (current != null && current.getVisibleBounds().getSize().getWidth() > getWidth());
                     scrollOutOfBounds = x < 0;
                     if (scrollOutOfBounds) {
@@ -3253,7 +3498,7 @@ public class Container extends Component implements Iterable<Component> {
     /// {@inheritDoc}
     @Override
     public boolean isScrollableY() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         int v = 0;
         if (f != null) {
             v = f.getInvisibleAreaUnderVKB();
@@ -3764,7 +4009,10 @@ public class Container extends Component implements Iterable<Component> {
             } else {
                 addComponent(dragged);
             }
-            getComponentForm().animateHierarchy(400);
+            Container dropRoot = TopLevelSupport.rootOf(this);
+            if (dropRoot != null) {
+                dropRoot.animateHierarchy(400);
+            }
         }
     }
 
@@ -4094,7 +4342,7 @@ public class Container extends Component implements Iterable<Component> {
     /// - `duration`: the duration in milliseconds for the animation
     private ComponentAnimation animateLayout(final int duration, boolean wait, int opacity, boolean addAnimation) {
         // this happens for some reason
-        Form f = getComponentForm();
+        Container f = TopLevelSupport.rootOf(this);
         if (f == null) {
             return null;
         }
@@ -4374,7 +4622,7 @@ public class Container extends Component implements Iterable<Component> {
         private final Container thisContainer;
         private final Component current;
         private final Component next;
-        private final Form parent;
+        private final Container parent;
         int growSpeed;
         int layoutAnimationSpeed;
         private boolean started = false;
@@ -4386,7 +4634,7 @@ public class Container extends Component implements Iterable<Component> {
             this.next = next;
             this.current = current;
             this.thisContainer = thisContainer;
-            this.parent = thisContainer.getComponentForm();
+            this.parent = TopLevelSupport.rootOf(thisContainer);
         }
 
         @Override
@@ -4539,7 +4787,7 @@ public class Container extends Component implements Iterable<Component> {
             if (AnimationTime.now() - startTime >= duration) {
                 setEnableLayoutOnPaint(true);
                 thisContainer.dontRecurseContainer = false;
-                Form f = thisContainer.getComponentForm();
+                Container f = TopLevelSupport.rootOf(thisContainer);
                 finished = true;
                 if (f == null) {
                     return;

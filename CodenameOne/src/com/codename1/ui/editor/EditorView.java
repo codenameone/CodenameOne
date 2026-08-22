@@ -36,6 +36,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.TopLevelContainer;
 
 /// The pure Codename One text editing surface. It renders a plain text `EditorDocument` with its own
 /// `Graphics` code, owns the caret and selection, handles pointer and keyboard interaction, and captures
@@ -192,9 +193,14 @@ public class EditorView extends Component implements TextInputClient {
 
     /// Relinquishes focus and stops the active platform text-input session.
     public void blur() {
-        com.codename1.ui.Form form = getComponentForm();
-        if (form != null && equals(form.getFocused())) {
-            form.setFocused(null);
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so blurring there took the else branch and merely stopped
+        // the input session. focusLost() then never ran, leaving the caret animation
+        // registered and the global multi-key mode switched on while the editor still
+        // reported itself focused.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null && equals(top.getFocused())) {
+            top.setFocused(null);
         } else {
             stopInput();
         }
@@ -1394,8 +1400,12 @@ public class EditorView extends Component implements TextInputClient {
             multiKeyModeInstalled = true;
         }
         startInput();
-        if (!animRegistered && getComponentForm() != null) {
-            getComponentForm().registerAnimated(this);
+        // Gated on the top level, not on an enclosing Form: getComponentForm() is
+        // null by design inside a Window, so the old guard skipped the registration
+        // there entirely and the caret never blinked.
+        TopLevelContainer focusTop = getTopLevelContainer();
+        if (!animRegistered && focusTop != null) {
+            focusTop.registerAnimated(this);
             animRegistered = true;
         }
         resetBlink();
@@ -1419,8 +1429,13 @@ public class EditorView extends Component implements TextInputClient {
         super.focusLost();
         restoreMultiKeyMode();
         stopInput();
-        if (animRegistered && getComponentForm() != null) {
-            getComponentForm().deregisterAnimated(this);
+        // Deregistration is driven by animRegistered rather than by an enclosing
+        // Form, so an editor that registered inside a Window is also released.
+        if (animRegistered) {
+            TopLevelContainer blurTop = getTopLevelContainer();
+            if (blurTop != null) {
+                blurTop.deregisterAnimated(this);
+            }
             animRegistered = false;
         }
         repaint();

@@ -42,6 +42,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -529,7 +530,8 @@ public class Tree extends Container {
     ///
     /// the object selected within the tree
     public Object getSelectedItem() {
-        Component c = getComponentForm().getFocused();
+        TopLevelContainer treeTop = getTopLevelContainer();
+        Component c = treeTop == null ? null : treeTop.getFocused();
         if (c != null) {
             return c.getClientProperty(KEY_OBJECT);
         }

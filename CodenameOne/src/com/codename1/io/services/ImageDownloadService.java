@@ -36,7 +36,6 @@ import com.codename1.io.Storage;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
@@ -671,9 +670,13 @@ public class ImageDownloadService extends ConnectionRequest {
                 @Override
                 public void run() {
                     l.setIcon(i);
-                    Form f = l.getComponentForm();
-                    if (f != null) {
-                        f.revalidate();
+                    // The top level, not the form. This is the cache-hit return, which
+                    // bypasses the download-completion path entirely, so it needs the
+                    // same resolution: in a Window the icon changed and the layout
+                    // stayed sized for the placeholder.
+                    com.codename1.ui.TopLevelContainer top = l.getTopLevelContainer();
+                    if (top != null) {
+                        top.asContainer().revalidate();
                     }
                 }
             });
@@ -876,44 +879,35 @@ public class ImageDownloadService extends ConnectionRequest {
         final Image i = image;
         if (parentLabel != null) {
             final Dimension pref = parentLabel.getPreferredSize();
-            if (parentLabel.getComponentForm() != null) {
-                Display.getInstance().callSerially(new Runnable() {
+            // One branch rather than two. These used to differ only in whether the
+            // revalidate ran, chosen by whether the label was on a form -- so a label
+            // in a Window took the branch that applies the icon and never reflows, and
+            // the window stayed laid out for the placeholder's size. Resolving the top
+            // level covers both, and does nothing when the label is detached.
+            Display.getInstance().callSerially(new Runnable() {
 
-                    @Override
-                    public void run() {
-                        if (isDownloadToStyles()) {
-                            parentLabel.getUnselectedStyle().setBgImage(i);
-                            parentLabel.getSelectedStyle().setBgImage(i);
-                            parentLabel.getPressedStyle().setBgImage(i);
-                        } else {
-                            parentLabel.setIcon(i);
-                        }
-                        Dimension newPref = parentLabel.getPreferredSize();
-                        // if the preferred size changed we need to reflow the UI
-                        // this might not be necessary if the label already had an identically
-                        // sized image in place or has a hardcoded preferred size.
-                        if (pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {
-                            parentLabel.getComponentForm().revalidate();
+                @Override
+                public void run() {
+                    if (isDownloadToStyles()) {
+                        parentLabel.getUnselectedStyle().setBgImage(i);
+                        parentLabel.getSelectedStyle().setBgImage(i);
+                        parentLabel.getPressedStyle().setBgImage(i);
+                    } else {
+                        parentLabel.setIcon(i);
+                    }
+                    Dimension newPref = parentLabel.getPreferredSize();
+                    // if the preferred size changed we need to reflow the UI
+                    // this might not be necessary if the label already had an identically
+                    // sized image in place or has a hardcoded preferred size.
+                    if (pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {
+                        com.codename1.ui.TopLevelContainer top =
+                                parentLabel.getTopLevelContainer();
+                        if (top != null) {
+                            top.asContainer().revalidate();
                         }
                     }
-                });
-
-            } else {
-                Display.getInstance().callSerially(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        if (isDownloadToStyles()) {
-                            parentLabel.getUnselectedStyle().setBgImage(i);
-                            parentLabel.getSelectedStyle().setBgImage(i);
-                            parentLabel.getPressedStyle().setBgImage(i);
-                        } else {
-                            parentLabel.setIcon(i);
-                        }
-
-                    }
-                });
-            }
+                }
+            });
             parentLabel.repaint();
             return;
         } else {

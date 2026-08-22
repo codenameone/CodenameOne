@@ -97,6 +97,13 @@ public final class WindowsNative {
     /** Creates a WebView2-backed browser peer; returns an opaque native handle. */
     public static native long browserCreate(int width, int height);
 
+    /**
+     * Re-hosts the browser in the given window. A BrowserComponent is routinely
+     * constructed while detached, so the window it belongs to is only known once the
+     * component is initialized in its real hierarchy.
+     */
+    public static native void browserSetHost(long peer, int slot);
+
     public static native void browserSetHtml(long peer, String html);
 
     public static native void browserSetUrl(long peer, String url);
@@ -137,11 +144,96 @@ public final class WindowsNative {
             float m11, float m02, float m12);
 
     /**
-     * Drains one queued input event into {@code out} ([type, x, y, keyCode]);
-     * returns true if an event was dequeued. See the {@code CN1_EVENT_*}
-     * constants in cn1_windows.h for the type codes.
+     * Drains one queued input event into {@code out}
+     * ([type, x, y, keyCode, windowId]); returns true if an event was dequeued.
+     * See the {@code CN1_EVENT_*} constants in cn1_windows.h for the type codes.
+     *
+     * <p>{@code windowId} is zero for the application's main window, which is every
+     * event this port produced before desktop windows existed. A shorter array is
+     * still accepted and simply drops the trailing fields.</p>
      */
     public static native boolean pollEvent(int[] out);
+
+    // ---- additional desktop windows (cn1_windows_desktopwindow.cpp) ----------
+    //
+    // A window is addressed by the slot index returned from desktopWindowCreate;
+    // the windowId passed in is the framework's own id, which the native layer
+    // stores and echoes back on every event so input can be routed without a
+    // lookup on the pump thread.
+
+    /** Creates a hidden native window; returns its slot, or -1 on failure. */
+    public static native int desktopWindowCreate(int windowId, String title, int x, int y,
+            int width, int height, boolean decorated, boolean resizable, int ownerSlot,
+            boolean positionSet);
+
+    /** Destroys a native window and releases its render target. */
+    public static native void desktopWindowDestroy(int slot);
+
+    /** Maps or unmaps a native window. */
+    public static native void desktopWindowShow(int slot, boolean visible);
+
+    public static native void desktopWindowSetTitle(int slot, String title);
+
+    public static native void desktopWindowSetBounds(int slot, int x, int y, int width, int height);
+
+    /** Fills {@code out} with x, y, width and height in desktop coordinates. */
+    public static native void desktopWindowGetBounds(int slot, int[] out);
+
+    public static native boolean mainWindowGetBounds(int[] out);
+
+    /** Width of the window's drawable area in pixels. */
+    public static native int desktopWindowGetWidth(int slot);
+
+    /** Height of the window's drawable area in pixels. */
+    public static native int desktopWindowGetHeight(int slot);
+
+    /**
+     * The window's CN1Graphics pointer. Also applies any resize the pump thread
+     * recorded, on the calling (drawing) thread and between frames.
+     */
+    public static native long desktopWindowGraphics(int slot);
+
+    public static native void desktopWindowSetResizable(int slot, boolean resizable);
+
+    /// Adds or removes the window's title bar and border.
+    public static native void desktopWindowSetDecorated(int slot, boolean decorated);
+
+    public static native void desktopWindowSetAlwaysOnTop(int slot, boolean onTop);
+
+    /** The smallest frame the user may drag the window to; 0 clears the constraint. */
+    public static native void desktopWindowSetMinimumSize(int slot, int width, int height);
+
+    /** Applies WS_EX_TOOLWINDOW, keeping a palette out of the task bar and Alt-Tab. */
+    public static native void desktopWindowSetUtility(int slot, boolean utility);
+
+    /** Enables or disables input, which is how native modality is applied. */
+    public static native void desktopWindowSetEnabled(int slot, boolean enabled);
+
+    /** Enables or disables the main window, for an application-modal window. */
+    public static native void mainWindowSetEnabled(boolean enabled);
+
+    public static native void desktopWindowFocus(int slot);
+
+    /** 0 restores, 1 minimizes, 2 toggles maximized. */
+    public static native void desktopWindowSetState(int slot, int state);
+
+    // ---- monitors ----
+
+    public static native int monitorCount();
+
+    public static native int primaryMonitor();
+
+    /** Fills {@code out} with a monitor's bounds, or its work area when asked. */
+    public static native void monitorBounds(int monitor, boolean workArea, int[] out);
+
+    public static native int monitorDpi(int monitor);
+
+    /** The monitor a window currently sits on. */
+    public static native int monitorForWindow(int slot);
+
+    /// The monitor the application's main window sits on. The main window has no
+    /// desktop-window slot, so `#monitorForWindow(int)` cannot answer for it.
+    public static native int monitorForMainWindow();
 
     /** Rebuilds the Windows UI Automation virtual fragment tree. */
     public static native void accessibilityBegin();
@@ -381,7 +473,8 @@ public final class WindowsNative {
      * {@link #editIsDone(long)}.
      */
     public static native long editStringAt(int x, int y, int w, int h, String text,
-            boolean singleLine, int maxSize, long fontPeer, int fgColor, int bgColor, int align);
+            boolean singleLine, int maxSize, long fontPeer, int fgColor, int bgColor, int align,
+            int slot);
 
     /** True once the user has committed the native edit (Enter / focus loss). */
     public static native boolean editIsDone(long peer);
@@ -868,7 +961,7 @@ public final class WindowsNative {
      * {@code @NativeInterface}; these reparent it onto the host window and
      * move/size/show it to track the lightweight {@link com.codename1.ui.PeerComponent}.
      */
-    public static native void peerInitialized(long peer, int x, int y, int w, int h);
+    public static native void peerInitialized(long peer, int slot, int x, int y, int w, int h);
 
     /** Repositions / resizes the peer HWND to the component's absolute bounds. */
     public static native void peerSetBounds(long peer, int x, int y, int w, int h);

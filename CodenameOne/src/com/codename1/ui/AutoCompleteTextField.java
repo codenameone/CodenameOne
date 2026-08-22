@@ -167,9 +167,9 @@ public class AutoCompleteTextField extends TextField {
                 if (popup.isVisible()) {
                     popup.setVisible(false);
                     popup.setEnabled(false);
-                    Form f = getComponentForm();
+                    TopLevelContainer f = getTopLevelContainer();
                     if (f != null) {
-                        f.revalidateLater();
+                        f.asContainer().revalidateLater();
                     }
                 }
             }
@@ -187,8 +187,14 @@ public class AutoCompleteTextField extends TextField {
     @Override
     protected void initComponent() {
         super.initComponent();
-        getComponentForm().addPointerPressedListener(pressListener);
-        getComponentForm().addPointerReleasedListener(listener);
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so the very first show() of a window containing an
+        // autocomplete field threw here before anything else could run.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().addPointerPressedListener(pressListener);
+            top.asContainer().addPointerReleasedListener(listener);
+        }
         Display.getInstance().callSerially(new Runnable() {
 
             @Override
@@ -202,8 +208,11 @@ public class AutoCompleteTextField extends TextField {
     @Override
     protected void deinitialize() {
         super.deinitialize();
-        getComponentForm().removePointerPressedListener(pressListener);
-        getComponentForm().removePointerReleasedListener(listener);
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().removePointerPressedListener(pressListener);
+            top.asContainer().removePointerReleasedListener(listener);
+        }
         Display.getInstance().callSerially(new Runnable() {
 
             @Override
@@ -246,7 +255,7 @@ public class AutoCompleteTextField extends TextField {
             }
         }
         pickedText = null;
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null && filterImpl(text)) {
             updateFilterList();
         }
@@ -254,7 +263,7 @@ public class AutoCompleteTextField extends TextField {
 
     /// In a case of an asynchronous filter this method can be invoked to refresh the completion list
     protected void updateFilterList() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         boolean v = filter.getSize() > 0 && getText().length() >= minimumLength;
         if (v != popup.isVisible()) {
             if (popup.getComponentCount() > 0) {
@@ -266,7 +275,7 @@ public class AutoCompleteTextField extends TextField {
             }
             popup.setVisible(v);
             popup.setEnabled(v);
-            f.revalidate();
+            f.asContainer().revalidate();
         }
         if (v && popup.getComponentCount() > 0) {
             int popupHeight = calcPopupHeight((List) popup.getComponentAt(0));
@@ -276,11 +285,11 @@ public class AutoCompleteTextField extends TextField {
             dontCalcSize = true;
         }
         if (f != null) {
-            f.revalidate();
+            f.asContainer().revalidate();
         }
         if (f != null) {
             dontCalcSize = false;
-            f.revalidate();
+            f.asContainer().revalidate();
             dontCalcSize = true;
         }
 
@@ -316,7 +325,7 @@ public class AutoCompleteTextField extends TextField {
                 popup.setVisible(v);
                 popup.setEnabled(v);
             }
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
 
             if (popup.getComponentCount() > 0) {
                 int popupHeight = calcPopupHeight((List) popup.getComponentAt(0));
@@ -326,7 +335,7 @@ public class AutoCompleteTextField extends TextField {
                 dontCalcSize = true;
             }
             if (f != null) {
-                f.revalidate();
+                f.asContainer().revalidate();
             }
         }
         return res;
@@ -377,9 +386,11 @@ public class AutoCompleteTextField extends TextField {
     }
 
     private void removePopup() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f == null && popup != null) {
-            f = popup.getComponentForm();
+            // The popup outlives the field's own attachment during teardown, so it is
+            // asked next. Its top level, not its form, for the same reason.
+            f = popup.getTopLevelContainer();
         }
         if (f != null) {
             Container lay = f.getLayeredPane(getClass(), true);
@@ -387,7 +398,7 @@ public class AutoCompleteTextField extends TextField {
             if (parent != null) {
                 lay.removeComponent(parent);
                 popup.remove();
-                f.revalidateLater();
+                f.asContainer().revalidateLater();
             }
 
         }
@@ -416,7 +427,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     private void addPopup(boolean updateFilter) {
-        final Form f = getComponentForm();
+        final TopLevelContainer f = getTopLevelContainer();
         popup.removeAll();
         popup.setVisible(false);
         popup.setEnabled(false);
@@ -452,7 +463,7 @@ public class AutoCompleteTextField extends TextField {
                     }
                     popup.setVisible(false);
                     popup.setEnabled(false);
-                    f.revalidate();
+                    f.asContainer().revalidate();
                 }
             }
         });
@@ -465,7 +476,7 @@ public class AutoCompleteTextField extends TextField {
         }
 
         int leftMargin = isRTL() ?
-                Math.max(0, f.getWidth() - getAbsoluteX() - getWidth()) :
+                Math.max(0, f.asContainer().getWidth() - getAbsoluteX() - getWidth()) :
                 Math.max(0, getAbsoluteX());
 
         popup.getAllStyles().setMargin(LEFT, leftMargin);
@@ -489,7 +500,7 @@ public class AutoCompleteTextField extends TextField {
                 wrapper.add(popup);
                 lay.addComponent(wrapper);
             }
-            f.revalidate();
+            f.asContainer().revalidate();
         }
     }
 
@@ -550,7 +561,7 @@ public class AutoCompleteTextField extends TextField {
         int topMargin;
         int popupHeight;
         int items = l.getModel().getSize();
-        final Form f = getComponentForm();
+        final TopLevelContainer f = getTopLevelContainer();
         if (f == null) {
             // for some reason this happens in the GUI builder
             return 10;
@@ -663,7 +674,7 @@ public class AutoCompleteTextField extends TextField {
         @Override
         public void actionPerformed(ActionEvent evt) {
             pressInBounds = false;
-            final Form f = getComponentForm();
+            final TopLevelContainer f = getTopLevelContainer();
             Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
 
             for (int i = 0; i < layered.getComponentCount(); i++) {
@@ -682,7 +693,7 @@ public class AutoCompleteTextField extends TextField {
 
         @Override
         public void actionPerformed(final ActionEvent evt) {
-            final Form f = getComponentForm();
+            final TopLevelContainer f = getTopLevelContainer();
             Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
 
             boolean canOpenPopup = shouldShowPopup();
@@ -694,7 +705,7 @@ public class AutoCompleteTextField extends TextField {
                     if (!pressInBounds && !pop.contains(evt.getX(), evt.getY())) {
                         pop.setVisible(false);
                         pop.setEnabled(false);
-                        f.revalidateLater();
+                        f.asContainer().revalidateLater();
                         evt.consume();
                     } else {
                         canOpenPopup = false;
@@ -725,7 +736,7 @@ public class AutoCompleteTextField extends TextField {
                 popup.setEnabled(true);
                 popup.revalidate();
                 dontCalcSize = false;
-                f.revalidate();
+                f.asContainer().revalidate();
                 dontCalcSize = true;
                 Display.getInstance().callSerially(new Runnable() {
 

@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.impl.linux;
 
@@ -50,8 +63,11 @@ class LinuxGLSurface extends PeerComponent {
     void setContinuous(boolean continuous) {
         this.continuous = continuous;
         if (continuous) {
-            if (animationTimer == null && getComponentForm() != null) {
-                animationTimer = UITimer.timer(16, true, getComponentForm(), new Runnable() {
+            // The top level rather than the form: getComponentForm() is null by design
+            // inside a Window, so this timer never started for a peer hosted in one.
+            com.codename1.ui.TopLevelContainer peerTop = getTopLevelContainer();
+            if (animationTimer == null && peerTop != null) {
+                animationTimer = UITimer.timer(16, true, peerTop, new Runnable() {
                     public void run() {
                         repaint();
                     }

@@ -25,7 +25,6 @@ package com.codename1.components;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.animations.Animation;
@@ -38,6 +37,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.Collection;
 import java.util.Vector;
@@ -365,7 +365,14 @@ public class OnOffSwitch extends Container implements ActionSource {
         final Motion current = Motion.createEaseInOutMotion(Math.abs(position), switchMaskImage.getWidth() - 2 * switchButtonPadInt, 100);
         current.start();
         deltaX = position;
-        getComponentForm().registerAnimated(new Animation() {
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so the switch threw instead of animating there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel == null) {
+            setValue(value);
+            return;
+        }
+        topLevel.registerAnimated(new Animation() {
             @Override
             public boolean animate() {
                 deltaX = current.getValue();
@@ -375,9 +382,9 @@ public class OnOffSwitch extends Container implements ActionSource {
                 dragged = true;
                 if (current.isFinished()) {
                     dragged = false;
-                    Form f = getComponentForm();
-                    if (f != null) {
-                        f.deregisterAnimated(this);
+                    TopLevelContainer t = getTopLevelContainer();
+                    if (t != null) {
+                        t.deregisterAnimated(this);
                     }
                     OnOffSwitch.this.setValue(value);
                 }

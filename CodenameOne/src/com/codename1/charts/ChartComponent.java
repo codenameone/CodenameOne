@@ -29,7 +29,6 @@ import com.codename1.charts.views.AbstractChart;
 import com.codename1.charts.views.XYChart;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Animation;
@@ -1012,7 +1011,7 @@ public class ChartComponent extends Component {
 
         @Override
         public void start() {
-            Form f = ChartComponent.this.getComponentForm();
+            com.codename1.ui.TopLevelContainer f = ChartComponent.this.getTopLevelContainer();
             if (f != null) {
                 f.registerAnimated(this);
                 this.motion.start();
@@ -1022,7 +1021,7 @@ public class ChartComponent extends Component {
         }
 
         public void cleanup() {
-            Form f = ChartComponent.this.getComponentForm();
+            com.codename1.ui.TopLevelContainer f = ChartComponent.this.getTopLevelContainer();
             if (f != null) {
                 f.deregisterAnimated(this);
             }
@@ -1101,7 +1100,7 @@ public class ChartComponent extends Component {
 
         @Override
         public void start() {
-            Form f = ChartComponent.this.getComponentForm();
+            com.codename1.ui.TopLevelContainer f = ChartComponent.this.getTopLevelContainer();
             if (f != null) {
                 f.registerAnimated(this);
                 this.motion.start();
@@ -1111,7 +1110,7 @@ public class ChartComponent extends Component {
         }
 
         public void cleanup() {
-            Form f = ChartComponent.this.getComponentForm();
+            com.codename1.ui.TopLevelContainer f = ChartComponent.this.getTopLevelContainer();
             if (f != null) {
                 f.deregisterAnimated(this);
             }

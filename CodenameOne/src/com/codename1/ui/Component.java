@@ -2172,7 +2172,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (contains(x, y)) {
             return true;
         }
-        Form f = getComponentForm();
+        Container f = TopLevelSupport.rootOf(this);
         if (f != null) {
             Component cmp = f.getComponentAt(x, y);
             if (cmp.isOwnedBy(this)) {
@@ -3376,13 +3376,13 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// The height of the area under the virtual keyboard in pixels
     private int getInvisibleAreaUnderVKB() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
-            int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(f);
+            int invisibleAreaUnderVKB = f.getInvisibleAreaUnderVKB();
             if (invisibleAreaUnderVKB == 0) {
                 return 0;
             }
-            int bottomGap = f.getHeight() - getAbsoluteY() - getScrollY() - getHeight();
+            int bottomGap = f.asContainer().getHeight() - getAbsoluteY() - getScrollY() - getHeight();
             if (bottomGap < invisibleAreaUnderVKB) {
                 return invisibleAreaUnderVKB - bottomGap;
             } else {
@@ -4331,6 +4331,30 @@ public class Component implements Animation, StyleListener, Editable {
         return retVal;
     }
 
+    /// Returns the top level container this component currently belongs to, which is
+    /// either the `Form` filling the main surface or the `Window` of a native desktop
+    /// window, or null when this component is not attached to one.
+    ///
+    /// Prefer this over `#getComponentForm()` in code that must keep working inside a
+    /// desktop `Window`. `getComponentForm()` keeps its original meaning and returns
+    /// null for a component hosted in a `Window`, because a `Window` is not a `Form`.
+    ///
+    /// #### Returns
+    ///
+    /// the enclosing top level container, or null when detached
+    ///
+    /// #### See also
+    ///
+    /// - #getComponentForm()
+    public TopLevelContainer getTopLevelContainer() {
+        TopLevelContainer retVal = null;
+        Component parent = getParent();
+        if (parent != null) {
+            retVal = parent.getTopLevelContainer();
+        }
+        return retVal;
+    }
+
     /// Repaint the given component to the screen
     ///
     /// #### Parameters
@@ -4482,7 +4506,7 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// the animation manager instance
     public AnimationManager getAnimationManager() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f == null) {
             return null;
         }
@@ -5375,7 +5399,7 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// a component drop target or null if no drop target is available at that coordinate
     private Component findDropTarget(Component source, int x, int y) {
-        Form f = getComponentForm();
+        Container f = TopLevelSupport.rootOf(this);
         if (f != null) {
             Component c = f.findDropTargetAt(x, y);
             while (c != null) {
@@ -5430,8 +5454,9 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private boolean pointerReleaseMaterialPullToRefresh() {
-        if (refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
-            Container c = getComponentForm().getLayeredPane(InfiniteProgress.class, true);
+        TopLevelContainer top = getTopLevelContainer();
+        if (refreshTask != null && top != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
+            Container c = top.getLayeredPane(InfiniteProgress.class, true);
             if (c.getComponentCount() > 0) {
                 Component cc = c.getComponentAt(0);
                 if (cc instanceof InfiniteProgress) {
@@ -5468,7 +5493,7 @@ public class Component implements Animation, StyleListener, Editable {
         return false;
     }
 
-    private boolean updateMaterialPullToRefresh(final Form p, int y) {
+    private boolean updateMaterialPullToRefresh(final TopLevelContainer p, int y) {
         if (refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode() &&
                 pullY < getHeight() / 4 &&
                 scrollableYFlag() && getScrollY() == 0) {
@@ -5500,11 +5525,12 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshLabel.putClientProperty("cn1$opacityMotion", opacityMotion);
                     refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
                     c.add(refreshLabel);
-                    p.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+                    final Container pc = p.asContainer();
+                    pc.addPointerReleasedListener(new ActionListener<ActionEvent>() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
                             pointerReleaseMaterialPullToRefresh();
-                            p.removePointerReleasedListener(this);
+                            pc.removePointerReleasedListener(this);
                             evt.consume();
                         }
                     });
@@ -5541,7 +5567,7 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `y`: the pointer y coordinate
     public void pointerDragged(final int x, final int y) {
-        Form f = getComponentForm();
+        Container f = TopLevelSupport.rootOf(this);
         if (f != null) {
             pointerDragged(x, y, f.getCurrentPointerPress());
         } else {
@@ -5568,7 +5594,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// the pointer is pressed, a new Object is generated, and is passed to pointerDragged.
     /// This is to help prevent infinite loops of pointerDragged after a pointer press has been released.
     private void pointerDragged(final Component lead, final int x, final int y, final Object currentPointerPress) {
-        Form p = getComponentForm();
+        Container p = TopLevelSupport.rootOf(this);
         if (p == null) {
             return;
         }
@@ -5688,7 +5714,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
 
         if (!dragActivated) {
-            boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
+            boolean draggedOnX = Math.abs(p.getInitialPressX() - x) > Math.abs(p.getInitialPressY() - y);
             shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
         }
 
@@ -5809,9 +5835,12 @@ public class Component implements Animation, StyleListener, Editable {
             lastScrollY = y;
             lastScrollX = x;
         } else {
-            //try to find a scrollable element until you reach the Form
+            //try to find a scrollable element until you reach the top level
             Component parent = getParent();
-            if (!(parent instanceof Form)) {
+            // Any top level, not just a Form: a Window dispatches drags to the pressed
+            // component itself, so bubbling past one would come straight back here and
+            // recurse until the stack ran out.
+            if (parent != null && !(parent instanceof TopLevelContainer)) {
                 parent.pointerDragged(x, y);
             }
         }
@@ -5832,7 +5861,7 @@ public class Component implements Animation, StyleListener, Editable {
         // the component might not be registered for animation if it started off
         // as smaller than the screen and grew (e.g. by adding components to the container
         // once it is visible).
-        Form f = getComponentForm();
+        Container f = TopLevelSupport.rootOf(this);
         if (f != null) {
             f.registerAnimatedInternal(this);
         }
@@ -6316,7 +6345,7 @@ public class Component implements Animation, StyleListener, Editable {
             draggedMotionX = draggedMotion;
         }
         // just to be sure, there are some cases where this doesn't work as expected
-        Form p = getComponentForm();
+        Container p = TopLevelSupport.rootOf(this);
         if (p != null) {
             p.registerAnimatedInternal(this);
         }
@@ -6326,8 +6355,11 @@ public class Component implements Animation, StyleListener, Editable {
         boolean ix = isScrollableX();
         boolean iy = isScrollableY();
         if (ix && iy) {
-            Form parent = getComponentForm();
-            return Math.abs(parent.initialPressX - x) > Math.abs(parent.initialPressY - y);
+            Container parent = TopLevelSupport.rootOf(this);
+            if (parent == null) {
+                return ix;
+            }
+            return Math.abs(parent.getInitialPressX() - x) > Math.abs(parent.getInitialPressY() - y);
         }
         return ix;
     }
@@ -6402,7 +6434,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     private void dragFinishedImpl(Component lead, int x, int y) {
         if (dragAndDropInitialized && dragActivated) {
-            Form p = getComponentForm();
+            Container p = TopLevelSupport.rootOf(this);
             if (p == null) {
                 //The component was removed from the form during the drag
                 dragActivated = false;
@@ -6447,7 +6479,7 @@ public class Component implements Animation, StyleListener, Editable {
             dropTargetComponent = null;
         }
         if (getUIManager().getLookAndFeel().isFadeScrollBar() && isScrollable()) {
-            Form frm = getComponentForm();
+            Container frm = TopLevelSupport.rootOf(this);
             if (frm != null) {
                 frm.registerAnimatedInternal(this);
             }
@@ -7209,7 +7241,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// Changes the current component to the focused component, will work only
     /// for a component that belongs to a parent form.
     public void requestFocus() {
-        Form rootForm = getComponentForm();
+        Container rootForm = TopLevelSupport.rootOf(this);
         if (rootForm != null) {
             Component.setDisableSmoothScrolling(true);
             rootForm.requestFocus(this);
@@ -7359,7 +7391,7 @@ public class Component implements Animation, StyleListener, Editable {
     void checkAnimation() {
         Image bgImage = getStyle().getBgImage();
         if (bgImage != null && bgImage.isAnimation()) {
-            Form pf = getComponentForm();
+            TopLevelContainer pf = getTopLevelContainer();
             if (pf != null) {
                 // animations are always running so the internal animation isn't
                 // good enough. We never want to stop this sort of animation
@@ -7368,14 +7400,14 @@ public class Component implements Animation, StyleListener, Editable {
         } else {
             Painter p = getStyle().getBgPainter();
             if (p != null && p.getClass() != BGPainter.class && p instanceof Animation) {
-                Form pf = getComponentForm();
+                TopLevelContainer pf = getTopLevelContainer();
                 if (pf != null) {
                     pf.registerAnimated(this);
                 }
             } else {
                 if (scrollOpacity == 0xff && isScrollable() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
                     // trigger initial fade process on a fresh view.
-                    Form pf = getComponentForm();
+                    Container pf = TopLevelSupport.rootOf(this);
                     if (pf != null) {
                         pf.registerAnimatedInternal(this);
                     }
@@ -7388,7 +7420,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (!internalRegisteredAnimated) {
             return;
         }
-        Form f = getComponentForm();
+        Container f = TopLevelSupport.rootOf(this);
         if (f != null) {
             f.deregisterAnimatedInternal(this);
         }
@@ -7892,7 +7924,10 @@ public class Component implements Animation, StyleListener, Editable {
             }
             showNativeOverlay();
             if (refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
-                final Form p = getComponentForm();
+                // The top level rather than the Form: a component inside a Window has
+                // no Form, and this ran listener methods on the result immediately, so
+                // showing such a window threw.
+                final TopLevelContainer p = getTopLevelContainer();
                 if (refreshTaskDragListener == null) {
                     refreshTaskDragListener = new ActionListener() {
                         @Override
@@ -7907,8 +7942,10 @@ public class Component implements Animation, StyleListener, Editable {
                         }
                     };
                 }
-                p.addPointerDraggedListener(refreshTaskDragListener);
-                p.addPointerPressedListener(refreshTaskDragListener);
+                if (p != null) {
+                    p.asContainer().addPointerDraggedListener(refreshTaskDragListener);
+                    p.asContainer().addPointerPressedListener(refreshTaskDragListener);
+                }
             }
         }
     }
@@ -7948,9 +7985,11 @@ public class Component implements Animation, StyleListener, Editable {
             }
             deinitialize();
             if (refreshTaskDragListener != null) {
-                Form f = getComponentForm();
-                f.removePointerDraggedListener(refreshTaskDragListener);
-                f.removePointerPressedListener(refreshTaskDragListener);
+                Container f = TopLevelSupport.rootOf(this);
+                if (f != null) {
+                    f.removePointerDraggedListener(refreshTaskDragListener);
+                    f.removePointerPressedListener(refreshTaskDragListener);
+                }
             }
         }
     }
@@ -8134,7 +8173,7 @@ public class Component implements Animation, StyleListener, Editable {
                         Style.PADDING.equals(propertyName))) {
             setShouldCalcPreferredSize(true);
             Container parent = getParent();
-            if (parent != null && parent.getComponentForm() != null) {
+            if (parent != null && parent.getTopLevelContainer() != null) {
                 if (isRevalidateOnStyleChange()) {
                     parent.revalidateLater();
                 }
@@ -8711,8 +8750,11 @@ public class Component implements Animation, StyleListener, Editable {
         hMotion.start();
         setPreferredSize(new Dimension(getWidth(), getHeight()));
         // we are using bgpainter just to save the cost of creating another class
-        getComponentForm().registerAnimated(new BGPainter(wMotion, hMotion));
-        getComponentForm().revalidate();
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.registerAnimated(new BGPainter(wMotion, hMotion));
+            top.asContainer().revalidate();
+        }
     }
 
     /// Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
@@ -9423,14 +9465,21 @@ public class Component implements Animation, StyleListener, Editable {
 
         @Override
         public boolean animate() {
+            TopLevelContainer top = getTopLevelContainer();
             if (wMotion.isFinished() && hMotion.isFinished()) {
-                getComponentForm().deregisterAnimated(this);
+                if (top != null) {
+                    top.deregisterAnimated(this);
+                }
                 setPreferredSize(null);
-                getComponentForm().revalidate();
+                if (top != null) {
+                    top.asContainer().revalidate();
+                }
                 return false;
             }
             setPreferredSize(new Dimension(wMotion.getValue(), hMotion.getValue()));
-            getComponentForm().revalidate();
+            if (top != null) {
+                top.asContainer().revalidate();
+            }
             return false;
         }
 

@@ -1362,7 +1362,7 @@ public class TextField extends TextArea {
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             f.deregisterAnimated(this);
         }
@@ -1371,8 +1371,11 @@ public class TextField extends TextArea {
             if (useSoftkeys) {
                 removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);
             } else {
-                if (f != null) {
-                    f.setClearCommand(originalClearCommand);
+                // Form only: the clear command lives on the soft button bar, which a
+                // Window has no equivalent of -- commands there reach the desktop menu
+                // instead. Nothing to restore when there is no such bar.
+                if (f instanceof Form) {
+                    ((Form) f).setClearCommand(originalClearCommand);
                 }
                 originalClearCommand = null;
             }
@@ -1392,7 +1395,12 @@ public class TextField extends TextArea {
                 removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);
             } else {
                 Form f = getComponentForm();
-                f.setClearCommand(originalClearCommand);
+                // Null inside a Window by design. The clear command lives on a Form's
+                // MenuBar, which a Window has none of, so there is nothing to restore
+                // there -- but dereferencing it threw out of an ordinary click.
+                if (f != null) {
+                    f.setClearCommand(originalClearCommand);
+                }
                 originalClearCommand = null;
             }
             pressedAndNotReleased = false;
@@ -1538,8 +1546,11 @@ public class TextField extends TextArea {
                 originalClearCommand = installCommands(DELETE_COMMAND, T9_COMMAND);
             } else {
                 Form f = getComponentForm();
-                originalClearCommand = f.getClearCommand();
-                f.setClearCommand(DELETE_COMMAND);
+                // See above: no MenuBar in a Window, so no clear command to take over.
+                if (f != null) {
+                    originalClearCommand = f.getClearCommand();
+                    f.setClearCommand(DELETE_COMMAND);
+                }
             }
             return;
         }
@@ -1549,7 +1560,12 @@ public class TextField extends TextArea {
                 removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);
             } else {
                 Form f = getComponentForm();
-                f.setClearCommand(originalClearCommand);
+                // Null inside a Window by design. The clear command lives on a Form's
+                // MenuBar, which a Window has none of, so there is nothing to restore
+                // there -- but dereferencing it threw out of an ordinary click.
+                if (f != null) {
+                    f.setClearCommand(originalClearCommand);
+                }
                 originalClearCommand = null;
             }
             fireActionEvent();
@@ -1730,7 +1746,7 @@ public class TextField extends TextArea {
 
         // text field relies too much on animation to use internal animations
 //        getComponentForm().registerAnimated(this);
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             f.registerAnimated(this);
         }

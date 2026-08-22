@@ -53,6 +53,7 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.Calendar;
 import java.util.Date;
@@ -298,7 +299,17 @@ public class Picker extends Button {
                 // still lets the next open re-resolve the default (useful when the
                 // getter returns a moving target like "due date - 1 hour").
                 applyDefaultDateIfNeeded();
-                if ((useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type)) && isLightweightModeSupportedForType(type)) {
+                // A picker inside a desktop window uses the lightweight popup even
+                // where a native one exists. Every native picker is attached to the
+                // application's main surface -- the Catalyst one sizes itself against
+                // the main scene's view -- so from a window it would open over the
+                // wrong window entirely. The lightweight popup is an InteractionDialog,
+                // which resolves its host from the component and lands in the right
+                // one.
+                boolean inWindow = getTopLevelContainer() instanceof com.codename1.ui.Window;
+                if ((useLightweightPopup || inWindow
+                        || !Display.getInstance().isNativePickerTypeSupported(type))
+                        && isLightweightModeSupportedForType(type)) {
                     showInteractionDialog();
                     evt.consume();
                     return;
@@ -639,12 +650,17 @@ public class Picker extends Button {
                     fireActionEvent(-99, -99);
 
                     Component next = null;
-                    Form f = getComponentForm();
+                    // Through the tab iterator rather than Form's getNextComponent /
+                    // getPreviousComponent: those are Form-only, but they are defined
+                    // as exactly this call, and getTabIterator is on TopLevelContainer.
+                    // Resolving a Form here left the Next and Previous buttons visible
+                    // in a window and doing nothing but closing the popup.
+                    TopLevelContainer f = getTopLevelContainer();
                     if (f != null && Picker.this.isTraversable()) {
                         if (command == COMMAND_NEXT) {
-                            next = f.getNextComponent(Picker.this);
+                            next = f.getTabIterator(Picker.this).getNext();
                         } else if (command == COMMAND_PREV) {
-                            next = f.getPreviousComponent(Picker.this);
+                            next = f.getTabIterator(Picker.this).getPrevious();
                         }
                     }
                     final Component nextToEdit = next;
@@ -705,6 +721,9 @@ public class Picker extends Button {
                 final InteractionDialog dlg = new InteractionDialog() {
 
                     ActionListener keyListener;
+                    /// The top level the Tab listener was added to, kept so it is
+                    /// removed from that one rather than from whatever resolves later.
+                    TopLevelContainer keyListenerHost;
 
                     @Override
                     protected void initComponent() {
@@ -725,17 +744,24 @@ public class Picker extends Button {
 
                             };
                         }
-                        getComponentForm().addKeyListener(9, keyListener);
+                        {
+                            keyListenerHost = getTopLevelContainer();
+                            if (keyListenerHost != null) {
+                                keyListenerHost.addKeyListener(9, keyListener);
+                            }
+                        }
                     }
 
                     @Override
                     protected void deinitialize() {
-                        Form f = getComponentForm();
-                        if (f == null) {
-                            f = Display.getInstance().getCurrent();
-                        }
-                        if (f != null && keyListener != null) {
-                            f.removeKeyListener(9, keyListener);
+                        // Removed from the very top level it was added to. Resolving it
+                        // again here found a Form -- null in a window, then falling back
+                        // to the current form, which never had the listener -- so after
+                        // the picker was dismissed every Tab release still ran
+                        // endEditing() against the stale dialog and spinner.
+                        if (keyListenerHost != null && keyListener != null) {
+                            keyListenerHost.removeKeyListener(9, keyListener);
+                            keyListenerHost = null;
                         }
                         super.deinitialize();
                     }
@@ -825,7 +851,9 @@ public class Picker extends Button {
                 //final Component nextComponent = getNextFocusRight() != null ? getNextFocusRight() :
                 //        getNextFocusDown() != null ? getNextFocusDown() :
                 //        null;
-                ListIterator<Component> traversalIt = getComponentForm().getTabIterator(Picker.this);
+                TopLevelContainer tabTop = getTopLevelContainer();
+                ListIterator<Component> traversalIt = tabTop == null
+                        ? null : tabTop.getTabIterator(Picker.this);
                 if (Picker.this.isTraversable() && traversalIt.hasNext()) {
                     nextButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
                     // Javascript port needs to know that this button is going to try to
@@ -883,10 +911,17 @@ public class Picker extends Button {
                 buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
 
-                Form form = getComponentForm();
+                // Through the top level. This used to insist on a Form, because the
+                // popup is an InteractionDialog and that was unsupported inside a
+                // Window -- so a picker in a window threw rather than opening over the
+                // wrong surface. InteractionDialog now takes an explicit host, so the
+                // reason for refusing is gone and a picker works in a window like any
+                // other component.
+                TopLevelContainer form = getTopLevelContainer();
                 if (form == null) {
                     throw new RuntimeException("Attempt to show interaction dialog while button is not on form.  Illegal state");
                 }
+                dlg.setTopLevelHost(form);
 
                 // The popup is anchored to the very bottom of the screen, so on devices with a
                 // bottom inset (e.g. the iPhone home indicator) its bottom-most row would be drawn
@@ -895,7 +930,16 @@ public class Picker extends Button {
                 // their bar (so the bar's background extends through the inset and the buttons remain
                 // tappable above it); otherwise it goes on the content pane. See issue #5152.
                 Rectangle safeArea = form.getSafeArea();
-                int bottomInset = Display.getInstance().getDisplayHeight() - (safeArea.getY() + safeArea.getHeight());
+                // Measured against the surface the popup sits on, not the display: in
+                // a window those differ, and the inset would be computed from the
+                // wrong height.
+                int hostHeight = form instanceof com.codename1.ui.Window
+                        ? form.asContainer().getHeight()
+                        : Display.getInstance().getDisplayHeight();
+                int hostWidth = form instanceof com.codename1.ui.Window
+                        ? form.asContainer().getWidth()
+                        : Display.getInstance().getDisplayWidth();
+                int bottomInset = hostHeight - (safeArea.getY() + safeArea.getHeight());
                 if (bottomInset > 0) {
                     Container insetTarget = bottomCustomButtons != null ? bottomCustomButtons : dlg.getContentPane();
                     Style insetStyle = insetTarget.getAllStyles();
@@ -911,14 +955,18 @@ public class Picker extends Button {
                 final int left = 0;
                 final int right = 0;
                 final int bottom = 0;
-                dlg.setWidth(Display.getInstance().getDisplayWidth());
+                // The host's geometry, not the display's. Reposition animation is off,
+                // so these are the popup's starting bounds: taken from the display, a
+                // window of a different size got a bottom sheet that was the wrong
+                // width and started its slide from the wrong place.
+                dlg.setWidth(hostWidth);
                 dlg.setHeight(dlg.getPreferredH());
-                dlg.setY(Display.getInstance().getDisplayHeight());
+                dlg.setY(hostHeight);
                 dlg.setX(0);
                 dlg.setRepositionAnimation(false);
                 registerAsInputDevice(dlg, spinner);
                 if (Display.getInstance().isTablet()) {
-                    getComponentForm().getAnimationManager().flushAnimation(new Runnable() {
+                    getTopLevelContainer().getAnimationManager().flushAnimation(new Runnable() {
 
                         @Override
                         public void run() {
@@ -928,7 +976,7 @@ public class Picker extends Button {
                     });
 
                 } else {
-                    getComponentForm().getAnimationManager().flushAnimation(new Runnable() {
+                    getTopLevelContainer().getAnimationManager().flushAnimation(new Runnable() {
 
                         @Override
                         public void run() {
@@ -1284,7 +1332,10 @@ public class Picker extends Button {
     @Override
     public void stopEditing(Runnable onFinish) {
         stopEditingCallback = onFinish;
-        Form f = this.getComponentForm();
+        // Through the top level, as registerAsInputDevice registers it: resolving a
+        // Form here found nothing in a window, so stopEditing() did not close the
+        // picker and never ran its callback.
+        TopLevelContainer f = this.getTopLevelContainer();
         if (f != null) {
             if (f.getCurrentInputDevice() == currentInput) { //NOPMD CompareObjectsWithEquals
                 try {
@@ -1298,7 +1349,7 @@ public class Picker extends Button {
 
     @Override
     public boolean isEditing() {
-        Form f = this.getComponentForm();
+        TopLevelContainer f = this.getTopLevelContainer();
         return currentInput != null && f != null && f.getCurrentInputDevice() == currentInput; //NOPMD CompareObjectsWithEquals
     }
 
@@ -1629,7 +1680,10 @@ public class Picker extends Button {
 
     private void registerAsInputDevice(final InteractionDialog dlg, final InternalPickerWidget spinner) {
 
-        final Form f = this.getComponentForm();
+        // Through the top level: this skipped every registration in a window, so an
+        // open picker reported isEditing() false, input-device replacement could not
+        // dismiss it, and stopEditing(onFinish) neither closed it nor ran its callback.
+        final TopLevelContainer f = this.getTopLevelContainer();
         if (f != null) {
             final ActionListener sizeChanged;
             if (!Display.getInstance().isTablet()) {
@@ -1644,9 +1698,12 @@ public class Picker extends Button {
                         final int left = 0;
                         final int right = 0;
                         final int bottom = 0;
-                        dlg.setWidth(Display.getInstance().getDisplayWidth());
+                        // As at the point of opening: the host's geometry rather than
+                        // the display's, so a resize re-lays the sheet out against the
+                        // window it lives in.
+                        dlg.setWidth(f.asContainer().getWidth());
                         dlg.setHeight(dlg.getPreferredH());
-                        dlg.setY(Display.getInstance().getDisplayHeight());
+                        dlg.setY(f.asContainer().getHeight());
                         dlg.setX(0);
                         f.getAnimationManager().flushAnimation(new Runnable() {
 

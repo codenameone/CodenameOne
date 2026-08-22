@@ -67,12 +67,16 @@ class SearchBar extends Toolbar {
             }
         });
         setUIIDFinal("ToolbarSearch");
-        if (parent.getComponentForm() == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals
+        // A search bar swapped into a Window's toolbar is already on screen, so it
+        // starts editing straight away. setEditOnShow is a Form-only deferral for a
+        // toolbar being prepared before its form is shown, and there is no Window
+        // equivalent because a Window's search bar is only ever installed live.
+        TopLevelContainer top = parent.getTopLevelContainer();
+        if (top == Display.INSTANCE.getCurrent() //NOPMD CompareObjectsWithEquals
+                || (top instanceof Window && ((Window) top).isWindowShowing())) {
             search.startEditingAsync();
-        } else {
-            if (parent.getComponentForm() != null) {
-                parent.getComponentForm().setEditOnShow(search);
-            }
+        } else if (top instanceof Form) {
+            ((Form) top).setEditOnShow(search);
         }
     }
 
@@ -87,14 +91,27 @@ class SearchBar extends Toolbar {
                     @Override
                     public void run() {
                         onSearch("");
-                        final Form f = (Form) SearchBar.this.getParent();
+                        // Through the top level rather than a cast of getParent() to
+                        // Form: inside a Window the toolbar hangs off the title area,
+                        // so that cast named the wrong type. ParparVM does not check
+                        // CHECKCAST, so on Mac Catalyst that was a native crash rather
+                        // than a ClassCastException anything could catch.
+                        final TopLevelContainer f = SearchBar.this.getTopLevelContainer();
+                        if (f == null) {
+                            return;
+                        }
                         f.getAnimationManager().flushAnimation(new Runnable() {
                             @Override
                             public void run() {
-                                f.removeComponentFromForm(SearchBar.this);
+                                if (f instanceof Form) {
+                                    // A Form hangs the toolbar off its own children, so
+                                    // the outgoing one has to be detached first; a
+                                    // Window's setToolbar replaces its title area.
+                                    ((Form) f).removeComponentFromForm(SearchBar.this);
+                                }
                                 f.setToolbar(parent);
                                 parent.setHidden(false);
-                                f.animateLayout(100);
+                                f.asContainer().animateLayout(100);
                             }
                         });
                     }

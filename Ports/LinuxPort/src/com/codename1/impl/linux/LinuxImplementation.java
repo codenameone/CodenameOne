@@ -76,6 +76,11 @@ import java.util.Set;
  */
 public class LinuxImplementation extends CodenameOneImplementation {
 
+    /// Slot value meaning "the application's main window" for the native peer,
+    /// editor and browser hosts. Matches CN1_MAIN_WINDOW_SLOT in cn1_linux_gfx.h.
+    static final int MAIN_WINDOW_SLOT = -1;
+
+
     @Override
     public boolean isHighContrastEnabled() {
         return LinuxNative.isHighContrastEnabled();
@@ -105,6 +110,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private static final int EVENT_PINCH = 10;
     private static final int EVENT_ROTATE = 11;
     private static final int EVENT_ACCESSIBILITY_ACTION = 12;
+    // Additional desktop windows. These always carry a non-zero window id.
+    private static final int EVENT_WINDOW_CLOSE = 13;
+    private static final int EVENT_WINDOW_FOCUS = 14;
+    private static final int EVENT_WINDOW_MONITOR = 15;
+    private static final int EVENT_WINDOW_SHOWN = 16;
+    private static final int EVENT_WINDOW_HIDDEN = 17;
+    private static final int EVENT_WINDOW_MOVED = 18;
+    private static final int EVENT_MONITORS_CHANGED = 19;
 
     // The native gesture events encode their float (incremental scale / radians) as
     // an int in 1/10000 units; see CN1_GESTURE_FIXED in cn1_linux.h.
@@ -121,7 +134,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private Long defaultFont;
     private L10NManager l10n;
     private com.codename1.ui.util.ImageIO imageIO;
-    private final int[] eventScratch = new int[4];
+    private final int[] eventScratch = new int[5];
     private final Map<String, Integer> accessibilityActionTokens = new HashMap<String, Integer>();
     private final Map<Integer, AccessibilityActionTarget> accessibilityActionTargets =
             new HashMap<Integer, AccessibilityActionTarget>();
@@ -559,6 +572,19 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return c;
     }
 
+    private LinuxWindowManager windowManager;
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    public com.codename1.impl.WindowManager getWindowManager() {
+        if (windowManager == null) {
+            windowManager = new LinuxWindowManager();
+        }
+        return windowManager;
+    }
+
     @Override
     public int getDisplayWidth() {
         return LinuxNative.getDisplayWidth();
@@ -733,47 +759,80 @@ public class LinuxImplementation extends CodenameOneImplementation {
             int x = eventScratch[1];
             int y = eventScratch[2];
             int key = eventScratch[3];
+            // Zero is the main window, which is every event this port produced
+            // before desktop windows existed.
+            int windowId = eventScratch[4];
             switch (type) {
+                case EVENT_WINDOW_CLOSE:
+                    Display.getInstance().windowCloseRequested(windowId);
+                    break;
+                case EVENT_WINDOW_FOCUS:
+                    Display.getInstance().windowFocusChanged(windowId, key != 0);
+                    break;
+                case EVENT_WINDOW_MONITOR:
+                    Display.getInstance().windowMonitorChanged(windowId);
+                    break;
+                case EVENT_WINDOW_SHOWN:
+                    Display.getInstance().windowShowNotify(windowId);
+                    // The window manager keeps its own record of what is on screen to
+                    // decide what an owner may take down and bring back. This change
+                    // did not go through it, so it has to be told.
+                    LinuxWindowManager.windowVisibilityChanged(windowId, true);
+                    break;
+                case EVENT_WINDOW_HIDDEN:
+                    Display.getInstance().windowHideNotify(windowId);
+                    LinuxWindowManager.windowVisibilityChanged(windowId, false);
+                    break;
+                case EVENT_WINDOW_MOVED:
+                    Display.getInstance().windowMoved(windowId);
+                    break;
+                case EVENT_MONITORS_CHANGED:
+                    Display.getInstance().monitorsChanged();
+                    break;
                 case EVENT_POINTER_PRESSED:
                     markPointer(key);
-                    pointerPressed(x, y);
+                    windowPointerPressed(windowId, x, y);
                     break;
                 case EVENT_POINTER_RELEASED:
                     markPointer(key);
-                    pointerReleased(x, y);
+                    windowPointerReleased(windowId, x, y);
                     break;
                 case EVENT_POINTER_DRAGGED:
                     markPointer(key);
-                    pointerDragged(x, y);
+                    windowPointerDragged(windowId, x, y);
                     break;
                 case EVENT_KEY_PRESSED:
-                    keyPressed(key);
+                    windowKeyPressed(windowId, key);
                     break;
                 case EVENT_KEY_RELEASED:
-                    keyReleased(key);
+                    windowKeyReleased(windowId, key);
                     break;
                 case EVENT_SIZE_CHANGED:
-                    sizeChanged(x, y);
+                    if (windowId == 0) {
+                        sizeChanged(x, y);
+                    } else {
+                        Display.getInstance().windowSizeChanged(windowId, x, y);
+                    }
                     break;
                 case EVENT_MOUSE_WHEEL:
                     // key carries the signed wheel delta (multiple of WHEEL_DELTA).
                     // A forward (positive) notch reveals content above, i.e. drags
                     // the finger down -> positive scrollY. Map through the shared
                     // CodenameOneImplementation.pointerWheelMoved scroll gesture.
-                    pointerWheelMoved(x, y, 0, wheelUnits(key));
+                    windowPointerWheelMoved(windowId, x, y, 0, wheelUnits(key), false, 0);
                     break;
                 case EVENT_MOUSE_HWHEEL:
                     // A positive horizontal notch tilts right (scrolls content
                     // left), i.e. drags the finger left -> negative scrollX.
-                    pointerWheelMoved(x, y, -wheelUnits(key), 0);
+                    windowPointerWheelMoved(windowId, x, y, -wheelUnits(key), 0, false, 0);
                     break;
                 case EVENT_PINCH:
                     // key is the incremental scale multiplier in 1/10000 units.
-                    Display.getInstance().fireMagnifyGesture(x, y, key / GESTURE_FIXED);
+                    Display.getInstance().windowMagnifyGesture(windowId, x, y, key / GESTURE_FIXED);
                     break;
                 case EVENT_ROTATE:
                     // key is the incremental rotation in 1/10000 radians.
-                    Display.getInstance().fireRotationGesture(x, y, key / GESTURE_FIXED);
+                    Display.getInstance().windowRotationGesture(windowId, x, y, key / GESTURE_FIXED);
                     break;
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();
@@ -1981,8 +2040,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
             fontPeer = ((Long) f.getNativeFont()).longValue();
         }
 
+        // The editor goes into the overlay of the window the field lives in; without
+        // the slot it appeared over the main window while the window being typed into
+        // showed nothing.
         long peer = LinuxNative.editStringAt(x, y, w, h, text == null ? "" : text,
-                singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0);
+                singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0,
+                LinuxWindowManager.slotForComponent(cmp));
         if (peer == 0) {
             // No native window (headless) -> nothing to edit; complete with the
             // existing text so a caller awaiting the callback still proceeds.
@@ -1991,9 +2054,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
         editPeer = peer;
         editCmp = cmp;
-        com.codename1.ui.Form form = cmp.getComponentForm();
-        if (form != null) {
-            editPoller = com.codename1.ui.util.UITimer.timer(30, true, form, new Runnable() {
+        // The top level, not the Form: getComponentForm() is null inside a Window, so
+        // binding the poller to it meant no timer ran at all there -- the native
+        // control's text was never streamed back into the field and the edit never
+        // auto-committed.
+        com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+        if (top != null) {
+            editPoller = com.codename1.ui.util.UITimer.timer(30, true, top, new Runnable() {
                 public void run() {
                     if (editPeer == 0) {
                         return;
