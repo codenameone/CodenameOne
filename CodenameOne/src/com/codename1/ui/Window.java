@@ -1627,6 +1627,7 @@ public class Window extends Container implements TopLevelContainer {
         // A window being shown is by definition no longer minimized. Only hide() and
         // showNotify() cleared this before, so restoring an iconified window through
         // show() left it marked iconified while it was on screen.
+        boolean wasIconified = iconified;
         iconified = false;
         acquireModal();
         // Only meaningful when this window is *not* modal, which is why acquireModal()
@@ -1638,6 +1639,15 @@ public class Window extends Container implements TopLevelContainer {
         // never briefly interactive.
         Display.getInstance().syncNativeModalBlocking();
         wm.show(nativePeer);
+        if (wasIconified) {
+            // Mapping a window does not clear its iconic state: AWT's setVisible(true)
+            // and Win32's SW_SHOW both leave it minimized, and only the dedicated
+            // restore path (Frame.NORMAL, SW_RESTORE) brings it back. Without this the
+            // framework counted the window restored -- and, when it was an owner,
+            // mapped the child and took its modal blocker -- while the platform still
+            // had the window in the dock or taskbar.
+            wm.restore(nativePeer);
+        }
         showListeners.fireActionEvent(new ActionEvent(this));
         fireWindowEvent(WindowEvent.Type.Shown);
         repaint();

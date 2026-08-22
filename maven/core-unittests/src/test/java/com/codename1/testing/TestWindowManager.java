@@ -53,6 +53,7 @@ public class TestWindowManager extends WindowManager {
         private boolean decorated;
         private boolean resizable;
         private boolean visible;
+        private int restoreCount;
         private boolean disposed;
         private boolean modal;
         private boolean alwaysOnTop;
@@ -92,6 +93,12 @@ public class TestWindowManager extends WindowManager {
 
         public int getHeight() {
             return height;
+        }
+
+        /// How many times the port was asked to restore this window, which is the
+        /// only call that clears a native window's iconic state.
+        public int getRestoreCount() {
+            return restoreCount;
         }
 
         public boolean isVisible() {
@@ -379,6 +386,14 @@ public class TestWindowManager extends WindowManager {
         FakeWindow w = win(peer);
         if (w != null) {
             w.visible = true;
+        }
+    }
+
+    @Override
+    public void restore(Object peer) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.restoreCount++;
         }
     }
 

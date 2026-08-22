@@ -402,8 +402,27 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void showingAMinimizedWindowAsksThePortToRestoreIt() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("minimized");
+        w.show();
+        w.hideNotify();
+        int before = wm.getLastWindow().getRestoreCount();
+
+        w.show();
+
+        // Mapping is not enough: setVisible(true) on AWT and SW_SHOW on Win32 leave a
+        // window iconic, so only the restore path actually brings it back.
+        assertEquals(before + 1, wm.getLastWindow().getRestoreCount(),
+                "showing a minimized window has to go through the port's restore path, "
+                        + "not just map it again");
+
+        w.dispose();
+    }
+
+    @FormTest
     void showingAWindowRestoresAnIconifiedOwner() {
-        implementation.setMultiWindowSupported(true);
+        TestWindowManager ownerWm = implementation.setMultiWindowSupported(true);
         Window owner = new Window("owner");
         owner.show();
         Window child = new Window("child");
@@ -421,6 +440,7 @@ class WindowTest extends UITestBase {
                         + "itself, so everywhere else the child was mapped against an "
                         + "owner still minimized");
         assertTrue(child.isWindowShowing());
+        assertNotNull(ownerWm, "the fake manager is what records the restore");
 
         owner.dispose();
     }
