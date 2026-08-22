@@ -514,4 +514,36 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Ext", IPhoneBuilder.winningSetting(settings,
                 "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos", "Release"));
     }
+
+    @Test
+    public void aVersionedSdkQualifierMatchesTheArchivesSdk() throws Exception {
+        // xcodebuild is given iphoneos14.4, not iphoneos, so a condition naming the version is
+        // the one Xcode picks -- and rejecting it aborted on a stale base identifier.
+        assertTrue(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos14.4]",
+                "iphoneos14.4", "Release"));
+        assertTrue(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos]",
+                "iphoneos14.4", "Release"));
+        assertTrue(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]",
+                "iphoneos14.4", "Release"));
+        // a different platform still does not
+        assertFalse(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator14.4]",
+                "iphoneos14.4", "Release"));
+        // and a different version of the same platform, when both name one
+        assertFalse(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos13.0]",
+                "iphoneos14.4", "Release"));
+    }
+
+    @Test
+    public void anArchitectureQualifierIsDecidedByTheArchiveNotByMapOrder() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        // x86_64 first, so map order would pick it.
+        settings.put("CODE_SIGN_ENTITLEMENTS[arch=x86_64]", "WalletUIExtension/Sim.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[arch=arm64]", "WalletUIExtension/Device.entitlements");
+
+        assertEquals("WalletUIExtension/Device.entitlements", IPhoneBuilder.winningSetting(
+                settings, "CODE_SIGN_ENTITLEMENTS", "iphoneos14.4", "Release", "arm64"));
+        // and with no architecture to judge by, both still count rather than one being guessed away
+        assertTrue(IPhoneBuilder.conditionApplies("CODE_SIGN_ENTITLEMENTS[arch=x86_64]",
+                "iphoneos14.4", "Release", null));
+    }
 }

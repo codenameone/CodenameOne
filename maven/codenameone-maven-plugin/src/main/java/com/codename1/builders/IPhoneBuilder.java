@@ -4874,7 +4874,9 @@ public class IPhoneBuilder extends Executor {
                             // plain one, so a stale base beside a right device value is not a
                             // reason to refuse a build Xcode would have got right.
                             String governingId = winningSetting(declaredSettings,
-                                    "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos", "Release");
+                                    "PRODUCT_BUNDLE_IDENTIFIER",
+                                    "iphoneos" + request.getArg("ios.sdk", "14.4"), "Release",
+                                    "arm64");
                             String resolvedBundleId = resolveSettingsInValue(
                                     governingId != null && governingId.trim().length() > 0
                                             ? governingId.trim()
@@ -4941,14 +4943,18 @@ public class IPhoneBuilder extends Executor {
                             // The configuration this build hands to xcodebuild is Release for a
                             // device archive whatever ios.buildType says, so that is what a
                             // [config=...] condition must be matched against.
-                            String archiveSdk = "iphoneos";
+                            // The same SDK name xcodebuild is given -- versioned -- and the
+                            // architecture the archive is built for, so [arch=arm64] beside
+                            // [arch=x86_64] is decided by what this build is, not by map order.
+                            String archiveSdk = "iphoneos" + request.getArg("ios.sdk", "14.4");
                             String archiveConfiguration = "Release";
+                            String archiveArch = "arm64";
                             File signingEntitlements = appExtensionSigningEntitlements(appExtension,
                                     buildSettingsMap, extEntitlementsFile, archiveSdk,
-                                    archiveConfiguration);
+                                    archiveConfiguration, archiveArch);
                             String extDeploymentTarget = appExtensionDeploymentTarget(
                                     winningSetting(buildSettingsMap, "IPHONEOS_DEPLOYMENT_TARGET",
-                                            archiveSdk, archiveConfiguration),
+                                            archiveSdk, archiveConfiguration, archiveArch),
                                     signingEntitlements,
                                     request.getArg("ios.deployment_target", null),
                                     appExtension, buildSettingsMap);
@@ -6711,7 +6717,13 @@ public class IPhoneBuilder extends Executor {
     /// The one entitlements file this archive is signed with.
     static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
             File byName, String sdk, String configuration) {
-        String winner = winningSetting(settings, "CODE_SIGN_ENTITLEMENTS", sdk, configuration);
+        return appExtensionSigningEntitlements(extensionFolder, settings, byName, sdk,
+                configuration, null);
+    }
+
+    static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
+            File byName, String sdk, String configuration, String arch) {
+        String winner = winningSetting(settings, "CODE_SIGN_ENTITLEMENTS", sdk, configuration, arch);
         if (winner == null || winner.trim().length() == 0) {
             return byName;
         }
@@ -6827,6 +6839,11 @@ public class IPhoneBuilder extends Executor {
     /// @return the winning value, or null when nothing applicable is declared
     static String winningSetting(Map<String, String> settings, String name, String sdk,
             String configuration) {
+        return winningSetting(settings, name, sdk, configuration, null);
+    }
+
+    static String winningSetting(Map<String, String> settings, String name, String sdk,
+            String configuration, String arch) {
         if (settings == null) {
             return null;
         }
@@ -6838,7 +6855,7 @@ public class IPhoneBuilder extends Executor {
             if (!qualified && !name.equals(key)) {
                 continue;
             }
-            if (qualified && !conditionApplies(key, sdk, configuration)) {
+            if (qualified && !conditionApplies(key, sdk, configuration, arch)) {
                 continue;
             }
             int specificity = 0;
@@ -6862,6 +6879,12 @@ public class IPhoneBuilder extends Executor {
     /// a condition does not apply risks signing an extension without an entitlement it needs,
     /// which fails the upload, while over-counting only costs iOS 12 and 13 availability.
     static boolean conditionApplies(String key, String sdk, String configuration) {
+        return conditionApplies(key, sdk, configuration, null);
+    }
+
+    /// @param arch the architecture the archive is built for, so [arch=arm64] and [arch=x86_64]
+    /// are not both counted applicable and then decided by map order
+    static boolean conditionApplies(String key, String sdk, String configuration, String arch) {
         int open = key.indexOf('[');
         if (open < 0) {
             return true;
@@ -6873,15 +6896,47 @@ public class IPhoneBuilder extends Executor {
             }
             String name = condition.substring(0, equals).trim();
             String value = condition.substring(equals + 1).trim();
-            if ("sdk".equals(name) && sdk != null && !matchesCondition(value, sdk)) {
+            if ("sdk".equals(name) && sdk != null && !matchesSdkCondition(value, sdk)) {
                 return false;
             }
             if ("config".equals(name) && configuration != null
                     && !matchesCondition(value, configuration)) {
                 return false;
             }
+            if ("arch".equals(name) && arch != null && !matchesCondition(value, arch)) {
+                return false;
+            }
         }
         return true;
+    }
+
+    /// An sdk condition against the SDK this build names, which is versioned: xcodebuild is given
+    /// iphoneos14.4, not iphoneos. [sdk=iphoneos*] and [sdk=iphoneos14.4] both mean this archive,
+    /// and so does [sdk=iphoneos] -- a condition and an SDK that name the same platform match,
+    /// and a version is only compared when both carry one. Erring toward applicable, as
+    /// everywhere in this matching: excluding a condition that does apply loses an entitlement.
+    private static boolean matchesSdkCondition(String value, String sdk) {
+        if (value.endsWith("*")) {
+            return matchesCondition(value, sdk);
+        }
+        String conditionPlatform = platformOf(value);
+        String sdkPlatform = platformOf(sdk);
+        if (!conditionPlatform.equalsIgnoreCase(sdkPlatform)) {
+            return false;
+        }
+        String conditionVersion = value.substring(conditionPlatform.length());
+        String sdkVersion = sdk.substring(sdkPlatform.length());
+        return conditionVersion.length() == 0 || sdkVersion.length() == 0
+                || conditionVersion.equals(sdkVersion);
+    }
+
+    /// The letters an SDK name starts with, which is its platform: "iphoneos" of "iphoneos14.4".
+    private static String platformOf(String sdk) {
+        int i = 0;
+        while (i < sdk.length() && Character.isLetter(sdk.charAt(i))) {
+            i++;
+        }
+        return sdk.substring(0, i);
     }
 
     /// A condition value against what this build is, with Xcode's trailing {@code *}.
