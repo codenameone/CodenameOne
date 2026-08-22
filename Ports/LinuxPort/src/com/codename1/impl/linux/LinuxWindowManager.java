@@ -56,10 +56,78 @@ public class LinuxWindowManager extends WindowManager {
     static final class Peer {
         final int slot;
         final int windowId;
+        /// The peer of the window that owns this one, or null.
+        ///
+        /// GTK expresses ownership as a transient-for hint, which keeps an owned
+        /// window above its owner but does not take it down with it -- unlike Win32,
+        /// where the window manager hides owned windows and reports it. So the
+        /// cascade is kept here, as the Catalyst port does for the same reason.
+        Object owner;
+        /// True while this window is hidden only because its owner is.
+        boolean hiddenByOwner;
+        boolean visible;
 
         Peer(int slot, int windowId) {
             this.slot = slot;
             this.windowId = windowId;
+        }
+    }
+
+    /// Every live window, so an owner can find the windows it owns.
+    private static final java.util.List<Peer> peers = new java.util.ArrayList<Peer>();
+
+    /// Stands in for the application's main window, which has no `Peer`.
+    private static final Object MAIN_WINDOW = new Object();
+
+    private static java.util.List<Peer> ownedBy(Object owner) {
+        java.util.List<Peer> out = new java.util.ArrayList<Peer>();
+        synchronized (peers) {
+            for (Peer each : peers) {
+                if (each.owner == owner) { //NOPMD CompareObjectsWithEquals
+                    out.add(each);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Applies an owner's visibility to every window it owns, to any depth, and tells
+    /// the framework about each window that actually changed.
+    ///
+    /// Ownership is only assigned when a window is created, so the graph is a tree and
+    /// this cannot cycle.
+    private static void cascadeFrom(Object owner, boolean shown) {
+        for (Peer child : ownedBy(owner)) {
+            boolean changed = false;
+            if (shown) {
+                if (child.hiddenByOwner) {
+                    child.hiddenByOwner = false;
+                    child.visible = true;
+                    LinuxNative.desktopWindowShow(child.slot, true);
+                    changed = true;
+                }
+            } else if (child.visible) {
+                child.hiddenByOwner = true;
+                child.visible = false;
+                LinuxNative.desktopWindowShow(child.slot, false);
+                changed = true;
+            }
+            if (changed) {
+                // Unmapping the native window alone leaves the framework believing it
+                // is up: it keeps painting and animating it and fires no lifecycle
+                // event.
+                if (shown) {
+                    com.codename1.ui.Display.getInstance().windowShowNotify(child.windowId);
+                } else {
+                    com.codename1.ui.Display.getInstance().windowHideNotify(child.windowId);
+                }
+            }
+            // Going down, a descendant follows even when its own parent was already
+            // hidden by the application. Coming back up, only a child that actually
+            // reappeared may restore the windows it owns.
+            if (!shown || child.visible) {
+                cascadeFrom(child, shown);
+            }
         }
     }
 
@@ -96,28 +164,63 @@ public class LinuxWindowManager extends WindowManager {
         if (s < 0) {
             return null;
         }
-        return new Peer(s, windowId);
+        Peer created = new Peer(s, windowId);
+        created.owner = ownedByMainWindow ? MAIN_WINDOW : parentPeer;
+        synchronized (peers) {
+            peers.add(created);
+        }
+        return created;
     }
 
     @Override
     public void show(Object peer) {
         int s = slot(peer);
-        if (s >= 0) {
-            LinuxNative.desktopWindowShow(s, true);
+        if (s < 0) {
+            return;
         }
+        Peer w = (Peer) peer;
+        w.visible = true;
+        w.hiddenByOwner = false;
+        LinuxNative.desktopWindowShow(s, true);
+        // Only the ones this owner took down. A child hidden by the application stays
+        // hidden, exactly as AWT and the Catalyst port behave.
+        cascadeFrom(w, true);
     }
 
     @Override
     public void hide(Object peer) {
         int s = slot(peer);
-        if (s >= 0) {
-            LinuxNative.desktopWindowShow(s, false);
+        if (s < 0) {
+            return;
         }
+        Peer w = (Peer) peer;
+        w.visible = false;
+        // An explicit hide takes the window's visibility over from any owner, so the
+        // owner's restore must not bring it back.
+        w.hiddenByOwner = false;
+        LinuxNative.desktopWindowShow(s, false);
+        // GTK leaves owned windows alone when their transient parent is unmapped, so
+        // without this the children either stayed on screen without their owner or
+        // were unmapped with no notification -- either way the framework went on
+        // painting and animating them.
+        cascadeFrom(w, false);
     }
 
     @Override
     public void dispose(Object peer) {
         int s = slot(peer);
+        if (peer instanceof Peer) {
+            synchronized (peers) {
+                peers.remove(peer);
+                // An owned window outliving its owner would keep a dangling reference
+                // and could be matched against a later peer at the same address.
+                for (Peer each : peers) {
+                    if (each.owner == peer) { //NOPMD CompareObjectsWithEquals
+                        each.owner = null;
+                    }
+                }
+            }
+        }
         if (s >= 0) {
             LinuxNative.desktopWindowDestroy(s);
         }
