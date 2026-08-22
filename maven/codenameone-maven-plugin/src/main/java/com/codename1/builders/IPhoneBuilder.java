@@ -6993,8 +6993,19 @@ public class IPhoneBuilder extends Executor {
         }
         String conditionVersion = value.substring(conditionPlatform.length());
         String sdkVersion = sdk.substring(sdkPlatform.length());
-        return conditionVersion.length() == 0 || sdkVersion.length() == 0
-                || conditionVersion.equals(sdkVersion);
+        if (sdkVersion.length() == 0) {
+            // This build does not know its own SDK version -- a local archive lets the destination
+            // choose it -- so a versioned condition may or may not be this one. Counted, by the
+            // same rule as any condition that cannot be evaluated here.
+            return true;
+        }
+        // Xcode matches an unwildcarded condition against the versioned SDK_NAME exactly, so
+        // [sdk=iphoneos] does NOT apply to an archive built with iphoneos14.4; [sdk=iphoneos*] is
+        // the spelling that does. Treating the bare one as a match picked settings Xcode ignores:
+        // an entitlements file the target is not signed with, or an identifier it is not built
+        // with. Erring toward applicable is for what this build cannot evaluate, not for what it
+        // can evaluate and Xcode says no to.
+        return conditionVersion.equals(sdkVersion);
     }
 
     /// The letters an SDK name starts with, which is its platform: "iphoneos" of "iphoneos14.4".

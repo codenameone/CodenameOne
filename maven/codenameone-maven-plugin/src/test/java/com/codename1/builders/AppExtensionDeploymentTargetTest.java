@@ -521,8 +521,15 @@ public class AppExtensionDeploymentTargetTest {
         // the one Xcode picks -- and rejecting it aborted on a stale base identifier.
         assertTrue(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos14.4]",
                 "iphoneos14.4", "Release"));
-        assertTrue(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos]",
+        // Not this one: Xcode matches an unwildcarded condition against the versioned SDK_NAME
+        // exactly, so [sdk=iphoneos] never applies to iphoneos14.4 and selecting on it would pick
+        // a setting Xcode ignores. [sdk=iphoneos*] is the spelling that applies.
+        assertFalse(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos]",
                 "iphoneos14.4", "Release"));
+        // But when THIS build does not know its own SDK version, a versioned condition still
+        // counts, because it cannot be evaluated either way.
+        assertTrue(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos26.0]",
+                "iphoneos", "Release"));
         assertTrue(IPhoneBuilder.conditionApplies("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]",
                 "iphoneos14.4", "Release"));
         // a different platform still does not
