@@ -2362,6 +2362,24 @@ public final class InterpRuntime {
         while (leaf.isArray()) {
             leaf = leaf.arrayComponent;
         }
+        // A multi-dimensional array's intermediate components are themselves
+        // arrays, and every array is Object/Cloneable/Serializable: `Pushed[][]`
+        // is a `Cloneable[]` because its `Pushed[]` component is a Cloneable.
+        // Check each intermediate rank against the marker interfaces so a
+        // hostClass of `Cloneable[]` or `Object[][]` on a rank-3 receiver still
+        // resolves to true. Rank 0 is the first block above; the leaf-supertype
+        // loop below covers the full rank.
+        for (int k = 1; k < rank; k++) {
+            StringBuilder mid = new StringBuilder();
+            for (int i = 0; i < k; i++) {
+                mid.append('[');
+            }
+            if (assignableToHostNamed(hostClass, mid + "Ljava/lang/Object;")
+                    || assignableToHostNamed(hostClass, mid + "Ljava/lang/Cloneable;")
+                    || assignableToHostNamed(hostClass, mid + "Ljava/io/Serializable;")) {
+                return true;
+            }
+        }
         StringBuilder brackets = new StringBuilder();
         for (int i = 0; i < rank; i++) {
             brackets.append('[');
