@@ -356,15 +356,26 @@ static int cn1WinIsLifecycleEvent(CN1EventType type) {
             || type == CN1_EVENT_WINDOW_CLOSE;
 }
 
-/* Replaces a queued lifecycle event for the same window with this newer one. The
+/* Visibility only. A close request is protected from eviction like any other
+ * lifecycle event, but it is not a state that a later one supersedes: WM_CLOSE does
+ * not destroy the window, so a close that a subsequent minimize overwrote would take
+ * the close listener and the close operation with it. */
+static int cn1WinIsVisibilityEvent(CN1EventType type) {
+    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN;
+}
+
+/* Replaces a queued visibility event for the same window with this newer one. The
  * latest state is the one that matters -- a hide followed by a show leaves the window
  * shown -- so superseding costs nothing and needs no room. */
 static int cn1WinCoalesceLifecycleLocked(int windowId, CN1EventType type, int x, int y,
         int keyCode) {
     LONG idx = cn1Win.eventHead;
+    if (!cn1WinIsVisibilityEvent(type)) {
+        return 0;
+    }
     while (idx != cn1Win.eventTail) {
         CN1Event* e = &cn1Win.events[idx];
-        if (e->windowId == windowId && cn1WinIsLifecycleEvent((CN1EventType) e->type)) {
+        if (e->windowId == windowId && cn1WinIsVisibilityEvent((CN1EventType) e->type)) {
             e->type = (JAVA_INT) type;
             e->x = x;
             e->y = y;

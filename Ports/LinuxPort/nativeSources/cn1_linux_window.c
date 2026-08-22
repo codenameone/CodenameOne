@@ -78,15 +78,26 @@ static int cn1LinuxIsLifecycleEvent(int type) {
             || type == CN1_EVENT_WINDOW_CLOSE;
 }
 
-/* Replaces a queued lifecycle event for the same window with this newer one. The
+/* Visibility only. A close request is protected from eviction like any other
+ * lifecycle event, but it is not a state that a later one supersedes: the delete
+ * signal does not destroy the window, so a close that a subsequent minimize overwrote
+ * would take the close listener and the close operation with it. */
+static int cn1LinuxIsVisibilityEvent(int type) {
+    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN;
+}
+
+/* Replaces a queued visibility event for the same window with this newer one. The
  * latest state is the one that matters -- a hide followed by a show leaves the window
  * shown -- so superseding costs nothing and needs no room. */
 static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
         int keyCode) {
     int idx = cn1EventHead;
+    if (!cn1LinuxIsVisibilityEvent(type)) {
+        return 0;
+    }
     while (idx != cn1EventTail) {
         if (cn1EventRing[idx].windowId == windowId
-                && cn1LinuxIsLifecycleEvent(cn1EventRing[idx].type)) {
+                && cn1LinuxIsVisibilityEvent(cn1EventRing[idx].type)) {
             cn1EventRing[idx].type = type;
             cn1EventRing[idx].x = x;
             cn1EventRing[idx].y = y;
