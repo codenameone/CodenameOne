@@ -283,4 +283,58 @@ public class AppExtensionDeploymentTargetTest {
         assertNull(IPhoneBuilder.outOfNamespaceExtensionIdMessage("WalletUIExtension",
                 "com.anything.Ext", null));
     }
+
+    @Test
+    public void aQualifiedTargetWrittenThroughAnotherSettingIsKept() throws Exception {
+        // $(EXTENSION_MIN) is not a number, and reading that as "below the floor" overwrote an
+        // extension's iOS 16 target with 12.0 -- taking its iOS 16 APIs down with it.
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_MIN", "16.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(EXTENSION_MIN)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0");
+
+        assertEquals("$(EXTENSION_MIN)", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertTrue(notes.toString(), notes.isEmpty());
+    }
+
+    @Test
+    public void aQualifiedTargetResolvingBelowTheFloorIsStillClamped() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_MIN", "10.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(EXTENSION_MIN)");
+
+        IPhoneBuilder.repairQualifiedExtensionSettings(settings, "com.example.app", "14.0");
+
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+    }
+
+    @Test
+    public void aReferenceThisBuildCannotResolveIsLeftAsWritten() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(SOMETHING_ELSE)");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "$(SOMETHING_ELSE)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0");
+
+        // Not evaluable here is not the same as known to be wrong.
+        assertEquals("$(SOMETHING_ELSE)", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertTrue(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+        assertTrue(notes.isEmpty());
+    }
+
+    @Test
+    public void aQualifiedIdentifierWrittenThroughAnotherSettingIsKept() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0");
+
+        assertTrue(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+        assertTrue(notes.isEmpty());
+    }
 }

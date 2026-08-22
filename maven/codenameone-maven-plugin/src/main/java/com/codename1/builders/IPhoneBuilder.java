@@ -4863,11 +4863,19 @@ public class IPhoneBuilder extends Executor {
 
 
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
-                            String outOfNamespace = outOfNamespaceExtensionIdMessage(extensionName,
-                                    appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER") != null
-                                            ? appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER")
-                                            : request.getPackageName() + "." + extensionName,
-                                    request.getPackageName());
+                            // The identifier as Xcode will see it: an archive may write
+                            // PRODUCT_BUNDLE_IDENTIFIER = $(EXTENSION_ID) with EXTENSION_ID beside
+                            // it, which resolves to a perfectly good identifier. Judging the raw
+                            // reference would refuse a build that works, and a reference this
+                            // build cannot resolve is not judged at all.
+                            Map<String, String> declaredSettings = appExtensionBuildSettings(appExtension);
+                            String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
+                            String resolvedBundleId = resolveSettingsInValue(declaredId != null
+                                    ? declaredId : request.getPackageName() + "." + extensionName,
+                                    declaredSettings);
+                            String outOfNamespace = resolvedBundleId.length() == 0 ? null
+                                    : outOfNamespaceExtensionIdMessage(extensionName, resolvedBundleId,
+                                            request.getPackageName());
                             if (outOfNamespace != null) {
                                 // Refused rather than logged: Apple requires an embedded bundle to
                                 // sit under its container's identifier, no profile of this app's
@@ -6667,12 +6675,23 @@ public class IPhoneBuilder extends Executor {
                 settings.entrySet())) {
             String key = setting.getKey();
             String value = setting.getValue() == null ? "" : setting.getValue().trim();
+            // What the value RESOLVES to, since a qualified setting may be written through another
+            // one -- IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] = $(EXTENSION_MIN) with
+            // EXTENSION_MIN = 16.0 is a perfectly good iOS 16 target. Comparing the raw text made
+            // "$(EXTENSION_MIN)" parse as no version at all, read as below the floor, and be
+            // overwritten with 12.0 -- taking an extension that compiles against iOS 16 APIs down
+            // with it. A reference that resolves to nothing here is left exactly as written: this
+            // build cannot evaluate it, which is not the same as knowing it is wrong.
+            String resolved = resolveSettingsInValue(value, settings);
+            if (resolved.length() == 0) {
+                continue;
+            }
             if (isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
-                    && isDeploymentTargetBelow(value, floor)) {
+                    && isDeploymentTargetBelow(resolved, floor)) {
                 settings.put(key, floor);
                 notes.add(key + " raised from " + value + " to " + floor);
             } else if (isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER") && hostPackage != null
-                    && value.length() > 0 && !value.startsWith(hostPackage + ".")) {
+                    && !resolved.startsWith(hostPackage + ".")) {
                 settings.remove(key);
                 notes.add(key + " = " + value + " dropped, since an embedded extension must be "
                         + "under " + hostPackage);
