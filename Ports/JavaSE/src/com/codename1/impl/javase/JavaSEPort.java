@@ -3498,7 +3498,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             //g.setColor(Color.white);
             //g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
             AffineTransform t = ((Graphics2D)g).getTransform();
-            AffineTransform t2 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
+            // This canvas's scale, not the main display's. The raster is sized with
+            // canvasScale(), so undoing it with the global retinaScale left the
+            // raster-to-canvas transform as the *ratio* between two monitors' scales
+            // -- a window moved to a display of a different scale was then stretched
+            // or clipped. Identical for the main window, whose canvasScale() is
+            // retinaScale by definition.
+            double blitScale = canvasScale();
+            AffineTransform t2 = AffineTransform.getScaleInstance(1/blitScale, 1/blitScale);
             
             t2.concatenate(t);
             
@@ -3607,12 +3614,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 AffineTransform t = g2.getTransform();
                 double tx = t.getTranslateX();
                 double ty = t.getTranslateY();
-                AffineTransform t2 = AffineTransform.getScaleInstance(retinaScale, retinaScale);
+                // Paired with the inverse applied in drawScreenBuffer, and for the
+                // same reason it uses this canvas's scale rather than the main
+                // display's.
+                double paintScale = canvasScale();
+                AffineTransform t2 = AffineTransform.getScaleInstance(paintScale, paintScale);
                 t2.translate(tx, ty);
                 if (getJavaVersion() < 9) {
                     // Java 8 didn't have full retina support
                     t2 = AffineTransform.getScaleInstance(1, 1);
-                    t2.translate(tx * retinaScale, ty * retinaScale);
+                    t2.translate(tx * paintScale, ty * paintScale);
                 }
 
 

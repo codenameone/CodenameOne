@@ -644,4 +644,24 @@ class MultiWindowGraphicsRoutingTest {
                 "a disposed window must not leave its canvas in the registry: the "
                         + "registry holds it strongly, so it would never be collected");
     }
+
+    /**
+     * The blit and paint transforms use {@code canvasScale()} rather than the global
+     * {@code retinaScale}, so a window on a display of a different scale is not
+     * stretched by the ratio between the two. That is only safe for the main window
+     * because its {@code canvasScale()} is {@code retinaScale} by definition -- if
+     * that stops being true, the main window's rendering changes with it, which no
+     * screenshot in the suite would attribute to this.
+     */
+    @Test
+    void theMainCanvasScaleIsTheGlobalRetinaScale() {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port, "the port should be booted by CodenameOneTest");
+
+        JavaSEPort.C main = port.createWindowCanvas(0);
+
+        assertEquals(JavaSEPort.retinaScale, main.canvasScale(), 0.0001,
+                "window 0 is the main window and must keep using the global scale");
+    }
 }
