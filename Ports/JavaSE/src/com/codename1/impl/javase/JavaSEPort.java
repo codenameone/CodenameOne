@@ -10831,6 +10831,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         // the primary canvas would appear on the main window.
         final C editorCanvas = editorCanvasFor(cmp);
         editorCanvas.add(tf);
+        // Recorded so a monitor-scale change can reposition this editor as well. The
+        // compat editor divides by the same canvas scale as the normal one and goes
+        // stale the same way when its window moves to a display with another.
+        legacyEditor = tf;
+        legacyEditingField = cmp;
         if (getSkin() != null) {
             tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x) * zoomLevel),
                     (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y) * zoomLevel),
@@ -10868,6 +10873,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 ((TextComponent) tf).removeTextListener(this);
                 tf.removeFocusListener(this);
+                legacyEditor = null;
+                legacyEditingField = null;
                 editorCanvas.remove(tf);
                 synchronized (this) {
                     notify();
@@ -11014,17 +11021,29 @@ public class JavaSEPort extends CodenameOneImplementation {
      * be set.
      */
     void reapplyEditorBounds(int windowId) {
-        com.codename1.ui.Component cmp = currentlyEditingField;
-        if (cmp == null || textCmp == null || getSkin() != null) {
+        if (getSkin() != null) {
             return;
         }
+        if (currentlyEditingField != null && textCmp != null
+                && editorWindowId(currentlyEditingField) == windowId) {
+            applyEditorBounds(currentlyEditingField);
+        }
+        // TextCompatMode uses its own editor, placed by the same division and stale in
+        // the same way. The mode is opt-in; the bug is not, once it is on.
+        if (legacyEditor != null && legacyEditingField != null
+                && editorWindowId(legacyEditingField) == windowId) {
+            double legacyScale = editorCanvasFor(legacyEditingField).canvasScale();
+            legacyEditor.setBounds((int) (legacyEditingField.getAbsoluteX() / legacyScale),
+                    (int) (legacyEditingField.getAbsoluteY() / legacyScale),
+                    (int) (legacyEditingField.getWidth() / legacyScale),
+                    (int) (legacyEditingField.getHeight() / legacyScale));
+        }
+    }
+
+    private int editorWindowId(com.codename1.ui.Component cmp) {
         Object peer = Display.getInstance().getWindowPeerForComponent(cmp);
-        int owner = peer instanceof JavaSEWindowManager.Peer
+        return peer instanceof JavaSEWindowManager.Peer
                 ? ((JavaSEWindowManager.Peer) peer).windowId : 0;
-        if (owner != windowId) {
-            return;
-        }
-        applyEditorBounds(cmp);
     }
 
     private C editorCanvasFor(com.codename1.ui.Component cmp) {
@@ -11058,6 +11077,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private EditingInProgress editingInProgress;
     private Component currentlyEditingField;
+    /// The TextCompatMode editor and the field it is editing, tracked only so a
+    /// monitor-scale change can reposition it; cleared when that editor is removed.
+    private java.awt.Component legacyEditor;
+    private Component legacyEditingField;
     
     private Process tabTipProcess;
     
