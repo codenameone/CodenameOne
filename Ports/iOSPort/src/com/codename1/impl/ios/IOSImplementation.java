@@ -2010,17 +2010,28 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    public static void windowVisibilityCallback(int windowId, boolean shown) {
-        // The other desktop platforms take a window's owned windows down with it and
-        // report each one; Catalyst scenes have no owner relation, so the cascade is
-        // emulated here. Doing it for the user-driven minimize as well as for hide()
-        // is what makes the two paths agree -- an owner becomes hidden both ways.
-        MacWindowManager.cascadeOwnerVisibility(windowId, shown);
-        if (shown) {
-            Display.getInstance().windowShowNotify(windowId);
-        } else {
-            Display.getInstance().windowHideNotify(windowId);
-        }
+    public static void windowVisibilityCallback(final int windowId, final boolean shown) {
+        // UIKit reports this on its main thread, but every other peer visibility
+        // mutation runs on the EDT. Cascading straight from here races an EDT dispose:
+        // the cascade holds a Peer and then uses its numeric slot, and a slot freed and
+        // reused in between would make this hide or show an unrelated window. Queueing
+        // the cascade and the lifecycle notification together also keeps them in that
+        // order, so the framework never sees a child reported before its owner.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                // The other desktop platforms take a window's owned windows down with
+                // it and report each one; Catalyst scenes have no owner relation, so
+                // the cascade is emulated here. Doing it for the user-driven minimize
+                // as well as for hide() is what makes the two paths agree -- an owner
+                // becomes hidden both ways.
+                MacWindowManager.cascadeOwnerVisibility(windowId, shown);
+                if (shown) {
+                    Display.getInstance().windowShowNotify(windowId);
+                } else {
+                    Display.getInstance().windowHideNotify(windowId);
+                }
+            }
+        });
     }
 
     /// Invoked when a window's drawable area changes size.

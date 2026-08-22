@@ -116,6 +116,48 @@ static int cn1MacCodenameOneWindowScene(UIScene *scene) {
     }
     return -1;
 }
+
+/*
+ * Whether the global "application is active" path is currently in effect. Focus
+ * moving between the application's own scenes is not the application resigning:
+ * running the global path there marks the implementation inactive and fires the
+ * application's pause hook, which left the app paused -- main window included --
+ * until the main window happened to be focused again. Suppressing the resign means
+ * the matching resume has to be suppressed too, or the application would be resumed
+ * from a pause it never entered, so both go through this one flag.
+ */
+static BOOL cn1MacApplicationActive = NO;
+
+/* YES while any of the application's scenes is foreground-active. */
+static BOOL cn1MacAnySceneActive(void) {
+    for (UIScene *each in [UIApplication sharedApplication].connectedScenes) {
+        if (each.activationState == UISceneActivationStateForegroundActive) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+/*
+ * Resigns the application, but only once it is clear the application itself is no
+ * longer active. The scene gaining focus has not necessarily reached
+ * ForegroundActive by the time the losing scene reports its resign, so reading the
+ * activation states here would see none active and pause the app on every
+ * window-to-window focus change. Deferring one runloop turn lets the gaining scene
+ * settle first: by then either one of our scenes is active, and this does nothing,
+ * or none is and the application really did resign.
+ */
+static void cn1MacResignActiveIfApplicationInactive(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!cn1MacApplicationActive || cn1MacAnySceneActive()) {
+            return;
+        }
+        cn1MacApplicationActive = NO;
+        CodenameOne_GLAppDelegate *appDelegate =
+                (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
+        [appDelegate cn1ApplicationWillResignActive];
+    });
+}
 #endif
 
 - (void)sceneDidBecomeActive:(UIScene *)scene API_AVAILABLE(ios(13.0))
@@ -127,9 +169,24 @@ static int cn1MacCodenameOneWindowScene(UIScene *scene) {
         int windowId = cn1MacCodenameOneWindowScene(scene);
         if (windowId >= 0) {
             CN1MacWindowDeliverFocus(windowId, YES);
+            // Clicking one of our windows is still how the user brings a resigned
+            // application back, so resume it here -- but only from a real resign,
+            // which is what the flag distinguishes.
+            if (!cn1MacApplicationActive) {
+                cn1MacApplicationActive = YES;
+                CodenameOne_GLAppDelegate *windowSceneDelegate =
+                        (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
+                [windowSceneDelegate cn1ApplicationDidBecomeActive];
+            }
             return;
         }
     }
+    // Focus arriving from one of our own window scenes never resigned the
+    // application, so there is nothing to resume.
+    if (cn1MacApplicationActive) {
+        return;
+    }
+    cn1MacApplicationActive = YES;
 #endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationDidBecomeActive];
@@ -142,12 +199,16 @@ static int cn1MacCodenameOneWindowScene(UIScene *scene) {
         int windowId = cn1MacCodenameOneWindowScene(scene);
         if (windowId >= 0) {
             CN1MacWindowDeliverFocus(windowId, NO);
-            return;
         }
     }
-#endif
+    // Every Catalyst resign goes through the deferred check, main scene included: the
+    // main window losing focus to one of our windows is not the application resigning
+    // either, and the check is what tells the two apart.
+    cn1MacResignActiveIfApplicationInactive();
+#else
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationWillResignActive];
+#endif
 }
 
 - (void)sceneDidDisconnect:(UIScene *)scene API_AVAILABLE(ios(13.0))

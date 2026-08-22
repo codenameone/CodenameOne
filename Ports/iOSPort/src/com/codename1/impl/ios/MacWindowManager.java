@@ -105,6 +105,11 @@ public class MacWindowManager extends WindowManager {
     /// Every live window, so an owner can find the windows it owns.
     private static final java.util.List<Peer> peers = new java.util.ArrayList<Peer>();
 
+    /// Stands in for the application's main scene, which has no `Peer` of its own.
+    /// A window owned by the main `Form` records this, so it still has an owner the
+    /// cascade below can start from.
+    private static final Object MAIN_WINDOW = new Object();
+
     private static Peer peer(Object p) {
         return p instanceof Peer ? (Peer) p : null;
     }
@@ -127,10 +132,13 @@ public class MacWindowManager extends WindowManager {
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
             boolean decorated, boolean resizable, Object parentPeer, boolean positionSet,
             boolean ownedByMainWindow) {
-        // Catalyst scenes have no owner relation, so ownedByMainWindow is deliberately
-        // unused. positionSet is not: inferring it from the coordinates makes a window
-        // explicitly placed at 0,0 look unplaced, and the window server then puts it
-        // wherever it likes.
+        // Catalyst scenes have no native owner relation, so ownership is tracked here
+        // and the cascade is emulated. A window owned by the main Form has a null
+        // parentPeer -- the main scene has no Peer -- so ownedByMainWindow is the only
+        // signal that it is owned at all; recording MAIN_WINDOW for it is what lets
+        // the main scene take its owned windows down with it. positionSet matters too:
+        // inferring it from the coordinates makes a window explicitly placed at 0,0
+        // look unplaced, and the window server then puts it wherever it likes.
         int s = IOSImplementation.nativeInstance.macWindowCreate(windowId,
                 title == null ? "" : title, x, y, width, height, decorated, resizable,
                 positionSet);
@@ -138,7 +146,7 @@ public class MacWindowManager extends WindowManager {
             return null;
         }
         Peer created = new Peer(s, windowId);
-        created.owner = parentPeer;
+        created.owner = ownedByMainWindow ? MAIN_WINDOW : parentPeer;
         synchronized (peers) {
             peers.add(created);
         }
@@ -156,13 +164,7 @@ public class MacWindowManager extends WindowManager {
         IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
         // Only the ones this owner took down. A child hidden by the application stays
         // hidden, exactly as AWT and GTK behave when an owner is shown again.
-        for (Peer child : ownedBy(p)) {
-            if (child.hiddenByOwner) {
-                child.hiddenByOwner = false;
-                child.visible = true;
-                IOSImplementation.nativeInstance.macWindowShow(child.slot, true);
-            }
-        }
+        cascadeFrom(w, true);
     }
 
     /// The live windows owned by the given peer.
@@ -181,30 +183,73 @@ public class MacWindowManager extends WindowManager {
     /// Hides or restores the windows owned by the window with the given id, which is
     /// how a Catalyst window follows its owner being minimized by the user -- there is
     /// no scene-level owner relation to do it for us.
+    ///
+    /// Runs on the EDT. The caller marshals it there so a native slot cannot be freed
+    /// by a concurrent dispose and handed to a new window between the lookup here and
+    /// the native call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ownerWindowId`: the owner's window id, 0 for the application's main window
+    ///
+    /// - `shown`: true when the owner became visible, false when it went away
     static void cascadeOwnerVisibility(int ownerWindowId, boolean shown) {
-        Peer owner = null;
-        synchronized (peers) {
-            for (Peer each : peers) {
-                if (each.windowId == ownerWindowId) {
-                    owner = each;
-                    break;
-                }
-            }
-        }
+        // Window id 0 is the main window, which has no Peer; windows owned by the main
+        // Form carry the MAIN_WINDOW sentinel instead.
+        Object owner = ownerWindowId == 0 ? MAIN_WINDOW : peerForWindowId(ownerWindowId);
         if (owner == null) {
             return;
         }
+        cascadeFrom(owner, shown);
+    }
+
+    private static Peer peerForWindowId(int windowId) {
+        synchronized (peers) {
+            for (Peer each : peers) {
+                if (each.windowId == windowId) {
+                    return each;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Applies an owner's visibility to every window it owns, to any depth, and tells
+    /// the framework about each window that actually changed.
+    ///
+    /// Ownership is only ever assigned when a window is created, so the graph is a
+    /// tree and this cannot cycle.
+    private static void cascadeFrom(Object owner, boolean shown) {
         for (Peer child : ownedBy(owner)) {
+            boolean changed = false;
             if (shown) {
                 if (child.hiddenByOwner) {
                     child.hiddenByOwner = false;
                     child.visible = true;
                     IOSImplementation.nativeInstance.macWindowShow(child.slot, true);
+                    changed = true;
                 }
             } else if (child.visible) {
                 child.hiddenByOwner = true;
                 child.visible = false;
                 IOSImplementation.nativeInstance.macWindowShow(child.slot, false);
+                changed = true;
+            }
+            if (changed) {
+                // Setting the native hidden flag alone leaves the framework believing
+                // the window is still up: it keeps painting it and fires no lifecycle
+                // event. macWindowShow reports nothing back, so report it here.
+                if (shown) {
+                    com.codename1.ui.Display.getInstance().windowShowNotify(child.windowId);
+                } else {
+                    com.codename1.ui.Display.getInstance().windowHideNotify(child.windowId);
+                }
+            }
+            // Going down, a descendant has to follow even when its own parent was
+            // already hidden by the application. Coming back up, only a child that
+            // actually reappeared may restore the windows it owns.
+            if (!shown || child.visible) {
+                cascadeFrom(child, shown);
             }
         }
     }
@@ -220,13 +265,7 @@ public class MacWindowManager extends WindowManager {
         // An owned window cannot stay on screen without its owner. Recorded as
         // hidden-by-owner so showing the owner again brings back exactly the children
         // it took down, and not ones the application hid itself.
-        for (Peer child : ownedBy(p)) {
-            if (child.visible) {
-                child.hiddenByOwner = true;
-                child.visible = false;
-                IOSImplementation.nativeInstance.macWindowShow(child.slot, false);
-            }
-        }
+        cascadeFrom(w, false);
     }
 
     @Override
