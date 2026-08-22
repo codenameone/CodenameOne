@@ -456,6 +456,19 @@ public final class InterpRuntime {
         st.depth++;
         if (st.depth > maxDepth) {
             st.depth--;
+            // The fresh-entry bookkeeping above already reset fuel, clock and
+            // hostCallDepth; the finally that undoes it is only reached
+            // through the run() call below, so this early throw has to undo it
+            // itself. Otherwise the enclosing host call returns to a state
+            // where hostCallDepth was zeroed and never restored, and a later
+            // reentrant callback fails to recognise itself as fresh -- it
+            // inherits the outer entry's budget and its cancellation
+            // checkpoints stop firing.
+            if (freshEntry) {
+                st.hostCallDepth = enclosingHostCalls;
+                st.runStartMs = enclosingRunStart;
+                st.fuel = enclosingFuel;
+            }
             throw new InterpThrowable(new StackOverflowError(
                     "interpreted call depth exceeded " + maxDepth), snapshotStack());
         }
