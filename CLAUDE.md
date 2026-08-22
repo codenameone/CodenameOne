@@ -213,6 +213,44 @@ removing one can make a previously-used private method dead.
 
 Findings land in each module's `target/spotbugsXml.xml`.
 
+### Build hints are a catalog, not free-form strings
+
+A build hint is a `codename1.arg.<name>=<value>` line that reaches a builder as
+`request.getArg(name, default)`. Nothing used to check the name, so a misspelled
+hint was accepted, never read, and silently did nothing -- a green build with the
+setting simply not applied. Our own agent reference shipped
+`android.xPermissions`, `android.minSdkVersion` and `android.sdkVersion` for
+years; the builders read `android.xpermissions`, `android.min_sdk_version`, and
+nothing at all.
+
+**`maven/build-hint-catalog` is the single source of truth.** Every hint's name,
+type, default, value domain, merge separator and documentation lives there, and
+everything else is generated from it:
+
+- the `com.codename1.annotations.buildhints` annotations in `CodenameOne/src`
+- `BuildHintAnnotationBinding`, which the annotation processor reads back
+- the developer guide's build hint table (`docs/developer-guide/_generated-build-hints.adoc`)
+- the simulator's Build Hint editor schema (`BuildHintCatalogDefaults`)
+- the agent reference's annotation table (`skill/references/build-hints.md`)
+
+Adding a hint to a builder means adding it to the catalog in the same change.
+Regenerate with:
+
+```bash
+source tools/env.sh
+scripts/gen-build-hint-annotations.sh          # rewrite the generated files
+scripts/gen-build-hint-annotations.sh --check  # what CI runs
+scripts/check-build-hint-catalog.sh            # every hint the code reads is catalogued
+```
+
+`scripts/build-hint-catalog-baseline.txt` is a ratchet, and it is **empty**: every
+hint the code reads is described. A new entry means a hint went in without a
+catalog row. The same gate refuses a `codename1.arg.*` key in our own docs and
+project templates that no builder reads.
+
+Do not re-run `tools/build-hint-bootstrap/` -- it seeded the catalog once and
+would overwrite hand edits.
+
 ### Never rely on ClassCastException
 
 **ParparVM's `CHECKCAST` is unchecked.** `BC_CHECKCAST` expands to nothing and the

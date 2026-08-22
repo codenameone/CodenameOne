@@ -5,6 +5,7 @@ import com.codename1.system.Lifecycle;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.annotations.buildhints.*;
 
 /**
  * Minimal Codename One app dedicated to the In-App-Purchase e2e tests.
@@ -16,6 +17,9 @@ import com.codename1.ui.layouts.BoxLayout;
  * purchase reached the store. Kept separate from the hellocodenameone sample so
  * IAP wiring never ripples into the screenshot/notification CI workflows.
  */
+@Android(licenseKey = "CN1TESTPLACEHOLDERKEYNOTFORPRODUCTIONxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxIDAQAB", useAndroidX = true)
+@Ios(applicationQueriesSchemes = {"cydia"}, newStorageLocation = true, uiscene = true)
+@IosPrivacy(cameraUsageDescription = "Used by the CI smoke test to verify the com.codename1.camera native bridge compiles. The app never opens a camera session.")
 public class PurchaseTestApp extends Lifecycle {
     @Override
     public void init(Object context) {

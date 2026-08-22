@@ -160,6 +160,7 @@ public class Simulator {
                 files.add(commonClasses.getAbsoluteFile());
             }
             loadSimulatorProperties(cn1Props.getParentFile());
+            publishAnnotationBuildHints(cn1Props.getParentFile());
         }
         if (isDebug && usingHotswapAgent) { 
             HotswapProperties hotswapProperties = new HotswapProperties();
@@ -451,4 +452,69 @@ public class Simulator {
         }
     }
     
+
+    /**
+     * Publishes build hints declared as annotations so the simulator sees them.
+     *
+     * <p>The simulator never runs {@code cn1:build}, so it never sees the build
+     * request the annotations feed. Without this, moving a hint like
+     * {@code desktop.titleBar} or {@code nativeTheme} out of
+     * {@code codenameone_settings.properties} and onto the main class would
+     * silently stop it working under {@code cn1:run} -- the build would still be
+     * right and only the simulator would be wrong, which is the hardest kind of
+     * discrepancy to track down.</p>
+     *
+     * <p>Published as system properties rather than added as another source to
+     * {@code JavaSEPort.buildHint} because several readers bypass that method
+     * and call {@code System.getProperty("codename1.arg....")} directly. Setting
+     * the property fixes those, and every future one, with no change to them.</p>
+     *
+     * <p>An existing value always wins, which is what preserves {@code -D}: the
+     * JVM has already applied the command line by the time this runs.</p>
+     *
+     * <p>Read straight off disk, not through {@code getResourceAsStream}: at this
+     * point in {@code main} the application classes are not on any classloader
+     * yet -- the loader is built from {@code files} further down.</p>
+     */
+    private static void publishAnnotationBuildHints(File projectDir) {
+        if (projectDir == null) {
+            return;
+        }
+        File f = new File(projectDir, "target" + File.separator + "classes"
+                + File.separator + "META-INF" + File.separator + "codenameone"
+                + File.separator + "build-hints.properties");
+        if (!f.isFile()) {
+            return;
+        }
+        java.util.Properties p = new java.util.Properties();
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            p.load(in);
+        } catch (IOException ex) {
+            System.err.println("Warning: could not read " + f + ": " + ex.getMessage());
+            return;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // read-only stream; nothing useful to do
+                }
+            }
+        }
+        int applied = 0;
+        for (String key : p.stringPropertyNames()) {
+            if (!key.startsWith("codename1.arg.")) {
+                continue;
+            }
+            if (System.getProperty(key) == null) {
+                System.setProperty(key, p.getProperty(key));
+                applied++;
+            }
+        }
+        if (applied > 0) {
+            System.out.println("Applied " + applied + " build hint(s) from annotations");
+        }
+    }
 }

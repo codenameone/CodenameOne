@@ -8,9 +8,17 @@
     </parent>
     <artifactId>cn1-settings-common</artifactId>
     <packaging>jar</packaging>
+
+    <properties>
+        <cn1.settings.skipTests>true</cn1.settings.skipTests>
+    </properties>
     <name>cn1-settings-common</name>
 
     <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-build-hint-catalog</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
@@ -74,13 +82,6 @@
             <resource>
                 <directory>${project.basedir}/src/main/resources</directory>
             </resource>
-            <resource>
-                <directory>${project.basedir}/../../../docs/developer-guide</directory>
-                <includes>
-                    <include>Advanced-Topics-Under-The-Hood.asciidoc</include>
-                </includes>
-                <targetPath>com/codename1/settings/hints</targetPath>
-            </resource>
         </resources>
         <plugins>
             <plugin>
@@ -131,7 +132,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <skipTests>true</skipTests>
+                    <!-- Skipped by default: this module's tests need a JDK 17 toolchain
+                         and the CN1 simulator classes, which the packaging build does not
+                         set up. Opt in with -Dcn1.settings.skipTests=false. -->
+                    <skipTests>${cn1.settings.skipTests}</skipTests>
                 </configuration>
             </plugin>
         </plugins>

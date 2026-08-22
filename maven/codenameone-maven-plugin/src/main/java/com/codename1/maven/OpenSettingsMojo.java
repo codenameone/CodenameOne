@@ -231,13 +231,15 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
 
     void writeBinding(File inputFile, File projectDir) throws MojoExecutionException {
         File root = multimoduleRoot(projectDir);
-        File buildHints = new File(root, "docs/developer-guide/Advanced-Topics-Under-The-Hood.asciidoc");
+        // No buildHintsDoc: the Settings tool used to scrape the developer guide's
+        // AsciiDoc table at runtime and guess each hint's type from its description
+        // prose. It now reads com.codename1.build.shared.BuildHints, the same table
+        // the build hint annotations are generated from.
         String content = "# Codename One Settings project binding\n"
                 + "projectDir=" + projectDir.getAbsolutePath() + "\n"
                 + "settings=" + new File(projectDir, "codenameone_settings.properties").getAbsolutePath() + "\n"
                 + "pom=" + new File(projectDir, "pom.xml").getAbsolutePath() + "\n"
-                + "multimoduleRoot=" + root.getAbsolutePath() + "\n"
-                + (buildHints.isFile() ? "buildHintsDoc=" + buildHints.getAbsolutePath() + "\n" : "");
+                + "multimoduleRoot=" + root.getAbsolutePath() + "\n";
         try {
             FileUtils.write(inputFile, content, StandardCharsets.UTF_8);
         } catch (IOException ex) {

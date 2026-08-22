@@ -109,18 +109,21 @@ This step matters because every platform has a different stub layout, naming con
 
 The CN1 iOS port runs **without ARC** for these `.m` files (`CLANG_ENABLE_OBJC_ARC=NO`). Don't rely on autorelease-pool magic; retain manually or use static singletons for objects whose lifetime needs to outlive a method call. (This is also true for native code authored in `Ports/iOSPort/nativeSources/`.)
 
-iOS Info.plist privacy strings have **dedicated build hint names** — set them directly, don't fall back to `ios.plistInject`. The pattern is `ios.<PListKey>=<value>`:
+iOS Info.plist privacy strings have **dedicated, compiler-checked names**. Set them with `@IosPrivacy` on the main class rather than hand-writing plist XML:
 
-```properties
-codename1.arg.ios.NSCameraUsageDescription=Scan QR codes to pair the device.
-codename1.arg.ios.NSLocationWhenInUseUsageDescription=Find nearby branches near your location.
-codename1.arg.ios.NSPhotoLibraryUsageDescription=Attach photos to support tickets.
-codename1.arg.ios.NSMicrophoneUsageDescription=Record voice notes.
+```java
+@IosPrivacy(
+    cameraUsageDescription = "Scan QR codes to pair the device.",
+    locationWhenInUseUsageDescription = "Find nearby branches near your location.",
+    microphoneUsageDescription = "Record voice notes."
+)
+public class MyAppName extends Lifecycle {
+}
 ```
 
-App Store builds reject location, camera, microphone, photo, contacts, etc. without the appropriate descriptions. Use `ios.plistInject` only for raw XML keys that don't have a dedicated hint.
+App Store builds reject location, camera, microphone, photo, contacts, etc. without the appropriate descriptions. Use `@Ios(plistInject = "...")` only for raw XML keys that have no dedicated attribute.
 
-If you need a CocoaPod dependency, add `codename1.arg.ios.pods=PodName,...` to `codenameone_settings.properties`.
+If you need a CocoaPod dependency, add it with `@Ios(pods = {"PodName"})`.
 
 ### Android (Java)
 
@@ -147,13 +150,15 @@ public class GpsBridgeImpl {
 }
 ```
 
-Permissions in the Android manifest are injected via `codename1.arg.android.xPermissions`. For example:
+Permissions in the Android manifest are injected with `@Android(xpermissions = ...)`:
 
-```properties
-codename1.arg.android.xPermissions=<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+```java
+@Android(xpermissions = "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>")
+public class MyAppName extends Lifecycle {
+}
 ```
 
-Extra Gradle dependencies go in `codename1.arg.android.gradleDep`. See `references/build-hints.md`.
+Extra Gradle dependencies go in `@Android(gradleDep = {"implementation 'com.example:lib:1.0'"})`. See `references/build-hints.md`.
 
 ### JavaScript (TeaVM-friendly JS)
 
@@ -299,6 +304,6 @@ navigator.geolocation.watchPosition(function(pos) {
 - **Method signature mismatch between the interface and the stub** — happens after you edit the Java interface but forget to regenerate. Re-run `mvn cn1:generate-native-interfaces -Dcn1.generateNativeInterfaces.overwrite=true` and re-apply your platform code.
 - **Returning Java objects** — not supported by the bridge marshaler. Return primitives, `String`, `byte[]`, or `PeerComponent` only.
 - **`PeerComponent` on iOS without ARC** — peer-component implementations can dangle if you treat the bridge like an ARC-managed Swift method. Retain natively, or wrap returned views in a static holder.
-- **Permissions / Info.plist** — the build server happily accepts a native interface that calls a privacy-protected API, but the App Store / Play Store reject it. Set `codename1.arg.ios.plistInject` and `codename1.arg.android.xPermissions` (see `references/build-hints.md`).
+- **Permissions / Info.plist** — the build server happily accepts a native interface that calls a privacy-protected API, but the App Store / Play Store reject it. Set `@IosPrivacy(...)` for the plist strings and `@Android(xpermissions = ...)` for the manifest (see `references/build-hints.md`).
 - **Forgetting `isSupported()` return** — defaults to `false`, so the Java side thinks the bridge isn't available. Always override.
 - **`NativeLookup.create()` returns null in the simulator only** — usually means the `javase/` impl class is missing or in the wrong package.

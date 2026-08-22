@@ -81,6 +81,7 @@
         <!--<module>codenameone-maven-goals</module>-->
         <module>cn1-binaries</module>
         <module>platform-feature-catalog</module>
+        <module>build-hint-catalog</module>
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>

@@ -5,7 +5,6 @@ public final class ProjectBinding {
     private String settings;
     private String pom;
     private String multimoduleRoot;
-    private String buildHintsDoc;
 
     public String projectDir() {
         return projectDir;
@@ -21,10 +20,6 @@ public final class ProjectBinding {
 
     public String multimoduleRoot() {
         return multimoduleRoot;
-    }
-
-    public String buildHintsDoc() {
-        return buildHintsDoc;
     }
 
     public boolean isValid() {
@@ -53,7 +48,6 @@ public final class ProjectBinding {
                 case "settings" -> b.settings = val;
                 case "pom" -> b.pom = val;
                 case "multimoduleRoot" -> b.multimoduleRoot = val;
-                case "buildHintsDoc" -> b.buildHintsDoc = val;
                 default -> {
                 }
             }

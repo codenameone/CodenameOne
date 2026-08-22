@@ -125,7 +125,12 @@ public class SettingsThemeTest {
                 "Theme font sizes must use physical mm units so Retina density does not create miniature text.");
         assertTrue(source.contains("new TableLayout(1, 2)"),
                 "The main content width should be responsive through TableLayout percentages.");
-        assertTrue(source.contains("new GridLayout(3, 2)"),
+        // Match the column count, not the row count. This asserted GridLayout(3, 2)
+        // and the Basic form has grown to five rows since; because this module's
+        // tests are skipped by default nothing reported the drift. The two columns
+        // are what makes the form responsive -- the row count is just how many
+        // fields there happen to be.
+        assertTrue(Pattern.compile("new GridLayout\\(\\d+, 2\\)").matcher(source).find(),
                 "The Basic form should use a responsive two-column GridLayout.");
         assertTrue(source.contains("private Container configureToolbar()"),
                 "Native desktop chrome should use a stable top-bar container, not a second Toolbar instance.");

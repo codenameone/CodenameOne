@@ -82,7 +82,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.codename1.annotations.buildhints.*;
 
+@Build(nativeTheme = NativeThemeMode.MODERN)
+@Desktop(height = 900, interactiveScrollbars = true, titleBar = DesktopTitleBar.NATIVE, width = 1440)
 public class CodenameOneGUIBuilder extends Lifecycle {
     private static CodenameOneGUIBuilder active;
     private ProjectBinding binding;

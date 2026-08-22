@@ -80,7 +80,12 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.codename1.annotations.buildhints.*;
 
+@Android(themeMode = AndroidThemeMode.MODERN)
+@Build(nativeTheme = NativeThemeMode.MODERN)
+@Desktop(height = 820, interactiveScrollbars = true, titleBar = DesktopTitleBar.NATIVE, width = 1260)
+@Ios(themeMode = IosThemeMode.MODERN)
 public class CodenameOneSettings extends Lifecycle {
     public enum Section { BASIC, BUILD_HINTS, EXTENSIONS, ADVANCED }
 
@@ -90,7 +95,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     private ProjectBinding binding;
     private SettingsProperties settings;
-    private BuildHintCatalog buildHints = BuildHintCatalog.fallback();
+    private BuildHintCatalog buildHints = BuildHintCatalog.load();
     private Section section = Section.BASIC;
     private Form form;
     private Container page;
@@ -221,38 +226,7 @@ public class CodenameOneSettings extends Lifecycle {
             } catch (Exception ex) {
                 Log.e(ex);
             }
-            buildHints = loadBuildHints(binding.buildHintsDoc());
-        }
-    }
-
-    private BuildHintCatalog loadBuildHints(String docPath) {
-        InputStream in = null;
-        if (docPath != null && docPath.length() > 0) {
-            try {
-                String url = ProjectIO.fsUrl(docPath);
-                FileSystemStorage fs = FileSystemStorage.getInstance();
-                if (fs.exists(url)) {
-                    in = fs.openInputStream(url);
-                    return BuildHintCatalog.fromAsciiDoc(Util.readToString(in, "UTF-8"));
-                }
-            } catch (Exception ex) {
-                Log.e(ex);
-            } finally {
-                Util.cleanup(in);
-                in = null;
-            }
-        }
-        try {
-            in = getClass().getResourceAsStream("/com/codename1/settings/hints/Advanced-Topics-Under-The-Hood.asciidoc");
-            if (in == null) {
-                return BuildHintCatalog.fallback();
-            }
-            return BuildHintCatalog.fromAsciiDoc(Util.readToString(in, "UTF-8"));
-        } catch (Exception ex) {
-            Log.e(ex);
-            return BuildHintCatalog.fallback();
-        } finally {
-            Util.cleanup(in);
+            buildHints = BuildHintCatalog.load();
         }
     }
 
@@ -817,6 +791,20 @@ public class CodenameOneSettings extends Lifecycle {
             return true;
         }
         String v = value.trim();
+        // A closed value domain is the one case where a wrong value is certain to
+        // be wrong: the builder compares against these strings and silently uses
+        // its default when it recognises none of them.
+        if (!meta.values().isEmpty()) {
+            for (String allowed : meta.values()) {
+                if (allowed.equalsIgnoreCase(v)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (meta.type() == BuildHintType.BOOLEAN) {
+            return "true".equalsIgnoreCase(v) || "false".equalsIgnoreCase(v);
+        }
         if (meta.type() == BuildHintType.INTEGER) {
             return isDigits(v);
         }
@@ -1544,9 +1532,6 @@ public class CodenameOneSettings extends Lifecycle {
         Container c = card("Files");
         actionRow(c, "Settings file", binding.settings(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.settings())));
         actionRow(c, "Common POM", binding.pom(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.pom())));
-        if (binding.buildHintsDoc() != null && binding.buildHintsDoc().length() > 0) {
-            actionRow(c, "Build-hints source", binding.buildHintsDoc(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.buildHintsDoc())));
-        }
         page.add(c);
     }
 

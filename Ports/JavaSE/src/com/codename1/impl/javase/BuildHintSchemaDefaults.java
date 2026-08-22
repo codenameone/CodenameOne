@@ -235,6 +235,12 @@ final class BuildHintSchemaDefaults {
                 + "category, android.software.leanback uses-feature, touchscreen "
                 + "required=false) and a generated tv_banner drawable. With the "
                 + "hint off the manifest is unchanged.");
+
+        // Everything else that has a build hint annotation, generated from the
+        // catalog. Registered last on purpose: set() never overwrites, so the
+        // hand-written labels and descriptions above win and this only fills in
+        // the hints nobody has written prose for.
+        BuildHintCatalogDefaults.register();
     }
 
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */

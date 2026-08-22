@@ -1,0 +1,23 @@
+# Build hint catalog bootstrap (one-off, archived)
+
+These scripts seeded `maven/build-hint-catalog` when the catalog was first
+created. They mined every `getArg` call site in the builders for a hint's name
+and default, imported the prose from the developer guide's hand-written build
+hint table, and emitted the `BuildHints*.java` registration classes.
+
+**They are not part of any build and should not be re-run.** The catalog is the
+source of truth now and is edited directly; `scripts/gen-build-hint-annotations.sh`
+generates the annotations, the docs and the Settings schema *from* it.
+
+They are kept only to show where the catalog's contents came from. They read the
+guide's original hand-written table from a `guide_old.asciidoc` that is
+deliberately not committed — recover it from history if you ever need it:
+
+```bash
+git show <commit-before-this-change>:docs/developer-guide/Advanced-Topics-Under-The-Hood.asciidoc \
+    > tools/build-hint-bootstrap/guide_old.asciidoc
+```
+
+Re-running them would overwrite hand-edits to the catalog. If you ever need to
+re-derive an entry, read the miner instead: `scripts/build_hint_miner.py` is the
+supported, tested version of the same extraction and is what the CI gate uses.
