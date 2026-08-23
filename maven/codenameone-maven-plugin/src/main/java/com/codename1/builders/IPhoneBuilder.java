@@ -6961,25 +6961,56 @@ public class IPhoneBuilder extends Executor {
     /// true if the window scene role names `CodenameOne_GLSceneDelegate`
     static boolean plistWiresWindowSceneDelegate(String plist) {
         String tag = "<key>UIWindowSceneSessionRoleApplication</key>";
-        // The declared role, not any mention of it: a commented-out Codename One
-        // configuration sitting above a live role that names someone else's delegate
-        // would otherwise answer for the live one, and the build would accept a
-        // manifest whose real scene configuration cannot adopt a window.
         int role = plistKeyIndex(plist, "UIWindowSceneSessionRoleApplication");
         if (role < 0) {
             return false;
         }
         int afterKey = role + tag.length();
-        // The delegate name and the next role both have to be live text as well. A
-        // commented-out Codename One configuration inside the role would otherwise
-        // answer for a live one naming somebody else, and a commented next role would
-        // wrongly extend this role's range.
-        int delegate = plistIndexOfLive(plist, "CodenameOne_GLSceneDelegate", afterKey);
-        if (delegate < 0) {
-            return false;
-        }
+        // Bounded by the next scene role, so a CarPlay configuration naming its own
+        // delegate cannot answer for this one.
         int nextRole = plistIndexOfLive(plist, "SceneSessionRole", afterKey);
-        return nextRole < 0 || delegate < nextRole;
+        int end = nextRole < 0 ? plist.length() : nextRole;
+        // Bound to its key rather than found anywhere in the role. The class name can
+        // appear as some other live value -- a UISceneConfigurationName of
+        // "CodenameOne_GLSceneDelegate" is legal -- while UISceneDelegateClassName
+        // names somebody else, and a manifest like that cannot adopt a window.
+        String delegateKey = "<key>UISceneDelegateClassName</key>";
+        int at = plistIndexOfLive(plist, delegateKey, afterKey);
+        while (at >= 0 && at < end) {
+            if ("CodenameOne_GLSceneDelegate".equals(
+                    plistStringValueAfter(plist, at + delegateKey.length()))) {
+                return true;
+            }
+            at = plistIndexOfLive(plist, delegateKey, at + delegateKey.length());
+        }
+        return false;
+    }
+
+    /// The text of the `<string>` element that follows `from`, or null when the next
+    /// element is not a string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `from`: index to read the value from, normally just past a key
+    ///
+    /// #### Returns
+    ///
+    /// the string's text, trimmed, or null
+    static String plistStringValueAfter(String plist, int from) {
+        if (!"string".equals(nextElementName(plist, from))) {
+            return null;
+        }
+        int open = plistIndexOfLive(plist, "<string>", from);
+        if (open < 0) {
+            return null;
+        }
+        int close = plist.indexOf("</string>", open);
+        if (close < 0) {
+            return null;
+        }
+        return plist.substring(open + "<string>".length(), close).trim();
     }
 
     private void injectToPlist(File tmpFile, File resDir, BuildRequest request)

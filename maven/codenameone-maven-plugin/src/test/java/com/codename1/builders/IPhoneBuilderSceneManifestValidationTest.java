@@ -192,4 +192,30 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "the live role names another delegate, so the commented one must not "
                         + "answer for it");
     }
+
+    @Test
+    void theClassNameHasToBeTheDelegateNotJustPresent() {
+        // Legal manifest: the configuration is *named* after our delegate while the
+        // delegate class is somebody else's. Matching the text anywhere in the role
+        // accepts it, and that build cannot adopt a secondary window.
+        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneConfigurationName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>SomeoneElsesSceneDelegate</string></dict></array>"),
+                "the class name appears, but not as the delegate");
+    }
+
+    @Test
+    void oneMatchingConfigurationAmongSeveralIsEnough() {
+        // A role may declare more than one configuration; windows can be adopted as
+        // long as one of them is ours.
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array>"
+                        + "<dict><key>UISceneDelegateClassName</key>"
+                        + "<string>SomeoneElsesSceneDelegate</string></dict>"
+                        + "<dict><key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"));
+    }
 }
