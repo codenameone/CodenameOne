@@ -3874,12 +3874,7 @@ public abstract class CodenameOneImplementation {
         }
 
         // have we passed the motion threshold on the Y axis?
-        if (((float) surfaceHeight) / 100.0f * startY <=
-                Math.abs(activationY - y)) {
-            return true;
-        }
-
-        return false;
+        return ((float) surfaceHeight) / 100.0f * startY <= Math.abs(activationY - y);
     }
 
     /// This method allows us to manipulate the drag started detection logic.
