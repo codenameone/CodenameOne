@@ -363,6 +363,26 @@ class AndroidWatchSurfaceCodegenTest {
                 "the runtime must append them as the builder does:\n" + body);
     }
 
+    /// A display name carrying an emoji is ordinary, and escaping its UTF-16 halves separately
+    /// produced two surrogate character references -- which are not legal XML, so the manifest
+    /// did not merely show the wrong glyph, it failed to parse. No literal emoji here: these
+    /// sources are compiled at the platform default encoding.
+    @Test
+    void aSupplementaryCharacterEscapesAsOneReference() {
+        String emoji = new String(Character.toChars(0x1F600));
+        assertEquals("hi &#x1f600;", AndroidGradleBuilder.xmlize("hi " + emoji));
+        assertFalse(AndroidGradleBuilder.xmlize(emoji).contains("d83d"),
+                "a surrogate half must never reach the manifest");
+    }
+
+    /// Everything that was already valid must escape exactly as it did before.
+    @Test
+    void ordinaryCharactersEscapeUnchanged() {
+        assertEquals("Hello &amp; &lt;bye&gt;", AndroidGradleBuilder.xmlize("Hello & <bye>"));
+        assertEquals("caf&#xe9;", AndroidGradleBuilder.xmlize("caf\u00e9"));
+        assertEquals("plain", AndroidGradleBuilder.xmlize("plain"));
+    }
+
     // --- tiles ------------------------------------------------------------------
 
     /// Only the rectangular family is roomy enough for a layout rather than a readout, so it is

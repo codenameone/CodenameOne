@@ -86,10 +86,18 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
             try {
                 ctx.getPackageManager().getReceiverInfo(provider, 0);
             } catch (Exception missing) {
-                Log.e(TAG, "Widget kind '" + kindId + "' was registered at runtime but is not "
-                        + "declared in surfaces.json; the build compiles widget kinds into the "
-                        + "app, so this kind cannot appear in the widget gallery. Add it to "
-                        + "surfaces.json and rebuild.");
+                // A missing receiver is not proof the kind is missing. A kind declaring only
+                // watch families gets no CN1Widget_ receiver ON PURPOSE -- that is the whole
+                // point of the split, and iOS refuses to host one for the same declaration --
+                // so the build-time list of watch kinds has to be consulted before calling this
+                // a mistake. Without it every correct watch-only registration produced this
+                // error and told the developer to add a kind that is already there.
+                if (!CN1WatchSurface.isWatchKind(ctx, kindId)) {
+                    Log.e(TAG, "Widget kind '" + kindId + "' was registered at runtime but is "
+                            + "not declared in surfaces.json; the build compiles widget kinds "
+                            + "into the app, so this kind cannot appear in the widget gallery. "
+                            + "Add it to surfaces.json and rebuild.");
+                }
             }
         } catch (Throwable t) {
             Log.w(TAG, "Failed to register widget kind", t);

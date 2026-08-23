@@ -377,11 +377,27 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         }
     }
 
+    /**
+     * Cuts a value down to what a short-text slot shows, without cutting a character in half.
+     *
+     * <p>The limit counts CODE POINTS rather than UTF-16 units, for two reasons that agree. It is
+     * what the limit means -- Wear's guidance is about characters a face can show, and a
+     * supplementary character is one of them. And a cut landing between the halves of one leaves
+     * a lone surrogate, which PlainComplicationText replaces or rejects: the slot then shows a
+     * corrupt character instead of the published value.</p>
+     */
     private static String shorten(String text) {
         if (text == null) {
             return "";
         }
-        return text.length() <= SHORT_TEXT_MAX ? text : text.substring(0, SHORT_TEXT_MAX);
+        if (text.length() <= SHORT_TEXT_MAX) {
+            return text;
+        }
+        int points = text.codePointCount(0, text.length());
+        if (points <= SHORT_TEXT_MAX) {
+            return text;
+        }
+        return text.substring(0, text.offsetByCodePoints(0, SHORT_TEXT_MAX));
     }
 
     /**

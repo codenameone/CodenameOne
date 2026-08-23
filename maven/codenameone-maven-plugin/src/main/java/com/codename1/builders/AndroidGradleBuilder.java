@@ -7058,15 +7058,23 @@ public class AndroidGradleBuilder extends Executor {
             if (c > 127) {
                 // we need to localize the string...
                 StringBuilder b = new StringBuilder();
-                for (int counter = 0; counter < charCount; counter++) {
-                    c = s.charAt(counter);
-                    if (c > 127) {
+                // By CODE POINT, not by char. A supplementary character -- an emoji in a display
+                // name is the ordinary way to get one -- is two chars in UTF-16, and escaping the
+                // halves separately emits a pair of surrogate code points such as
+                // &#xd83d;&#xde00;. Those are not legal XML character references, so a manifest
+                // carrying one failed to parse at all rather than showing the wrong glyph. Every
+                // BMP character still escapes exactly as before, so nothing that was already
+                // valid changes.
+                for (int counter = 0; counter < charCount; ) {
+                    int point = s.codePointAt(counter);
+                    if (point > 127) {
                         b.append("&#x");
-                        b.append(Integer.toHexString(c));
+                        b.append(Integer.toHexString(point));
                         b.append(";");
                     } else {
-                        b.append(c);
+                        b.append((char) point);
                     }
+                    counter += Character.charCount(point);
                 }
                 return b.toString();
             }
