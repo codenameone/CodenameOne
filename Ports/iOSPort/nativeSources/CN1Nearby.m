@@ -1743,8 +1743,13 @@ static CN1NearbyCompanion *cn1nbCompanionInit(void) API_AVAILABLE(ios(18.0)) {
     CN1NearbyCompanion *companion = (CN1NearbyCompanion *)cn1nbCompanion;
     [companion activate];
     // Waited for here rather than at each call site, so nothing reaches
-    // showPicker or session.accessories before the session is usable.
-    [companion awaitActive];
+    // showPicker or session.accessories before the session is usable -- and
+    // nil when it never became usable, so a caller cannot proceed on an
+    // inactive session and blame the result on the accessory. Activation can
+    // fail outright, not only run late.
+    if (![companion awaitActive]) {
+        return nil;
+    }
     return companion;
 }
 
@@ -2193,6 +2198,12 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                 return;
             }
             CN1NearbyCompanion *companion = cn1nbCompanionInit();
+            if (companion == nil) {
+                cn1nbFailCompanion(requestId,
+                        CN1_NEARBY_ERR_RADIO_UNAVAILABLE,
+                        @"AccessorySetupKit did not become active");
+                return;
+            }
             // Taken BEFORE the picker opens, so the accessory it adds can be
             // told apart from the ones this app already had.
             NSMutableSet *before = [NSMutableSet set];
@@ -2258,6 +2269,12 @@ com_codename1_impl_ios_IOSNative_nearbyAssociations___R_java_lang_String(
     if (@available(iOS 18.0, *)) {
         @autoreleasepool {
             CN1NearbyCompanion *companion = cn1nbCompanionInit();
+            if (companion == nil) {
+                // getAssociations is synchronous and has no error channel, so
+                // an inactive session can only answer with nothing. The
+                // operations that CAN report a failure do.
+                return cn1nbJString(@"");
+            }
             NSMutableArray *lines = [NSMutableArray array];
             for (ASAccessory *a in companion.session.accessories) {
                 [lines addObject:[companion encode:a present:NO]];
@@ -2276,6 +2293,14 @@ void com_codename1_impl_ios_IOSNative_nearbyDisassociate___int_java_lang_String(
     if (@available(iOS 18.0, *)) {
         @autoreleasepool {
             CN1NearbyCompanion *companion = cn1nbCompanionInit();
+            if (companion == nil) {
+                // Distinguished from "no such association", which is what an
+                // inactive session used to look like.
+                cn1nbFailCompanion(requestId,
+                        CN1_NEARBY_ERR_RADIO_UNAVAILABLE,
+                        @"AccessorySetupKit did not become active");
+                return;
+            }
             NSString *aid = toNSString(CN1_THREAD_STATE_PASS_ARG associationId);
             ASAccessory *accessory = [companion accessoryForId:aid];
             if (accessory == nil) {
