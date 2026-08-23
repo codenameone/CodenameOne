@@ -498,6 +498,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     @Override
     public void stopAdvertising() {
         advertising = false;
+        transportGeneration++;
     }
 
     @Override
@@ -505,9 +506,20 @@ public class LocalNearbyBridge implements NearbyBridge {
             int strategy) {
         discovering = true;
         discoverStrategy = strategy;
+        final int generation = transportGeneration;
         answer(new Runnable() {
             @Override
             public void run() {
+                // A stop between the call and this hop means there is no
+                // discovery to report into. Reporting endpoints anyway had
+                // the stopped simulator announcing peers nobody had asked
+                // for, which is not what a device does.
+                if (!discovering || generation != transportGeneration) {
+                    NearbyTransport.deliverRequestFailed(requestId,
+                            NearbyError.SESSION_INVALIDATED.ordinal(),
+                            "discovery was stopped before it started");
+                    return;
+                }
                 NearbyTransport.deliverRequestOk(requestId);
                 for (SimEndpoint e : endpoints) {
                     e.serviceId = serviceId;
@@ -520,6 +532,9 @@ public class LocalNearbyBridge implements NearbyBridge {
     @Override
     public void stopDiscovery() {
         discovering = false;
+        // Bumped so a start still queued for this run of discovery can tell
+        // that it has been stopped, the same way stopAllTransport does.
+        transportGeneration++;
     }
 
     @Override

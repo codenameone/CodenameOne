@@ -568,6 +568,23 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     // delegate queue that is trying to take the same monitor.
     session.delegate = nil;
     [session disconnect];
+    // Reported here, because clearing the delegate above is what stops
+    // didChangeState:NotConnected from reporting it. A deliberate close is
+    // still a disconnection as far as the app is concerned, and suppressing
+    // both the callback and its replacement left every listener believing
+    // the peer was still connected.
+    //
+    // Only for a peer that actually reached Connected -- the same test the
+    // delegate applies, so a close during an unanswered invitation stays
+    // silent rather than inventing a disconnection that never happened.
+    if ([self takeEverConnected:endpointId]) {
+        MCPeerID *peer = [self peerForId:endpointId];
+        if (peer != nil) {
+            com_codename1_impl_ios_IOSNearbyCallbacks_disconnected___java_lang_String(
+                    getThreadLocalData(),
+                    cn1nbJString([self encodePeer:peer]));
+        }
+    }
 }
 
 /// Records one recipient's transfer so cancel can reach it.
@@ -827,23 +844,11 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         withError:(NSError *)error {
     @autoreleasepool {
         NSString *encoded = [self encodePeer:peerID];
-        if (error != nil || localURL == nil) {
-            com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
-                    getThreadLocalData(), cn1nbJString(encoded), 0, 0, -1,
-                    CN1_NEARBY_PAYLOAD_FAILURE);
-            return;
-        }
-        // The URL the framework hands over is in a temporary location it will
-        // delete, so the file is moved somewhere the app can still read when
-        // the callback returns.
-        // resourceName is chosen by the REMOTE peer, so it is untrusted
-        // input. Appended raw, a name like "../../Library/Preferences/x"
-        // walked out of the app's Documents directory and the removeItem and
-        // move below would then delete and overwrite files elsewhere in the
-        // container. Reduced to its last path component, and anything that
-        // still looks like traversal or a separator is replaced outright.
-        // The sender framed its payload id into the name; strip it back off
-        // before the name is used for anything else.
+        // The sender's id is parsed off the resource name BEFORE anything
+        // else, because the failure branch below needs it too. Parsed after
+        // it, a transfer that broke mid-flight -- a cancellation at the
+        // sender, a dropped link -- reported its failure under id 0 and the
+        // receiver could not match it to the transfer it was watching.
         JAVA_INT filePayloadId = 0;
         NSString *bare = resourceName;
         if ([bare hasPrefix:@"cn1id-"]) {
@@ -856,6 +861,25 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
                 bare = [bare substringFromIndex:dash.location + 1];
             }
         }
+        if (error != nil || localURL == nil) {
+            com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                    getThreadLocalData(), cn1nbJString(encoded),
+                    filePayloadId, 0, -1,
+                    cn1nbWasCancelled(error) ? CN1_NEARBY_PAYLOAD_CANCELED
+                            : CN1_NEARBY_PAYLOAD_FAILURE);
+            return;
+        }
+        // The URL the framework hands over is in a temporary location it will
+        // delete, so the file is moved somewhere the app can still read when
+        // the callback returns.
+        // resourceName is chosen by the REMOTE peer, so it is untrusted
+        // input. Appended raw, a name like "../../Library/Preferences/x"
+        // walked out of the app's Documents directory and the removeItem and
+        // move below would then delete and overwrite files elsewhere in the
+        // container. Reduced to its last path component, and anything that
+        // still looks like traversal or a separator is replaced outright.
+        // filePayloadId and bare were resolved above, before the failure
+        // branch that also needs them.
         NSString *safe = [bare lastPathComponent];
         if (safe == nil || [safe length] == 0
                 || [safe isEqualToString:@"."]

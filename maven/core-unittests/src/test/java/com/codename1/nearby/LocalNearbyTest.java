@@ -556,6 +556,30 @@ class LocalNearbyTest {
     // ------------------------------------------------------------------
 
     @Test
+    void stoppingBeforeDiscoveryStartsReportsNoEndpoints() {
+        // The queued start had no idea discovery had been stopped, so a
+        // stopped simulator announced peers nobody had asked for -- and
+        // resolved the start as though discovery were running.
+        final List<Endpoint> found = new ArrayList<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.add(e);
+            }
+        });
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        AsyncResource<Boolean> pending = NearbyTransport.startDiscovery("chat",
+                TransportStrategy.CLUSTER);
+        NearbyTransport.stop();
+        drain(queue);
+
+        assertTrue(found.isEmpty(),
+                "a stopped simulator must not announce peers: " + found);
+        assertFailedWith(NearbyError.SESSION_INVALIDATED, pending);
+    }
+
+    @Test
     void stoppingBeforeTheAcceptanceLandsLeavesTheTransportStopped() {
         // Nothing in the simulation completes inline, which is the point --
         // and it means the delayed acceptance really can outlive the stop()

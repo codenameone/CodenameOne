@@ -2644,6 +2644,26 @@ public class AndroidGradleBuilder extends Executor {
         // usesHealthStore, NOT usesHealth: com.codename1.health.sensors is
         // pure BLE and must not drag in Health Connect or a Google Play
         // health-permissions review.
+        if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
+            // Every nearby build compiles against SDK 33 -- see the floor
+            // further down, which AndroidNearbyBackend's use of
+            // android.companion.AssociationInfo forces. An Android Gradle
+            // plugin from before that SDK existed cannot build such a
+            // project: it either rejects the compile SDK outright or, on the
+            // legacy toolchain, is handed a DSL it does not have. Refused
+            // here rather than left to fail during Gradle evaluation with a
+            // message that names none of this.
+            if (!useGradle8 || gradleVersionInt < 8) {
+                throw new BuildException(
+                        "com.codename1.nearby needs to compile against"
+                        + " Android SDK 33, which the Android Gradle plugin"
+                        + " for Gradle " + gradleVersion
+                        + " (android.useGradle8=" + useGradle8 + ") predates."
+                        + " Set android.useGradle8=true and leave"
+                        + " android.gradleVersion unset to build a nearby"
+                        + " app.");
+            }
+        }
         if (usesNearbyRanging) {
             // androidx.core.uwb's AAR declares minAgpVersion=8.9.1 as well as
             // minCompileSdk=36, and Gradle's dependency check rejects the
