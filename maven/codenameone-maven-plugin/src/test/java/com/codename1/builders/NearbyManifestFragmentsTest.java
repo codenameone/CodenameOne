@@ -67,15 +67,20 @@ class NearbyManifestFragmentsTest {
     }
 
     @Test
-    void uwbRangingIsNotDeclaredBelowTheApiThatHasIt() {
-        // The permission arrives in API 31. Declaring it on an older target
-        // is harmless and noisy, and a store review asks about it.
-        String out = NearbyManifestFragments.inject("", true, false, false,
+    void uwbRangingIsDeclaredWhateverTheTargetSdk() {
+        // targetSdkVersion picks compatibility behaviours, not the device. An
+        // app targeting 30 still runs on an Android 12 phone with a UWB radio,
+        // and there the runtime request fails unless the manifest declares
+        // this. Older devices ignore a permission they do not know.
+        String legacy = NearbyManifestFragments.inject("", true, false, false,
                 false, false, 30);
-        assertFalse(out.contains("android.permission.UWB_RANGING"));
-        // The feature is still declared, because that is what keeps the app
+        assertTrue(legacy.contains("android.permission.UWB_RANGING"));
+        String modern = NearbyManifestFragments.inject("", true, false, false,
+                false, false, 34);
+        assertTrue(modern.contains("android.permission.UWB_RANGING"));
+        // The feature stays optional, because that is what keeps the app
         // installable on a device without the radio.
-        assertTrue(out.contains("android.hardware.uwb"));
+        assertTrue(legacy.contains("android.hardware.uwb"));
     }
 
     @Test

@@ -252,9 +252,11 @@ public final class Ranging {
             int sessionHandle, boolean role, int tokenPlatform,
             byte[] tokenPayload) {
         EdtResult<RangingSession> r = PENDING_SESSIONS.take(requestId);
-        if (r == null) {
-            // Nobody is waiting: the caller cancelled, or a port answered
-            // twice. Release the radio rather than leaking the session.
+        // Cancelled counts as nobody waiting. take() hands back a cancelled
+        // resource just the same, and completing one is a no-op -- so building
+        // the session here registered it in two places and handed the caller
+        // nothing, leaving a radio session alive that no one could stop.
+        if (r == null || r.isCancelled()) {
             NearbyBridge b = NearbyRequests.bridge();
             if (b != null) {
                 b.stopRangingSession(sessionHandle);

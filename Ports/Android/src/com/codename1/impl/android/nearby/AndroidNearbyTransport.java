@@ -66,7 +66,13 @@ import java.util.Map;
 public class AndroidNearbyTransport implements NearbyBridge {
 
     /// The Nearby Connections limit for a BYTES payload.
-    private static final int MAX_BYTES_PAYLOAD = 32 * 1024;
+    private static final int NEARBY_BYTES_LIMIT = 32 * 1024;
+
+    /// What an app may actually send: the limit less the four-byte payload-id
+    /// header this transport frames in. Reported rather than the raw limit,
+    /// because an app that respects getMaxPayloadSize() must not then be
+    /// rejected by Nearby for the header it never knew about.
+    private static final int MAX_BYTES_PAYLOAD = NEARBY_BYTES_LIMIT - 4;
 
     private final Context context;
     private final Map<String, String> endpointNames =
@@ -77,6 +83,10 @@ public class AndroidNearbyTransport implements NearbyBridge {
     /// update that says the bytes actually arrived.
     private final Map<Long, Payload> incomingFiles =
             Collections.synchronizedMap(new HashMap<Long, Payload>());
+    /// How many recipients of an outgoing payload have yet to reach a
+    /// terminal transfer state.
+    private final Map<Long, Integer> payloadRecipients =
+            Collections.synchronizedMap(new HashMap<Long, Integer>());
 
     private String serviceId = "";
     private String localName = "";
@@ -276,8 +286,21 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 }
                 payload = Payload.fromFile(new File(p));
             } else {
-                payload = Payload.fromBytes(bytes == null ? new byte[0]
-                        : bytes);
+                    // Framed with the sender's payload id. Nearby Connections
+                // mints its own id on each side, so without this the
+                // receiver saw Google's local id -- which is not the one the
+                // sender was handed, may collide, and cannot be matched to
+                // the sender's progress events. Payload.getId() documents
+                // the sender's id, so it has to travel with the bytes. Both
+                // ends are Codename One, so the framing is symmetric.
+                byte[] body = bytes == null ? new byte[0] : bytes;
+                byte[] framed = new byte[body.length + 4];
+                framed[0] = (byte) ((payloadId >> 24) & 0xff);
+                framed[1] = (byte) ((payloadId >> 16) & 0xff);
+                framed[2] = (byte) ((payloadId >> 8) & 0xff);
+                framed[3] = (byte) (payloadId & 0xff);
+                System.arraycopy(body, 0, framed, 4, body.length);
+                payload = Payload.fromBytes(framed);
             }
         } catch (Exception e) {
             NearbyTransport.deliverRequestFailed(requestId,
@@ -289,6 +312,8 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // report progress against the id the app was handed.
         payloadIds.put(Long.valueOf(payload.getId()),
                 Integer.valueOf(payloadId));
+        payloadRecipients.put(Long.valueOf(payload.getId()),
+                Integer.valueOf(endpointIds.length));
         java.util.List<String> targets = java.util.Arrays.asList(endpointIds);
         client().sendPayload(targets, payload)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
@@ -324,6 +349,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
         client().stopAllEndpoints();
         endpointNames.clear();
         payloadIds.clear();
+        payloadRecipients.clear();
         incomingFiles.clear();
     }
 
@@ -387,11 +413,22 @@ public class AndroidNearbyTransport implements NearbyBridge {
             public void onPayloadReceived(String endpointId, Payload payload) {
                 if (payload.getType() == Payload.Type.BYTES) {
                     // A BYTES payload arrives complete -- Nearby delivers the
-                    // whole array in this callback.
+                    // whole array in this callback. The first four bytes are
+                    // the sender's payload id; see sendPayload.
+                    byte[] raw = payload.asBytes();
+                    int senderId = 0;
+                    byte[] body = raw == null ? new byte[0] : raw;
+                    if (body.length >= 4) {
+                        senderId = ((body[0] & 0xff) << 24)
+                                | ((body[1] & 0xff) << 16)
+                                | ((body[2] & 0xff) << 8) | (body[3] & 0xff);
+                        byte[] trimmed = new byte[body.length - 4];
+                        System.arraycopy(body, 4, trimmed, 0, trimmed.length);
+                        body = trimmed;
+                    }
                     NearbyTransport.deliverPayloadReceived(
                             encode(endpointId, nameOf(endpointId)),
-                            (int) payload.getId(), NearbyBridge.PAYLOAD_BYTES,
-                            payload.asBytes(), null);
+                            senderId, NearbyBridge.PAYLOAD_BYTES, body, null);
                     return;
                 }
                 if (payload.getType() == Payload.Type.FILE) {
@@ -421,6 +458,19 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         == PayloadTransferUpdate.Status.IN_PROGRESS) {
                     return;
                 }
+                // Kept until EVERY recipient is done. One payload sent to
+                // several endpoints produces a terminal update per endpoint
+                // under the same Nearby id, so dropping the mapping on the
+                // first meant later recipients' progress was reported under
+                // Google's local id, and cancel() could no longer reach the
+                // transfers still running.
+                Integer left = payloadRecipients.get(key);
+                int remaining = left == null ? 0 : left.intValue() - 1;
+                if (remaining > 0) {
+                    payloadRecipients.put(key, Integer.valueOf(remaining));
+                    return;
+                }
+                payloadRecipients.remove(key);
                 payloadIds.remove(key);
                 // The terminal update is where an incoming file becomes real.
                 // Anything other than SUCCESS means the app never hears about

@@ -86,12 +86,15 @@ final class NearbyManifestFragments {
         boolean tiramisu = targetSdkVersion >= 33;
 
         if (ranging) {
-            // API 31 and later only. Declaring it below that is harmless but
-            // noisy, and an unknown permission in a manifest is the kind of
-            // thing a store review flags and a developer then has to explain.
-            if (modern) {
-                out = addPermission(out, "android.permission.UWB_RANGING", "");
-            }
+            // Declared whatever the target SDK is. targetSdkVersion says
+            // which compatibility behaviours the app opts into, NOT which
+            // device it runs on -- and an app targeting 30 still runs on an
+            // Android 12 phone with a UWB radio, where the runtime request
+            // fails outright unless the manifest declares the permission.
+            // Older devices ignore a permission they have never heard of, so
+            // declaring it always costs nothing and gating it cost the
+            // feature on every build that had not yet raised its target.
+            out = addPermission(out, "android.permission.UWB_RANGING", "");
             out = addFeature(out, "android.hardware.uwb", false);
         }
 

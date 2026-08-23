@@ -318,7 +318,15 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
 @interface CN1NearbyTransport : NSObject <MCSessionDelegate,
         MCNearbyServiceAdvertiserDelegate, MCNearbyServiceBrowserDelegate>
 @property (nonatomic, retain) MCPeerID *localPeer;
-@property (nonatomic, retain) MCSession *session;
+/// One MCSession PER PEER, keyed by endpoint id.
+///
+/// MCSession has no per-peer disconnect -- `disconnect` tears the whole thing
+/// down -- so a single shared session made NearbyTransport.disconnect(endpoint)
+/// impossible to honour once two peers were connected: it either dropped
+/// everyone or, as it did, silently did nothing. A session per peer is the
+/// arrangement MultipeerConnectivity actually supports for that, and it costs
+/// only the dictionary: MCSession is cheap and the delegate is shared.
+@property (nonatomic, retain) NSMutableDictionary *sessionsById;
 @property (nonatomic, retain) MCNearbyServiceAdvertiser *advertiser;
 @property (nonatomic, retain) MCNearbyServiceBrowser *browser;
 @property (nonatomic, retain) NSMutableDictionary *peersById;
@@ -408,7 +416,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 - (void)dealloc {
     [_localPeer release];
-    [_session release];
+    [_sessionsById release];
     [_advertiser release];
     [_browser release];
     [_peersById release];
@@ -417,6 +425,55 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_everConnected release];
     [_serviceType release];
     [super dealloc];
+}
+
+/// The session for one endpoint, created on first use.
+///
+/// The delegate is shared: MCSessionDelegate hands the session back on every
+/// callback, and nothing here needs to know which one it was.
+- (MCSession *)sessionFor:(NSString *)endpointId {
+    if (endpointId == nil) {
+        return nil;
+    }
+    MCSession *existing = [self.sessionsById objectForKey:endpointId];
+    if (existing != nil) {
+        return existing;
+    }
+    MCSession *created = [[[MCSession alloc] initWithPeer:self.localPeer
+                                         securityIdentity:nil
+                                     encryptionPreference:MCEncryptionRequired]
+            autorelease];
+    created.delegate = self;
+    [self.sessionsById setObject:created forKey:endpointId];
+    return created;
+}
+
+/// Drops one endpoint's session and forgets it.
+- (void)closeSessionFor:(NSString *)endpointId {
+    MCSession *session = [self.sessionsById objectForKey:endpointId];
+    if (session == nil) {
+        return;
+    }
+    [self.sessionsById removeObjectForKey:endpointId];
+    session.delegate = nil;
+    [session disconnect];
+}
+
+/// How many peers are connected across every session.
+- (NSUInteger)connectedPeerCount {
+    NSUInteger n = 0;
+    for (MCSession *session in [self.sessionsById allValues]) {
+        n += [session.connectedPeers count];
+    }
+    return n;
+}
+
+/// Drops every session.
+- (void)closeAllSessions {
+    NSArray *keys = [self.sessionsById allKeys];
+    for (NSString *key in keys) {
+        [self closeSessionFor:key];
+    }
 }
 
 - (NSString *)encodePeer:(MCPeerID *)peer {
@@ -675,7 +732,7 @@ static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
     }
     if (t.localPeer != nil && wanted != nil
             && ![t.localPeer.displayName isEqualToString:wanted]
-            && [t.session.connectedPeers count] == 0) {
+            && [t connectedPeerCount] == 0) {
         BOOL wasAdvertising = t.advertiser != nil;
         BOOL wasBrowsing = t.browser != nil;
         if (wasAdvertising) {
@@ -688,16 +745,9 @@ static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
             t.browser.delegate = nil;
             t.browser = nil;
         }
-        t.session.delegate = nil;
-        [t.session disconnect];
-        t.session = nil;
+        [t closeAllSessions];
         t.localPeer = [[[MCPeerID alloc] initWithDisplayName:wanted]
                 autorelease];
-        t.session = [[[MCSession alloc] initWithPeer:t.localPeer
-                                    securityIdentity:nil
-                                encryptionPreference:MCEncryptionRequired]
-                autorelease];
-        t.session.delegate = t;
         if (wasAdvertising) {
             t.advertiser = [[[MCNearbyServiceAdvertiser alloc]
                     initWithPeer:t.localPeer
@@ -734,6 +784,7 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.invitations = [NSMutableDictionary dictionary];
         cn1nbTransport.progressByPayload = [NSMutableDictionary dictionary];
         cn1nbTransport.everConnected = [NSMutableSet set];
+        cn1nbTransport.sessionsById = [NSMutableDictionary dictionary];
     }
     if (serviceId != nil) {
         // Reassigned on EVERY call, not just the first. Caching it meant
@@ -745,13 +796,6 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.serviceType = cn1nbServiceType(serviceId);
     }
     cn1nbApplyLocalName(cn1nbTransport, localName);
-    if (cn1nbTransport.session == nil) {
-        cn1nbTransport.session = [[[MCSession alloc]
-                initWithPeer:cn1nbTransport.localPeer
-                securityIdentity:nil
-                encryptionPreference:MCEncryptionRequired] autorelease];
-        cn1nbTransport.session.delegate = cn1nbTransport;
-    }
     return cn1nbTransport;
 }
 
@@ -1456,7 +1500,7 @@ void com_codename1_impl_ios_IOSNative_nearbyRequestConnection___int_java_lang_St
             return;
         }
         [cn1nbTransport.browser invitePeer:peer
-                                 toSession:cn1nbTransport.session
+                                 toSession:[cn1nbTransport sessionFor:pid]
                                withContext:nil
                                    timeout:30];
         cn1nbTransportOk(requestId);
@@ -1482,7 +1526,7 @@ void com_codename1_impl_ios_IOSNative_nearbyAcceptConnection___int_java_lang_Str
             return;
         }
         [cn1nbTransport.invitations removeObjectForKey:pid];
-        handler(YES, cn1nbTransport.session);
+        handler(YES, [cn1nbTransport sessionFor:pid]);
         cn1nbTransportOk(requestId);
         return;
     }
@@ -1515,7 +1559,7 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
         JAVA_INT payloadType, JAVA_OBJECT bytes, JAVA_OBJECT path) {
 #ifdef CN1_NEARBY_HAS_MPC
     @autoreleasepool {
-        if (cn1nbTransport == nil || cn1nbTransport.session == nil) {
+        if (cn1nbTransport == nil) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_SESSION_FAILED,
                     @"the transport is not running");
             return;
@@ -1523,10 +1567,12 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
         NSString *joined = toNSString(CN1_THREAD_STATE_PASS_ARG
                                       joinedEndpointIds);
         NSMutableArray *peers = [NSMutableArray array];
+        NSMutableArray *peerIds = [NSMutableArray array];
         for (NSString *pid in cn1nbSplitLines(joined)) {
             MCPeerID *peer = [cn1nbTransport peerForId:pid];
             if (peer != nil) {
                 [peers addObject:peer];
+                [peerIds addObject:pid];
             }
         }
         if ([peers count] == 0) {
@@ -1540,8 +1586,11 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                 p = [p substringFromIndex:7];
             }
             NSURL *url = [NSURL fileURLWithPath:p];
-            for (MCPeerID *peer in peers) {
-                [cn1nbTransport.session sendResourceAtURL:url
+            for (NSUInteger i = 0; i < [peers count]; i++) {
+                MCPeerID *peer = [peers objectAtIndex:i];
+                MCSession *session = [cn1nbTransport
+                        sessionFor:[peerIds objectAtIndex:i]];
+                [session sendResourceAtURL:url
                         withName:[p lastPathComponent]
                           toPeer:peer
            withCompletionHandler:^(NSError *error) {
@@ -1572,11 +1621,24 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
         if (data != nil) {
             [framed appendData:data];
         }
+        // One send per peer, because each has its own session now.
         NSError *err = nil;
-        BOOL sent = [cn1nbTransport.session sendData:framed
-                                             toPeers:peers
-                                            withMode:MCSessionSendDataReliable
-                                               error:&err];
+        BOOL sent = [peers count] > 0;
+        for (NSUInteger i = 0; i < [peers count]; i++) {
+            MCSession *session = [cn1nbTransport
+                    sessionFor:[peerIds objectAtIndex:i]];
+            NSError *one = nil;
+            if (![session sendData:framed
+                           toPeers:[NSArray arrayWithObject:
+                                   [peers objectAtIndex:i]]
+                          withMode:MCSessionSendDataReliable
+                             error:&one]) {
+                sent = NO;
+                if (err == nil) {
+                    err = one;
+                }
+            }
+        }
         if (!sent) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_IO_ERROR,
                     [err localizedDescription]);
@@ -1609,18 +1671,16 @@ void com_codename1_impl_ios_IOSNative_nearbyDisconnect___java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT endpointId) {
 #ifdef CN1_NEARBY_HAS_MPC
     @autoreleasepool {
-        if (cn1nbTransport == nil || cn1nbTransport.session == nil) {
+        if (cn1nbTransport == nil) {
             return;
         }
-        // MCSession disconnects as a whole rather than per peer, so a
-        // one-peer session is the only case this can honour precisely. The
-        // delegate reports the drop either way, so the app is told the truth.
+        // Drops exactly the endpoint asked for. With one shared MCSession this
+        // was impossible -- disconnect tears the whole thing down -- so it
+        // used to do nothing at all once a second peer connected, quietly
+        // breaking a method the public API documents as dropping one endpoint.
+        // Each peer has its own session now, so closing one closes one.
         NSString *pid = toNSString(CN1_THREAD_STATE_PASS_ARG endpointId);
-        MCPeerID *peer = [cn1nbTransport peerForId:pid];
-        if (peer != nil
-                && [cn1nbTransport.session.connectedPeers count] <= 1) {
-            [cn1nbTransport.session disconnect];
-        }
+        [cn1nbTransport closeSessionFor:pid];
     }
 #endif
 }
@@ -1642,7 +1702,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStopAllTransport__(
             cn1nbTransport.browser.delegate = nil;
             cn1nbTransport.browser = nil;
         }
-        [cn1nbTransport.session disconnect];
+        [cn1nbTransport closeAllSessions];
         [cn1nbTransport.invitations removeAllObjects];
     }
 #endif

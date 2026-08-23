@@ -301,7 +301,13 @@ public class IPhoneBuilder extends Executor {
             return "";
         }
         StringBuilder out = new StringBuilder();
-        String lower = serviceId.toLowerCase();
+        // Locale.ROOT, not the default locale. This is a protocol identifier,
+        // and in a Turkish locale toLowerCase() maps ASCII 'I' to dotless
+        // 'i' -- which the ASCII filter below then drops, folding "PING" to
+        // "p-ng". The device doing the runtime fold has its own locale, so a
+        // build server in tr_TR would declare a service type no device ever
+        // registers and the transport would find nobody.
+        String lower = serviceId.toLowerCase(java.util.Locale.ROOT);
         for (int i = 0; i < lower.length() && out.length() < 15; i++) {
             char c = lower.charAt(i);
             if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
