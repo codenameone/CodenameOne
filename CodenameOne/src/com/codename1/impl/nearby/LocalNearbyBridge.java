@@ -737,26 +737,29 @@ public class LocalNearbyBridge implements NearbyBridge {
                     pendingPayloads.remove(id);
                     cancelledPayloads.remove(id);
                 }
-                boolean any = false;
+                // EVERY requested endpoint has to be available, not just
+                // one. Skipping the unavailable ones and answering
+                // successfully left the omitted recipient with neither
+                // delivery nor failure -- and let a desktop test pass for a
+                // send the real ports refuse. The iOS transport rejects the
+                // same case.
+                List<String> unavailable = new ArrayList<String>();
                 for (String endpointId : endpointIds) {
-                    if (findEndpoint(endpointId) != null
-                            && connected.contains(endpointId)) {
-                        any = true;
-                        break;
+                    if (findEndpoint(endpointId) == null
+                            || !connected.contains(endpointId)) {
+                        unavailable.add(endpointId);
                     }
                 }
-                if (!any) {
+                if (!unavailable.isEmpty()) {
                     NearbyTransport.deliverRequestFailed(requestId,
                             NearbyError.PEER_UNAVAILABLE.ordinal(),
-                            "none of those endpoints is connected");
+                            "these endpoints are not connected: "
+                            + unavailable);
                     return;
                 }
                 NearbyTransport.deliverRequestOk(requestId);
                 for (String endpointId : endpointIds) {
                     final SimEndpoint e = findEndpoint(endpointId);
-                    if (e == null || !connected.contains(endpointId)) {
-                        continue;
-                    }
                     long total = payloadType == PAYLOAD_BYTES && bytes != null
                             ? bytes.length : -1;
                     if (cancelled) {

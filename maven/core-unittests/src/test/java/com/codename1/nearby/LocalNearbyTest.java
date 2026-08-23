@@ -579,6 +579,23 @@ class LocalNearbyTest {
     // ------------------------------------------------------------------
 
     @Test
+    void sendingToAMixOfConnectedAndUnavailableFailsRatherThanPartlySending() {
+        // Skipping the unavailable one and answering successfully left that
+        // recipient with neither delivery nor failure, and let a desktop test
+        // pass for a send the real ports refuse.
+        List<Endpoint> found = discoverAll(TransportStrategy.CLUSTER);
+        assertTrue(found.size() >= 2, "need two synthetic peers to test this");
+        Endpoint connected = found.get(0);
+        Endpoint neverConnected = found.get(1);
+        assertTrue(value(NearbyTransport.requestConnection(connected, "me"))
+                .booleanValue());
+
+        assertFailedWith(NearbyError.PEER_UNAVAILABLE,
+                NearbyTransport.send(new Endpoint[] {connected, neverConnected},
+                        Payload.fromBytes(new byte[] {1})));
+    }
+
+    @Test
     void sendingToNobodyFailsRatherThanResolvingWithNothingInIt() {
         // Answering ok and then skipping every recipient left the caller
         // holding a resolved resource and waiting for a terminal

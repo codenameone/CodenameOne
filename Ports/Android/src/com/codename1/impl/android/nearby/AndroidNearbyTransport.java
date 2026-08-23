@@ -468,9 +468,19 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 discoveredEndpoints.remove(id);
             }
         }
-        payloadIds.clear();
-        payloadRecipients.clear();
-        incomingFiles.clear();
+        // The transfer maps are NOT cleared here either. stopAllEndpoints
+        // produces terminal payload callbacks asynchronously, and those
+        // callbacks are what map a platform id back to the portable one and
+        // what turn an incoming file into a delivered payload -- so clearing
+        // now made an outgoing terminal update fall back to Google's id, and
+        // an incoming file report SUCCESS with its entry already discarded so
+        // payloadReceived never followed.
+        //
+        // Each entry is removed by its own terminal update. What a vanished
+        // endpoint strands is bounded by the transfers in flight at the stop,
+        // and a later send overwrites by platform id, so the residue is a
+        // handful of Long-to-Integer entries rather than a leak worth racing
+        // the callbacks to clear.
     }
 
     // ------------------------------------------------------------------
@@ -541,25 +551,28 @@ public class AndroidNearbyTransport implements NearbyBridge {
                     connectedEndpoints.add(endpointId);
                 } else {
                     connectedEndpoints.remove(endpointId);
-                    if (!discoveredEndpoints.contains(endpointId)) {
-                        // Arrived through advertising and never connected, so
-                        // nothing else will ever call back about it: neither
-                        // onEndpointLost, which only fires for something
-                        // discovery saw, nor onDisconnected, which needs a
-                        // connection. Left behind, each failed request kept
-                        // its name and service id for the life of the
-                        // process -- and the containsKey guard in
-                        // onConnectionInitiated then preserved that stale
-                        // service id if the same endpoint id came back under
-                        // another advertised service.
-                        endpointNames.remove(endpointId);
-                        endpointServices.remove(endpointId);
-                    }
                 }
+                // Encoded BEFORE anything is removed: this is the event that
+                // names the endpoint, and clearing first handed the listener
+                // an empty name for exactly the inbound failures the cleanup
+                // below exists for.
                 NearbyTransport.deliverConnectionResult(
                         encode(endpointId, nameOf(endpointId)), ok,
                         ok ? 0 : NearbyError.SESSION_FAILED.ordinal(),
                         ok ? null : resolution.getStatus().getStatusMessage());
+                if (!ok && !discoveredEndpoints.contains(endpointId)) {
+                    // Arrived through advertising and never connected, so
+                    // nothing else will ever call back about it: neither
+                    // onEndpointLost, which only fires for something
+                    // discovery saw, nor onDisconnected, which needs a
+                    // connection. Left behind, each failed request kept its
+                    // name and service id for the life of the process -- and
+                    // the containsKey guard in onConnectionInitiated then
+                    // preserved that stale service id if the same endpoint id
+                    // came back under another advertised service.
+                    endpointNames.remove(endpointId);
+                    endpointServices.remove(endpointId);
+                }
             }
 
             @Override
