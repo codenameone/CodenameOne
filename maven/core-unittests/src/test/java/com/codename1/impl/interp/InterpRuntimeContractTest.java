@@ -100,6 +100,13 @@ class InterpRuntimeContractTest {
                 packageOf("package com.example\n\nclass A { fun f() {} }\n"));
         assertEquals("com.example",
                 packageOf("/* license */\npackage com.example\n\nfun main() {}\n"));
+        // A Kotlin source may escape reserved-word segments with backticks --
+        // `package com.`is`.foo` -- but kotlinc's SourceFile attribute names
+        // the file at `com/is/Foo.kt`. Storing it under the raw path with
+        // backticks left the reader looking for a source the writer did not
+        // key, and the entire push was refused as missing source.
+        assertEquals("com.is.foo",
+                packageOf("package com.`is`.foo\n\nfun main() {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {
@@ -642,6 +649,38 @@ class InterpRuntimeContractTest {
         assertNotNull(bundle.getSource("b/Util.java"), "b's source was dropped");
         assertTrue(bundle.getSource("a/Util.java").contains("package a;"));
         assertTrue(bundle.getSource("b/Util.java").contains("package b;"));
+    }
+
+    /// A source file goes to the source section, not to both.
+    ///
+    /// `addResourceTree` used to reject only `.java`, so a Kotlin project's
+    /// `.kt` files landed in both the source section (via `addSourceTree`) and
+    /// the resource section as well. That doubled the source payload and a
+    /// Kotlin-heavy program could cross the service's 64 MiB bundle limit even
+    /// though the executable half would fit; extending the exclusion to every
+    /// source extension keeps the two sections disjoint.
+    @Test
+    @DisplayName("addResourceTree does not double a Kotlin source into the resource section")
+    void kotlinSourcesDoNotShipTwice() throws Exception {
+        Path dir = Files.createTempDirectory("interp-src-once");
+        Files.write(dir.resolve("Foo.kt"),
+                "package example\n\nfun main() {}\n".getBytes(StandardCharsets.UTF_8));
+        Files.write(dir.resolve("theme.res"), new byte[]{1, 2, 3});
+
+        Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
+        Object writer = writerClass.getDeclaredConstructor().newInstance();
+        writerClass.getMethod("addResourceTree", java.io.File.class).invoke(writer, dir.toFile());
+
+        java.lang.reflect.Field resourcesField = writerClass.getDeclaredField("resources");
+        resourcesField.setAccessible(true);
+        java.util.Map<?, ?> resources = (java.util.Map<?, ?>) resourcesField.get(writer);
+        assertTrue(resources.containsKey("/theme.res"),
+                "non-source resources should still be collected");
+        for (Object key : resources.keySet()) {
+            String k = (String) key;
+            assertTrue(!k.endsWith(".kt") && !k.endsWith(".java"),
+                    "a source file leaked into the resource section: " + k);
+        }
     }
 
     /// A class literal for a pushed type has no host class object behind it, so

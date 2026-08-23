@@ -147,8 +147,12 @@ public class InterpBundleWriter {
     }
 
     /**
-     * Adds every file that is not a {@code .java} under a directory, keyed by
-     * its path relative to that directory.
+     * Adds every non-source file under a directory, keyed by its path relative
+     * to that directory. Source files ({@code .java}, {@code .kt}) are skipped
+     * because {@link #addSourceTree} has already collected them into the
+     * bundle's source section; storing them again as resources doubles the
+     * payload of a Kotlin-heavy project and can push it past the service's
+     * 64 MiB limit even though the executable half would fit.
      */
     public void addResourceTree(File dir) throws IOException {
         addResourceTree(dir, dir);
@@ -162,7 +166,7 @@ public class InterpBundleWriter {
         for (File f : kids) {
             if (f.isDirectory()) {
                 addResourceTree(root, f);
-            } else if (!f.getName().endsWith(".java")) {
+            } else if (!isSourceFile(f.getName())) {
                 String rel = f.getAbsolutePath()
                         .substring(root.getAbsolutePath().length())
                         .replace(File.separatorChar, '/');
@@ -261,7 +265,15 @@ public class InterpBundleWriter {
                         }
                         end++;
                     }
-                    return code.substring(i, end).replaceAll("\\s", "");
+                    // Kotlin escapes reserved words in identifiers with
+                    // backticks (``package com.`is`.foo``), which kotlinc
+                    // strips from the class's internal name and its
+                    // `SourceFile` attribute. Storing the source at
+                    // `com/` `is`/Foo.kt` would then miss the reader's lookup
+                    // for `com/is/Foo.kt` and the whole push would be refused
+                    // as source-less. Whitespace goes for the usual reason:
+                    // ``package com . foo`` is one identifier to the compiler.
+                    return code.substring(i, end).replaceAll("\\s|`", "");
                 }
                 if ("import".equals(token) || "class".equals(token)
                         || "interface".equals(token) || "enum".equals(token)) {
