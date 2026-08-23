@@ -31,15 +31,18 @@ chmod 755 mvnw
 MAIN=common/src/main/java/com/example/MyApp.java
 SETTINGS=common/codenameone_settings.properties
 
-echo "--- the generated project must already use annotations ---"
+# The archetype deliberately still ships its hints as properties: generated
+# projects are pinned to a released Codename One whose core has no
+# com.codename1.annotations.buildhints, so a template carrying them would not
+# compile. The annotations move there in a follow-up. Add them here instead, and
+# only for hints the template does NOT declare -- setting one in both places is
+# a build error, which is covered separately at the end of this test.
+echo "--- annotate the generated main class ---"
+perl -0pi -e 's/^import com\.codename1\.system\.Lifecycle;/import com.codename1.annotations.buildhints.*;\nimport com.codename1.system.Lifecycle;/m' $MAIN
+perl -0pi -e 's/^public class MyApp extends Lifecycle \{/\@Ios(pods = {"Alamofire", "SwiftyJSON"}, teamId = "ABCDE12345")\n\@Android(installLocation = InstallLocation.INTERNAL_ONLY)\n\@Desktop(width = 1280)\npublic class MyApp extends Lifecycle {/m' $MAIN
 grep -q "com.codename1.annotations.buildhints" $MAIN \
-  || { echo "FAIL: the archetype's main class does not import the build hint annotations"; exit 1; }
-grep -q "^codename1.arg.ios.newStorageLocation" $SETTINGS \
-  && { echo "FAIL: ios.newStorageLocation should have moved to @Ios, not stayed in $SETTINGS"; exit 1; }
-
-echo "--- add a hint of each shape ---"
-perl -0pi -e 's/\@Ios\(/\@Ios(pods = {"Alamofire", "SwiftyJSON"}, teamId = "ABCDE12345", /' $MAIN
-grep -q 'pods = {"Alamofire"' $MAIN || { echo "FAIL: could not patch $MAIN"; exit 1; }
+  || { echo "FAIL: could not add the import to $MAIN"; exit 1; }
+grep -q 'pods = {"Alamofire"' $MAIN || { echo "FAIL: could not annotate $MAIN"; head -40 $MAIN; exit 1; }
 
 echo "--- process-classes must emit the hints ---"
 ./mvnw -B -q -pl common process-classes
@@ -53,10 +56,16 @@ check() {
 # rather than the constant name, and an unset attribute writes nothing at all
 check "codename1.arg.ios.pods=Alamofire,SwiftyJSON"
 check "codename1.arg.ios.teamId=ABCDE12345"
-check "codename1.arg.ios.themeMode=modern"
-check "codename1.arg.desktop.titleBar=native"
+check "codename1.arg.desktop.width=1280"
+# The enum is written as the value the builder compares against, not the Java
+# constant name -- INTERNAL_ONLY would be silently unrecognized.
+check "codename1.arg.android.installLocation=internalOnly"
 grep -q "codename1.arg.ios.objC" $EMITTED \
   && { echo "FAIL: an attribute nobody set must not be written"; exit 1; }
+# A hint the properties file declares must not appear here: the annotations do
+# not set it, and the two sources stay separate.
+grep -q "codename1.arg.desktop.titleBar" $EMITTED \
+  && { echo "FAIL: $EMITTED should only carry what the annotations declare"; exit 1; }
 
 echo "--- the hints must reach the build request ---"
 # "Build target not supported" is thrown after the merged settings file is
