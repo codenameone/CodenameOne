@@ -4982,7 +4982,8 @@ public class IPhoneBuilder extends Executor {
                             for (String note : repairQualifiedExtensionSettings(buildSettingsMap,
                                     request.getPackageName(),
                                     appExtensionDeploymentFloor(signingEntitlements),
-                                    archiveSdk, archiveConfiguration, archiveArch)) {
+                                    ArchiveContext.of(archiveSdk, archiveConfiguration, archiveArch,
+                                            buildSettingsMap))) {
                                 debug("The " + extensionName + " app extension: " + note + ".");
                             }
 
@@ -6069,12 +6070,14 @@ public class IPhoneBuilder extends Executor {
 
         Map<String, File> out = new LinkedHashMap<String, File>();
         String base = settings.get("INFOPLIST_FILE");
+        // The same settings go to the resolver: a path may reference any of them.
         if (base == null || base.trim().length() == 0) {
             File byDefault = new File(extensionFolder, "Info.plist");
             out.put("Info.plist",
                     insideProjectDir(byDefault, extensionFolder.getParentFile()) ? byDefault : null);
         } else {
-            out.put(base.trim(), resolveInfoPlistPath(base.trim(), extensionFolder, settings));
+            out.put("INFOPLIST_FILE = " + base.trim(),
+                    resolveInfoPlistPath(base.trim(), extensionFolder, settings));
         }
         for (Map.Entry<String, String> setting : settings.entrySet()) {
             String key = setting.getKey();
@@ -6086,8 +6089,18 @@ public class IPhoneBuilder extends Executor {
                 continue;
             }
             String value = setting.getValue() == null ? "" : setting.getValue().trim();
-            if (value.length() > 0 && !out.containsKey(value)) {
-                out.put(value, resolveInfoPlistPath(value, extensionFolder, settings));
+            if (value.length() > 0) {
+                // In the context the qualifier declares: [config=Debug] means $(CONFIGURATION) is
+                // Debug for THAT entry, whatever this archive builds.
+                ArchiveContext own = contextForCondition(key, context);
+                // Keyed by the SETTING, not by its text: two settings can carry the same text and
+                // still name different files, which is exactly what
+                // $(CONFIGURATION)/Info.plist under [config=Debug] does. Keying by the text threw
+                // the second one away before it was ever resolved.
+                out.put(key + " = " + value, resolveInfoPlistPath(value, extensionFolder,
+                        context == null ? declared
+                                : extensionSettingsWithBuiltIns(extensionFolder, declared,
+                                        own.configuration, own.sdk, own.arch)));
             }
         }
         return out;
@@ -6876,11 +6889,21 @@ public class IPhoneBuilder extends Executor {
     /// loses iOS 12 and 13 for a Wallet entitlement it never carried.
     static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
             String hostPackage, String floor, String sdk, String configuration, String arch) {
+        return repairQualifiedExtensionSettings(settings, hostPackage, floor,
+                ArchiveContext.of(sdk, configuration, arch, settings));
+    }
+
+    /// @param context the whole of it. Rebuilding one here from three loose values put the variant
+    /// back to "normal", so an archive declaring BUILD_VARIANTS=profile had its
+    /// [variant=profile] entries skipped -- and an under-floor target among them was then copied
+    /// onto the target and won for the build Xcode actually makes.
+    static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
+            String hostPackage, String floor, ArchiveContext context) {
         List<String> notes = new ArrayList<String>();
         for (Map.Entry<String, String> setting : new ArrayList<Map.Entry<String, String>>(
                 settings.entrySet())) {
             String key = setting.getKey();
-            if (!conditionApplies(key, sdk, configuration, arch)) {
+            if (!conditionApplies(key, context)) {
                 continue;
             }
             String value = setting.getValue() == null ? "" : setting.getValue().trim();
@@ -6980,6 +7003,48 @@ public class IPhoneBuilder extends Executor {
         }
         return developer != null && new File(developer, "usr/bin").isDirectory()
                 ? developer.getAbsolutePath() : null;
+    }
+
+    /// The context a qualified setting describes, over the top of the archive's own.
+    ///
+    /// INFOPLIST_FILE[config=Debug] = $(CONFIGURATION)/Info.plist means Debug/Info.plist, not
+    /// Release/Info.plist -- resolving every candidate in the ACTIVE context stamped a file that
+    /// belongs to another configuration and left the one the qualifier names untouched. Whatever
+    /// the condition does not name stays as this archive has it.
+    static ArchiveContext contextForCondition(String key, ArchiveContext active) {
+        int open = key == null ? -1 : key.indexOf('[');
+        if (open < 0) {
+            return active;
+        }
+        String sdk = active == null ? null : active.sdk;
+        String configuration = active == null ? null : active.configuration;
+        String arch = active == null ? null : active.arch;
+        List<String> variants = active == null ? null : active.variants;
+        for (String condition : key.substring(open).split("[\\[\\],]")) {
+            int equals = condition.indexOf('=');
+            if (equals < 0) {
+                continue;
+            }
+            String name = condition.substring(0, equals).trim();
+            String value = condition.substring(equals + 1).trim();
+            if (value.endsWith("*")) {
+                // A pattern names a family, not a build; its stem is the closest thing to a value.
+                value = value.substring(0, value.length() - 1);
+            }
+            if (value.length() == 0) {
+                continue;
+            }
+            if ("sdk".equals(name)) {
+                sdk = value;
+            } else if ("config".equals(name)) {
+                configuration = value;
+            } else if ("arch".equals(name)) {
+                arch = value;
+            } else if ("variant".equals(name)) {
+                variants = java.util.Collections.singletonList(value);
+            }
+        }
+        return new ArchiveContext(sdk, configuration, arch, variants);
     }
 
     /// What this archive IS, for matching conditional build settings against.

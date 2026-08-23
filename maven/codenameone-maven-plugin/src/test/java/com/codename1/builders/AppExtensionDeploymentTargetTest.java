@@ -740,4 +740,56 @@ public class AppExtensionDeploymentTargetTest {
         // Unresolvable here meant the stamping skipped the plist that actually ships.
         assertTrue(plists.toString(), plists.values().contains(release));
     }
+
+    @Test
+    public void repairsSeeTheVariantsTheArchiveDeclares() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("BUILD_VARIANTS", "profile");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[variant=profile]", "10.0");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Rebuilding a context here from loose values put the variant back to "normal", so this
+        // entry was skipped -- and it is the one Xcode uses for the build it actually makes.
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[variant=profile]"));
+        assertEquals(1, notes.size());
+    }
+
+    @Test
+    public void aQualifiedPlistResolvesInItsOwnConfiguration() throws Exception {
+        File dist = tmp.newFolder("dist23");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(new File(extension, "Debug").mkdirs());
+        assertTrue(new File(extension, "Release").mkdirs());
+        File debugPlist = new File(extension, "Debug/Info.plist");
+        write(debugPlist, "<plist><dict/></plist>");
+        File releasePlist = new File(extension, "Release/Info.plist");
+        write(releasePlist, "<plist><dict/></plist>");
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/$(CONFIGURATION)/Info.plist\n"
+                + "INFOPLIST_FILE[config\\=Debug] = WalletUIExtension/$(CONFIGURATION)/Info.plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // The Debug-qualified entry means Debug/Info.plist. Resolving it in the ACTIVE context
+        // stamped Release/Info.plist twice and left the Debug one untouched.
+        assertTrue(plists.toString(), plists.values().contains(releasePlist));
+        assertTrue(plists.toString(), plists.values().contains(debugPlist));
+    }
+
+    @Test
+    public void aConditionsOwnContextOverridesOnlyWhatItNames() throws Exception {
+        IPhoneBuilder.ArchiveContext active = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", null);
+        IPhoneBuilder.ArchiveContext own = IPhoneBuilder.contextForCondition("X[config=Debug]", active);
+        assertEquals("Debug", own.configuration);
+        assertEquals("iphoneos14.4", own.sdk);
+        assertEquals("arm64", own.arch);
+        // a pattern names a family; its stem is the closest thing to a value
+        assertEquals("iphonesimulator", IPhoneBuilder.contextForCondition(
+                "X[sdk=iphonesimulator*]", active).sdk);
+    }
 }
