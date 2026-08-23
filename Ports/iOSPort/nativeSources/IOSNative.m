@@ -65,6 +65,13 @@
 #include "com_codename1_impl_ios_IOSSecureStorage.h"
 #include "com_codename1_impl_ios_IOSNfc.h"
 #include "com_codename1_impl_ios_IOSConnectivity.h"
+// Declares nativeSurfaceAction for cn1HandleSurfaceURL below. The decode used to live in
+// the app delegate, which includes this same header; moving it here for the watch left the
+// call with no declaration, and C then invented one. Catalyst builds with
+// -Werror=implicit-function-declaration and said so, but the danger is not the diagnostic:
+// an invented prototype passes three JAVA_OBJECTs and a thread state through the wrong
+// registers, which links and then misbehaves.
+#include "com_codename1_impl_ios_IOSSurfaceCallbacks.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
