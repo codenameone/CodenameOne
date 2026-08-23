@@ -1101,6 +1101,13 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 - (void)advertiser:(MCNearbyServiceAdvertiser *)advertiser
         didNotStartAdvertisingPeer:(NSError *)error {
     @autoreleasepool {
+        if (advertiser != self.advertiser) {
+            // From an advertiser that has since been replaced. Clearing the
+            // delegate above should stop this, but a callback already in
+            // flight is not recalled by it, and answering would fail the
+            // replacement's request with a dead advertiser's error.
+            return;
+        }
         // MultipeerConnectivity rejects advertising asynchronously -- an
         // unavailable radio, a service type it will not take -- and
         // startAdvertising has already resolved true by the time this fires.
@@ -1145,6 +1152,11 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 - (void)browser:(MCNearbyServiceBrowser *)browser
         didNotStartBrowsingForPeers:(NSError *)error {
     @autoreleasepool {
+        if (browser != self.browser) {
+            // From a browser that has since been replaced; answering would
+            // fail the replacement's request with a dead browser's error.
+            return;
+        }
         // Same as advertising: the answer is already out, so the request id is
         // held to fail it when the framework changes its mind.
         int requestId = self.pendingDiscoverRequest;
@@ -1538,11 +1550,27 @@ com_codename1_impl_ios_IOSNative_nearbyRangingCapabilities___R_int(
             }
         }
     }
-    // CAP_BACKGROUND is deliberately never set. Background ranging needs the
-    // com.apple.developer.nearby-interaction entitlement, which the builder
-    // never injects on its own because it has to be enabled on the App ID
-    // first -- so claiming it here would be a promise the binary usually
-    // cannot keep.
+    // CAP_BACKGROUND is reported from the app's own configuration, not
+    // assumed either way.
+    //
+    // Background ranging needs the com.apple.developer.nearby-interaction
+    // entitlement AND the nearby-interaction background mode, which the
+    // builder injects together and only for ios.nearby.background=true --
+    // because the entitlement has to be enabled on the App ID first, so it
+    // cannot be turned on for everyone. Never setting the bit made
+    // isBackgroundRangingSupported() false even in the configuration that
+    // enables the feature, so an app that gates on it disabled ranging it
+    // actually had.
+    //
+    // The background MODE is the signal: it is in the Info.plist, which is
+    // readable at runtime, whereas the entitlement is not -- and the builder
+    // writes neither without the other.
+    NSArray *modes = [[NSBundle mainBundle]
+            objectForInfoDictionaryKey:@"UIBackgroundModes"];
+    if ([modes isKindOfClass:[NSArray class]]
+            && [modes containsObject:@"nearby-interaction"]) {
+        bits |= CN1_NEARBY_CAP_BACKGROUND;
+    }
 #endif
     return bits;
 }
@@ -2016,6 +2044,12 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
         NSString *name = toNSString(CN1_THREAD_STATE_PASS_ARG localName);
         CN1NearbyTransport *t = cn1nbTransportInit(sid, name, YES);
         if (t.advertiser != nil) {
+            // The delegate goes with it. A replaced advertiser can still
+            // deliver didNotStartAdvertisingPeer, and that callback consumes
+            // pendingAdvertiseRequest -- which by then belongs to the
+            // REPLACEMENT, so the new start was failed with the old
+            // advertiser's error.
+            t.advertiser.delegate = nil;
             [t.advertiser stopAdvertisingPeer];
             t.advertiser = nil;
         }
@@ -2082,6 +2116,8 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
         }
         CN1NearbyTransport *t = cn1nbTransportInit(sid, nil, NO);
         if (t.browser != nil) {
+            // Detached for the reason the advertiser above is.
+            t.browser.delegate = nil;
             [t.browser stopBrowsingForPeers];
             t.browser = nil;
         }
