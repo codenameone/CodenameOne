@@ -21,7 +21,9 @@ class PortStatusTest(unittest.TestCase):
         # adding a test conflicted here by construction -- on a line whose only
         # content was a number neither author had a reason to think about. What
         # is worth asserting is the relationship: the suite and the contract
-        # describe the same set of tests, and nothing is counted twice.
+        # describe the same set of tests, and nothing is counted twice. Which
+        # test belongs to which capability is a separate question, and a real
+        # one; it is asserted below rather than dropped.
         counts = port_status.validate(self.manifest)
         registered = port_status.registered_tests()
         mapped = port_status.test_to_feature(self.manifest)
@@ -44,6 +46,22 @@ class PortStatusTest(unittest.TestCase):
         self.assertGreater(counts["manual_features"], 15)
         self.assertEqual(8, counts["deployment_platforms"])
         self.assertEqual(3, counts["browser_engines"])
+
+    def test_load_bearing_tests_stay_under_the_capability_they_prove(self):
+        # A spot check, not a registry: these are the mappings where landing a result under the
+        # wrong row would publish a specific capability claim the test never made. Nothing above
+        # catches that -- validate() only requires each test to sit under exactly one feature,
+        # and any feature satisfies it. Adding a feature does not oblige anyone to extend this
+        # list; it is the literal totals that every branch had to retype, not these.
+        features = {feature["id"]: feature["tests"] for feature in self.manifest["features"]}
+        self.assertEqual(["ARApiTest", "MotionSensorDeviceTest"], features["ar-motion-sensors"])
+        self.assertEqual(["CameraApiTest"], features["camera-access"])
+        self.assertEqual(["VisionOnDeviceApiTest"], features["on-device-vision"])
+        self.assertEqual(["LanguageOnDeviceApiTest"], features["on-device-language"])
+        self.assertEqual(["InferenceOnDeviceApiTest"], features["on-device-inference"])
+        self.assertEqual(["CalendarApiTest"], features["calendar-integration"])
+        self.assertEqual(["VideoIODecodedFramesScreenshotTest"], features["video-decoding"])
+        self.assertEqual(["VideoIORoundTripTest"], features["video-round-trip"])
 
     def test_normalize_preserves_pass_skip_and_screenshot_failure(self):
         log_text = "\n".join(
