@@ -13489,6 +13489,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    private AndroidNearbyBridge nearbyBridge;
+
+    /// The nearby bridge, which finds its own implementation.
+    ///
+    /// Always returned rather than conditionally null: the shell answers every
+    /// capability query honestly whether or not the optional backend was
+    /// bundled, so the public API reports NOT_SUPPORTED without this getter
+    /// having to know how the app was built.
+    @Override
+    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        if (nearbyBridge == null) {
+            nearbyBridge = new AndroidNearbyBridge(getActivity());
+        }
+        return nearbyBridge;
+    }
+
     @Override
     public com.codename1.impl.VisionImpl createVisionImpl() {
         return (com.codename1.impl.VisionImpl) createOptionalAiBackend(

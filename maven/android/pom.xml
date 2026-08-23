@@ -100,6 +100,17 @@
                                      dependency and deletes the package for
                                      everyone else. -->
                                 <exclude>com/codename1/impl/android/cipher/**</exclude>
+                                <!-- The nearby implementation needs an SDK far
+                                     newer than the one this jar is compiled
+                                     against (CompanionDeviceService is API 31,
+                                     AssociationInfo API 33) as well as
+                                     androidx.core.uwb and play-services-nearby,
+                                     which AndroidGradleBuilder adds only for an
+                                     app that referenced the matching package.
+                                     It compiles in the generated app instead;
+                                     the builder deletes whichever halves the
+                                     app did not ask for. -->
+                                <exclude>com/codename1/impl/android/nearby/**</exclude>
                             </excludes>
                         </configuration>
                     </plugin>
