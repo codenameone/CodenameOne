@@ -227,7 +227,11 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // no honest placeholder to give. Null lets the picker fall back to another type.
             return null;
         }
-        return shortText(null, shorten(label), null, null);
+        // The FULL label. shortText shortens what it shows and keeps what it is given as the
+        // content description, so shortening first handed the picker and TalkBack the same seven
+        // characters the slot already displays -- the published path was fixed for exactly this
+        // and the placeholder kept doing it.
+        return shortText(null, label, null, null);
     }
 
     /**

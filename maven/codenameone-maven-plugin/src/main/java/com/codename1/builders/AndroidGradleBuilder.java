@@ -351,6 +351,10 @@ public class AndroidGradleBuilder extends Executor {
 
     /** Location, geofence and foreground-service declarations the Wear manifest needs too. */
     private String watchFeatureComponents = "";
+    /// The com.codename1.intents wiring, carried into the generated Wear manifest. See where
+    /// they are assigned for why both halves have to travel together.
+    private String watchIntentsActivityMetaData = "";
+    private String watchIntentsManifestEntries = "";
 
     /** Audio and remote-control declarations the Wear manifest needs too. */
     private String watchMediaComponents = "";
@@ -3439,6 +3443,14 @@ public class AndroidGradleBuilder extends Executor {
         // LAUNCHER intent filter, so this half is spliced into the main activity rather than
         // sitting beside it at application level, where it would be silently ignored.
         String intentsActivityMetaData = intentsShortcutsMetaData;
+        // Carried to the watch as well. The wear module compiles the same lifecycle, so
+        // AndroidIntentBridge.areIntentsSupported() answers true there and publishes shortcuts
+        // aimed at CN1IntentTrampolineActivity -- an activity that manifest never declared. The
+        // static list is read from meta-data on whichever activity carries LAUNCHER, so both
+        // halves have to travel: the meta-data into the watch launcher and the trampoline with
+        // it, or the shortcuts are advertised and then resolve to nothing.
+        watchIntentsActivityMetaData = intentsActivityMetaData;
+        watchIntentsManifestEntries = intentsManifestEntries;
 
         String surfacesManifestEntries = "";
         String watchSurfacesManifestEntries = "";
@@ -7842,6 +7854,7 @@ public class AndroidGradleBuilder extends Executor {
                 // too. Without it a link opened on the watch has nowhere to go, and the watch
                 // half of a companion cannot be reached by anything but its launcher icon.
                 + request.getArg("android.xintent_filter", "")
+                + watchIntentsActivityMetaData
                 + "        </activity>\n"
                 // The Data Layer listener. This manifest is selected outright by the module's
                 // sourceSets rather than merged with the phone's, so anything the watch needs has
@@ -7859,6 +7872,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "  " + watchAlarmReceiver
                 + "  " + watchBackgroundWorkService
                 + "  " + watchBackgroundFetchService
+                + "  " + watchIntentsManifestEntries
                 + "  " + watchFeatureComponents
                 + "  " + watchMediaComponents
                 // A complication or Tile tap still needs the trampoline, and a TILE tap needs it

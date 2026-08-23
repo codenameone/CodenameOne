@@ -130,16 +130,26 @@ final class IOSSurfaceBridge implements SurfaceBridge {
                 if (name == null || !name.endsWith(".png")) {
                     continue;
                 }
-                java.io.InputStream in = fs.openInputStream(kindDir + "/" + name);
+                // PER FILE. One unreadable blob -- a concurrent publish removing it between the
+                // listing and the read is the ordinary way -- used to abandon the enumeration, so
+                // every image after it was dropped too. The descriptor then went to the watch
+                // with a partial map, and a watch installing it fresh showed gaps for artwork
+                // that was perfectly readable, until some later publish happened to fix it.
                 try {
-                    byte[] blob = com.codename1.io.Util.readInputStream(in);
-                    out.put(name.substring(0, name.length() - 4), blob);
-                } finally {
-                    in.close();
+                    java.io.InputStream in = fs.openInputStream(kindDir + "/" + name);
+                    try {
+                        byte[] blob = com.codename1.io.Util.readInputStream(in);
+                        out.put(name.substring(0, name.length() - 4), blob);
+                    } finally {
+                        in.close();
+                    }
+                } catch (Throwable oneBlob) {
+                    // A blob that cannot be read is a gap in that image, not in the rest.
+                    Log.e(oneBlob);
                 }
             }
         } catch (Throwable t) {
-            // A blob that cannot be read is a gap in the mirrored surface, not a failed reload.
+            // The listing itself failed, which is the only thing left that can reach here.
             Log.e(t);
         }
         return out;
