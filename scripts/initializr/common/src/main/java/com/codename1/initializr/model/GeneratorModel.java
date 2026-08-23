@@ -166,8 +166,10 @@ public class GeneratorModel {
             ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
             return;
         }
+        if (downloadWebsiteProject(fileName, bytes)) {
+            return;
+        }
         if (downloadBytesAsFile(fileName, bytes)) {
-            notifyWebsiteProjectDownloaded();
             return;
         }
 
@@ -194,11 +196,18 @@ public class GeneratorModel {
         execute(filePath);
     }
 
-    /** Tell the embedding website only after the browser accepted the ZIP download. */
-    private static void notifyWebsiteProjectDownloaded() {
+    /** Use the website bridge so the metric is emitted only after its download handler succeeds. */
+    private static boolean downloadWebsiteProject(String fileName, byte[] bytes) {
         WebsiteThemeNative nativeBridge = NativeLookup.create(WebsiteThemeNative.class);
-        if (nativeBridge != null && nativeBridge.isSupported()) {
-            nativeBridge.notifyProjectDownloaded();
+        if (nativeBridge == null || !nativeBridge.isSupported()) {
+            return false;
+        }
+        try {
+            String dataUrl = "data:application/octet-stream;base64,"
+                    + com.codename1.util.Base64.encodeNoNewline(bytes);
+            return nativeBridge.downloadProject(fileName, dataUrl);
+        } catch (Throwable t) {
+            return false;
         }
     }
 

@@ -185,10 +185,12 @@ jobs:
         run: |
           set -euo pipefail
           test -f docs/website/public/initializr-app/index.html
-          rg -q 'notifyProjectDownloaded' docs/website/public/initializr-app/translated_app.js
+          rg -q 'downloadProject' docs/website/public/initializr-app/translated_app.js
           rg -q 'cn1-initializr-project-downloaded' \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
           rg -q 'cn1-initializr-project-downloaded' docs/website/public/initializr/index.html
+          node docs/website/scripts/test-initializr-download-bridge.mjs \
+            docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
 
       - name: Validate Playground JS bundle output
         run: test -f docs/website/public/playground-app/index.html
