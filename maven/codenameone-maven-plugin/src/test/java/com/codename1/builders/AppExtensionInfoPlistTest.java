@@ -476,4 +476,46 @@ public class AppExtensionInfoPlistTest {
         assertNull(IPhoneBuilder.stampInfoPlistIdentity("bplist00 ", "5.4", "5.4", NO_SETTINGS, changes));
         assertEquals(1, changes.size());
     }
+
+    @Test
+    public void aVersionReferenceFollowsTheConditionalTheArchiveGets() {
+        // The base matches the app, the device-qualified value does not -- and the qualified one
+        // is what Xcode uses for this archive, so the extension shipped a version its container
+        // does not have.
+        String plist = NO_IDENTITY.replace("<key>CFBundleName</key>",
+                "<key>CFBundleShortVersionString</key>\n\t<string>$(MARKETING_VERSION)</string>\n"
+                + "\t<key>CFBundleName</key>");
+        Map<String, String> settings = new HashMap<String, String>();
+        settings.put("MARKETING_VERSION", "5.4");
+        settings.put("MARKETING_VERSION[sdk=iphoneos*]", "5.3");
+
+        List<String> changes = new ArrayList<String>();
+        String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4", null,
+                IPhoneBuilder.flattenForContext(settings,
+                        IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings)),
+                changes);
+
+        assertTrue(out, out.contains("<key>CFBundleShortVersionString</key>\n\t<string>5.4</string>"));
+        assertTrue(changes.toString(), changes.toString().contains("resolves to '5.3'"));
+    }
+
+    @Test
+    public void aConditionalThatMatchesTheAppIsLeftAlone() {
+        String plist = NO_IDENTITY.replace("<key>CFBundleName</key>",
+                "<key>CFBundleShortVersionString</key>\n\t<string>$(MARKETING_VERSION)</string>\n"
+                + "\t<key>CFBundleName</key>");
+        Map<String, String> settings = new HashMap<String, String>();
+        settings.put("MARKETING_VERSION", "1.0");
+        settings.put("MARKETING_VERSION[sdk=iphoneos*]", "5.4");
+
+        List<String> changes = new ArrayList<String>();
+        String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4", null,
+                IPhoneBuilder.flattenForContext(settings,
+                        IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings)),
+                changes);
+
+        // The qualified value is the app's version, so the reference is right as written.
+        assertTrue(out.contains("<string>$(MARKETING_VERSION)</string>"));
+        assertFalse(changes.toString().contains("CFBundleShortVersionString"));
+    }
 }

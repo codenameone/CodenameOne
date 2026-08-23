@@ -5886,7 +5886,8 @@ public class IPhoneBuilder extends Executor {
             settings.put("PRODUCT_BUNDLE_IDENTIFIER", declaredId != null ? declaredId
                     : request.getPackageName() + "." + appExtension.getName());
             List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
-                    embeddedExtensionBundleVersion(request), request.getPackageName(), settings);
+                    embeddedExtensionBundleVersion(request), request.getPackageName(),
+                    flattenForContext(settings, context));
             if (changes == null) {
                 debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
                         + " as an XML property list, so its bundle identity was left as it is. If "
@@ -6063,14 +6064,16 @@ public class IPhoneBuilder extends Executor {
     /// the plist Xcode actually processes. Without it the path came back unresolvable and the
     /// stamping skipped the file that ships -- the same hole the entitlements path had.
     static Map<String, File> appExtensionInfoPlists(File extensionFolder, ArchiveContext context) {
+        // The DECLARED settings, qualified keys and all: those keys are the candidates. The
+        // resolution map beside it is flattened for this archive, which is right for expanding a
+        // reference and useless for finding conditionals -- reading candidates out of it made the
+        // qualified entries disappear.
         Map<String, String> declared = appExtensionBuildSettings(extensionFolder);
         Map<String, String> settings = context == null ? declared
                 : extensionSettingsWithBuiltIns(extensionFolder, declared, context.configuration,
                         context.sdk, context.arch);
-
         Map<String, File> out = new LinkedHashMap<String, File>();
-        String base = settings.get("INFOPLIST_FILE");
-        // The same settings go to the resolver: a path may reference any of them.
+        String base = declared.get("INFOPLIST_FILE");
         if (base == null || base.trim().length() == 0) {
             File byDefault = new File(extensionFolder, "Info.plist");
             out.put("Info.plist",
@@ -6079,7 +6082,7 @@ public class IPhoneBuilder extends Executor {
             out.put("INFOPLIST_FILE = " + base.trim(),
                     resolveInfoPlistPath(base.trim(), extensionFolder, settings));
         }
-        for (Map.Entry<String, String> setting : settings.entrySet()) {
+        for (Map.Entry<String, String> setting : declared.entrySet()) {
             String key = setting.getKey();
             // Closing bracket included: an unescaped conditional leaves Properties with the key
             // INFOPLIST_FILE[sdk and the rest of the line as its value, and that is not a setting
@@ -7005,13 +7008,43 @@ public class IPhoneBuilder extends Executor {
                 ? developer.getAbsolutePath() : null;
     }
 
+    /// The archive's settings with every conditional resolved to the value THIS build gets.
+    ///
+    /// A reference is expanded against a map, and a map lookup only ever sees the plain key -- so
+    /// $(MARKETING_VERSION) resolved to the base 5.4 while MARKETING_VERSION[sdk=iphoneos*] = 5.3
+    /// sat beside it and was the value Xcode used for the device archive. The extension then
+    /// carried a version its containing app does not have, which is the rejection this stamping
+    /// exists to prevent. Flattened here, once, so everything downstream expands against the
+    /// values the build really has.
+    static Map<String, String> flattenForContext(Map<String, String> settings,
+            ArchiveContext context) {
+        if (settings == null) {
+            return null;
+        }
+        Map<String, String> flat = new LinkedHashMap<String, String>();
+        for (String key : settings.keySet()) {
+            int open = key.indexOf('[');
+            String name = open < 0 ? key : key.substring(0, open);
+            if (flat.containsKey(name)) {
+                continue;
+            }
+            String winner = context == null ? settings.get(name)
+                    : winningSetting(settings, name, context);
+            if (winner != null) {
+                flat.put(name, winner);
+            }
+        }
+        return flat;
+    }
+
     /// The context a qualified setting describes, over the top of the archive's own.
     ///
     /// INFOPLIST_FILE[config=Debug] = $(CONFIGURATION)/Info.plist means Debug/Info.plist, not
     /// Release/Info.plist -- resolving every candidate in the ACTIVE context stamped a file that
     /// belongs to another configuration and left the one the qualifier names untouched. Whatever
     /// the condition does not name stays as this archive has it.
-    static ArchiveContext contextForCondition(String key, ArchiveContext active) {
+    static ArchiveContext contextForCondition(String key, ArchiveContext context) {
+        ArchiveContext active = context;
         int open = key == null ? -1 : key.indexOf('[');
         if (open < 0) {
             return active;
@@ -7027,8 +7060,18 @@ public class IPhoneBuilder extends Executor {
             }
             String name = condition.substring(0, equals).trim();
             String value = condition.substring(equals + 1).trim();
-            if (value.endsWith("*")) {
-                // A pattern names a family, not a build; its stem is the closest thing to a value.
+            boolean pattern = value.endsWith("*");
+            if (pattern) {
+                // A pattern names a family. If THIS archive is in that family, its own value is
+                // the one Xcode will expand -- $(SDK_NAME) under [sdk=iphoneos*] is iphoneos14.4,
+                // not "iphoneos", and looking for the stem's file left the real one unstamped.
+                // Only when the pattern describes some other build does the stem stand in for it.
+                String archiveValue = "sdk".equals(name) ? (context == null ? null : context.sdk)
+                        : "config".equals(name) ? (context == null ? null : context.configuration)
+                        : "arch".equals(name) ? (context == null ? null : context.arch) : null;
+                if (archiveValue != null && matchesCondition(value, archiveValue)) {
+                    continue;
+                }
                 value = value.substring(0, value.length() - 1);
             }
             if (value.length() == 0) {
