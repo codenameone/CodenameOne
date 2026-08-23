@@ -85,6 +85,27 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertNull(MigrateBuildHintsMojo.propertyKeyOf("    "));
     }
 
+    /// Kotlin interpolates `$` inside a string; Java does not. A hint value
+    /// carrying one -- a Gradle snippet such as `${'$'}{version}` -- would either
+    /// fail to compile as an unresolved reference or resolve to something else.
+    @Test
+    public void dollarSignsAreEscapedOnlyForKotlin() {
+        assertEquals("\"implementation 'x:y:\\$version'\"",
+                MigrateBuildHintsMojo.quoteFor("implementation 'x:y:$version'", true));
+        assertEquals("\"implementation 'x:y:$version'\"",
+                MigrateBuildHintsMojo.quoteFor("implementation 'x:y:$version'", false));
+    }
+
+    /// The class declaration is the only safe anchor in a default-package source:
+    /// there is no `package` line, and the old arithmetic put the import at the
+    /// first newline in the file, which is inside the copyright comment.
+    @Test
+    public void aDefaultPackageSourceStillGetsAUsableAnchor() {
+        String src = "/*\n * Copyright\n */\npublic class MyApp {\n}\n";
+        assertEquals(src.indexOf("public class MyApp"),
+                MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
+    }
+
     @Test
     public void aValueOnlyLineHasNoSeparator() {
         assertEquals("bare", MigrateBuildHintsMojo.propertyKeyOf("bare"));

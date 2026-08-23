@@ -256,7 +256,7 @@ final class BuildHintsDesktop {
 
         h.add(new Hint("windows.msix.password")
                 .group(HintGroup.WINDOWS)
-                .type(HintType.STRING)
+                .type(HintType.SECRET)
                 .platform("windows")
                 .consumedBy("WindowsNativeBuilder"));
 
@@ -316,7 +316,7 @@ final class BuildHintsDesktop {
 
         h.add(new Hint("windows.signing.password")
                 .group(HintGroup.WINDOWS)
-                .type(HintType.STRING)
+                .type(HintType.SECRET)
                 .platform("windows")
                 .consumedBy("WindowsNativeBuilder"));
 

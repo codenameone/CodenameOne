@@ -168,7 +168,7 @@ final class BuildHintsApple {
 
         h.add(new Hint("macNative.notarize.password")
                 .group(HintGroup.MAC_NATIVE)
-                .type(HintType.STRING)
+                .type(HintType.SECRET)
                 .platform("mac")
                 .consumedBy("MacNativeBuilder"));
 

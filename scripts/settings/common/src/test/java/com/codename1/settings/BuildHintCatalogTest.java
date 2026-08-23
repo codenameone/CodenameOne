@@ -125,6 +125,38 @@ public class BuildHintCatalogTest {
         assertTrue(annotated > 50, "expected the curated set, got " + annotated);
     }
 
+    /**
+     * The Settings field for a credential is masked from its type. The catalog
+     * that replaced the old name-matching scraper has to keep classifying these
+     * as SECRET, or a stored certificate password renders as visible text.
+     */
+    @Test
+    public void credentialHintsStayMasked() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        for (BuildHintMetadata h : catalog.all()) {
+            String n = h.name().toLowerCase();
+            if (n.contains("password") || n.contains("secret") || n.contains("token")) {
+                assertEquals(BuildHintType.SECRET, h.type(),
+                        h.name() + " holds a credential and must render masked");
+            }
+        }
+    }
+
+    /**
+     * A deprecated alias configures the same effective setting as its target, so
+     * the Build Hints UI has to treat it as annotation-owned too -- otherwise its
+     * row still offers Add and creates the duplicate the next build refuses.
+     */
+    @Test
+    public void aliasesResolveToTheirCanonicalName() {
+        assertEquals("and.themeMode",
+                com.codename1.build.shared.BuildHints.canonicalName("cn1.androidTheme"));
+        assertEquals("nativeTheme",
+                com.codename1.build.shared.BuildHints.canonicalName("cn1.nativeTheme"));
+        assertEquals("ios.pods",
+                com.codename1.build.shared.BuildHints.canonicalName("ios.pods"));
+    }
+
     @Test
     public void searchStillMatchesOnNameAndDescription() {
         BuildHintCatalog catalog = BuildHintCatalog.load();

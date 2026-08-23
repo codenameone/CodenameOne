@@ -336,7 +336,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             case STRING_LIST: {
                 String sep = hint.separator();
                 if (sep == null || sep.length() == 0) {
-                    return quote(v);
+                    return quoteFor(v, kotlin);
                 }
                 String[] parts = v.split(java.util.regex.Pattern.quote(sep), -1);
                 StringBuilder sb = new StringBuilder(kotlin ? "[" : "{");
@@ -349,12 +349,12 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     if (written++ > 0) {
                         sb.append(", ");
                     }
-                    sb.append(quote(t));
+                    sb.append(quoteFor(t, kotlin));
                 }
                 return sb.append(kotlin ? ']' : '}').toString();
             }
             default:
-                return quote(v);
+                return quoteFor(v, kotlin);
         }
     }
 
@@ -373,7 +373,16 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return out.length() > 0 && Character.isDigit(out.charAt(0)) ? "V" + out : out;
     }
 
-    private static String quote(String s) {
+    /**
+     * Renders a value as a string literal for the target language.
+     *
+     * <p>Kotlin interpolates {@code $} inside a string, and hint values contain
+     * it: an {@code android.gradleDep} of
+     * {@code implementation "com.x:y:${'$'}{version}"} would either fail to
+     * compile as an unresolved reference or silently resolve to something else.
+     * Java has no such construct, so the escape is emitted only for Kotlin.</p>
+     */
+    static String quoteFor(String s, boolean kotlin) {
         StringBuilder sb = new StringBuilder("\"");
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
@@ -383,6 +392,9 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 case '\n': sb.append("\\n"); break;
                 case '\r': sb.append("\\r"); break;
                 case '\t': sb.append("\\t"); break;
+                case '$':
+                    sb.append(kotlin ? "\\$" : "$");
+                    break;
                 default: sb.append(c);
             }
         }
@@ -456,9 +468,17 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             int eol = head.indexOf('\n', lastImport + 1);
             head = head.substring(0, eol + 1) + importLine + "\n" + head.substring(eol + 1);
         } else {
-            int pkgEnd = head.indexOf('\n', head.indexOf("package "));
-            head = head.substring(0, pkgEnd + 1) + "\n" + importLine + "\n"
-                    + head.substring(pkgEnd + 1);
+            // No existing import. Anchor on the package declaration, and when the
+            // class is in the default package anchor on the class declaration
+            // instead: indexOf("package ") returns -1 there, and the old
+            // arithmetic then put the import at the first newline in the file,
+            // which is inside the copyright comment. The result compiled to
+            // nothing useful while the properties entries had already been
+            // deleted.
+            int pkg = head.indexOf("package ");
+            int anchor = pkg >= 0 ? head.indexOf('\n', pkg) + 1 : head.length();
+            head = head.substring(0, anchor) + (pkg >= 0 ? "\n" : "")
+                    + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
         }
         write(source, head + annotations + tail);
     }

@@ -181,7 +181,7 @@ final class BuildHintsGeneral {
 
         h.add(new Hint("facebook.clientToken")
                 .group(HintGroup.GENERAL)
-                .type(HintType.STRING)
+                .type(HintType.SECRET)
                 .platform("general")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("The client token for an app that requires native Facebook login integration, this is "

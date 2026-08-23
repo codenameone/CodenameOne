@@ -659,7 +659,13 @@ public class CodenameOneSettings extends Lifecycle {
     private Component hintRow(BuildHintMetadata meta) {
         Container row = new Container(BoxLayout.y());
         row.setUIID(uiid("SettingsRow"));
-        String ownedBy = annotationOwnedHints.get(meta.name());
+        // Look the hint up by its canonical name: a deprecated alias configures the
+        // same effective setting, so cn1.androidTheme is owned whenever an
+        // annotation owns and.themeMode. Matching on the exact name left the alias
+        // row offering Add, which would create the second declaration the next
+        // build refuses through the alias conflict check.
+        String ownedBy = annotationOwnedHints.get(
+                com.codename1.build.shared.BuildHints.canonicalName(meta.name()));
         boolean active = hasBuildHint(meta.name());
         String value = active ? settings.getBuildHint(meta.name()) : "";
         BuildHintType effectiveType = effectiveHintType(meta, value);
@@ -2107,7 +2113,9 @@ public class CodenameOneSettings extends Lifecycle {
                 }
                 int eq = t.indexOf('=');
                 if (eq > originPrefix.length()) {
-                    out.put(t.substring(originPrefix.length(), eq).trim(), t.substring(eq + 1).trim());
+                    String hint = t.substring(originPrefix.length(), eq).trim();
+                    out.put(com.codename1.build.shared.BuildHints.canonicalName(hint),
+                            t.substring(eq + 1).trim());
                 }
             }
         } catch (Exception ex) {

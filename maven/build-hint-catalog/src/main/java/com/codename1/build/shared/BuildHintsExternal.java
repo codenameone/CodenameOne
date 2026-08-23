@@ -149,7 +149,7 @@ final class BuildHintsExternal {
 
         h.add(new Hint("codename1.mac.certificatePassword")
                 .group(HintGroup.GENERAL)
-                .type(HintType.STRING)
+                .type(HintType.SECRET)
                 .platform("general")
                 .external()
                 .doc("Mac Native cloud builds only. Password to unlock the P12 referenced by "

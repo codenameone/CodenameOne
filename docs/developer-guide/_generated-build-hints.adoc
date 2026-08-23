@@ -1387,7 +1387,7 @@
 |Mac Native cloud builds only. Path to the `.p12` file containing the Mac signing certificate(s) — _Mac App Distribution_ (3rd Party Mac Developer Application) for App Store builds, _Developer ID Application_ for Developer ID builds, or both bundled into the same P12 when `macNative.distribution=both`. Not interchangeable with the iOS distribution certificate. Required for cloud Mac builds.
 
 |codename1.mac.certificatePassword
-|string
+|secret
 |_(none)_
 |_(none)_
 |Mac Native cloud builds only. Password to unlock the P12 referenced by `codename1.mac.certificate`. Required for cloud Mac builds.
@@ -1417,7 +1417,7 @@
 |The application ID for an app that requires native Facebook login integration, this defaults to null which means native Facebook support shouldn't be in the app
 
 |facebook.clientToken
-|string
+|secret
 |_(none)_
 |_(none)_
 |The client token for an app that requires native Facebook login integration, this is required if the facebook.appId is set.
@@ -2941,7 +2941,7 @@
 |
 
 |macNative.notarize.password
-|string
+|secret
 |_(none)_
 |_(none)_
 |
@@ -3115,7 +3115,7 @@
 |
 
 |windows.msix.password
-|string
+|secret
 |_(none)_
 |_(none)_
 |
@@ -3163,7 +3163,7 @@
 |
 
 |windows.signing.password
-|string
+|secret
 |_(none)_
 |_(none)_
 |
