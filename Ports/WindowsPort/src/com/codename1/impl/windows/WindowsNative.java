@@ -330,6 +330,18 @@ public final class WindowsNative {
      */
     public static native byte[] captureWindowToPngBytes();
 
+    /**
+     * PNG bytes of one secondary window's client area, or null when it cannot be
+     * read. Unlike {@link #captureWindowToPngBytes()} this is a real readback of
+     * what the window is showing, native peers and editors included -- a secondary
+     * window draws into an ID2D1HwndRenderTarget, which has no WIC bitmap behind it,
+     * so it is captured through PrintWindow rather than through the encoder.
+     *
+     * @param slot the window's slot in the native window table
+     * @return the PNG bytes, or null
+     */
+    public static native byte[] captureDesktopWindowToPngBytes(int slot);
+
     /* ----------------------------------------------------- graphics state */
 
     public static native int getColor(long graphics);

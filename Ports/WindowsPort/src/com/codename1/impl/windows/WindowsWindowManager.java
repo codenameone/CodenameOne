@@ -292,6 +292,37 @@ public class WindowsWindowManager extends WindowManager {
         }
     }
 
+    /// Reads this window's own contents back, rather than letting
+    /// `com.codename1.ui.Window#capture()` fall back to re-rendering the component
+    /// tree. The fallback produces the content the window *should* be showing, so it
+    /// can neither tell a correct window from one whose raster and hierarchy
+    /// disagree, nor show a native peer or editor at all -- and those are exactly
+    /// what the windowed screenshot goldens exist to check.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window's native peer
+    ///
+    /// #### Returns
+    ///
+    /// the native image, or null when the window has no surface to read
+    @Override
+    public Object capture(Object peer) {
+        int s = slot(peer);
+        if (s < 0) {
+            return null;
+        }
+        byte[] png = WindowsNative.captureDesktopWindowToPngBytes(s);
+        if (png == null || png.length == 0) {
+            return null;
+        }
+        long img = WindowsNative.createImageFromBytes(png, 0, png.length);
+        if (img == 0) {
+            return null;
+        }
+        return Long.valueOf(img);
+    }
+
     @Override
     public void setPaintDirtyRegionClip(Object peerObj, int x, int y, int width, int height) {
         int s = slot(peerObj);
