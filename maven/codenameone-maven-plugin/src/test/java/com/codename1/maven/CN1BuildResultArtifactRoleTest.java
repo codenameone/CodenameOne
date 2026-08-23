@@ -100,6 +100,18 @@ class CN1BuildResultArtifactRoleTest {
         assertEquals("-wear", CN1BuildMojo.roleSuffixFor("fitness-wear-wear", ".apk", both));
     }
 
+    /// The R8 retrace maps. A minified companion build hands back two of them, and the Wear
+    /// module's is worthless if it lands on the phone map's path -- so this pins the naming the
+    /// build server relies on from the other side of the repo boundary.
+    @Test
+    void theWearRetraceMapLandsBesideThePhoneOne() {
+        java.util.Map<String, java.util.Set<String>> maps =
+                returned("myapp.apk", "myapp-wear.apk", "mapping.txt", "mapping-wear.txt");
+
+        assertEquals("", CN1BuildMojo.roleSuffixFor("mapping", ".txt", maps));
+        assertEquals("-wear", CN1BuildMojo.roleSuffixFor("mapping-wear", ".txt", maps));
+    }
+
     /// Per extension, because a build can return a companion APK and no companion AAB.
     @Test
     void theQuestionIsAskedPerExtension() {

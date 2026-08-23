@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceTest {
 
     /** Records bridge calls so publishing and live activity behaviour can be asserted. */
-    private static final class FakeBridge implements SurfaceBridge {
+    private static class FakeBridge implements SurfaceBridge {
         boolean widgetsSupported = true;
         boolean activitiesSupported = true;
         String publishedKind;
@@ -433,6 +433,65 @@ class SurfaceTest {
 
         Surfaces.reloadWidgets(null);
         assertNull(bridge.reloadedKind);
+    }
+
+    /// A publish is a write followed by a hand-off to the watch, and the platform bridges pair
+    /// them by doing both inside this one call. Two threads publishing one kind must therefore
+    /// not be inside it at once: interleaved, the later write can be paired with the earlier
+    /// hand-off and the watch keeps a descriptor the phone has already replaced. publish() is
+    /// documented as callable from any thread, so this is a supported call pattern.
+    @Test
+    void concurrentPublishesOfOneKindDoNotInterleave() throws Exception {
+        final java.util.concurrent.atomic.AtomicInteger inFlight =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger peak =
+                new java.util.concurrent.atomic.AtomicInteger();
+        FakeBridge bridge = new FakeBridge() {
+            @Override
+            public void publishWidgetTimeline(String kindId, String timelineJson,
+                    Map<String, byte[]> images) {
+                int now = inFlight.incrementAndGet();
+                // Highest seen, not last seen: the failing interleaving is transient.
+                while (true) {
+                    int was = peak.get();
+                    if (now <= was || peak.compareAndSet(was, now)) {
+                        break;
+                    }
+                }
+                try {
+                    // Wide enough that an unserialized run overlaps rather than merely being
+                    // able to. Without the lock this test fails essentially every time.
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                inFlight.decrementAndGet();
+                super.publishWidgetTimeline(kindId, timelineJson, images);
+            }
+        };
+        Surfaces.setBridge(bridge);
+        Surfaces.registerWidgetKind(new WidgetKind("delivery_status")
+                .setDisplayName("Delivery").addSupportedSize(WidgetSize.SMALL));
+
+        Thread[] threads = new Thread[6];
+        for (int i = 0; i < threads.length; i++) {
+            final int n = i;
+            threads[i] = new Thread(new Runnable() {
+                public void run() {
+                    Surfaces.publish("delivery_status",
+                            new WidgetTimeline().setContent(new SurfaceText("v" + n)));
+                }
+            });
+        }
+        for (Thread t : threads) {
+            t.start();
+        }
+        for (Thread t : threads) {
+            t.join();
+        }
+
+        assertEquals(1, peak.get());
+        assertEquals("delivery_status", bridge.publishedKind);
     }
 
     @Test

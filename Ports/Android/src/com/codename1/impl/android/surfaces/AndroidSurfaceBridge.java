@@ -104,6 +104,10 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
         }
     }
 
+    // The store write and the mirror below are one operation, and they are safe to write as one
+    // because Surfaces serializes publishes of a kind against each other. Nothing here
+    // re-establishes that: interleave two of these and the later write pairs with the earlier
+    // mirror, leaving the watch on a descriptor the phone has replaced.
     @Override
     public void publishWidgetTimeline(String kindId, String timelineJson,
             Map<String, byte[]> images) {

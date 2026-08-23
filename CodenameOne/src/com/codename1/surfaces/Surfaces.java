@@ -28,6 +28,7 @@ import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -197,7 +198,40 @@ public final class Surfaces {
         }
         Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
         String json = SurfaceSerializer.serializeTimeline(kindId, timeline, images);
-        b.publishWidgetTimeline(kindId, json, images);
+        synchronized (publishLock(kindId)) {
+            b.publishWidgetTimeline(kindId, json, images);
+        }
+    }
+
+    /// One monitor per kind, created on demand and never removed. Kind ids come from
+    /// surfaces.json, so the set is bounded by the app's own declaration.
+    private static final Map<String, Object> PUBLISH_LOCKS = new HashMap<String, Object>();
+
+    /// The monitor that serializes publishes of a single kind.
+    ///
+    /// A publish is a WRITE FOLLOWED BY A HAND-OFF, and the two are only meaningful as a pair:
+    /// the platform replaces the timeline in its container and then gives the same descriptor to
+    /// the watch. Let two publishes of one kind interleave and the later write can be paired with
+    /// the earlier hand-off, so the watch is left holding a descriptor the phone has already
+    /// replaced -- and left holding it for good, because nothing publishes again to correct it.
+    /// The imagery is worse than stale rather than merely old: both platforms read the blobs back
+    /// off disk at hand-off time, so the descriptor of one publish can be sent with the artwork of
+    /// another, which is a pairing neither publish ever produced.
+    ///
+    /// publish() documents itself as callable from any thread, so two threads publishing one kind
+    /// is a supported way to call this rather than an abuse of it.
+    ///
+    /// Per KIND rather than one global monitor: a publish is file I/O plus a synchronous native
+    /// call, and two different kinds have nothing to say to each other.
+    private static Object publishLock(String kindId) {
+        synchronized (PUBLISH_LOCKS) {
+            Object lock = PUBLISH_LOCKS.get(kindId);
+            if (lock == null) {
+                lock = new Object();
+                PUBLISH_LOCKS.put(kindId, lock);
+            }
+            return lock;
+        }
     }
 
     /// Push-framework entry point for a server-rendered timeline descriptor. The descriptor uses
@@ -247,7 +281,11 @@ public final class Surfaces {
                     + kindId);
             return;
         }
-        b.publishWidgetTimeline(kindId, timelineJson, safeImageNames(images));
+        // The same monitor publish() uses: a remote descriptor and a local one race exactly the
+        // same way, and a push landing while the app publishes is the ordinary way it happens.
+        synchronized (publishLock(kindId)) {
+            b.publishWidgetTimeline(kindId, timelineJson, safeImageNames(images));
+        }
     }
 
     /// The image side-map with anything that is not a plain blob name removed.

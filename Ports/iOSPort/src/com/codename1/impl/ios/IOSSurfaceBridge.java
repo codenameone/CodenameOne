@@ -87,6 +87,10 @@ final class IOSSurfaceBridge implements SurfaceBridge {
         }
     }
 
+    // The container write and the watch hand-off below are one operation, and they are safe to
+    // write as one because Surfaces serializes publishes of a kind against each other. Nothing
+    // here re-establishes that: interleave two of these and the later write pairs with the
+    // earlier hand-off, leaving the watch on a descriptor the phone has replaced.
     public void publishWidgetTimeline(String kindId, String timelineJson,
             Map<String, byte[]> images) {
         String container = containerPath();
