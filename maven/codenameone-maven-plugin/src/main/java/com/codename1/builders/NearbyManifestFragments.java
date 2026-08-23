@@ -341,4 +341,246 @@ final class NearbyManifestFragments {
                 + "\" android:required=\"" + required + "\" />\n"
                 + xPermissions;
     }
+
+    // ------------------------------------------------------------------
+    // Library bytecode
+    // ------------------------------------------------------------------
+
+    /// What a tree of bytecode was found to use.
+    public static final class NearbyUsage {
+
+        private boolean ranging;
+        private boolean transport;
+        private boolean companion;
+        private boolean presence;
+
+        public boolean usesRanging() {
+            return ranging;
+        }
+
+        public boolean usesTransport() {
+            return transport;
+        }
+
+        public boolean usesCompanion() {
+            return companion;
+        }
+
+        public boolean usesPresence() {
+            return presence;
+        }
+
+        /// True when nothing at all was found, which is the ordinary case.
+        public boolean isEmpty() {
+            return !ranging && !transport && !companion && !presence;
+        }
+    }
+
+    /// The package a reference to it is stored under, in every constant pool
+    /// that names one of its classes.
+    private static final String RANGING_MARKER =
+            "com/codename1/nearby/ranging/";
+    private static final String TRANSPORT_MARKER =
+            "com/codename1/nearby/transport/";
+    private static final String COMPANION_MARKER =
+            "com/codename1/nearby/companion/";
+    /// The method name, because presence is a call rather than a class.
+    private static final String PRESENCE_MARKER = "startObservingPresence";
+
+    /// Classes whose own mention of these packages says nothing about the
+    /// application: the API, the simulator bridge and the ports implement
+    /// them, so a framework jar staged beside the libraries would otherwise
+    /// report every application as using all of it.
+    private static final String[] FRAMEWORK_PREFIXES = {
+        "com/codename1/nearby/",
+        "com/codename1/impl/nearby/",
+        "com/codename1/impl/android/nearby/",
+        "com/codename1/impl/ios/",
+    };
+
+    /// What the bytecode under `root` uses of the nearby packages.
+    ///
+    /// Loose class files, jars and Android archives alike, because a library
+    /// can be the only thing that touches these APIs -- the application calls
+    /// the library and never names a nearby class itself. Reading only the
+    /// loose tree reported no use at all, and the Android build then DELETED
+    /// the implementation package out from under the library that calls it
+    /// while iOS left the natives and frameworks out, so the feature was
+    /// missing from a build that looked clean. The database scan is extended
+    /// over the same trees for the same reason.
+    ///
+    /// The test is a search of the whole class file for the package name,
+    /// which is how every reference to a class in it is stored. A class that
+    /// mentions the string for some other reason counts too, which errs
+    /// towards keeping the implementation -- the safe direction, since the
+    /// cost of a false positive is bytes and the cost of a false negative is
+    /// an app that crashes on a class the build removed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: a directory of staged classes and libraries, or null
+    ///
+    /// #### Returns
+    ///
+    /// what it uses, never null and empty when `root` is not a directory
+    public static NearbyUsage scanForNearbyUsage(java.io.File root) {
+        NearbyUsage found = new NearbyUsage();
+        if (root != null && root.isDirectory()) {
+            scanTree(root, "", found);
+        }
+        return found;
+    }
+
+    private static void scanTree(java.io.File dir, String relativePath,
+            NearbyUsage found) {
+        java.io.File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (int iter = 0; iter < children.length; iter++) {
+            java.io.File child = children[iter];
+            String childPath = relativePath.length() == 0
+                    ? child.getName() : relativePath + "/" + child.getName();
+            String name = child.getName().toLowerCase(java.util.Locale.ROOT);
+            if (child.isDirectory()) {
+                scanTree(child, childPath, found);
+            } else if (name.endsWith(".jar") || name.endsWith(".aar")
+                    || name.endsWith(".zip")) {
+                scanArchive(child, found);
+            } else if (name.endsWith(".class")
+                    && !isFrameworkClass(childPath)) {
+                inspect(readAll(child), found);
+            }
+        }
+    }
+
+    private static void scanArchive(java.io.File archive, NearbyUsage found) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(archive);
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries =
+                    zip.entries();
+            while (entries.hasMoreElements()) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                String entryName = entry.getName();
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                String lower = entryName.toLowerCase(java.util.Locale.ROOT);
+                if (lower.endsWith(".jar")) {
+                    // An Android archive keeps its bytecode in a nested
+                    // classes.jar, so the entries that matter are one level
+                    // further in. Caught per entry: one unreadable entry says
+                    // nothing about the entries after it.
+                    try {
+                        inspectNested(readAll(zip.getInputStream(entry)),
+                                found);
+                    } catch (Throwable unreadable) {
+                        continue;
+                    }
+                } else if (lower.endsWith(".class")
+                        && !isFrameworkClass(entryName)) {
+                    try {
+                        inspect(readAll(zip.getInputStream(entry)), found);
+                    } catch (Throwable unreadable) {
+                        continue;
+                    }
+                }
+            }
+        } catch (Throwable unreadable) {
+            // Not an archive, or a broken one. Nothing can be read out of it,
+            // and guessing that it uses everything would charge the whole
+            // apparatus to every application that ships a stray file.
+            return;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (java.io.IOException ignored) {
+                    // Nothing useful to do with a failure to close.
+                }
+            }
+        }
+    }
+
+    private static void inspectNested(byte[] archiveBytes, NearbyUsage found) {
+        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(
+                new java.io.ByteArrayInputStream(archiveBytes));
+        try {
+            java.util.zip.ZipEntry entry = in.getNextEntry();
+            while (entry != null) {
+                String entryName = entry.getName();
+                if (!entry.isDirectory()
+                        && entryName.toLowerCase(java.util.Locale.ROOT)
+                                .endsWith(".class")
+                        && !isFrameworkClass(entryName)) {
+                    inspect(readAll(in), found);
+                }
+                entry = in.getNextEntry();
+            }
+        } catch (Throwable unreadable) {
+            return;
+        } finally {
+            try {
+                in.close();
+            } catch (java.io.IOException ignored) {
+                // Nothing useful to do with a failure to close.
+            }
+        }
+    }
+
+    private static boolean isFrameworkClass(String path) {
+        String normalized = path.replace('\\', '/');
+        for (int iter = 0; iter < FRAMEWORK_PREFIXES.length; iter++) {
+            if (normalized.indexOf(FRAMEWORK_PREFIXES[iter]) >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void inspect(byte[] bytes, NearbyUsage found) {
+        if (bytes == null || bytes.length == 0) {
+            return;
+        }
+        String text;
+        try {
+            text = new String(bytes, "ISO-8859-1");
+        } catch (java.io.UnsupportedEncodingException never) {
+            return;
+        }
+        found.ranging |= text.indexOf(RANGING_MARKER) >= 0;
+        found.transport |= text.indexOf(TRANSPORT_MARKER) >= 0;
+        found.companion |= text.indexOf(COMPANION_MARKER) >= 0;
+        found.presence |= text.indexOf(PRESENCE_MARKER) >= 0;
+    }
+
+    private static byte[] readAll(java.io.File file) {
+        try {
+            java.io.InputStream in = new java.io.FileInputStream(file);
+            try {
+                return readAll(in);
+            } finally {
+                in.close();
+            }
+        } catch (Throwable unreadable) {
+            return null;
+        }
+    }
+
+    private static byte[] readAll(java.io.InputStream in) {
+        java.io.ByteArrayOutputStream out =
+                new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        try {
+            int read = in.read(buffer);
+            while (read > 0) {
+                out.write(buffer, 0, read);
+                read = in.read(buffer);
+            }
+        } catch (java.io.IOException unreadable) {
+            return out.toByteArray();
+        }
+        return out.toByteArray();
+    }
 }

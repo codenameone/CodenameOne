@@ -2406,6 +2406,53 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("An error occurred while trying to scan the classes for API usage.", ex);
         }
 
+        // The libraries as well as the loose class tree.
+        //
+        // scanClassesForPermissions reads .class files and never opens a jar,
+        // so a library that is the only code touching these APIs -- the
+        // application calls the library and never names a nearby class --
+        // left every flag false. This build then DELETED
+        // com/codename1/impl/android/nearby out of the sources and omitted
+        // the dependencies and manifest entries, so the library called into
+        // classes the build had removed. The database scan above reads both
+        // trees for exactly that reason; this is the same fix for the same
+        // hazard, kept to the feature whose implementation gets deleted
+        // rather than turned on for every flag the scanner carries.
+        NearbyManifestFragments.NearbyUsage libraryNearby =
+                NearbyManifestFragments.scanForNearbyUsage(libsDir);
+        if (!libraryNearby.isEmpty()) {
+            debug("Nearby usage found inside a submitted library"
+                    + (libraryNearby.usesRanging() ? " ranging" : "")
+                    + (libraryNearby.usesTransport() ? " transport" : "")
+                    + (libraryNearby.usesCompanion() ? " companion" : "")
+                    + (libraryNearby.usesPresence() ? " presence" : ""));
+        }
+        usesNearbyRanging |= libraryNearby.usesRanging();
+        usesNearbyTransport |= libraryNearby.usesTransport();
+        usesNearbyCompanion |= libraryNearby.usesCompanion();
+        usesNearbyPresence |= libraryNearby.usesPresence();
+
+        // Fed to the CATALOG as well as to the flags. The flags decide which
+        // sources survive and which manifest fragments are written; the
+        // accumulator is what supplies the dependencies, the frameworks, the
+        // privacy strings and the minimum SDK. Setting only the flags kept
+        // AndroidUwbRanging.java in the generated sources without
+        // androidx.core.uwb to compile it against, and enabled the iOS
+        // defines without NearbyInteraction to link -- a build that fails
+        // late for a reason nothing in it names.
+        //
+        // The entry prefix IS the key: the catalog matches a consumed class
+        // by startsWith, and a prefix starts with itself.
+        if (libraryNearby.usesRanging()) {
+            aiAcc.consume("com/codename1/nearby/ranging/");
+        }
+        if (libraryNearby.usesTransport()) {
+            aiAcc.consume("com/codename1/nearby/transport/");
+        }
+        if (libraryNearby.usesCompanion()) {
+            aiAcc.consume("com/codename1/nearby/companion/");
+        }
+
         // Apply AI/ML dependency table hits accumulated during the
         // scan. Permissions / features go to xPermissions right
         // away (so they're visible to all the downstream manifest

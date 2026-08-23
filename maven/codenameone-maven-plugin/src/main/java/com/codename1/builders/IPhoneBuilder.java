@@ -2238,6 +2238,51 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
+
+        // The libraries as well as the loose class tree, and read HERE --
+        // before the port's own jars are unzipped into btres further down,
+        // which is what keeps the framework's own use of these packages from
+        // answering for the application's.
+        //
+        // scanClassesForPermissions reads .class files and never opens a jar,
+        // so a library that is the only code touching these APIs -- the
+        // application calls the library and never names a nearby class --
+        // left every flag false, and this build then left CN1_INCLUDE_NEARBY
+        // undefined and the frameworks unlinked. The feature was simply
+        // absent from a build that looked clean. The database scan above
+        // reads both trees for the same reason.
+        NearbyManifestFragments.NearbyUsage libraryNearby =
+                NearbyManifestFragments.scanForNearbyUsage(buildinRes);
+        if (!libraryNearby.isEmpty()) {
+            debug("Nearby usage found inside a submitted library"
+                    + (libraryNearby.usesRanging() ? " ranging" : "")
+                    + (libraryNearby.usesTransport() ? " transport" : "")
+                    + (libraryNearby.usesCompanion() ? " companion" : ""));
+        }
+        usesNearbyRanging |= libraryNearby.usesRanging();
+        usesNearbyTransport |= libraryNearby.usesTransport();
+        usesNearbyCompanion |= libraryNearby.usesCompanion();
+
+        // Fed to the CATALOG as well as to the flags. The flags decide which
+        // sources survive and which manifest fragments are written; the
+        // accumulator is what supplies the dependencies, the frameworks, the
+        // privacy strings and the minimum SDK. Setting only the flags kept
+        // AndroidUwbRanging.java in the generated sources without
+        // androidx.core.uwb to compile it against, and enabled the iOS
+        // defines without NearbyInteraction to link -- a build that fails
+        // late for a reason nothing in it names.
+        //
+        // The entry prefix IS the key: the catalog matches a consumed class
+        // by startsWith, and a prefix starts with itself.
+        if (libraryNearby.usesRanging()) {
+            aiAcc.consume("com/codename1/nearby/ranging/");
+        }
+        if (libraryNearby.usesTransport()) {
+            aiAcc.consume("com/codename1/nearby/transport/");
+        }
+        if (libraryNearby.usesCompanion()) {
+            aiAcc.consume("com/codename1/nearby/companion/");
+        }
         stopwatch.split("Scan Classes");
 
         if (usesCalendarApi) {
