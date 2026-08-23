@@ -183,6 +183,14 @@ point. An event that arrives before any listener is registered is held and
 replayed to the first one that registers, so a wake-up isn't lost, but only the
 64 most recent are kept.
 
+Presence doesn't run your code the moment a device comes into range. Android
+can start the process for the companion service alone, and Codename One
+doesn't run an application's `init()` there -- a form has nowhere to live in a
+service. Your listener hears about the sighting, in order, when the app next
+initializes. Treat presence as a record of what happened while the app was away rather than
+as a background execution mechanism; for work that must happen without the
+app, use the background features in the notifications chapter.
+
 === Transport: Sending Something
 
 [source,java]

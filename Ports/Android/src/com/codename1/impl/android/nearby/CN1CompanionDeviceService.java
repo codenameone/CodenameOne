@@ -27,7 +27,9 @@ import android.companion.AssociationInfo;
 import android.companion.CompanionDeviceService;
 import android.os.Build;
 
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.nearby.companion.CompanionDevices;
+import com.codename1.ui.Display;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -42,10 +44,31 @@ import java.util.Set;
 /// appeared while the app was not running.
 ///
 /// The platform may start the process for THIS service alone, with no activity
-/// and therefore no initialized Codename One and no registered listener yet.
-/// The event is not dispatched and dropped in that case: `CompanionDevices`
-/// parks it and replays it to the first listener that registers, which in a
-/// cold start is the one the app adds from `init()`.
+/// and therefore no registered listener yet. The event is not dispatched and
+/// dropped in that case: `CompanionDevices` parks it and replays it to the
+/// first listener that registers, which in a cold start is the one the app
+/// adds from `init()`.
+///
+/// #### What this does NOT do, and why
+///
+/// It does not run the application's `init()` headlessly, so an app is not
+/// executing code the moment a watch walks into range -- it hears about it
+/// when it next initializes, replayed in order.
+///
+/// It was suggested this service should bootstrap the whole lifecycle. That
+/// is a bigger promise than Codename One makes anywhere else on Android, and
+/// deliberately so: an app's `init()` is allowed to touch a `Form`, and a
+/// service has no UI thread to touch one on. The framework already had to
+/// decide this once, for App Intents, and decided the same way -- see the
+/// note on `AndroidImplementation.deliverPendingIntentRequests`, where a
+/// handler that is not headless can only ask for the app to be brought
+/// forward. Inventing a headless-lifecycle contract for presence alone would
+/// make this one feature run app code in a state nothing else does.
+///
+/// What it does do is start the Codename One context, so the event is parked
+/// in an initialized runtime with a real event thread rather than dispatched
+/// inline on a binder thread. The public documentation says plainly that the
+/// listener hears about the sighting when the app initializes.
 ///
 /// The builder writes the `<service>` element that binds this, guarded by
 /// `android.permission.BIND_COMPANION_DEVICE_SERVICE` and the
@@ -53,6 +76,9 @@ import java.util.Set;
 /// presence.
 @SuppressLint("NewApi")
 public class CN1CompanionDeviceService extends CompanionDeviceService {
+
+    /// Whether this service is the one that started the Codename One context.
+    private boolean startedContext;
 
     private static final Set<String> OBSERVED =
             Collections.synchronizedSet(new HashSet<String>());
@@ -78,6 +104,35 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
         if (associationId != null) {
             OBSERVED.remove(associationId);
         }
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        // Started so the parked event sits in an initialized runtime: without
+        // it Display.isInitialized() is false and the delivery runs inline on
+        // whatever binder thread the platform used.
+        if (!Display.isInitialized()) {
+            startedContext = true;
+            try {
+                AndroidImplementation.startContext(this);
+            } catch (Throwable notStartable) {
+                startedContext = false;
+            }
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        if (startedContext) {
+            startedContext = false;
+            try {
+                AndroidImplementation.stopContext(this);
+            } catch (Throwable alreadyGone) {
+                // Nothing to do: the context is going away either way.
+            }
+        }
+        super.onDestroy();
     }
 
     @Override

@@ -880,12 +880,20 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// Records a payload sent to a peer and waiting for its acknowledgement.
 - (void)awaitAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid {
     @synchronized (self) {
-        NSMutableSet *ids = [self.awaitingAck objectForKey:pid];
+        NSMutableDictionary *ids = [self.awaitingAck objectForKey:pid];
         if (ids == nil) {
-            ids = [NSMutableSet set];
+            ids = [NSMutableDictionary dictionary];
             [self.awaitingAck setObject:ids forKey:pid];
         }
-        [ids addObject:[NSNumber numberWithInt:(int)payloadId]];
+        // Counted, not deduplicated. The same immutable Payload sent to one
+        // peer twice before either answer arrives is two accepted sends under
+        // one portable id -- and a set kept one, so the first acknowledgement
+        // emitted the only terminal status and the second send never got one.
+        NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
+        NSNumber *outstanding = [ids objectForKey:key];
+        [ids setObject:[NSNumber numberWithInt:
+                (outstanding == nil ? 1 : [outstanding intValue] + 1)]
+                forKey:key];
     }
 }
 
@@ -893,12 +901,18 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// outstanding -- so a duplicate or unknown ack reports nothing.
 - (BOOL)takeAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid {
     @synchronized (self) {
-        NSMutableSet *ids = [self.awaitingAck objectForKey:pid];
+        NSMutableDictionary *ids = [self.awaitingAck objectForKey:pid];
         NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
-        if (![ids containsObject:key]) {
+        NSNumber *outstanding = [ids objectForKey:key];
+        if (outstanding == nil) {
             return NO;
         }
-        [ids removeObject:key];
+        int left = [outstanding intValue] - 1;
+        if (left > 0) {
+            [ids setObject:[NSNumber numberWithInt:left] forKey:key];
+        } else {
+            [ids removeObjectForKey:key];
+        }
         if ([ids count] == 0) {
             [self.awaitingAck removeObjectForKey:pid];
         }
@@ -909,9 +923,18 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// Takes every payload still waiting on a peer, for a disconnect.
 - (NSArray *)takeAllAcksFromPeer:(NSString *)pid {
     @synchronized (self) {
-        NSArray *ids = [[[self.awaitingAck objectForKey:pid] allObjects] copy];
+        NSMutableDictionary *ids = [self.awaitingAck objectForKey:pid];
+        NSMutableArray *out = [NSMutableArray array];
+        // One entry per outstanding SEND, so two sends of one payload get two
+        // terminal updates -- the same count they would have got as acks.
+        for (NSNumber *key in [ids allKeys]) {
+            int outstanding = [[ids objectForKey:key] intValue];
+            for (int i = 0; i < outstanding; i++) {
+                [out addObject:key];
+            }
+        }
         [self.awaitingAck removeObjectForKey:pid];
-        return [ids autorelease];
+        return out;
     }
 }
 
@@ -2565,16 +2588,32 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                                       joinedEndpointIds);
         NSMutableArray *peers = [NSMutableArray array];
         NSMutableArray *peerIds = [NSMutableArray array];
+        NSMutableArray *unknown = [NSMutableArray array];
         for (NSString *pid in cn1nbSplitLines(joined)) {
             MCPeerID *peer = [cn1nbTransport peerForId:pid];
             if (peer != nil) {
                 [peers addObject:peer];
                 [peerIds addObject:pid];
+            } else {
+                [unknown addObject:pid];
             }
         }
         if ([peers count] == 0) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
                     @"none of those endpoints is connected");
+            return;
+        }
+        if ([unknown count] > 0) {
+            // A requested endpoint this transport no longer knows is a FAILED
+            // handoff, not a silent omission. Sending to the rest and
+            // answering successfully left the omitted recipient with neither
+            // the data nor a progress event of any kind -- while the same
+            // send reports a per-recipient failure for a peer that is merely
+            // unreachable, which is the lesser problem of the two.
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
+                    [NSString stringWithFormat:
+                            @"these endpoints are no longer connected: %@",
+                            [unknown componentsJoinedByString:@", "]]);
             return;
         }
         if (payloadType == CN1_NEARBY_PAYLOAD_FILE) {

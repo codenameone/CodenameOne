@@ -270,11 +270,18 @@ public final class CompanionDevices {
     /// Registers a presence listener. Callbacks arrive on the EDT.
     ///
     /// Register from the app's `init()`: presence is exactly the event that
-    /// can arrive during a cold start, because the platform launched the app
-    /// to deliver it. An event that arrived before any listener existed is
-    /// replayed to the listeners as soon as the first one registers, so a
-    /// wake-up delivered into a process whose `init()` had not run yet is not
-    /// lost. At most the 64 most recent are kept.
+    /// can arrive during a cold start, because the platform may start the
+    /// process to deliver it. An event that arrived before any listener
+    /// existed is replayed to the listeners as soon as the first one
+    /// registers, so a sighting delivered into a process whose `init()` had
+    /// not run yet is not lost. At most the 64 most recent are kept.
+    ///
+    /// This is not background execution. The platform starting the process
+    /// does not make the application run: Android hands the event to a
+    /// service, and Codename One does not initialize an app there, because an
+    /// `init()` may build a `Form` and a service has nowhere to put one. The
+    /// listener hears about the sighting, in order, when the app next
+    /// initializes.
     ///
     /// #### Parameters
     ///
