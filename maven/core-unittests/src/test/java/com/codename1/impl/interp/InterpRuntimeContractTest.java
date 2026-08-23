@@ -159,6 +159,11 @@ class InterpRuntimeContractTest {
         String kotlin = "@file:Suppress(\"" + "\\" + "u0022 package fake\")\n"
                 + "package real.p\n\nfun main() {}\n";
         assertEquals("real.p", packageOfKotlin(kotlin));
+        // Kotlin block comments nest -- a legal source can open one comment
+        // inside another. A non-nesting scanner would close the outer at
+        // the inner `*/` and read `package fake;` as the declaration.
+        assertEquals("real.pkg", packageOfKotlin(
+                "/* outer /* inner */ package fake; */ package real.pkg\n\nfun main() {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {

@@ -250,7 +250,7 @@ public class InterpBundleWriter {
         // line of perfectly ordinary Java, and reading it as the default
         // package stored the source under a key the runtime never looks up --
         // so the push was refused for missing source that had been supplied.
-        String code = stripComments(java ? decodeUnicodeEscapes(text) : text);
+        String code = stripComments(java ? decodeUnicodeEscapes(text) : text, !java);
         int i = 0;
         // Track paren depth so a `{` inside an annotation's argument list
         // (`@p.A({String.class}) package p;`) reads as an array-initializer
@@ -444,8 +444,14 @@ public class InterpBundleWriter {
      *
      * <p>Blanked rather than removed, so nothing shifts: only the scan above
      * uses this, and it cares about what a token is, not where it sits.</p>
+     *
+     * <p>{@code kotlinNested} nests block comments -- Kotlin allows it, and
+     * a legal source that opens with {@code /* outer /* inner *} {@code / package
+     * fake; *}{@code /} would otherwise close at the inner {@code *}{@code /}
+     * and expose the fake package inside the still-open outer comment. Java
+     * does not nest, so the flag stays false there.</p>
      */
-    private static String stripComments(String text) {
+    private static String stripComments(String text, boolean kotlinNested) {
         StringBuilder out = new StringBuilder(text.length());
         int i = 0;
         while (i < text.length()) {
@@ -456,11 +462,23 @@ public class InterpBundleWriter {
                 }
             } else if (c == '/' && i + 1 < text.length() && text.charAt(i + 1) == '*') {
                 i += 2;
-                while (i + 1 < text.length()
-                        && !(text.charAt(i) == '*' && text.charAt(i + 1) == '/')) {
-                    i++;
+                int depth = 1;
+                while (depth > 0 && i + 1 < text.length()) {
+                    if (kotlinNested && text.charAt(i) == '/' && text.charAt(i + 1) == '*') {
+                        depth++;
+                        i += 2;
+                    } else if (text.charAt(i) == '*' && text.charAt(i + 1) == '/') {
+                        depth--;
+                        i += 2;
+                    } else {
+                        i++;
+                    }
                 }
-                i = Math.min(i + 2, text.length());
+                if (depth > 0) {
+                    // Unterminated -- treat the rest of the file as comment
+                    // rather than fall through and mis-tokenise it.
+                    i = text.length();
+                }
                 out.append(' ');
             } else if (c == '"' && i + 2 < text.length()
                     && text.charAt(i + 1) == '"' && text.charAt(i + 2) == '"') {
