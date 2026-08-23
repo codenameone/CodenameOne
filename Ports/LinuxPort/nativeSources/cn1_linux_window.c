@@ -68,14 +68,27 @@ void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
     cn1LinuxPushWindowEvent(0, type, x, y, keyCode);
 }
 
-/* Events the framework cannot reconstruct if they are lost. Input can be dropped on
- * overflow -- a missing move is invisible and a missing press affects one gesture --
- * but a lost hide leaves a window the framework believes is on screen, painting and
- * animating until something else happens to it, and a lost close leaves it registered
- * with no native window behind it. */
-static int cn1LinuxIsLifecycleEvent(int type) {
+/* Events the framework cannot reconstruct if they are lost, of which there are two
+ * kinds.
+ *
+ * Lifecycle: a lost hide leaves a window the framework believes is on screen, painting
+ * and animating until something else happens to it, and a lost close leaves it
+ * registered with no native window behind it.
+ *
+ * Terminations: a release ends something a press started. Lose it and the component
+ * the press went to stays in that state for good -- the key goes on repeating, the
+ * button stays down, the drag never finishes -- and the focus change that would
+ * otherwise cancel a held gesture is no use as a backstop if it is droppable too.
+ *
+ * Note the asymmetry with presses, which stay droppable: a release that arrives with
+ * no press behind it finds no recorded target and is discarded harmlessly, so when
+ * something has to go it must never be the release. */
+static int cn1LinuxIsProtectedEvent(int type) {
     return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
-            || type == CN1_EVENT_WINDOW_CLOSE;
+            || type == CN1_EVENT_WINDOW_CLOSE
+            || type == CN1_EVENT_KEY_RELEASED
+            || type == CN1_EVENT_POINTER_RELEASED
+            || type == CN1_EVENT_WINDOW_FOCUS;
 }
 
 /* Visibility only. A close request is protected from eviction like any other
@@ -117,9 +130,9 @@ static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
     return 1;
 }
 
-/* Removes the oldest input event, closing the gap. Used to make room for a lifecycle
- * event: advancing the head instead would evict whatever is oldest, and that can be a
- * lifecycle event itself -- which is the very thing being protected. */
+/* Removes the oldest droppable event, closing the gap. Used to make room for a
+ * protected one: advancing the head instead would evict whatever is oldest, and that
+ * can be a protected event itself -- which is the very thing being kept. */
 static void cn1LinuxRemoveAtLocked(int idx) {
     int cur = idx;
     int follow = (cur + 1) % CN1_EVENT_RING;
@@ -134,7 +147,7 @@ static void cn1LinuxRemoveAtLocked(int idx) {
 static int cn1LinuxEvictInputLocked(void) {
     int idx = cn1EventHead;
     while (idx != cn1EventTail) {
-        if (!cn1LinuxIsLifecycleEvent(cn1EventRing[idx].type)) {
+        if (!cn1LinuxIsProtectedEvent(cn1EventRing[idx].type)) {
             cn1LinuxRemoveAtLocked(idx);
             return 1;
         }
@@ -171,7 +184,7 @@ static int cn1LinuxEvictSupersededVisibilityLocked(void) {
 void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
-    if (next == cn1EventHead && cn1LinuxIsLifecycleEvent(type)) {
+    if (next == cn1EventHead && cn1LinuxIsProtectedEvent(type)) {
         /* Full, and this one must not be the casualty. Supersede this window's own
          * queued transition if it has one, otherwise take the room from an input event,
          * and failing that from a transition that a later one already supersedes. Never
