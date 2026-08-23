@@ -7019,6 +7019,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private com.codename1.home.spi.HomeBridge homeBridge;
 
+    private com.codename1.impl.nearby.LocalNearbyBridge nearbyBridge;
+
     /// Returns a local simulated home. There is no HomeKit or Google Home on
     /// this port, so the bridge reports
     /// {@code HomeAvailability.LOCAL_ONLY}: the accessories are furnished by
@@ -7047,6 +7049,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return homeBridge;
         }
     }
+
+    /// The nearby bridge for the JavaScript port: a simulated
+    /// implementation rather than no implementation, for the same reason
+    /// [#getHomeBridge()] carries one.
+    /// Ranging UI, an association flow and a transport screen are almost
+    /// entirely code with nothing to do with radios, and a port that reported
+    /// nothing would make all of it testable only on a pair of phones.
+    ///
+    /// It reports `LOCAL_ONLY`, never `AVAILABLE`, so an app can tell the
+    /// developer the peers it is tracking are not real.
+    @Override
+    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        // Guarded for the reason the home bridge is: the bridge holds the
+        // live sessions, the association store and the connection set, and
+        // two threads racing this getter would each get their own -- a
+        // session prepared through one would be invisible to the other.
+        synchronized (HTML5Implementation.class) {
+            if (nearbyBridge == null) {
+                com.codename1.impl.nearby.LocalNearbyBridge local =
+                        new com.codename1.impl.nearby.LocalNearbyBridge();
+                com.codename1.impl.nearby.SyntheticNearby.populate(local);
+                nearbyBridge = local;
+            }
+            return nearbyBridge;
+        }
+    }
+
 
     private com.codename1.media.VideoIO videoIO;
     private boolean videoIOResolved;

@@ -29,7 +29,7 @@ import com.codename1.home.spi.HomeBridge;
 import com.codename1.impl.async.EdtResult;
 import com.codename1.impl.home.CommissioningGateway;
 import com.codename1.impl.home.HomeWire;
-import com.codename1.impl.home.PendingMap;
+import com.codename1.impl.async.PendingMap;
 import com.codename1.impl.home.SubscriptionState;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
