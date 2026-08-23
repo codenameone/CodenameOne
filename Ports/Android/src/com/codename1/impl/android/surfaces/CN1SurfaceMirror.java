@@ -515,7 +515,10 @@ public final class CN1SurfaceMirror {
     public static boolean reloadRequested(Context ctx, String kindId) {
         try {
             if (kindId != null && kindId.length() > 0) {
-                CN1WidgetProvider.requestAppRefresh(ctx, kindId);
+                // NOT allowed to ask the peer. This IS the peer's request: a device with nothing
+                // to publish answering by asking back is how the two bounce messages at each
+                // other until they disconnect.
+                CN1WidgetProvider.requestAppRefresh(ctx, kindId, false);
             }
         } catch (Throwable t) {
             Log.w(TAG, "Could not answer a watch request to republish " + kindId, t);

@@ -223,9 +223,31 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
     }
 
     static void requestAppRefresh(Context context, String kindId) {
+        requestAppRefresh(context, kindId, true);
+    }
+
+    /**
+     * As above, but able to refuse the peer fallback.
+     *
+     * <p>{@code mayAskPeer} is false when this IS the answer to a peer's request. Without that
+     * the two devices bounce: a watch with no listener asks the phone, a phone with no listener
+     * answers by asking the watch, and neither ever acquires one -- an unthrottled message loop
+     * waking both processes until they disconnect. The device that was asked either has content
+     * to produce or has nothing to say, and saying nothing is the end of it.</p>
+     *
+     * @param context any context
+     * @param kindId the kind wanting fresh content
+     * @param mayAskPeer whether a device with no listener of its own may ask the other one
+     */
+    static void requestAppRefresh(Context context, String kindId, boolean mayAskPeer) {
         try {
             String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
             if (listenerClass == null) {
+                if (!mayAskPeer) {
+                    // Answering a peer. It asked because it has nothing; this device has nothing
+                    // either, so there is no one left to ask.
+                    return;
+                }
                 // Nothing local to run. On a WATCH this is the normal case for a mirrored kind:
                 // the preference is recorded by publishWidgetTimeline, which the watch never
                 // runs -- its descriptors arrive through CN1SurfaceMirror.receive instead. The

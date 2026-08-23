@@ -264,15 +264,23 @@ public final class Surfaces {
     /// Dropped rather than rejected wholesale: a descriptor referencing an image that did not
     /// arrive renders a gap, which every renderer already tolerates, and refusing the whole
     /// publish would let one bad name suppress a timeline that is otherwise fine.
-    /// Whether a name has the shape SurfaceSerializer gives a content hash: sixteen lowercase
-    /// hex digits. Only those are verified, so a name that was never a hash -- a registered image
+    /// The prefix `SurfaceSerializer.registerImageBytes` puts in front of a content hash.
+    private static final String CONTENT_HASH_PREFIX = "img";
+
+    /// Whether a name has the shape SurfaceSerializer gives a content hash: the `img` prefix and
+    /// sixteen lowercase hex digits. The prefix is the point -- checking for bare hex matched
+    /// nothing the framework produces, so the integrity check below never ran on a real payload
+    /// at all, and would have compared a prefixed name against an unprefixed hash if it had.
+    ///
+    /// Only names of this shape are verified, so one that was never a hash -- a registered image
     /// the app named itself -- is passed through rather than refused for failing a test that does
     /// not apply to it.
     private static boolean looksLikeContentHash(String name) {
-        if (name.length() != 16) {
+        if (name.length() != CONTENT_HASH_PREFIX.length() + 16
+                || !name.startsWith(CONTENT_HASH_PREFIX)) {
             return false;
         }
-        for (int i = 0; i < 16; i++) {
+        for (int i = CONTENT_HASH_PREFIX.length(); i < name.length(); i++) {
             char c = name.charAt(i);
             if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
                 return false;
@@ -296,7 +304,7 @@ public final class Surfaces {
                 continue;
             }
             if (looksLikeContentHash(name) && e.getValue() != null
-                    && !name.equals(SurfaceSerializer.fnv1a(e.getValue()))) {
+                    && !name.equals(CONTENT_HASH_PREFIX + SurfaceSerializer.fnv1a(e.getValue()))) {
                 // The name is a CLAIM about the bytes, and this descriptor came from outside the
                 // process. iOS skips writing a blob whose file already exists, on the strength of
                 // that claim -- so bad bytes landing first cannot be repaired by any later

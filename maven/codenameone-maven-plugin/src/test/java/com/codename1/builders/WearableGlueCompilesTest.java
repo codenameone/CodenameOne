@@ -139,6 +139,9 @@ public class WearableGlueCompilesTest {
                         + "import android.content.Context;\n"
                         + "public class CN1WidgetProvider {\n"
                         + "    static void requestAppRefresh(Context c, String k) { }\n"
+                        // The form that refuses to ask the peer, which is what an answer to a
+                        // peer's own request must use or the two bounce messages for ever.
+                        + "    static void requestAppRefresh(Context c, String k, boolean p) { }\n"
                         + "}\n").getBytes("UTF-8"));
         collectJava(tmp.resolve("shims").toFile(), sources);
 
