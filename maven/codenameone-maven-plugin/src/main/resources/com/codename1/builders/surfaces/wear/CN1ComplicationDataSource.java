@@ -189,10 +189,15 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // period. The timeline is the mechanism for exactly this: a second entry starting at the
         // target, composed as the moment after it, carries the count-up form.
         long crossing = relativeCrossing(active);
-        if (crossing > 0) {
+        long until = active.getNextFlipDate();
+        // Only INSIDE the active reading's own window. A crossing at or after the next flip
+        // belongs to an entry this one has already handed over to, and an interval running to
+        // Instant.MAX from there would overlap every later entry and compete with them -- a stale
+        // reading resurfacing after it stopped being current. The entry that is active then will
+        // compute its own crossing when it is built.
+        if (crossing > 0 && (until <= 0 || crossing < until)) {
             ComplicationData after = build(type, active, crossing + 1);
             if (after != null) {
-                long until = active.getNextFlipDate();
                 entries.add(new TimelineEntry(
                         new TimeInterval(Instant.ofEpochMilli(crossing),
                                 until > crossing ? Instant.ofEpochMilli(until) : Instant.MAX),
@@ -310,13 +315,20 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             String title = texts.isEmpty() ? getKindId() : texts.get(0);
             String body = texts.size() > 1 ? join(texts, 1) : "";
             ComplicationText titleText = primary != null ? primary : plain(title);
+            // The BODY can tick as well, and in a rectangular layout it is the likelier place for
+            // a countdown -- a static label first, the moving value beneath it. Only when the body
+            // is exactly one node, though: a join of several is a string, and there is nothing to
+            // hand a face that would advance part of it.
+            ComplicationText bodyText = texts.size() == 2
+                    ? textFor(secondTextNode(nodes), reading.getState(), texts.get(1), asOf)
+                    : plain(body);
             // The whole value, not just the title. TalkBack reads this instead of the layout, so
             // omitting the body announced the label of a complication without the thing it says
             // -- the order status, the message, the number the user actually wanted.
             String spoken = body.length() == 0 ? title : title + ", " + body;
             LongTextComplicationData.Builder builder =
                     new LongTextComplicationData.Builder(
-                            body.length() == 0 ? titleText : plain(body), plain(spoken))
+                            body.length() == 0 ? titleText : bodyText, plain(spoken))
                             .setTitle(body.length() == 0 ? null : titleText)
                             .setTapAction(tap);
             return builder.build();
@@ -378,13 +390,44 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         if (reading == null) {
             return 0;
         }
-        JSONObject node = firstTextNode(CN1WatchSurface.flatten(reading.getLayout()));
+        List<JSONObject> nodes = CN1WatchSurface.flatten(reading.getLayout());
+        // BOTH nodes that can be handed over as ticking text, not only the first: a rectangular
+        // layout routinely puts the label first and the moving value beneath it, and the body
+        // ticks too. The earliest crossing wins, since that is when the timeline first differs.
+        long first = relativeCrossingOf(firstTextNode(nodes), reading);
+        long second = relativeCrossingOf(secondTextNode(nodes), reading);
+        if (first <= 0) {
+            return second;
+        }
+        if (second <= 0) {
+            return first;
+        }
+        return Math.min(first, second);
+    }
+
+    /// One node's crossing moment, or 0 when it has none.
+    private long relativeCrossingOf(JSONObject node, CN1WatchSurface.Reading reading) {
         if (node == null || !"dyn".equals(node.optString("t", ""))
                 || !"relative".equals(node.optString("style", "timerDown"))) {
             return 0;
         }
         long date = CN1WatchSurface.dynamicDate(node, reading.getState());
         return date > System.currentTimeMillis() ? date : 0;
+    }
+
+    /// The second text-bearing node, which is a long-text body when there is exactly one.
+    private static JSONObject secondTextNode(List<JSONObject> nodes) {
+        boolean seenFirst = false;
+        for (JSONObject node : nodes) {
+            String type = node.optString("t", "");
+            if ("text".equals(type) || "dyn".equals(type)) {
+                if (seenFirst) {
+                    return node;
+                }
+                seenFirst = true;
+            }
+        }
+        return null;
     }
 
     /// The first text-bearing node, so the caller can ask what KIND of text it is.
