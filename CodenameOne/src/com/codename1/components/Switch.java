@@ -1038,7 +1038,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             // Resolved through the top level rather than the form: getComponentForm()
             // is null by design inside a Window, so a switch hosted in one threw
             // instead of toggling.
-            TopLevelContainer top = getTopLevelContainer();
+            final TopLevelContainer top = getTopLevelContainer();
             if (top == null) {
                 setValue(value, true);
                 return;
@@ -1052,10 +1052,14 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                         dragged = false;
                         deltaX = 0;
                         deltaY = 0;
-                        TopLevelContainer t = getTopLevelContainer();
-                        if (t != null) {
-                            t.deregisterAnimated(this);
-                        }
+                        // Deregistered from the top level that registered it, not
+                        // from wherever this component is now. A switch removed or
+                        // reparented mid-animation resolves to null or to a different
+                        // top level, so the original one kept the animation for good:
+                        // its hasAnimations() stays true, the event dispatch thread
+                        // never sleeps, and this branch runs again on every frame --
+                        // firing the change listener each time.
+                        top.deregisterAnimated(this);
                         Switch.this.setValue(value, true);
                     }
                     repaint();

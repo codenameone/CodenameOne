@@ -367,7 +367,7 @@ public class OnOffSwitch extends Container implements ActionSource {
         deltaX = position;
         // The top level rather than the form: getComponentForm() is null by design
         // inside a Window, so the switch threw instead of animating there.
-        TopLevelContainer topLevel = getTopLevelContainer();
+        final TopLevelContainer topLevel = getTopLevelContainer();
         if (topLevel == null) {
             setValue(value);
             return;
@@ -382,10 +382,14 @@ public class OnOffSwitch extends Container implements ActionSource {
                 dragged = true;
                 if (current.isFinished()) {
                     dragged = false;
-                    TopLevelContainer t = getTopLevelContainer();
-                    if (t != null) {
-                        t.deregisterAnimated(this);
-                    }
+                    // Deregistered from the top level that registered it, not
+                    // from wherever this component is now. A switch removed or
+                    // reparented mid-animation resolves to null or to a different
+                    // top level, so the original one kept the animation for good:
+                    // its hasAnimations() stays true, the event dispatch thread
+                    // never sleeps, and this branch runs again on every frame --
+                    // firing the change listener each time.
+                    topLevel.deregisterAnimated(this);
                     OnOffSwitch.this.setValue(value);
                 }
                 repaint();

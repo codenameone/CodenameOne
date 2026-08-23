@@ -110,4 +110,49 @@ class SwitchTest extends UITestBase {
             throw new AssertionError(e);
         }
     }
+
+    /// The animations a form currently has registered.
+    @SuppressWarnings("unchecked")
+    private static java.util.List<com.codename1.ui.animations.Animation> registeredAnimations(
+            com.codename1.ui.Form f) throws Exception {
+        java.lang.reflect.Field fld =
+                com.codename1.ui.Form.class.getDeclaredField("animatableComponents");
+        fld.setAccessible(true);
+        Object v = fld.get(f);
+        return v == null ? new java.util.ArrayList<com.codename1.ui.animations.Animation>()
+                : (java.util.List<com.codename1.ui.animations.Animation>) v;
+    }
+
+    @FormTest
+    void aSwitchRemovedMidAnimationStillComesOffTheFormThatRegisteredIt() throws Exception {
+        com.codename1.ui.Form f = new com.codename1.ui.Form("host",
+                new com.codename1.ui.layouts.BorderLayout());
+        Switch sw = new Switch();
+        f.add(com.codename1.ui.layouts.BorderLayout.CENTER, sw);
+        f.show();
+
+        Method animateTo = Switch.class.getDeclaredMethod("animateTo",
+                boolean.class, int.class, int.class, int.class);
+        animateTo.setAccessible(true);
+        animateTo.invoke(sw, true, 0, 10, 10);
+
+        assertEquals(1, registeredAnimations(f).size(),
+                "the switch registers its animation on the form hosting it");
+        com.codename1.ui.animations.Animation a = registeredAnimations(f).get(0);
+
+        // The switch goes away before the animation finishes. Resolving the top level
+        // again at that point answers null, or answers a different one after a
+        // reparent.
+        f.removeComponent(sw);
+
+        long deadline = System.currentTimeMillis() + 3000;
+        while (!registeredAnimations(f).isEmpty() && System.currentTimeMillis() < deadline) {
+            a.animate();
+        }
+
+        assertTrue(registeredAnimations(f).isEmpty(),
+                "the animation has to come off the form that registered it: left on, that "
+                        + "form never reports itself idle, so the event dispatch thread "
+                        + "cannot sleep and the finished branch runs on every frame");
+    }
 }
