@@ -182,6 +182,23 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             return null;
         }
         CN1WatchSurface.Reading active = readings.get(0);
+        // A relative countdown has to change SIDES when it reaches its target: "in 5m" becomes
+        // "5m ago", which is what formatRelative does everywhere else. The direction is fixed by
+        // the reference type handed to TimeDifferenceComplicationText, so one text cannot span
+        // both -- and nothing would rebuild it, the provider being asked once with no update
+        // period. The timeline is the mechanism for exactly this: a second entry starting at the
+        // target, composed as the moment after it, carries the count-up form.
+        long crossing = relativeCrossing(active);
+        if (crossing > 0) {
+            ComplicationData after = build(type, active, crossing + 1);
+            if (after != null) {
+                long until = active.getNextFlipDate();
+                entries.add(new TimelineEntry(
+                        new TimeInterval(Instant.ofEpochMilli(crossing),
+                                until > crossing ? Instant.ofEpochMilli(until) : Instant.MAX),
+                        after));
+            }
+        }
         if (active.isReloadAtEnd()) {
             CN1WidgetProvider.requestAppRefresh(this, getKindId());
         }
@@ -265,6 +282,15 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
     }
 
     private ComplicationData build(ComplicationType type, CN1WatchSurface.Reading given) {
+        return build(type, given, System.currentTimeMillis());
+    }
+
+    /// As {@link #build(ComplicationType, CN1WatchSurface.Reading)}, but resolving anything that
+    /// depends on "now" against a stated moment. Used to build the entry that takes over when a
+    /// relative countdown reaches its target -- that entry has to be composed as the moment AFTER
+    /// the target, not as now.
+    private ComplicationData build(ComplicationType type, CN1WatchSurface.Reading given,
+            long asOf) {
         CN1WatchSurface.Reading reading = given != null ? given
                 : CN1WatchSurface.read(this, getKindId(), familyFor(type));
         if (reading == null) {
@@ -278,7 +304,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // FACE ticks rather than a string frozen at this request. With the update period at 0
         // there is no later request to refresh it, so a countdown really did stop.
         ComplicationText primary = texts.isEmpty() ? null
-                : textFor(firstTextNode(nodes), reading.getState(), texts.get(0));
+                : textFor(firstTextNode(nodes), reading.getState(), texts.get(0), asOf);
 
         if (ComplicationType.LONG_TEXT.equals(type)) {
             String title = texts.isEmpty() ? getKindId() : texts.get(0);
@@ -338,6 +364,29 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         return null;
     }
 
+    /**
+     * When this reading's primary text stops counting down and starts counting up, or 0.
+     *
+     * <p>Only a {@code relative} node crosses: a timer counts one way by definition, and a clock
+     * or a date does not move at all. Only a target still in the FUTURE matters -- one already
+     * past is counting up from the start and never changes side again.</p>
+     *
+     * @param reading the entry being rendered
+     * @return the crossing moment in epoch millis, or 0 when nothing crosses
+     */
+    private long relativeCrossing(CN1WatchSurface.Reading reading) {
+        if (reading == null) {
+            return 0;
+        }
+        JSONObject node = firstTextNode(CN1WatchSurface.flatten(reading.getLayout()));
+        if (node == null || !"dyn".equals(node.optString("t", ""))
+                || !"relative".equals(node.optString("style", "timerDown"))) {
+            return 0;
+        }
+        long date = CN1WatchSurface.dynamicDate(node, reading.getState());
+        return date > System.currentTimeMillis() ? date : 0;
+    }
+
     /// The first text-bearing node, so the caller can ask what KIND of text it is.
     ///
     /// texts() returns resolved strings and deliberately says nothing about where they came from;
@@ -354,9 +403,10 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
 
     /// A node's complication text: the face-ticked form where the node is dynamic and the style
     /// is one that moves, a plain string otherwise.
-    private ComplicationText textFor(JSONObject node, JSONObject state, String resolved) {
+    private ComplicationText textFor(JSONObject node, JSONObject state, String resolved,
+            long asOf) {
         if (node != null && "dyn".equals(node.optString("t", ""))) {
-            ComplicationText ticking = tickingText(node, state);
+            ComplicationText ticking = tickingText(node, state, asOf);
             if (ticking != null) {
                 return ticking;
             }
@@ -380,7 +430,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
      * @param state the entry state, which may supply the date by key
      * @return the ticking text, or null to fall back to a plain string
      */
-    private ComplicationText tickingText(JSONObject node, JSONObject state) {
+    private ComplicationText tickingText(JSONObject node, JSONObject state, long asOf) {
         long date = CN1WatchSurface.dynamicDate(node, state);
         if (date <= 0 || Build.VERSION.SDK_INT < 26) {
             return null;
@@ -390,7 +440,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             java.time.Instant at = java.time.Instant.ofEpochMilli(date);
             if ("relative".equals(style)) {
                 // "in 3m" / "3m ago" -- a single unit, which is what a relative date reads as.
-                return date > System.currentTimeMillis()
+                return date > asOf
                         ? new TimeDifferenceComplicationText.Builder(
                                 TimeDifferenceStyle.SHORT_SINGLE_UNIT,
                                 new CountDownTimeReference(at)).build()
