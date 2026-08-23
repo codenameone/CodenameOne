@@ -324,6 +324,7 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
 @property (nonatomic, retain) NSMutableDictionary *peersById;
 @property (nonatomic, retain) NSMutableDictionary *invitations;
 @property (nonatomic, retain) NSMutableDictionary *progressByPayload;
+@property (nonatomic, retain) NSMutableSet *everConnected;
 @property (nonatomic, retain) NSString *serviceType;
 @end
 
@@ -411,6 +412,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_peersById release];
     [_invitations release];
     [_progressByPayload release];
+    [_everConnected release];
     [_serviceType release];
     [super dealloc];
 }
@@ -427,26 +429,25 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     return pid == nil ? nil : [self.peersById objectForKey:pid];
 }
 
-/// The short string both devices show the user before accepting.
+/// MultipeerConnectivity gives no comparison token, and this does not invent
+/// one.
 ///
-/// MultipeerConnectivity produces nothing like Nearby Connections'
-/// authentication token, so this is computed from the two display names and
-/// the service, sorted so both ends compute the same value. It is a
-/// comparison aid rather than a secret, which is all the Android one is too.
+/// Nearby Connections derives its authentication digits from the key exchange,
+/// which is what makes comparing them on both screens detect a device in the
+/// middle. MultipeerConnectivity exposes no equivalent: with
+/// `securityIdentity:nil` the peers use ephemeral keys and
+/// `session:didReceiveCertificate:` hands over nothing to bind a token to.
+///
+/// An earlier version hashed the two display names and the service type. That
+/// is public information a relay observes and can reproduce on both of its
+/// sessions, so it would have shown matching digits at both ends while
+/// relaying -- a check that looks like a defence and is not, which is worse
+/// than no check at all. So iOS reports an empty token, which
+/// `IncomingConnection.getAuthenticationToken()` documents as "the platform
+/// does not produce one", and the guide tells iOS apps to verify identity
+/// their own way.
 - (NSString *)tokenForPeer:(MCPeerID *)peer {
-    NSArray *names = [[NSArray arrayWithObjects:
-            self.localPeer.displayName == nil ? @"" : self.localPeer.displayName,
-            peer.displayName == nil ? @"" : peer.displayName, nil]
-            sortedArrayUsingSelector:@selector(compare:)];
-    NSString *material = [NSString stringWithFormat:@"%@|%@|%@",
-            [names objectAtIndex:0], [names objectAtIndex:1],
-            self.serviceType == nil ? @"" : self.serviceType];
-    unsigned long h = 5381;
-    const char *utf8 = [material UTF8String];
-    for (NSUInteger i = 0; utf8 != NULL && utf8[i] != 0; i++) {
-        h = ((h << 5) + h) + (unsigned char)utf8[i];
-    }
-    return [NSString stringWithFormat:@"%04lu", h % 10000];
+    return @"";
 }
 
 // ---- MCSessionDelegate ----------------------------------------------
@@ -457,15 +458,31 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         if (state == MCSessionStateConnecting) {
             return;
         }
+        NSString *pid = cn1nbIdForPeer(peerID);
         NSString *encoded = [self encodePeer:peerID];
         if (state == MCSessionStateConnected) {
+            [self.everConnected addObject:pid];
             com_codename1_impl_ios_IOSNearbyCallbacks_connectionResult___java_lang_String_boolean_int_java_lang_String(
                     getThreadLocalData(), cn1nbJString(encoded), JAVA_TRUE, 0,
                     JAVA_NULL);
-        } else {
+            return;
+        }
+        // NotConnected covers two different events, and reporting both as a
+        // disconnection left an app that was INVITING a peer waiting forever
+        // for a connected/failed answer that never came -- a rejected or
+        // timed-out invitation lands here without ever having been connected.
+        // Only a peer that actually reached Connected can disconnect.
+        if ([self.everConnected containsObject:pid]) {
+            [self.everConnected removeObject:pid];
             com_codename1_impl_ios_IOSNearbyCallbacks_disconnected___java_lang_String(
                     getThreadLocalData(), cn1nbJString(encoded));
+            return;
         }
+        com_codename1_impl_ios_IOSNearbyCallbacks_connectionResult___java_lang_String_boolean_int_java_lang_String(
+                getThreadLocalData(), cn1nbJString(encoded), JAVA_FALSE,
+                CN1_NEARBY_ERR_PEER_UNAVAILABLE,
+                cn1nbJString(@"the peer declined the invitation or it timed"
+                             @" out"));
     }
 }
 
@@ -607,8 +624,15 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.peersById = [NSMutableDictionary dictionary];
         cn1nbTransport.invitations = [NSMutableDictionary dictionary];
         cn1nbTransport.progressByPayload = [NSMutableDictionary dictionary];
+        cn1nbTransport.everConnected = [NSMutableSet set];
     }
-    if (cn1nbTransport.serviceType == nil && serviceId != nil) {
+    if (serviceId != nil) {
+        // Reassigned on EVERY call, not just the first. Caching it meant
+        // stopping discovery for "chat" and starting it for "files" carried on
+        // browsing chat, and an app advertising one service while browsing
+        // another silently used whichever call came first. The advertiser and
+        // browser below are rebuilt per call and read this, so the id the
+        // caller passed is the one that takes effect.
         cn1nbTransport.serviceType = cn1nbServiceType(serviceId);
     }
     if (cn1nbTransport.localPeer == nil) {

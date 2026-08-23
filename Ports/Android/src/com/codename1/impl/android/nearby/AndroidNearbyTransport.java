@@ -121,36 +121,15 @@ public class AndroidNearbyTransport implements NearbyBridge {
         return 0;
     }
 
-    public void requestPermissions(final int requestId, int permissionBits) {
-        // Actually ask. Nearby Connections drives Bluetooth, BLE and Wi-Fi and
-        // refuses to start without the runtime grants, and nothing on the
-        // startAdvertising/startDiscovery path checks them -- so answering a
-        // blanket true here made requestPermissions resolve while the first
-        // real operation failed for a permission the user was never asked
-        // about. AndroidBluetooth.requestPermissions is the shape this
-        // follows, down to running the blocking check on the EDT.
-        final ArrayList<String> perms = new ArrayList<String>();
-        if (Build.VERSION.SDK_INT >= 31) {
-            add(perms, "android.permission.BLUETOOTH_SCAN");
-            add(perms, "android.permission.BLUETOOTH_ADVERTISE");
-            add(perms, "android.permission.BLUETOOTH_CONNECT");
-        }
-        if (Build.VERSION.SDK_INT >= 33) {
-            add(perms, "android.permission.NEARBY_WIFI_DEVICES");
-        } else {
-            // Below 33 Nearby Connections genuinely needs a location grant --
-            // it is not a scan-results technicality there, the API refuses to
-            // start without one.
-            add(perms, "android.permission.ACCESS_FINE_LOCATION");
-        }
-        if (perms.isEmpty()) {
-            com.codename1.nearby.ranging.Ranging.deliverPermissionResult(
-                    requestId, true);
-            return;
-        }
-        // checkForPermission blocks through invokeAndBlock and must run on the
-        // EDT.
-        Display.getInstance().callSerially(requestRunnable(requestId, perms));
+    public void requestPermissions(int requestId, int permissionBits) {
+        // AndroidNearbyBackend owns the permission flow for both halves: the
+        // strings are platform permissions, needing no optional dependency,
+        // and an app using ranging AND transport needs ONE answer covering
+        // both -- which no single backend can give. Reached only through that
+        // coordinator, so this is unreachable; it answers rather than hanging
+        // in case a future caller finds another way in.
+        com.codename1.nearby.ranging.Ranging.deliverPermissionResult(requestId,
+                true);
     }
 
     /// Adds a permission the app has not already been granted.

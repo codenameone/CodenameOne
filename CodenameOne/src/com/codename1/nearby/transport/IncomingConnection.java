@@ -70,9 +70,13 @@ public final class IncomingConnection {
         return endpoint;
     }
 
-    /// The short string both devices compute from this connection. Identical
-    /// on both sides when nothing is in the middle. Never null; empty on a
-    /// platform that does not produce one.
+    /// The short string both devices derive from this connection's key
+    /// exchange. Identical on both sides when nothing is in the middle.
+    ///
+    /// Never null, and **empty on iOS**: MultipeerConnectivity offers no
+    /// material to bind a token to, and inventing one from the service name
+    /// and display names would produce matching digits at both ends of a
+    /// relay. Treat empty as "this platform cannot answer the question".
     public String getAuthenticationToken() {
         return authenticationToken;
     }

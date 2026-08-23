@@ -23,6 +23,7 @@ types.
 | Companion association | yes (iOS 18 and later) | yes (Android 8 and later) | simulated | simulated
 | Presence notifications | -- | yes (Android 12 and later) | simulated | simulated
 | Device-to-device transport | Apple devices only | Android devices only | simulated loopback | simulated loopback
+| Connection authentication token | -- | yes | -- | --
 |===
 
 Branch on the capability queries -- `Ranging.isSupported()`,
@@ -172,11 +173,17 @@ the build log says so.
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearbyDevicesJava005Snippet.java[tag=nearby-devices-java-005,indent=0]
 ----
 
-`getAuthenticationToken()` is a short string both devices compute from the
-connection, and it's the only defense against a device in the middle pretending
-to be the one the user meant. Showing it on both screens and asking whether they
+`getAuthenticationToken()` is a short string both devices derive from the
+connection's own key exchange, so a device relaying between them can't make both
+ends show the same value. Showing it on both screens and asking whether they
 match is what makes the pairing trustworthy; skipping that step is a choice to
 trust whoever answered first.
+
+It's empty on iOS. MultipeerConnectivity exposes nothing to derive one from, and
+a token computed from the service name and the display names would be one a
+relay can reproduce at both ends -- a check that looks like a defense and isn't.
+An iOS app that needs to know who it's talking to has to establish that itself,
+over a channel the relay doesn't control.
 
 Answer every `connectionRequested` without delay. A request that's never answered
 holds radio resources open on both sides until the far end times out.

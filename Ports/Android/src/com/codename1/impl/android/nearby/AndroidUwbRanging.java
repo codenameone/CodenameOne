@@ -167,14 +167,14 @@ public class AndroidUwbRanging implements NearbyBridge {
     }
 
     public void requestPermissions(int requestId, int permissionBits) {
-        boolean granted = true;
-        if ((permissionBits & NearbyBridge.PERMISSION_RANGING) != 0
-                && Build.VERSION.SDK_INT >= 31) {
-            granted = context.checkSelfPermission(
-                    "android.permission.UWB_RANGING")
-                    == PackageManager.PERMISSION_GRANTED;
-        }
-        Ranging.deliverPermissionResult(requestId, granted);
+        // AndroidNearbyBackend owns the permission flow for both halves: the
+        // strings are platform permissions, needing no optional dependency,
+        // and an app using ranging AND transport needs ONE answer covering
+        // both -- which no single backend can give. Reached only through that
+        // coordinator, so this is unreachable; it answers rather than hanging
+        // in case a future caller finds another way in.
+        com.codename1.nearby.ranging.Ranging.deliverPermissionResult(requestId,
+                true);
     }
 
     // ------------------------------------------------------------------

@@ -4375,13 +4375,43 @@ public class IPhoneBuilder extends Executor {
                 enableNearbyDefine(buildinRes, "CN1_INCLUDE_NEARBY");
                 if (usesNearbyRanging) {
                     enableNearbyDefine(buildinRes, "CN1_NEARBY_RANGING");
-                    // Background ranging needs an entitlement Apple grants on
-                    // the App ID. Injected only when the developer asks for
-                    // it, because an entitlement the App ID does not carry
-                    // fails codesigning with an error that names the
-                    // entitlement and not the reason it appeared -- the same
-                    // trap com.apple.developer.homekit sets, handled the same
-                    // way. RangingCapabilities.isBackgroundRangingSupported()
+                    // com.apple.developer.nearby-interaction stays behind the
+                    // hint, and is NOT injected for ordinary foreground
+                    // ranging.
+                    //
+                    // It was suggested that the entitlement gates access to
+                    // the framework itself rather than only background
+                    // execution, and that a foreground build therefore links
+                    // Nearby Interaction but cannot run an NISession. Three
+                    // things say otherwise, and all three are checkable
+                    // without a device:
+                    //
+                    //  - The entitlement arrived with iOS 16. Nearby
+                    //    Interaction shipped in iOS 14 and NISession.isSupported
+                    //    is deprecated FROM 16 -- so two OS versions of
+                    //    foreground ranging predate the entitlement entirely,
+                    //    and requiring it would have broken every app built
+                    //    against them.
+                    //  - NIError declares no missing-entitlement code. Its
+                    //    failures are InvalidConfiguration, SessionFailed,
+                    //    ResourceUsageTimeout, ActiveSessionsLimitExceeded,
+                    //    UserDidNotAllow, InvalidARConfiguration and
+                    //    AccessoryPeerDeviceUnavailable. What gates a session
+                    //    on consent is UserDidNotAllow, and what governs that
+                    //    is the NSNearbyInteraction* usage string the catalog
+                    //    entry already injects.
+                    //  - Apple documents the capability as permitting Nearby
+                    //    Interaction in the BACKGROUND.
+                    //
+                    // Injecting it unconditionally is not free: an entitlement
+                    // the App ID does not carry fails codesigning with an error
+                    // naming the entitlement and not the reason it appeared,
+                    // which is the trap com.apple.developer.homekit sets and
+                    // the reason that one is behind a hint too. So the cost of
+                    // being wrong in this direction is every ranging app
+                    // failing to sign; the cost of being wrong the other way
+                    // is background ranging needing one build hint.
+                    // RangingCapabilities.isBackgroundRangingSupported()
                     // reports false regardless, so nothing promises it.
                     if ("true".equalsIgnoreCase(request.getArg(
                             "ios.nearby.background", "false"))) {

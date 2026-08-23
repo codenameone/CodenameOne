@@ -3064,6 +3064,25 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
+        // Nearby Connections needs the modular play-services-nearby artifact.
+        // Legacy mode adds ONLY the 6.5.87 monolith, which predates that API
+        // by years, while the nearby transport sources are retained for the
+        // same input -- so the generated project would compile
+        // AndroidNearbyTransport against a bundle with no
+        // com.google.android.gms.nearby.connection package in it and fail
+        // with a wall of unresolved imports. Checked here, after every route
+        // into legacy mode has been taken, and refused with a message that
+        // names the cause.
+        if (legacyGplayServicesMode && usesNearbyTransport) {
+            error("Error: com.codename1.nearby.transport needs the modular"
+                    + " play-services-nearby artifact, but this build selected"
+                    + " the legacy monolithic Play Services bundle, which"
+                    + " predates the Nearby Connections API. Remove"
+                    + " android.includeGPlayServices (and build against a"
+                    + " version newer than 3.3) -- the nearby dependency is"
+                    + " added for you.", new RuntimeException());
+            return false;
+        }
         playServicesPlus = !request.getArg("android.playService.plus", "false" ).equals("false");
         playServicesAuth = !request.getArg("android.playService.auth", (Boolean.valueOf(playFlag) || googleServicesJson.exists()) ? "true" : "false").equals("false");
         playServicesBase = !request.getArg("android.playService.base", playFlag).equals("false");

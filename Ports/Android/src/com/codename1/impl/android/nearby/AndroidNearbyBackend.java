@@ -33,18 +33,21 @@ import android.companion.WifiDeviceFilter;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.net.MacAddress;
 import android.os.ParcelUuid;
 
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.impl.android.IntentResultListener;
 import com.codename1.nearby.NearbyAvailability;
 import com.codename1.nearby.NearbyError;
 import com.codename1.nearby.companion.CompanionDevices;
 import com.codename1.nearby.spi.NearbyBridge;
+import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -131,21 +134,91 @@ public class AndroidNearbyBackend implements NearbyBridge {
     }
 
     public void requestPermissions(int requestId, int permissionBits) {
-        // Delegated to whichever half is present: the permissions differ, and
-        // the ranging half is the one that knows about UWB_RANGING.
-        if (ranging != null) {
-            ranging.requestPermissions(requestId, permissionBits);
+        // Owned here rather than delegated to the two optional backends, for
+        // two reasons that between them killed the previous arrangement.
+        //
+        // Delegating by "whichever half is loaded" handed an app that uses
+        // both its discovery, advertise and connect bits to the UWB backend,
+        // which knows only UWB_RANGING, ignores the rest and reports success
+        // -- so the transport grants were never requested and the first
+        // advertise failed for a permission the user never saw. Splitting the
+        // request in two instead needs the two answers joined into the single
+        // result the caller is waiting on, and neither backend can be asked
+        // for a partial answer through an SPI whose only reply path is a
+        // request id the caller owns.
+        //
+        // None of this needs an optional dependency: these are platform
+        // permission strings and AndroidImplementation.checkForPermission is
+        // in the always-compiled half of the port. So one list, one pass, one
+        // answer.
+        final ArrayList<String> perms = new ArrayList<String>();
+        if ((permissionBits & NearbyBridge.PERMISSION_RANGING) != 0
+                && Build.VERSION.SDK_INT >= 31) {
+            add(perms, "android.permission.UWB_RANGING");
+        }
+        boolean transportBits = (permissionBits
+                & (NearbyBridge.PERMISSION_DISCOVERY
+                        | NearbyBridge.PERMISSION_ADVERTISE
+                        | NearbyBridge.PERMISSION_CONNECT)) != 0;
+        if (transportBits) {
+            if (Build.VERSION.SDK_INT >= 31) {
+                if ((permissionBits & NearbyBridge.PERMISSION_DISCOVERY) != 0) {
+                    add(perms, "android.permission.BLUETOOTH_SCAN");
+                }
+                if ((permissionBits & NearbyBridge.PERMISSION_ADVERTISE) != 0) {
+                    add(perms, "android.permission.BLUETOOTH_ADVERTISE");
+                }
+                if ((permissionBits & NearbyBridge.PERMISSION_CONNECT) != 0) {
+                    add(perms, "android.permission.BLUETOOTH_CONNECT");
+                }
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                add(perms, "android.permission.NEARBY_WIFI_DEVICES");
+            } else {
+                // Below 33 Nearby Connections genuinely refuses to start
+                // without a location grant; it is not a scan-results
+                // technicality there.
+                add(perms, "android.permission.ACCESS_FINE_LOCATION");
+            }
+        }
+        if (perms.isEmpty()) {
+            // Nothing left to ask for -- everything is already granted, or the
+            // request was for association, which needs no runtime permission
+            // on any Android version because the chooser IS the consent.
+            com.codename1.nearby.ranging.Ranging
+                    .deliverPermissionResult(requestId, true);
             return;
         }
-        if (transport != null) {
-            transport.requestPermissions(requestId, permissionBits);
-            return;
+        // checkForPermission blocks through invokeAndBlock and must run on the
+        // EDT.
+        Display.getInstance().callSerially(
+                permissionRunnable(requestId, perms));
+    }
+
+    /// Adds a permission the app has not already been granted.
+    private void add(ArrayList<String> perms, String permission) {
+        if (activity.checkSelfPermission(permission)
+                != PackageManager.PERMISSION_GRANTED) {
+            perms.add(permission);
         }
-        // Association needs no runtime permission on any Android version --
-        // consent is the chooser itself -- so an app that only associates is
-        // told yes rather than left waiting.
-        com.codename1.nearby.ranging.Ranging.deliverPermissionResult(requestId,
-                true);
+    }
+
+    /// Static so the Runnable carries no synthetic outer reference, which
+    /// SpotBugs reports as SIC_INNER_SHOULD_BE_STATIC_ANON.
+    private static Runnable permissionRunnable(final int requestId,
+            final ArrayList<String> perms) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                boolean all = true;
+                for (String permission : perms) {
+                    all = AndroidImplementation.checkForPermission(permission,
+                            "This is required to find nearby devices") && all;
+                }
+                com.codename1.nearby.ranging.Ranging.deliverPermissionResult(
+                        requestId, all);
+            }
+        };
     }
 
     // ------------------------------------------------------------------
