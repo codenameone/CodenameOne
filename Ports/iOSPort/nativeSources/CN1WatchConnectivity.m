@@ -902,6 +902,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     NSMutableArray<NSString *> *_pendingComplicationOrder;
     /// The kind currently handed to WCSession, or nil when nothing is in flight.
     NSString *_complicationInFlight;
+    /// The exact payload handed over for that kind. Compared by identity when the transfer
+    /// finishes, so a NEWER payload queued for the same kind meanwhile is not mistaken for the
+    /// one that was just delivered and discarded with it.
+    NSDictionary *_complicationInFlightPayload;
     /// Guards the recurring tombstone sweep to a single pending chain; see pruneTombstonesNow.
     BOOL _tombstoneSweepScheduled;
     /// Guards the post-removal deadline sweep to one block, however many paths are removed.
@@ -1042,11 +1046,13 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             return;
         }
         _complicationInFlight = kind;
+        _complicationInFlightPayload = info;
     }
     WCSession *s = [self session];
     if (s == nil) {
         @synchronized (self) {
             _complicationInFlight = nil;
+            _complicationInFlightPayload = nil;
         }
         return;
     }
@@ -1061,16 +1067,34 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 }
 
 /// Retires a kind whose transfer has completed (or failed) and starts the next.
+///
+/// Only the payload that was actually sent is retired. Publishing the same kind again while its
+/// transfer is in flight replaces the queued value with the newer timeline, and removing the
+/// entry unconditionally here threw that replacement away -- the watch then stayed on the older
+/// timeline for good, since the generated provider disables periodic updates. Compared by
+/// identity rather than by kind: it is the same object only if nothing has replaced it.
 - (void)finishComplicationForKind:(NSString *)kind {
     if (kind == nil) {
         return;
     }
     @synchronized (self) {
+        NSDictionary *sent = _complicationInFlightPayload;
         if (_complicationInFlight != nil && [_complicationInFlight isEqualToString:kind]) {
             _complicationInFlight = nil;
+            _complicationInFlightPayload = nil;
         }
-        [_pendingComplications removeObjectForKey:kind];
-        [_pendingComplicationOrder removeObject:kind];
+        NSDictionary *queued = [_pendingComplications objectForKey:kind];
+        if (queued == nil || queued == sent) {
+            // Nothing newer arrived while it was in flight, so this kind is done.
+            [_pendingComplications removeObjectForKey:kind];
+            [_pendingComplicationOrder removeObject:kind];
+        } else {
+            // A newer timeline for the same kind is waiting. Keep it queued -- and move it to the
+            // BACK, so a kind republished in a tight loop cannot hold the head of the queue and
+            // starve the other kinds behind it.
+            [_pendingComplicationOrder removeObject:kind];
+            [_pendingComplicationOrder addObject:kind];
+        }
     }
     [self sendNextComplicationUserInfo];
 }
