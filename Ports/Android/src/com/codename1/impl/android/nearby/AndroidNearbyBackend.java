@@ -392,7 +392,16 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // the platform scan all three transports, which is what the portable
         // API promises for an empty filter list.
         pendingAssociateRequest = requestId;
-        listenForResult(requestId, cdm);
+        if (!listenForResult(requestId, cdm)) {
+            // Nothing would ever answer this request, so it is refused now
+            // rather than left pending while another flow takes its result.
+            pendingAssociateRequest = 0;
+            CompanionDevices.deliverRequestFailed(requestId,
+                    NearbyError.BUSY.ordinal(),
+                    "another activity result is outstanding; try again when"
+                    + " it has finished");
+            return;
+        }
         cdm.associate(request.build(), new CompanionDeviceManager.Callback() {
             @Override
             public void onDeviceFound(IntentSender chooserLauncher) {
@@ -439,10 +448,26 @@ public class AndroidNearbyBackend implements NearbyBridge {
         }
     }
 
-    private void listenForResult(final int requestId,
+    /// Installs the result listener for the association chooser.
+    ///
+    /// #### Returns
+    ///
+    /// true when the listener is in place, false when the activity-result
+    /// channel could not take it -- in which case the chooser must not be
+    /// launched at all
+    private boolean listenForResult(final int requestId,
             final CompanionDeviceManager cdm) {
         if (!(activity instanceof CodenameOneActivity)) {
-            return;
+            return false;
+        }
+        // setIntentResultListener SILENTLY ignores a registration while
+        // another activity-result flow is outstanding -- the camera, the
+        // scanner, anything that called startActivityForResult. Launching
+        // the chooser anyway sent its result to that other listener and left
+        // this request's AsyncResource pending for good, so the caller is
+        // told the truth instead.
+        if (((CodenameOneActivity) activity).isWaitingForResult()) {
+            return false;
         }
         // Taken BEFORE the chooser opens, so the association it creates can be
         // told apart from the ones this app already had.
@@ -472,6 +497,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 }
             }
         });
+        return true;
     }
 
     /// The association the chooser just created.
