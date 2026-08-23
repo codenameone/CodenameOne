@@ -750,6 +750,12 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     // delegate queue that is trying to take the same monitor.
     session.delegate = nil;
     [session disconnect];
+    // The reservation goes too. Clearing the delegate above is what stops the
+    // state callback that normally releases it, so closing a session whose
+    // invitation had not been answered left the slot held -- and every later
+    // STAR or POINT_TO_POINT request answered BUSY until the whole transport
+    // was stopped.
+    [self clearInviting:endpointId];
     // Reported here, because clearing the delegate above is what stops
     // didChangeState:NotConnected from reporting it. A deliberate close is
     // still a disconnection as far as the app is concerned, and suppressing
@@ -2724,13 +2730,27 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                             payloadId, 0, -1, CN1_NEARBY_PAYLOAD_FAILURE);
                 }
             }
-            if (started == 0) {
-                // Nothing was handed to the platform, so answering the
-                // request successfully promised a transfer that will never
-                // report anything at all.
+            if (started != [peers count]) {
+                // EVERY requested transfer has to have started, not just one.
+                // A partial handoff answered successfully told the caller the
+                // payload was with the platform while one recipient's
+                // transfer had never begun -- and the byte path fails the
+                // same case, so the two differed on identical input.
+                //
+                // The ones that DID start are cancelled, because a send the
+                // app has been told failed must not go on to deliver the
+                // file to some of its recipients. Bytes cannot be recalled
+                // once queued; a file can.
+                for (NSProgress *partial in
+                        [cn1nbTransport takeProgressesForPayload:payloadId]) {
+                    [partial cancel];
+                }
                 cn1nbFailTransport(requestId, CN1_NEARBY_ERR_IO_ERROR,
-                        @"the file could not be handed to any of those"
-                         @" endpoints");
+                        started == 0
+                        ? @"the file could not be handed to any of those"
+                           @" endpoints"
+                        : @"the file could not be handed to every one of"
+                           @" those endpoints");
                 return;
             }
             cn1nbTransportOk(requestId);
