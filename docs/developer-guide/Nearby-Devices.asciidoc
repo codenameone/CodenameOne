@@ -166,6 +166,13 @@ only ever discovers Bluetooth services an app declared up front, so set
 your accessories advertise -- without it the picker finds nothing on iOS, and
 the build log says so.
 
+Register the presence listener from your app's `init()` rather than from a form.
+Android may start the process to deliver a sighting and nothing else, with no
+form on screen, and a listener that a form registers doesn't exist yet at that
+point. An event that arrives before any listener is registered is held and
+replayed to the first one that registers, so a wake-up isn't lost, but only the
+64 most recent are kept.
+
 === Transport: Sending Something
 
 [source,java]
