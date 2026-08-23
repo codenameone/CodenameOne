@@ -5,10 +5,20 @@
 # scripts/cn1-device-runtime/store/README.md for why that is deliberate.
 #
 # Without credentials the job reports what is missing and stops. It never
-# publishes half of a release: the two build jobs run independently on their
-# own runners, but publishing is gated on both having reached success (or been
-# skipped because that platform is not configured), so a failing iOS archive
-# cannot leave Google Play with a lone Android upload for the week.
+# publishes half of a release. Two mechanisms hold that together:
+#
+# 1. The two build jobs run independently on their own runners, but publishing
+#    is gated on both having reached success (or been skipped because that
+#    platform is not configured), so a failing iOS archive cannot leave Google
+#    Play with a lone Android upload for the week.
+# 2. Publishing is ordered rather than parallel. iOS uploads first, because
+#    TestFlight has no draft-then-release split -- an upload there is a
+#    release the moment Apple's processing finishes, and there is no undo.
+#    Android's Play upload runs only if the iOS half succeeded, so a failing
+#    iOS upload never leaves Google Play with a lone Android release for the
+#    week. The residual risk is the mirror image (iOS uploaded, Android
+#    upload then fails), which is a follow-up the human can fix while the
+#    Android side sits still, rather than a half-published state.
 name: Device runtime store build
 
 on:
@@ -262,21 +272,25 @@ jobs:
           retention-days: 7
 
   publish-android:
-    # Gated on both build jobs. GitHub applies an implicit `success()` when
-    # the `if:` contains no status-check function, and that would skip this
-    # job whenever any `needs` was skipped -- including the iOS build when
-    # only Android is configured. `always()` is the documented way to opt
-    # out of that implicit gate so the explicit result comparisons below
-    # actually run: Android must have succeeded, iOS must have succeeded or
-    # been skipped, and a failing iOS build still blocks Android publish --
-    # which is what the workflow's opening comment promises.
-    needs: [preflight, build-android, build-ios]
+    # Gated on both build jobs, and additionally on publish-ios having
+    # already succeeded (or been skipped because iOS is not configured).
+    # GitHub applies an implicit `success()` when the `if:` contains no
+    # status-check function, and that would skip this job whenever any
+    # `needs` was skipped -- including the iOS build when only Android is
+    # configured. `always()` is the documented way to opt out of that
+    # implicit gate so the explicit result comparisons below actually run:
+    # Android must have succeeded, iOS must have succeeded or been skipped,
+    # a failing iOS build still blocks Android publish, and a failing
+    # publish-ios keeps Play untouched so we never ship a lone Android
+    # release for the week.
+    needs: [preflight, build-android, build-ios, publish-ios]
     if: >-
       always()
       && !inputs.dry_run
       && needs.preflight.outputs.android == 'true'
       && needs.build-android.result == 'success'
       && (needs.build-ios.result == 'success' || needs.build-ios.result == 'skipped')
+      && (needs.publish-ios.result == 'success' || needs.publish-ios.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

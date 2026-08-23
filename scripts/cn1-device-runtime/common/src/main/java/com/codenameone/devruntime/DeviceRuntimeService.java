@@ -111,11 +111,23 @@ public class DeviceRuntimeService {
     /// first authenticated" race, and no more.
     private static final long PRE_AUTH_MEMORY_CAP = 2L * MAX_BUNDLE;
 
-    /// Monitor + counter for {@link #PRE_AUTH_MEMORY_CAP}. Held for a moment
-    /// on reservation and release; the actual body read happens without the
-    /// lock so slow senders do not block a legitimate second connection.
+    /// The number of concurrent pre-authentication reservations. The memory
+    /// cap alone still admits thousands of tiny-body pushes (128 MiB / 64 KiB
+    /// = 2048 reservations), each holding a socket and its framework
+    /// connection thread -- enough to exhaust the device's file descriptors
+    /// or thread limit without ever having proved possession of the secret.
+    /// Capping the count as well as the byte budget bounds those directly.
+    /// Four leaves room for the "second push during approval" race the
+    /// memory cap is sized for, plus two more.
+    private static final int PRE_AUTH_MAX_CONCURRENT = 4;
+
+    /// Monitor + counter for {@link #PRE_AUTH_MEMORY_CAP} and
+    /// {@link #PRE_AUTH_MAX_CONCURRENT}. Held for a moment on reservation
+    /// and release; the actual body read happens without the lock so slow
+    /// senders do not block a legitimate second connection.
     private static final Object PRE_AUTH_LOCK = new Object();
     private static long preAuthAllocated;
+    private static int preAuthConnections;
 
     private static final DeviceRuntimeService INSTANCE = new DeviceRuntimeService();
 
@@ -840,15 +852,21 @@ public class DeviceRuntimeService {
 
     /// Reserves {@code length} bytes against the aggregate pre-authentication
     /// memory budget. Returns false when the reservation would push the
-    /// running total past {@link #PRE_AUTH_MEMORY_CAP}; the caller then
-    /// rejects rather than allocating and holding a heap slot behind an
-    /// unauthenticated peer.
+    /// running total past {@link #PRE_AUTH_MEMORY_CAP} or when the
+    /// concurrent-reservation count is already at
+    /// {@link #PRE_AUTH_MAX_CONCURRENT}; the caller then rejects rather
+    /// than allocating and holding a heap slot behind an unauthenticated
+    /// peer. The count cap matters even at trivial byte sizes because
+    /// each reservation is backed by a socket and a framework connection
+    /// thread, both of which are exhaustible.
     private static boolean reservePreAuth(int length) {
         synchronized (PRE_AUTH_LOCK) {
-            if (preAuthAllocated + length > PRE_AUTH_MEMORY_CAP) {
+            if (preAuthAllocated + length > PRE_AUTH_MEMORY_CAP
+                    || preAuthConnections >= PRE_AUTH_MAX_CONCURRENT) {
                 return false;
             }
             preAuthAllocated += length;
+            preAuthConnections++;
             return true;
         }
     }
@@ -860,11 +878,15 @@ public class DeviceRuntimeService {
     private static void releasePreAuth(int length) {
         synchronized (PRE_AUTH_LOCK) {
             preAuthAllocated -= length;
+            preAuthConnections--;
             if (preAuthAllocated < 0) {
                 // A double release is a caller bug, but do not let the
                 // counter drift negative -- a later legitimate push would
                 // then reserve more than the cap permits.
                 preAuthAllocated = 0;
+            }
+            if (preAuthConnections < 0) {
+                preAuthConnections = 0;
             }
         }
     }
