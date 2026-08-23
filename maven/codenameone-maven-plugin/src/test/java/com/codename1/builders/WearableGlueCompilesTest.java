@@ -98,7 +98,7 @@ public class WearableGlueCompilesTest {
         collectJava(stubs.toFile(), sources);
         assertTrue(sources.size() > 20, "the stub tree must be there: " + STUBS);
 
-        // The mirror's three collaborators are shimmed rather than compiled: they reach into the
+        // The mirror's collaborators are shimmed rather than compiled: they reach into the
         // RemoteViews renderer and the wider port, and what matters here is that the glue agrees
         // with the mirror, which the port's own build already proves for the rest.
         Path shims = tmp.resolve("shims/com/codename1/impl/android/surfaces");
@@ -130,6 +130,15 @@ public class WearableGlueCompilesTest {
                         + "import android.content.Context;\n"
                         + "public class CN1WatchSurfaceNotifier {\n"
                         + "    public static void requestUpdate(Context c, String k) { }\n"
+                        + "}\n").getBytes("UTF-8"));
+        // The widget provider, which the mirror now reaches for a watch's reload request. Shimmed
+        // like the rest: the real one extends AppWidgetProvider and pulls the whole RemoteViews
+        // surface in behind it, none of which this test is about.
+        Files.write(shims.resolve("CN1WidgetProvider.java"),
+                ("package com.codename1.impl.android.surfaces;\n"
+                        + "import android.content.Context;\n"
+                        + "public class CN1WidgetProvider {\n"
+                        + "    static void requestAppRefresh(Context c, String k) { }\n"
                         + "}\n").getBytes("UTF-8"));
         collectJava(tmp.resolve("shims").toFile(), sources);
 

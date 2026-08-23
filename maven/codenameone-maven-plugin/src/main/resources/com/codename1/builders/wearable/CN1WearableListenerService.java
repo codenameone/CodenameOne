@@ -175,6 +175,18 @@ public class CN1WearableListenerService extends WearableListenerService {
         // node can still send something this process cannot act on -- a reply whose requester died,
         // a malformed request path, a path from a different build -- and launching first brought
         // the UI forward for a message that is discarded a few lines later.
+        if (path.startsWith(CN1WearableBridge.surfaceReloadPath())) {
+            // A watch asking the phone to publish a mirrored kind again. Framework traffic, so it
+            // is answered here and never delivered to the app's own listeners -- the same
+            // position and reasoning the /cn1surface descriptors get on the way down.
+            //
+            // The watch cannot refresh a mirrored surface itself: the content is produced here,
+            // and it has no background-fetch listener recorded because that preference is written
+            // by the publish path a watch never runs.
+            surfaceMirror("reloadRequested",
+                    path.substring(CN1WearableBridge.surfaceReloadPath().length()), null);
+            return;
+        }
         if (path.startsWith(CN1WearableBridge.replyUnavailablePath())) {
             // The peer says it cannot answer -- it is installed and reachable, but has no listener
             // and no permitted way to get one (see CN1WearableBridge.declineRequest). Failing the
@@ -524,7 +536,9 @@ public class CN1WearableListenerService extends WearableListenerService {
             return false;
         }
         try {
-            if (payload == null && "remove".equals(method)) {
+            // A null payload means the two-argument form, whichever method it is: remove and
+            // reloadRequested both take (Context, String) and neither carries bytes.
+            if (payload == null) {
                 Object removed = mirror
                         .getMethod(method, android.content.Context.class, String.class)
                         .invoke(null, this, path);

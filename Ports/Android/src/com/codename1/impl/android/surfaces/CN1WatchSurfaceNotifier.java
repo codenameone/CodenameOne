@@ -66,6 +66,35 @@ public final class CN1WatchSurfaceNotifier {
         requestTileUpdate(ctx, "com.codename1.impl.android.CN1Tile_" + suffix);
     }
 
+    /**
+     * Asks the PHONE to publish this kind again, for a watch that has no content of its own.
+     *
+     * <p>A mirrored kind's descriptors are produced on the phone and sent down, so a watch asking
+     * itself for fresh content asks the wrong device -- and it has no background-fetch listener
+     * recorded anyway, that preference being written by the publish path the watch never runs.
+     * The request goes back over the Data Layer the descriptor came down.</p>
+     *
+     * <p>Reflective for the same reason the update requesters are: CN1WearableBridge is injected
+     * by the build and is simply absent from a project that declares no wearable link, where
+     * there is no phone half to ask.</p>
+     *
+     * @param ctx any context
+     * @param kindId the kind wanting fresh content
+     */
+    static void requestPhoneReload(Context ctx, String kindId) {
+        try {
+            Class<?> bridge = Class.forName("com.codename1.impl.android.CN1WearableBridge");
+            bridge.getMethod("requestSurfaceReload", Context.class, String.class)
+                    .invoke(null, ctx, kindId);
+        } catch (ClassNotFoundException expected) {
+            // No wearable link in this build, so there is no phone half to ask.
+        } catch (NoSuchMethodException expected) {
+            // An older injected bridge. The watch keeps what it has, as it did before.
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not ask the phone to republish " + kindId, t);
+        }
+    }
+
     private static void requestComplicationUpdate(Context ctx, String className) {
         try {
             Class<?> service = Class.forName(className);

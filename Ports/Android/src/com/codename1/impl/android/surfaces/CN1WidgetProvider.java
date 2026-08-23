@@ -166,7 +166,16 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
     static void scheduleAppRefresh(Context context, String kindId, long whenMillis) {
         try {
             String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
-            if (listenerClass == null || whenMillis <= System.currentTimeMillis()) {
+            if (listenerClass == null) {
+                // A mirrored kind on the watch; see requestAppRefresh. The phone is asked NOW
+                // rather than at the timeline's end, because the alarm below needs a local
+                // component to deliver to and this build has none -- the throttle is what keeps
+                // that from being chatty. Asking early costs one phone-side publish; not asking
+                // leaves the complication on its final entry.
+                CN1WatchSurfaceNotifier.requestPhoneReload(context, kindId);
+                return;
+            }
+            if (whenMillis <= System.currentTimeMillis()) {
                 return;
             }
             // The cast sits INSIDE the instanceof branch, which is the shape the cast-semantics
@@ -217,6 +226,13 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
         try {
             String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
             if (listenerClass == null) {
+                // Nothing local to run. On a WATCH this is the normal case for a mirrored kind:
+                // the preference is recorded by publishWidgetTimeline, which the watch never
+                // runs -- its descriptors arrive through CN1SurfaceMirror.receive instead. The
+                // content belongs to the phone, so the phone is who to ask, and the request goes
+                // back over the same Data Layer the descriptor came down. A no-op everywhere
+                // else, including a phone with no background fetch declared.
+                CN1WatchSurfaceNotifier.requestPhoneReload(context, kindId);
                 return;
             }
             if (!CN1SurfaceStore.tryClaimBackgroundFetch(context, kindId,

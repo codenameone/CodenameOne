@@ -496,6 +496,33 @@ public final class CN1SurfaceMirror {
         }
     }
 
+    /**
+     * Republishes a mirrored kind because the watch asked for it.
+     *
+     * <p>Called on the PHONE, where the content actually lives. A watch showing a mirrored
+     * surface cannot refresh it by asking itself -- it has no publish path of its own and no
+     * background-fetch listener recorded, that preference being written by the very method it
+     * never runs -- so it sends the ask back up the link and this answers it.</p>
+     *
+     * <p>The same throttled request a widget makes, so a watch asking repeatedly costs no more
+     * than a home-screen widget doing the same, and an app that declares no background fetch is
+     * unaffected.</p>
+     *
+     * @param ctx any context
+     * @param kindId the kind the watch wants republished
+     * @return true, so the reflective caller treats it as handled
+     */
+    public static boolean reloadRequested(Context ctx, String kindId) {
+        try {
+            if (kindId != null && kindId.length() > 0) {
+                CN1WidgetProvider.requestAppRefresh(ctx, kindId);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not answer a watch request to republish " + kindId, t);
+        }
+        return true;
+    }
+
     /** True when a Data Layer path belongs to this framework rather than to the app. */
     public static boolean isMirrorPath(String path) {
         return path != null && path.startsWith(PATH_PREFIX);
