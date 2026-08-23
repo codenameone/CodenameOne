@@ -7522,6 +7522,29 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     /**
+     * The Wear module's {@code <uses-sdk>}, or nothing when the project set no
+     * {@code android.xmanifest}.
+     *
+     * <p>The ATTRIBUTES only -- no {@code minSdkVersion} or {@code targetSdkVersion}. The wear
+     * module declares its own in build.gradle and the Gradle values win over the manifest, so
+     * repeating the phone's floors here would say something false about a module whose floor is
+     * deliberately higher.</p>
+     *
+     * <p>Emitted only when the hint is set, so an unmodified project's Wear manifest is
+     * byte-identical to what it was.</p>
+     *
+     * @param request the build being generated
+     * @return the element, or an empty string
+     */
+    static String wearUsesSdk(BuildRequest request) {
+        String attributes = request.getArg("android.xmanifest", "");
+        if (attributes == null || attributes.trim().length() == 0) {
+            return "";
+        }
+        return "    <uses-sdk " + attributes.trim() + " />\n";
+    }
+
+    /**
      * The Wear manifest's {@code <application>} opening tag.
      *
      * <p>Written the way the phone manifest writes its own: a default is emitted only when
@@ -7533,6 +7556,7 @@ public class AndroidGradleBuilder extends Executor {
      * @param request the build being generated
      * @return the opening tag, ending with the closing angle bracket and a newline
      */
+
     private String wearApplicationTag(BuildRequest request) {
         String attrs = request.getArg("android.xapplication_attr", "");
         StringBuilder sb = new StringBuilder("    <application");
@@ -7805,6 +7829,13 @@ public class AndroidGradleBuilder extends Executor {
                 + "          package=\"" + request.getPackageName() + "\">\n"
                 + "    <uses-feature android:name=\"android.hardware.type.watch\" "
                 + "android:required=\"true\" />\n"
+                // The uses-sdk attributes the project set with android.xmanifest -- in practice
+                // tools:overrideLibrary, which is how a project accepts a dependency whose own
+                // manifest demands a higher minSdk than the app declares. deriveWearGradle keeps
+                // the phone module's dependency graph, so that same library manifest is merged
+                // into :wear as well, and without the override carried across the wear merge
+                // fails on exactly the conflict the phone build was told to allow.
+                + wearUsesSdk(request)
                 + sharedPermissions
                 // The package-visibility queries, for the same reason the permissions above are
                 // here: this manifest is selected outright rather than merged with the phone's,

@@ -289,6 +289,38 @@ class WearModuleGradleTest {
         assertTrue(!wear.contains("dir: 'libs'"), wear);
     }
 
+    /// android.xmanifest is how a project accepts a dependency whose own manifest demands a
+    /// higher minSdk than the app declares -- tools:overrideLibrary, on uses-sdk. The wear module
+    /// keeps the phone's dependency graph, so it merges that same library manifest and needs the
+    /// same override; without it a project that builds today fails in the wear merge instead.
+    @Test
+    void theWearManifestCarriesAUsesSdkOverride() {
+        BuildRequest overridden =
+                new BuildRequest();
+        overridden.putArgument("android.xmanifest",
+                " tools:overrideLibrary=\"com.example.sdk\"");
+
+        String usesSdk = AndroidGradleBuilder.wearUsesSdk(overridden);
+        assertTrue(usesSdk.contains("<uses-sdk "), usesSdk);
+        assertTrue(usesSdk.contains("tools:overrideLibrary=\"com.example.sdk\""), usesSdk);
+        // The module's floor is 26 and lives in build.gradle, which outranks the manifest. Saying
+        // the phone's floor here would be saying something false about this module.
+        assertFalse(usesSdk.contains("minSdkVersion"), usesSdk);
+        assertFalse(usesSdk.contains("targetSdkVersion"), usesSdk);
+    }
+
+    /// And nothing at all without the hint, so an unmodified project's Wear manifest is exactly
+    /// what it was.
+    @Test
+    void noHintMeansNoUsesSdkElement() {
+        assertEquals("", AndroidGradleBuilder.wearUsesSdk(
+                new BuildRequest()));
+        BuildRequest blank =
+                new BuildRequest();
+        blank.putArgument("android.xmanifest", "   ");
+        assertEquals("", AndroidGradleBuilder.wearUsesSdk(blank));
+    }
+
     /// The watch outranks the phone so Play picks it on a watch, and only the wear module takes
     /// the 26 floor the androidx.wear libraries require.
     @Test

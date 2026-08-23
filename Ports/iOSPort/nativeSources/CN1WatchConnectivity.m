@@ -1092,35 +1092,15 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     if (!s.isPaired || !s.isWatchAppInstalled) {
         // No watch, or no watch app to receive it. Not a failure: most installs are this.
+        //
+        // A FAST PATH ONLY. sendNextComplicationUserInfo asks the same question again about
+        // whatever it is about to send, because a payload can reach it without passing through
+        // here at all. Kept because the common install has no watch, and without it every
+        // publish on such a phone would write a queue file and delete it again.
         return;
     }
-    // The ladder, weakest guarantee last.
-    //
-    // transferCurrentComplicationUserInfo is the only API that WAKES the watch app in the
-    // background to refresh a complication, and it is budgeted -- roughly fifty a day. Spending
-    // one when the user has placed no complication wastes the budget the app will want later,
-    // and spending one that is not there fails outright, so both cases fall through to
-    // transferUserInfo: queued, unbudgeted, and applied whenever the watch app next runs. That
-    // is materially weaker -- a complication may show stale content until then -- which is why
-    // it is the fallback rather than the default.
-    BOOL wantsWake = s.isComplicationEnabled;
-    if (wantsWake && s.remainingComplicationUserInfoTransfers == 0) {
-        wantsWake = NO;
-        NSLog(@"[CN1Surfaces] the watch complication refresh budget is spent for today; "
-              "queueing the update to apply when the watch app next runs");
-    }
-    if (!wantsWake) {
-        // transferUserInfo: QUEUES -- successive calls all survive -- so it needs none of the
-        // sequencing below.
-        @try {
-            [s transferUserInfo:info];
-        } @catch (NSException *ex) {
-            // WCSession raises rather than returning an error for a payload it will not carry.
-            // The publish itself already succeeded, so this is reported and dropped.
-            NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
-        }
-        return;
-    }
+    // Which transfer to spend is decided at the moment of SENDING, not here: see
+    // sendNextComplicationUserInfo.
     [self_ enqueueComplicationUserInfo:info forKind:kind];
 #endif
 }
@@ -1171,6 +1151,47 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             _complicationInFlightPayload = nil;
             _complicationInFlightTransfer = nil;
         }
+        return;
+    }
+    // THE LADDER, weakest guarantee last -- and here rather than at the publish that produced the
+    // payload, because a payload can reach this point without having been judged at all: the
+    // pre-activation queue and the restore from disk both hand over payloads whose publish either
+    // could not ask the session yet or happened in a previous run of the app. Sending those
+    // straight down the budgeted path spends a transfer on a watch with no complication placed,
+    // or on a budget already exhausted -- and the resulting exception retires the payload, which
+    // is the discard this queue exists to prevent.
+    if (!s.isPaired || !s.isWatchAppInstalled) {
+        // Nothing to deliver it to. Retired rather than held for ever: a queue that keeps a
+        // payload for a watch that is not there never drains, and it is persisted, so it would
+        // outlive the process too.
+        [self finishComplicationForKind:kind];
+        return;
+    }
+    // transferCurrentComplicationUserInfo is the only API that WAKES the watch app in the
+    // background to refresh a complication, and it is budgeted -- roughly fifty a day. Spending
+    // one when the user has placed no complication wastes the budget the app will want later,
+    // and spending one that is not there fails outright, so both cases fall through to
+    // transferUserInfo: queued, unbudgeted, and applied whenever the watch app next runs. That
+    // is materially weaker -- a complication may show stale content until then -- which is why
+    // it is the fallback rather than the default.
+    BOOL wantsWake = s.isComplicationEnabled;
+    if (wantsWake && s.remainingComplicationUserInfoTransfers == 0) {
+        wantsWake = NO;
+        NSLog(@"[CN1Surfaces] the watch complication refresh budget is spent for today; "
+              "queueing the update to apply when the watch app next runs");
+    }
+    if (!wantsWake) {
+        @try {
+            // transferUserInfo: QUEUES -- successive calls all survive -- so it needs none of the
+            // in-flight sequencing the budgeted transfer below does. Handed over and retired in
+            // one step, which also drains whatever is behind it.
+            [s transferUserInfo:info];
+        } @catch (NSException *ex) {
+            // WCSession raises rather than returning an error for a payload it will not carry.
+            // The publish itself already succeeded, so this is reported and dropped.
+            NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
+        }
+        [self finishComplicationForKind:kind];
         return;
     }
     @try {
