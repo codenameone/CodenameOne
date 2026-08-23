@@ -792,4 +792,36 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("iphonesimulator", IPhoneBuilder.contextForCondition(
                 "X[sdk=iphonesimulator*]", active).sdk);
     }
+
+    @Test
+    public void aHelperSettingResolvesInTheActiveContext() throws Exception {
+        File extension = tmp.newFolder("dist24", "WalletUIExtension");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_MIN", "10.0");
+        settings.put("EXTENSION_MIN[config=Debug]", "16.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET", "$(EXTENSION_MIN)");
+
+        String target = IPhoneBuilder.appExtensionDeploymentTarget("$(EXTENSION_MIN)",
+                (File) null, "11", extension, settings,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Without the archive's context the Debug qualifier wins by specificity, the reference
+        // looks like 16.0, and the expression is kept -- while Xcode expands it to the Release
+        // base 10.0 and the floor is bypassed.
+        assertEquals("12.0", target);
+    }
+
+    @Test
+    public void variantsWrittenThroughAnotherSettingAreExpanded() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_VARIANTS", "profile");
+        settings.put("BUILD_VARIANTS", "$(EXTENSION_VARIANTS)");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[variant=profile]", "com.example.app.Ext.profile");
+
+        // Xcode expands the chain and applies the profile settings; splitting the raw text
+        // recorded "$(EXTENSION_VARIANTS)" as the variant and matched nothing.
+        assertEquals("com.example.app.Ext.profile", IPhoneBuilder.winningSetting(settings,
+                "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos14.4", "Release", "arm64"));
+    }
 }

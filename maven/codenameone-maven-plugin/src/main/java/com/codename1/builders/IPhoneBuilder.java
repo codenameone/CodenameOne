@@ -4960,9 +4960,13 @@ public class IPhoneBuilder extends Executor {
                             // The configuration this build hands to xcodebuild is Release for a
                             // device archive whatever ios.buildType says, so that is what a
                             // [config=...] condition must be matched against.
+                            // The same context, now that buildSettingsMap holds the archive's own
+                            // settings as well: BUILD_VARIANTS among them.
+                            ArchiveContext buildContext = ArchiveContext.of(archiveSdk,
+                                    archiveConfiguration, archiveArch, buildSettingsMap);
                             File signingEntitlements = appExtensionSigningEntitlements(appExtension,
-                                    buildSettingsMap, extEntitlementsFile, archiveSdk,
-                                    archiveConfiguration, archiveArch);
+                                    buildSettingsMap, extEntitlementsFile, buildContext.sdk,
+                                    buildContext.configuration, buildContext.arch);
                             // The BASE setting is copied into every Xcode configuration, so
                             // writing the archive's answer there hands Debug a minimum belonging
                             // to Release; it gets the base value, clamped on its own. The
@@ -4971,13 +4975,13 @@ public class IPhoneBuilder extends Executor {
                                     buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
                                     signingEntitlements,
                                     request.getArg("ios.deployment_target", null),
-                                    appExtension, buildSettingsMap);
+                                    appExtension, buildSettingsMap, buildContext);
                             String archiveDeploymentTarget = appExtensionDeploymentTarget(
                                     winningSetting(buildSettingsMap, "IPHONEOS_DEPLOYMENT_TARGET",
-                                            archiveSdk, archiveConfiguration, archiveArch),
+                                            buildContext),
                                     signingEntitlements,
                                     request.getArg("ios.deployment_target", null),
-                                    appExtension, buildSettingsMap);
+                                    appExtension, buildSettingsMap, buildContext);
                             buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
                             for (String note : repairQualifiedExtensionSettings(buildSettingsMap,
                                     request.getPackageName(),
@@ -6188,9 +6192,16 @@ public class IPhoneBuilder extends Executor {
         if (valueEnd < 0) {
             return true;
         }
-        String current = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, valueEnd));
+        String exact = WatchNativeBuilder.plistStringContentExact(
+                plist.substring(openEnd + 1, valueEnd));
+        String current = exact == null ? null : exact.trim();
         if (current == null || current.length() == 0) {
             return true;
+        }
+        if (!exact.equals(current)) {
+            // A plist parser keeps that padding, so " com.example.app.Ext " is not the identifier
+            // it reads as -- it is an invalid one. Not ours to keep, whatever it trims to.
+            return false;
         }
         // Through the settings, because $(PRODUCT_BUNDLE_IDENTIFIER) is not automatically safe:
         // the archive may override PRODUCT_BUNDLE_IDENTIFIER itself, with the identifier from the
@@ -6200,8 +6211,9 @@ public class IPhoneBuilder extends Executor {
         if (resolved.length() == 0) {
             // $(EXTENSION_BUNDLE_ID) with nothing defining it does not fall back to the target's
             // identifier -- Xcode expands it to the empty string and the .appex ships with no
-            // identifier at all. The one reference that IS safe, $(PRODUCT_BUNDLE_IDENTIFIER),
-            // resolves through the settings because the caller puts the target's own there.
+            // identifier at all. An unknown reference is therefore the opposite of safe, and the
+            // one reference that IS safe, $(PRODUCT_BUNDLE_IDENTIFIER), resolves through the
+            // settings above because the caller puts the target's own identifier in them.
             return false;
         }
         return resolved.startsWith(hostBundleId + ".");
@@ -7115,7 +7127,12 @@ public class IPhoneBuilder extends Executor {
         static ArchiveContext of(String sdk, String configuration, String arch,
                 Map<String, String> settings) {
             List<String> variants = new ArrayList<String>();
-            String declared = settings == null ? null : settings.get("BUILD_VARIANTS");
+            // Resolved first: BUILD_VARIANTS = $(EXTENSION_VARIANTS) is a chain Xcode expands, and
+            // splitting the raw text recorded "$(EXTENSION_VARIANTS)" as the variant -- so the
+            // [variant=profile] settings Xcode applies were matched against a literal reference.
+            String declaredRaw = settings == null ? null : settings.get("BUILD_VARIANTS");
+            String declared = declaredRaw == null ? null
+                    : resolveSettingsInValue(declaredRaw, settings);
             if (declared != null) {
                 for (String variant : declared.trim().split("\\s+")) {
                     if (variant.length() > 0) {
@@ -7353,15 +7370,32 @@ public class IPhoneBuilder extends Executor {
     /// $(EXTENSION_MIN) is judged by the version it resolves to rather than parsed as none
     static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget,
             File extensionFolder, Map<String, String> settings) {
+        return appExtensionDeploymentTarget(declared, entitlements, appTarget, extensionFolder,
+                settings, null);
+    }
+
+    static String appExtensionDeploymentTarget(String declared, File entitlements, String appTarget,
+            File extensionFolder, Map<String, String> settings, ArchiveContext context) {
         return appExtensionDeploymentTarget(declared,
                 entitlements == null ? new ArrayList<File>() : Arrays.asList(entitlements),
-                appTarget, extensionFolder, settings);
+                appTarget, extensionFolder, settings, context);
     }
 
     /// @param entitlements every file this target may be signed with, since a qualified
     /// CODE_SIGN_ENTITLEMENTS can be the one that carries the Wallet entitlement
     static String appExtensionDeploymentTarget(String declared, List<File> entitlements,
             String appTarget, File extensionFolder, Map<String, String> settings) {
+        return appExtensionDeploymentTarget(declared, entitlements, appTarget, extensionFolder,
+                settings, null);
+    }
+
+    /// @param context the archive's, so a target written through another setting is resolved with
+    /// the conditionals THIS build gets. Rebuilding an empty context here let an inactive
+    /// qualifier -- EXTENSION_MIN[config=Debug] beside a Release build -- win by specificity, and
+    /// the expression was then kept on the strength of a value Xcode never expands it to.
+    static String appExtensionDeploymentTarget(String declared, List<File> entitlements,
+            String appTarget, File extensionFolder, Map<String, String> settings,
+            ArchiveContext context) {
         // The floor is a floor, not a default. An archive exported from an old project may carry
         // IPHONEOS_DEPLOYMENT_TARGET = 10.0 of its own, and honouring that unconditionally would
         // reproduce the very rejection this exists to prevent -- 10.0 does not even build against
@@ -7375,7 +7409,10 @@ public class IPhoneBuilder extends Executor {
             // on a version clearing the floor is kept as written, because Xcode resolves it on the
             // target and that is the archive author's expression to keep.
             String resolved = extensionFolder == null ? "" : resolveSettingsInValue(chosen,
-                    extensionSettingsWithBuiltIns(extensionFolder, settings));
+                    context == null
+                            ? extensionSettingsWithBuiltIns(extensionFolder, settings)
+                            : extensionSettingsWithBuiltIns(extensionFolder, settings,
+                                    context.configuration, context.sdk, context.arch));
             if (resolved.length() == 0) {
                 // And a reference to a setting nothing defines is not "unknown" -- Xcode expands
                 // it to the empty string, so the extension would declare no minimum at all. The

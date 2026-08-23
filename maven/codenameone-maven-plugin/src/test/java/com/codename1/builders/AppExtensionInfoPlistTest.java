@@ -518,4 +518,28 @@ public class AppExtensionInfoPlistTest {
         assertTrue(out.contains("<string>$(MARKETING_VERSION)</string>"));
         assertFalse(changes.toString().contains("CFBundleShortVersionString"));
     }
+
+    @Test
+    public void aPaddedIdentifierIsNotTheIdentifierItReadsAs() {
+        String plist = NO_IDENTITY.replace("<key>CFBundleName</key>",
+                "<key>CFBundleIdentifier</key>\n\t<string> com.new.app.Ext </string>\n"
+                + "\t<key>CFBundleName</key>");
+        List<String> changes = new ArrayList<String>();
+        String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4", "com.new.app",
+                NO_SETTINGS, changes);
+        // A plist parser keeps the padding, so this ships as " com.new.app.Ext " -- an identifier
+        // Apple refuses, however well it trims.
+        assertTrue(out, out.contains("<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>"));
+    }
+
+    @Test
+    public void paddingInsideCdataIsNoDifferent() {
+        String plist = NO_IDENTITY.replace("<key>CFBundleName</key>",
+                "<key>CFBundleIdentifier</key>\n\t<string><![CDATA[ com.new.app.Ext ]]></string>\n"
+                + "\t<key>CFBundleName</key>");
+        List<String> changes = new ArrayList<String>();
+        String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4", "com.new.app",
+                NO_SETTINGS, changes);
+        assertTrue(out, out.contains("<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>"));
+    }
 }
