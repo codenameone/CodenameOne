@@ -762,9 +762,20 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     if ([self takeEverConnected:endpointId]) {
         MCPeerID *peer = [self peerForId:endpointId];
         if (peer != nil) {
+            NSString *encoded = [self encodePeer:peer];
+            // Anything queued for this peer and still unacknowledged has to
+            // be failed HERE. Clearing the delegate above is what stops
+            // didChangeState from reaching takeAllAcksFromPeer, so a
+            // deliberate close left an accepted send with no terminal status
+            // at all -- and its bookkeeping alive until a full stop swept it.
+            for (NSNumber *stranded in [self takeAllAcksFromPeer:endpointId]) {
+                com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                        getThreadLocalData(), cn1nbJString(encoded),
+                        (JAVA_INT)[stranded intValue], 0, -1,
+                        CN1_NEARBY_PAYLOAD_FAILURE);
+            }
             com_codename1_impl_ios_IOSNearbyCallbacks_disconnected___java_lang_String(
-                    getThreadLocalData(),
-                    cn1nbJString([self encodePeer:peer]));
+                    getThreadLocalData(), cn1nbJString(encoded));
         }
     }
 }

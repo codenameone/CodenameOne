@@ -95,6 +95,15 @@ public class AndroidNearbyTransport implements NearbyBridge {
     /// discovering service A had the later call overwrite it, and endpoints
     /// found under A were then encoded as B -- which Endpoint.getServiceId()
     /// documents as the service they were found under.
+    /// Endpoints discovery can currently see.
+    ///
+    /// A peer that arrived through ADVERTISING was never discovered, so a
+    /// rejected or failed handshake leaves it with no callback coming at all
+    /// -- no onEndpointLost, no onDisconnected. Only this tells such a peer
+    /// from one discovery is still showing, whose metadata has to stay.
+    private final java.util.Set<String> discoveredEndpoints =
+            java.util.Collections.synchronizedSet(
+                    new java.util.HashSet<String>());
     /// Endpoints currently connected.
     ///
     /// stop() has to clear the metadata of endpoints nothing will call back
@@ -456,6 +465,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
             for (String id : discoveredOnly) {
                 endpointNames.remove(id);
                 endpointServices.remove(id);
+                discoveredEndpoints.remove(id);
             }
         }
         payloadIds.clear();
@@ -473,6 +483,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
             @Override
             public void onEndpointFound(String endpointId,
                     DiscoveredEndpointInfo info) {
+                discoveredEndpoints.add(endpointId);
                 endpointNames.put(endpointId, info.getEndpointName());
                 endpointServices.put(endpointId, serviceId);
                 NearbyTransport.deliverEndpointFound(
@@ -483,6 +494,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
             public void onEndpointLost(String endpointId) {
                 NearbyTransport.deliverEndpointFound(
                         encode(endpointId, nameOf(endpointId)), false);
+                discoveredEndpoints.remove(endpointId);
                 endpointNames.remove(endpointId);
                 // The service mapping goes with it. Nearby reuses endpoint
                 // ids, so a peer lost under the discovery service could come
@@ -521,6 +533,20 @@ public class AndroidNearbyTransport implements NearbyBridge {
                     connectedEndpoints.add(endpointId);
                 } else {
                     connectedEndpoints.remove(endpointId);
+                    if (!discoveredEndpoints.contains(endpointId)) {
+                        // Arrived through advertising and never connected, so
+                        // nothing else will ever call back about it: neither
+                        // onEndpointLost, which only fires for something
+                        // discovery saw, nor onDisconnected, which needs a
+                        // connection. Left behind, each failed request kept
+                        // its name and service id for the life of the
+                        // process -- and the containsKey guard in
+                        // onConnectionInitiated then preserved that stale
+                        // service id if the same endpoint id came back under
+                        // another advertised service.
+                        endpointNames.remove(endpointId);
+                        endpointServices.remove(endpointId);
+                    }
                 }
                 NearbyTransport.deliverConnectionResult(
                         encode(endpointId, nameOf(endpointId)), ok,
