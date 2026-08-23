@@ -4342,4 +4342,49 @@ class WindowTest extends UITestBase {
                 "and its release has to get through, or the component it went to stays "
                         + "pressed and the key goes on repeating");
     }
+
+    /// Whether any key-repeat slot is currently armed.
+    private static boolean anyKeyRepeatArmed() throws Exception {
+        java.lang.reflect.Field f = Display.class.getDeclaredField("keyRepeatArmed");
+        f.setAccessible(true);
+        boolean[] armed = (boolean[]) f.get(Display.getInstance());
+        for (int iter = 0; iter < armed.length; iter++) {
+            if (armed[iter]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @FormTest
+    void aRejectedKeyPressArmsNoRepeat() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent keys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, keys);
+        main.show();
+        main.setFocused(keys);
+
+        // Refused for certain, rather than by filling the stack to an exact boundary:
+        // drop mode is the same rejection the queue makes when it is full, and the
+        // question here is what happens to the timers when a press is refused, not how
+        // it came to be refused.
+        java.lang.reflect.Field drop = Display.class.getDeclaredField("dropEvents");
+        drop.setAccessible(true);
+        drop.setBoolean(Display.getInstance(), true);
+        try {
+            Display.getInstance().keyPressed(65);
+        } finally {
+            drop.setBoolean(Display.getInstance(), false);
+        }
+        DisplayTest.flushEdt();
+
+        assertEquals(0, keys.pressed,
+                "the press was refused, so the component never saw it");
+        // The repeat and long-press timers fire straight into the top level, so arming
+        // them off a refused press sends keyRepeated() to a component that never got
+        // keyPressed() -- and with the key still held, sends it every frame.
+        assertFalse(anyKeyRepeatArmed(),
+                "and nothing may be armed off a press that was never accepted");
+    }
 }

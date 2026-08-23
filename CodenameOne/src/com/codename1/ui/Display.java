@@ -2148,21 +2148,26 @@ public final class Display extends CN1Constants {
         getImplementation().restoreMinimizedApplication();
     }
 
-    private void addSingleArgumentEvent(int type, int code) {
+    /// #### Returns
+    ///
+    /// true if the event was queued, false if it was dropped -- the caller must not arm
+    /// anything off a press that was never accepted
+    private boolean addSingleArgumentEvent(int type, int code) {
         synchronized (lock) {
             if (this.dropEvents) {
-                return;
+                return false;
             }
             if (isTerminationEvent(type)
                     ? !hasInputEventStackCapacity(2)
                     : !hasDroppableInputEventStackCapacity(2)) {
-                return;
+                return false;
             }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = code;
             inputEventStackPointer++;
             lock.notifyAll();
+            return true;
         }
     }
 
@@ -2527,7 +2532,14 @@ public final class Display extends CN1Constants {
     }
 
     private void keyPressedImpl(int windowId, final int keyCode) {
-        addSingleArgumentEvent(KEY_PRESSED | (windowId << 8), keyCode);
+        if (!addSingleArgumentEvent(KEY_PRESSED | (windowId << 8), keyCode)) {
+            // The press was not accepted, so nothing may be armed off it. The repeat
+            // and long-press timers fire straight into the top level, so a component
+            // that never received keyPressed() would start getting keyRepeated() and
+            // longKeyPress() for a press it never saw -- and with the key still held,
+            // go on getting them.
+            return;
+        }
 
         lastInteractionWasKeypad = lastInteractionWasKeypad || (keyCode != MenuBar.leftSK && keyCode != MenuBar.clearSK && keyCode != MenuBar.backSK);
 

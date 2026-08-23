@@ -372,6 +372,13 @@ public class ImageViewer extends Component {
             // animation unregistered there.
             TopLevelContainer topLevel = getTopLevelContainer();
             if (topLevel != null) {
+                // Remembered, so the animation comes off the top level that took it
+                // rather than off whatever this viewer resolves to when the motion
+                // ends. A viewer removed or reparented mid-zoom resolves to null or to
+                // somewhere else, and the original keeps the animation for good: its
+                // hasAnimations() stays true, so the event dispatch thread never
+                // sleeps and the finished branch runs every frame.
+                zoomAnimationHost = topLevel;
                 topLevel.registerAnimated(this);
             }
         }
@@ -851,12 +858,9 @@ public class ImageViewer extends Component {
             if (motion.isFinished()) {
                 zooming = false;
                 if (!result) {
-                    // The top level rather than the form: getComponentForm() is null
-                    // by design inside a Window, so this both threw and left the
-                    // animation unregistered there.
-                    TopLevelContainer topLevel = getTopLevelContainer();
-                    if (topLevel != null) {
-                        topLevel.deregisterAnimated(this);
+                    if (zoomAnimationHost != null) {
+                        zoomAnimationHost.deregisterAnimated(this);
+                        zoomAnimationHost = null;
                     }
                 }
             }
@@ -1537,7 +1541,13 @@ public class ImageViewer extends Component {
 
     }
 
+    /// The top level this viewer's zoom animation was registered on.
+    private TopLevelContainer zoomAnimationHost;
+
     class AnimatePanX implements Animation {
+        /// The top level this animation was registered on, so it is removed from that
+        /// one rather than from wherever the viewer has since moved.
+        private TopLevelContainer host;
         private final Motion motion;
         private final Image replaceImage;
         private final int updatePos;
@@ -1553,6 +1563,7 @@ public class ImageViewer extends Component {
             // animation against the wrong surface and later deregistered from it.
             TopLevelContainer panTop = getTopLevelContainer();
             if (panTop != null) {
+                host = panTop;
                 panTop.registerAnimated(this);
             }
         }
@@ -1596,9 +1607,9 @@ public class ImageViewer extends Component {
                         getImageRight().unlock();
                     }
                 }
-                TopLevelContainer panTop = getTopLevelContainer();
-                if (panTop != null) {
-                    panTop.deregisterAnimated(this);
+                if (host != null) {
+                    host.deregisterAnimated(this);
+                    host = null;
                 }
             }
             repaint();
