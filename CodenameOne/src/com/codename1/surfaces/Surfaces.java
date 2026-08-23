@@ -235,8 +235,40 @@ public final class Surfaces {
         if (b == null || !b.areWidgetsSupported() || kindId == null || timelineJson == null) {
             return;
         }
-        b.publishWidgetTimeline(kindId, timelineJson,
-                images == null ? Collections.<String, byte[]>emptyMap() : images);
+        b.publishWidgetTimeline(kindId, timelineJson, safeImageNames(images));
+    }
+
+    /// The image side-map with anything that is not a plain blob name removed.
+    ///
+    /// A name here is a content hash produced by `SurfaceSerializer`, and every platform turns it
+    /// into a file inside the kind's own directory. This descriptor did NOT come from this
+    /// process, though -- a server push and the watch mirror both arrive from outside -- so the
+    /// names are input, not something the app computed. A name carrying a separator or a parent
+    /// segment escapes that directory: on iOS the path is composed as `dir + "/" + key + ".png"`
+    /// with no sanitizing of its own, so `../other_kind/hash` plants a blob under a different
+    /// kind, where a later legitimate publish will not replace it -- content-hash names are
+    /// assumed to already hold the right bytes.
+    ///
+    /// Dropped rather than rejected wholesale: a descriptor referencing an image that did not
+    /// arrive renders a gap, which every renderer already tolerates, and refusing the whole
+    /// publish would let one bad name suppress a timeline that is otherwise fine.
+    private static Map<String, byte[]> safeImageNames(Map<String, byte[]> images) {
+        if (images == null || images.isEmpty()) {
+            return Collections.<String, byte[]>emptyMap();
+        }
+        Map<String, byte[]> safe = new LinkedHashMap<String, byte[]>();
+        for (Map.Entry<String, byte[]> e : images.entrySet()) {
+            String name = e.getKey();
+            if (name == null || name.length() == 0 || name.indexOf('/') >= 0
+                    || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0
+                    || name.indexOf('\0') >= 0 || ".".equals(name) || "..".equals(name)) {
+                Log.p("Surfaces: dropping a remote image whose name is not a plain blob name: "
+                        + name);
+                continue;
+            }
+            safe.put(name, e.getValue());
+        }
+        return safe;
     }
 
     /// Asks the platform to re-render widgets from their already-published timelines.

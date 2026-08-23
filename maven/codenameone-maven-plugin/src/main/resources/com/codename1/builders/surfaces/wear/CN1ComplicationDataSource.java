@@ -30,6 +30,8 @@ import android.os.Build;
 import android.util.Log;
 
 import androidx.wear.watchface.complications.data.ComplicationData;
+import androidx.wear.watchface.complications.data.CountDownTimeReference;
+import androidx.wear.watchface.complications.data.CountUpTimeReference;
 import androidx.wear.watchface.complications.data.ComplicationText;
 import androidx.wear.watchface.complications.data.ComplicationType;
 import androidx.wear.watchface.complications.data.LongTextComplicationData;
@@ -39,6 +41,8 @@ import androidx.wear.watchface.complications.data.NoDataComplicationData;
 import androidx.wear.watchface.complications.data.PlainComplicationText;
 import androidx.wear.watchface.complications.data.RangedValueComplicationData;
 import androidx.wear.watchface.complications.data.ShortTextComplicationData;
+import androidx.wear.watchface.complications.data.TimeDifferenceComplicationText;
+import androidx.wear.watchface.complications.data.TimeDifferenceStyle;
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService;
 import androidx.wear.watchface.complications.datasource.ComplicationDataTimeline;
 import androidx.wear.watchface.complications.datasource.ComplicationRequest;
@@ -223,7 +227,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // no honest placeholder to give. Null lets the picker fall back to another type.
             return null;
         }
-        return shortText(shorten(label), null, null);
+        return shortText(null, shorten(label), null, null);
     }
 
     /**
@@ -261,14 +265,24 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         List<String> texts = CN1WatchSurface.texts(nodes, reading.getState());
         PendingIntent tap = tapIntent(reading.getLayout());
         reportDroppedContent(nodes, texts);
+        // The node the primary text came from, so a dynamic one can be handed over as a value the
+        // FACE ticks rather than a string frozen at this request. With the update period at 0
+        // there is no later request to refresh it, so a countdown really did stop.
+        ComplicationText primary = texts.isEmpty() ? null
+                : textFor(firstTextNode(nodes), reading.getState(), texts.get(0));
 
         if (ComplicationType.LONG_TEXT.equals(type)) {
             String title = texts.isEmpty() ? getKindId() : texts.get(0);
             String body = texts.size() > 1 ? join(texts, 1) : "";
+            ComplicationText titleText = primary != null ? primary : plain(title);
+            // The whole value, not just the title. TalkBack reads this instead of the layout, so
+            // omitting the body announced the label of a complication without the thing it says
+            // -- the order status, the message, the number the user actually wanted.
+            String spoken = body.length() == 0 ? title : title + ", " + body;
             LongTextComplicationData.Builder builder =
-                    new LongTextComplicationData.Builder(plain(body.length() == 0 ? title : body),
-                            plain(title))
-                            .setTitle(body.length() == 0 ? null : plain(title))
+                    new LongTextComplicationData.Builder(
+                            body.length() == 0 ? titleText : plain(body), plain(spoken))
+                            .setTitle(body.length() == 0 ? null : titleText)
                             .setTapAction(tap);
             return builder.build();
         }
@@ -284,7 +298,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                     new RangedValueComplicationData.Builder(value, 0f, 1f,
                             plain(texts.isEmpty() ? getKindId() : texts.get(0)));
             if (!texts.isEmpty()) {
-                builder.setText(plain(shorten(texts.get(0))));
+                builder.setText(primary != null ? primary : plain(shorten(texts.get(0))));
             }
             builder.setTapAction(tap);
             return builder.build();
@@ -309,18 +323,97 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // content description, so shortening first handed a screen reader the same seven
             // characters the slot already shows -- losing exactly the text the description exists
             // to supply.
-            return shortText(texts.get(0), texts.size() > 1 ? shorten(texts.get(1)) : null,
-                    tap);
+            return shortText(primary, texts.get(0),
+                    texts.size() > 1 ? shorten(texts.get(1)) : null, tap);
         }
         return null;
     }
 
-    private ShortTextComplicationData shortText(String text, String title,
-            PendingIntent tap) {
+    /// The first text-bearing node, so the caller can ask what KIND of text it is.
+    ///
+    /// texts() returns resolved strings and deliberately says nothing about where they came from;
+    /// a native ticking value needs the node itself.
+    private static JSONObject firstTextNode(List<JSONObject> nodes) {
+        for (JSONObject node : nodes) {
+            String type = node.optString("t", "");
+            if ("text".equals(type) || "dyn".equals(type)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    /// A node's complication text: the face-ticked form where the node is dynamic and the style
+    /// is one that moves, a plain string otherwise.
+    private ComplicationText textFor(JSONObject node, JSONObject state, String resolved) {
+        if (node != null && "dyn".equals(node.optString("t", ""))) {
+            ComplicationText ticking = tickingText(node, state);
+            if (ticking != null) {
+                return ticking;
+            }
+        }
+        return plain(resolved);
+    }
+
+    /**
+     * A dynamic node as a value the watch face advances itself, or null when it cannot be one.
+     *
+     * <p>Only the three time-RELATIVE styles qualify. {@code time} and {@code date} format the
+     * node's OWN timestamp -- a published moment, not the current one -- so handing them to a
+     * clock text would replace the value with whatever time it is now, which is a different
+     * number and a wrong one. They stay plain, and correctly so: nothing about them moves.</p>
+     *
+     * <p>The reward for the three that do qualify is that the face redraws them from its own
+     * clock with no wake-up, which is the only way a countdown ticks at all here: the generated
+     * provider sets no update period, so there is no second request in which to re-render it.</p>
+     *
+     * @param node a {@code dyn} node
+     * @param state the entry state, which may supply the date by key
+     * @return the ticking text, or null to fall back to a plain string
+     */
+    private ComplicationText tickingText(JSONObject node, JSONObject state) {
+        long date = CN1WatchSurface.dynamicDate(node, state);
+        if (date <= 0 || Build.VERSION.SDK_INT < 26) {
+            return null;
+        }
+        String style = node.optString("style", "timerDown");
+        try {
+            java.time.Instant at = java.time.Instant.ofEpochMilli(date);
+            if ("relative".equals(style)) {
+                // "in 3m" / "3m ago" -- a single unit, which is what a relative date reads as.
+                return date > System.currentTimeMillis()
+                        ? new TimeDifferenceComplicationText.Builder(
+                                TimeDifferenceStyle.SHORT_SINGLE_UNIT,
+                                new CountDownTimeReference(at)).build()
+                        : new TimeDifferenceComplicationText.Builder(
+                                TimeDifferenceStyle.SHORT_SINGLE_UNIT,
+                                new CountUpTimeReference(at)).build();
+            }
+            if ("timerUp".equals(style)) {
+                return new TimeDifferenceComplicationText.Builder(TimeDifferenceStyle.STOPWATCH,
+                        new CountUpTimeReference(at)).build();
+            }
+            if ("timerDown".equals(style)) {
+                return new TimeDifferenceComplicationText.Builder(TimeDifferenceStyle.STOPWATCH,
+                        new CountDownTimeReference(at)).build();
+            }
+            return null;
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not build a ticking complication text for kind " + getKindId(), t);
+            return null;
+        }
+    }
+
+    private ShortTextComplicationData shortText(ComplicationText ticking, String text,
+            String title, PendingIntent tap) {
         // The untruncated string becomes the content description, so a screen reader still hears
         // what the layout said even where the slot shows seven characters.
+        //
+        // A ticking value is handed over whole: shortening it would mean rendering it here, which
+        // is the freezing this exists to avoid. The face sizes what it draws.
         ShortTextComplicationData.Builder builder =
-                new ShortTextComplicationData.Builder(plain(shorten(text)), plain(text));
+                new ShortTextComplicationData.Builder(
+                        ticking != null ? ticking : plain(shorten(text)), plain(text));
         if (title != null && title.length() > 0) {
             builder.setTitle(plain(title));
         }
