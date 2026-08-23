@@ -376,6 +376,22 @@ public final class BuildHintCodeGenerator {
                 + "`codenameone_settings.properties`, which continues to work exactly as "
                 + "before. Setting the same hint in both places is a build error.", ""));
         sb.append("///\n");
+        sb.append(doc("A project generated recently already runs the goal that turns these into "
+                + "build hints. An older one may not: a goal's default phase does not add an "
+                + "execution to a project, so the annotations would compile and then be ignored. "
+                + "The build refuses rather than shipping without them, and the module that "
+                + "compiles the main class needs:", ""));
+        sb.append("///\n");
+        sb.append("/// ```xml\n");
+        sb.append("/// <execution>\n");
+        sb.append("///   <id>cn1-process-classes</id>\n");
+        sb.append("///   <phase>process-classes</phase>\n");
+        sb.append("///   <goals>\n");
+        sb.append("///     <goal>process-annotations</goal>\n");
+        sb.append("///   </goals>\n");
+        sb.append("/// </execution>\n");
+        sb.append("/// ```\n");
+        sb.append("///\n");
         sb.append(GENERATED_NOTE);
         sb.append("package ").append(PKG).append(";\n");
         return sb.toString();

@@ -227,6 +227,32 @@ public class BuildHintCatalogTest {
         assertEquals("@Android(xpermissions)", owned2.get("android.xpermissions"));
     }
 
+    /**
+     * The fully qualified spelling needs no import and is equally valid. Missing
+     * it left the hint editable, and Add then wrote the duplicate declaration.
+     */
+    @Test
+    public void fullyQualifiedAnnotationsAreRecognized() {
+        String src = "@com.codename1.annotations.buildhints.Ios(teamId = \"T\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
+
+    /** `@Ios` must not match `@IosPrivacy`, which is a different annotation. */
+    @Test
+    public void aSimpleNameDoesNotMatchALongerAnnotation() {
+        String src = "@IosPrivacy(cameraUsageDescription = \"why\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@IosPrivacy(cameraUsageDescription)",
+                owned.get("ios.NSCameraUsageDescription"));
+        assertTrue(owned.get("ios.teamId") == null,
+                "@IosPrivacy must not be read as @Ios");
+    }
+
     @Test
     public void searchStillMatchesOnNameAndDescription() {
         BuildHintCatalog catalog = BuildHintCatalog.load();

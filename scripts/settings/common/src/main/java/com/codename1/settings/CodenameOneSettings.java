@@ -2193,20 +2193,38 @@ public class CodenameOneSettings extends Lifecycle {
             if (!h.isAnnotated()) {
                 continue;
             }
-            String marker = "@" + h.group().annotationSimpleName();
-            int at = source.indexOf(marker);
-            while (at >= 0) {
-                int open = source.indexOf('(', at);
-                if (open < 0) {
-                    break;
+            String simple = h.group().annotationSimpleName();
+            // Both spellings are valid: the imported simple name, and the fully
+            // qualified one, which needs no import. Missing the qualified form
+            // left the hint editable and Add wrote the duplicate declaration.
+            String[] markers = {
+                "@" + simple,
+                "@com.codename1.annotations.buildhints." + simple,
+            };
+            boolean found = false;
+            for (int m = 0; m < markers.length && !found; m++) {
+                int at = source.indexOf(markers[m]);
+                while (at >= 0) {
+                    // "@Ios" must not match "@IosPrivacy": the next character has
+                    // to end the name.
+                    int after = at + markers[m].length();
+                    if (after < source.length() && continuesAName(source.charAt(after))) {
+                        at = source.indexOf(markers[m], after);
+                        continue;
+                    }
+                    int open = source.indexOf('(', at);
+                    if (open < 0) {
+                        break;
+                    }
+                    String args = balancedArgs(source, open);
+                    if (args != null && declaresAttribute(args, h.attr())) {
+                        out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
+                                "@" + simple + "(" + h.attr() + ")");
+                        found = true;
+                        break;
+                    }
+                    at = source.indexOf(markers[m], after);
                 }
-                String args = balancedArgs(source, open);
-                if (args != null && declaresAttribute(args, h.attr())) {
-                    out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
-                            marker + "(" + h.attr() + ")");
-                    break;
-                }
-                at = source.indexOf(marker, at + marker.length());
             }
         }
     }
@@ -2267,6 +2285,15 @@ public class CodenameOneSettings extends Lifecycle {
             }
         }
         return false;
+    }
+
+    /// Whether `c` could continue a Java identifier.
+    ///
+    /// Hand-rolled because Character.isJavaIdentifierPart is outside the
+    /// Codename One API subset, and this class is compiled as app code.
+    private static boolean continuesAName(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9') || c == '_' || c == '$';
     }
 
     /// If a string, character literal or comment starts at `i`, the index just

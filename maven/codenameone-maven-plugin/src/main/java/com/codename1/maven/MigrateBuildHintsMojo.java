@@ -292,6 +292,16 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     private String verifyAnnotationsAreProcessed(File projectDir, List<String> migratedKeys) {
         getLog().info("cn1: building " + projectDir.getName()
                 + " to confirm the annotations produce the hints...");
+        // Delete any manifest an earlier build left behind first. Checking that
+        // the file exists and holds the right keys proves nothing if it was
+        // already there: with processing now skipped or unbound the nested build
+        // leaves it untouched, the check passes, the properties are deleted, and
+        // the next clean build removes the stale artifact and the hints with it.
+        File emitted = new File(projectDir, "target/classes/" + ANNOTATION_HINTS_RESOURCE);
+        if (emitted.isFile() && !emitted.delete()) {
+            return "Could not remove the previous " + ANNOTATION_HINTS_RESOURCE
+                    + ", so this build's output could not be told apart from it.";
+        }
         File pom = new File(projectDir, "pom.xml");
         InvocationRequest request = new DefaultInvocationRequest();
         request.setPomFile(pom.isFile() ? pom : new File(project.getBasedir(), "pom.xml"));
@@ -311,7 +321,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     + "), so the annotations could not be checked.";
         }
 
-        File emitted = new File(projectDir, "target/classes/" + ANNOTATION_HINTS_RESOURCE);
         if (!emitted.isFile()) {
             return "No " + ANNOTATION_HINTS_RESOURCE + " was written under "
                     + projectDir.getName() + "/target/classes.";

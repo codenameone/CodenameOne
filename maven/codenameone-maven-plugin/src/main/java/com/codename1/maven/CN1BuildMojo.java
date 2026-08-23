@@ -2548,7 +2548,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * written by the annotation processor on every build and deleted by it when
      * the last annotation goes away, so it always reflects the current source.</p>
      */
-    private void mergeAnnotationBuildHints(Properties target, List<String> classpathElements) {
+    private void mergeAnnotationBuildHints(Properties target, List<String> classpathElements)
+            throws MojoFailureException {
         if (target == null || classpathElements == null) {
             return;
         }
@@ -2587,6 +2588,127 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 return;
             }
         }
+        // Nothing was applied. If the compiled classes carry build hint
+        // annotations anyway, the processor never ran -- a mojo's defaultPhase
+        // does not add an execution to a project's POM, so an app that adopts the
+        // annotations without binding process-annotations compiles cleanly and
+        // ships with every annotated hint missing. Refuse rather than build that.
+        String annotated = classCarryingBuildHintAnnotations(classpathElements);
+        if (annotated != null) {
+            throw new MojoFailureException(annotated + " carries build hint annotations, but no "
+                    + ANNOTATION_HINTS_RESOURCE + " was produced, so none of them reached this "
+                    + "build.\n\nThe cn1 process-annotations goal has to run on the module that "
+                    + "compiles it:\n"
+                    + "    <execution>\n"
+                    + "      <id>cn1-process-classes</id>\n"
+                    + "      <phase>process-classes</phase>\n"
+                    + "      <goals>\n"
+                    + "        <goal>process-annotations</goal>\n"
+                    + "      </goals>\n"
+                    + "    </execution>");
+        }
+    }
+
+    /**
+     * The first application class found carrying a build hint annotation, or null.
+     *
+     * <p>Read straight out of the class file's annotation table rather than from
+     * source, so it sees exactly what the compiler emitted.</p>
+     */
+    private String classCarryingBuildHintAnnotations(List<String> classpathElements) {
+        java.util.Collection<String> descriptors =
+                com.codename1.build.shared.BuildHintAnnotationBinding.descriptors();
+        for (String element : classpathElements) {
+            File f = new File(element);
+            if (f.isDirectory()) {
+                String hit = findAnnotatedClass(f, descriptors);
+                if (hit != null) {
+                    return hit;
+                }
+                continue;
+            }
+            // A reactor `package` build hands us the dependency module's jar
+            // rather than its output directory, which is exactly the shape this
+            // check has to work in.
+            if (f.isFile() && f.getName().endsWith(".jar")) {
+                String hit = findAnnotatedClassInJar(f, descriptors);
+                if (hit != null) {
+                    return hit;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String findAnnotatedClassInJar(File jar, java.util.Collection<String> descriptors) {
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar)) {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
+                    continue;
+                }
+                try (InputStream in = zip.getInputStream(entry)) {
+                    String name = carriesBuildHintAnnotation(in, descriptors)
+                            ? entry.getName() : null;
+                    if (name != null) {
+                        return name.substring(0, name.length() - ".class".length())
+                                .replace('/', '.');
+                    }
+                }
+            }
+        } catch (IOException | RuntimeException ex) {
+            getLog().debug("cn1: could not scan " + jar + ": " + ex.getMessage());
+        }
+        return null;
+    }
+
+    private boolean carriesBuildHintAnnotation(InputStream in,
+                                               java.util.Collection<String> descriptors)
+            throws IOException {
+        final boolean[] seen = {false};
+        new org.objectweb.asm.ClassReader(in).accept(
+                new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                    @Override
+                    public org.objectweb.asm.AnnotationVisitor visitAnnotation(
+                            String desc, boolean visible) {
+                        if (descriptors.contains(desc)) {
+                            seen[0] = true;
+                        }
+                        return null;
+                    }
+                },
+                org.objectweb.asm.ClassReader.SKIP_CODE
+                        | org.objectweb.asm.ClassReader.SKIP_DEBUG
+                        | org.objectweb.asm.ClassReader.SKIP_FRAMES);
+        return seen[0];
+    }
+
+    private String findAnnotatedClass(File dir, java.util.Collection<String> descriptors) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return null;
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                String hit = findAnnotatedClass(f, descriptors);
+                if (hit != null) {
+                    return hit;
+                }
+                continue;
+            }
+            if (!f.getName().endsWith(".class")) {
+                continue;
+            }
+            try (InputStream in = new FileInputStream(f)) {
+                if (carriesBuildHintAnnotation(in, descriptors)) {
+                    return f.getName().substring(0, f.getName().length() - ".class".length());
+                }
+            } catch (IOException | RuntimeException ex) {
+                getLog().debug("cn1: could not scan " + f + ": " + ex.getMessage());
+            }
+        }
+        return null;
     }
 
     /**

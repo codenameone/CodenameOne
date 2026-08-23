@@ -46,6 +46,22 @@
 /// continues to work exactly as before. Setting the same hint in both places is
 /// a build error.
 ///
+/// A project generated recently already runs the goal that turns these into
+/// build hints. An older one may not: a goal's default phase does not add an
+/// execution to a project, so the annotations would compile and then be
+/// ignored. The build refuses rather than shipping without them, and the module
+/// that compiles the main class needs:
+///
+/// ```xml
+/// <execution>
+///   <id>cn1-process-classes</id>
+///   <phase>process-classes</phase>
+///   <goals>
+///     <goal>process-annotations</goal>
+///   </goals>
+/// </execution>
+/// ```
+///
 /// Generated from com.codename1.build.shared.BuildHints by
 /// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
 /// re-run scripts/gen-build-hint-annotations.sh.
