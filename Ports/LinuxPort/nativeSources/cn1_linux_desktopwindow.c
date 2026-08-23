@@ -67,6 +67,11 @@ typedef struct {
      * cumulatively from the gesture's BEGIN, so the previous value is what turns
      * it into the incremental multiplier Codename One dispatches. */
     double pinchLastScale;
+    /* Smooth-scroll residue, per window for the same reason as the pinch baseline.
+     * GDK reports touchpad scrolling as a stream of fractional notches; whole
+     * notches are dispatched and the remainder is carried here. */
+    double scrollResidueX;
+    double scrollResidueY;
     /* Back-buffer replacement is deferred to the drawing thread, mirroring the
      * Windows port's pendingResize: GTK reports a resize on its own thread while
      * the event dispatch thread may be painting through g.cr, and freeing the
@@ -332,6 +337,41 @@ static gboolean cn1DesktopOnScroll(GtkWidget* widget, GdkEventScroll* e, gpointe
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, -120);
     } else if (e->direction == GDK_SCROLL_RIGHT) {
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, 120);
+    } else if (e->direction == GDK_SCROLL_SMOOTH) {
+        /* Two-finger touchpad scrolling arrives here and nowhere else. A touchpad
+         * reports no discrete steps, so GDK emits only a smooth event for it, and
+         * gdk_window.c drops that event before delivery unless the widget selected
+         * GDK_SMOOTH_SCROLL_MASK -- which is why the mask above is not optional.
+         * Selecting it also makes GDK drop the pointer-emulated discrete events a
+         * real wheel produces, so the branches above and this one cannot both fire
+         * for one physical movement.
+         *
+         * The deltas are fractions of a notch and arrive continuously, so they
+         * cannot be forwarded one for one: wheelUnits() on the Java side floors any
+         * sub-notch delta to a whole notch, which would turn a gentle drag into a
+         * page-a-frame stampede. Only whole notches are dispatched; the remainder
+         * stays in the window until it adds up. */
+        int vertical;
+        int horizontal;
+        if (e->is_stop) {
+            /* Kinetic end-of-gesture marker. Dropping the residue keeps the next
+             * gesture from inheriting a partial notch from this one. */
+            w->scrollResidueX = 0;
+            w->scrollResidueY = 0;
+            return TRUE;
+        }
+        vertical = cn1LinuxTakeWholeNotches(e->delta_y, &w->scrollResidueY);
+        horizontal = cn1LinuxTakeWholeNotches(e->delta_x, &w->scrollResidueX);
+        if (vertical != 0) {
+            /* delta_y grows downwards, the direction GDK_SCROLL_DOWN reports as
+             * negative units above. */
+            cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_WHEEL,
+                    (int) e->x, (int) e->y, -vertical * 120);
+        }
+        if (horizontal != 0) {
+            cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_HWHEEL,
+                    (int) e->x, (int) e->y, horizontal * 120);
+        }
     }
     return TRUE;
 }
@@ -645,6 +685,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     gtk_widget_add_events(w->drawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
             | GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK
+            | GDK_SMOOTH_SCROLL_MASK
             | GDK_TOUCHPAD_GESTURE_MASK | GDK_TOUCH_MASK);
 
     /* Every handler takes the window as its closure data, which is what makes

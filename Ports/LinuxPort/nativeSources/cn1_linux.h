@@ -103,6 +103,10 @@ typedef enum {
 #define CN1_PE_TOUCH_FLAG     256
 
 /* Pushes one event onto the ring buffer (called from the GTK thread). */
+/* Turns fractional smooth-scroll notches into whole ones, carrying the remainder
+ * in *residue. Shared by the main window and by each secondary window. */
+int cn1LinuxTakeWholeNotches(double delta, double* residue);
+
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode);
 /* Same, but tagged with the desktop window the event came from. */
 void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode);

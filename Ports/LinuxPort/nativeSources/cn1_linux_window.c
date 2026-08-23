@@ -614,6 +614,25 @@ static gboolean cn1OnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointer data)
     return TRUE;
 }
 
+/* Converts a stream of fractional scroll notches into whole ones.
+ *
+ * Smooth scroll deltas are fractions of a notch, so they cannot be forwarded one
+ * for one: wheelUnits() on the Java side floors any sub-notch delta to a whole
+ * notch, and a touchpad emits deltas continuously. Whole notches are returned and
+ * the remainder is carried in *residue until it adds up. Truncation is toward
+ * zero, so the residue always keeps the sign of the travel. */
+int cn1LinuxTakeWholeNotches(double delta, double* residue) {
+    double total = *residue + delta;
+    int notches = (int) total;
+    *residue = total - notches;
+    return notches;
+}
+
+/* The main window's smooth-scroll residue. Secondary windows keep their own in
+ * CN1LinuxWindow, so two windows cannot consume each other's partial notches. */
+static double cn1ScrollResidueX = 0;
+static double cn1ScrollResidueY = 0;
+
 static gboolean cn1OnScroll(GtkWidget* widget, GdkEventScroll* e, gpointer data) {
     (void) widget;
     (void) data;
@@ -626,6 +645,31 @@ static gboolean cn1OnScroll(GtkWidget* widget, GdkEventScroll* e, gpointer data)
         cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, -120);
     } else if (e->direction == GDK_SCROLL_RIGHT) {
         cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, 120);
+    } else if (e->direction == GDK_SCROLL_SMOOTH) {
+        /* Two-finger touchpad scrolling arrives here and nowhere else: a touchpad
+         * reports no discrete steps, so GDK emits only a smooth event for it, and
+         * drops that event before delivery unless the widget selected
+         * GDK_SMOOTH_SCROLL_MASK. Without the mask and this branch the main window
+         * ignored touchpad scrolling entirely. Selecting the mask also makes GDK
+         * drop the pointer-emulated discrete events a real wheel produces, so the
+         * branches above and this one cannot both fire for one movement. */
+        int vertical;
+        int horizontal;
+        if (e->is_stop) {
+            cn1ScrollResidueX = 0;
+            cn1ScrollResidueY = 0;
+            return TRUE;
+        }
+        vertical = cn1LinuxTakeWholeNotches(e->delta_y, &cn1ScrollResidueY);
+        horizontal = cn1LinuxTakeWholeNotches(e->delta_x, &cn1ScrollResidueX);
+        if (vertical != 0) {
+            /* delta_y grows downwards, which GDK_SCROLL_DOWN reports as negative
+             * units above. */
+            cn1LinuxPushEvent(CN1_EVENT_MOUSE_WHEEL, (int) e->x, (int) e->y, -vertical * 120);
+        }
+        if (horizontal != 0) {
+            cn1LinuxPushEvent(CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, horizontal * 120);
+        }
     }
     return TRUE;
 }
@@ -820,7 +864,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     cn1DrawingArea = gtk_drawing_area_new();
     gtk_widget_set_events(cn1DrawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_POINTER_MOTION_MASK |
-            GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_SCROLL_MASK | GDK_TOUCH_MASK |
+            GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_SCROLL_MASK |
+            GDK_SMOOTH_SCROLL_MASK | GDK_TOUCH_MASK |
             GDK_TOUCHPAD_GESTURE_MASK | GDK_STRUCTURE_MASK);
     gtk_widget_set_can_focus(cn1DrawingArea, TRUE);
 
