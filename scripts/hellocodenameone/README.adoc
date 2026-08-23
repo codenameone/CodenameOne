@@ -138,10 +138,12 @@ editing eleven report files and retyping their totals -- which made every
 test-adding branch conflict with every other one, and made the cheapest way to
 a green build typing `pass` next to a test no port had run. Twelve results
 reached `master` that way, attributed to runs that predated the tests. `Validate
-port status contract` now refuses a report whose findings changed while the
-`generated_at`, `commit` and `run_url` naming the run stayed put -- every field
-but those three, so the benchmark durations the page publishes as measurements
-are covered along with the test map.
+port status contract` now refuses a report whose findings changed without a new
+run behind them: every field but `generated_at`, `commit` and `run_url` counts
+as a finding, so the benchmark durations the page publishes as measurements are
+covered along with the test map, and both `run_url` and `generated_at` have to
+name a genuinely different run before the change is believed. (`commit` need not
+move -- a port legitimately re-runs the same master commit.)
 
 "All tests run on all ports" is still enforced, just where it cannot be typed:
 the nightly sweep holds the *published* reports to it. A test left at `not-run`

@@ -522,6 +522,11 @@ def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
 
 
 PROVENANCE_FIELDS = ("generated_at", "commit", "run_url")
+# What has to be *new* before changed findings are believable. `commit` is not
+# among them: a port legitimately re-runs the same master commit, and its second
+# run is a different run. `run_url` is the run's identity and `generated_at` is
+# when it reported; a real snapshot carries new values for both.
+RUN_IDENTITY_FIELDS = ("generated_at", "run_url")
 
 
 def provenance_problems(port_id: str, before: dict, after: dict) -> list[str]:
@@ -547,18 +552,32 @@ def provenance_problems(port_id: str, before: dict, after: dict) -> list[str]:
     )
     if findings[0] == findings[1]:
         return []
-    if any(before.get(field) != after.get(field) for field in PROVENANCE_FIELDS):
+    # Every identity field, not any provenance field. Accepting a change to one
+    # of the three left the gate open to the easier version of the same forgery:
+    # invent a result, type today's date into `generated_at`, and leave the
+    # `commit` and `run_url` still naming the run that never produced it. A
+    # snapshot that came from a run has a new run behind it.
+    if all(
+        before.get(field) != after.get(field) and after.get(field)
+        for field in RUN_IDENTITY_FIELDS
+    ):
         return []
     changed = sorted(
         key
         for key in set(findings[0]) | set(findings[1])
         if findings[0].get(key) != findings[1].get(key)
     )
+    stale = sorted(
+        field
+        for field in RUN_IDENTITY_FIELDS
+        if not (before.get(field) != after.get(field) and after.get(field))
+    )
     return [
-        f"{port_id}: {', '.join(changed)} changed but "
-        f"{', '.join(PROVENANCE_FIELDS)} did not. These reports are CI output -- "
-        "a branch never needs to edit one. Adding a test needs no report change "
-        "at all; each port picks it up on its next master run."
+        f"{port_id}: {', '.join(changed)} changed without a new run behind it -- "
+        f"{', '.join(stale)} still name{'s' if len(stale) == 1 else ''} the "
+        "previous one. These reports are CI output, and a branch never needs to "
+        "edit one. Adding a test needs no report change at all; each port picks "
+        "it up on its next master run."
     ]
 
 

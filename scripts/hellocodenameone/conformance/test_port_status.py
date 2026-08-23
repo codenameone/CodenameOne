@@ -507,7 +507,45 @@ class PortStatusTest(unittest.TestCase):
         after["summary"]["pass"] += 1
         after["generated_at"] = "2026-12-31T00:00:00Z"
         after["commit"] = "0123456789abcdef"
+        after["run_url"] = "https://example.invalid/run/9"
         self.assertEqual([], port_status.provenance_problems("android", before, after))
+
+    def test_provenance_rejects_a_fresh_stamp_over_the_same_run(self):
+        # The easier version of the same forgery, and the one a gate that accepted any single
+        # provenance change would have invited: invent the result, type today's date, and leave
+        # commit and run_url still naming the run that never produced it.
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        after["tests"]["SomeBrandNewTest"] = {"feature": "crypto", "status": "pass"}
+        after["summary"]["pass"] += 1
+        after["generated_at"] = "2026-12-31T00:00:00Z"
+        problems = port_status.provenance_problems("android", before, after)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("run_url", problems[0])
+
+    def test_provenance_rejects_a_new_run_url_on_the_same_stamp(self):
+        # The mirror image. A run reports at a time; reusing the old one says this snapshot is
+        # the same measurement under a different name.
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        after["performance"]["benchmarks"]["quicksort"]["duration_ns"] = 1
+        after["run_url"] = "https://example.invalid/run/9"
+        problems = port_status.provenance_problems("android", before, after)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("generated_at", problems[0])
+
+    def test_provenance_rejects_an_emptied_run_url(self):
+        # "Different" is not enough on its own: deleting the field would otherwise read as a
+        # change and let the edit through with no run named at all.
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        after["tests"]["SomeBrandNewTest"] = {"feature": "crypto", "status": "pass"}
+        after["summary"]["pass"] += 1
+        after["generated_at"] = "2026-12-31T00:00:00Z"
+        after["run_url"] = ""
+        problems = port_status.provenance_problems("android", before, after)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("run_url", problems[0])
 
     def test_provenance_rejects_edited_benchmark_measurements(self):
         # The findings nobody can check by reading them. A benchmark duration is published as a
