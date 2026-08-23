@@ -81,15 +81,21 @@ public class AndroidNearbyBackend implements NearbyBridge {
     }
 
     private NearbyBridge load(String className) {
+        Object instance = null;
         try {
             Class<?> clazz = Class.forName(className);
-            return (NearbyBridge) clazz.getConstructor(Context.class)
+            instance = clazz.getConstructor(Context.class)
                     .newInstance(activity);
         } catch (Throwable t) {
             // The builder deletes the half an app did not reference, so this
             // is the ordinary path rather than an error.
-            return null;
+            instance = null;
         }
+        // Guarded with instanceof rather than cast inside the catch: a failed
+        // cast does not throw under ParparVM, so catching one is a handler
+        // that never runs.
+        return instance instanceof NearbyBridge ? (NearbyBridge) instance
+                : null;
     }
 
     // ------------------------------------------------------------------

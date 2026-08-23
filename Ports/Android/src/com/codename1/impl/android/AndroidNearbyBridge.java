@@ -58,18 +58,24 @@ public class AndroidNearbyBridge implements NearbyBridge {
     /// - `activity`: the host activity, which the backend needs for the
     ///   association chooser
     public AndroidNearbyBridge(Activity activity) {
-        NearbyBridge loaded = null;
+        Object instance = null;
         try {
             Class<?> clazz = Class.forName(
                     "com.codename1.impl.android.nearby.AndroidNearbyBackend");
-            loaded = (NearbyBridge) clazz.getConstructor(Activity.class)
+            instance = clazz.getConstructor(Activity.class)
                     .newInstance(activity);
         } catch (Throwable t) {
             // Expected for every app that never referenced com.codename1
             // .nearby: the builder deleted the package. Nothing to log.
-            loaded = null;
+            instance = null;
         }
-        this.delegate = loaded;
+        // Tested rather than cast inside the catch. A failed cast does not
+        // throw under ParparVM, so a `catch` around one is a handler that
+        // never runs -- and scripts/check-cast-semantics.sh rejects the
+        // shape repo-wide, on Android sources too, so the rule stays one
+        // rule rather than a per-port exception.
+        this.delegate = instance instanceof NearbyBridge
+                ? (NearbyBridge) instance : null;
     }
 
     // ------------------------------------------------------------------
