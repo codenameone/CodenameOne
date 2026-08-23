@@ -234,11 +234,20 @@ public class DeviceRuntimeService {
         return listening;
     }
 
-    /// This device's address on the network, or null.
+    /// This device's address on the network, or null. Accepts both IPv4
+    /// (contains `.`) and IPv6 (contains `:`) forms -- an IPv6-only Wi-Fi
+    /// network is otherwise reachable and the UI needs to show the address
+    /// so the user can type it on the desktop.
     public static String getLocalAddress() {
         try {
             String ip = Socket.getHostOrIP();
-            return ip != null && ip.indexOf('.') > 0 && !isLoopback(ip) ? ip : null;
+            if (ip == null || isLoopback(ip)) {
+                return null;
+            }
+            if (ip.indexOf('.') > 0 || ip.indexOf(':') >= 0) {
+                return ip;
+            }
+            return null;
         } catch (Throwable t) {
             return null;
         }
@@ -591,7 +600,17 @@ public class DeviceRuntimeService {
         } catch (Throwable t) {
             // Some platforms decline; there is nothing to sweep without it.
         }
-        if (self == null || self.indexOf('.') < 0 || isLoopback(self)) {
+        if (self == null || isLoopback(self)) {
+            return false;
+        }
+        if (self.indexOf('.') < 0) {
+            // IPv6-only network: the address space is astronomical, so a
+            // sweep of every host on the local subnet is not a search. The
+            // manual-address flow still works (the UI shows this device's
+            // address via getLocalAddress; the user types it into the
+            // desktop) and dial() reaches an IPv6 desktop the same way it
+            // reaches an IPv4 one.
+            status = "IPv6-only network: enter this device's address on the desktop";
             return false;
         }
         String prefix = self.substring(0, self.lastIndexOf('.') + 1);
