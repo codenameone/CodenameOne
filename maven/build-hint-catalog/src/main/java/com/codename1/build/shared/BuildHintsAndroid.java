@@ -1365,8 +1365,8 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Boolean true/false defaults to true. Set to false to build the phone app alone in a "
-                        + "companion build: the wearable link stays, the watch module is not generated, and the "
-                        + "phone output is exactly what it was before the watch app existed."));
+                        + "companion build: the wearable link stays, no watch module is generated, and the "
+                        + "phone output matches what it was before the watch app existed."));
 
         h.add(new Hint("android.watchVersionCode")
                 .group(HintGroup.ANDROID)
@@ -1374,9 +1374,9 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("The wear module's version code, stated outright. Play requires it to be higher than the "
-                        + "phone's, so a value that is not a whole number above `android.versionCode` fails the "
-                        + "build rather than being silently replaced. Unset, it is derived from "
-                        + "`android.watchVersionCodeOffset`."));
+                        + "phone's, so a value other than a whole number above `android.versionCode` fails the "
+                        + "build rather than being replaced without a word. Leave it unset to derive the value "
+                        + "from `android.watchVersionCodeOffset`."));
 
         h.add(new Hint("android.watchVersionCodeOffset")
                 .group(HintGroup.ANDROID)
@@ -1385,7 +1385,7 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("How far above the phone's version code the wear module's sits when "
-                        + "`android.watchVersionCode` is not set. The default leaves room for the phone app to "
+                        + "`android.watchVersionCode` is unset. The default leaves room for the phone app to "
                         + "keep incrementing without ever catching up."));
 
         h.add(new Hint("android.wear")
