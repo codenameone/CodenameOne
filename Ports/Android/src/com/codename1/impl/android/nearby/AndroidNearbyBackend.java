@@ -242,10 +242,25 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // permission strings and AndroidImplementation.checkForPermission is
         // in the always-compiled half of the port. So one list, one pass, one
         // answer.
+        // The APPLICATION context, and checked for null before anything is
+        // read off it. Everything below only needs package-manager and
+        // permission lookups, which every Context answers, and a bridge
+        // cached for the life of the process legitimately has no activity at
+        // times -- during a recreation, or when reached from a service after
+        // the weak initial activity was collected. Dereferencing one anyway
+        // threw out of a method the facade had already registered an
+        // EdtResult for, so the exception escaped synchronously and left
+        // that permission request pending for good.
+        Context ctx = contextForBackends();
+        if (ctx == null) {
+            com.codename1.nearby.ranging.Ranging
+                    .deliverPermissionResult(requestId, false);
+            return;
+        }
         final ArrayList<String> perms = new ArrayList<String>();
         if ((permissionBits & NearbyBridge.PERMISSION_RANGING) != 0
                 && Build.VERSION.SDK_INT >= 31) {
-            add(perms, "android.permission.UWB_RANGING");
+            add(perms, "android.permission.UWB_RANGING", ctx);
         }
         boolean transportBits = (permissionBits
                 & (NearbyBridge.PERMISSION_DISCOVERY
@@ -260,9 +275,9 @@ public class AndroidNearbyBackend implements NearbyBridge {
             // 12 uses the legacy permissions and location, and asking it for
             // BLUETOOTH_SCAN left the grant it needed unrequested.
             List<String> transport = NearbyPermissions.transportPermissions(
-                    currentActivity(), permissionBits);
+                    ctx, permissionBits);
             for (int i = 0; i < transport.size(); i++) {
-                add(perms, transport.get(i));
+                add(perms, transport.get(i), ctx);
             }
         }
         if (perms.isEmpty()) {
@@ -273,10 +288,19 @@ public class AndroidNearbyBackend implements NearbyBridge {
                     .deliverPermissionResult(requestId, true);
             return;
         }
+        // Asking for a grant DOES need an activity, and there may be none.
+        // Answered false rather than thrown: the caller is waiting on a
+        // result, and "not granted" is both true and something it can act on.
+        Activity host = currentActivity();
+        if (host == null) {
+            com.codename1.nearby.ranging.Ranging
+                    .deliverPermissionResult(requestId, false);
+            return;
+        }
         // checkForPermission blocks through invokeAndBlock and must run on the
         // EDT.
         Display.getInstance().callSerially(
-                permissionRunnable(requestId, perms, currentActivity()));
+                permissionRunnable(requestId, perms, host));
     }
 
     /// Adds a permission the app has not already been granted.
@@ -286,11 +310,12 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// calling it threw NoSuchMethodError rather than answering, which a
     /// transport app on Android 5.0 or 5.1 can reach, since the transport's
     /// minimum is 21.
-    private void add(ArrayList<String> perms, String permission) {
+    private void add(ArrayList<String> perms, String permission,
+            Context ctx) {
         if (Build.VERSION.SDK_INT < 23) {
             return;
         }
-        if (currentActivity().checkSelfPermission(permission)
+        if (ctx.checkSelfPermission(permission)
                 != PackageManager.PERMISSION_GRANTED) {
             perms.add(permission);
         }
@@ -555,8 +580,21 @@ public class AndroidNearbyBackend implements NearbyBridge {
     }
 
     private void launch(IntentSender chooserLauncher, int requestId) {
+        // This runs from the platform's callback, which is a main-looper hop
+        // after the activity was checked -- long enough for it to have gone.
+        // Failed rather than thrown, for the reason requestPermissions is.
+        Activity host = currentActivity();
+        if (host == null) {
+            pendingAssociateRequest = 0;
+            releaseResultListener();
+            CompanionDevices.deliverRequestFailed(requestId,
+                    NearbyError.USER_CANCELED.ordinal(),
+                    "the screen went away before the device chooser could"
+                    + " open; associate again");
+            return;
+        }
         try {
-            currentActivity().startIntentSenderForResult(chooserLauncher,
+            host.startIntentSenderForResult(chooserLauncher,
                     ASSOCIATE_REQUEST, null, 0, 0, 0);
         } catch (IntentSender.SendIntentException e) {
             pendingAssociateRequest = 0;

@@ -516,10 +516,14 @@ public class LocalNearbyBridge implements NearbyBridge {
 
     @Override
     public int getMaxPayloadSize() {
-        // What Nearby Connections allows for a BYTES payload. Matching the
-        // tighter of the two real limits means an app that fits here fits
-        // everywhere.
-        return 32 * 1024;
+        // Nearby Connections allows 32K for a BYTES payload, and the Android
+        // transport spends four of those bytes on the payload-id header it
+        // frames in -- so 32764 is what an app may actually send there, and
+        // the tightest of the real backends is the only honest number for a
+        // simulator to advertise. Reporting the raw 32768 let an app size
+        // itself against the simulator, pass, and then be refused on the
+        // first device it ran on.
+        return 32 * 1024 - 4;
     }
 
     @Override

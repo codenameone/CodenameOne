@@ -4648,6 +4648,25 @@ public class IPhoneBuilder extends Executor {
                             usesBonjour);
                 }
                 if (usesNearbyCompanion) {
+                    // Info.plist keys and NO entitlement, deliberately.
+                    //
+                    // AccessorySetupKit is gated on these declarations, not
+                    // on a capability: there is no
+                    // com.apple.developer.accessory-setup-kit -- Xcode's own
+                    // portal capability list has no such entitlement, and the
+                    // one AccessorySetupKit entitlement that does exist,
+                    // com.apple.developer.accessory-setup-discovery-extension,
+                    // is for an app EXTENSION that offers a third-party
+                    // accessory to the SYSTEM picker. An app presenting its
+                    // own ASAccessorySession picker, which is all this port
+                    // does, is not that.
+                    //
+                    // Adding one anyway would not be harmless. An entitlement
+                    // the App ID does not grant fails signing, so every app
+                    // that merely touches com.codename1.nearby.companion
+                    // would stop building -- which is exactly why the
+                    // nearby-interaction entitlement below is behind an
+                    // explicit hint rather than switched on by use.
                     enableNearbyDefine(buildinRes, "CN1_NEARBY_COMPANION");
                     declareNearbyPlistArray(request,
                             "NSAccessorySetupKitSupports",

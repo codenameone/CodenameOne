@@ -2505,9 +2505,11 @@ JAVA_INT com_codename1_impl_ios_IOSNative_nearbyMaxPayloadSize___R_int(
 #ifdef CN1_NEARBY_HAS_MPC
     // MultipeerConnectivity has no published limit for sendData, but it
     // degrades badly past a few tens of kilobytes and the portable API
-    // promises one number an app can rely on everywhere. Matching the tighter
-    // of the two real backends means a payload that fits here fits on Android.
-    return 32 * 1024;
+    // promises one number an app can rely on everywhere. So this is Android's
+    // number: its 32K Nearby Connections ceiling less the four bytes its
+    // payload-id header takes, which is the tightest of the real backends.
+    // Anything else and "fits here fits everywhere" is false by four bytes.
+    return 32 * 1024 - 4;
 #else
     return 0;
 #endif

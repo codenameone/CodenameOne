@@ -2163,10 +2163,19 @@ public class AndroidGradleBuilder extends Executor {
                     // same classes. Only the call tells them apart, and only
                     // the second should carry the background permissions.
                     if ("com/codename1/nearby/companion/CompanionDevices"
-                            .equals(cls)
-                            && method.contains("ObservingPresence")) {
+                            .equals(cls)) {
                         usesNearbyCompanion = true;
-                        usesNearbyPresence = true;
+                        // START, specifically. stopObservingPresence is a
+                        // cleanup call -- an app version that dropped
+                        // observation still makes it, to undo an observation
+                        // a previous version persisted -- and counting it as
+                        // observing kept the exported companion service and
+                        // the background companion permissions in the
+                        // manifest of an app that no longer observes
+                        // anything, which is the opposite of what the
+                        // per-operation gating above is for.
+                        usesNearbyPresence |=
+                                "startObservingPresence".equals(method);
                     }
                     if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                         usesHealth = true;
