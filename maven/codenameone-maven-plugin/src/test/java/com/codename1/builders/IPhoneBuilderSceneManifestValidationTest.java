@@ -157,4 +157,22 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "UIApplicationSupportsMultipleScenes"),
                 "a key and value that exist only inside a comment enable nothing");
     }
+
+    @Test
+    void aCommentedOutValueIsNotTheKeysValue() {
+        // Found by re-reading the check rather than reported: stepping over a comment's
+        // opening and resuming at the next '<' lands inside the comment, so the value
+        // someone commented out would be read as the live one -- in the direction that
+        // silently enables multi-window on a manifest that disables it.
+        assertFalse(IPhoneBuilder.plistKeyIsTrue(
+                "<key>UIApplicationSupportsMultipleScenes</key>"
+                        + "<!-- <true/> was here --><false/>",
+                "UIApplicationSupportsMultipleScenes"),
+                "the commented-out true must not stand in for the real false");
+        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+                "<key>UIApplicationSupportsMultipleScenes</key>"
+                        + "<!-- <false/> was here --><true/>",
+                "UIApplicationSupportsMultipleScenes"),
+                "and the commented-out false must not hide the real true");
+    }
 }

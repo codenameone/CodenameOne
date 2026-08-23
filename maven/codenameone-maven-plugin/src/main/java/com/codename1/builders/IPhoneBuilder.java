@@ -6892,6 +6892,17 @@ public class IPhoneBuilder extends Executor {
     static String nextElementName(String plist, int from) {
         int lt = plist.indexOf('<', from);
         while (lt >= 0 && lt + 1 < plist.length()) {
+            if (plist.startsWith("<!--", lt)) {
+                // Past the whole comment, not merely past its opening: resuming at the
+                // next '<' lands inside the comment, so a commented-out value would be
+                // read as the key's real one.
+                int close = plist.indexOf("-->", lt);
+                if (close < 0) {
+                    return null;
+                }
+                lt = plist.indexOf('<', close + 3);
+                continue;
+            }
             char kind = plist.charAt(lt + 1);
             if (kind == '!' || kind == '?' || kind == '/') {
                 lt = plist.indexOf('<', lt + 1);
