@@ -4314,4 +4314,32 @@ class WindowTest extends UITestBase {
                 "movement across the window is a drag and still has to get through");
         w.dispose();
     }
+
+    @FormTest
+    void aKeyReleaseSurvivesAFloodOfPointerTraffic() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent keys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, keys);
+        main.show();
+        main.setFocused(keys);
+
+        Display.getInstance().keyPressed(-97);
+
+        // Enough pointer traffic to fill the input stack while the event dispatch
+        // thread has not drained it. Hover rather than drag: drags coalesce into a
+        // single slot, so any number of them would never fill anything -- which is
+        // also why the first version of this test passed without the reserve and
+        // proved nothing.
+        for (int iter = 0; iter < 400; iter++) {
+            Display.getInstance().pointerHover(new int[]{iter % 100}, new int[]{iter % 100});
+        }
+        Display.getInstance().keyReleased(-97);
+        DisplayTest.flushEdt();
+
+        assertEquals(1, keys.pressed, "the press was accepted before the flood");
+        assertEquals(1, keys.released,
+                "and its release has to get through, or the component it went to stays "
+                        + "pressed and the key goes on repeating");
+    }
 }

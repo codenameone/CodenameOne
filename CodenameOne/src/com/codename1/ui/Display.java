@@ -2648,7 +2648,8 @@ public final class Display extends CN1Constants {
                     inputEventStack[lastDragOffset + 1] = y;
                     inputEventStack[lastDragOffset + 2] = (int) (System.currentTimeMillis() - displayInitTime);
                 } else {
-                    if (!hasInputEventStackCapacity(4)) {
+                    // A drag is ordinary input, so it stops short of the reserve.
+                    if (!hasDroppableInputEventStackCapacity(4)) {
                         return;
                     }
                     pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
@@ -2677,7 +2678,9 @@ public final class Display extends CN1Constants {
                 return;
             }
             try {
-                if (!hasInputEventStackCapacity(4)) {
+                if (isTerminationEvent(type)
+                        ? !hasInputEventStackCapacity(4)
+                        : !hasDroppableInputEventStackCapacity(4)) {
                     return;
                 }
                 pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
