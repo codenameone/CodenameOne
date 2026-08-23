@@ -112,16 +112,27 @@
                             <arguments>
                                 <argument>--classes</argument>
                                 <argument>${project.build.outputDirectory}</argument>
-                                <!-- Both roots: a Kotlin project compiles
-                                     `src/main/kotlin` to the same target/classes
-                                     but the SourceFile attributes still name .kt
-                                     files, and the bundle needs those on hand.
-                                     Passing a root that does not exist is a
-                                     no-op inside DevicePush. -->
+                                <!-- Every root the compiler read. Kotlin is
+                                     compiled to the same target/classes but
+                                     the SourceFile attribute still names a
+                                     .kt file, and an annotation processor
+                                     (Lombok, MapStruct) compiles code from
+                                     target/generated-sources/annotations
+                                     whose SourceFile likewise points into
+                                     that tree. Omitting either means the
+                                     bundle reader refuses the whole push
+                                     for missing source. Passing a root that
+                                     does not exist is a no-op inside
+                                     DevicePush, so listing all four is safe
+                                     for projects that use only one. -->
                                 <argument>--source</argument>
                                 <argument>${project.basedir}/src/main/java</argument>
                                 <argument>--source</argument>
                                 <argument>${project.basedir}/src/main/kotlin</argument>
+                                <argument>--source</argument>
+                                <argument>${project.build.directory}/generated-sources/annotations</argument>
+                                <argument>--source</argument>
+                                <argument>${project.build.directory}/generated-sources/kapt/main</argument>
                                 <argument>--port</argument>
                                 <argument>${devruntime.port}</argument>
                             </arguments>
@@ -154,16 +165,27 @@
                             <arguments>
                                 <argument>--classes</argument>
                                 <argument>${project.build.outputDirectory}</argument>
-                                <!-- Both roots: a Kotlin project compiles
-                                     `src/main/kotlin` to the same target/classes
-                                     but the SourceFile attributes still name .kt
-                                     files, and the bundle needs those on hand.
-                                     Passing a root that does not exist is a
-                                     no-op inside DevicePush. -->
+                                <!-- Every root the compiler read. Kotlin is
+                                     compiled to the same target/classes but
+                                     the SourceFile attribute still names a
+                                     .kt file, and an annotation processor
+                                     (Lombok, MapStruct) compiles code from
+                                     target/generated-sources/annotations
+                                     whose SourceFile likewise points into
+                                     that tree. Omitting either means the
+                                     bundle reader refuses the whole push
+                                     for missing source. Passing a root that
+                                     does not exist is a no-op inside
+                                     DevicePush, so listing all four is safe
+                                     for projects that use only one. -->
                                 <argument>--source</argument>
                                 <argument>${project.basedir}/src/main/java</argument>
                                 <argument>--source</argument>
                                 <argument>${project.basedir}/src/main/kotlin</argument>
+                                <argument>--source</argument>
+                                <argument>${project.build.directory}/generated-sources/annotations</argument>
+                                <argument>--source</argument>
+                                <argument>${project.build.directory}/generated-sources/kapt/main</argument>
                                 <argument>--port</argument>
                                 <argument>${devruntime.port}</argument>
                                 <argument>--lan</argument>

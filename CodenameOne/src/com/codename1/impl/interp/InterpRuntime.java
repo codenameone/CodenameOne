@@ -75,11 +75,19 @@ public final class InterpRuntime {
     /// one.
     private static final class Failure {
         private final Object thrown;
+        /// The object interpreted code will see on the operand stack when a
+        /// catch runs -- `getThrown()` for a wrapped InterpObject, and the
+        /// throwable itself when there is no wrapper. Kept alongside
+        /// [#thrown] so a rethrow of either identity is recognised: the
+        /// wrapper is what escapes to host code, but the original is what
+        /// interpreted code pops off the stack and passes to ATHROW.
+        private final Object original;
         private final String[] stack;
         private final String hostCall;
 
-        Failure(Object thrown, String[] stack, String hostCall) {
+        Failure(Object thrown, Object original, String[] stack, String hostCall) {
             this.thrown = thrown;
+            this.original = original;
             this.stack = stack;
             this.hostCall = hostCall;
         }
@@ -2373,7 +2381,7 @@ public final class InterpRuntime {
             // neither what was called nor from where.
             Failure previous = lastFailure;
             if (previous == null || previous.thrown != t) {  //NOPMD CompareObjectsWithEquals - the same throwable instance, not an equal one
-                lastFailure = new Failure(t, snapshotStack(),
+                lastFailure = new Failure(t, t, snapshotStack(),
                         owner.replace('/', '.') + "." + name + desc);
             }
             throw t;
@@ -3593,11 +3601,16 @@ public final class InterpRuntime {
         }
         // Rethrow: `catch (E e) { throw e; }` reaches ATHROW with the same
         // instance the original throw recorded, and Java preserves the stack
-        // of the original throw rather than the rethrow site. Detect that by
-        // instance identity with `lastFailure.thrown` and keep the recorded
-        // stack instead of taking a fresh snapshot.
+        // of the original throw rather than the rethrow site. Detect that
+        // by instance identity: `lastFailure.thrown` is what escapes host
+        // code (an InterpThrowable wrapper for interpreted throwables) and
+        // `.original` is what interpreted code sees on the stack (the
+        // InterpObject or bare host throwable) -- either match makes this a
+        // rethrow, and the recorded stack is kept rather than replaced with
+        // the rethrow site.
         Failure prev = lastFailure;
-        boolean rethrow = prev != null && prev.thrown == t;   //NOPMD CompareObjectsWithEquals - identity is the point
+        boolean rethrow = prev != null                             //NOPMD CompareObjectsWithEquals - identity is the point
+                && (prev.thrown == t || prev.original == t);
         if (t instanceof Throwable) {
             // Deliberately not wrapped. A framework method that calls
             // interpreted code and catches IllegalStateException has to keep
@@ -3605,15 +3618,19 @@ public final class InterpRuntime {
             // interpreted frames are recorded beside it instead, and
             // [#interpretedStackFor] hands them back if it escapes.
             if (!rethrow) {
-                lastFailure = new Failure(t, snapshotStack(), null);
+                lastFailure = new Failure(t, t, snapshotStack(), null);
             }
             return (Throwable) t;
         }
         InterpThrowable wrapped = new InterpThrowable(t, rethrow ? prev.stack : snapshotStack());
-        // Record the wrapper too, so a later `throw e` that catches this
-        // InterpThrowable is recognised as a rethrow and keeps the original
-        // stack rather than replacing it with the rethrow site.
-        lastFailure = new Failure(wrapped, wrapped.getInterpretedStack(), null);
+        // Record BOTH identities: `thrown` = wrapper (what host code sees
+        // and passes to [#interpretedStackFor]) and `original` = the
+        // InterpObject (what a subsequent interpreted `throw e` pops off
+        // the operand stack, since the catch handler pushed `getThrown()`
+        // rather than the wrapper). Without the second, the rethrow would
+        // fail the identity check and land a new snapshot at the rethrow
+        // site rather than preserving the original one.
+        lastFailure = new Failure(wrapped, t, wrapped.getInterpretedStack(), null);
         return wrapped;
     }
 
