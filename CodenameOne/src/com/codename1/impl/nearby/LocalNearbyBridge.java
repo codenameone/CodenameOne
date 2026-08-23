@@ -38,9 +38,12 @@ import com.codename1.nearby.transport.TransportStrategy;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// A working `com.codename1.nearby` implementation with no radio behind it,
 /// used by the simulator, the desktop ports and the JavaScript port.
@@ -139,17 +142,20 @@ public class LocalNearbyBridge implements NearbyBridge {
     private int lastAcceptRequestId;
     /// Payload ids the app has cancelled, so a delivery already queued for
     /// one can report CANCELED instead of SUCCESS.
-    private final java.util.Set<Integer> cancelledPayloads =
-            new java.util.HashSet<Integer>();
-    /// Payload ids whose send has been queued and not yet delivered.
+    private final Set<Integer> cancelledPayloads = new HashSet<Integer>();
+    /// Payload id to the number of queued sends still carrying it.
     ///
-    /// A cancel is only worth recording for one of these. Recorded
-    /// unconditionally, a cancel for an id that had already completed -- or
-    /// one that was never sent -- sat in the set for good, and reusing the
-    /// same immutable Payload in a later send() then consumed the stale
-    /// marker and reported that perfectly good transfer as CANCELED.
-    private final java.util.Set<Integer> pendingPayloads =
-            new java.util.HashSet<Integer>();
+    /// A cancel is only recorded for an id that is in here. Recorded
+    /// unconditionally, a cancel for a transfer that had already completed --
+    /// or an id that was never sent -- sat in the set for good, and reusing
+    /// the same immutable Payload in a later send() consumed the stale marker
+    /// and reported that perfectly good transfer as CANCELED.
+    ///
+    /// A count rather than a set, because the same Payload can be handed to
+    /// several send() calls at once: one portable id, several pending sends,
+    /// and a cancel has to stay in force until the last of them settles.
+    private final Map<Integer, Integer> pendingPayloads =
+            new HashMap<Integer, Integer>();
     /// Where delayed deliveries go while a test drives the clock, or null in
     /// normal operation.
     ///
@@ -705,7 +711,10 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void sendPayload(final int requestId, final String[] endpointIds,
             final int payloadId, final int payloadType, final byte[] bytes,
             final String path) {
-        pendingPayloads.add(Integer.valueOf(payloadId));
+        Integer key = Integer.valueOf(payloadId);
+        Integer outstanding = pendingPayloads.get(key);
+        pendingPayloads.put(key, Integer.valueOf(
+                outstanding == null ? 1 : outstanding.intValue() + 1));
         answer(new Runnable() {
             @Override
             public void run() {
@@ -714,7 +723,20 @@ public class LocalNearbyBridge implements NearbyBridge {
                 // the caller holding a resolved resource and waiting for a
                 // terminal payloadProgress that could never come, which is
                 // exactly the state transfer UI hangs on.
-                pendingPayloads.remove(Integer.valueOf(payloadId));
+                // Settled: one fewer send carrying this id. The cancel
+                // marker outlives it and is dropped with the last one.
+                Integer id = Integer.valueOf(payloadId);
+                // Read BEFORE the count is decremented: the marker is
+                // dropped with the last pending send, and this may be it.
+                boolean cancelled = cancelledPayloads.contains(id);
+                Integer left = pendingPayloads.get(id);
+                int remaining = left == null ? 0 : left.intValue() - 1;
+                if (remaining > 0) {
+                    pendingPayloads.put(id, Integer.valueOf(remaining));
+                } else {
+                    pendingPayloads.remove(id);
+                    cancelledPayloads.remove(id);
+                }
                 boolean any = false;
                 for (String endpointId : endpointIds) {
                     if (findEndpoint(endpointId) != null
@@ -730,8 +752,6 @@ public class LocalNearbyBridge implements NearbyBridge {
                     return;
                 }
                 NearbyTransport.deliverRequestOk(requestId);
-                boolean cancelled = cancelledPayloads.remove(
-                        Integer.valueOf(payloadId));
                 for (String endpointId : endpointIds) {
                     final SimEndpoint e = findEndpoint(endpointId);
                     if (e == null || !connected.contains(endpointId)) {
@@ -769,7 +789,7 @@ public class LocalNearbyBridge implements NearbyBridge {
         // Only for a send that is actually pending: cancelling something that
         // has finished, or an id that was never sent, is a no-op on a real
         // platform and must not leave a marker behind here either.
-        if (pendingPayloads.contains(Integer.valueOf(payloadId))) {
+        if (pendingPayloads.containsKey(Integer.valueOf(payloadId))) {
             cancelledPayloads.add(Integer.valueOf(payloadId));
         }
     }

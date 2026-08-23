@@ -600,6 +600,51 @@ class LocalNearbyTest {
     }
 
     @Test
+    void cancellingReachesEverySendCarryingThatPayloadId() {
+        // The same immutable Payload can be handed to two send() calls, which
+        // is one portable id across two pending sends. Consumed by the first,
+        // the second reported SUCCESS and echoed data the app had cancelled.
+        final List<PayloadTransferUpdate> progress =
+                new ArrayList<PayloadTransferUpdate>();
+        final List<Payload> received = new ArrayList<Payload>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void payloadProgress(Endpoint e, PayloadTransferUpdate u) {
+                progress.add(u);
+            }
+
+            @Override
+            public void payloadReceived(Endpoint e, Payload p) {
+                received.add(p);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        value(NearbyTransport.requestConnection(e, "me"));
+
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        Payload p = Payload.fromBytes(new byte[] {1, 2, 3});
+        NearbyTransport.send(e, p);
+        NearbyTransport.send(e, p);
+        NearbyTransport.cancel(p.getId());
+        drain(queue);
+
+        assertTrue(received.isEmpty(),
+                "neither send may be delivered: " + received);
+        assertEquals(2, progress.size());
+        for (PayloadTransferUpdate u : progress) {
+            assertSame(PayloadStatus.CANCELED, u.getStatus());
+        }
+    }
+
+    @Test
     void cancellingAFinishedPayloadDoesNotPoisonTheNextSend() {
         // Recorded unconditionally, a cancel for an id that had already
         // completed sat in the set for good -- and reusing the same immutable

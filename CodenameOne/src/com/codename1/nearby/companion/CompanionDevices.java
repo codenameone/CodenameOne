@@ -308,7 +308,18 @@ public final class CompanionDevices {
             List<PendingPresence> batch;
             synchronized (LISTENERS) {
                 if (PENDING_PRESENCE.isEmpty()) {
-                    replayingPresence = false;
+                    // Cleared from a runnable queued BEHIND the replay, not
+                    // here. dispatchPresence only queues -- so clearing on
+                    // this thread released the marker while the backlog was
+                    // still waiting to run, and a live event delivered on the
+                    // EDT then ran inline in front of it. The sentinel takes
+                    // its turn after every callback this drain queued.
+                    NearbyRequests.onEdt(new Runnable() {
+                        @Override
+                        public void run() {
+                            finishReplay();
+                        }
+                    });
                     return;
                 }
                 batch = new ArrayList<PendingPresence>(PENDING_PRESENCE);
@@ -318,6 +329,18 @@ public final class CompanionDevices {
                 dispatchPresence(parked.device, parked.present);
             }
         }
+    }
+
+    /// Ends the replay, or continues it when events parked while the backlog
+    /// was in flight.
+    private static void finishReplay() {
+        synchronized (LISTENERS) {
+            if (PENDING_PRESENCE.isEmpty()) {
+                replayingPresence = false;
+                return;
+            }
+        }
+        replayPresence();
     }
 
     /// Removes a listener added by [#addPresenceListener].
