@@ -27,4 +27,3 @@ vm/ByteCodeTranslator/src/cn1_sqlite3.h | SQLite3 Multiple Ciphers public header
 vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h | SQLite3 Multiple Ciphers amalgamation, upstream MIT notice over public-domain SQLite
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js | SQLite3 Multiple Ciphers WebAssembly loader, Emscripten generated, MIT over public-domain SQLite
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js | SQLite3 Multiple Ciphers OPFS proxy worker, MIT over public-domain SQLite
-maven/cn1app-archetype/src/main/resources/archetype-resources/common/src/main/java/__mainName__.java | Archetype template for the application class of a user's own project, not Codename One source; a GPL header here would be applied to the user's code

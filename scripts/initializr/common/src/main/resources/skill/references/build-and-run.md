@@ -198,27 +198,15 @@ This file lives at `common/codenameone_settings.properties`. The most useful key
 codename1.packageName=com.example.myapp
 codename1.mainName=MyAppName
 codename1.displayName=My App Name
-codename1.kotlin=false
 codename1.arg.java.version=17                 # Required: routes the build to the Java 17 build server
+codename1.arg.ios.includePush=false
+codename1.kotlin=false
+codename1.arg.android.xpermissions=...
+codename1.arg.ios.deployment_target=14.0
+codename1.arg.ios.teamId=ABCDEF1234
 ```
 
-Anything prefixed `codename1.arg.<key>` is forwarded to the build server. Note that
-`java.version` stays here on purpose -- it picks the toolchain that compiles the app,
-so it is resolved before any of the app's own classes exist.
-
-Most other build hints are better written as annotations on the main class, where the
-compiler checks them:
-
-```java
-@Ios(includePush = false, deploymentTarget = "14.0", teamId = "ABCDEF1234")
-@Android(xpermissions = "...")
-public class MyAppName extends Lifecycle {
-}
-```
-
-Declaring the same hint in both places fails the build. See
-[`build-hints.md`](build-hints.md) for which hints have an annotation and which are
-still set in the properties file.
+Anything prefixed `codename1.arg.<platform>.<key>` is forwarded to the build server. See [`build-hints.md`](build-hints.md) for the curated index of build hints. The complete reference is in the Codename One Developer Guide at <https://www.codenameone.com/developer-guide/>.
 
 ## Layout invariants
 

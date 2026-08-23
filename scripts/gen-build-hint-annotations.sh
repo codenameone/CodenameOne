@@ -32,17 +32,15 @@ check=0
 echo "gen-build-hint-annotations: building the catalog" >&2
 (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog package -DskipTests)
 
-SKILL_REF="$REPO_ROOT/scripts/initializr/common/src/main/resources/skill/references/build-hints.md"
 JAVASE_SRC="$REPO_ROOT/Ports/JavaSE/src"
 GUIDE_TABLE="$REPO_ROOT/docs/developer-guide/_generated-build-hints.adoc"
 
 java -cp "$CLASSES" com.codename1.build.shared.BuildHintCodeGenerator \
-     "$ANN_ROOT" "$CATALOG_SRC" "$SKILL_REF" "$JAVASE_SRC" "$GUIDE_TABLE"
+     "$ANN_ROOT" "$CATALOG_SRC" "$JAVASE_SRC" "$GUIDE_TABLE"
 
 if [ "$check" -eq 1 ]; then
   targets=("CodenameOne/src/com/codename1/annotations/buildhints"
            "maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintAnnotationBinding.java"
-           "scripts/initializr/common/src/main/resources/skill/references/build-hints.md"
            "Ports/JavaSE/src/com/codename1/impl/javase/BuildHintCatalogDefaults.java"
            "docs/developer-guide/_generated-build-hints.adoc")
   if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
