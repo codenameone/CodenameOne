@@ -576,6 +576,17 @@ public final class InterpRuntime {
                 if ((elem.startsWith("L") || elem.startsWith("["))
                         && !"Ljava/lang/Object;".equals(elem)
                         && !isInterpretedLeaf(elem)) {
+                    // The materialisation is a one-time copy: alias identity
+                    // with the interpreted source is lost, so a host mutation
+                    // through the returned array and a subsequent interpreted
+                    // mutation through the source do not converge. Documented
+                    // as a known deviation in Device-Runtime.asciidoc ("A
+                    // known deviation, returned typed arrays are one-time
+                    // copies"); the alternative -- an alias registry that
+                    // syncs both sides on every crossing -- adds a wrapper to
+                    // every array element access for a rare pattern (an
+                    // override that hands a mutable field-held array back
+                    // and expects both sides to keep writing to it).
                     Object[] typed = materializeTypedArray((Object[]) result, elem, null);
                     if (typed != null) {
                         return typed;
@@ -653,6 +664,7 @@ public final class InterpRuntime {
         int enclosingHostCalls = 0;
         long enclosingRunStart = st.runStartMs;
         int enclosingFuel = st.fuel;
+        boolean enclosingCancelCaughtOnce = st.cancelCaughtOnce;
         if (freshEntry) {
             st.runStartMs = System.currentTimeMillis();
             st.fuel = fuelPerCheck;
@@ -667,7 +679,12 @@ public final class InterpRuntime {
             // next EDT callback's try-with-resources to be skipped when
             // its budget expires. Nested (non-fresh) entries do NOT reset
             // -- they participate in the same cancellation unwind as the
-            // enclosing entry.
+            // enclosing entry. A reentrant fresh entry (a callback
+            // dispatched from inside the outer entry's host call) is also
+            // fresh, so it resets too; the enclosing flag is stashed above
+            // and restored in the `finally` so the outer retry loop's
+            // pending cancellation is not silently re-armed for a fresh
+            // typed catch each time a nested callback returns.
             st.cancelCaughtOnce = false;
         }
         // Entering a method is progress too. A back edge is the usual place to
@@ -695,6 +712,7 @@ public final class InterpRuntime {
                 st.hostCallDepth = enclosingHostCalls;
                 st.runStartMs = enclosingRunStart;
                 st.fuel = enclosingFuel;
+                st.cancelCaughtOnce = enclosingCancelCaughtOnce;
             }
             throw new InterpThrowable(new StackOverflowError(
                     "interpreted call depth exceeded " + maxDepth), snapshotStack());
@@ -719,6 +737,13 @@ public final class InterpRuntime {
                 // iteration and never reach a checkpoint -- so Stop would have
                 // nothing to act on, which is the thing the counter is for.
                 st.fuel = enclosingFuel;
+                // And the cancel-in-flight flag. The outer entry may have
+                // already caught InterpCancelled once through a typed
+                // handler; leaving this callback's clean slate in place
+                // would let the outer retry loop's `catch (Throwable)`
+                // silence the next re-raised cancellation, so Stop and the
+                // EDT budget would be swallowed each pass.
+                st.cancelCaughtOnce = enclosingCancelCaughtOnce;
             }
         }
     }

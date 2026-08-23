@@ -1051,7 +1051,16 @@ public class DeviceRuntimeService {
                 int version = in.readInt();
                 if (version == PROTOCOL_V1) {
                     progress.identify();
-                    if (!loopback) {
+                    // Loopback is authenticated by physical presence only in
+                    // the JavaSE simulator, where it is the same process's
+                    // peer. On a real device -- notably Android, where
+                    // every app shares the TCP loopback namespace -- a local
+                    // app can connect to this listener over 127.0.0.1 and
+                    // would otherwise get an unpaired v1 bundle accepted
+                    // and its entry point run. Require the paired v3
+                    // protocol on the device so the loopback address is
+                    // never mistaken for authorisation.
+                    if (!loopback || !Display.getInstance().isSimulator()) {
                         reject = "this app requires a paired computer; upgrade the push tool";
                     } else {
                         int length = in.readInt();
