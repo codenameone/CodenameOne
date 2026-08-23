@@ -4433,6 +4433,13 @@ public class AndroidGradleBuilder extends Executor {
                     + dataLines
                     + "    </intent-filter>\n"
                     + "</activity>\n";
+            // The watch too. Its manifest is selected outright rather than merged, so nothing
+            // else declares this -- yet the wear module compiles the SAME receiver and the same
+            // lifecycle that handles what it delivers. Without the declaration ACTION_SEND and
+            // ACTION_SEND_MULTIPLE cannot resolve to the watch app at all, so a companion whose
+            // watch half is meant to accept shared content silently never appears in the share
+            // sheet there.
+            watchFeatureComponents += shareReceiverActivity;
         }
 
         // Host card emulation service is generated only when the classpath

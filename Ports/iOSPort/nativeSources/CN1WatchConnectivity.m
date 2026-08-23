@@ -888,6 +888,20 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     /// When each pending reply arrived, so one that is never answered can be retired. Parallel to
     /// _pendingReplies and guarded by the same monitor.
     NSMutableDictionary<NSNumber *, NSNumber *> *_pendingReplyAt;
+    /// Complication payloads waiting to be sent, keyed by kind id.
+    ///
+    /// transferCurrentComplicationUserInfo: keeps only the MOST RECENT transfer -- handing it a
+    /// second payload discards the first -- and each payload carries one kind. So two kinds
+    /// published before the first is delivered meant the earlier one simply never arrived, and
+    /// with the generated providers disabling periodic updates nothing would refresh it. Held
+    /// here and sent one at a time instead. A repeat of the same kind replaces its own entry,
+    /// which is what should happen: only the newest timeline for a kind is worth sending.
+    NSMutableDictionary<NSString *, NSDictionary *> *_pendingComplications;
+    /// The order the kinds were published in, so the queue is not at the mercy of dictionary
+    /// enumeration. A kind already queued keeps its original position.
+    NSMutableArray<NSString *> *_pendingComplicationOrder;
+    /// The kind currently handed to WCSession, or nil when nothing is in flight.
+    NSString *_complicationInFlight;
     /// Guards the recurring tombstone sweep to a single pending chain; see pruneTombstonesNow.
     BOOL _tombstoneSweepScheduled;
     /// Guards the post-removal deadline sweep to one block, however many paths are removed.
@@ -918,6 +932,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (self != nil) {
         _pendingReplies = [[NSMutableDictionary alloc] init];
         _pendingReplyAt = [[NSMutableDictionary alloc] init];
+        _pendingComplications = [[NSMutableDictionary alloc] init];
+        _pendingComplicationOrder = [[NSMutableArray alloc] init];
         _nextInboundToken = 1;
         _lastReceived = [[NSMutableDictionary alloc] init];
     }
@@ -974,19 +990,91 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         NSLog(@"[CN1Surfaces] the watch complication refresh budget is spent for today; "
               "queueing the update to apply when the watch app next runs");
     }
-    @try {
-        if (wantsWake) {
-            [s transferCurrentComplicationUserInfo:info];
-        } else {
+    if (!wantsWake) {
+        // transferUserInfo: QUEUES -- successive calls all survive -- so it needs none of the
+        // sequencing below.
+        @try {
             [s transferUserInfo:info];
+        } @catch (NSException *ex) {
+            // WCSession raises rather than returning an error for a payload it will not carry.
+            // The publish itself already succeeded, so this is reported and dropped.
+            NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
         }
-    } @catch (NSException *ex) {
-        // WCSession raises rather than returning an error for a payload it will not carry. The
-        // publish itself already succeeded, so this is reported and dropped.
-        NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
+        return;
     }
+    NSString *kind = [info objectForKey:@"cn1.surfaces.kind"];
+    if (kind == nil) {
+        kind = @"";
+    }
+    [self_ enqueueComplicationUserInfo:info forKind:kind];
 #endif
 }
+
+#if !TARGET_OS_WATCH
+/// Queues a complication payload and sends it when the session is free.
+///
+/// One at a time, because transferCurrentComplicationUserInfo: keeps only the most recent
+/// transfer: handing it a second payload while the first is still pending discards the first
+/// outright. Sending only when nothing is in flight means the payload it holds is always one we
+/// have not yet been told was delivered, so nothing is displaced.
+- (void)enqueueComplicationUserInfo:(NSDictionary *)info forKind:(NSString *)kind {
+    @synchronized (self) {
+        if ([_pendingComplications objectForKey:kind] == nil) {
+            [_pendingComplicationOrder addObject:kind];
+        }
+        [_pendingComplications setObject:info forKey:kind];
+    }
+    [self sendNextComplicationUserInfo];
+}
+
+/// Hands the next queued payload to WCSession, if nothing is in flight.
+- (void)sendNextComplicationUserInfo {
+    NSDictionary *info = nil;
+    NSString *kind = nil;
+    @synchronized (self) {
+        if (_complicationInFlight != nil || [_pendingComplicationOrder count] == 0) {
+            return;
+        }
+        kind = [_pendingComplicationOrder objectAtIndex:0];
+        info = [_pendingComplications objectForKey:kind];
+        if (info == nil) {
+            [_pendingComplicationOrder removeObjectAtIndex:0];
+            return;
+        }
+        _complicationInFlight = kind;
+    }
+    WCSession *s = [self session];
+    if (s == nil) {
+        @synchronized (self) {
+            _complicationInFlight = nil;
+        }
+        return;
+    }
+    @try {
+        [s transferCurrentComplicationUserInfo:info];
+    } @catch (NSException *ex) {
+        // Raised for a payload the session will not carry. Drop this kind and carry on with the
+        // rest: holding the queue for it would strand every kind behind it.
+        NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
+        [self finishComplicationForKind:kind];
+    }
+}
+
+/// Retires a kind whose transfer has completed (or failed) and starts the next.
+- (void)finishComplicationForKind:(NSString *)kind {
+    if (kind == nil) {
+        return;
+    }
+    @synchronized (self) {
+        if (_complicationInFlight != nil && [_complicationInFlight isEqualToString:kind]) {
+            _complicationInFlight = nil;
+        }
+        [_pendingComplications removeObjectForKey:kind];
+        [_pendingComplicationOrder removeObject:kind];
+    }
+    [self sendNextComplicationUserInfo];
+}
+#endif
 
 // --- state ---------------------------------------------------------------
 
@@ -1385,6 +1473,30 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 }
 
 // --- WCSessionDelegate ---------------------------------------------------
+
+#if !TARGET_OS_WATCH
+/// Completion for the complication queue: the transfer WCSession was holding is done, so the
+/// next queued kind can be handed over without displacing anything.
+///
+/// Retired on failure too. A payload the watch refused is not going to succeed by being kept at
+/// the head of the queue, and holding it there strands every kind behind it -- which is the very
+/// failure the queue exists to prevent.
+- (void)session:(WCSession *)session
+        didFinishUserInfoTransfer:(WCSessionUserInfoTransfer *)userInfoTransfer
+                            error:(NSError *)error {
+    NSDictionary *info = userInfoTransfer.userInfo;
+    NSString *kind = info == nil ? nil : [info objectForKey:@"cn1.surfaces.kind"];
+    if (kind == nil) {
+        // Not one of ours -- the wearable API's own transferUserInfo: traffic lands here too.
+        return;
+    }
+    if (error != nil) {
+        NSLog(@"[CN1Surfaces] the watch did not accept the update for \"%@\": %@", kind,
+              error.localizedDescription);
+    }
+    [self finishComplicationForKind:kind];
+}
+#endif
 
 - (void)session:(WCSession *)session
         didFinishFileTransfer:(WCSessionFileTransfer *)fileTransfer
