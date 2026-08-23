@@ -2153,7 +2153,9 @@ public final class Display extends CN1Constants {
             if (this.dropEvents) {
                 return;
             }
-            if (!hasInputEventStackCapacity(2)) {
+            if (isTerminationEvent(type)
+                    ? !hasInputEventStackCapacity(2)
+                    : !hasDroppableInputEventStackCapacity(2)) {
                 return;
             }
             inputEventStack[inputEventStackPointer] = type;
@@ -2164,8 +2166,37 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Slots at the end of the input stack that only a termination may use.
+    ///
+    /// The native queues protect a release from being dropped on overflow, and that is
+    /// worth nothing if this second queue drops it instead: a lost release leaves the
+    /// component the press went to stuck down, or a drag never finished. Ordinary input
+    /// -- moves, drags, presses, hovers -- therefore stops short of the end of the
+    /// stack, leaving room for the releases and size changes that cannot be
+    /// reconstructed.
+    ///
+    /// A press is ordinary on purpose: a release arriving with no press behind it finds
+    /// no recorded target and is discarded harmlessly, so when something has to go it
+    /// must never be the release.
+    private static final int TERMINATION_RESERVE = 64;
+
     private boolean hasInputEventStackCapacity(int additionalSlots) {
         return inputEventStackPointer + additionalSlots < inputEventStack.length;
+    }
+
+    /// Capacity for an event that may be dropped, which stops short of the reserve.
+    private boolean hasDroppableInputEventStackCapacity(int additionalSlots) {
+        return inputEventStackPointer + additionalSlots
+                < inputEventStack.length - TERMINATION_RESERVE;
+    }
+
+    /// Whether this packed event type is one whose loss the framework cannot recover
+    /// from, and which may therefore use the reserve.
+    private static boolean isTerminationEvent(int packedType) {
+        int type = packedType & 0xFF;
+        return type == POINTER_RELEASED || type == POINTER_RELEASED_MULTI
+                || type == POINTER_HOVER_RELEASED || type == KEY_RELEASED
+                || type == SIZE_CHANGED;
     }
 
     /// Checks if the control key is currently down.  Only relevant for desktop ports.
@@ -2549,7 +2580,9 @@ public final class Display extends CN1Constants {
             if (this.dropEvents) {
                 return;
             }
-            if (!hasInputEventStackCapacity(3)) {
+            if (isTerminationEvent(type)
+                    ? !hasInputEventStackCapacity(3)
+                    : !hasDroppableInputEventStackCapacity(3)) {
                 return;
             }
             pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
@@ -2568,7 +2601,9 @@ public final class Display extends CN1Constants {
             if (this.dropEvents) {
                 return;
             }
-            if (!hasInputEventStackCapacity(3 + x.length + y.length)) {
+            if (isTerminationEvent(type)
+                    ? !hasInputEventStackCapacity(3 + x.length + y.length)
+                    : !hasDroppableInputEventStackCapacity(3 + x.length + y.length)) {
                 return;
             }
             pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
@@ -2933,6 +2968,9 @@ public final class Display extends CN1Constants {
 
     private void addSizeChangeEvent(int type, int w, int h) {
         synchronized (lock) {
+            // A size change is state, and a lost one leaves the hierarchy laid out at
+            // a size the surface no longer has -- painting and hit testing stay
+            // misaligned until something else resizes the window.
             if (!hasInputEventStackCapacity(3)) {
                 return;
             }

@@ -366,15 +366,22 @@ static int cn1WinIsProtectedEvent(CN1EventType type) {
             || type == CN1_EVENT_WINDOW_CLOSE
             || type == CN1_EVENT_KEY_RELEASED
             || type == CN1_EVENT_POINTER_RELEASED
-            || type == CN1_EVENT_WINDOW_FOCUS;
+            || type == CN1_EVENT_WINDOW_FOCUS
+            || type == CN1_EVENT_SIZE_CHANGED;
 }
 
 /* Visibility only. A close request is protected from eviction like any other
  * lifecycle event, but it is not a state that a later one supersedes: WM_CLOSE does
  * not destroy the window, so a close that a subsequent minimize overwrote would take
  * the close listener and the close operation with it. */
-static int cn1WinIsVisibilityEvent(CN1EventType type) {
-    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN;
+static int cn1WinStateClass(CN1EventType type) {
+    if (type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN) {
+        return 1;
+    }
+    if (type == CN1_EVENT_SIZE_CHANGED) {
+        return 2;
+    }
+    return 0;
 }
 
 /* Replaces a queued visibility event for the same window with this newer one. The
@@ -384,7 +391,8 @@ static int cn1WinCoalesceLifecycleLocked(int windowId, CN1EventType type, int x,
         int keyCode) {
     LONG idx = cn1Win.eventHead;
     LONG newest = -1;
-    if (!cn1WinIsVisibilityEvent(type)) {
+    int cls = cn1WinStateClass(type);
+    if (cls == 0) {
         return 0;
     }
     /* The *newest* match, not the first one found. A window can already have more than
@@ -393,7 +401,7 @@ static int cn1WinCoalesceLifecycleLocked(int windowId, CN1EventType type, int x,
      * window that is natively hidden is on screen, and go on painting it. */
     while (idx != cn1Win.eventTail) {
         CN1Event* e = &cn1Win.events[idx];
-        if (e->windowId == windowId && cn1WinIsVisibilityEvent((CN1EventType) e->type)) {
+        if (e->windowId == windowId && cn1WinStateClass((CN1EventType) e->type) == cls) {
             newest = idx;
         }
         idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
@@ -444,12 +452,13 @@ static int cn1WinEvictSupersededVisibilityLocked(void) {
     LONG idx = cn1Win.eventHead;
     while (idx != cn1Win.eventTail) {
         CN1Event* e = &cn1Win.events[idx];
-        if (cn1WinIsVisibilityEvent((CN1EventType) e->type)) {
+        int cls = cn1WinStateClass((CN1EventType) e->type);
+        if (cls != 0) {
             LONG scan = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
             while (scan != cn1Win.eventTail) {
                 CN1Event* later = &cn1Win.events[scan];
                 if (later->windowId == e->windowId
-                        && cn1WinIsVisibilityEvent((CN1EventType) later->type)) {
+                        && cn1WinStateClass((CN1EventType) later->type) == cls) {
                     cn1WinRemoveAtLocked(idx);
                     return 1;
                 }

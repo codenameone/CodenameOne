@@ -88,15 +88,22 @@ static int cn1LinuxIsProtectedEvent(int type) {
             || type == CN1_EVENT_WINDOW_CLOSE
             || type == CN1_EVENT_KEY_RELEASED
             || type == CN1_EVENT_POINTER_RELEASED
-            || type == CN1_EVENT_WINDOW_FOCUS;
+            || type == CN1_EVENT_WINDOW_FOCUS
+            || type == CN1_EVENT_SIZE_CHANGED;
 }
 
 /* Visibility only. A close request is protected from eviction like any other
  * lifecycle event, but it is not a state that a later one supersedes: the delete
  * signal does not destroy the window, so a close that a subsequent minimize overwrote
  * would take the close listener and the close operation with it. */
-static int cn1LinuxIsVisibilityEvent(int type) {
-    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN;
+static int cn1LinuxStateClass(int type) {
+    if (type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN) {
+        return 1;
+    }
+    if (type == CN1_EVENT_SIZE_CHANGED) {
+        return 2;
+    }
+    return 0;
 }
 
 /* Replaces a queued visibility event for the same window with this newer one. The
@@ -106,7 +113,8 @@ static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
         int keyCode) {
     int idx = cn1EventHead;
     int newest = -1;
-    if (!cn1LinuxIsVisibilityEvent(type)) {
+    int cls = cn1LinuxStateClass(type);
+    if (cls == 0) {
         return 0;
     }
     /* The *newest* match, not the first one found. A window can already have more than
@@ -115,7 +123,7 @@ static int cn1LinuxCoalesceLifecycleLocked(int windowId, int type, int x, int y,
      * window that is natively hidden is on screen, and go on painting it. */
     while (idx != cn1EventTail) {
         if (cn1EventRing[idx].windowId == windowId
-                && cn1LinuxIsVisibilityEvent(cn1EventRing[idx].type)) {
+                && cn1LinuxStateClass(cn1EventRing[idx].type) == cls) {
             newest = idx;
         }
         idx = (idx + 1) % CN1_EVENT_RING;
@@ -165,11 +173,12 @@ static int cn1LinuxEvictInputLocked(void) {
 static int cn1LinuxEvictSupersededVisibilityLocked(void) {
     int idx = cn1EventHead;
     while (idx != cn1EventTail) {
-        if (cn1LinuxIsVisibilityEvent(cn1EventRing[idx].type)) {
+        int cls = cn1LinuxStateClass(cn1EventRing[idx].type);
+        if (cls != 0) {
             int scan = (idx + 1) % CN1_EVENT_RING;
             while (scan != cn1EventTail) {
                 if (cn1EventRing[scan].windowId == cn1EventRing[idx].windowId
-                        && cn1LinuxIsVisibilityEvent(cn1EventRing[scan].type)) {
+                        && cn1LinuxStateClass(cn1EventRing[scan].type) == cls) {
                     cn1LinuxRemoveAtLocked(idx);
                     return 1;
                 }
