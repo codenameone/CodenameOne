@@ -189,6 +189,11 @@ public final class CN1WatchSurface {
      */
     public static List<Reading> readTimeline(Context ctx, String kindId, String family) {
         List<Reading> out = new ArrayList<Reading>();
+        // Every read path sweeps, not just read(). A complication-only kind renders through
+        // readTimeline and never through read, so the collection never ran for the watches most
+        // likely to need it -- the mirror is their only source of artwork. Reading is the durable
+        // hook precisely because it always happens again; that only holds if every reader does it.
+        CN1SurfaceMirror.collectStaleImages(ctx, kindId);
         String json = CN1SurfaceStore.readWidgetTimeline(ctx, kindId);
         if (json == null || json.length() == 0) {
             return out;
@@ -248,6 +253,11 @@ public final class CN1WatchSurface {
      */
     public static List<Reading> readAllEntries(Context ctx, String kindId, String family) {
         List<Reading> out = new ArrayList<Reading>();
+        // Every read path sweeps, not just read(). A complication-only kind renders through
+        // readTimeline and never through read, so the collection never ran for the watches most
+        // likely to need it -- the mirror is their only source of artwork. Reading is the durable
+        // hook precisely because it always happens again; that only holds if every reader does it.
+        CN1SurfaceMirror.collectStaleImages(ctx, kindId);
         String json = CN1SurfaceStore.readWidgetTimeline(ctx, kindId);
         if (json == null || json.length() == 0) {
             return out;
