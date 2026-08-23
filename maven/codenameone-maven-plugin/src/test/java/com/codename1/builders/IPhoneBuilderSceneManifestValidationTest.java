@@ -125,4 +125,36 @@ class IPhoneBuilderSceneManifestValidationTest {
                     "should reject " + spelling);
         }
     }
+
+    @Test
+    void aManifestNamedOnlyInACommentIsNotADeclaredManifest() {
+        // These two checks fail the build, so matching a mention rather than a
+        // declaration would stop a build that was going to work -- and the builder
+        // would skip generating the manifest it should have generated.
+        assertFalse(IPhoneBuilder.plistDeclaresKey(
+                "<!-- we deliberately do not set UIApplicationSceneManifest here -->",
+                "UIApplicationSceneManifest"),
+                "a key named inside a comment is not declared");
+        assertFalse(IPhoneBuilder.plistDeclaresKey(
+                "<key>CFBundleName</key><string>UIApplicationSceneManifest</string>",
+                "UIApplicationSceneManifest"),
+                "a key quoted as a string value is not declared either");
+    }
+
+    @Test
+    void aRealDeclarationIsFoundEvenWhenACommentMentionsItFirst() {
+        assertTrue(IPhoneBuilder.plistDeclaresKey(
+                "<!-- about to set UIApplicationSceneManifest -->\n"
+                        + "<key>UIApplicationSceneManifest</key><dict/>",
+                "UIApplicationSceneManifest"),
+                "the commented mention must not hide the declaration that follows it");
+    }
+
+    @Test
+    void aCommentedKeyDoesNotVouchForItsValue() {
+        assertFalse(IPhoneBuilder.plistKeyIsTrue(
+                "<!-- <key>UIApplicationSupportsMultipleScenes</key><true/> -->",
+                "UIApplicationSupportsMultipleScenes"),
+                "a key and value that exist only inside a comment enable nothing");
+    }
 }

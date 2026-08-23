@@ -6806,7 +6806,7 @@ public class IPhoneBuilder extends Executor {
     /// true if the key is present and its value is `<true/>`
     static boolean plistKeyIsTrue(String plist, String key) {
         String tag = "<key>" + key + "</key>";
-        int at = plist.indexOf(tag);
+        int at = plistKeyIndex(plist, key);
         if (at < 0) {
             return false;
         }
@@ -6816,6 +6816,61 @@ public class IPhoneBuilder extends Executor {
         // them would fail a build over valid XML -- worse than the misconfiguration
         // this check exists to catch, because it stops a build that would have worked.
         return "true".equals(nextElementName(plist, at + tag.length()));
+    }
+
+    /// Whether the fragment actually declares the given key.
+    ///
+    /// The rest of this method tests the injected plist with plain `contains`, which is
+    /// fine where the answer only decides whether to add a key of our own -- matching
+    /// too eagerly there just skips an injection. These two checks are different: they
+    /// fail the build, so a key named inside a comment or quoted in some unrelated
+    /// string value would stop a build that was going to work. Hence a declared
+    /// `<key>` element, and not one that only exists inside a comment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `key`: the key to look for
+    ///
+    /// #### Returns
+    ///
+    /// true if the fragment declares the key outside any comment
+    static boolean plistDeclaresKey(String plist, String key) {
+        return plistKeyIndex(plist, key) >= 0;
+    }
+
+    /// Index of the declared key element, skipping any occurrence inside a comment, or
+    /// -1 when the fragment does not declare it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `key`: the key to look for
+    ///
+    /// #### Returns
+    ///
+    /// the index of the `<key>` element, or -1
+    static int plistKeyIndex(String plist, String key) {
+        String tag = "<key>" + key + "</key>";
+        int at = plist.indexOf(tag);
+        while (at >= 0) {
+            if (!plistIndexIsCommented(plist, at)) {
+                return at;
+            }
+            at = plist.indexOf(tag, at + tag.length());
+        }
+        return -1;
+    }
+
+    private static boolean plistIndexIsCommented(String plist, int index) {
+        int open = plist.lastIndexOf("<!--", index);
+        if (open < 0) {
+            return false;
+        }
+        int close = plist.indexOf("-->", open);
+        return close < 0 || close > index;
     }
 
     /// The name of the next element opening at or after `from`, or null if there is
@@ -7080,7 +7135,7 @@ public class IPhoneBuilder extends Executor {
         // and getWindowManager() reads that key back out of the bundle, so windows were
         // reported unsupported and constructing one threw, in the very build that had
         // just asked for them.
-        if (multiWindow && inject.contains("UIApplicationSceneManifest")) {
+        if (multiWindow && plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             // The application supplied its own manifest, so this build must not write a
             // second one -- but a Catalyst build that asked for windows and whose own
             // manifest does not support them fails at run time, not here: the bundle is
@@ -7107,7 +7162,8 @@ public class IPhoneBuilder extends Executor {
                         + "ios.plistInject and let the build emit one.");
             }
         }
-        if ((useUISceneManifest || usesCar || multiWindow) && !inject.contains("UIApplicationSceneManifest")) {
+        if ((useUISceneManifest || usesCar || multiWindow)
+                && !plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             String carPlayScene = usesCar
                     ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
                     + "        <array>\n"
