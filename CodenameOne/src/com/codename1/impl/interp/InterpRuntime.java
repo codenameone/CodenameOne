@@ -2359,28 +2359,38 @@ public final class InterpRuntime {
                 toHostElements(arg, new Vector());
             }
         }
-        // A typed-array parameter (`Component[]`, `MyButton[]`, ...) needs
-        // an actual array of that host component type. The interpreter's
-        // representation is a plain `Object[]` -- `ANEWARRAY` cannot allocate
-        // a Sub[] whose leaf exists in the bundle, and even Sub[] whose leaf
-        // is a host class extending Component came out as Object[]. Method
-        // dispatch on the JVM rejects a plain Object[] passed to a
-        // `Component[]` slot with an argument-type mismatch, so materialise
+        // A typed-array parameter (`Component[]`, `MyButton[]`,
+        // `Component[][]`, `Object[][]`, ...) needs an actual array of that
+        // host component type. The interpreter's representation is a plain
+        // `Object[]` -- `ANEWARRAY` cannot allocate a Sub[] whose leaf
+        // exists in the bundle, and even Sub[] whose leaf is a host class
+        // extending Component came out as Object[]. Method dispatch on the
+        // JVM rejects a plain Object[] passed to a `Component[]` (or
+        // `Object[][]`) slot with an argument-type mismatch, so materialise
         // the array here and copy the (already peer-converted) elements
-        // across. Class[] is handled above; Object[] parameters need no
-        // conversion. Anything else with `[L...;` gets a typed array.
+        // across. Class[] is handled above; a 1D Object[] parameter needs
+        // no conversion. Anything else with `[L...;` or `[[...` gets a
+        // typed array, recursively for multi-dimensional cases so covariance
+        // through the outer type reaches the innermost element type too.
         Vector hostArrayPairs = null;
         for (int i = 0; i < args.length && i < params.length; i++) {
             if (!(args[i] instanceof Object[])) {
                 continue;
             }
             String p = params[i];
-            if (!p.startsWith("[L") || !p.endsWith(";")) {
+            if (!p.startsWith("[")) {
                 continue;
             }
-            String component = p.substring(2, p.length() - 1);
-            if ("java/lang/Object".equals(component)
-                    || "java/lang/Class".equals(component)) {
+            if ("[Ljava/lang/Object;".equals(p)
+                    || "[Ljava/lang/Class;".equals(p)) {
+                continue;
+            }
+            String elementDesc = p.substring(1);
+            // Primitive-leaf arrays (`[I`, `[[D`) can never present as
+            // Object[] here -- they are int[], double[], etc. The rank-2
+            // form `[[I` is a `[I[]` whose outer *is* Object[] though, so
+            // only reject when the element descriptor is a primitive.
+            if (!elementDesc.startsWith("L") && !elementDesc.startsWith("[")) {
                 continue;
             }
             Object[] src = (Object[]) args[i];
@@ -2391,13 +2401,9 @@ public final class InterpRuntime {
             if (!"[Ljava.lang.Object;".equals(src.getClass().getName())) {
                 continue;
             }
-            Object array = linker.newArray("L" + component + ";", src.length);
-            if (!(array instanceof Object[])) {
+            Object[] dst = materializeTypedArray(src, elementDesc);
+            if (dst == null) {
                 continue;
-            }
-            Object[] dst = (Object[]) array;
-            for (int j = 0; j < src.length; j++) {
-                dst[j] = src[j];
             }
             if (hostArrayPairs == null) {
                 hostArrayPairs = new Vector();
@@ -2783,6 +2789,36 @@ public final class InterpRuntime {
         String[] answer = new String[out.size()];
         out.copyInto(answer);
         return answer;
+    }
+
+    /// A real host array of the requested element type, built from an
+    /// interpreter-owned Object[]. Elements are copied as-is (the caller has
+    /// already replaced peer-backed values with their peers), and a nested
+    /// plain `Object[]` recurses so multi-dimensional parameters
+    /// (`Component[][]`, `Object[][]`) also arrive as the exact host array
+    /// class the JVM will accept through reflection. Returns null when the
+    /// linker cannot produce an array of this type at all -- the caller
+    /// falls back to the untyped array in that case.
+    private Object[] materializeTypedArray(Object[] src, String elementDescriptor) throws Throwable {
+        Object array = linker.newArray(elementDescriptor, src.length);
+        if (!(array instanceof Object[])) {
+            return null;
+        }
+        Object[] dst = (Object[]) array;
+        boolean nested = elementDescriptor.startsWith("[");
+        String innerDesc = nested ? elementDescriptor.substring(1) : null;
+        for (int j = 0; j < src.length; j++) {
+            Object el = src[j];
+            if (nested && el instanceof Object[]
+                    && "[Ljava.lang.Object;".equals(el.getClass().getName())
+                    && (innerDesc.startsWith("L") || innerDesc.startsWith("["))) {
+                Object[] inner = materializeTypedArray((Object[]) el, innerDesc);
+                dst[j] = inner != null ? inner : el;
+            } else {
+                dst[j] = el;
+            }
+        }
+        return dst;
     }
 
     /// A real `Class[]` built from an interpreter-owned Object[] used to

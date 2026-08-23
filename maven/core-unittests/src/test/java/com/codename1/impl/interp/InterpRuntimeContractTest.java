@@ -125,6 +125,14 @@ class InterpRuntimeContractTest {
         // fix: the `class` after `::` is the literal, not a declaration.
         assertEquals("p", packageOf(
                 "@file:A(String::class)\npackage p\n\nfun main() {}\n"));
+        // Kotlin's `"""..."""` raw strings (and Java text blocks) contain
+        // lone `"` characters. Treating each quote as its own delimiter
+        // exposed a fake `package` word inside the literal and stored the
+        // source at the wrong key; the whole push was then refused as
+        // missing source. The scanner has to recognise the triple-quote as
+        // one token.
+        assertEquals("real.p", packageOf(
+                "@file:Tag(\"\"\"x\" package fake \"\"\")\npackage real.p\n\nfun main() {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {

@@ -415,6 +415,23 @@ public class InterpBundleWriter {
                 }
                 i = Math.min(i + 2, text.length());
                 out.append(' ');
+            } else if (c == '"' && i + 2 < text.length()
+                    && text.charAt(i + 1) == '"' && text.charAt(i + 2) == '"') {
+                // Kotlin `"""raw"""` and Java text-block `"""..."""`. Content
+                // may contain a lone `"` -- treating each quote as its own
+                // delimiter would expose a fake `package` inside a raw
+                // string, or consume the real one that follows. The literal
+                // ends at the next `"""`; nothing inside it has meaning to
+                // the package scanner.
+                i += 3;
+                while (i + 2 < text.length()
+                        && !(text.charAt(i) == '"'
+                                && text.charAt(i + 1) == '"'
+                                && text.charAt(i + 2) == '"')) {
+                    i++;
+                }
+                i = Math.min(i + 3, text.length());
+                out.append(' ');
             } else if (c == '"' || c == '\'') {
                 char quote = c;
                 i++;
