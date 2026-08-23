@@ -4270,4 +4270,48 @@ class WindowTest extends UITestBase {
                         + "again; only its visibility and modality are given up");
         w.dispose();
     }
+
+    /// Counts pointer drags reaching a component.
+    private static final class DragCountingComponent extends Component {
+        private int drags;
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            drags++;
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            return new com.codename1.ui.geom.Dimension(200, 150);
+        }
+    }
+
+    @FormTest
+    void jitterInAWindowIsNotADragButRealMovementIs() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drag", new BorderLayout());
+        w.setWindowSize(400, 300);
+        DragCountingComponent c = new DragCountingComponent();
+        w.add(BorderLayout.CENTER, c);
+        w.show();
+        w.asContainer().revalidate();
+
+        // A press then a pixel of movement. Unfiltered this reached the component
+        // straight away, activating drag and drop and moving a draggable component on
+        // what the user meant as a click.
+        implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+        implementation.windowPointerDraggedForTest(w.getWindowId(), 101, 100);
+        DisplayTest.flushEdt();
+        assertEquals(0, c.drags,
+                "a pixel of jitter after a press is not a drag");
+
+        // Movement well past the threshold is.
+        for (int iter = 0; iter < 12; iter++) {
+            implementation.windowPointerDraggedForTest(w.getWindowId(), 100 + iter * 20, 100);
+        }
+        DisplayTest.flushEdt();
+        assertTrue(c.drags > 0,
+                "movement across the window is a drag and still has to get through");
+        w.dispose();
+    }
 }

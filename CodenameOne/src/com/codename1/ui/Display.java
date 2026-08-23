@@ -4517,6 +4517,56 @@ public final class Display extends CN1Constants {
 
     /// Indicates whether input aimed at the given window is currently blocked by a
     /// modal window above it.
+    /// The drag-region status at a point inside one of the additional native windows,
+    /// used by the implementation's drag activation filter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window to ask
+    ///
+    /// - `x`: x in the window's coordinates
+    ///
+    /// - `y`: y in the window's coordinates
+    ///
+    /// #### Returns
+    ///
+    /// the drag region status, or `Component#DRAG_REGION_NOT_DRAGGABLE` when there is
+    /// no such window
+    public int windowDragRegionStatus(int windowId, int x, int y) {
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w == null ? Component.DRAG_REGION_NOT_DRAGGABLE : w.getDragRegionStatus(x, y);
+    }
+
+    /// The width of one of the additional native windows, or 0 when there is no such
+    /// window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window to ask
+    ///
+    /// #### Returns
+    ///
+    /// the window's width in Codename One coordinates
+    public int windowWidth(int windowId) {
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w == null ? 0 : w.getWidth();
+    }
+
+    /// The height of one of the additional native windows, or 0 when there is no such
+    /// window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window to ask
+    ///
+    /// #### Returns
+    ///
+    /// the window's height in Codename One coordinates
+    public int windowHeight(int windowId) {
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w == null ? 0 : w.getHeight();
+    }
+
     private boolean isBlockedByModal(int windowId) {
         // Every registered blocker is consulted rather than only the newest one.
         // Modal windows nest: a window modal opened from inside an application modal

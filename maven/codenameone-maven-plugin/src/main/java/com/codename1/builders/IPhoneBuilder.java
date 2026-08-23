@@ -6853,13 +6853,35 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the index of the `<key>` element, or -1
     static int plistKeyIndex(String plist, String key) {
-        String tag = "<key>" + key + "</key>";
-        int at = plist.indexOf(tag);
+        return plistIndexOfLive(plist, "<key>" + key + "</key>", 0);
+    }
+
+    /// Index of the first occurrence of `needle` at or after `from` that is not inside
+    /// a comment, or -1.
+    ///
+    /// Every one of these checks needs the same thing -- text that is really there,
+    /// rather than text someone commented out -- so they share this rather than each
+    /// deciding for itself. Three separate `indexOf` calls is how the role ended up
+    /// comment-aware while the delegate name beneath it was not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `needle`: the text to find
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the index of the first live occurrence, or -1
+    static int plistIndexOfLive(String plist, String needle, int from) {
+        int at = plist.indexOf(needle, from);
         while (at >= 0) {
             if (!plistIndexIsCommented(plist, at)) {
                 return at;
             }
-            at = plist.indexOf(tag, at + tag.length());
+            at = plist.indexOf(needle, at + needle.length());
         }
         return -1;
     }
@@ -6948,11 +6970,15 @@ public class IPhoneBuilder extends Executor {
             return false;
         }
         int afterKey = role + tag.length();
-        int delegate = plist.indexOf("CodenameOne_GLSceneDelegate", afterKey);
+        // The delegate name and the next role both have to be live text as well. A
+        // commented-out Codename One configuration inside the role would otherwise
+        // answer for a live one naming somebody else, and a commented next role would
+        // wrongly extend this role's range.
+        int delegate = plistIndexOfLive(plist, "CodenameOne_GLSceneDelegate", afterKey);
         if (delegate < 0) {
             return false;
         }
-        int nextRole = plist.indexOf("SceneSessionRole", afterKey);
+        int nextRole = plistIndexOfLive(plist, "SceneSessionRole", afterKey);
         return nextRole < 0 || delegate < nextRole;
     }
 

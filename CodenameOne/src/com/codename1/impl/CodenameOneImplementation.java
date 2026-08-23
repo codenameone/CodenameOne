@@ -166,6 +166,14 @@ public abstract class CodenameOneImplementation {
     private boolean builtinSoundEnabled = true;
     private boolean dragStarted = false;
     private int dragActivationCounter = 0;
+    /// Drag activation state for a gesture inside one of the additional native
+    /// windows, kept apart from the main surface's because nothing resets that one for
+    /// a window gesture.
+    private boolean windowDragStarted;
+    private int windowDragActivationCounter;
+    private int windowDragActivationX;
+    private int windowDragActivationY;
+
     private int dragActivationX = 0;
     private int dragActivationY = 0;
     private int dragStartPercentage = 3;
@@ -3424,6 +3432,11 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `y`: the position of the event
     protected void windowPointerPressed(int windowId, int x, int y) {
+        if (windowId > 0) {
+            // A new gesture in a window starts its activation filter over.
+            windowDragStarted = false;
+            windowDragActivationCounter = 0;
+        }
         if (windowId == 0) {
             pointerPressed(x, y);
             return;
@@ -3444,6 +3457,10 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `y`: the position of the event
     protected void windowPointerReleased(int windowId, int x, int y) {
+        if (windowId > 0) {
+            windowDragStarted = false;
+            windowDragActivationCounter = 0;
+        }
         if (windowId == 0) {
             pointerReleased(x, y);
             return;
@@ -3476,10 +3493,27 @@ public abstract class CodenameOneImplementation {
     /// - `y`: the y positions of the pointers
     protected void windowPointerDragged(int windowId, final int[] x, final int[] y) {
         if (windowId > 0) {
-            Display.getInstance().windowPointerDragged(windowId, x, y);
-        } else {
-            pointerDragged(x, y);
+            // The same activation filter the main surface applies. Forwarding straight
+            // through made a pixel of jitter after a press into a drag, which activates
+            // drag and drop and moves a draggable component on what was meant as a
+            // click.
+            boolean started = false;
+            if (!windowDragStarted) {
+                try {
+                    started = hasWindowDragStarted(windowId, x[0], y[0]);
+                } catch (Throwable t) {
+                    // Matches the main path: a filter that throws must not take the
+                    // gesture with it.
+                    Log.e(t);
+                }
+            }
+            if (windowDragStarted || started) {
+                windowDragStarted = true;
+                Display.getInstance().windowPointerDragged(windowId, x, y);
+            }
+            return;
         }
+        pointerDragged(x, y);
     }
 
     protected void windowPointerDragged(int windowId, int x, int y) {
@@ -3489,7 +3523,9 @@ public abstract class CodenameOneImplementation {
         }
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
-        Display.getInstance().windowPointerDragged(windowId, xPointerEvent, yPointerEvent);
+        // Through the array overload rather than straight to the framework, so this
+        // path gets the activation filter too.
+        windowPointerDragged(windowId, xPointerEvent, yPointerEvent);
     }
 
     /// Delivers a key press that happened in one of the additional native windows.
@@ -3716,18 +3752,74 @@ public abstract class CodenameOneImplementation {
             dragActivationCounter++;
             return false;
         }
-        int dragRegion = getCurrentForm().getDragRegionStatus(x, y);
-
-        //send the drag events to the form only after latency of 7 drag events,
-        //most touch devices are too sensitive and send too many drag events.
-        //7 is just a latency const number that is pretty good for most devices
-        //this may be tuned for specific devices.
         dragActivationCounter++;
+        if (dragPassedThreshold(getCurrentForm().getDragRegionStatus(x, y),
+                getDisplayWidth(), getDisplayHeight(),
+                dragActivationX, dragActivationY, dragActivationCounter, x, y)) {
+            dragActivationCounter = getDragAutoActivationThreshold() + 1;
+            return true;
+        }
+        return false;
+    }
+
+    /// The same activation filter, for a drag inside one of the additional native
+    /// windows.
+    ///
+    /// Window drags used to reach the framework unfiltered, so a pixel of jitter after
+    /// a press was already a drag: drag and drop activated, and a draggable component
+    /// moved on what the user meant as a click.
+    ///
+    /// The state is separate from the main surface's rather than shared, because
+    /// nothing resets the main one for a window gesture -- window presses and releases
+    /// go straight to the framework -- so a shared counter would be stale from the
+    /// first window drag onwards. And the region and the size come from the window: the
+    /// thresholds are a percentage of the surface, and measuring a window's drag
+    /// against the display makes a small window nearly undraggable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window the drag is happening in
+    ///
+    /// - `x`: the position of the current drag event
+    ///
+    /// - `y`: the position of the current drag event
+    ///
+    /// #### Returns
+    ///
+    /// true if the drag should propagate into Codename One
+    protected boolean hasWindowDragStarted(final int windowId, final int x, final int y) {
+        Display d = Display.getInstance();
+        int surfaceWidth = d.windowWidth(windowId);
+        int surfaceHeight = d.windowHeight(windowId);
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) {
+            return false;
+        }
+        if (windowDragActivationCounter == 0) {
+            windowDragActivationX = x;
+            windowDragActivationY = y;
+            windowDragActivationCounter++;
+            return false;
+        }
+        windowDragActivationCounter++;
+        if (dragPassedThreshold(d.windowDragRegionStatus(windowId, x, y),
+                surfaceWidth, surfaceHeight,
+                windowDragActivationX, windowDragActivationY,
+                windowDragActivationCounter, x, y)) {
+            windowDragActivationCounter = getDragAutoActivationThreshold() + 1;
+            return true;
+        }
+        return false;
+    }
+
+    /// Whether a drag has moved far enough, for a given drag region and surface size.
+    /// Shared by the main surface and by the windows so the two cannot drift.
+    private boolean dragPassedThreshold(int dragRegion, int surfaceWidth, int surfaceHeight,
+            int activationX, int activationY, int counter, final int x, final int y) {
         float startX = getDragStartPercentage();
         float startY = startX;
         switch (dragRegion) {
             case Component.DRAG_REGION_NOT_DRAGGABLE:
-                if (dragActivationCounter > getDragAutoActivationThreshold()) {
+                if (counter > getDragAutoActivationThreshold()) {
                     return true;
                 }
                 startX = Math.max(5, startX);
@@ -3776,16 +3868,14 @@ public abstract class CodenameOneImplementation {
         }
 
         // have we passed the motion threshold on the X axis?
-        if (((float) getDisplayWidth()) / 100.0f * startX <=
-                Math.abs(dragActivationX - x)) {
-            dragActivationCounter = getDragAutoActivationThreshold() + 1;
+        if (((float) surfaceWidth) / 100.0f * startX <=
+                Math.abs(activationX - x)) {
             return true;
         }
 
         // have we passed the motion threshold on the Y axis?
-        if (((float) getDisplayHeight()) / 100.0f * startY <=
-                Math.abs(dragActivationY - y)) {
-            dragActivationCounter = getDragAutoActivationThreshold() + 1;
+        if (((float) surfaceHeight) / 100.0f * startY <=
+                Math.abs(activationY - y)) {
             return true;
         }
 
