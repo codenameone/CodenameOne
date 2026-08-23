@@ -59,7 +59,7 @@ public class ImageRenderElement extends RenderElement {
             // headless unit tests: no CN1 components can exist
             return null;
         }
-        Label l = new Label("", "FlutterImage");
+        FittedImage l = new FittedImage();
         l.getAllStyles().setPadding(0, 0, 0, 0);
         l.getAllStyles().setMargin(0, 0, 0, 0);
         loadImage(l);
@@ -86,7 +86,7 @@ public class ImageRenderElement extends RenderElement {
                     Log.p("Flutter runtime: asset image not found: " + image().getAssetName()
                             + " (resource " + FlutterAssets.resourceName(image().getAssetName()) + ")");
                 } else {
-                    img = EncodedImage.create(res.stream());
+                    img = downsample(EncodedImage.create(res.stream()));
                     assetRatio = res.ratio();
                 }
             } else if (image().getUrl() != null) {
@@ -104,7 +104,65 @@ public class ImageRenderElement extends RenderElement {
             Log.p("Flutter runtime: could not load image " + source);
             Log.e(err);
         }
-        l.setIcon(img);
+        // The NATURAL size is remembered here, at full resolution, because the
+        // picture may later be re-decoded smaller to fit its box (see
+        // shrinkToBox) and the size this box reports must not change when that
+        // happens -- a natural size that shrank would shrink the box, which
+        // would shrink the picture again.
+        naturalW = img == null ? 0 : img.getWidth();
+        naturalH = img == null ? 0 : img.getHeight();
+        if (l instanceof FittedImage) {
+            // The SOURCE, not a scaled copy: FittedImage draws it into its box
+            // at paint time. See fitNow.
+            ((FittedImage) l).setSource(img);
+            l.setIcon(null);
+        } else {
+            l.setIcon(img);
+        }
+    }
+
+    /// The decoded size of the artwork as it was loaded; see loadImage.
+    private int naturalW;
+    private int naturalH;
+
+    /**
+     * Honours a {@code ResizeImage}: keep the picture at the size it asked to
+     * be decoded at, and let the full-resolution decode go.
+     *
+     * <p>The scaled copy is the ONLY thing retained — the EncodedImage it came
+     * from, its bytes and its full-size bitmap all become garbage as this
+     * method returns. That is the point: the gallery's flight thumbnails ask
+     * for 80x80 out of artwork that is a thousand times the area, and holding
+     * the big one to draw the small one is the single largest piece of resident
+     * memory an image-heavy screen carries.</p>
+     */
+    private com.codename1.ui.Image downsample(com.codename1.ui.Image full) {
+        if (full == null) {
+            return null;
+        }
+        Long tw = image().getResizeWidthPx();
+        Long th = image().getResizeHeightPx();
+        if (tw == null && th == null) {
+            return full;
+        }
+        int iw = full.getWidth();
+        int ih = full.getHeight();
+        if (iw <= 0 || ih <= 0) {
+            return full;
+        }
+        // A missing axis keeps the aspect ratio, as ResizeImage does.
+        int w = tw != null ? (int) tw.longValue()
+                : Math.max(1, (int) Math.round(iw * (th.doubleValue() / ih)));
+        int h = th != null ? (int) th.longValue()
+                : Math.max(1, (int) Math.round(ih * (tw.doubleValue() / iw)));
+        if (w >= iw && h >= ih) {
+            return full;   // never upscale; that is ResizeImage's rule too
+        }
+        try {
+            return full.scaled(Math.max(1, w), Math.max(1, h));
+        } catch (Throwable t) {
+            return full;
+        }
     }
 
     @Override
@@ -119,7 +177,7 @@ public class ImageRenderElement extends RenderElement {
         double naturalScale = assetRatio > 0 ? Dp.scale() / assetRatio : 1;
         Size natural = img == null
                 ? new Size(wPx == null ? 0 : wPx, hPx == null ? 0 : hPx)
-                : new Size(img.getWidth() * naturalScale, img.getHeight() * naturalScale);
+                : new Size(naturalW * naturalScale, naturalH * naturalScale);
         return inner.constrain(natural);
     }
 
@@ -144,7 +202,75 @@ public class ImageRenderElement extends RenderElement {
     private BoxFit fittedFit;
     private int fittedRadius;
 
+    /**
+     * Whether a deferred fit is already queued for this element.
+     *
+     * <p>Scaling an image DECODES it, and this runs inside layout — so the very
+     * first frame used to wait for every visible image to decode. Measured on
+     * the gallery's home screen that was 636ms of a 1187ms first frame, for 15
+     * images. Flutter does not do this: {@code Image.asset} resolves
+     * asynchronously and the first frame paints without the artwork, which then
+     * appears a frame or two later. Matching that is worth more than any
+     * micro-optimisation of the decode itself.
+     *
+     * <p>Deferred with {@code callSerially} rather than a background thread on
+     * purpose: image creation is not safe off the event thread on every port,
+     * and the win here comes from not blocking the FIRST frame, not from using
+     * another core.</p>
+     */
+    private boolean fitScheduled;
+
+    /**
+     * Whether artwork may be resolved after the frame that asked for it.
+     *
+     * <p>True only until the first frame is on screen. Deferring FOREVER is
+     * what Flutter does and is the better model, but it needs the box and the
+     * bitmap to converge over several frames, and on an image-heavy grid ours
+     * settles on the wrong crop. Bounding it to start-up takes the whole win
+     * that matters for cold start — the first frame no longer waits for every
+     * visible image to decode — without changing steady-state rendering.</p>
+     */
+    private static boolean deferFits = true;
+
+    /** Called once the first frame is up; see {@link #deferFits}. */
+    public static void firstFrameShown() {
+        deferFits = false;
+    }
+
     private void applyFit() {
+        Label l = (Label) component();
+        if (l == null || img == null || img instanceof URLImage) {
+            return;
+        }
+        if (!com.codename1.ui.Display.isInitialized() || !deferFits) {
+            fitNow();
+            return;
+        }
+        if (needsFit() && !fitScheduled) {
+            fitScheduled = true;
+            com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    fitScheduled = false;
+                    fitNow();
+                }
+            });
+        }
+    }
+
+    /** Whether the icon in place is not the one this box now wants. */
+    private boolean needsFit() {
+        int bw = (int) Math.round(size().width());
+        int bh = (int) Math.round(size().height());
+        if (bw <= 0 || bh <= 0) {
+            return false;
+        }
+        BoxFit fit = image().getFit() == null ? BoxFit.contain : image().getFit();
+        return !(img == fittedFrom && bw == fittedW && bh == fittedH && fit == fittedFit
+                && enclosingCornerRadius(bw, bh) == fittedRadius);
+    }
+
+    private void fitNow() {
         Label l = (Label) component();
         if (l == null || img == null || img instanceof URLImage) {
             return;
@@ -167,6 +293,81 @@ public class ImageRenderElement extends RenderElement {
         fittedH = bh;
         fittedFit = fit;
         fittedRadius = radius;
+        if (radius <= 0 && l instanceof FittedImage) {
+            // NO COPY. The component draws the decoded source into its own box
+            // under the fit rule, the way Flutter draws one texture through a
+            // transform. Materialising a scaled bitmap per image and handing it
+            // to a Label held the artwork twice -- the decoded original (behind
+            // its soft reference) and the copy (hard, from the live component)
+            // -- and it did the scaling on the layout pass that produced the
+            // first frame.
+            //
+            // The rounded case below still copies. Painting the source through a
+            // rounded-rectangle clip instead was tried and is worse: Codename
+            // One's shaped clip has a hard edge, and a grid of clipped thumbnails
+            // measured 12.90% wrong pixels against the reference where the
+            // rounded bitmap measures 8.03% (`/demo/grid-lists`). The bitmap's
+            // corners are anti-aliased because they are alpha-blended pixels
+            // rather than a stencil test, which is what the reference does too.
+            FittedImage f = (FittedImage) l;
+            f.setSource(img);
+            f.fit = fit;
+            l.repaint();
+            return;
+        }
+        long fitStart = System.currentTimeMillis();
+        com.codename1.ui.Image scaled;
+        // Scale to a bitmap, not through the image codec. EncodedImage.scaled()
+        // defaults to "scaled encoded": it decodes, scales, RE-ENCODES the result
+        // and keeps the compressed bytes -- and it picks JPEG at quality 0.9 for
+        // any opaque picture, so the artwork this runtime displays had been
+        // through a lossy round trip it never needed. The result is decoded again
+        // on the next line anyway (roundCorners reads getRGB()), so the encode
+        // bought nothing and cost a codec pass per image inside the layout that
+        // produces the first frame: 36 of them in the gallery, and the retained
+        // rasters behind them.
+        Object prevScaling = restoreScalingTo();
+        try {
+            scaled = scaleUnencoded(img, fit, bw, bh, iw, ih);
+        } finally {
+            restoreScaling(prevScaling);
+        }
+        l.setIcon(roundCorners(scaled, radius));
+        scaleMs += System.currentTimeMillis() - fitStart;
+        scaleCount++;
+        // The box was laid out before the artwork existed, so the frame that
+        // showed it empty has to be replaced.
+        l.repaint();
+    }
+
+    /// Turns off {@code encodedImageScaling} for the duration of one scale and
+    /// returns the previous setting for {@link #restoreScaling}. The property is
+    /// Codename One's own switch for this: with it off, {@code EncodedImage
+    /// .scaled} scales the decoded bitmap instead of re-encoding.
+    private static Object restoreScalingTo() {
+        try {
+            com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+            String prev = d.getProperty("encodedImageScaling", "true");
+            d.setProperty("encodedImageScaling", "false");
+            return prev;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static void restoreScaling(Object prev) {
+        if (prev == null) {
+            return;
+        }
+        try {
+            com.codename1.ui.Display.getInstance().setProperty("encodedImageScaling", (String) prev);
+        } catch (Throwable t) {
+            // leaving it off is safe; it only ever means "scale pixels, not bytes"
+        }
+    }
+
+    private static com.codename1.ui.Image scaleUnencoded(com.codename1.ui.Image img,
+            BoxFit fit, int bw, int bh, int iw, int ih) {
         com.codename1.ui.Image scaled;
         switch (fit) {
             case fill:
@@ -191,7 +392,181 @@ public class ImageRenderElement extends RenderElement {
                         Math.max(1, (int) Math.round(ih * r)));
                 break;
         }
-        l.setIcon(roundCorners(scaled, radius));
+        return scaled;
+    }
+
+    /**
+     * A Label that paints its SOURCE image into its own box under a
+     * {@link BoxFit} rule, instead of holding a scaled copy of it.
+     *
+     * <p>Codename One clips a component's paint to its bounds before calling
+     * {@code paint}, so {@code cover} — which draws a rectangle larger than the
+     * box — crops for free, and more faithfully than the whole-image
+     * {@code Image.fill} approximation it replaces.</p>
+     */
+    /**
+     * Holds at most one image lock, on whatever picture is currently on screen.
+     *
+     * <p>Separated from {@link FittedImage} because this is where the bugs live —
+     * a lock left on a replaced picture never gets released, and a second lock on
+     * the same picture never gets balanced — and because it can then be tested at
+     * all: constructing any {@link com.codename1.ui.Image} needs an initialised
+     * {@code Display}, which a headless test does not have. The two hooks are
+     * overridable so a test can drive the bookkeeping with plain objects.</p>
+     */
+    static class ImageLock {
+
+        private Object held;
+
+        /// Makes {@code img} the locked image, releasing whatever was locked
+        /// before. Null means "nothing should be locked".
+        final void want(Object img) {
+            if (held == img) {
+                return;
+            }
+            if (held != null) {
+                unlock(held);
+            }
+            held = img;
+            if (held != null) {
+                lock(held);
+            }
+        }
+
+        final Object held() {
+            return held;
+        }
+
+        void lock(Object img) {
+            ((com.codename1.ui.Image) img).lock();
+        }
+
+        void unlock(Object img) {
+            ((com.codename1.ui.Image) img).unlock();
+        }
+    }
+
+    static final class FittedImage extends Label {
+
+        private com.codename1.ui.Image source;
+        private final ImageLock lock = new ImageLock();
+        BoxFit fit = BoxFit.contain;
+        FittedImage() {
+            super("", "FlutterImage");
+        }
+
+        /// Sets the picture to draw, keeping the decode lock on whatever is
+        /// actually being shown.
+        ///
+        /// An {@link com.codename1.ui.EncodedImage} keeps its decoded bitmap behind
+        /// a soft reference and re-decodes on demand, so a picture that is drawn
+        /// every frame and collected between them is decoded every frame. Label
+        /// avoids that by locking its ICON while it is on screen; this component
+        /// paints its source directly instead of holding a scaled copy as an icon,
+        /// which is what keeps one bitmap in memory instead of two -- and which
+        /// also stepped outside the locking Label does for free. Lock and unlock
+        /// on the same boundary Label uses, so the picture is pinned exactly while
+        /// it is on screen and collectable the moment it is not.
+        void setSource(com.codename1.ui.Image img) {
+            if (source == img) {
+                return;
+            }
+            source = img;
+            syncLock();
+        }
+
+        com.codename1.ui.Image getSource() {
+            return source;
+        }
+
+        /// Whether this component is on screen, tracked rather than read back from
+        /// {@code isInitialized()} so the two transitions drive the lock directly:
+        /// the framework clears the initialised flag before it calls
+        /// {@code deinitialize()}, and a lock that depends on the ORDER of those
+        /// two is a lock that leaks the day the order changes.
+        private boolean onScreen;
+
+        private void syncLock() {
+            lock.want(onScreen ? source : null);
+        }
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            onScreen = true;
+            syncLock();
+        }
+
+        @Override
+        protected void deinitialize() {
+            onScreen = false;
+            syncLock();
+            super.deinitialize();
+        }
+
+        @Override
+        public void paint(com.codename1.ui.Graphics g) {
+            com.codename1.ui.Image s = source;
+            if (s == null) {
+                super.paint(g);
+                return;
+            }
+            int bw = getWidth();
+            int bh = getHeight();
+            int iw = s.getWidth();
+            int ih = s.getHeight();
+            if (bw <= 0 || bh <= 0 || iw <= 0 || ih <= 0) {
+                return;
+            }
+            double[] r = fittedSize(fit, bw, bh, iw, ih);
+            double dw = r[0];
+            double dh = r[1];
+            // Centred in the box, which is what every BoxFit but `fill` means.
+            int dx = getX() + (int) Math.round((bw - dw) / 2);
+            int dy = getY() + (int) Math.round((bh - dh) / 2);
+            g.drawImage(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh));
+        }
+    }
+
+    /**
+     * The size {@code iw x ih} is drawn at inside a box {@code bw x bh} under
+     * {@code fit} — the whole of BoxFit's arithmetic, free of any Graphics so
+     * it can be pinned by a test.
+     *
+     * @return {@code {width, height}} in device pixels; {@code cover} returns a
+     *         size LARGER than the box, which the component's own clip crops.
+     */
+    static double[] fittedSize(BoxFit fit, double bw, double bh, double iw, double ih) {
+        switch (fit == null ? BoxFit.contain : fit) {
+            case fill:
+                return new double[] {bw, bh};
+            case cover: {
+                double r = Math.max(bw / iw, bh / ih);
+                return new double[] {iw * r, ih * r};
+            }
+            case fitWidth:
+                return new double[] {bw, ih * (bw / iw)};
+            case fitHeight:
+                return new double[] {iw * (bh / ih), bh};
+            case none:
+                return new double[] {iw, ih};
+            case contain:
+            default: {
+                double r = Math.min(bw / iw, bh / ih);
+                return new double[] {iw * r, ih * r};
+            }
+        }
+    }
+
+    /// Cumulative cost of decoding and rescaling artwork, which happens inside
+    /// layout and therefore inside the first frame. Read through
+    /// {@link #scalingCost()}; see the startup trace in FlutterUI.
+    private static long scaleMs;
+    private static int scaleCount;
+
+    /** How much of the frame went into decoding and rescaling images. */
+    public static String scalingCost() {
+        return scaleCount + " image(s) in " + scaleMs + "ms";
     }
 
     /**
