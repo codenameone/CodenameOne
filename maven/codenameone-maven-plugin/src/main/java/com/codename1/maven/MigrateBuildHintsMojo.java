@@ -231,7 +231,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         String originalSettings;
         try {
             originalSource = read(source);
-            originalSettings = read(settingsFile);
+            originalSettings = readProperties(settingsFile);
             insertAnnotations(source, rendered.toString(),
                     settings.getProperty("codename1.mainName", "").trim());
             removeMigratedLines(settingsFile, migratedKeys);
@@ -709,9 +709,26 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
     }
 
+    /**
+     * Reads a properties file as ISO-8859-1, matching {@link #writeProperties}.
+     *
+     * <p>The rollback snapshot has to round-trip byte for byte. Taking it through
+     * the UTF-8 {@link #read} and restoring it with the ISO-8859-1 writer would
+     * mangle any raw high byte in an unrelated property -- an accented
+     * {@code codename1.displayName}, say -- while the goal reports that both
+     * files were put back as they were.</p>
+     */
+    private static String readProperties(File f) throws IOException {
+        return read(f, PROPERTIES_ENCODING);
+    }
+
     private static String read(File f) throws IOException {
+        return read(f, "UTF-8");
+    }
+
+    private static String read(File f, String encoding) throws IOException {
         StringBuilder sb = new StringBuilder();
-        BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+        BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), encoding));
         try {
             int c;
             while ((c = r.read()) >= 0) {

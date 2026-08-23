@@ -2098,15 +2098,23 @@ public class CodenameOneSettings extends Lifecycle {
         String path = binding.projectDir() + "/target/classes/META-INF/codenameone/build-hints.properties";
         InputStream in = null;
         try {
+            // Always start from the source, because it is the only current
+            // statement of what the annotations declare. The manifest is a build
+            // artifact and goes stale in both directions: absent right after
+            // cn1:migrate-build-hints, and out of date the moment an attribute is
+            // added to a project that was built earlier. Trusting it alone left
+            // the newly annotated hint looking unowned, and Add then wrote the
+            // duplicate declaration the next build refuses.
+            //
+            // The manifest is merged in on top for its origins; the union is the
+            // safe direction, since over-reporting ownership only withholds an
+            // editor, while under-reporting breaks the build.
+            out.putAll(annotationOwnedHintsFromSource());
+
             String url = ProjectIO.fsUrl(path);
             FileSystemStorage fs = FileSystemStorage.getInstance();
             if (!fs.exists(url)) {
-                // Not built yet. Read the annotations off the source instead --
-                // the window right after cn1:migrate-build-hints is exactly when
-                // the source declares them and no build has emitted anything, and
-                // treating them as unowned there would offer Add for a hint the
-                // annotations already set, which fails the next build.
-                return annotationOwnedHintsFromSource();
+                return out;
             }
             in = fs.openInputStream(url);
             String text = Util.readToString(in, "ISO-8859-1");
