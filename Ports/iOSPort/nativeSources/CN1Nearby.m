@@ -381,11 +381,21 @@ static void cn1nbSessionsInit(void) {
 
 @end
 
+/// The session for a handle, retained past any removal the caller performs.
+///
+/// The registry is normally the ONLY owner: the entry was created
+/// autoreleased and the pool it was created in drained long ago. So a caller
+/// that looks the entry up, removes it, and then messages it -- which is
+/// exactly what stopping a session does -- was messaging freed memory. The
+/// lock added for the registry serialises the dictionary; it does nothing for
+/// the lifetime of what comes out of it, which is a separate problem with the
+/// same shape as the MCSession and invitation-block ones.
 static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
         API_AVAILABLE(ios(14.0)) {
     cn1nbSessionsInit();
     @synchronized (cn1nbSessionsLock) {
-        return [cn1nbSessions objectForKey:[NSNumber numberWithInt:handle]];
+        return [[[cn1nbSessions objectForKey:[NSNumber numberWithInt:handle]]
+                retain] autorelease];
     }
 }
 

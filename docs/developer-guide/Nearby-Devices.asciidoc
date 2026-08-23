@@ -159,6 +159,13 @@ because it arrives as an enum constant, so name it yourself: set
 profile's own permission, and without it Android rejects the association
 before the chooser opens -- which looks to the user like nothing happened.
 
+Profiles arrived at different Android versions: `WATCH` at 12, `COMPUTER` at
+13, `GLASSES` at 14. Asking for one the running device doesn't have fails with
+`NearbyError.NOT_SUPPORTED` rather than associating without it. A profile is a
+request for elevated privileges, and an association that lacks them without
+saying so is worse than one that didn't happen. Fall back to
+`CompanionProfile.GENERIC` yourself if that's what you want.
+
 Two platform differences to design around. Presence notifications are Android
 only: AccessorySetupKit reports an accessory being added to or removed from the
 app's set, which isn't the same event as it coming into range, so

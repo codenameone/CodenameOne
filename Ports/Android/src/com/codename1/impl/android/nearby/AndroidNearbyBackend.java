@@ -393,11 +393,27 @@ public class AndroidNearbyBackend implements NearbyBridge {
         }
         AssociationRequest.Builder request = new AssociationRequest.Builder();
         request.setSingleDevice(singleDevice);
-        if (Build.VERSION.SDK_INT >= 31) {
-            String deviceProfile = profileFor(profile);
-            if (deviceProfile != null) {
-                request.setDeviceProfile(deviceProfile);
+        // A profile this Android version does not have FAILS the request.
+        //
+        // profileFor returns null both for GENERIC, which wants no profile at
+        // all, and for a profile that arrived too early -- WATCH below API 31,
+        // COMPUTER below 33, GLASSES below 34. Treating the two alike
+        // submitted a generic association for a caller that asked for an
+        // elevated one, so the chooser succeeded WITHOUT the privileges
+        // requested and handed back a device reporting GENERIC. A profile is
+        // not a preference to drop quietly.
+        if (profile != 0) {
+            String deviceProfile = Build.VERSION.SDK_INT >= 31
+                    ? profileFor(profile) : null;
+            if (deviceProfile == null) {
+                CompanionDevices.deliverRequestFailed(requestId,
+                        NearbyError.NOT_SUPPORTED.ordinal(),
+                        "this Android version has no companion profile "
+                        + profile + "; associate with CompanionProfile.GENERIC"
+                        + " or check CompanionDevices.isSupported first");
+                return;
             }
+            request.setDeviceProfile(deviceProfile);
         }
         // A supplied filter that cannot be installed FAILS the request. It
         // used to be ignored, which quietly turned "show me only devices
