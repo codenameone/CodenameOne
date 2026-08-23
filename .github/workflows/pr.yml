@@ -27,6 +27,15 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The build hint gates are run from this workflow and nowhere else, and one
+      # of them holds an empty baseline. Ignoring the whole directory meant a
+      # change that breaks a gate, or that adds a line to the baseline, could
+      # merge without the gate it weakens ever running.
+      - 'scripts/check-build-hint-catalog.sh'
+      - 'scripts/check-build-hint-catalog.py'
+      - 'scripts/build_hint_miner.py'
+      - 'scripts/build-hint-catalog-baseline.txt'
+      - 'scripts/gen-build-hint-annotations.sh'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
@@ -59,6 +68,15 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The build hint gates are run from this workflow and nowhere else, and one
+      # of them holds an empty baseline. Ignoring the whole directory meant a
+      # change that breaks a gate, or that adds a line to the baseline, could
+      # merge without the gate it weakens ever running.
+      - 'scripts/check-build-hint-catalog.sh'
+      - 'scripts/check-build-hint-catalog.py'
+      - 'scripts/build_hint_miner.py'
+      - 'scripts/build-hint-catalog-baseline.txt'
+      - 'scripts/gen-build-hint-annotations.sh'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'

@@ -2562,6 +2562,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         ? main.trim() : pkg.trim() + "." + main.trim();
             }
         }
+        // The manifest's presence, not its contents, is what proves the processor
+        // ran. An annotation with every member left at its default -- @Ios() after
+        // the last attribute was deleted -- is legal Java, and the processor emits
+        // a manifest carrying only the main-class stamp for it. Judging by the hint
+        // count alone would read that as "never processed" and refuse a build that
+        // is in fact perfectly configured.
+        boolean processed = false;
         for (String element : classpathElements) {
             Properties found = readAnnotationHints(new File(element));
             if (found == null) {
@@ -2575,6 +2582,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         + " -- they were generated for " + stamped);
                 continue;
             }
+            processed = true;
             int applied = 0;
             for (String key : found.stringPropertyNames()) {
                 if (!key.startsWith("codename1.arg.")) {
@@ -2588,7 +2596,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 return;
             }
         }
-        // Nothing was applied. If the compiled classes carry build hint
+        if (processed) {
+            getLog().debug("cn1: annotations were processed and set no build hint");
+            return;
+        }
+        // No manifest at all. If the compiled classes carry build hint
         // annotations anyway, the processor never ran -- a mojo's defaultPhase
         // does not add an execution to a project's POM, so an app that adopts the
         // annotations without binding process-annotations compiles cleanly and

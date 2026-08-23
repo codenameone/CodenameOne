@@ -232,28 +232,30 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         try {
             originalSource = read(source);
             originalSettings = readProperties(settingsFile);
-            insertAnnotations(source, rendered.toString(),
-                    settings.getProperty("codename1.mainName", "").trim());
-            removeMigratedLines(settingsFile, migratedKeys);
         } catch (IOException ex) {
             throw new MojoExecutionException("Migration failed: " + ex.getMessage(), ex);
         }
 
+        // Anything that throws from here on has to put both files back. The half
+        // that fails is not always the second one: if the annotations go in and
+        // the properties rewrite then fails -- an unwritable file, a full disk, a
+        // partial write -- the project is left declaring the same hint twice,
+        // which is exactly the state the next build refuses to compile. Leaving
+        // the developer with that is worse than not migrating at all.
+        try {
+            insertAnnotations(source, rendered.toString(),
+                    settings.getProperty("codename1.mainName", "").trim());
+            removeMigratedLines(settingsFile, migratedKeys);
+        } catch (IOException | RuntimeException ex) {
+            throw new MojoExecutionException("Migration failed, so " + source.getName() + " and "
+                    + settingsFile.getName() + " have been put back as they were: "
+                    + ex.getMessage()
+                    + restore(source, originalSource, settingsFile, originalSettings), ex);
+        }
+
         String missing = verifyAnnotationsAreProcessed(projectDir, migratedKeys);
         if (missing != null) {
-            StringBuilder restoreFailed = new StringBuilder();
-            try {
-                write(source, originalSource);
-            } catch (IOException ex) {
-                restoreFailed.append("\nCould not restore ").append(source).append(": ")
-                        .append(ex.getMessage());
-            }
-            try {
-                writeProperties(settingsFile, originalSettings);
-            } catch (IOException ex) {
-                restoreFailed.append("\nCould not restore ").append(settingsFile).append(": ")
-                        .append(ex.getMessage());
-            }
+            String restoreFailed = restore(source, originalSource, settingsFile, originalSettings);
             throw new MojoFailureException("The annotations were added but the build did not turn "
                     + "them into build hints, so " + source.getName() + " and "
                     + settingsFile.getName() + " have been put back as they were.\n\n"
@@ -275,13 +277,29 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * Whether any module in the reactor binds the {@code process-annotations}
-     * goal.
+     * Puts both files back as they were.
      *
-     * <p>Checked across the reactor rather than on {@code project} because this
-     * goal is an aggregator, so {@code project} is the root POM while the binding
-     * lives in the common module.</p>
+     * @return an empty string when both were restored, otherwise a description of
+     *         what could not be, to append to the failure being reported
      */
+    private String restore(File source, String originalSource,
+                           File settingsFile, String originalSettings) {
+        StringBuilder failed = new StringBuilder();
+        try {
+            write(source, originalSource);
+        } catch (IOException ex) {
+            failed.append("\nCould not restore ").append(source).append(": ")
+                    .append(ex.getMessage());
+        }
+        try {
+            writeProperties(settingsFile, originalSettings);
+        } catch (IOException ex) {
+            failed.append("\nCould not restore ").append(settingsFile).append(": ")
+                    .append(ex.getMessage());
+        }
+        return failed.toString();
+    }
+
     /**
      * Runs the project's own build over the module that holds the main class and
      * checks that every migrated hint came back out of it.

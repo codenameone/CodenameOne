@@ -262,6 +262,21 @@ public class BuildHintAnnotationProcessorTest {
         assertFalse(ctx.hasErrors());
     }
 
+    /// An annotation with every member left at its default is legal Java, and
+    /// `@Ios()` is what is left after the last attribute is deleted. The manifest
+    /// is still emitted for it, carrying only the main-class stamp: its presence
+    /// is what tells the build that processing ran at all, and dropping it here
+    /// would make a harmless annotation indistinguishable from an unbound goal.
+    @Test
+    public void anAnnotationWithNoMembersStillEmitsAStampedManifest() throws Exception {
+        Properties p = hintsOf("@Ios()");
+        assertEquals(MAIN, p.getProperty("cn1.buildHints.mainClass"));
+        for (String key : p.stringPropertyNames()) {
+            assertFalse("no hint should have been written, got " + key,
+                    key.startsWith("codename1.arg."));
+        }
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
