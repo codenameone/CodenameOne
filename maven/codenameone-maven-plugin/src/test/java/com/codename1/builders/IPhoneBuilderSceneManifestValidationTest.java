@@ -299,4 +299,28 @@ class IPhoneBuilderSceneManifestValidationTest {
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
                 "a nested array must not be mistaken for the role's closing array");
     }
+
+    @Test
+    void elementsMayCarryAttributesOrTagWhitespace() {
+        // Named as an assumption a round ago and closed here rather than left to be
+        // found: these are elements, so "<key >" and "<string xml:space=...>" are the
+        // same elements as their bare spellings.
+        assertTrue(IPhoneBuilder.plistDeclaresKey(
+                "<key >UIApplicationSceneManifest</key><dict/>",
+                "UIApplicationSceneManifest"));
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string xml:space=\"preserve\">CodenameOne_GLSceneDelegate</string>"
+                        + "</dict></array>"),
+                "an attribute on the string must not hide the delegate");
+    }
+
+    @Test
+    void anElementWhoseNameMerelyStartsTheSameIsNotAMatch() {
+        // The tolerance must not turn <keyboard> into <key>.
+        assertFalse(IPhoneBuilder.plistDeclaresKey(
+                "<keyboard>UIApplicationSceneManifest</keyboard>",
+                "UIApplicationSceneManifest"));
+    }
 }

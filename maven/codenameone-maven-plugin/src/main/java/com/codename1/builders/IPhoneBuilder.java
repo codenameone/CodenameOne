@@ -6869,20 +6869,21 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the index of the key element, or -1
     static int plistKeyIndex(String plist, String key, int from) {
-        int at = plistIndexOfLive(plist, "<key>", from);
+        int at = plistElementIndex(plist, "key", from);
         while (at >= 0) {
+            int contentStart = plistOpenTagEnd(plist, at);
             int close = plist.indexOf("</key>", at);
-            if (close < 0) {
+            if (close < 0 || contentStart < 0) {
                 return -1;
             }
             // The element's text, trimmed. "<key>\n  UIApplicationSceneManifest\n</key>"
             // is the same key as the contiguous spelling, and requiring the tags and the
             // name to be adjacent reported it absent -- which made the build append a
             // second manifest beside the application's own, leaving duplicate keys.
-            if (key.equals(plist.substring(at + "<key>".length(), close).trim())) {
+            if (key.equals(plist.substring(contentStart, close).trim())) {
                 return at;
             }
-            at = plistIndexOfLive(plist, "<key>", close);
+            at = plistElementIndex(plist, "key", close);
         }
         return -1;
     }
@@ -6903,6 +6904,56 @@ public class IPhoneBuilder extends Executor {
     static int plistKeyEnd(String plist, int keyIndex) {
         int close = plist.indexOf("</key>", keyIndex);
         return close < 0 ? -1 : close + "</key>".length();
+    }
+
+    /// Index of the next live element with this name at or after `from`, or -1.
+    ///
+    /// Matches the element rather than a literal tag, so `<key>`, `<key >` and
+    /// `<key attr="x">` are all that element and `<keyboard>` is not. The rest of this
+    /// guard used literal tags, which is true of every Info.plist in practice but is an
+    /// assumption about formatting rather than about the document.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `name`: the element name
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the index of the element's `<`, or -1
+    static int plistElementIndex(String plist, String name, int from) {
+        int at = plistIndexOfLive(plist, "<" + name, from);
+        while (at >= 0) {
+            int after = at + 1 + name.length();
+            if (after < plist.length()) {
+                char c = plist.charAt(after);
+                if (c == '>' || c == '/' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    return at;
+                }
+            }
+            at = plistIndexOfLive(plist, "<" + name, at + 1);
+        }
+        return -1;
+    }
+
+    /// Index just past the `>` closing the opening tag that starts at `elementIndex`,
+    /// or -1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `elementIndex`: index of the element's `<`
+    ///
+    /// #### Returns
+    ///
+    /// the index just past the opening tag, or -1
+    static int plistOpenTagEnd(String plist, int elementIndex) {
+        int gt = plist.indexOf('>', elementIndex);
+        return gt < 0 ? -1 : gt + 1;
     }
 
     /// Index of the first occurrence of `needle` at or after `from` that is not inside
@@ -7059,7 +7110,7 @@ public class IPhoneBuilder extends Executor {
         if (name == null) {
             return -1;
         }
-        int open = plistIndexOfLive(plist, "<" + name, from);
+        int open = plistElementIndex(plist, name, from);
         if (open < 0) {
             return -1;
         }
@@ -7108,15 +7159,16 @@ public class IPhoneBuilder extends Executor {
         if (!"string".equals(nextElementName(plist, from))) {
             return null;
         }
-        int open = plistIndexOfLive(plist, "<string>", from);
-        if (open < 0) {
+        int open = plistElementIndex(plist, "string", from);
+        int contentStart = open < 0 ? -1 : plistOpenTagEnd(plist, open);
+        if (contentStart < 0) {
             return null;
         }
         int close = plist.indexOf("</string>", open);
         if (close < 0) {
             return null;
         }
-        return plist.substring(open + "<string>".length(), close).trim();
+        return plist.substring(contentStart, close).trim();
     }
 
     private void injectToPlist(File tmpFile, File resDir, BuildRequest request)
