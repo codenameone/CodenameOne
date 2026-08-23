@@ -518,15 +518,55 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual(1, len(problems), problems)
         self.assertIn("CI output", problems[0])
 
-    def test_provenance_accepts_a_genuinely_newer_snapshot(self):
-        before = self.stored_reports()["android"]
+    def newer_snapshot(self, before):
         after = json.loads(json.dumps(before))
         after["tests"]["SomeBrandNewTest"] = {"feature": "crypto", "status": "pass"}
         after["summary"]["pass"] += 1
         after["generated_at"] = "2026-12-31T00:00:00Z"
         after["commit"] = "0123456789abcdef"
-        after["run_url"] = "https://example.invalid/run/9"
-        self.assertEqual([], port_status.provenance_problems("android", before, after))
+        after["run_url"] = "https://github.com/codenameone/CodenameOne/actions/runs/99"
+        return after
+
+    def test_provenance_accepts_a_genuinely_newer_snapshot(self):
+        # Without the data branch to consult. Unverifiable is not the same as forged, and
+        # failing a branch because a fetch flaked would teach people to route around this.
+        before = self.stored_reports()["android"]
+        self.assertEqual(
+            [], port_status.provenance_problems("android", before, self.newer_snapshot(before))
+        )
+
+    def test_provenance_accepts_a_report_the_data_branch_published(self):
+        before = self.stored_reports()["android"]
+        after = self.newer_snapshot(before)
+        self.assertEqual(
+            [],
+            port_status.provenance_problems(
+                "android", before, after, published=[before, after]
+            ),
+        )
+
+    def test_provenance_rejects_a_report_no_run_ever_published(self):
+        # The bypass that survived requiring both identity fields: type a plausible run URL and
+        # a plausible date. A checked-in report is a copy of what CI put on the data branch, so
+        # the branch is asked whether this report was ever there. Producing one that was needs
+        # the write access to that branch which only the publish workflows have.
+        before = self.stored_reports()["android"]
+        after = self.newer_snapshot(before)
+        problems = port_status.provenance_problems(
+            "android", before, after, published=[before]
+        )
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("never published", problems[0])
+
+    def test_provenance_rejects_a_run_url_that_names_no_run(self):
+        before = self.stored_reports()["android"]
+        after = self.newer_snapshot(before)
+        after["run_url"] = "made-up-new-run"
+        problems = port_status.provenance_problems(
+            "android", before, after, published=[after]
+        )
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("does not name a workflow run", problems[0])
 
     def test_provenance_rejects_a_fresh_stamp_over_the_same_run(self):
         # The easier version of the same forgery, and the one a gate that accepted any single

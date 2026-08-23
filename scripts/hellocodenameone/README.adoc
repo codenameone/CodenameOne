@@ -139,11 +139,18 @@ test-adding branch conflict with every other one, and made the cheapest way to
 a green build typing `pass` next to a test no port had run. Twelve results
 reached `master` that way, attributed to runs that predated the tests. `Validate
 port status contract` now refuses a report whose findings changed without a new
-run behind them: every field but `generated_at`, `commit` and `run_url` counts
+run behind them. Every field but `generated_at`, `commit` and `run_url` counts
 as a finding, so the benchmark durations the page publishes as measurements are
-covered along with the test map, and both `run_url` and `generated_at` have to
-name a genuinely different run before the change is believed. (`commit` need not
-move -- a port legitimately re-runs the same master commit.)
+covered along with the test map. Both `run_url` and `generated_at` have to name
+a genuinely different run (`commit` need not move -- a port legitimately re-runs
+the same master commit), the run URL has to look like one, and the report itself
+has to be a version the `port-status-data` branch actually holds. That last
+check is the one that matters: a refreshed snapshot is a copy of what CI
+published, so it matches by construction, while an invented one cannot be made
+to match without the write access to that branch which only the publish
+workflows have. The check reads about a week of the branch's history, so a
+refresh taken before the port ran again still matches; if the branch cannot be
+fetched it is skipped rather than failed, because unverifiable is not forged.
 
 "All tests run on all ports" is still enforced, just where it cannot be typed:
 the nightly sweep holds the *published* reports to it. A test left at `not-run`

@@ -37,6 +37,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 MANIFEST="${REPO_ROOT}/docs/website/data/port_status.json"
 REPORT_PATH="docs/website/data/port_status_reports"
+DATA_REF="refs/heads/port-status-data"
+# Roughly a week of publications across all eleven ports, fetched in under a
+# second. A snapshot older than that should be refreshed before review anyway,
+# and the failure mode if it is not says exactly that.
+DATA_DEPTH=200
 
 base_ref="${1:-}"
 if [ -z "${base_ref}" ]; then
@@ -55,10 +60,48 @@ fi
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
+base_dir="${tmp_dir}/base"
+published_dir="${tmp_dir}/published"
+mkdir -p "${base_dir}" "${published_dir}"
+
+# What the data branch has actually published turns this from "are these two
+# strings different" into "did a run produce this report". Unreachable is not
+# the same as forged, so a fetch failure drops the corroboration rather than
+# failing the branch -- the inequality checks still apply either way.
+have_published=1
+if ! git -C "${REPO_ROOT}" fetch --quiet --no-tags --depth="${DATA_DEPTH}" origin "${DATA_REF}"; then
+  echo "Port Status data branch is unavailable; checking provenance fields only." >&2
+  have_published=0
+fi
+
 while IFS= read -r port; do
-  git -C "${REPO_ROOT}" show "${base_ref}:${REPORT_PATH}/${port}.json" \
-    > "${tmp_dir}/${port}.json" 2>/dev/null \
-    || rm -f "${tmp_dir}/${port}.json"
+  if ! git -C "${REPO_ROOT}" show "${base_ref}:${REPORT_PATH}/${port}.json" \
+      > "${base_dir}/${port}.json" 2>/dev/null; then
+    # New port, or a base revision from before this file existed. Nothing to
+    # compare against, so there is no edit to object to.
+    rm -f "${base_dir}/${port}.json"
+    continue
+  fi
+  if cmp -s "${base_dir}/${port}.json" "${REPO_ROOT}/${REPORT_PATH}/${port}.json"; then
+    continue
+  fi
+  [ "${have_published}" -eq 1 ] || continue
+  # Only for a report that changed: every version the branch has held, so a
+  # refresh taken before the port ran again still matches an ancestor rather
+  # than being rejected for not equalling today's tip.
+  mkdir -p "${published_dir}/${port}"
+  index=0
+  while IFS= read -r revision; do
+    git -C "${REPO_ROOT}" show "${revision}:ports/${port}.json" \
+      > "${published_dir}/${port}/${index}.json" 2>/dev/null \
+      || rm -f "${published_dir}/${port}/${index}.json"
+    index=$((index + 1))
+  done < <(git -C "${REPO_ROOT}" log --format=%H FETCH_HEAD -- "ports/${port}.json")
 done < <(jq -r '.ports[].id' "${MANIFEST}")
 
-python3 "${SCRIPT_DIR}/port_status.py" provenance --base "${tmp_dir}"
+if [ "${have_published}" -eq 1 ]; then
+  python3 "${SCRIPT_DIR}/port_status.py" provenance \
+    --base "${base_dir}" --published "${published_dir}"
+else
+  python3 "${SCRIPT_DIR}/port_status.py" provenance --base "${base_dir}"
+fi

@@ -527,9 +527,20 @@ PROVENANCE_FIELDS = ("generated_at", "commit", "run_url")
 # run is a different run. `run_url` is the run's identity and `generated_at` is
 # when it reported; a real snapshot carries new values for both.
 RUN_IDENTITY_FIELDS = ("generated_at", "run_url")
+# A run URL names a run on this forge. Shape alone proves nothing about whether
+# the run happened -- the data branch below is what establishes that -- but it
+# costs nothing and rejects a field filled in with a placeholder.
+RUN_URL_RE = re.compile(
+    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/\d+(?:/[A-Za-z0-9_/-]*)?$"
+)
 
 
-def provenance_problems(port_id: str, before: dict, after: dict) -> list[str]:
+def provenance_problems(
+    port_id: str,
+    before: dict,
+    after: dict,
+    published: list[dict] | None = None,
+) -> list[str]:
     """Refuse a hand-edited report.
 
     A report says "at this commit, this run, at this time, this is what the port
@@ -545,6 +556,17 @@ def provenance_problems(port_id: str, before: dict, after: dict) -> list[str]:
     say the suite completed. Naming a subset here would leave the numbers most
     worth doubting -- the ones nobody can check by reading them -- as the one
     thing a branch could still rewrite in place.
+
+    ``published`` is what turns this from a shape check into a verification. It
+    is every version of this port's report the ``port-status-data`` branch has
+    held recently, and a changed snapshot has to *be* one of them -- which it
+    will be, because the only way to refresh one is to copy what CI published.
+    A new ``run_url`` and stamp are then not two strings a branch can invent;
+    they have to belong to a report that a run really produced, and producing one
+    needs the write access to the data branch that only the publish workflows
+    have. Pass None when the branch could not be reached: unverifiable is not the
+    same as forged, and failing a pull request because a fetch flaked would teach
+    people to route around this.
     """
     findings = tuple(
         {key: value for key, value in report.items() if key not in PROVENANCE_FIELDS}
@@ -561,7 +583,21 @@ def provenance_problems(port_id: str, before: dict, after: dict) -> list[str]:
         before.get(field) != after.get(field) and after.get(field)
         for field in RUN_IDENTITY_FIELDS
     ):
-        return []
+        run_url = after.get("run_url")
+        if not isinstance(run_url, str) or not RUN_URL_RE.match(run_url):
+            return [
+                f"{port_id}: run_url {run_url!r} does not name a workflow run. "
+                "Refresh the report from the port-status-data branch instead of "
+                "editing it."
+            ]
+        if published is None or any(candidate == after for candidate in published):
+            return []
+        return [
+            f"{port_id}: this report was never published by the run it names. A "
+            "checked-in report is a copy of what CI put on the port-status-data "
+            "branch, so refresh it from there rather than editing it; adding a "
+            "test needs no report change at all."
+        ]
     changed = sorted(
         key
         for key in set(findings[0]) | set(findings[1])
@@ -1115,6 +1151,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="directory holding the base revision's reports",
     )
+    provenance_parser.add_argument(
+        "--published",
+        type=Path,
+        help=(
+            "directory of <port>/*.json holding every version of each report the "
+            "data branch has held recently; omit when it could not be fetched"
+        ),
+    )
 
     normalize_parser = subparsers.add_parser("normalize", help="write a normalized port report")
     normalize_parser.add_argument("--port", required=True)
@@ -1180,9 +1224,19 @@ def main() -> int:
                 if not base_path.is_file():
                     continue
                 head_path = REPO_ROOT / report_directory / f"{port_id}.json"
+                published = None
+                if args.published is not None:
+                    candidates = args.published / port_id
+                    published = [
+                        read_json(item)
+                        for item in sorted(candidates.glob("*.json"))
+                    ] if candidates.is_dir() else []
                 problems.extend(
                     provenance_problems(
-                        port_id, read_json(base_path), read_json(head_path)
+                        port_id,
+                        read_json(base_path),
+                        read_json(head_path),
+                        published,
                     )
                 )
             for problem in problems:
