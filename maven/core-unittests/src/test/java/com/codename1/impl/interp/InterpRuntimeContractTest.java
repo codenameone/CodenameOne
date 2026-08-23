@@ -141,6 +141,14 @@ class InterpRuntimeContractTest {
         // the annotation's array value rather than the class body.
         assertEquals("p", packageOf(
                 "@p.A({String.class})\npackage p;\n"));
+        // Kotlin annotations may name themselves through backtick-escaped
+        // identifiers -- `@file:com.foo.`package`.Ann` -- and the word
+        // inside the backticks is *not* the package keyword. Recognising
+        // it as such returned garbled text from the annotation line as
+        // the package and refused the real `package real.pkg` on the
+        // next line as source-less.
+        assertEquals("real.pkg", packageOf(
+                "@file:com.foo.`package`.Ann\npackage real.pkg\n\nfun main() {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {

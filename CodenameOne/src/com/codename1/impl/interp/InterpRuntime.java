@@ -182,6 +182,14 @@ public final class InterpRuntime {
         long runStartMs;
         final Vector callStack = new Vector();
         Failure lastFailure;
+        /// Set once an InterpCancelled has been caught anywhere on this
+        /// thread's frame stack. From then on, only catch-all (finally)
+        /// handlers may match a subsequent cancellation; a `catch
+        /// (Throwable)` that would otherwise turn a stop request into a
+        /// heartbeat is skipped, so `for (;;) { try { work(); } catch
+        /// (Throwable t) {} }` unwinds instead of running forever.
+        /// Cleared with `cancelRequested` when a new run begins.
+        boolean cancelCaughtOnce;
     }
 
     private final ThreadLocal threadState = new ThreadLocal();
@@ -269,6 +277,7 @@ public final class InterpRuntime {
         }
         InterpMethod m = c.declaredMethod("main", "([Ljava/lang/String;)V");
         cancelRequested = false;
+        state().cancelCaughtOnce = false;
         ensureInitialized(c);
         // Only a `public static void main(String[])` is an entry point, per
         // the same rule the JVM applies. A Lifecycle subclass that happens to
@@ -442,7 +451,17 @@ public final class InterpRuntime {
     /// yet. Generated shims call this instead of the raw
     /// `$runtime.dispatch(...)` so a constructor-time override reaches
     /// the pushed class even during the `super()` window.
-    public static Object dispatchOrDeferred(InterpRuntime rt, InterpObject io,
+    ///
+    /// `shim` is the partially constructed peer -- `this` inside the
+    /// generated method. Binding it as `io.hostPeer` before dispatch is
+    /// what lets the interpreted override call an inherited host method
+    /// on itself (`initGlobalToolbar()` calling `setToolbar(...)`) during
+    /// `super()`: the host-method path in `hostCall` reads `io.hostPeer`,
+    /// and without this the call would land in the peerless fallback and
+    /// fail with `IncompatibleClassChangeError` or a null-target error.
+    /// `createPeer` will assign the same reference again once the
+    /// factory constructor returns, so the write is idempotent.
+    public static Object dispatchOrDeferred(Object shim, InterpRuntime rt, InterpObject io,
                                             String name, String descriptor, Object[] args) {
         if (rt == null) {
             Vector stack = (Vector) PENDING_SHIM_CONTEXT.get();
@@ -452,6 +471,10 @@ public final class InterpRuntime {
             Object[] ctx = (Object[]) stack.elementAt(stack.size() - 1);
             rt = (InterpRuntime) ctx[0];
             io = (InterpObject) ctx[1];
+        }
+        if (io != null && io.hostPeer == null && shim != null) {
+            io.hostPeer = shim;
+            io.hostPeerOwner = rt.factory.peerClassName(shim);
         }
         return rt.dispatch(io, name, descriptor, args);
     }
@@ -1245,20 +1268,22 @@ public final class InterpRuntime {
                                 "opcode " + op + " in " + m), snapshotStack());
                 }
             } catch (InterpThrowable it) {
-                // Cancellation (InterpCancelled) is now caught by any handler,
-                // including javac's compiler-generated cleanup for
-                // try-with-resources (which is a `catch (Throwable)` entry
-                // rather than a catch-all). The Stop button and EDT budget
-                // are still honoured: `cancelRequested` stays set, so the
-                // next checkpoint after the handler returns raises
-                // `InterpCancelled` again. A `catch (Throwable)` around a
-                // loop can therefore run its cleanup but cannot resume --
-                // the back-edge checkpoint will re-fire cancellation on the
-                // next iteration.
+                // Cancellation (InterpCancelled) may be caught once,
+                // typically by javac's compiler-generated cleanup for
+                // try-with-resources (a synthesised `catch (Throwable)`
+                // rather than a catch-all). After that first match, the
+                // per-thread `cancelCaughtOnce` flag flips and
+                // `findHandler` narrows subsequent InterpCancelled matches
+                // to catch-all entries only, so a user `catch (Throwable)`
+                // around a retry loop cannot repeatedly swallow the
+                // re-raised cancellation and turn Stop into a heartbeat.
                 Object thrown = it.getThrown();
                 int handler = findHandler(m, insn, thrown, false);
                 if (handler < 0) {
                     throw it;
+                }
+                if (thrown instanceof InterpCancelled) {
+                    state().cancelCaughtOnce = true;
                 }
                 f.sp = 0;
                 f.pushRef(thrown);
@@ -1271,6 +1296,9 @@ public final class InterpRuntime {
                 int handler = findHandler(m, insn, hostThrown, false);
                 if (handler < 0) {
                     throw hostThrown;
+                }
+                if (hostThrown instanceof InterpCancelled) {
+                    state().cancelCaughtOnce = true;
                 }
                 f.sp = 0;
                 f.pushRef(hostThrown);
@@ -1296,6 +1324,9 @@ public final class InterpRuntime {
                         int handler = findHandler(m, insn, thrown, false);
                         if (handler < 0) {
                             throw it;
+                        }
+                        if (thrown instanceof InterpCancelled) {
+                            st.cancelCaughtOnce = true;
                         }
                         f.sp = 0;
                         f.pushRef(thrown);
@@ -4108,17 +4139,17 @@ public final class InterpRuntime {
 
     private int findHandler(InterpMethod m, int insn, Object thrown, boolean unusedFilter)
             throws Throwable {
-        // `unusedFilter` was a per-throwable filter used to gate cancellation
-        // to catch-all handlers only. That skipped javac's compiler-generated
-        // cleanup for try-with-resources (which is a typed `catch (Throwable)`
-        // rather than a catch-all), so the resource never closed on cancel.
-        // The runtime now allows any handler to match; `cancelRequested`
-        // stays set for the ThreadState, so the next checkpoint after the
-        // handler returns re-raises `InterpCancelled` -- a user
-        // `catch (Throwable)` around a loop cannot silence Stop for long
-        // because the back-edge checkpoint keeps firing it. The parameter
-        // is kept in the signature so callers do not all need touching for
-        // the removed distinction.
+        // The first InterpCancelled is offered to any typed handler so
+        // javac's `try (Resource r = ...) {}` -- a synthesised `catch
+        // (Throwable)` that closes `r` -- runs. From that point on the
+        // cancellation is "in flight" and only catch-all (finally)
+        // entries may match; a user `catch (Throwable)` around a retry
+        // loop would otherwise turn a stop request into a heartbeat by
+        // swallowing every subsequent InterpCancelled the next
+        // checkpoint fires. `unusedFilter` stays in the signature so
+        // callers don't all need touching.
+        boolean cancelInFlight = thrown instanceof InterpCancelled
+                && state().cancelCaughtOnce;
         int[] t = m.exceptionTable;
         for (int i = 0; i < t.length; i += 4) {
             if (insn < t[i] || insn >= t[i + 1]) {
@@ -4127,6 +4158,9 @@ public final class InterpRuntime {
             int typeExtern = t[i + 3];
             if (typeExtern < 0) {
                 return t[i + 2];   // finally / catch-all
+            }
+            if (cancelInFlight) {
+                continue;   // typed catch may not silence a re-raised cancel
             }
             if (thrown != null && isInstanceOf(thrown, typeExtern)) {
                 return t[i + 2];

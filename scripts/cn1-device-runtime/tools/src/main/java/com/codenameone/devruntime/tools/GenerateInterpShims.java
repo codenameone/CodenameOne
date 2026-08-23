@@ -1587,7 +1587,7 @@ public final class GenerateInterpShims {
         if (!alreadyEmitted.contains("toString()") && !sealed(target, "toString")) {
             w.println("    @Override");
             w.println("    public String toString() {");
-            w.println("        Object $r = InterpRuntime.dispatchOrDeferred($runtime, $interp,");
+            w.println("        Object $r = InterpRuntime.dispatchOrDeferred(this, $runtime, $interp,");
             w.println("                \"toString\", \"()Ljava/lang/String;\", new Object[]{});");
             w.println("        if (" + MISS + ") {");
             w.println("            return super.toString();");
@@ -1599,7 +1599,7 @@ public final class GenerateInterpShims {
         if (!alreadyEmitted.contains("hashCode()") && !sealed(target, "hashCode")) {
             w.println("    @Override");
             w.println("    public int hashCode() {");
-            w.println("        Object $r = InterpRuntime.dispatchOrDeferred($runtime, $interp,");
+            w.println("        Object $r = InterpRuntime.dispatchOrDeferred(this, $runtime, $interp,");
             w.println("                \"hashCode\", \"()I\", new Object[]{});");
             w.println("        if (" + MISS + ") {");
             w.println("            return super.hashCode();");
@@ -1612,7 +1612,7 @@ public final class GenerateInterpShims {
                 && !sealed(target, "equals")) {
             w.println("    @Override");
             w.println("    public boolean equals(Object a0) {");
-            w.println("        Object $r = InterpRuntime.dispatchOrDeferred($runtime, $interp,");
+            w.println("        Object $r = InterpRuntime.dispatchOrDeferred(this, $runtime, $interp,");
             w.println("                \"equals\", \"(Ljava/lang/Object;)Z\", new Object[]{a0});");
             w.println("        if (" + MISS + ") {");
             w.println("            return super.equals(a0);");
@@ -1686,7 +1686,7 @@ public final class GenerateInterpShims {
         // constructor pushes before super() runs; the object has no state
         // yet, exactly as Java dictates during that window, but the
         // override runs rather than being silently skipped.
-        emitDispatch(w, m, "InterpRuntime.dispatchOrDeferred($runtime, $interp, \""
+        emitDispatch(w, m, "InterpRuntime.dispatchOrDeferred(this, $runtime, $interp, \""
                 + m.getName() + "\", \""
                 + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "})");
         if (abstractMethod) {

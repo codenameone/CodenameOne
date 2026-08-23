@@ -262,6 +262,22 @@ public class InterpBundleWriter {
             if (c == '{' && parens == 0) {
                 break;
             }
+            // Kotlin escapes an identifier that reuses a keyword name with
+            // backticks: `@file:com.foo.`package`.Ann` puts `package` inside
+            // one. Treating it as the keyword would return the surrounding
+            // annotation text as the package name and miss the real
+            // `package real.pkg` that follows. Skip the escaped token as an
+            // opaque identifier.
+            if (c == '`') {
+                i++;
+                while (i < code.length() && code.charAt(i) != '`') {
+                    i++;
+                }
+                if (i < code.length()) {
+                    i++;
+                }
+                continue;
+            }
             if (Character.isJavaIdentifierStart(c)) {
                 int start = i;
                 while (i < code.length() && Character.isJavaIdentifierPart(code.charAt(i))) {
