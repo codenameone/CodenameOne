@@ -4272,6 +4272,81 @@ class WindowTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void centeringFromABackgroundThreadUsesTheSizeItWillActuallyHave() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("centre", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // Both calls made off the event dispatch thread, in this order, while the
+            // queue is not draining -- which is the sequence the bug needs. setWindowSize
+            // marshals, so the resize is still pending when centerOnDesktop runs; reading
+            // the bounds before marshalling therefore centred for the size the window is
+            // about to stop having.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setWindowSize(200, 100);
+                    w.centerOnDesktop();
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            int[] work = wm.getMonitorWorkArea(0, new int[4]);
+            TestWindowManager.FakeWindow peer = wm.getLastWindow();
+            assertEquals(work[0] + (work[2] - 200) / 2, peer.getX(),
+                    "centred for the new width, not the width the resize replaced");
+            assertEquals(work[1] + (work[3] - 100) / 2, peer.getY(),
+                    "centred for the new height, not the height the resize replaced");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void restoringFromABackgroundThreadDoesNotReachThePortBeforeTheOwner() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("restore-me", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            final TestWindowManager.FakeWindow peer = wm.getLastWindow();
+            w.minimize();
+            DisplayTest.flushEdt();
+            int before = peer.getRestoreCount();
+
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.restore();
+                }
+            });
+            background.start();
+            background.join();
+
+            // The point of marshalling: nothing has reached the port yet, so the owner
+            // chain showOwnerChain() may have queued still runs first. Calling straight
+            // through from the background thread restored the child ahead of its owner
+            // and put a WindowManager call outside the only context the SPI is defined
+            // in.
+            assertEquals(before, peer.getRestoreCount(),
+                    "restore() from a background thread must be queued, not handed "
+                            + "straight to the port");
+            DisplayTest.flushEdt();
+            assertEquals(before + 1, peer.getRestoreCount(),
+                    "and it must still happen once the queue drains");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
     /// A scrollable container that can be put into a glide, so a press can be made to
     /// land on something still moving.
     private static final class GlidingContainer extends Container {

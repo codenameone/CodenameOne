@@ -1353,6 +1353,21 @@ public class Window extends Container implements TopLevelContainer {
     /// Centres this window on the work area of the monitor it sits on, so it does not
     /// land under the task bar or dock.
     public void centerOnDesktop() {
+        // The whole calculation runs on the event dispatch thread, not just the move at
+        // the end. setWindowLocation marshals itself, but the reads above it did not, so
+        // a background caller that resized and then centred computed the centre from the
+        // size the window had *before* the queued resize -- and the event dispatch thread
+        // then applied the resize followed by a location centred for the old size. The
+        // same trap setWindowLocation itself documents.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    centerOnDesktop();
+                }
+            });
+            return;
+        }
         Rectangle work = getMonitor().getWorkArea();
         Rectangle b = getWindowBounds();
         setWindowLocation(work.getX() + (work.getWidth() - b.getWidth()) / 2,
@@ -1364,7 +1379,19 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `other`: the top level to centre over
-    public void centerOn(TopLevelContainer other) {
+    public void centerOn(final TopLevelContainer other) {
+        // Marshalled as a whole for the same reason as centerOnDesktop: this reads both
+        // windows' bounds and only then moves, so computing off the event dispatch
+        // thread centres against geometry a queued resize is about to invalidate.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    centerOn(other);
+                }
+            });
+            return;
+        }
         Rectangle o = null;
         if (other instanceof Window) {
             o = ((Window) other).getWindowBounds();
@@ -1417,6 +1444,21 @@ public class Window extends Container implements TopLevelContainer {
     /// is `#show()`'s job, which restores the whole lifecycle rather than just the
     /// native state.
     public void restore() {
+        // Marshalled as a whole, not just the native call. showOwnerChain() below may
+        // queue the owner's show(), and a background caller would then hand the child to
+        // the platform's restore first -- putting it back on screen ahead of its owner,
+        // or letting the window system suppress it while the framework counts it back.
+        // It also kept a WindowManager call off the event dispatch thread, which is the
+        // only context the SPI is defined in.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    restore();
+                }
+            });
+            return;
+        }
         // Deliberately not "iconified only": between minimize() and the platform
         // reporting it, a window is still nativeVisible, and an application that
         // minimizes and immediately restores has to get its window back.
