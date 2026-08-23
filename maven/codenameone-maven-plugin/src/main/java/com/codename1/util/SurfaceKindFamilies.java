@@ -73,11 +73,15 @@ public final class SurfaceKindFamilies {
             // carrying both keys -- silently built the legacy list the author had just replaced,
             // shipping a surface they had removed. Present and unusable is an authoring mistake,
             // and it is said rather than absorbed.
-            if (portable == null) {
-                // Explicitly nothing. Not an error -- it is a legible way to say the kind
-                // declares no families -- but it must not fall through to iosFamilies.
-                return Collections.emptyList();
-            }
+            // An explicit null is an authoring mistake, not a way to say "no families".
+            //
+            // There is no empty answer that means that: an EMPTY declaration deliberately means
+            // "take the home-screen default", which is what a kind with no families key gets and
+            // what hasPhoneFamily documents. Returning empty here therefore produced the three
+            // default iOS sizes and an Android provider -- the opposite of what a null plainly
+            // intends -- so the honest thing is to say the value cannot be read, exactly as any
+            // other unusable one is. A kind that should offer nothing is a kind that should not
+            // be declared.
             List<String> read = asFamilyList(portable);
             if (read == null) {
                 throw new IllegalArgumentException("The \"families\" value of surface kind \""

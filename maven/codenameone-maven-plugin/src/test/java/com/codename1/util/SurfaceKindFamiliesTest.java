@@ -25,6 +25,7 @@ package com.codename1.util;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -209,17 +210,32 @@ class SurfaceKindFamiliesTest {
         assertTrue(SurfaceKindFamilies.read(kind).isEmpty());
     }
 
-    /// An explicit null is PRESENT. A JSON author writes "families": null to mean the kind
-    /// declares none, and reading iosFamilies instead resurrects exactly what they were removing
-    /// -- the same failure as a malformed value, reached through a different door.
+    /// An explicit null is PRESENT, so it must not fall through to the legacy list -- and it is
+    /// an authoring mistake rather than a way to say "no families", because there is no empty
+    /// answer that means that: an empty declaration deliberately takes the home-screen default,
+    /// which is what a kind with no families key gets. Returning empty would have produced the
+    /// three default sizes and an Android provider, the opposite of what a null plainly intends.
     @Test
-    void anExplicitNullFamiliesKeyStillWins() {
+    void anExplicitNullFamiliesKeyIsRefused() {
         Map<String, Object> kind = new LinkedHashMap<String, Object>();
         kind.put("id", "status");
         kind.put("families", null);
         kind.put("iosFamilies", Arrays.asList("small"));
 
-        assertTrue(SurfaceKindFamilies.read(kind).isEmpty(),
-                "the legacy list must not come back through a null portable key");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> SurfaceKindFamilies.read(kind));
+        assertTrue(ex.getMessage().contains("status"), ex.getMessage());
+    }
+
+    /// And the empty declaration keeps its own meaning, which the refusal above depends on.
+    @Test
+    void anEmptyFamiliesListStillTakesTheDefault() {
+        Map<String, Object> kind = new LinkedHashMap<String, Object>();
+        kind.put("id", "status");
+        kind.put("families", new ArrayList<String>());
+
+        assertTrue(SurfaceKindFamilies.read(kind).isEmpty());
+        assertTrue(SurfaceKindFamilies.hasPhoneFamily(SurfaceKindFamilies.read(kind)),
+                "an empty declaration takes the home-screen default");
     }
 }
