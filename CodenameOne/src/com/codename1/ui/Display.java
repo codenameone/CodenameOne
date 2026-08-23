@@ -297,6 +297,21 @@ public final class Display extends CN1Constants {
     private int[] inputEventStackTmp = new int[1000];
     private int inputEventStackPointerTmp;
     private boolean pointerPressedAndNotReleasedOrDragged;
+
+    /// Per window: whether a contact is down and has not yet been released or
+    /// dragged, and where it went down.
+    ///
+    /// Window zero keeps using the singleton above and the global pointerX/pointerY,
+    /// so the single window path is untouched. Anything else needs its own copy: with
+    /// a contact down in two windows the singleton was set and cleared by whichever
+    /// window's packet ran last, so releasing in one window dropped the pressed
+    /// selection in the other while it was still held. The coordinates travel with it
+    /// because shouldRenderSelection(Component) tests them against the component's own
+    /// bounds, and window coordinates are window relative -- a component in one window
+    /// tested against another window's pointer is comparing two different origins.
+    private final boolean[] selectionPressed = new boolean[TRACKED_KEY_PRESSES];
+    private final int[] selectionPressedX = new int[TRACKED_KEY_PRESSES];
+    private final int[] selectionPressedY = new int[TRACKED_KEY_PRESSES];
     private boolean recursivePointerReleaseA;
     private boolean recursivePointerReleaseB;
     private int pointerX;
@@ -3497,6 +3512,88 @@ public final class Display extends CN1Constants {
         return false;
     }
 
+    /// Records a press that has not been released or dragged yet, for one window.
+    private void setSelectionPressed(int windowId, boolean value, int x, int y) {
+        if (windowId == 0) {
+            pointerPressedAndNotReleasedOrDragged = value;
+            return;
+        }
+        int slot = dragHistorySlot(windowId);
+        if (slot >= 0) {
+            selectionPressed[slot] = value;
+            if (value) {
+                selectionPressedX[slot] = x;
+                selectionPressedY[slot] = y;
+            }
+        }
+    }
+
+    /// Clears the pressed selection for one window; the coordinates stop mattering
+    /// the moment the flag goes down.
+    private void clearSelectionPressed(int windowId) {
+        setSelectionPressed(windowId, false, 0, 0);
+    }
+
+    /// Whether the given window has a press down that has not been released or
+    /// dragged. Never allocates a slot -- this is a query.
+    private boolean isSelectionPressed(int windowId) {
+        if (windowId == 0) {
+            return pointerPressedAndNotReleasedOrDragged;
+        }
+        int slot = dragHistorySlot(windowId, false);
+        return slot >= 0 && selectionPressed[slot];
+    }
+
+    /// Whether any window has a press down. What the component-less
+    /// shouldRenderSelection() answers, since it has nothing to resolve a window from.
+    private boolean anySelectionPressed() {
+        if (pointerPressedAndNotReleasedOrDragged) {
+            return true;
+        }
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (selectionPressed[iter]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Clears every window's pressed selection. Used where the whole application
+    /// loses its input, which is not a per window event.
+    private void clearAllSelectionPressed() {
+        pointerPressedAndNotReleasedOrDragged = false;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            selectionPressed[iter] = false;
+        }
+    }
+
+    /// The window a component paints in, or zero for the main surface.
+    private int selectionWindowId(Component c) {
+        TopLevelContainer top = c.getTopLevelContainer();
+        if (top instanceof Window) {
+            return ((Window) top).getWindowId();
+        }
+        return 0;
+    }
+
+    /// Where the press that is still down in this window went down.
+    private int selectionX(int windowId) {
+        if (windowId == 0) {
+            return pointerX;
+        }
+        int slot = dragHistorySlot(windowId, false);
+        return slot >= 0 ? selectionPressedX[slot] : pointerX;
+    }
+
+    /// Where the press that is still down in this window went down.
+    private int selectionY(int windowId) {
+        if (windowId == 0) {
+            return pointerY;
+        }
+        int slot = dragHistorySlot(windowId, false);
+        return slot >= 0 ? selectionPressedY[slot] : pointerY;
+    }
+
     /// Records that a drag happened in one window.
     private void setDragOccured(int windowId, boolean value) {
         if (windowId == 0) {
@@ -3798,7 +3895,8 @@ public final class Display extends CN1Constants {
     public void hideNotify() {
         cancelAllKeyRepeats();
         cancelAllLongPresses();
-        pointerPressedAndNotReleasedOrDragged = false;
+        // Every window, not just the main one: the application is losing its input.
+        clearAllSelectionPressed();
         addNotifyEvent(HIDE_NOTIFY);
     }
 
@@ -4033,11 +4131,14 @@ public final class Display extends CN1Constants {
                     }
                     setDragOccured(windowId, false);
                     resetDragHistory(windowId);
-                    pointerPressedAndNotReleasedOrDragged = true;
                     xArray1[0] = inputEventStackTmp[offset];
                     offset++;
                     yArray1[0] = inputEventStackTmp[offset];
                     offset++;
+                    // After the coordinates are decoded, because the press is recorded
+                    // with them: the selection test compares them against the pressed
+                    // component's own bounds.
+                    setSelectionPressed(windowId, true, xArray1[0], yArray1[0]);
                     currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
                     // Recorded before the dispatch, not after. A pressed callback can
                     // enter a nested loop -- showModal() does -- and the matching
@@ -4054,11 +4155,12 @@ public final class Display extends CN1Constants {
                     }
                     setDragOccured(windowId, false);
                     resetDragHistory(windowId);
-                    pointerPressedAndNotReleasedOrDragged = true;
                     int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array1.length + 1;
                     int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array2.length + 1;
+                    // Same ordering reason as the single-pointer branch.
+                    setSelectionPressed(windowId, true, array1[0], array2[0]);
                     currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
                     // Same ordering as the single-pointer branch above.
                     rememberPointerPress(windowId, f);
@@ -4067,7 +4169,7 @@ public final class Display extends CN1Constants {
                 }
                 case POINTER_RELEASED:
                     recursivePointerReleaseA = true;
-                    pointerPressedAndNotReleasedOrDragged = false;
+                    clearSelectionPressed(windowId);
 
                     // pointer release can cycle into invoke and block which will cause this method
                     // to recurse if a pointer will be released while we are in an invoke and block state
@@ -4104,7 +4206,7 @@ public final class Display extends CN1Constants {
                     break;
                 case POINTER_RELEASED_MULTI:
                     recursivePointerReleaseA = true;
-                    pointerPressedAndNotReleasedOrDragged = false;
+                    clearSelectionPressed(windowId);
 
                     // pointer release can cycle into invoke and block which will cause this method
                     // to recurse if a pointer will be released while we are in an invoke and block state
@@ -4146,7 +4248,7 @@ public final class Display extends CN1Constants {
                     int timestamp = inputEventStackTmp[offset];
                     offset++;
                     updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
-                    pointerPressedAndNotReleasedOrDragged = false;
+                    clearSelectionPressed(windowId);
                     xArray1[0] = arg1;
                     yArray1[0] = arg2;
                     currentPointerEvent = impl.buildPointerEvent(arg1, arg2, false);
@@ -4155,7 +4257,7 @@ public final class Display extends CN1Constants {
                 }
                 case POINTER_DRAGGED_MULTI: {
                     setDragOccured(windowId, true);
-                    pointerPressedAndNotReleasedOrDragged = false;
+                    clearSelectionPressed(windowId);
                     int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array1.length + 1;
                     int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
@@ -5400,7 +5502,7 @@ public final class Display extends CN1Constants {
     ///
     /// the shouldRenderSelection
     public boolean shouldRenderSelection() {
-        return !pureTouch || pointerPressedAndNotReleasedOrDragged || lastInteractionWasKeypad;
+        return !pureTouch || anySelectionPressed() || lastInteractionWasKeypad;
     }
 
     /// This is an internal state flag relevant only for pureTouch mode (otherwise it
@@ -5418,7 +5520,11 @@ public final class Display extends CN1Constants {
         if (c.isCellRenderer()) {
             return shouldRenderSelection();
         }
-        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY)) || c.shouldRenderComponentSelection();
+        int windowId = selectionWindowId(c);
+        return !pureTouch || lastInteractionWasKeypad
+                || (isSelectionPressed(windowId)
+                        && c.contains(selectionX(windowId), selectionY(windowId)))
+                || c.shouldRenderComponentSelection();
     }
 
     /// A pure touch device has no focus showing when the user is using the touch
