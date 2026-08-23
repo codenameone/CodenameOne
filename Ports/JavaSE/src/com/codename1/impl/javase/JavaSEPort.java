@@ -4603,9 +4603,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         // otherwise. A simulator session that restarts through deinitialize()/init()
         // builds a new manager each time, and every previous poller kept waking every
         // two seconds and reporting the same topology change independently.
-        if (windowManager != null) {
-            windowManager.stopWatchingMonitorTopology();
-            windowManager = null;
+        synchronized (windowManagerLock) {
+            if (windowManager != null) {
+                windowManager.stopWatchingMonitorTopology();
+                windowManager = null;
+            }
         }
         if (canvas != null) {
             canvas.disposeGestureListeners();
@@ -21541,6 +21543,16 @@ public class JavaSEPort extends CodenameOneImplementation {
    
     private JavaSEWindowManager windowManager;
 
+    /// Guards the lazy creation of windowManager against the matching teardown in
+    /// deinitialize(). Both paths are reachable off the EDT -- Desktop.isSupported()
+    /// and the Window constructor are callable from any thread -- and an unsynchronized
+    /// lazy init loses more than a wasted allocation here: the constructor starts a
+    /// monitor-topology timer, so the instance that loses the race is unreachable
+    /// through the field yet its poller keeps waking every two seconds for the life of
+    /// the process, reporting every topology change a second time and surviving the
+    /// deinitialize() that was supposed to stop it.
+    private final Object windowManagerLock = new Object();
+
     /**
      * Creates the canvas backing one desktop window, tagged with the id its input
      * events are routed by.
@@ -21568,10 +21580,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 .getBoolean("desktopSkin", false)) {
             return null;
         }
-        if (windowManager == null) {
-            windowManager = new JavaSEWindowManager(this);
+        synchronized (windowManagerLock) {
+            if (windowManager == null) {
+                windowManager = new JavaSEWindowManager(this);
+            }
+            return windowManager;
         }
-        return windowManager;
     }
 
     @Override
