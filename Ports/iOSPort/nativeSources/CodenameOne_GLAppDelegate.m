@@ -372,6 +372,15 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 
 - (void)cn1ApplicationWillEnterForeground
 {
+#ifdef CN1_DETECT_JAILBREAK
+    // Again, on every return from the background. A launch-time-only gate is
+    // trivially stepped around: background the app, attach the instrumentation
+    // to the running process, bring it back. This hook is not called on the
+    // initial launch -- iOS goes straight to didBecomeActive: there -- so the
+    // gate still runs exactly once per foreground, and the probes are a
+    // sub-millisecond handful of syscalls.
+    cn1DetectJailbreakBypassesAndExit();
+#endif
     if (cn1IsHiddenInBackground) {
         [CodenameOne_GLViewController instance].view.hidden = NO;
     }

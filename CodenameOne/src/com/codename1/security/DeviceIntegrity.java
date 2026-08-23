@@ -175,8 +175,12 @@ public final class DeviceIntegrity {
         return Display.getInstance().isDeviceCompromised();
     }
 
-    /// Returns the reason codes behind [#isDeviceCompromised()], e.g. `"root"`, `"frida"`, `"emulator"`,
-    /// `"jailbreak"`. Empty when the device appears clean.
+    /// Returns the reason codes behind [#isDeviceCompromised()]: `"root"`, `"jailbreak"`, `"frida"`
+    /// (any hooking or instrumentation framework, including one caught hooking the detection
+    /// itself), `"emulator"` and `"debugger"`. Empty when the device appears clean.
+    ///
+    /// Nothing is cached, so calling this again before a sensitive operation reports an
+    /// instrumentation framework that attached after launch.
     public static String[] getCompromiseReasons() {
         return Display.getInstance().getCompromiseReasons();
     }
