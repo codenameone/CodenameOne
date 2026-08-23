@@ -66,6 +66,19 @@ public abstract class WindowHostTest extends BaseTest {
     /// Counts readiness polls for the size re-assert above.
     private int resizeAttempts;
 
+    /// How many windows one size may burn before the case is called a failure.
+    ///
+    /// Re-asserting the size into a window the platform has already refused does not
+    /// always rescue it: on Mac Catalyst a scene can stay pinned to another window's
+    /// geometry -- a native editor is one way to pin it -- and every later request on
+    /// that scene comes back as the system default. A window that never reached its
+    /// size is therefore discarded and asked for again from scratch, which releases
+    /// the scene and gets a fresh one.
+    private static final int MAX_WINDOW_ATTEMPTS = 2;
+
+    /// Windows opened for the size currently being captured.
+    private int windowAttempts;
+
     /** Window sizes every windowed case is captured at. */
     protected static final int[][] SIZES = new int[][]{
         {400, 300},   // small
@@ -83,9 +96,12 @@ public abstract class WindowHostTest extends BaseTest {
     private int lastHeight = -1;
 
     /**
-     * The content to host in the window. Invoked once per size, so an implementation
-     * must build a fresh component tree each time rather than caching one -- the same
-     * component cannot live in two hierarchies.
+     * The content to host in the window. Invoked once per window opened -- which is
+     * once per size, and again for each retry when the platform refuses the size --
+     * so an implementation must build a fresh component tree every time rather than
+     * caching one. The same component cannot live in two hierarchies, and the window
+     * this content went into has already been disposed by the time it is asked for
+     * again.
      */
     protected abstract Component createWindowContent(int width, int height);
 
@@ -144,10 +160,18 @@ public abstract class WindowHostTest extends BaseTest {
         final int width = all[index][0];
         final int height = all[index][1];
 
+        windowAttempts = 0;
+        openWindowFor(index, width, height);
+    }
+
+    /// Opens a window for one size and starts waiting for it to become renderable.
+    /// Called again when a window has to be discarded and asked for from scratch.
+    private void openWindowFor(final int index, final int width, final int height) {
         closeWindow();
         lastWidth = -1;
         lastHeight = -1;
         resizeAttempts = 0;
+        windowAttempts++;
         window = new Window(baseImageName(), new BorderLayout());
         window.setResizable(true);
         window.add(BorderLayout.CENTER, createWindowContent(width, height));
@@ -277,6 +301,26 @@ public abstract class WindowHostTest extends BaseTest {
 
     private void captureAndAdvance(final int index, int width, int height, boolean ready) {
         String name = baseImageName() + "-" + width + "x" + height;
+        if (!ready && windowAttempts < MAX_WINDOW_ATTEMPTS) {
+            // Throw this window away and ask for another. Re-asserting the size into a
+            // window whose scene is pinned to someone else's geometry never wins; a new
+            // window gets a new scene. Reported rather than silent, so a port that only
+            // ever passes on the second attempt is visible in the log instead of
+            // looking clean.
+            println("CN1SS:INFO:test=" + getClass().getName().substring(
+                    getClass().getName().lastIndexOf('.') + 1)
+                    + " note=window-size-refused name=" + name
+                    + " got=" + (window == null ? "none"
+                            : window.getWidth() + "x" + window.getHeight())
+                    + " retrying-with-a-new-window");
+            stopEditingThen(new Runnable() {
+                @Override
+                public void run() {
+                    openWindowFor(index, width, height);
+                }
+            });
+            return;
+        }
         if (!ready) {
             Image last = window == null ? null : window.capture();
             fail("Window never became renderable at the requested size for " + name
@@ -301,26 +345,40 @@ public abstract class WindowHostTest extends BaseTest {
         Cn1ssDeviceRunnerHelper.emitImage(shot, name, new Runnable() {
             @Override
             public void run() {
-                // Stop any editor before tearing the window down. A native editor holds
-                // platform state tied to the window it is in -- on Mac Catalyst it pins
-                // the scene, so the *next* window came back at the system's default size
-                // instead of the one requested and never became renderable, which is why
-                // the editing case produced only its first size there. Stopping is
-                // asynchronous, hence the continuation.
-                if (window != null && window.isEditing()) {
-                    window.stopEditing(new Runnable() {
-                        @Override
-                        public void run() {
-                            closeWindow();
-                            captureNext(index + 1);
-                        }
-                    });
-                    return;
-                }
-                closeWindow();
-                captureNext(index + 1);
+                stopEditingThen(new Runnable() {
+                    @Override
+                    public void run() {
+                        captureNext(index + 1);
+                    }
+                });
             }
         });
+    }
+
+    /// Stops any native editor in the current window, then runs the continuation.
+    ///
+    /// A native editor holds platform state tied to the window it is in -- on Mac
+    /// Catalyst it pins the scene, so the *next* window came back at the system's
+    /// default size instead of the one requested and never became renderable, which is
+    /// why the editing case produced only its first size there. Stopping is
+    /// asynchronous, hence the continuation rather than a plain call.
+    ///
+    /// The window is closed either way before the continuation runs: releasing the
+    /// scene is the point, and a window left open would be captured by whatever comes
+    /// next.
+    private void stopEditingThen(final Runnable after) {
+        if (window != null && window.isEditing()) {
+            window.stopEditing(new Runnable() {
+                @Override
+                public void run() {
+                    closeWindow();
+                    after.run();
+                }
+            });
+            return;
+        }
+        closeWindow();
+        after.run();
     }
 
     private void closeWindow() {
