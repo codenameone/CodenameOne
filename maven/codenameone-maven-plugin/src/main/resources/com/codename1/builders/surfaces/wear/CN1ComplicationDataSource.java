@@ -298,7 +298,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // FACE ticks rather than a string frozen at this request. With the update period at 0
         // there is no later request to refresh it, so a countdown really did stop.
         ComplicationText primary = texts.isEmpty() ? null
-                : textFor(firstTextNode(nodes), reading.getState(), texts.get(0), asOf);
+                : textFor(textNodeAt(nodes, reading.getState(), 0), reading.getState(), texts.get(0), asOf);
 
         if (ComplicationType.LONG_TEXT.equals(type)) {
             String title = texts.isEmpty() ? getKindId() : texts.get(0);
@@ -309,7 +309,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // is exactly one node, though: a join of several is a string, and there is nothing to
             // hand a face that would advance part of it.
             ComplicationText bodyText = texts.size() == 2
-                    ? textFor(secondTextNode(nodes), reading.getState(), texts.get(1), asOf)
+                    ? textFor(textNodeAt(nodes, reading.getState(), 1), reading.getState(), texts.get(1), asOf)
                     : plain(body);
             // The whole value, not just the title. TalkBack reads this instead of the layout, so
             // omitting the body announced the label of a complication without the thing it says
@@ -392,11 +392,20 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             return;
         }
         long windowEnd = reading.getNextFlipDate();
+        // The reading's own START is the lower bound, not just its end. A future entry beginning
+        // in an hour can name a target thirty minutes away, and an entry starting AT that target
+        // would carry the future reading's content from before it is current -- overlapping the
+        // entry actually on screen and showing tomorrow's state today. A crossing before the
+        // reading begins has already happened by the time the reading takes over, and the entry
+        // is built as of its own start, so it is already on the right side.
+        long windowStart = reading.getStart();
         java.util.TreeSet<Long> crossings = new java.util.TreeSet<Long>();
         List<JSONObject> nodes = CN1WatchSurface.flatten(reading.getLayout());
-        for (JSONObject node : new JSONObject[] {firstTextNode(nodes), secondTextNode(nodes)}) {
+        JSONObject state = reading.getState();
+        for (JSONObject node : new JSONObject[] {textNodeAt(nodes, state, 0),
+                textNodeAt(nodes, state, 1)}) {
             long at = relativeCrossingOf(node, reading);
-            if (at > 0 && (windowEnd <= 0 || at < windowEnd)) {
+            if (at > 0 && at > windowStart && (windowEnd <= 0 || at < windowEnd)) {
                 crossings.add(Long.valueOf(at));
             }
         }
@@ -427,34 +436,44 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         return date > System.currentTimeMillis() ? date : 0;
     }
 
-    /// The second text-bearing node, which is a long-text body when there is exactly one.
-    private static JSONObject secondTextNode(List<JSONObject> nodes) {
-        boolean seenFirst = false;
+    /**
+     * The nodes that actually produced the strings in {@code texts}, in the same order.
+     *
+     * <p>Indexing matters here and the two lists have to be built by the SAME rule.
+     * {@code CN1WatchSurface.texts} drops a node whose value resolves to nothing -- a missing
+     * ${placeholder} is the ordinary way -- so a plain scan for text-bearing nodes returns a
+     * longer list, and texts.get(0) then belonged to a different node than the first one found.
+     * A timer displayed after an empty label was handed over as the label's static text and
+     * frozen, which is the failure the ticking work exists to prevent, reached by an off-by-one.</p>
+     *
+     * @param nodes the flattened layout
+     * @param state the entry state, which decides what resolves to nothing
+     * @return the contributing nodes, positionally matching texts()
+     */
+    private static List<JSONObject> textNodes(List<JSONObject> nodes, JSONObject state) {
+        List<JSONObject> out = new ArrayList<JSONObject>();
         for (JSONObject node : nodes) {
             String type = node.optString("t", "");
-            if ("text".equals(type) || "dyn".equals(type)) {
-                if (seenFirst) {
-                    return node;
-                }
-                seenFirst = true;
+            if (!"text".equals(type) && !"dyn".equals(type)) {
+                continue;
+            }
+            // One node at a time through the same call texts() makes, so the two cannot disagree
+            // about what "resolves to nothing" means.
+            List<JSONObject> one = new ArrayList<JSONObject>(1);
+            one.add(node);
+            if (!CN1WatchSurface.texts(one, state).isEmpty()) {
+                out.add(node);
             }
         }
-        return null;
+        return out;
     }
 
-    /// The first text-bearing node, so the caller can ask what KIND of text it is.
-    ///
-    /// texts() returns resolved strings and deliberately says nothing about where they came from;
-    /// a native ticking value needs the node itself.
-    private static JSONObject firstTextNode(List<JSONObject> nodes) {
-        for (JSONObject node : nodes) {
-            String type = node.optString("t", "");
-            if ("text".equals(type) || "dyn".equals(type)) {
-                return node;
-            }
-        }
-        return null;
+    /// The nth contributing text node, or null.
+    private static JSONObject textNodeAt(List<JSONObject> nodes, JSONObject state, int index) {
+        List<JSONObject> contributing = textNodes(nodes, state);
+        return index < contributing.size() ? contributing.get(index) : null;
     }
+
 
     /// A node's complication text: the face-ticked form where the node is dynamic and the style
     /// is one that moves, a plain string otherwise.

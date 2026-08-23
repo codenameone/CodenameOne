@@ -336,6 +336,48 @@ public final class CN1SurfaceMirror {
      *         acknowledgement is durable -- a false answer gets the transfer redelivered, a
      *         wrongly true one loses the artwork for good
      */
+    /// Kinds with a delayed sweep already pending, so a burst of arriving images schedules one
+    /// pass rather than one per image.
+    private static final java.util.HashSet<String> SWEEPS_PENDING = new java.util.HashSet<String>();
+
+    /**
+     * Runs the stale-image sweep once more after the grace period has passed.
+     *
+     * <p>The synchronous sweep cannot collect the blob that triggered it: it was just written, so
+     * it is inside the grace by definition. When that blob belongs to a superseded publication --
+     * the last transfer of a batch the watch was too late for -- nothing else will look again,
+     * and it stays. One delayed pass per kind is enough, and the set keeps a burst of arrivals
+     * from queuing one apiece.</p>
+     *
+     * @param ctx any context
+     * @param kindId the kind whose directory to sweep
+     */
+    private static void scheduleStaleImageSweep(final Context ctx, final String kindId) {
+        synchronized (SWEEPS_PENDING) {
+            if (!SWEEPS_PENDING.add(kindId)) {
+                return;
+            }
+        }
+        final Context app = ctx.getApplicationContext();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                synchronized (SWEEPS_PENDING) {
+                    SWEEPS_PENDING.remove(kindId);
+                }
+                try {
+                    String json = CN1SurfaceStore.readWidgetTimeline(app, kindId);
+                    if (json != null && json.length() > 0) {
+                        CN1SurfaceStore.deleteUnreferencedImages(
+                                CN1SurfaceStore.kindDir(app, kindId), json,
+                                STALE_IMAGE_GRACE_MILLIS);
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "Could not collect stale mirrored images for " + kindId, t);
+                }
+            }
+        }, STALE_IMAGE_GRACE_MILLIS + 1000L);
+    }
+
     /// How long an unreferenced mirrored image is left alone before it counts as stale.
     ///
     /// Art that arrives ahead of the descriptor naming it is seconds or minutes old -- the two
@@ -396,6 +438,12 @@ public final class CN1SurfaceMirror {
             if (stored != null && stored.length() > 0) {
                 CN1SurfaceStore.deleteUnreferencedImages(dir, stored, STALE_IMAGE_GRACE_MILLIS);
             }
+            // And AGAIN once the grace has passed. This sweep necessarily spares the file it has
+            // just written -- writeAtomically gives it the current time -- so the last transfer
+            // of a superseded publication is always the one left behind, and nothing else is
+            // promised to run: no further descriptor, no further image. A single delayed pass
+            // closes that, and repeated disconnects otherwise accumulate one blob each.
+            scheduleStaleImageSweep(ctx, kindId);
             return true;
         } catch (Throwable t) {
             Log.w(TAG, "Could not store a mirrored image from " + path, t);

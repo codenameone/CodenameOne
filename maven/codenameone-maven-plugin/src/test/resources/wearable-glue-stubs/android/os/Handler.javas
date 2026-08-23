@@ -1,0 +1,10 @@
+package android.os;
+
+/**
+ * Stub mirroring the real API. postDelayed is what the surface mirror uses to run its stale-image
+ * sweep once the grace has passed, so the signature is pinned here.
+ */
+public class Handler {
+    public Handler(Looper looper) { }
+    public boolean postDelayed(Runnable r, long delayMillis) { return true; }
+}
