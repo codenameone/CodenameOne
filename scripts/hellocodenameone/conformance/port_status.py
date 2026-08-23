@@ -369,8 +369,17 @@ def stored_report_problems(manifest: dict) -> tuple[set[str], list[str], list[st
         port_id = port.get("id")
         if not port_id:
             continue
+        path = root / f"{port_id}.json"
+        if not path.is_file():
+            # A port with no published report renders as "No stored report" on
+            # every one of its cells, which is what is true of a port CI has
+            # never heard from. Demanding a file here is what made adding a port
+            # start by hand-authoring one, and a hand-authored report is the
+            # thing this whole contract is trying to stop existing.
+            drift.append(f"{port_id}: no stored report yet")
+            continue
         try:
-            report = read_json(root / f"{port_id}.json")
+            report = read_json(path)
         except ContractError as exc:
             malformed.append(str(exc))
             continue
@@ -537,7 +546,7 @@ RUN_URL_RE = re.compile(
 
 def provenance_problems(
     port_id: str,
-    before: dict,
+    before: dict | None,
     after: dict,
     published: list[dict] | None = None,
 ) -> list[str]:
@@ -568,52 +577,74 @@ def provenance_problems(
     same as forged, and failing a pull request because a fetch flaked would teach
     people to route around this.
     """
-    findings = tuple(
-        {key: value for key, value in report.items() if key not in PROVENANCE_FIELDS}
-        for report in (before, after)
-    )
-    if findings[0] == findings[1]:
+    if before == after:
         return []
+
+    advice = (
+        "A checked-in report is a copy of what CI put on the port-status-data "
+        "branch, so refresh it from there rather than editing it; adding a test "
+        "needs no report change at all."
+    )
+
+    # Checked on any change to the field, not only alongside changed findings.
+    if before is None or before.get("run_url") != after.get("run_url"):
+        run_url = after.get("run_url")
+        if not isinstance(run_url, str) or not RUN_URL_RE.match(run_url):
+            return [
+                f"{port_id}: run_url {run_url!r} does not name a workflow run. "
+                + advice
+            ]
+
     # Every identity field, not any provenance field. Accepting a change to one
     # of the three left the gate open to the easier version of the same forgery:
     # invent a result, type today's date into `generated_at`, and leave the
     # `commit` and `run_url` still naming the run that never produced it. A
     # snapshot that came from a run has a new run behind it.
-    if all(
+    findings = tuple(
+        {key: value for key, value in (report or {}).items() if key not in PROVENANCE_FIELDS}
+        for report in (before, after)
+    )
+    if before is not None and findings[0] != findings[1] and not all(
         before.get(field) != after.get(field) and after.get(field)
         for field in RUN_IDENTITY_FIELDS
     ):
-        run_url = after.get("run_url")
-        if not isinstance(run_url, str) or not RUN_URL_RE.match(run_url):
-            return [
-                f"{port_id}: run_url {run_url!r} does not name a workflow run. "
-                "Refresh the report from the port-status-data branch instead of "
-                "editing it."
-            ]
-        if published is None or any(candidate == after for candidate in published):
-            return []
+        changed = sorted(
+            key
+            for key in set(findings[0]) | set(findings[1])
+            if findings[0].get(key) != findings[1].get(key)
+        )
+        stale = sorted(
+            field
+            for field in RUN_IDENTITY_FIELDS
+            if not (before.get(field) != after.get(field) and after.get(field))
+        )
         return [
-            f"{port_id}: this report was never published by the run it names. A "
-            "checked-in report is a copy of what CI put on the port-status-data "
-            "branch, so refresh it from there rather than editing it; adding a "
-            "test needs no report change at all."
+            f"{port_id}: {', '.join(changed)} changed without a new run behind it -- "
+            f"{', '.join(stale)} still name{'s' if len(stale) == 1 else ''} the "
+            "previous one. These reports are CI output, and a branch never needs to "
+            "edit one. Adding a test needs no report change at all; each port picks "
+            "it up on its next master run."
         ]
-    changed = sorted(
-        key
-        for key in set(findings[0]) | set(findings[1])
-        if findings[0].get(key) != findings[1].get(key)
-    )
-    stale = sorted(
-        field
-        for field in RUN_IDENTITY_FIELDS
-        if not (before.get(field) != after.get(field) and after.get(field))
-    )
+
+    # Asked of *any* change, including one that touches only the provenance
+    # fields. Retyping generated_at alone changes no finding, and the page reads
+    # that field to decide whether a column is stale -- so the edit nothing else
+    # objected to was the one that made a port which had stopped reporting look
+    # like it was still running.
+    if published is None:
+        return []
+    if any(candidate == after for candidate in published):
+        return []
+    if not published:
+        return [
+            f"{port_id}: this port has never published a report, so there is "
+            "nothing for a checked-in one to be a copy of. Leave it out -- every "
+            "cell reads 'No stored report' until the port's first run, which is "
+            "what is true. " + advice
+        ]
     return [
-        f"{port_id}: {', '.join(changed)} changed without a new run behind it -- "
-        f"{', '.join(stale)} still name{'s' if len(stale) == 1 else ''} the "
-        "previous one. These reports are CI output, and a branch never needs to "
-        "edit one. Adding a test needs no report change at all; each port picks "
-        "it up on its next master run."
+        f"{port_id}: this report is not a version the port-status-data branch "
+        "ever held. " + advice
     ]
 
 
@@ -1221,9 +1252,11 @@ def main() -> int:
             for port in manifest.get("ports", []):
                 port_id = port.get("id")
                 base_path = args.base / f"{port_id}.json"
-                if not base_path.is_file():
-                    continue
                 head_path = REPO_ROOT / report_directory / f"{port_id}.json"
+                if not head_path.is_file():
+                    # Removed, or a port that has never published. Neither is an
+                    # edit to a result.
+                    continue
                 published = None
                 if args.published is not None:
                     candidates = args.published / port_id
@@ -1234,7 +1267,7 @@ def main() -> int:
                 problems.extend(
                     provenance_problems(
                         port_id,
-                        read_json(base_path),
+                        read_json(base_path) if base_path.is_file() else None,
                         read_json(head_path),
                         published,
                     )

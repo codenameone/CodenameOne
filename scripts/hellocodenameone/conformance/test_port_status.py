@@ -556,7 +556,7 @@ class PortStatusTest(unittest.TestCase):
             "android", before, after, published=[before]
         )
         self.assertEqual(1, len(problems), problems)
-        self.assertIn("never published", problems[0])
+        self.assertIn("ever held", problems[0])
 
     def test_provenance_rejects_a_run_url_that_names_no_run(self):
         before = self.stored_reports()["android"]
@@ -587,7 +587,7 @@ class PortStatusTest(unittest.TestCase):
         before = self.stored_reports()["android"]
         after = json.loads(json.dumps(before))
         after["performance"]["benchmarks"]["quicksort"]["duration_ns"] = 1
-        after["run_url"] = "https://example.invalid/run/9"
+        after["run_url"] = "https://github.com/codenameone/CodenameOne/actions/runs/98"
         problems = port_status.provenance_problems("android", before, after)
         self.assertEqual(1, len(problems), problems)
         self.assertIn("generated_at", problems[0])
@@ -627,6 +627,69 @@ class PortStatusTest(unittest.TestCase):
         problems = port_status.provenance_problems("android", before, after)
         self.assertEqual(1, len(problems), problems)
         self.assertIn("suite_finished", problems[0])
+
+    def test_provenance_rejects_a_timestamp_retyped_onto_an_old_snapshot(self):
+        # Changes no finding, so every rule about findings passes it -- and it is the edit with
+        # the worst consequence of any of them. The page reads generated_at to decide whether a
+        # column is stale, so retyping it is how a port that has stopped reporting altogether
+        # would go on looking like it was still running. Corroboration is therefore asked of any
+        # change, not only of a changed result.
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        after["generated_at"] = "2026-12-31T00:00:00Z"
+        problems = port_status.provenance_problems(
+            "android", before, after, published=[before]
+        )
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("ever held", problems[0])
+
+    def test_provenance_rejects_a_hand_authored_report_for_a_new_port(self):
+        # The one report with no earlier version to be checked against, and so the only one
+        # nobody was checking at all: a pull request that adds a port could give it an entirely
+        # green snapshot. It has to be a report the data branch published, like every other.
+        published = self.stored_reports()["android"]
+        invented = json.loads(json.dumps(published))
+        invented["port"] = "freebsd"
+        problems = port_status.provenance_problems(
+            "freebsd", None, invented, published=[published]
+        )
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("ever held", problems[0])
+
+    def test_provenance_tells_a_new_port_it_needs_no_report(self):
+        # And the advice has to be actionable, which it is only because a port with no stored
+        # report is now a supported state: every cell reads "No stored report" until its first
+        # run. Otherwise the only way to add a port would be to hand-author the snapshot this
+        # rule refuses.
+        invented = self.stored_reports()["android"]
+        problems = port_status.provenance_problems("freebsd", None, invented, published=[])
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("never published a report", problems[0])
+
+    def test_provenance_accepts_a_new_port_report_copied_from_the_branch(self):
+        published = self.stored_reports()["android"]
+        self.assertEqual(
+            [], port_status.provenance_problems("android", None, published, published=[published])
+        )
+
+    def test_validate_accepts_a_port_with_no_stored_report(self):
+        original_directory = self.manifest["report_directory"]
+        with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
+            report_root = Path(tmp)
+            for port in self.manifest["ports"]:
+                if port["id"] == "tvos":
+                    continue
+                source = port_status.REPO_ROOT / original_directory / (port["id"] + ".json")
+                (report_root / source.name).write_text(
+                    source.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+            manifest = dict(self.manifest)
+            manifest["report_directory"] = str(report_root.relative_to(port_status.REPO_ROOT))
+            counts = port_status.validate(manifest)
+        self.assertTrue(
+            any("tvos" in item and "no stored report" in item for item in counts["drift"]),
+            counts["drift"],
+        )
 
     def test_provenance_ignores_an_untouched_report(self):
         before = self.stored_reports()["android"]

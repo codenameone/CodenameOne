@@ -148,9 +148,17 @@ has to be a version the `port-status-data` branch actually holds. That last
 check is the one that matters: a refreshed snapshot is a copy of what CI
 published, so it matches by construction, while an invented one cannot be made
 to match without the write access to that branch which only the publish
-workflows have. The check reads about a week of the branch's history, so a
-refresh taken before the port ran again still matches; if the branch cannot be
-fetched it is skipped rather than failed, because unverifiable is not forged.
+workflows have. It is asked of any change, including one that touches only
+`generated_at` -- that edit changes no finding, and it is how a port that had
+stopped reporting would go on looking current -- and of a report the branch
+*adds*, which is otherwise the one file with no earlier version to check against.
+The check reads about a week of the branch's history, so a refresh taken before
+the port ran again still matches; if the branch cannot be fetched it is skipped
+rather than failed, because unverifiable is not forged.
+
+A port with no stored report is a supported state, so adding a port does not
+start by hand-authoring one: every cell reads "No stored report" and the card
+reads "unknown" until that port's first run publishes something to copy.
 
 "All tests run on all ports" is still enforced, just where it cannot be typed:
 the nightly sweep holds the *published* reports to it. A test left at `not-run`

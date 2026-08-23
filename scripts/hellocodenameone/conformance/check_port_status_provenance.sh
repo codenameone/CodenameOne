@@ -75,15 +75,20 @@ if ! git -C "${REPO_ROOT}" fetch --quiet --no-tags --depth="${DATA_DEPTH}" origi
 fi
 
 while IFS= read -r port; do
-  if ! git -C "${REPO_ROOT}" show "${base_ref}:${REPORT_PATH}/${port}.json" \
+  head_report="${REPO_ROOT}/${REPORT_PATH}/${port}.json"
+  [ -f "${head_report}" ] || continue
+  if git -C "${REPO_ROOT}" show "${base_ref}:${REPORT_PATH}/${port}.json" \
       > "${base_dir}/${port}.json" 2>/dev/null; then
-    # New port, or a base revision from before this file existed. Nothing to
-    # compare against, so there is no edit to object to.
+    if cmp -s "${base_dir}/${port}.json" "${head_report}"; then
+      continue
+    fi
+  else
+    # A report the branch ADDS. Skipping it here is how a pull request that also
+    # adds a port could hand-author an entirely green snapshot for it -- the one
+    # report with no earlier version to be checked against, and so the only one
+    # nobody was checking at all. It still has to be a report the data branch
+    # published; a port that has never published simply does not need one.
     rm -f "${base_dir}/${port}.json"
-    continue
-  fi
-  if cmp -s "${base_dir}/${port}.json" "${REPO_ROOT}/${REPORT_PATH}/${port}.json"; then
-    continue
   fi
   [ "${have_published}" -eq 1 ] || continue
   # Only for a report that changed: every version the branch has held, so a
