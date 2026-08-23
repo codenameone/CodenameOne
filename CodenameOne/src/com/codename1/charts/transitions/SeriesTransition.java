@@ -39,6 +39,10 @@ import com.codename1.ui.animations.Motion;
 /// @author shannah
 public abstract class SeriesTransition implements Animation {
 
+    /// The top level this transition registered on, so it is removed from that one
+    /// rather than from wherever the chart resolves to when the motion ends.
+    private com.codename1.ui.TopLevelContainer animationHost;
+
 
     public static final int EASING_LINEAR = 1;
     public static final int EASING_IN = 2;
@@ -119,9 +123,9 @@ public abstract class SeriesTransition implements Animation {
     public boolean animate() {
         if (finished) {
             cleanup();
-            com.codename1.ui.TopLevelContainer top = chart.getTopLevelContainer();
-            if (top != null) {
-                top.deregisterAnimated(this);
+            if (animationHost != null) {
+                animationHost.deregisterAnimated(this);
+                animationHost = null;
             }
             return false;
         } else if (motion.isFinished()) {
@@ -201,6 +205,7 @@ public abstract class SeriesTransition implements Animation {
         // design inside a Window, so a chart transition threw there.
         com.codename1.ui.TopLevelContainer top = chart.getTopLevelContainer();
         if (top != null) {
+            animationHost = top;
             top.registerAnimated(this);
         }
 
