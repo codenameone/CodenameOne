@@ -166,13 +166,59 @@ public abstract class CodenameOneImplementation {
     private boolean builtinSoundEnabled = true;
     private boolean dragStarted = false;
     private int dragActivationCounter = 0;
-    /// Drag activation state for a gesture inside one of the additional native
-    /// windows, kept apart from the main surface's because nothing resets that one for
-    /// a window gesture.
-    private boolean windowDragStarted;
-    private int windowDragActivationCounter;
-    private int windowDragActivationX;
-    private int windowDragActivationY;
+    /// How many windows may have a drag gesture in flight at once. A touchscreen can
+    /// have a contact down in two windows at the same time, and the framework already
+    /// keys press targets and drag histories per window rather than globally.
+    private static final int TRACKED_WINDOW_DRAGS = 8;
+
+    /// Drag activation state per window, kept apart from the main surface's because
+    /// nothing resets that one for a window gesture. Slot 0 of each array is used by
+    /// whichever window claims it; windowDragIds holds the owner, 0 meaning free.
+    private final int[] windowDragIds = new int[TRACKED_WINDOW_DRAGS];
+    private final boolean[] windowDragStarted = new boolean[TRACKED_WINDOW_DRAGS];
+    private final int[] windowDragActivationCounter = new int[TRACKED_WINDOW_DRAGS];
+    private final int[] windowDragActivationX = new int[TRACKED_WINDOW_DRAGS];
+    private final int[] windowDragActivationY = new int[TRACKED_WINDOW_DRAGS];
+
+    /// The slot tracking this window's drag gesture, claiming a free one when asked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window to look up
+    ///
+    /// - `claim`: whether to take a free slot when the window has none
+    ///
+    /// #### Returns
+    ///
+    /// the slot, or -1 when the window has none and none was claimed
+    private int windowDragSlot(int windowId, boolean claim) {
+        int free = -1;
+        for (int iter = 0; iter < TRACKED_WINDOW_DRAGS; iter++) {
+            if (windowDragIds[iter] == windowId) {
+                return iter;
+            }
+            if (free < 0 && windowDragIds[iter] == 0) {
+                free = iter;
+            }
+        }
+        if (!claim || free < 0) {
+            return -1;
+        }
+        windowDragIds[free] = windowId;
+        windowDragStarted[free] = false;
+        windowDragActivationCounter[free] = 0;
+        return free;
+    }
+
+    /// Releases a window's drag slot.
+    private void releaseWindowDragSlot(int windowId) {
+        int slot = windowDragSlot(windowId, false);
+        if (slot >= 0) {
+            windowDragIds[slot] = 0;
+            windowDragStarted[slot] = false;
+            windowDragActivationCounter[slot] = 0;
+        }
+    }
 
     private int dragActivationX = 0;
     private int dragActivationY = 0;
@@ -3433,9 +3479,10 @@ public abstract class CodenameOneImplementation {
     /// - `y`: the position of the event
     protected void windowPointerPressed(int windowId, int x, int y) {
         if (windowId > 0) {
-            // A new gesture in a window starts its activation filter over.
-            windowDragStarted = false;
-            windowDragActivationCounter = 0;
+            // A new gesture in this window starts its own activation filter over,
+            // leaving any other window's gesture alone.
+            releaseWindowDragSlot(windowId);
+            windowDragSlot(windowId, true);
         }
         if (windowId == 0) {
             pointerPressed(x, y);
@@ -3458,8 +3505,7 @@ public abstract class CodenameOneImplementation {
     /// - `y`: the position of the event
     protected void windowPointerReleased(int windowId, int x, int y) {
         if (windowId > 0) {
-            windowDragStarted = false;
-            windowDragActivationCounter = 0;
+            releaseWindowDragSlot(windowId);
         }
         if (windowId == 0) {
             pointerReleased(x, y);
@@ -3497,18 +3543,25 @@ public abstract class CodenameOneImplementation {
             // through made a pixel of jitter after a press into a drag, which activates
             // drag and drop and moves a draggable component on what was meant as a
             // click.
+            int slot = windowDragSlot(windowId, true);
+            if (slot < 0) {
+                // More windows dragging at once than there are slots. Filtering is a
+                // refinement, so let the gesture through rather than swallow it.
+                Display.getInstance().windowPointerDragged(windowId, x, y);
+                return;
+            }
             boolean started = false;
-            if (!windowDragStarted) {
+            if (!windowDragStarted[slot]) {
                 try {
-                    started = hasWindowDragStarted(windowId, x[0], y[0]);
+                    started = hasWindowDragStarted(windowId, slot, x[0], y[0]);
                 } catch (Throwable t) {
                     // Matches the main path: a filter that throws must not take the
                     // gesture with it.
                     Log.e(t);
                 }
             }
-            if (windowDragStarted || started) {
-                windowDragStarted = true;
+            if (windowDragStarted[slot] || started) {
+                windowDragStarted[slot] = true;
                 Display.getInstance().windowPointerDragged(windowId, x, y);
             }
             return;
@@ -3787,25 +3840,26 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// true if the drag should propagate into Codename One
-    protected boolean hasWindowDragStarted(final int windowId, final int x, final int y) {
+    protected boolean hasWindowDragStarted(final int windowId, final int slot,
+            final int x, final int y) {
         Display d = Display.getInstance();
         int surfaceWidth = d.windowWidth(windowId);
         int surfaceHeight = d.windowHeight(windowId);
         if (surfaceWidth <= 0 || surfaceHeight <= 0) {
             return false;
         }
-        if (windowDragActivationCounter == 0) {
-            windowDragActivationX = x;
-            windowDragActivationY = y;
-            windowDragActivationCounter++;
+        if (windowDragActivationCounter[slot] == 0) {
+            windowDragActivationX[slot] = x;
+            windowDragActivationY[slot] = y;
+            windowDragActivationCounter[slot]++;
             return false;
         }
-        windowDragActivationCounter++;
+        windowDragActivationCounter[slot]++;
         if (dragPassedThreshold(d.windowDragRegionStatus(windowId, x, y),
                 surfaceWidth, surfaceHeight,
-                windowDragActivationX, windowDragActivationY,
-                windowDragActivationCounter, x, y)) {
-            windowDragActivationCounter = getDragAutoActivationThreshold() + 1;
+                windowDragActivationX[slot], windowDragActivationY[slot],
+                windowDragActivationCounter[slot], x, y)) {
+            windowDragActivationCounter[slot] = getDragAutoActivationThreshold() + 1;
             return true;
         }
         return false;

@@ -4468,4 +4468,42 @@ class WindowTest extends UITestBase {
                         + "grew by " + (after - before) + " slots");
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void twoWindowsDraggingAtOnceKeepSeparateActivationState() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a", new BorderLayout());
+        a.setWindowSize(400, 300);
+        DragCountingComponent ca = new DragCountingComponent();
+        a.add(BorderLayout.CENTER, ca);
+        a.show();
+        a.asContainer().revalidate();
+
+        Window b = new Window("b", new BorderLayout());
+        b.setWindowSize(400, 300);
+        DragCountingComponent cb = new DragCountingComponent();
+        b.add(BorderLayout.CENTER, cb);
+        b.show();
+        b.asContainer().revalidate();
+
+        // A touchscreen can have a contact down in two windows at once, and the
+        // framework keys press targets and drag histories per window already. Shared
+        // activation state lets a gesture in one window carry the other past its
+        // threshold, or reset it.
+        implementation.windowPointerPressedForTest(a.getWindowId(), 100, 100);
+        implementation.windowPointerPressedForTest(b.getWindowId(), 100, 100);
+        for (int iter = 0; iter < 12; iter++) {
+            implementation.windowPointerDraggedForTest(a.getWindowId(), 100 + iter * 20, 100);
+        }
+        // b has only jittered, so it must not be dragging just because a is.
+        implementation.windowPointerDraggedForTest(b.getWindowId(), 101, 100);
+        DisplayTest.flushEdt();
+
+        assertTrue(ca.drags > 0, "the window that actually moved is dragging");
+        assertEquals(0, cb.drags,
+                "a drag activated in one window must not carry another window's jitter "
+                        + "past its own threshold");
+        a.dispose();
+        b.dispose();
+    }
 }
