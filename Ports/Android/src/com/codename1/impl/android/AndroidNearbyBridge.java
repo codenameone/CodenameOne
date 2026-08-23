@@ -49,6 +49,11 @@ import com.codename1.nearby.spi.NearbyBridge;
 public class AndroidNearbyBridge implements NearbyBridge {
 
     private final NearbyBridge delegate;
+    /// The backend's activity-changed hook, or null when there is no backend
+    /// or it predates the hook. Resolved once, because reflection per
+    /// activity change would be paid on every rotation.
+    private final java.lang.reflect.Method activityChanged;
+
 
     /// Loads the optional backend, or `null` when the build did not include
     /// it.
@@ -76,6 +81,34 @@ public class AndroidNearbyBridge implements NearbyBridge {
         // rule rather than a per-port exception.
         this.delegate = instance instanceof NearbyBridge
                 ? (NearbyBridge) instance : null;
+        java.lang.reflect.Method hook = null;
+        if (this.delegate != null) {
+            try {
+                hook = this.delegate.getClass()
+                        .getMethod("onActivityChanged");
+            } catch (Throwable noHook) {
+                hook = null;
+            }
+        }
+        this.activityChanged = hook;
+    }
+
+    /// Tells the backend the host activity has been replaced.
+    ///
+    /// Called from `AndroidImplementation.init`, which is the one place that
+    /// knows. A backend holding a destroyed activity would launch the
+    /// association chooser on it and wait for a result the new activity
+    /// receives instead.
+    public void onActivityChanged() {
+        if (activityChanged == null) {
+            return;
+        }
+        try {
+            activityChanged.invoke(delegate);
+        } catch (Throwable ignored) {
+            // A backend that cannot rebind is no worse off than one that was
+            // never told.
+        }
     }
 
     // ------------------------------------------------------------------

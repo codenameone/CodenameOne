@@ -1330,9 +1330,14 @@ static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
             && [wanted lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > 63) {
         wanted = cn1nbPeerName(wanted);
     }
+    // heldPeerCount, not connectedPeerCount: an invitation that has gone out
+    // and not been answered counts too. Rebuilding the peer id tears down
+    // every session, and doing that while an invitation was pending
+    // disconnected it without ever reporting connected or connectionFailed,
+    // so the app waited for a lifecycle outcome that was never coming.
     if (t.localPeer != nil && wanted != nil
             && ![t.localPeer.displayName isEqualToString:wanted]
-            && [t connectedPeerCount] == 0) {
+            && [t heldPeerCount] == 0) {
         BOOL wasAdvertising = t.advertiser != nil;
         BOOL wasBrowsing = t.browser != nil;
         if (wasAdvertising) {

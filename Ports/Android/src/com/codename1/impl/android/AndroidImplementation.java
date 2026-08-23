@@ -1580,6 +1580,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             setActivity(null);
             setContext((Context)m);
         }
+        // The nearby bridge is cached for the life of the process while
+        // Android recreates the activity freely -- a configuration change,
+        // or "Don't keep activities". An association chooser opened by the
+        // old activity delivers its result to the NEW one, where the
+        // backend's result listener is not installed, so the association
+        // resource never settled and every later association answered BUSY.
+        // Told here because this is the one place that knows it changed.
+        if (nearbyBridge != null) {
+            nearbyBridge.onActivityChanged();
+        }
 
         instance = this;
         if(getActivity() != null && getActivity().hasUI()){

@@ -88,6 +88,44 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 + "AndroidNearbyTransport");
     }
 
+    /// The activity the association's result listener is installed on, or
+    /// null when none is.
+    private Activity listeningOn;
+
+    /// Re-installs the association result listener on the activity that
+    /// replaced the one it was on.
+    ///
+    /// Android delivers the chooser's result to whichever activity is alive
+    /// when it closes, and the listener lives on the instance -- so a
+    /// recreation mid-chooser sent the result somewhere the backend was not
+    /// listening, leaving the association resource unsettled and
+    /// pendingAssociateRequest set, which made every later association answer
+    /// BUSY. Called from AndroidImplementation.init through
+    /// AndroidNearbyBridge, the one place that knows the activity changed.
+    public void onActivityChanged() {
+        if (pendingAssociateRequest == 0) {
+            return;
+        }
+        Activity current = currentActivity();
+        if (current == null || current == listeningOn) {
+            return;
+        }
+        CompanionDeviceManager cdm = manager();
+        if (cdm == null || !listenForResult(pendingAssociateRequest, cdm)) {
+            // Nothing can answer it now, so it is failed rather than left to
+            // hang -- and the pending slot is released so the next
+            // association is not refused as BUSY for a chooser nobody is
+            // waiting on any more.
+            int requestId = pendingAssociateRequest;
+            pendingAssociateRequest = 0;
+            listeningOn = null;
+            CompanionDevices.deliverRequestFailed(requestId,
+                    NearbyError.USER_CANCELED.ordinal(),
+                    "the screen was recreated while the device chooser was"
+                    + " open; associate again");
+        }
+    }
+
     /// The activity to launch from and ask permissions on, now.
     ///
     /// NOT the one this backend was constructed with. The bridge is cached
@@ -488,6 +526,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// Hands the activity-result channel back, so the next
     /// startActivityForResult caller can install its own listener.
     private void releaseResultListener() {
+        listeningOn = null;
         Activity current = currentActivity();
         if (current instanceof CodenameOneActivity) {
             ((CodenameOneActivity) current).restoreIntentResultListener();
@@ -520,6 +559,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // told apart from the ones this app already had.
         final Set<String> before = associationKeys(cdm);
         final CodenameOneActivity host = (CodenameOneActivity) current;
+        listeningOn = current;
         host.setIntentResultListener(new IntentResultListener() {
             public void onActivityResult(int requestCode, int resultCode,
                     Intent data) {
