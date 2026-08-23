@@ -110,6 +110,10 @@ public class WearableGlueCompilesTest {
                         + "public class CN1SurfaceStore {\n"
                         + "    public static File kindDir(Context c, String k) { return null; }\n"
                         + "    static void deleteUnreferencedImages(File d, String t) { }\n"
+                        // The grace overload the mirror uses: on the watch an unreferenced blob
+                        // is either stale art or art whose descriptor has not landed, and age is
+                        // what tells them apart.
+                        + "    static void deleteUnreferencedImages(File d, String t, long g) { }\n"
                         + "    public static String readWidgetTimeline(Context c, String k) "
                         + "{ return null; }\n"
                         + "    public static void rememberKind(Context c, String k) { }\n"

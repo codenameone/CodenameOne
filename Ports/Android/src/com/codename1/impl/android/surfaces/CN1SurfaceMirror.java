@@ -328,6 +328,13 @@ public final class CN1SurfaceMirror {
      *         acknowledgement is durable -- a false answer gets the transfer redelivered, a
      *         wrongly true one loses the artwork for good
      */
+    /// How long an unreferenced mirrored image is left alone before it counts as stale.
+    ///
+    /// Art that arrives ahead of the descriptor naming it is seconds or minutes old -- the two
+    /// travel together and the images are sent first on purpose. An hour is far past that and far
+    /// short of letting a disconnected watch accumulate every missed publication's artwork.
+    private static final long STALE_IMAGE_GRACE_MILLIS = 60L * 60L * 1000L;
+
     public static boolean receiveFile(Context ctx, String path, byte[] payload) {
         try {
             String kindId = kindOf(path);
@@ -356,12 +363,16 @@ public final class CN1SurfaceMirror {
             // transfer is then acknowledged and gone, and the new descriptor references a blob
             // that will never exist.
             //
-            // The opposite hazard -- art from publication N arriving after N+1's descriptor has
-            // already collected -- leaves an orphan, but a bounded one: every descriptor collects
-            // what it does not reference, so the next publish removes it, and only the art in
-            // flight during the last publish of all can linger. That is a fixed cost, not the
-            // unbounded growth it looks like at first glance, and it is the cheaper of the two
-            // failures by a wide margin.
+            // The opposite hazard is art from a superseded publish arriving after the newest
+            // descriptor has already collected. That is NOT the fixed one-publish cost it looks
+            // like: the descriptor is a Data Layer item and collapses to the newest value when
+            // delivery is delayed, while each image is a transfer with its own sequence and none
+            // of them collapse -- so a watch that was away for ten publications receives one
+            // descriptor and then ten publications' worth of artwork behind it, with no later
+            // descriptor promised to collect the nine that are stale.
+            //
+            // Hence the sweep below rather than a condition here. Refusing the write outright is
+            // still wrong for the reason above, so what settles it is age, not reference.
             mkdirs(dir);
             writeAtomically(new File(dir, name), contents);
             // A file transfer is asynchronous and unordered against the descriptor, so artwork
@@ -370,6 +381,13 @@ public final class CN1SurfaceMirror {
             // and nothing else would ask again until the next publish. So each arriving image
             // asks too.
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            // Collect what the stored descriptor does not reference and is old enough not to be
+            // waiting for one. Done HERE and not only in receive(), because the case this exists
+            // for is precisely the one where no further descriptor arrives.
+            String stored = CN1SurfaceStore.readWidgetTimeline(ctx, kindId);
+            if (stored != null && stored.length() > 0) {
+                CN1SurfaceStore.deleteUnreferencedImages(dir, stored, STALE_IMAGE_GRACE_MILLIS);
+            }
             return true;
         } catch (Throwable t) {
             Log.w(TAG, "Could not store a mirrored image from " + path, t);
