@@ -1,36 +1,36 @@
 {
-  "commit": "c2732fd24ff606421f361f239792cc2d717ce47d",
-  "generated_at": "2026-08-23T11:14:46Z",
+  "commit": "73bd710543cba1d6728b9e0e92d436fb0d95580a",
+  "generated_at": "2026-08-23T16:49:41Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 342584000
+        "duration_ns": 266403000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 24001000
+        "duration_ns": 22948000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 121546000
+        "duration_ns": 116149000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 78571000
+        "duration_ns": 71090000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 309299000
+        "duration_ns": 308336000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 161716000
+        "duration_ns": 117945000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 190209000
+        "duration_ns": 221570000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32613256755",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32636698135",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 175,
+    "pass": 176,
     "skip": 4
   },
   "tests": {
@@ -451,6 +451,10 @@
     },
     "LocalNotificationOverrideTest": {
       "feature": "notifications",
+      "status": "pass"
+    },
+    "LogSubclassCaptureTest": {
+      "feature": "logging-diagnostics",
       "status": "pass"
     },
     "LottieAnimatedScreenshotTest": {
