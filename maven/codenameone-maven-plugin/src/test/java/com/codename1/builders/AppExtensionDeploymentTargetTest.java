@@ -824,4 +824,76 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Ext.profile", IPhoneBuilder.winningSetting(settings,
                 "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos14.4", "Release", "arm64"));
     }
+
+    @Test
+    public void aQualifiedVariantListSelectsTheArchivesVariants() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("BUILD_VARIANTS", "normal");
+        settings.put("BUILD_VARIANTS[sdk=iphoneos*]", "profile");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[variant=profile]", "10.0");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Xcode honours the qualified list for the device archive; reading the plain key alone
+        // judged that archive as "normal", skipped the profile target, and copied an under-floor
+        // 10.0 onto the target where it outranks the clamped base.
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[variant=profile]"));
+        assertEquals(1, notes.size());
+    }
+
+    @Test
+    public void aVariantListQualifiedByItsOwnVariantIsIgnored() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("BUILD_VARIANTS", "normal");
+        settings.put("BUILD_VARIANTS[variant=profile]", "profile");
+
+        // The list decides the variants, so it cannot be selected by them -- and neither can
+        // Xcode select it that way. Letting this qualifier apply would be a self-fulfilling
+        // reading in which every archive builds every variant it mentions.
+        assertEquals(java.util.Collections.singletonList("normal"), IPhoneBuilder.ArchiveContext
+                .of("iphoneos14.4", "Release", "arm64", settings).variants);
+    }
+
+    @Test
+    public void aQualifiedIdentifierResolvesItsHelperInTheArchivesContext() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.other.Ext");
+        settings.put("EXTENSION_ID[config=Release]", "com.example.app.Custom");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Resolved against the raw map the helper answers with its base foreign value, the
+        // identifier is dropped as out of namespace, and the target falls back to a bundle id the
+        // export options and the signing profile do not name.
+        assertEquals("$(EXTENSION_ID)", settings.get("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
+
+    @Test
+    public void anIdentifierWrittenThroughAConditionalHelperResolvesToTheConditional()
+            throws Exception {
+        File dist = tmp.newFolder("dist31");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.other.Ext");
+        settings.put("EXTENSION_ID[sdk=iphoneos*]", "com.example.app.Wallet");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        // extensionSettingsWithBuiltIns flattens before it hands anything to the resolver, so the
+        // reference already expands to the value the device archive gets. Pinned because a review
+        // twice read that map as keeping qualified values under their bracketed keys only: it
+        // does not, and a change that makes it do so has to break this test first.
+        assertEquals("com.example.app.Wallet", IPhoneBuilder.resolveSettingsFully(
+                IPhoneBuilder.winningSetting(settings, "PRODUCT_BUNDLE_IDENTIFIER",
+                        IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                                settings)),
+                IPhoneBuilder.extensionSettingsWithBuiltIns(extension, settings, "Release",
+                        "iphoneos14.4", "arm64")));
+    }
 }

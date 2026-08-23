@@ -5884,11 +5884,11 @@ public class IPhoneBuilder extends Executor {
             // already matched its app into one that does not -- the very validation failure this
             // method exists to prevent.
             // The settings the TARGET will carry, so a $(PRODUCT_BUNDLE_IDENTIFIER) in the plist
-            // is judged by the identifier it will actually resolve to.
+            // is judged by the identifier it will actually resolve to -- the archive's override
+            // included, which is where an identifier from another project comes in.
             Map<String, String> settings = appExtensionBuildSettings(appExtension);
-            String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
-            settings.put("PRODUCT_BUNDLE_IDENTIFIER", declaredId != null ? declaredId
-                    : request.getPackageName() + "." + appExtension.getName());
+            settings.put("PRODUCT_BUNDLE_IDENTIFIER", appExtensionBundleId(appExtension,
+                    request.getPackageName() + "." + appExtension.getName()));
             List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
                     embeddedExtensionBundleVersion(request), request.getPackageName(),
                     flattenForContext(settings, context));
@@ -6752,8 +6752,13 @@ public class IPhoneBuilder extends Executor {
     static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
             Map<String, String> settings, String configuration, String sdk, String arch) {
         Map<String, String> out = new LinkedHashMap<String, String>();
-        if (settings != null) {
-            out.putAll(settings);
+        // Conditionals resolved to what this build gets, before anything expands a reference
+        // against them: a map lookup only ever sees the plain key, and the qualified value is the
+        // one Xcode uses.
+        Map<String, String> flat = flattenForContext(settings,
+                ArchiveContext.of(sdk, configuration, arch, settings));
+        if (flat != null) {
+            out.putAll(flat);
         }
         String targetName = extensionFolder.getName();
         out.put("TARGET_NAME", targetName);
@@ -6915,6 +6920,13 @@ public class IPhoneBuilder extends Executor {
     static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
             String hostPackage, String floor, ArchiveContext context) {
         List<String> notes = new ArrayList<String>();
+        // Flattened once, for the references these values make. A qualified identifier written as
+        // $(EXTENSION_ID) resolved against the raw map, which only ever answers with the plain
+        // EXTENSION_ID -- so an archive whose EXTENSION_ID[config=Release] is a perfectly good
+        // extension of this app had the base value read instead, and the qualified identifier
+        // Xcode would have used was dropped for being out of namespace. The generated target then
+        // fell back to its base bundle id while the export options still named the custom one.
+        Map<String, String> flat = flattenForContext(settings, context);
         for (Map.Entry<String, String> setting : new ArrayList<Map.Entry<String, String>>(
                 settings.entrySet())) {
             String key = setting.getKey();
@@ -6929,7 +6941,7 @@ public class IPhoneBuilder extends Executor {
             // overwritten with 12.0 -- taking an extension that compiles against iOS 16 APIs down
             // with it. A reference that resolves to nothing here is left exactly as written: this
             // build cannot evaluate it, which is not the same as knowing it is wrong.
-            String resolved = resolveSettingsInValue(value, settings);
+            String resolved = resolveSettingsInValue(value, flat);
             if (resolved.length() == 0) {
                 continue;
             }
@@ -7127,12 +7139,24 @@ public class IPhoneBuilder extends Executor {
         static ArchiveContext of(String sdk, String configuration, String arch,
                 Map<String, String> settings) {
             List<String> variants = new ArrayList<String>();
+            // The variant list is what the OTHER conditions are matched against, so it has to be
+            // chosen before any of them and cannot be chosen BY one: this bootstrap context knows
+            // the archive's sdk, configuration and architecture and has no variants at all, which
+            // makes a [variant=...] qualifier on BUILD_VARIANTS itself apply to nothing. Xcode is
+            // in the same position -- the setting decides the variants, so it cannot be selected
+            // by them -- and reading only the plain key missed BUILD_VARIANTS[sdk=iphoneos*],
+            // which Xcode does honour: preflight then judged the device archive as "normal" and
+            // skipped the [variant=profile] target that outranked the clamped base on it.
+            ArchiveContext selection = new ArchiveContext(sdk, configuration, arch,
+                    java.util.Collections.<String>emptyList());
+            String declaredRaw = settings == null ? null
+                    : winningSetting(settings, "BUILD_VARIANTS", selection);
             // Resolved first: BUILD_VARIANTS = $(EXTENSION_VARIANTS) is a chain Xcode expands, and
             // splitting the raw text recorded "$(EXTENSION_VARIANTS)" as the variant -- so the
             // [variant=profile] settings Xcode applies were matched against a literal reference.
-            String declaredRaw = settings == null ? null : settings.get("BUILD_VARIANTS");
+            // Against the flattened settings, since the helper it names may itself be qualified.
             String declared = declaredRaw == null ? null
-                    : resolveSettingsInValue(declaredRaw, settings);
+                    : resolveSettingsInValue(declaredRaw, flattenForContext(settings, selection));
             if (declared != null) {
                 for (String variant : declared.trim().split("\\s+")) {
                     if (variant.length() > 0) {
@@ -7538,6 +7562,17 @@ public class IPhoneBuilder extends Executor {
             // A path this process cannot even canonicalize is not one to write to.
             return false;
         }
+    }
+
+    /// The identifier this extension's archive declares, or the one derived from the app.
+    ///
+    /// Named rather than inlined because four call sites have to agree on it: an archive that
+    /// overrides PRODUCT_BUNDLE_IDENTIFIER decides the export-options key, the profile that can
+    /// sign it, the plist that is stamped and the namespace refusal, and one of them reading the
+    /// derived default instead pairs the target with a bundle the archive does not contain.
+    static String appExtensionBundleId(File extensionFolder, String defaultBundleId) {
+        String override = appExtensionBuildSetting(extensionFolder, "PRODUCT_BUNDLE_IDENTIFIER");
+        return override == null ? defaultBundleId : override;
     }
 
     /// One build setting as the extension's own buildSettings.properties overrides it, or null
@@ -8917,7 +8952,11 @@ public class IPhoneBuilder extends Executor {
             throw new IllegalArgumentException("extractAppExtensions sourceDirectory must be an existing directory but received "+sourceDirectory);
         }
         List<File> out = new ArrayList<>();
-        for (File appExtension : sourceDirectory.listFiles()) {
+        File[] entries = sourceDirectory.listFiles();
+        if (entries == null) {
+            return new File[0];
+        }
+        for (File appExtension : entries) {
             if (!appExtension.getName().endsWith(".ios.appext")) {
                 // Only interested in files ending in .ios.appext since
                 // Maven would have bundled the app extensions in this way.
