@@ -264,6 +264,23 @@ public final class Surfaces {
     /// Dropped rather than rejected wholesale: a descriptor referencing an image that did not
     /// arrive renders a gap, which every renderer already tolerates, and refusing the whole
     /// publish would let one bad name suppress a timeline that is otherwise fine.
+    /// Whether a name has the shape SurfaceSerializer gives a content hash: sixteen lowercase
+    /// hex digits. Only those are verified, so a name that was never a hash -- a registered image
+    /// the app named itself -- is passed through rather than refused for failing a test that does
+    /// not apply to it.
+    private static boolean looksLikeContentHash(String name) {
+        if (name.length() != 16) {
+            return false;
+        }
+        for (int i = 0; i < 16; i++) {
+            char c = name.charAt(i);
+            if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static Map<String, byte[]> safeImageNames(Map<String, byte[]> images) {
         if (images == null || images.isEmpty()) {
             return Collections.<String, byte[]>emptyMap();
@@ -275,6 +292,17 @@ public final class Surfaces {
                     || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0
                     || name.indexOf('\0') >= 0 || ".".equals(name) || "..".equals(name)) {
                 Log.p("Surfaces: dropping a remote image whose name is not a plain blob name: "
+                        + name);
+                continue;
+            }
+            if (looksLikeContentHash(name) && e.getValue() != null
+                    && !name.equals(SurfaceSerializer.fnv1a(e.getValue()))) {
+                // The name is a CLAIM about the bytes, and this descriptor came from outside the
+                // process. iOS skips writing a blob whose file already exists, on the strength of
+                // that claim -- so bad bytes landing first cannot be repaired by any later
+                // legitimate publish, and the surface shows wrong artwork for good. Checking the
+                // claim costs one pass over bytes that are about to be written anyway.
+                Log.p("Surfaces: dropping a remote image whose bytes do not match its name: "
                         + name);
                 continue;
             }

@@ -169,7 +169,7 @@ public abstract class CN1SurfaceTileService extends TileService {
             } else {
                 root = render(reading.getLayout(), reading.getState(), 0, false);
                 freshness = freshnessFor(reading.getNextFlipDate(),
-                        hasMovingContent(reading.getLayout()));
+                        hasMovingContent(reading.getLayout(), reading.getState()));
                 version = resourcesVersion(reading);
                 // Kept for the resources request that follows, which asks about THIS version.
                 remember(version, reading);
@@ -218,15 +218,36 @@ public abstract class CN1SurfaceTileService extends TileService {
      * @param layout the resolved layout root
      * @return true when the Tile should be rebuilt periodically
      */
-    private static boolean hasMovingContent(JSONObject layout) {
-        if (hasDynamicText(layout)) {
-            return true;
-        }
+    private static boolean hasMovingContent(JSONObject layout, JSONObject state) {
+        long now = System.currentTimeMillis();
         for (JSONObject node : CN1WatchSurface.flatten(layout)) {
-            if ("prog".equals(node.optString("t", ""))
-                    && node.has("start") && node.has("end")) {
-                return true;
+            String type = node.optString("t", "");
+            if ("prog".equals(type) && node.has("start") && node.has("end")) {
+                // Only while the interval is actually RUNNING. A finished one is clamped at its
+                // completed value for ever, so treating its mere presence as movement asked for
+                // a rebuild every minute until the app published again -- spending the Tile
+                // refresh budget and the battery to redraw an identical bar.
+                if (now < node.optLong("end")) {
+                    return true;
+                }
+                continue;
             }
+            if (!"dyn".equals(type)) {
+                continue;
+            }
+            String style = node.optString("style", "timerDown");
+            if ("time".equals(style) || "date".equals(style)) {
+                // These format the node's OWN timestamp, which does not move. They were counted
+                // as dynamic because they are dyn nodes, and a Tile carrying nothing else rebuilt
+                // itself every minute to redraw the same string.
+                continue;
+            }
+            if ("timerDown".equals(style)
+                    && CN1WatchSurface.dynamicDate(node, state) <= now) {
+                // An expired countdown is clamped at zero and equally still.
+                continue;
+            }
+            return true;
         }
         return false;
     }
@@ -253,14 +274,6 @@ public abstract class CN1SurfaceTileService extends TileService {
     }
 
     /// Whether the active layout shows anything that changes on its own.
-    private static boolean hasDynamicText(JSONObject root) {
-        for (JSONObject node : CN1WatchSurface.flatten(root)) {
-            if ("dyn".equals(node.optString("t", ""))) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     /**
      * The version the Tile advertises for its resource set.

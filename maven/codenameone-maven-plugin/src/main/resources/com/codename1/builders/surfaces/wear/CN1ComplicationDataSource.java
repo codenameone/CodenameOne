@@ -315,8 +315,12 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // The node the primary text came from, so a dynamic one can be handed over as a value the
         // FACE ticks rather than a string frozen at this request. With the update period at 0
         // there is no later request to refresh it, so a countdown really did stop.
-        ComplicationText primary = texts.isEmpty() ? null
-                : textFor(textNodeAt(nodes, reading.getState(), 0), reading.getState(), texts.get(0), asOf);
+        JSONObject primaryNode = texts.isEmpty() ? null
+                : textNodeAt(nodes, reading.getState(), 0);
+        boolean titleTicks = primaryNode != null
+                && tickingText(primaryNode, reading.getState(), asOf) != null;
+        ComplicationText primary = primaryNode == null ? null
+                : textFor(primaryNode, reading.getState(), texts.get(0), asOf);
 
         if (ComplicationType.LONG_TEXT.equals(type)) {
             String title = texts.isEmpty() ? getKindId() : texts.get(0);
@@ -326,9 +330,15 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // a countdown -- a static label first, the moving value beneath it. Only when the body
             // is exactly one node, though: a join of several is a string, and there is nothing to
             // hand a face that would advance part of it.
-            ComplicationText bodyText = texts.size() == 2
-                    ? textFor(textNodeAt(nodes, reading.getState(), 1), reading.getState(),
-                            texts.get(1), asOf)
+            // Whether the body is a value the FACE advances, tracked rather than inferred: a
+            // ticking text and a plain one are both ComplicationText, and the description below
+            // has to know which it has.
+            JSONObject bodyNode = texts.size() == 2
+                    ? textNodeAt(nodes, reading.getState(), 1) : null;
+            boolean bodyTicks = bodyNode != null
+                    && tickingText(bodyNode, reading.getState(), asOf) != null;
+            ComplicationText bodyText = bodyNode != null
+                    ? textFor(bodyNode, reading.getState(), texts.get(1), asOf)
                     : plain(body);
             // A body that JOINS several nodes cannot tick, and this is a real limitation rather
             // than an oversight: a ticking value is an object the face advances, not a string, so
@@ -351,9 +361,18 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // omitting the body announced the label of a complication without the thing it says
             // -- the order status, the message, the number the user actually wanted.
             String spoken = body.length() == 0 ? title : title + ", " + body;
+            // Described by whichever part TICKS, for the reason the short-text branch gives: a
+            // plain description of a moving value is announced wrong. The body is preferred when
+            // both could, being the value rather than the label.
+            ComplicationText spokenText = plain(spoken);
+            if (body.length() > 0 && bodyTicks) {
+                spokenText = bodyText;
+            } else if (body.length() == 0 && titleTicks) {
+                spokenText = titleText;
+            }
             LongTextComplicationData.Builder builder =
                     new LongTextComplicationData.Builder(
-                            body.length() == 0 ? titleText : bodyText, plain(spoken))
+                            body.length() == 0 ? titleText : bodyText, spokenText)
                             .setTitle(body.length() == 0 ? null : titleText)
                             .setTapAction(tap);
             return builder.build();
@@ -395,7 +414,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // content description, so shortening first handed a screen reader the same seven
             // characters the slot already shows -- losing exactly the text the description exists
             // to supply.
-            return shortText(primary, texts.get(0),
+            return shortText(titleTicks ? primary : null, texts.get(0),
                     texts.size() > 1 ? texts.get(1) : null, tap);
         }
         return null;
@@ -537,7 +556,11 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             long at = ordered.get(i).longValue();
             ComplicationData after = build(type, reading, at + 1);
             if (after == null) {
-                continue;
+                // No-data, not a skip. The base entry has already been ended at the first of
+                // these moments, so skipping leaves that stretch uncovered and the timeline falls
+                // back to its default -- the OLDER reading, resurfacing after it stopped being
+                // current. This is the same reason the main loop substitutes no-data.
+                after = noData();
             }
             // Until the NEXT crossing, so two nodes changing sides at different moments each get
             // their own stretch rather than the first one's entry covering both.
@@ -671,10 +694,20 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // A ticking value is handed over whole: shortening it would mean rendering it here, which
         // is the freezing this exists to avoid. The face sizes what it draws.
         boolean titled = title != null && title.length() > 0;
+        // The description TICKS too when the value does. It was a plain string resolved at
+        // request time, so with no update period a screen reader went on announcing the moment
+        // the provider was called long after the face had moved on -- reading out a time that is
+        // simply wrong. The ticking text is the same object the face advances, so it stays right.
+        //
+        // The title is not folded into it in that case, because a ticking value is an object
+        // rather than a string and there is nothing to concatenate onto. An announcement that is
+        // shorter and correct beats one that is complete and wrong, and the title is static text
+        // the face is already showing beside it.
+        ComplicationText described = ticking != null ? ticking
+                : plain(titled ? text + ", " + title : text);
         ShortTextComplicationData.Builder builder =
                 new ShortTextComplicationData.Builder(
-                        ticking != null ? ticking : plain(shorten(text)),
-                        plain(titled ? text + ", " + title : text));
+                        ticking != null ? ticking : plain(shorten(text)), described);
         if (titled) {
             builder.setTitle(plain(shorten(title)));
         }
