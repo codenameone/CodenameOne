@@ -95,19 +95,73 @@ public final class InterpRuntime {
 
     /// Cross-thread lookup for [#interpretedStackFor] and [#hostCallFor].
     /// The current [Failure] is stored per-thread on [ThreadState] so
-    /// concurrent throws don't overwrite each other's rethrow records; but
-    /// a caller catching a Throwable that another thread raised still has
-    /// to be able to ask for its interpreted stack. `WeakHashMap` keyed
-    /// by the throwable itself keeps the failure discoverable while the
-    /// throwable is alive and lets it go when the caller drops it -- no
-    /// leak, no lifetime coupling to the runtime. Throwable's hashCode
-    /// and equals are Object identity by inheritance, so `WeakHashMap`
-    /// is effectively an identity-keyed map here.
+    /// concurrent throws don't overwrite each other's rethrow records;
+    /// but a caller catching a Throwable that another thread raised still
+    /// has to be able to ask for its interpreted stack.
     ///
-    /// Wrapped in `Collections.synchronizedMap` because both entry and
-    /// lookup can happen from any thread.
+    /// The map is identity-keyed: a Throwable subclass may override
+    /// `hashCode` or `equals` (nothing in the language forbids it), and a
+    /// map that relied on equality could collapse two distinct-but-equal
+    /// exceptions to a single entry -- returning the wrong throw site --
+    /// or unreachable the entry entirely once a mutable hash changed.
+    /// The stored value is a [FailureInfo] that holds only the stack and
+    /// host-call name; it deliberately does *not* keep a reference to
+    /// the throwable, so the [IdentityWeakRef] weak key can be reclaimed
+    /// when the caller drops the throwable and the entry follows via the
+    /// reference queue. Wrapped in `Collections.synchronizedMap` because
+    /// both entry and lookup can happen from any thread.
+    private final java.lang.ref.ReferenceQueue failuresQueue =
+            new java.lang.ref.ReferenceQueue();
     private final java.util.Map failuresByThrown =
-            java.util.Collections.synchronizedMap(new java.util.WeakHashMap());
+            java.util.Collections.synchronizedMap(new java.util.HashMap());
+
+    /// Stack + host-call information *without* a strong reference to the
+    /// throwable it describes. Storing the throwable here would keep the
+    /// weak key alive forever, so long-running programs would leak every
+    /// exception they ever raised.
+    private static final class FailureInfo {
+        private final String[] stack;
+        private final String hostCall;
+
+        FailureInfo(String[] stack, String hostCall) {
+            this.stack = stack;
+            this.hostCall = hostCall;
+        }
+    }
+
+    /// Weak reference that hashes and equals by referent identity, so
+    /// a Throwable subclass's own `equals` / `hashCode` cannot collide
+    /// two different exceptions in [#failuresByThrown]. The identity
+    /// hash is captured at construction and remains stable after the
+    /// referent is cleared, so the reference queue can still find the
+    /// entry to remove.
+    private static final class IdentityWeakRef extends java.lang.ref.WeakReference {
+        private final int hash;
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        IdentityWeakRef(Object referent, java.lang.ref.ReferenceQueue queue) {
+            super(referent, queue);
+            this.hash = System.identityHashCode(referent);
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof IdentityWeakRef)) {
+                return false;
+            }
+            Object mine = get();
+            Object theirs = ((IdentityWeakRef) other).get();
+            return mine != null && mine == theirs;   //NOPMD CompareObjectsWithEquals - identity is the point
+        }
+    }
 
     /// Execution state that belongs to one thread, not to the runtime.
     ///
@@ -3928,15 +3982,35 @@ public final class InterpRuntime {
     }
 
     /// Sets both the thread's rethrow-detection slot and the runtime-wide
-    /// weak map used by [#interpretedStackFor] / [#hostCallFor]. The map
-    /// entry is keyed by both identities (`thrown` and, when distinct,
-    /// `original`) so a caller that catches either can still ask for the
-    /// interpreted stack.
+    /// identity-weak map used by [#interpretedStackFor] /
+    /// [#hostCallFor]. The map entry is keyed by both identities (`thrown`
+    /// and, when distinct, `original`) so a caller that catches either
+    /// can still ask for the interpreted stack.
     private void recordFailure(ThreadState st, Failure f) {
         st.lastFailure = f;
-        failuresByThrown.put(f.thrown, f);
+        FailureInfo info = new FailureInfo(f.stack, f.hostCall);
+        if (f.thrown instanceof Throwable) {
+            putFailureInfo((Throwable) f.thrown, info);
+        }
         if (f.original != f.thrown && f.original instanceof Throwable) {   //NOPMD CompareObjectsWithEquals - identity is the point
-            failuresByThrown.put(f.original, f);
+            putFailureInfo((Throwable) f.original, info);
+        }
+    }
+
+    private void putFailureInfo(Throwable t, FailureInfo info) {
+        drainFailuresQueue();
+        failuresByThrown.put(new IdentityWeakRef(t, failuresQueue), info);
+    }
+
+    private FailureInfo getFailureInfo(Throwable t) {
+        drainFailuresQueue();
+        return (FailureInfo) failuresByThrown.get(new IdentityWeakRef(t, null));
+    }
+
+    private void drainFailuresQueue() {
+        java.lang.ref.Reference ref;
+        while ((ref = failuresQueue.poll()) != null) {
+            failuresByThrown.remove(ref);
         }
     }
 
@@ -3948,14 +4022,14 @@ public final class InterpRuntime {
     /// runtime-wide weak map so a caller on any thread that received the
     /// throwable can ask (a listener firing on the event thread, say).
     public String[] interpretedStackFor(Throwable t) {
-        Failure f = (Failure) failuresByThrown.get(t);
-        return f != null ? f.stack : null;
+        FailureInfo info = getFailureInfo(t);
+        return info != null ? info.stack : null;
     }
 
     /// The framework method that threw this, or null if interpreted code did.
     public String hostCallFor(Throwable t) {
-        Failure f = (Failure) failuresByThrown.get(t);
-        return f != null ? f.hostCall : null;
+        FailureInfo info = getFailureInfo(t);
+        return info != null ? info.hostCall : null;
     }
 
     private int findHandler(InterpMethod m, int insn, Object thrown, boolean unusedFilter)
