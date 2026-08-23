@@ -34,6 +34,7 @@ import com.codename1.nearby.ranging.RangingToken;
 import com.codename1.nearby.spi.NearbyBridge;
 import com.codename1.nearby.transport.NearbyTransport;
 import com.codename1.nearby.transport.PayloadStatus;
+import com.codename1.nearby.transport.TransportStrategy;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
@@ -101,6 +102,25 @@ public class LocalNearbyBridge implements NearbyBridge {
     private final List<Candidate> candidates = new ArrayList<Candidate>();
     private final List<SimEndpoint> endpoints = new ArrayList<SimEndpoint>();
     private final List<String> connected = new ArrayList<String>();
+    /// Endpoints whose connection requests were rejected. Recorded so a
+    /// test can tell an immediate refusal from silence.
+    private final List<String> rejected = new ArrayList<String>();
+    /// The topology each half was started with, as a TransportStrategy
+    /// ordinal. CLUSTER is the default, which is also what a caller that
+    /// passed no strategy is given.
+    private int advertiseStrategy = TransportStrategy.CLUSTER.ordinal();
+    private int discoverStrategy = TransportStrategy.CLUSTER.ordinal();
+    /// Bumped by every stop, so work queued by an earlier run of the
+    /// transport can tell that it is answering for a transport that has
+    /// since been stopped. Nothing in the simulation completes inline, which
+    /// is the point -- and that means a delayed acceptance really can outlive
+    /// the stop() that was supposed to have ended it.
+    private int transportGeneration;
+    /// Where delayed deliveries go while a test drives the clock, or null in
+    /// normal operation.
+    ///
+    /// @hidden not part of the public API; test-only.
+    private List<Runnable> deferred;
 
     private int sessionSequence;
     private boolean advertising;
@@ -466,6 +486,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void startAdvertising(final int requestId, String serviceId,
             String localName, int strategy) {
         advertising = true;
+        advertiseStrategy = strategy;
         answerOk(requestId);
     }
 
@@ -478,6 +499,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void startDiscovery(final int requestId, final String serviceId,
             int strategy) {
         discovering = true;
+        discoverStrategy = strategy;
         answer(new Runnable() {
             @Override
             public void run() {
@@ -504,15 +526,40 @@ public class LocalNearbyBridge implements NearbyBridge {
                     NearbyError.PEER_UNAVAILABLE, "no such endpoint"));
             return;
         }
+        // The simulation refuses what the real platforms refuse. This device
+        // is the one CONNECTING, and both STAR and POINT_TO_POINT allow it
+        // exactly one peer -- under STAR it is one of the many, not the
+        // centre. A simulator that let an app hold three connections under
+        // POINT_TO_POINT would teach it a topology no device will honour.
+        if (discoverStrategy != TransportStrategy.CLUSTER.ordinal()
+                && !connected.isEmpty()) {
+            answer(new TransportFailure(requestId, NearbyError.BUSY,
+                    "this strategy allows one connection at a time;"
+                    + " disconnect the current peer first"));
+            return;
+        }
+        final int generation = transportGeneration;
         answer(new Runnable() {
             @Override
             public void run() {
+                if (generation != transportGeneration) {
+                    return;
+                }
                 NearbyTransport.deliverRequestOk(requestId);
                 // The simulated peer always accepts, one hop later, so the
                 // app sees the two-step shape the real platforms have.
                 answer(new Runnable() {
                     @Override
                     public void run() {
+                        // Checked again here, because THIS is the hop that
+                        // outlives a stop(): the acceptance was already
+                        // queued when the app stopped the transport, and
+                        // adding the endpoint then reported a connection on
+                        // a transport that had been stopped and never
+                        // restarted.
+                        if (generation != transportGeneration) {
+                            return;
+                        }
                         connected.add(endpointId);
                         NearbyTransport.deliverConnectionResult(e.encode(),
                                 true, 0, null);
@@ -524,6 +571,18 @@ public class LocalNearbyBridge implements NearbyBridge {
 
     @Override
     public void acceptConnection(final int requestId, String endpointId) {
+        // POINT_TO_POINT bounds the advertiser too -- one connection on each
+        // side. STAR does not: accepting many is what makes this device the
+        // centre of the star.
+        if (advertiseStrategy == TransportStrategy.POINT_TO_POINT.ordinal()
+                && !connected.isEmpty()
+                && !connected.contains(endpointId)) {
+            rejectConnection(endpointId);
+            answer(new TransportFailure(requestId, NearbyError.BUSY,
+                    "POINT_TO_POINT allows one connection at a time;"
+                    + " disconnect the current peer first"));
+            return;
+        }
         if (!connected.contains(endpointId)) {
             connected.add(endpointId);
         }
@@ -533,6 +592,18 @@ public class LocalNearbyBridge implements NearbyBridge {
     @Override
     public void rejectConnection(String endpointId) {
         connected.remove(endpointId);
+        if (endpointId != null && !rejected.contains(endpointId)) {
+            rejected.add(endpointId);
+        }
+    }
+
+    /// The endpoints whose connection requests were turned down, newest last.
+    ///
+    /// #### Returns
+    ///
+    /// the rejected endpoint ids, never null
+    public List<String> getRejectedEndpoints() {
+        return new ArrayList<String>(rejected);
     }
 
     @Override
@@ -580,6 +651,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void stopAllTransport() {
         advertising = false;
         discovering = false;
+        transportGeneration++;
         List<String> doomed = new ArrayList<String>(connected);
         connected.clear();
         for (String id : doomed) {
@@ -588,6 +660,23 @@ public class LocalNearbyBridge implements NearbyBridge {
                 NearbyTransport.deliverDisconnected(e.encode());
             }
         }
+    }
+
+    /// Parks every delayed delivery in `sink` instead of running it, so a
+    /// test can decide when each one lands.
+    ///
+    /// Without a Display there is no timer, so deliveries otherwise run
+    /// inline and no test can put anything BETWEEN the two hops of a
+    /// simulated connection -- which is exactly where the interesting races
+    /// are.
+    ///
+    /// @hidden not part of the public API; test-only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sink`: where to park deliveries, or null to run them as usual
+    public void deferForTest(List<Runnable> sink) {
+        deferred = sink;
     }
 
     /// Whether [#startAdvertising] is in effect, for the simulator panel.
@@ -672,6 +761,15 @@ public class LocalNearbyBridge implements NearbyBridge {
     }
 
     private void later(int millis, Runnable delivery) {
+        List<Runnable> sink = deferred;
+        if (sink != null) {
+            // A test is driving the clock. Held until it says otherwise, so
+            // the delayed ordering the simulation exists to reproduce can be
+            // reproduced in a unit test too -- without a Display there is no
+            // timer, and everything below runs inline.
+            sink.add(delivery);
+            return;
+        }
         if (Display.isInitialized()) {
             Display.getInstance().setTimeout(millis, delivery);
             return;

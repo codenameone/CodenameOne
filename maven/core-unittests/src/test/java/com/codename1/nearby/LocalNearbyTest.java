@@ -42,6 +42,7 @@ import com.codename1.nearby.ranging.RangingToken;
 import com.codename1.nearby.ranging.RangingUnit;
 import com.codename1.nearby.ranging.RangingUpdate;
 import com.codename1.nearby.transport.Endpoint;
+import com.codename1.nearby.transport.IncomingConnection;
 import com.codename1.nearby.transport.NearbyTransport;
 import com.codename1.nearby.transport.Payload;
 import com.codename1.nearby.transport.PayloadStatus;
@@ -552,6 +553,149 @@ class LocalNearbyTest {
     // ------------------------------------------------------------------
     // transport
     // ------------------------------------------------------------------
+
+    @Test
+    void stoppingBeforeTheAcceptanceLandsLeavesTheTransportStopped() {
+        // Nothing in the simulation completes inline, which is the point --
+        // and it means the delayed acceptance really can outlive the stop()
+        // that was supposed to have ended the transport. Adding the endpoint
+        // then reported a connection on a transport nobody had restarted.
+        final List<Endpoint> connected = new ArrayList<Endpoint>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void connected(Endpoint e) {
+                connected.add(e);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        assertNotNull(e);
+
+        // From here the test drives the clock, so a stop() can land between
+        // the request and the acceptance the way it does on a real timer.
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        NearbyTransport.requestConnection(e, "me");
+        NearbyTransport.stop();
+        drain(queue);
+
+        assertTrue(connected.isEmpty(),
+                "a stopped transport must not connect: " + connected);
+    }
+
+    @Test
+    void anAcceptanceThatBeatsTheStopStillConnects() {
+        // The other side of the same guard: a connection that completed
+        // before the stop is a real connection, not one to suppress.
+        final List<Endpoint> connected = new ArrayList<Endpoint>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void connected(Endpoint e) {
+                connected.add(e);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        NearbyTransport.requestConnection(e, "me");
+        drain(queue);
+        assertEquals(1, connected.size());
+    }
+
+    /// Runs every parked delivery, including any the deliveries themselves
+    /// park, until nothing is left.
+    private static void drain(List<Runnable> queue) {
+        while (!queue.isEmpty()) {
+            Runnable next = queue.remove(0);
+            next.run();
+        }
+    }
+
+    @Test
+    void pointToPointRefusesASecondConnectionInsteadOfAllowingIt() {
+        // TransportStrategy documents "exactly one connection on each side",
+        // and a simulator that let an app hold three would teach it a
+        // topology no device will honour.
+        List<Endpoint> found = discoverAll(TransportStrategy.POINT_TO_POINT);
+        assertTrue(found.size() >= 2, "need two synthetic peers to test this");
+        assertTrue(value(NearbyTransport.requestConnection(found.get(0), "me"))
+                .booleanValue());
+        assertFailedWith(NearbyError.BUSY,
+                NearbyTransport.requestConnection(found.get(1), "me"));
+    }
+
+    @Test
+    void clusterAllowsTheSecondConnectionPointToPointRefuses() {
+        List<Endpoint> found = discoverAll(TransportStrategy.CLUSTER);
+        assertTrue(value(NearbyTransport.requestConnection(found.get(0), "me"))
+                .booleanValue());
+        assertTrue(value(NearbyTransport.requestConnection(found.get(1), "me"))
+                .booleanValue());
+    }
+
+    /// Starts discovery with a strategy and hands back every endpoint it saw.
+    private List<Endpoint> discoverAll(TransportStrategy strategy) {
+        final List<Endpoint> found = new ArrayList<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.add(e);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", strategy));
+        return found;
+    }
+
+    @Test
+    void aListenerMayAnswerAConnectionRequestAfterItReturns() {
+        // The documented flow: show getAuthenticationToken() on both screens,
+        // ask the user whether the two match, and accept when they say yes.
+        // That cannot finish inside the callback, and rejecting a request the
+        // listener had not answered YET made the later accept() a no-op --
+        // so the one handshake worth trusting could never connect.
+        final AtomicReference<IncomingConnection> held =
+                new AtomicReference<IncomingConnection>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void connectionRequested(IncomingConnection request) {
+                held.set(request);
+            }
+        });
+        NearbyTransport.deliverConnectionRequested(
+                "peer-1\tA Phone\tchat", "1234");
+
+        IncomingConnection r = held.get();
+        assertNotNull(r);
+        assertFalse(r.isAnswered(),
+                "a listener that has not answered must not be answered for it");
+        r.accept();
+        assertTrue(r.isAnswered());
+    }
+
+    @Test
+    void aConnectionRequestNobodyHeardIsRejectedRatherThanLeftHanging() {
+        // With no listener at all nobody will ever answer, and the far side
+        // would sit in its connecting state until it timed out.
+        NearbyTransport.deliverConnectionRequested(
+                "peer-2\tAnother Phone\tchat", "5678");
+        assertTrue(bridge.getRejectedEndpoints().contains("peer-2"),
+                "expected an immediate reject, got "
+                        + bridge.getRejectedEndpoints());
+    }
 
     @Test
     void discoveryFindsTheSyntheticEndpoints() {

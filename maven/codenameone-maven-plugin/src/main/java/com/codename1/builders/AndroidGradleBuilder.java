@@ -2644,6 +2644,30 @@ public class AndroidGradleBuilder extends Executor {
         // usesHealthStore, NOT usesHealth: com.codename1.health.sensors is
         // pure BLE and must not drag in Health Connect or a Google Play
         // health-permissions review.
+        if (usesNearbyRanging) {
+            // androidx.core.uwb's AAR declares minAgpVersion=8.9.1 as well as
+            // minCompileSdk=36, and Gradle's dependency check rejects the
+            // project rather than building it -- with a message about AAR
+            // metadata that names neither UWB nor this hint. Raising the
+            // compile SDK alone is not enough, so a build that has explicitly
+            // selected an older toolchain is refused here, where the reason
+            // can still be explained.
+            //
+            // The version that will actually run, not the flag that usually
+            // selects it: android.gradleVersion overrides the choice, which is
+            // the same trap the Health Connect gate below documents.
+            if (!useGradle8 || gradleVersionInt < 8) {
+                throw new BuildException(
+                        "com.codename1.nearby.ranging needs androidx.core.uwb,"
+                        + " whose Android Gradle plugin floor is 8.9.1, but"
+                        + " this build would use Gradle " + gradleVersion
+                        + " (android.useGradle8=" + useGradle8 + ") and an"
+                        + " older plugin with it. Set android.useGradle8=true"
+                        + " and leave android.gradleVersion unset to build a"
+                        + " ranging app.");
+            }
+        }
+
         if (usesHealthStore) {
             String readHint = request.getArg("android.health.read", "");
             String writeHint = request.getArg("android.health.write", "");
@@ -6569,6 +6593,17 @@ public class AndroidGradleBuilder extends Executor {
             // ANDROID_GRADLE_PLUGIN_8_VERSION is well past that.)
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
                     compileSdkVersion, "36");
+        }
+        if (usesNearbyTransport) {
+            // android:usesPermissionFlags is an API 31 manifest attribute,
+            // and the transport's permissions carry it whatever the app
+            // targets -- they have to, because a permission is requested
+            // according to the level the DEVICE runs. AAPT rejects an
+            // attribute the compile SDK has never heard of, so a legacy
+            // toolchain (build tools 30, android.useGradle8=false) failed on
+            // the manifest before it ever reached javac.
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, "31");
         }
         jcenter =
                 "      google()\n" +

@@ -366,6 +366,14 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
 @property (nonatomic, retain) NSString *discoverServiceId;
 /// Peer id to the unfolded service id the peer was seen on.
 @property (nonatomic, retain) NSMutableDictionary *serviceIdByPeer;
+/// The topology each half was started with.
+///
+/// MultipeerConnectivity enforces no topology of its own -- it will happily
+/// connect a peer that asked for POINT_TO_POINT to a second one -- so the
+/// strategy the caller passed has to be honoured here or not at all. Ignoring
+/// it made TransportStrategy a documented promise the iOS port did not keep.
+@property (nonatomic, assign) int advertiseStrategy;
+@property (nonatomic, assign) int discoverStrategy;
 /// Counts received files, so two with the same name get different paths.
 /// Read and written under @synchronized(self): MultipeerConnectivity
 /// delivers from a queue per session, so two arrivals really can race.
@@ -757,6 +765,14 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
                     filePayloadId, 0, -1, CN1_NEARBY_PAYLOAD_FAILURE);
             return;
         }
+        // The terminal SUCCESS update, which only the failure paths above
+        // used to emit. A receiver that dismisses its transfer UI or releases
+        // per-payload state on the documented terminal status waited forever
+        // on every file that actually arrived -- the one case that always
+        // works on Android.
+        com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                getThreadLocalData(), cn1nbJString(encoded), filePayloadId,
+                0, -1, CN1_NEARBY_PAYLOAD_SUCCESS);
         com_codename1_impl_ios_IOSNearbyCallbacks_payloadReceived___java_lang_String_int_int_byte_1ARRAY_java_lang_String(
                 getThreadLocalData(), cn1nbJString(encoded), filePayloadId,
                 CN1_NEARBY_PAYLOAD_FILE, JAVA_NULL,
@@ -1027,13 +1043,33 @@ static id cn1nbCompanion = nil;
 /// a MAC address, because that is the only handle iOS gives out -- and it is
 /// the same one `BluetoothLE.getPeripheral(String)` takes, which is what makes
 /// an association useful rather than decorative.
+/// The association id for an accessory, stable across process launches.
+///
+/// NOT the object's hash. An accessory offered through the SSID filter has no
+/// bluetoothIdentifier, and the hash that stood in for it was a different
+/// number every launch -- so an id the public API documents as persistable
+/// could not be persisted, and accessoryForId, which only ever compared
+/// Bluetooth UUIDs, could not find it even within one launch.
+///
+/// One function so the two cannot drift: whatever this returns is what
+/// accessoryForId matches on.
+static NSString *cn1nbAccessoryId(ASAccessory *accessory)
+        API_AVAILABLE(ios(18.0)) {
+    if (accessory.bluetoothIdentifier != nil) {
+        return [accessory.bluetoothIdentifier UUIDString];
+    }
+    if (accessory.SSID != nil && [accessory.SSID length] > 0) {
+        return [@"ssid:" stringByAppendingString:accessory.SSID];
+    }
+    return [@"name:" stringByAppendingString:
+            accessory.displayName == nil ? @"" : accessory.displayName];
+}
+
 - (NSString *)encode:(ASAccessory *)accessory present:(BOOL)present {
     NSString *identifier = accessory.bluetoothIdentifier != nil
             ? [accessory.bluetoothIdentifier UUIDString] : @"";
     return cn1nbJoin([NSArray arrayWithObjects:
-            identifier.length > 0 ? identifier
-                    : [NSString stringWithFormat:@"%lu",
-                            (unsigned long)[accessory hash]],
+            cn1nbAccessoryId(accessory),
             accessory.displayName == nil ? @"" : accessory.displayName,
             identifier,
             @"0",
@@ -1046,9 +1082,7 @@ static id cn1nbCompanion = nil;
         return nil;
     }
     for (ASAccessory *a in self.session.accessories) {
-        if (a.bluetoothIdentifier != nil
-                && [[a.bluetoothIdentifier UUIDString]
-                        isEqualToString:associationId]) {
+        if ([cn1nbAccessoryId(a) isEqualToString:associationId]) {
             return a;
         }
     }
@@ -1638,6 +1672,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
         t.advertiser.delegate = t;
         // Recorded BEFORE the answer: didNotStartAdvertisingPeer can fire
         // after this returns, and it needs the id to fail.
+        t.advertiseStrategy = (int)strategy;
         t.pendingAdvertiseRequest = requestId;
         [t.advertiser startAdvertisingPeer];
         cn1nbSettleTransportStart(t, YES, requestId);
@@ -1691,6 +1726,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
                 initWithPeer:t.localPeer
                 serviceType:t.discoverServiceType] autorelease];
         t.browser.delegate = t;
+        t.discoverStrategy = (int)strategy;
         t.pendingDiscoverRequest = requestId;
         [t.browser startBrowsingForPeers];
         cn1nbSettleTransportStart(t, NO, requestId);
@@ -1737,6 +1773,19 @@ void com_codename1_impl_ios_IOSNative_nearbyRequestConnection___int_java_lang_St
                     @"no such endpoint");
             return;
         }
+        // This device is the one CONNECTING, so both STAR and POINT_TO_POINT
+        // allow it exactly one peer: under STAR it is the many, not the one.
+        if (cn1nbTransport.discoverStrategy != CN1_NEARBY_STRATEGY_CLUSTER
+                && [cn1nbTransport connectedPeerCount] > 0) {
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_BUSY,
+                    cn1nbTransport.discoverStrategy
+                            == CN1_NEARBY_STRATEGY_POINT_TO_POINT
+                    ? @"POINT_TO_POINT allows one connection at a time;"
+                       @" disconnect the current peer first"
+                    : @"a STAR discoverer holds one connection at a time;"
+                       @" disconnect the current peer first");
+            return;
+        }
         // The name the caller wants the invited peer to see. Applied before
         // the invitation goes out, or it would carry the previous identity.
         cn1nbApplyLocalName(cn1nbTransport,
@@ -1776,6 +1825,19 @@ void com_codename1_impl_ios_IOSNative_nearbyAcceptConnection___int_java_lang_Str
         if (handler == nil) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
                     @"there is no invitation from that endpoint");
+            return;
+        }
+        // POINT_TO_POINT means one connection on EACH side, so the
+        // advertiser is bounded too. STAR is not: accepting many is what
+        // makes this device the star's centre.
+        if (cn1nbTransport.advertiseStrategy
+                        == CN1_NEARBY_STRATEGY_POINT_TO_POINT
+                && [cn1nbTransport connectedPeerCount] > 0) {
+            [cn1nbTransport.invitations removeObjectForKey:pid];
+            handler(NO, nil);
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_BUSY,
+                    @"POINT_TO_POINT allows one connection at a time;"
+                     @" disconnect the current peer first");
             return;
         }
         [cn1nbTransport.invitations removeObjectForKey:pid];

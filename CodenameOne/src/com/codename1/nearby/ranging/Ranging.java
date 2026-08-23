@@ -309,9 +309,17 @@ public final class Ranging {
         EdtResult<byte[]> r = PENDING_ACCESSORY.take(requestId);
         if (r != null) {
             RangingSession s = RangingSession.lookup(sessionHandle);
-            if (s != null) {
-                s.markRunning();
+            if (s == null) {
+                // Mirrors deliverSessionStarted. A stop() that lands while the
+                // start is in flight deregisters the session, and completing
+                // anyway handed the caller handshake bytes for a session that
+                // is not running -- bytes it would then send to an accessory
+                // that has nothing to talk to.
+                r.error(new NearbyException(NearbyError.SESSION_INVALIDATED,
+                        "the session was closed before it started"));
+                return;
             }
+            s.markRunning();
             r.complete(shareableConfiguration == null
                     ? new byte[0] : shareableConfiguration);
         }

@@ -507,10 +507,19 @@ public final class NearbyTransport {
                 for (TransportListener l : ls) {
                     l.connectionRequested(r);
                 }
-                if (!r.isAnswered()) {
+                if (ls.length == 0) {
                     // Nobody was listening, so nobody will ever answer. The
                     // far side would sit in its connecting state until it
                     // timed out; reject instead so it learns immediately.
+                    //
+                    // Only when there were NO listeners. A listener that
+                    // returns without answering is the documented flow, not a
+                    // mistake: showing the authentication token and asking the
+                    // user whether it matches cannot finish inside this
+                    // callback. Rejecting on "not answered yet" made the
+                    // later accept() a no-op and left the verified handshake
+                    // -- the one thing that makes the pairing trustworthy --
+                    // unable to connect at all.
                     r.reject();
                 }
             }

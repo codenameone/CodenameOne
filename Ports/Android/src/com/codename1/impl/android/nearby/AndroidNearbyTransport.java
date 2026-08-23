@@ -406,6 +406,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 NearbyTransport.deliverEndpointFound(
                         encode(endpointId, nameOf(endpointId)), false);
                 endpointNames.remove(endpointId);
+                // The service mapping goes with it. Nearby reuses endpoint
+                // ids, so a peer lost under the discovery service could come
+                // back by CONNECTING to this device's advertisement for a
+                // different service -- and onConnectionInitiated leaves an
+                // existing entry alone, so it kept reporting the old one.
+                endpointServices.remove(endpointId);
             }
         };
     }
@@ -443,6 +449,8 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 NearbyTransport.deliverDisconnected(
                         encode(endpointId, nameOf(endpointId)));
                 endpointNames.remove(endpointId);
+                // Cleared with the name, for the reason onEndpointLost does.
+                endpointServices.remove(endpointId);
             }
         };
     }
@@ -615,11 +623,31 @@ public class AndroidNearbyTransport implements NearbyBridge {
     /// is what a file from an older build would look like -- wrong, but no
     /// worse than it was before, and better than zero.
     private static int senderIdOf(Payload file) {
+        // Read from the received file's NAME, both ways it can be reached.
+        //
+        // It was suggested this should call Payload.getFileName() instead.
+        // There is no such method: play-services-nearby 19.3.0 has
+        // Payload.setFileName(String) and no getter for it, and neither
+        // Payload nor Payload.File exposes the transmitted name under any
+        // other name -- javap over the whole
+        // com.google.android.gms.nearby.connection package finds no
+        // getFileName at all. setFileName is what makes the RECEIVED file
+        // carry the sender's name, so asJavaFile().getName() is where that
+        // name arrives.
+        //
+        // asUri() is the second route and not a redundant one: under scoped
+        // storage asJavaFile() returns null and the Uri is all there is.
         String name = null;
         try {
-            if (file.asFile() != null) {
-                name = file.asFile().asJavaFile() == null ? null
-                        : file.asFile().asJavaFile().getName();
+            Payload.File f = file.asFile();
+            if (f != null) {
+                java.io.File local = f.asJavaFile();
+                if (local != null) {
+                    name = local.getName();
+                }
+                if (name == null && f.asUri() != null) {
+                    name = f.asUri().getLastPathSegment();
+                }
             }
         } catch (Throwable t) {
             name = null;

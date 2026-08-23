@@ -355,9 +355,22 @@ public class IPhoneBuilder extends Executor {
     ///
     /// @param request the build request
     /// @param serviceTypes the folded service types this app advertises
+    /// @param usesBonjour whether the app also uses com.codename1.io.bonjour
     private void mergeNearbyBonjourServices(BuildRequest request,
-            List<String> serviceTypes) throws BuildException {
+            List<String> serviceTypes, boolean usesBonjour)
+            throws BuildException {
+        // The com.codename1.io.bonjour block further down seeds _http._tcp.
+        // only when the hint is still unset, which is its way of leaving a
+        // project that named its own types alone. This merge runs FIRST and
+        // creates the hint, so it would have taken that default away from an
+        // app that uses both APIs and set nothing -- leaving the ordinary
+        // Bonjour API unable to discover anything on iOS 14 and later.
+        boolean seedHttp = usesBonjour
+                && request.getArg("ios.NSBonjourServices", null) == null;
         List<String> needed = new ArrayList<String>();
+        if (seedHttp) {
+            needed.add("_http._tcp.");
+        }
         for (int i = 0; i < serviceTypes.size(); i++) {
             // MultipeerConnectivity uses both transports for one service.
             needed.add("_" + serviceTypes.get(i) + "._tcp.");
@@ -4538,7 +4551,8 @@ public class IPhoneBuilder extends Executor {
                                     + " comma-separated list of the service"
                                     + " ids this app passes to"
                                     + " startAdvertising)"));
-                    mergeNearbyBonjourServices(request, serviceTypes);
+                    mergeNearbyBonjourServices(request, serviceTypes,
+                            usesBonjour);
                 }
                 if (usesNearbyCompanion) {
                     enableNearbyDefine(buildinRes, "CN1_NEARBY_COMPANION");

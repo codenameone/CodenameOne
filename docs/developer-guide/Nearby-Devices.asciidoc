@@ -192,8 +192,18 @@ relay can reproduce at both ends -- a check that looks like a defense and isn't.
 An iOS app that needs to know who it's talking to has to establish that itself,
 over a channel the relay doesn't control.
 
-Answer every `connectionRequested` without delay. A request that's never answered
-holds radio resources open on both sides until the far end times out.
+Answer every `connectionRequested`. You don't have to answer inside the callback
+-- showing the token and waiting for the user is the whole point, and the
+request stays live until you call `accept()` or `reject()` -- but a request
+that's never answered at all holds radio resources open on both sides until the
+far end times out. If nothing is listening when a request arrives, it's
+rejected for you, so the far end learns immediately instead of waiting.
+
+The strategy you pass to `startAdvertising` and `startDiscovery` is a limit, not
+a hint. Under `POINT_TO_POINT` a second connection is refused with
+`NearbyError.BUSY` on either side, and under `STAR` the discovering side holds
+one connection while the advertising side accepts many. `CLUSTER` is the only
+one with no limit. Disconnect before connecting elsewhere.
 
 *On iOS, list your service ids at build time.* The service id becomes a Bonjour
 service type there, and iOS browses only the types an app declared in its
