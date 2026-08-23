@@ -32,6 +32,7 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class AppExtensionInfoPlistTest {
@@ -541,5 +542,49 @@ public class AppExtensionInfoPlistTest {
         String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4", "com.new.app",
                 NO_SETTINGS, changes);
         assertTrue(out, out.contains("<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>"));
+    }
+
+    @Test
+    public void aQualifiedCandidateIsStampedInItsOwnContext() {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("MARKETING_VERSION", "5.4");
+        settings.put("MARKETING_VERSION[config=Debug]", "1.0");
+        IPhoneBuilder.ArchiveContext release = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", settings);
+
+        // The Debug plist's context, taken from the setting that names it.
+        IPhoneBuilder.ArchiveContext candidate = IPhoneBuilder.infoPlistCandidateContext(
+                "INFOPLIST_FILE[config=Debug] = $(CONFIGURATION)/Info.plist", release);
+        String plist = NO_IDENTITY.replace("<key>CFBundleName</key>",
+                "<key>CFBundleShortVersionString</key>\n\t<string>$(MARKETING_VERSION)</string>\n"
+                + "\t<key>CFBundleName</key>");
+        List<String> changes = new ArrayList<String>();
+        String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4",
+                IPhoneBuilder.flattenForContext(settings, candidate), changes);
+
+        // Judged in the archive's Release context the reference reads as 5.4, already the app's
+        // version, and is left -- while the build that uses this file expands it to the Debug
+        // 1.0 and ships a version its container does not have.
+        assertTrue(out.contains("<key>CFBundleShortVersionString</key>\n\t<string>5.4</string>"));
+        assertTrue(changes.toString(), changes.toString().contains("resolves to '1.0'"));
+
+        // The contrast, pinned: in the archive's own context the same plist is left untouched,
+        // so this is the candidate's context doing the work and not some general strictness.
+        List<String> underRelease = new ArrayList<String>();
+        assertTrue(IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4",
+                IPhoneBuilder.flattenForContext(settings, release), underRelease)
+                        .contains("<string>$(MARKETING_VERSION)</string>"));
+    }
+
+    @Test
+    public void anUnqualifiedCandidateKeepsTheArchivesContext() {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        IPhoneBuilder.ArchiveContext release = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", settings);
+
+        // Nothing to narrow: the base INFOPLIST_FILE is the file this archive builds with.
+        assertSame(release, IPhoneBuilder.infoPlistCandidateContext(
+                "INFOPLIST_FILE = WalletUIExtension/Info.plist", release));
+        assertSame(release, IPhoneBuilder.infoPlistCandidateContext("Info.plist", release));
     }
 }

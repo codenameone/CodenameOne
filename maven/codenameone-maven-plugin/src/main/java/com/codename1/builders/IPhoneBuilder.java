@@ -5886,9 +5886,17 @@ public class IPhoneBuilder extends Executor {
             Map<String, String> settings = appExtensionBuildSettings(appExtension);
             settings.put("PRODUCT_BUNDLE_IDENTIFIER", appExtensionBundleId(appExtension,
                     request.getPackageName() + "." + appExtension.getName()));
+            // In the candidate's OWN context, not this archive's. Every candidate is stamped,
+            // because the generated project keeps them all and a later Debug build off
+            // sources.tar.bz2 ships whichever one it names -- but a reference inside the Debug
+            // plist expands to the Debug values, and judging it against the Release ones read
+            // $(MARKETING_VERSION) as already matching the app. Left in place, it becomes the
+            // stale Debug version on the build that actually uses that file, which is the
+            // host-mismatch rejection this stamping exists to prevent.
             List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
                     embeddedExtensionBundleVersion(request), request.getPackageName(),
-                    flattenForContext(settings, context));
+                    flattenForContext(settings,
+                            infoPlistCandidateContext(candidate.getKey(), context)));
             if (changes == null) {
                 debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
                         + " as an XML property list, so its bundle identity was left as it is. If "
@@ -6059,6 +6067,23 @@ public class IPhoneBuilder extends Executor {
     /// null when that value is unresolvable or lands outside the project directory
     static Map<String, File> appExtensionInfoPlists(File extensionFolder) {
         return appExtensionInfoPlists(extensionFolder, null);
+    }
+
+    /// The context a candidate from {@link #appExtensionInfoPlists} belongs to.
+    ///
+    /// The candidates are keyed by the setting that names them -- "INFOPLIST_FILE[config=Debug] =
+    /// $(CONFIGURATION)/Info.plist" -- and the qualifier in that key is the whole difference
+    /// between the two files. The path was already resolved in it; what is IN the file has to be
+    /// resolved in it too.
+    ///
+    /// @return the archive's own context for an unqualified candidate
+    static ArchiveContext infoPlistCandidateContext(String candidateKey, ArchiveContext context) {
+        int open = candidateKey == null ? -1 : candidateKey.indexOf('[');
+        int close = open < 0 ? -1 : candidateKey.indexOf(']', open);
+        if (close < 0) {
+            return context;
+        }
+        return contextForCondition(candidateKey.substring(0, close + 1), context);
     }
 
     /// @param context this archive, so INFOPLIST_FILE = $(CONFIGURATION)/Info.plist resolves to
