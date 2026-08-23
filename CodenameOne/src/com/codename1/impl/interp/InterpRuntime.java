@@ -4170,16 +4170,17 @@ public final class InterpRuntime {
         boolean rethrow = prev != null                             //NOPMD CompareObjectsWithEquals - identity is the point
                 && (prev.thrown == t || prev.original == t);
         String[] rethrowStack = rethrow ? prev.stack : null;
-        if (!rethrow && t instanceof Throwable) {
+        if (!rethrow) {
             // The `lastFailure` slot only remembers the most recent throw
-            // on this thread. A `catch (Exception e) { try { risky(); }
+            // on this thread. A `catch (E e) { try { risky(); }
             // catch (Exception ignored) {} throw e; }` overwrites it with
             // `ignored`, so an identity match against `prev` would miss
             // the outer rethrow of `e`. The identity-keyed registry keeps
-            // every still-reachable failure, so if this throwable has an
-            // entry there we recognise the rethrow and keep the original
+            // every still-reachable failure -- including an interpreted
+            // `original` InterpObject -- so if this value has an entry
+            // there we recognise the rethrow and keep the original
             // recorded stack.
-            FailureInfo info = getFailureInfo((Throwable) t);
+            FailureInfo info = getFailureInfo(t);
             if (info != null) {
                 rethrow = true;
                 rethrowStack = info.stack;
@@ -4212,24 +4213,29 @@ public final class InterpRuntime {
     /// identity-weak map used by [#interpretedStackFor] /
     /// [#hostCallFor]. The map entry is keyed by both identities (`thrown`
     /// and, when distinct, `original`) so a caller that catches either
-    /// can still ask for the interpreted stack.
+    /// can still ask for the interpreted stack. An interpreted-only
+    /// exception's `original` is an InterpObject rather than a Throwable,
+    /// so the registry accepts any Object identity -- otherwise a nested
+    /// catch that overwrites `lastFailure` would leave the outer rethrow
+    /// unable to recover its recorded stack when the caught value is
+    /// interpreted.
     private void recordFailure(ThreadState st, Failure f) {
         st.lastFailure = f;
         FailureInfo info = new FailureInfo(f.stack, f.hostCall);
-        if (f.thrown instanceof Throwable) {
-            putFailureInfo((Throwable) f.thrown, info);
+        if (f.thrown != null) {
+            putFailureInfo(f.thrown, info);
         }
-        if (f.original != f.thrown && f.original instanceof Throwable) {   //NOPMD CompareObjectsWithEquals - identity is the point
-            putFailureInfo((Throwable) f.original, info);
+        if (f.original != f.thrown && f.original != null) {   //NOPMD CompareObjectsWithEquals - identity is the point
+            putFailureInfo(f.original, info);
         }
     }
 
-    private void putFailureInfo(Throwable t, FailureInfo info) {
+    private void putFailureInfo(Object t, FailureInfo info) {
         sweepClearedEntries();
         failuresByThrown.put(new IdentityWeakRef(t), info);
     }
 
-    private FailureInfo getFailureInfo(Throwable t) {
+    private FailureInfo getFailureInfo(Object t) {
         return (FailureInfo) failuresByThrown.get(new IdentityWeakRef(t));
     }
 
