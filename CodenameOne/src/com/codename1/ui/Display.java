@@ -342,6 +342,10 @@ public final class Display extends CN1Constants {
     private DebugRunnable currentEdtContext;
     private int previousKeyPressed;
     private int lastKeyPressed;
+    /// Offset of the dimensions in the size-change packet currently queued, or -1.
+    /// A newer size overwrites it rather than queueing behind it.
+    private int lastSizeChangeOffset = -1;
+
     private int lastDragOffset;
     /// The window the coalescable drag packet at lastDragOffset belongs to. Coalescing
     /// across windows would overwrite one window's coordinates with another's while
@@ -436,6 +440,13 @@ public final class Display extends CN1Constants {
             impl.setDisplayLock(lock);
             impl.initImpl(m);
             INSTANCE.codenameOneGraphics = new Graphics(impl.getNativeGraphics());
+            // A monitor listener registered before this point could not start the
+            // port watching for display changes, because there was no implementation
+            // to ask. Doing it here rather than only guarding the registration is what
+            // makes such a listener actually hear about a change: the ports start
+            // watching when their window manager is first created, and nothing else
+            // necessarily creates it.
+            Desktop.startMonitorWatchingIfListening();
             INSTANCE.codenameOneGraphics.paintPeersBehind = impl.paintNativePeersBehind();
             impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
@@ -1391,6 +1402,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointerTmp = inputEventStackPointer;
             inputEventStackPointer = 0;
             lastDragOffset = -1;
+            lastSizeChangeOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
             // The metadata slots are addressed by offset into the stack being
@@ -3000,6 +3012,20 @@ public final class Display extends CN1Constants {
 
     private void addSizeChangeEvent(int type, int w, int h) {
         synchronized (lock) {
+            // Coalesced onto whichever size packet of this type is already queued. A
+            // live resize produces hundreds of these, and queueing each one fills the
+            // stack -- after which the *final* size is dropped, leaving the hierarchy
+            // laid out for a size the surface no longer has, and the releases behind it
+            // are dropped with it because a size change may use the reserve. Only the
+            // latest dimensions matter, so a queued packet is overwritten rather than
+            // followed.
+            if (lastSizeChangeOffset > -1
+                    && inputEventStack[lastSizeChangeOffset - 1] == type) {
+                inputEventStack[lastSizeChangeOffset] = w;
+                inputEventStack[lastSizeChangeOffset + 1] = h;
+                lock.notifyAll();
+                return;
+            }
             // A size change is state, and a lost one leaves the hierarchy laid out at
             // a size the surface no longer has -- painting and hit testing stay
             // misaligned until something else resizes the window.
@@ -3008,6 +3034,7 @@ public final class Display extends CN1Constants {
             }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
+            lastSizeChangeOffset = inputEventStackPointer;
             inputEventStack[inputEventStackPointer] = w;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = h;

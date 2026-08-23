@@ -272,12 +272,24 @@ public final class Desktop {
         // changes; without it a listener registered before anything else looked at
         // the windowing system would never hear about one.
         //
-        // Guarded, because registering a listener before Codename One is initialized is
-        // a reasonable thing to do -- it is the point at which an application knows it
-        // wants to hear about monitors -- and it used to throw. The listener stays
-        // registered either way, and the port starts watching when something else
-        // reaches the manager after initialization.
+        // Registering a listener before Codename One is initialized is a reasonable
+        // thing to do -- it is the point at which an application knows it wants to hear
+        // about monitors -- and it used to throw. Guarding alone was not enough either:
+        // the ports start watching when their window manager is first created, so a
+        // listener registered early and never followed by anything that touches the
+        // desktop would simply never hear about a change. Display.init() calls
+        // startMonitorWatchingIfListening() once an implementation exists.
         if (Display.impl != null) {
+            Display.impl.getWindowManager();
+        }
+    }
+
+    /// Starts the port watching for display changes if anything is listening for them.
+    ///
+    /// Called from `Display#init(java.lang.Object)`, because a listener registered
+    /// before there was an implementation could not start the watch itself.
+    static void startMonitorWatchingIfListening() {
+        if (Display.impl != null && INSTANCE.monitorListeners.hasListeners()) {
             Display.impl.getWindowManager();
         }
     }

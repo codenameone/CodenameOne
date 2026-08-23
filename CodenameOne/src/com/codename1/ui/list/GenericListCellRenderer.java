@@ -180,6 +180,10 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     private final Component[] selectedEntries;
     private final Component[] unselectedEntries;
     private final Monitor mon = new Monitor();
+
+    /// The top level the monitor was registered on, so it is released from that one
+    /// rather than from wherever the list has since moved.
+    private TopLevelContainer monitorHost;
     private final boolean firstCharacterRTL;
     private final HashMap<String, EncodedImage> placeholders = new HashMap<String, EncodedImage>();
     private Button lastClickedComponent;
@@ -513,6 +517,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         // the ticker would silently never animate.
                         TopLevelContainer f = parentList.getTopLevelContainer();
                         if (f != null) {
+                            monitorHost = f;
                             f.registerAnimated(mon);
                             label.startTicker(cmp.getUIManager().getLookAndFeel().getTickerSpeed(), true);
                         }
@@ -556,6 +561,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         if (parentList != null) {
                             TopLevelContainer f = parentList.getTopLevelContainer();
                             if (f != null) {
+                                monitorHost = f;
                                 f.registerAnimated(mon);
                                 waitingForRegisterAnimation = false;
                             } else {
@@ -567,6 +573,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                             if (parentList != null) {
                                 TopLevelContainer f = parentList.getTopLevelContainer();
                                 if (f != null) {
+                                    monitorHost = f;
                                     f.registerAnimated(mon);
                                     waitingForRegisterAnimation = false;
                                 }
@@ -776,7 +783,15 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         parentList.repaint();
                     } else {
                         if (!hasAnimations) {
-                            f.deregisterAnimated(this);
+                            // The top level that took the registration, not whatever the
+                            // list resolves to now: a list removed or reparented while a
+                            // ticker or animated image is running resolves to null or
+                            // somewhere else, and the original keeps this monitor for
+                            // good -- invoking it every frame and never sleeping.
+                            if (monitorHost != null) {
+                                monitorHost.deregisterAnimated(this);
+                                monitorHost = null;
+                            }
                         }
                     }
                     return false;

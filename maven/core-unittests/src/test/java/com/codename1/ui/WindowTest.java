@@ -4443,4 +4443,29 @@ class WindowTest extends UITestBase {
             impl.set(null, saved);
         }
     }
+
+    @FormTest
+    void aLiveResizeDoesNotFillTheInputStack() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        java.lang.reflect.Field sp = Display.class.getDeclaredField("inputEventStackPointer");
+        sp.setAccessible(true);
+        int before = sp.getInt(Display.getInstance());
+
+        // A drag-resize produces hundreds of these. Queueing each one fills the stack,
+        // and then the final size is dropped -- leaving the hierarchy laid out for a
+        // size the surface no longer has -- along with any release behind it.
+        for (int iter = 1; iter <= 400; iter++) {
+            Display.getInstance().sizeChanged(300 + iter, 200 + iter);
+        }
+        int after = sp.getInt(Display.getInstance());
+
+        assertTrue(after - before <= 3,
+                "a live resize must cost one queued packet, not one per notification; "
+                        + "grew by " + (after - before) + " slots");
+        DisplayTest.flushEdt();
+    }
 }
