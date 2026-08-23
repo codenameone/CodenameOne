@@ -279,14 +279,34 @@ public class InterpBundleWriter {
                 }
                 if ("import".equals(token) || "class".equals(token)
                         || "interface".equals(token) || "enum".equals(token)) {
-                    // Past anything a package declaration may precede.
-                    break;
+                    // `String.class` inside a package annotation --
+                    // `@p.A(String.class) package p;` -- is a class literal,
+                    // not a type declaration; a dot preceding the token
+                    // proves it. Stopping there would return the default
+                    // package for a source that declares one, key it at the
+                    // wrong path, and get the whole push refused as missing
+                    // source. Skip the token and keep scanning for `package`.
+                    if (!"class".equals(token) || !precededByDot(code, start)) {
+                        // Past anything a package declaration may precede.
+                        break;
+                    }
                 }
                 continue;
             }
             i++;
         }
         return "";
+    }
+
+    /// Whether the character preceding `pos`, skipping ASCII whitespace, is
+    /// a `.`. Used by [#packageOf] to recognise a class literal
+    /// (`String.class`) as distinct from a class declaration keyword.
+    private static boolean precededByDot(String code, int pos) {
+        int j = pos - 1;
+        while (j >= 0 && Character.isWhitespace(code.charAt(j))) {
+            j--;
+        }
+        return j >= 0 && code.charAt(j) == '.';
     }
 
     /// Removes whitespace outside backtick-escaped segments and drops the

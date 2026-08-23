@@ -59,7 +59,32 @@ if [ -z "$PARPAR_JAR" ]; then
     echo "  mvn -pl parparvm install -f maven/pom.xml" >&2
     exit 1
 fi
-ASM_JARS="$(find "$REPO_ROOT/.m2-local/org/ow2/asm" "$HOME/.m2/repository/org/ow2/asm" -name 'asm*-9.8.jar' 2>/dev/null | tr '\n' ':')"
+# ASM classpath for the Pack.java compile and run. Any 9.x version is
+# fine (BCT uses stable API), but the four artifacts have to be the same
+# version -- ASM does not promise cross-minor compatibility between its
+# own modules. Search .m2-local first, then ~/.m2, and pick the highest
+# version present at which all four artifacts exist. Hard-coding 9.8 (as
+# an earlier version of this script did) missed the 9.2 that the
+# advertised `mvn -pl parparvm install` puts on disk, and the push then
+# failed for missing ASM classes on a fresh checkout.
+ASM_JARS=""
+for asm_repo in "$REPO_ROOT/.m2-local/org/ow2/asm" "$HOME/.m2/repository/org/ow2/asm"; do
+    [ -d "$asm_repo/asm" ] || continue
+    for v in $(ls "$asm_repo/asm" 2>/dev/null | sort -V -r); do
+        if [ -f "$asm_repo/asm/$v/asm-$v.jar" ] \
+                && [ -f "$asm_repo/asm-tree/$v/asm-tree-$v.jar" ] \
+                && [ -f "$asm_repo/asm-commons/$v/asm-commons-$v.jar" ] \
+                && [ -f "$asm_repo/asm-analysis/$v/asm-analysis-$v.jar" ]; then
+            ASM_JARS="$asm_repo/asm/$v/asm-$v.jar:$asm_repo/asm-tree/$v/asm-tree-$v.jar:$asm_repo/asm-commons/$v/asm-commons-$v.jar:$asm_repo/asm-analysis/$v/asm-analysis-$v.jar"
+            break 2
+        fi
+    done
+done
+if [ -z "$ASM_JARS" ]; then
+    echo "no complete ASM install found (asm, asm-tree, asm-commons, asm-analysis at the same version)" >&2
+    echo "build parparvm first:  mvn -pl parparvm install -f maven/pom.xml" >&2
+    exit 1
+fi
 
 echo "compiling $SOURCE"
 mkdir -p "$WORK/classes"

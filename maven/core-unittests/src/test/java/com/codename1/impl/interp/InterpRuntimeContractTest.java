@@ -113,6 +113,14 @@ class InterpRuntimeContractTest {
         // reader then asked for a key nobody had written.
         assertEquals("com.foo bar.baz",
                 packageOf("package com.`foo bar`.baz\n\nfun main() {}\n"));
+        // A `package-info.java` may carry an annotation whose argument is a
+        // class literal (`@Foo(String.class) package p;`). The `class` in
+        // `String.class` is not a type declaration -- the preceding dot
+        // proves it -- so the scanner must not stop there. Stopping used to
+        // return the default package for a file that declared one, key its
+        // source at the wrong path, and get the whole push refused.
+        assertEquals("p", packageOf(
+                "@p.A(String.class)\npackage p;\n"));
     }
 
     private static String packageOf(String source) throws Exception {
