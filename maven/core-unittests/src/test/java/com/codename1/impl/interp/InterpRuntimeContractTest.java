@@ -121,6 +121,10 @@ class InterpRuntimeContractTest {
         // source at the wrong path, and get the whole push refused.
         assertEquals("p", packageOf(
                 "@p.A(String.class)\npackage p;\n"));
+        // Kotlin spells the class literal with `::class`. Same problem, same
+        // fix: the `class` after `::` is the literal, not a declaration.
+        assertEquals("p", packageOf(
+                "@file:A(String::class)\npackage p\n\nfun main() {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {

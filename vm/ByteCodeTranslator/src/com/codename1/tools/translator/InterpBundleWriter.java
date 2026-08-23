@@ -298,15 +298,24 @@ public class InterpBundleWriter {
         return "";
     }
 
-    /// Whether the character preceding `pos`, skipping ASCII whitespace, is
-    /// a `.`. Used by [#packageOf] to recognise a class literal
-    /// (`String.class`) as distinct from a class declaration keyword.
+    /// Whether the character preceding `pos`, skipping whitespace, marks a
+    /// class literal rather than a class declaration keyword.
+    ///
+    /// Java spells the reference `String.class`, Kotlin spells it
+    /// `String::class`. Both mean "class literal here, not a type
+    /// declaration"; scanning past `class` in either case is the whole
+    /// point, since the file may still declare a `package` further down.
     private static boolean precededByDot(String code, int pos) {
         int j = pos - 1;
         while (j >= 0 && Character.isWhitespace(code.charAt(j))) {
             j--;
         }
-        return j >= 0 && code.charAt(j) == '.';
+        if (j < 0) {
+            return false;
+        }
+        char c = code.charAt(j);
+        // `X::class` -- the colon we land on is the second of a pair.
+        return c == '.' || (c == ':' && j > 0 && code.charAt(j - 1) == ':');
     }
 
     /// Removes whitespace outside backtick-escaped segments and drops the

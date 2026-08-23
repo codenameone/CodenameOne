@@ -1949,20 +1949,29 @@ public final class InterpRuntime {
                 pushBoxed(f, returnKind, new NativeStub((InterpClass) args[0]));
                 return;
             }
-            // `System.identityHashCode(value)` on a pushed InterpObject would
-            // otherwise hash the peer -- `popBoxed` converted the argument to
-            // its hostPeer before this call site, and the peer is a different
-            // object from the interpreter's InterpObject wrapper. The
-            // interpreter's own `hashCode` (in `objectCall`) hashes the
-            // InterpObject, so a caller doing
-            // `value.hashCode() == System.identityHashCode(value)` would see
-            // the two differ. Compute the identity hash on the InterpObject
-            // side of the boundary so both paths agree.
+            // `System.identityHashCode(value)` must return the same hash as
+            // `value.hashCode()` would when hashCode is not overridden.
+            // Which object that hashes depends on whether the pushed class
+            // has a host peer to inherit `Object.hashCode` from:
+            //
+            //  * class-backed peer (`class Sub extends Form`): hashCode
+            //    reaches the peer's inherited Object.hashCode and returns
+            //    the peer's identity, so identityHashCode has to match it.
+            //  * interface-only peer or peerless: hashCode is answered by
+            //    `objectCall(io)` which hashes the InterpObject wrapper,
+            //    so identityHashCode has to hash the wrapper too.
+            //
+            // `popBoxed` handed us the peer for a peered InterpObject, so
+            // `fromHost` picks the wrapper back up; the choice below then
+            // selects the identity that matches the hashCode path.
             if ("java/lang/System".equals(owner) && "identityHashCode".equals(name)
                     && "(Ljava/lang/Object;)I".equals(desc) && args.length == 1) {
                 Object v = fromHost(args[0]);
                 if (v instanceof InterpObject) {
-                    pushBoxed(f, returnKind, Integer.valueOf(System.identityHashCode(v)));
+                    InterpObject io = (InterpObject) v;
+                    Object target = io.hostPeer != null && !io.hostPeerFromInterfacesOnly
+                            ? io.hostPeer : io;
+                    pushBoxed(f, returnKind, Integer.valueOf(System.identityHashCode(target)));
                     return;
                 }
             }

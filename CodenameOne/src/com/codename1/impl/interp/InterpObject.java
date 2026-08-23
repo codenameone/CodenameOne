@@ -152,7 +152,13 @@ public final class InterpObject {
             // override it.
             return enumName;
         }
-        return type.name.replace('/', '.') + "@interp";
+        // Object.toString's own shape: `getName() + "@" + hex(hashCode())`.
+        // A fixed `@interp` suffix folded every peerless instance of the
+        // same class to one string, hid the difference between two objects
+        // in logs and labels, and returned a non-Java value from what looks
+        // like a plain `toString()` call.
+        return type.name.replace('/', '.') + "@"
+                + Integer.toHexString(System.identityHashCode(this));
     }
 
     /// Delegates to an interpreted `equals`, for the same reason `toString`
