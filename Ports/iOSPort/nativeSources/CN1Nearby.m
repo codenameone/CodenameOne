@@ -385,8 +385,17 @@ static NSArray *cn1nbDeclaredServiceTypes(void) {
         if (![entry isKindOfClass:[NSString class]]) {
             continue;
         }
-        // "_chat._tcp" -> "chat"
+        // "_chat._tcp" -> "chat", and "_chat._tcp." likewise.
+        //
+        // The trailing dot is not optional to handle: the builder's
+        // NSBonjourServices renderer appends one to every entry, so that is
+        // the spelling most plists actually carry. Stripped FIRST -- taken
+        // last, it is the dot the transport suffix is cut at, which left
+        // "chat._tcp" here and made every declared service look undeclared.
         NSString *name = (NSString *)entry;
+        while ([name hasSuffix:@"."]) {
+            name = [name substringToIndex:[name length] - 1];
+        }
         if ([name hasPrefix:@"_"]) {
             name = [name substringFromIndex:1];
         }

@@ -257,6 +257,58 @@ class NearbyManifestFragmentsTest {
     }
 
     @Test
+    void transportWidensTheLocationCapBluetoothAlreadyDeclared() {
+        // BluetoothManifestFragments runs first and, for a scanning app with
+        // the default neverForLocation, caps this at 30. Nearby Connections
+        // needs it through 32, and a plain duplicate-suppressing add left the
+        // 30 in place -- so transport had no location grant at all on Android
+        // 12 and 12L, where the API refuses to start without one.
+        String bluetooth = BluetoothManifestFragments.inject("", true, false,
+                false, false, true, false, 34);
+        assertTrue(bluetooth.contains("ACCESS_FINE_LOCATION"),
+                "precondition: bluetooth declares the permission");
+        assertTrue(bluetooth.contains("android:maxSdkVersion=\"30\""),
+                "precondition: bluetooth caps it at 30");
+
+        String out = NearbyManifestFragments.inject(bluetooth, false, true,
+                false, false, false, 34);
+        int at = out.indexOf("ACCESS_FINE_LOCATION");
+        int elementEnd = out.indexOf('>', at);
+        String element = out.substring(out.lastIndexOf('<', at), elementEnd);
+        assertTrue(element.contains("android:maxSdkVersion=\"32\""),
+                "the cap should reach 32: " + element);
+        // Widened, never duplicated: two declarations of one permission is
+        // not a manifest Android accepts predictably.
+        assertEquals(out.indexOf("ACCESS_FINE_LOCATION"),
+                out.lastIndexOf("ACCESS_FINE_LOCATION"));
+    }
+
+    @Test
+    void transportBelowTiramisuRemovesTheCapAltogether() {
+        // With no NEARBY_WIFI_DEVICES to fall back on, the location grant has
+        // to hold at every level the app runs at.
+        String bluetooth = BluetoothManifestFragments.inject("", true, false,
+                false, false, true, false, 32);
+        String out = NearbyManifestFragments.inject(bluetooth, false, true,
+                false, false, false, 32);
+        int at = out.indexOf("ACCESS_FINE_LOCATION");
+        String element = out.substring(out.lastIndexOf('<', at),
+                out.indexOf('>', at));
+        assertFalse(element.contains("maxSdkVersion"),
+                "the cap should be gone: " + element);
+    }
+
+    @Test
+    void aCapThatAlreadyReachesFarEnoughIsLeftAlone() {
+        String seeded = "    <uses-permission android:name=\"android.permission"
+                + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"33\" />\n";
+        String out = NearbyManifestFragments.inject(seeded, false, true, false,
+                false, false, 34);
+        assertTrue(out.contains("android:maxSdkVersion=\"33\""),
+                "a wider cap is not narrowed: " + out);
+    }
+
+    @Test
     void usingNoneOfItChangesNothing() {
         String seeded = "    <uses-permission android:name=\"x\" />\n";
         assertEquals(seeded, NearbyManifestFragments.inject(seeded, false,

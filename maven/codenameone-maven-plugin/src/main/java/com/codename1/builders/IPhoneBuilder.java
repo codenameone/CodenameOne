@@ -336,6 +336,88 @@ public class IPhoneBuilder extends Executor {
     /// #### Returns
     ///
     /// the escaped text
+    /// Adds the nearby service types to the app's Bonjour array, MERGING
+    /// with whatever is already declared rather than replacing it.
+    ///
+    /// Written through the `ios.NSBonjourServices` hint, the same route Matter
+    /// commissioning uses, and NOT through `ios.plistInject`. The plist
+    /// renderer emits the generated array only when the injected fragment has
+    /// no `NSBonjourServices` key of its own -- a plist carrying the key twice
+    /// keeps neither value reliably -- so injecting the key here silently
+    /// suppressed every service the app had already declared. An app that
+    /// commissions Matter accessories and also uses nearby transport lost
+    /// `_matter._tcp.` and `_matterc._udp.` that way, and iOS then drops the
+    /// mDNS traffic those need.
+    ///
+    /// A project that owns the key through `ios.plistInject` is refused
+    /// rather than rewritten, again as Matter does: the fragment is the
+    /// developer's own XML and reformatting it here would be guessing.
+    ///
+    /// @param request the build request
+    /// @param serviceTypes the folded service types this app advertises
+    private void mergeNearbyBonjourServices(BuildRequest request,
+            List<String> serviceTypes) throws BuildException {
+        List<String> needed = new ArrayList<String>();
+        for (int i = 0; i < serviceTypes.size(); i++) {
+            // MultipeerConnectivity uses both transports for one service.
+            needed.add("_" + serviceTypes.get(i) + "._tcp.");
+            needed.add("_" + serviceTypes.get(i) + "._udp.");
+        }
+        if (WatchNativeBuilder.injectedPlistKeys(request)
+                .contains("NSBonjourServices")) {
+            List<String> declared = WatchNativeBuilder
+                    .injectedPlistStringArray(request, "NSBonjourServices");
+            List<String> missing = new ArrayList<String>();
+            for (String service : needed) {
+                if (!bonjourListed(declared, service)) {
+                    missing.add(service);
+                }
+            }
+            if (!missing.isEmpty()) {
+                throw new BuildException(
+                        "This app uses com.codename1.nearby.transport and "
+                        + "declares NSBonjourServices through ios.plistInject, "
+                        + "but that array does not list " + missing + ". iOS "
+                        + "drops mDNS traffic for a service type the plist "
+                        + "does not name, so the app would find no peers. Add "
+                        + "those entries to the array in ios.plistInject, or "
+                        + "remove the key from it and let the build declare "
+                        + "the array through ios.NSBonjourServices.");
+            }
+            return;
+        }
+        String bonjour = request.getArg("ios.NSBonjourServices", "");
+        List<String> existing = new ArrayList<String>();
+        for (String entry : bonjour.split("[,;]")) {
+            existing.add(entry.trim());
+        }
+        for (String service : needed) {
+            if (bonjourListed(existing, service)) {
+                continue;
+            }
+            existing.add(service);
+            bonjour = bonjour.trim().length() == 0 ? service
+                    : bonjour.trim() + "," + service;
+        }
+        request.putArgument("ios.NSBonjourServices", bonjour);
+    }
+
+    /// True when a Bonjour service type is already in a list, with or without
+    /// its trailing dot -- both spellings appear in the wild and name the
+    /// same service.
+    private static boolean bonjourListed(List<String> declared,
+            String service) {
+        String bare = service.endsWith(".")
+                ? service.substring(0, service.length() - 1) : service;
+        for (String entry : declared) {
+            String trimmed = entry == null ? "" : entry.trim();
+            if (trimmed.equals(service) || trimmed.equals(bare)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static String escapeNearbyPlistText(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;")
                 .replace(">", "&gt;");
@@ -4456,15 +4538,7 @@ public class IPhoneBuilder extends Executor {
                                     + " comma-separated list of the service"
                                     + " ids this app passes to"
                                     + " startAdvertising)"));
-                    String[] bonjour = new String[serviceTypes.size() * 2];
-                    for (int i = 0; i < serviceTypes.size(); i++) {
-                        bonjour[i * 2] = "_" + serviceTypes.get(i) + "._tcp";
-                        bonjour[i * 2 + 1] = "_" + serviceTypes.get(i)
-                                + "._udp";
-                    }
-                    declareNearbyPlistArray(request, "NSBonjourServices",
-                            bonjour,
-                            "MultipeerConnectivity cannot browse without it");
+                    mergeNearbyBonjourServices(request, serviceTypes);
                 }
                 if (usesNearbyCompanion) {
                     enableNearbyDefine(buildinRes, "CN1_NEARBY_COMPANION");

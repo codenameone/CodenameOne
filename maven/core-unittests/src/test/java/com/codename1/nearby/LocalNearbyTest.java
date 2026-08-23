@@ -281,6 +281,35 @@ class LocalNearbyTest {
     }
 
     @Test
+    void anUpdateAlreadyOnItsWayCannotRestartAStoppedSession() {
+        // A native update queued from a background thread can reach the EDT
+        // after stop() ran there. Delivering it set running back to true on a
+        // session isRunning() had already promised was finished, and notified
+        // a listener registered after the stop.
+        RangingSession s = running();
+        int handle = handleOf();
+        s.stop();
+        assertFalse(s.isRunning());
+
+        final AtomicInteger seen = new AtomicInteger();
+        s.addRangingListener(new RangingAdapter() {
+            @Override
+            public void updated(RangingUpdate u) {
+                seen.incrementAndGet();
+            }
+        });
+        RangingSession.deliverUpdate(handle, true, 1.5, false, 0, false, 0,
+                null);
+        RangingSession.deliverSuspended(handle);
+        RangingSession.deliverResumed(handle);
+        RangingSession.deliverInvalidated(handle,
+                NearbyError.SESSION_FAILED.ordinal(), "too late");
+
+        assertEquals(0, seen.get());
+        assertFalse(s.isRunning());
+    }
+
+    @Test
     void aPeerCanWalkAwayWithoutKillingTheSession() {
         RangingSession s = running();
         final AtomicReference<RangingRemovalReason> reason =

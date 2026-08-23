@@ -88,7 +88,9 @@ public final class RangingSession {
     /// `true` while the radio is measuring. False before [#start] and after
     /// [#stop()], and false while the session is suspended.
     public boolean isRunning() {
-        return running;
+        synchronized (SESSIONS) {
+            return running;
+        }
     }
 
     /// Starts ranging against a peer whose token arrived out of band.
@@ -245,7 +247,17 @@ public final class RangingSession {
         NearbyRequests.onEdt(new Runnable() {
             @Override
             public void run() {
-                s.running = true;
+                // A native update queued from a background thread can reach
+                // the EDT after stop() ran there. Without this it set running
+                // back to true on a session isRunning() has already promised
+                // is finished, and delivered to a listener registered after
+                // the stop.
+                if (s.isClosed()) {
+                    return;
+                }
+                synchronized (SESSIONS) {
+                    s.running = true;
+                }
                 RangingListener[] ls = s.snapshot();
                 for (RangingListener l : ls) {
                     l.updated(u);
@@ -275,6 +287,9 @@ public final class RangingSession {
         NearbyRequests.onEdt(new Runnable() {
             @Override
             public void run() {
+                if (s.isClosed()) {
+                    return;
+                }
                 RangingListener[] ls = s.snapshot();
                 for (RangingListener l : ls) {
                     l.peerRemoved(reason);
@@ -298,7 +313,12 @@ public final class RangingSession {
         NearbyRequests.onEdt(new Runnable() {
             @Override
             public void run() {
-                s.running = false;
+                if (s.isClosed()) {
+                    return;
+                }
+                synchronized (SESSIONS) {
+                    s.running = false;
+                }
                 RangingListener[] ls = s.snapshot();
                 for (RangingListener l : ls) {
                     l.suspended();
@@ -322,7 +342,12 @@ public final class RangingSession {
         NearbyRequests.onEdt(new Runnable() {
             @Override
             public void run() {
-                s.running = true;
+                if (s.isClosed()) {
+                    return;
+                }
+                synchronized (SESSIONS) {
+                    s.running = true;
+                }
                 RangingListener[] ls = s.snapshot();
                 for (RangingListener l : ls) {
                     l.resumed();
@@ -355,8 +380,15 @@ public final class RangingSession {
         NearbyRequests.onEdt(new Runnable() {
             @Override
             public void run() {
-                s.running = false;
-                s.closed = true;
+                // stop() promises no callback follows it, so an invalidation
+                // that was already queued when it ran stays unreported.
+                if (s.isClosed()) {
+                    return;
+                }
+                synchronized (SESSIONS) {
+                    s.running = false;
+                    s.closed = true;
+                }
                 RangingListener[] ls = s.snapshot();
                 synchronized (s.listeners) {
                     s.listeners.clear();
@@ -404,8 +436,22 @@ public final class RangingSession {
     }
 
     void markRunning() {
-        running = true;
+        synchronized (SESSIONS) {
+            running = true;
+        }
         starting = false;
+    }
+
+    /// True once [#stop] or an invalidation has finished this session.
+    ///
+    /// Read under the SESSIONS monitor because that is where the flag is
+    /// written, and every queued delivery consults it before touching the
+    /// session: a callback that was already on its way when the app stopped
+    /// the session must not arrive.
+    boolean isClosed() {
+        synchronized (SESSIONS) {
+            return closed;
+        }
     }
 
     /// Clears the in-progress flag after a start that failed.
@@ -426,7 +472,7 @@ public final class RangingSession {
     }
 
     private NearbyException checkStartable() {
-        if (closed) {
+        if (isClosed()) {
             return new NearbyException(NearbyError.SESSION_INVALIDATED,
                     "this session has been stopped; prepare another");
         }

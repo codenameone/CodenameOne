@@ -93,8 +93,81 @@ public class AndroidUwbRanging implements NearbyBridge {
 
     private UwbManager manager;
 
+    private final Object capabilityLock = new Object();
+    /// The capability bits the platform reported, or -1 while unknown. A
+    /// probe that FAILS leaves this at -1 rather than caching zero: the usual
+    /// reason it fails is that UWB_RANGING has not been granted yet, and
+    /// remembering "no direction" from before the user said yes would make
+    /// the answer wrong for the rest of the process.
+    private int probedCapabilities = -1;
+    private boolean probeInFlight;
+
     public AndroidUwbRanging(Context context) {
         this.context = context;
+    }
+
+    /// Asks the platform for its ranging capabilities, off the calling thread.
+    ///
+    /// Android reports them only through a session scope, and opening one
+    /// binds to the UWB system service -- seconds, on a cold radio. Started
+    /// once, as early as anything touches this bridge, so that by the time an
+    /// app asks the answer is usually already here.
+    private void startCapabilityProbe() {
+        synchronized (capabilityLock) {
+            if (probedCapabilities >= 0 || probeInFlight) {
+                return;
+            }
+            probeInFlight = true;
+        }
+        try {
+            UwbManagerRx.clientSessionScopeSingle(managerOrThrow())
+                    .subscribeOn(Schedulers.io())
+                    .subscribe(new io.reactivex.rxjava3.functions.Consumer<
+                            UwbClientSessionScope>() {
+                        public void accept(UwbClientSessionScope scope) {
+                            int bits = 0;
+                            try {
+                                RangingCapabilities caps =
+                                        scope.getRangingCapabilities();
+                                if (caps.isAzimuthalAngleSupported()) {
+                                    bits |= NearbyBridge.CAPABILITY_DIRECTION;
+                                }
+                                if (caps.isElevationAngleSupported()) {
+                                    bits |= NearbyBridge.CAPABILITY_ELEVATION;
+                                }
+                                if (caps.isBackgroundRangingSupported()) {
+                                    bits |= NearbyBridge.CAPABILITY_BACKGROUND;
+                                }
+                            } catch (Throwable unreadable) {
+                                bits = 0;
+                            }
+                            settleProbe(bits);
+                        }
+                    }, new io.reactivex.rxjava3.functions.Consumer<
+                            Throwable>() {
+                        public void accept(Throwable error) {
+                            settleProbe(-1);
+                        }
+                    });
+        } catch (Throwable noRadio) {
+            settleProbe(-1);
+        }
+    }
+
+    /// Records the probe's answer and wakes anything waiting for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bits`: the capability bits, or -1 when the probe failed and the
+    ///   next caller should try again
+    private void settleProbe(int bits) {
+        synchronized (capabilityLock) {
+            if (bits >= 0) {
+                probedCapabilities = bits;
+            }
+            probeInFlight = false;
+            capabilityLock.notifyAll();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -127,6 +200,9 @@ public class AndroidUwbRanging implements NearbyBridge {
                         != PackageManager.PERMISSION_GRANTED) {
             return NearbyAvailability.UNAUTHORIZED.ordinal();
         }
+        // Warmed here, where the permission is known to be granted, so the
+        // scope is usually open by the time an app asks what it can measure.
+        startCapabilityProbe();
         return NearbyAvailability.AVAILABLE.ordinal();
     }
 
@@ -139,22 +215,32 @@ public class AndroidUwbRanging implements NearbyBridge {
         // answer is distance alone: claiming direction a device cannot
         // produce would have an app draw an arrow that never moves.
         int bits = NearbyBridge.CAPABILITY_DISTANCE;
-        try {
-            UwbClientSessionScope scope = UwbManagerRx
-                    .clientSessionScopeSingle(managerOrThrow())
-                    .blockingGet();
-            RangingCapabilities caps = scope.getRangingCapabilities();
-            if (caps.isAzimuthalAngleSupported()) {
-                bits |= NearbyBridge.CAPABILITY_DIRECTION;
+        // The scope that carries the answer is opened by a background probe,
+        // not here: opening one on the calling thread blocks it on the UWB
+        // system service binding, and this is called from the EDT. The wait
+        // below is bounded and only ever happens on a call that beats the
+        // probe; once it lands the answer is cached and every later call is
+        // free.
+        startCapabilityProbe();
+        int probed;
+        long deadline = System.currentTimeMillis() + 400;
+        synchronized (capabilityLock) {
+            while (probedCapabilities < 0 && probeInFlight) {
+                long left = deadline - System.currentTimeMillis();
+                if (left <= 0) {
+                    break;
+                }
+                try {
+                    capabilityLock.wait(left);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
-            if (caps.isElevationAngleSupported()) {
-                bits |= NearbyBridge.CAPABILITY_ELEVATION;
-            }
-            if (caps.isBackgroundRangingSupported()) {
-                bits |= NearbyBridge.CAPABILITY_BACKGROUND;
-            }
-        } catch (Throwable t) {
-            // Left at distance-only.
+            probed = probedCapabilities;
+        }
+        if (probed > 0) {
+            bits |= probed;
         }
         // An accessory is ranged here by joining the session it names, which
         // is the same code path as a peer -- so if ranging works at all,
@@ -201,27 +287,71 @@ public class AndroidUwbRanging implements NearbyBridge {
                     "this device has no ultra-wideband radio");
             return;
         }
+        // Subscribed, never blockingGet(). Opening a session scope binds to
+        // the UWB system service and negotiates a local address, and this is
+        // called from the EDT -- so blocking on it froze the UI for as long as
+        // the service took to come up, which on a cold radio is long enough to
+        // be an ANR rather than a stutter. The answer arrives on an io thread
+        // and Ranging hops it back to the EDT itself.
         try {
-            Session session = new Session(sessionHandle, controller);
+            final Session session = new Session(sessionHandle, controller);
+            UwbManager uwb = managerOrThrow();
             if (controller) {
-                UwbControllerSessionScope scope = UwbManagerRx
-                        .controllerSessionScopeSingle(managerOrThrow())
-                        .blockingGet();
-                session.scope = scope;
-                session.channel = scope.getUwbComplexChannel();
-            } else {
-                UwbControleeSessionScope scope = UwbManagerRx
-                        .controleeSessionScopeSingle(managerOrThrow())
-                        .blockingGet();
-                session.scope = scope;
+                UwbManagerRx.controllerSessionScopeSingle(uwb)
+                        .subscribeOn(Schedulers.io())
+                        .subscribe(new io.reactivex.rxjava3.functions.Consumer<
+                                UwbControllerSessionScope>() {
+                            public void accept(UwbControllerSessionScope scope) {
+                                session.scope = scope;
+                                session.channel = scope.getUwbComplexChannel();
+                                finishPrepare(requestId, session);
+                            }
+                        }, new io.reactivex.rxjava3.functions.Consumer<
+                                Throwable>() {
+                            public void accept(Throwable error) {
+                                fail(requestId, NearbyError.SESSION_FAILED,
+                                        message(error));
+                            }
+                        });
+                return;
             }
+            UwbManagerRx.controleeSessionScopeSingle(uwb)
+                    .subscribeOn(Schedulers.io())
+                    .subscribe(new io.reactivex.rxjava3.functions.Consumer<
+                            UwbControleeSessionScope>() {
+                        public void accept(UwbControleeSessionScope scope) {
+                            session.scope = scope;
+                            finishPrepare(requestId, session);
+                        }
+                    }, new io.reactivex.rxjava3.functions.Consumer<
+                            Throwable>() {
+                        public void accept(Throwable error) {
+                            fail(requestId, NearbyError.SESSION_FAILED,
+                                    message(error));
+                        }
+                    });
+        } catch (Throwable t) {
+            fail(requestId, NearbyError.SESSION_FAILED, message(t));
+        }
+    }
+
+    /// Finishes a prepare once the session scope has been opened. Runs on the
+    /// RxJava io thread the scope was delivered on, never on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request to answer
+    /// - `session`: the session whose scope is now set
+    private void finishPrepare(int requestId, Session session) {
+        try {
             session.localAddress = session.scope.getLocalAddress();
             session.sessionId = random.nextInt(Integer.MAX_VALUE - 1) + 1;
             session.sessionKey = new byte[8];
             random.nextBytes(session.sessionKey);
-            sessions.put(Integer.valueOf(sessionHandle), session);
-            Ranging.deliverSessionPrepared(requestId, sessionHandle, controller,
-                    RangingToken.PLATFORM_ANDROID_UWB, session.token());
+            sessions.put(Integer.valueOf(session.handle), session);
+            Ranging.deliverSessionPrepared(requestId, session.handle,
+                    session.controller, RangingToken.PLATFORM_ANDROID_UWB,
+                    session.token());
         } catch (Throwable t) {
             fail(requestId, NearbyError.SESSION_FAILED, message(t));
         }

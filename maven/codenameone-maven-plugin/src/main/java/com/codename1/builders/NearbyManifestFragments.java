@@ -130,8 +130,16 @@ final class NearbyManifestFragments {
             // refuses to start without it. Capped so 33 and later use
             // NEARBY_WIFI_DEVICES instead and the app stops asking for
             // location it does not use.
-            out = addPermission(out, "android.permission.ACCESS_FINE_LOCATION",
-                    tiramisu ? " android:maxSdkVersion=\"32\"" : "");
+            //
+            // Widened rather than added, because addPermission suppresses a
+            // duplicate by NAME alone. BluetoothManifestFragments runs first
+            // and, for a scanning app with the default neverForLocation, has
+            // already declared this permission with maxSdkVersion="30" -- so
+            // the plain add left that cap in place and transport had no
+            // location grant at all on Android 12 and 12L, where it cannot
+            // start without one.
+            out = widenPermission(out, "android.permission.ACCESS_FINE_LOCATION",
+                    tiramisu ? 32 : 0);
         }
 
         if (companion) {
@@ -210,6 +218,66 @@ final class NearbyManifestFragments {
         }
         return "    <uses-permission android:name=\"" + name + "\""
                 + extraAttributes + " />\n" + xPermissions;
+    }
+
+    /// Makes sure a permission is declared and that its `maxSdkVersion` cap,
+    /// if any, reaches at least as far as this feature needs.
+    ///
+    /// A permission another feature already declared is not re-added -- the
+    /// manifest would then carry it twice -- so the only way to widen its
+    /// reach is to edit the declaration that is there. An existing
+    /// declaration with no cap already covers every level and is left alone.
+    ///
+    /// @param xPermissions the manifest fragment so far
+    /// @param name the permission
+    /// @param requiredThrough the highest API level at which the permission
+    ///        must still be granted, or 0 when it must not be capped at all
+    /// @return the fragment, with the declaration added or widened
+    static String widenPermission(String xPermissions, String name,
+            int requiredThrough) {
+        int at = xPermissions.indexOf("\"" + name + "\"");
+        if (at < 0) {
+            return addPermission(xPermissions, name, requiredThrough > 0
+                    ? " android:maxSdkVersion=\"" + requiredThrough + "\"" : "");
+        }
+        int start = xPermissions.lastIndexOf('<', at);
+        int end = xPermissions.indexOf('>', at);
+        if (start < 0 || end < 0) {
+            return xPermissions;
+        }
+        String element = xPermissions.substring(start, end + 1);
+        String marker = "android:maxSdkVersion=\"";
+        int capAt = element.indexOf(marker);
+        if (capAt < 0) {
+            // Uncapped, so it already reaches further than anything asked for.
+            return xPermissions;
+        }
+        int capEnd = element.indexOf('"', capAt + marker.length());
+        if (capEnd < 0) {
+            return xPermissions;
+        }
+        int cap;
+        try {
+            cap = Integer.parseInt(element.substring(
+                    capAt + marker.length(), capEnd).trim());
+        } catch (NumberFormatException notANumber) {
+            return xPermissions;
+        }
+        if (requiredThrough > 0 && cap >= requiredThrough) {
+            return xPermissions;
+        }
+        String widened;
+        if (requiredThrough > 0) {
+            widened = element.substring(0, capAt + marker.length())
+                    + requiredThrough + element.substring(capEnd);
+        } else {
+            widened = element.substring(0, capAt)
+                    + element.substring(capEnd + 1);
+            // The attribute left a double space behind it.
+            widened = widened.replace("  ", " ");
+        }
+        return xPermissions.substring(0, start) + widened
+                + xPermissions.substring(end + 1);
     }
 
     private static String addFeature(String xPermissions, String name,

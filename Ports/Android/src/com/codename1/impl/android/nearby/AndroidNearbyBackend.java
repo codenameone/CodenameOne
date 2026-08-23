@@ -50,7 +50,9 @@ import com.codename1.nearby.spi.NearbyBridge;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /// The Android nearby implementation, compiled inside the generated app
@@ -302,19 +304,16 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 request.setDeviceProfile(deviceProfile);
             }
         }
-        boolean anyFilter = false;
         for (int i = 0; filters != null && i < filters.length; i++) {
-            if (addFilter(request, filters[i])) {
-                anyFilter = true;
-            }
+            addFilter(request, filters[i]);
         }
-        if (!anyFilter) {
-            // An unfiltered request is legal and shows everything the radios
-            // can see. Left as is rather than refused: that is the same thing
-            // an empty filter list means in the portable API.
-            request.addDeviceFilter(new BluetoothLeDeviceFilter.Builder()
-                    .build());
-        }
+        // No filter is added when the caller gave none. An empty
+        // BluetoothLeDeviceFilter is NOT the neutral choice it looks like: a
+        // request carrying one restricts the chooser to a BLE scan, so classic
+        // Bluetooth and Wi-Fi companions vanish from the very case that asked
+        // to see everything. A request with no filters at all is what makes
+        // the platform scan all three transports, which is what the portable
+        // API promises for an empty filter list.
         pendingAssociateRequest = requestId;
         listenForResult(requestId, cdm);
         cdm.associate(request.build(), new CompanionDeviceManager.Callback() {
@@ -368,6 +367,9 @@ public class AndroidNearbyBackend implements NearbyBridge {
         if (!(activity instanceof CodenameOneActivity)) {
             return;
         }
+        // Taken BEFORE the chooser opens, so the association it creates can be
+        // told apart from the ones this app already had.
+        final Set<String> before = associationKeys(cdm);
         final CodenameOneActivity host = (CodenameOneActivity) activity;
         host.setIntentResultListener(new IntentResultListener() {
             public void onActivityResult(int requestCode, int resultCode,
@@ -383,7 +385,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
                             "the user dismissed the chooser");
                     return;
                 }
-                String encoded = newestAssociation(cdm, data);
+                String encoded = newestAssociation(cdm, data, before);
                 if (encoded == null) {
                     CompanionDevices.deliverRequestFailed(requestId,
                             NearbyError.UNKNOWN.ordinal(),
@@ -401,12 +403,50 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// wherever possible: on API 33 and later the association carries an id
     /// and a display name the intent extra does not, and that id is what
     /// `disassociate` and presence observation take.
+    ///
+    /// Identified three ways, in descending order of certainty, because
+    /// "the last one in the list" is not one of them -- `getMyAssociations`
+    /// documents no order, so an app that already held associations could be
+    /// handed one the user did not pick:
+    ///
+    /// 1. `EXTRA_ASSOCIATION`, which API 33 puts in the result intent and
+    ///    which names the association directly;
+    /// 2. the one association missing from the snapshot taken before the
+    ///    chooser opened;
+    /// 3. the intent's device extra, which is all API 26 through 32 offer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cdm`: the platform manager
+    /// - `data`: the chooser's result intent
+    /// - `before`: the association keys this app held before the chooser ran
     @SuppressLint("MissingPermission")
-    private String newestAssociation(CompanionDeviceManager cdm, Intent data) {
+    private String newestAssociation(CompanionDeviceManager cdm, Intent data,
+            Set<String> before) {
         if (Build.VERSION.SDK_INT >= 33) {
+            if (data != null) {
+                Object association = data.getParcelableExtra(
+                        CompanionDeviceManager.EXTRA_ASSOCIATION);
+                if (association instanceof AssociationInfo) {
+                    return encode((AssociationInfo) association, true);
+                }
+            }
             List<AssociationInfo> all = cdm.getMyAssociations();
-            if (all != null && !all.isEmpty()) {
-                return encode(all.get(all.size() - 1), true);
+            AssociationInfo fresh = null;
+            for (int i = 0; all != null && i < all.size(); i++) {
+                if (!before.contains(idOf(all.get(i)))) {
+                    if (fresh != null) {
+                        // Two new ones means something else associated while
+                        // the chooser was open; neither can be claimed as the
+                        // user's pick, so fall through to the intent extra.
+                        fresh = null;
+                        break;
+                    }
+                    fresh = all.get(i);
+                }
+            }
+            if (fresh != null) {
+                return encode(fresh, true);
             }
         }
         if (data != null) {
@@ -418,11 +458,41 @@ public class AndroidNearbyBackend implements NearbyBridge {
             }
         }
         List<String> legacy = cdm.getAssociations();
-        if (legacy != null && !legacy.isEmpty()) {
-            String mac = legacy.get(legacy.size() - 1);
-            return encodeLegacy(mac, mac, true);
+        for (int i = 0; legacy != null && i < legacy.size(); i++) {
+            if (!before.contains(legacy.get(i))) {
+                String mac = legacy.get(i);
+                return encodeLegacy(mac, mac, true);
+            }
         }
         return null;
+    }
+
+    /// The keys of every association this app currently holds: the API 33 id
+    /// where there is one, the MAC address below that.
+    @SuppressLint("MissingPermission")
+    private Set<String> associationKeys(CompanionDeviceManager cdm) {
+        Set<String> out = new HashSet<String>();
+        if (cdm == null) {
+            return out;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                List<AssociationInfo> all = cdm.getMyAssociations();
+                for (int i = 0; all != null && i < all.size(); i++) {
+                    out.add(idOf(all.get(i)));
+                }
+                return out;
+            }
+            List<String> legacy = cdm.getAssociations();
+            for (int i = 0; legacy != null && i < legacy.size(); i++) {
+                out.add(legacy.get(i));
+            }
+        } catch (Throwable notPermitted) {
+            // Reading associations needs no permission, but a manufacturer
+            // build that throws here must not take the association with it:
+            // an empty snapshot only costs the fallback path.
+        }
+        return out;
     }
 
     @SuppressLint("MissingPermission")
