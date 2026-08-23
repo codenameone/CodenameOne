@@ -23,6 +23,7 @@
 package com.codename1.nearby;
 
 import com.codename1.impl.nearby.LocalNearbyBridge;
+import com.codename1.util.AsyncResource;
 import com.codename1.impl.nearby.NearbyRequests;
 import com.codename1.impl.nearby.SyntheticNearby;
 import com.codename1.nearby.companion.AssociationRequest;
@@ -581,12 +582,16 @@ class LocalNearbyTest {
         // the request and the acceptance the way it does on a real timer.
         List<Runnable> queue = new ArrayList<Runnable>();
         bridge.deferForTest(queue);
-        NearbyTransport.requestConnection(e, "me");
+        AsyncResource<Boolean> pending = NearbyTransport.requestConnection(e,
+                "me");
         NearbyTransport.stop();
         drain(queue);
 
         assertTrue(connected.isEmpty(),
                 "a stopped transport must not connect: " + connected);
+        // Failed rather than left hanging: a resource that never settles is
+        // worse than one that fails.
+        assertFailedWith(NearbyError.SESSION_INVALIDATED, pending);
     }
 
     @Test

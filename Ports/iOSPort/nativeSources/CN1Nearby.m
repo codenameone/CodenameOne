@@ -144,6 +144,26 @@ static void cn1nbFailTransport(int requestId, int error, NSString *message) {
             getThreadLocalData(), requestId, error, cn1nbJString(message));
 }
 
+/// True when an error describes a transfer this app cancelled.
+///
+/// MultipeerConnectivity reports a cancelled resource through the same
+/// completion handler as a broken one, so the error is all there is to go on.
+static BOOL cn1nbWasCancelled(NSError *error) {
+    if (error == nil) {
+        return NO;
+    }
+    if ([[error domain] isEqualToString:NSCocoaErrorDomain]
+            && [error code] == NSUserCancelledError) {
+        return YES;
+    }
+    // NSProgress cancellation surfaces as POSIX ECANCELED on some releases.
+    if ([[error domain] isEqualToString:NSPOSIXErrorDomain]
+            && [error code] == ECANCELED) {
+        return YES;
+    }
+    return NO;
+}
+
 static void cn1nbTransportOk(int requestId) {
     com_codename1_impl_ios_IOSNearbyCallbacks_transportOk___int(
             getThreadLocalData(), requestId);
@@ -513,6 +533,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     if (endpointId == nil) {
         return nil;
     }
+    @synchronized (self) {
     MCSession *existing = [self.sessionsById objectForKey:endpointId];
     if (existing != nil) {
         return existing;
@@ -524,6 +545,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     created.delegate = self;
     [self.sessionsById setObject:created forKey:endpointId];
     return created;
+    }
 }
 
 /// Drops one endpoint's session and forgets it.
@@ -532,12 +554,18 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     // owner of this session -- it was created autoreleased and the pool it
     // was created in has long since drained -- so removing the entry first
     // released it, and the two messages below then went to freed memory.
-    MCSession *session = [[[self.sessionsById objectForKey:endpointId] retain]
-            autorelease];
-    if (session == nil) {
-        return;
+    MCSession *session;
+    @synchronized (self) {
+        session = [[[self.sessionsById objectForKey:endpointId] retain]
+                autorelease];
+        if (session == nil) {
+            return;
+        }
+        [self.sessionsById removeObjectForKey:endpointId];
     }
-    [self.sessionsById removeObjectForKey:endpointId];
+    // Outside the lock: disconnect can run delegate work, and holding the
+    // transport's monitor across it would invite a deadlock against the
+    // delegate queue that is trying to take the same monitor.
     session.delegate = nil;
     [session disconnect];
 }
@@ -550,32 +578,96 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// - `payloadId`: the payload every recipient of this send shares
 - (void)rememberProgress:(NSProgress *)progress forPayload:(JAVA_INT)payloadId {
     NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
-    NSMutableArray *all = [self.progressByPayload objectForKey:key];
-    if (all == nil) {
-        all = [NSMutableArray array];
-        [self.progressByPayload setObject:all forKey:key];
+    @synchronized (self) {
+        NSMutableArray *all = [self.progressByPayload objectForKey:key];
+        if (all == nil) {
+            all = [NSMutableArray array];
+            [self.progressByPayload setObject:all forKey:key];
+        }
+        [all addObject:progress];
     }
-    [all addObject:progress];
 }
 
 /// Forgets the transfers in `holder`, and the payload entry once the last
 /// recipient is done with it.
 - (void)forgetProgress:(NSArray *)holder forPayload:(JAVA_INT)payloadId {
     NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
-    NSMutableArray *all = [self.progressByPayload objectForKey:key];
-    if (all == nil) {
-        return;
+    @synchronized (self) {
+        NSMutableArray *all = [self.progressByPayload objectForKey:key];
+        if (all == nil) {
+            return;
+        }
+        [all removeObjectsInArray:holder];
+        if ([all count] == 0) {
+            [self.progressByPayload removeObjectForKey:key];
+        }
     }
-    [all removeObjectsInArray:holder];
-    if ([all count] == 0) {
+}
+
+/// Takes and forgets every transfer registered for a payload, for cancel.
+- (NSArray *)takeProgressesForPayload:(JAVA_INT)payloadId {
+    NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
+    @synchronized (self) {
+        NSArray *all = [[[self.progressByPayload objectForKey:key] copy]
+                autorelease];
         [self.progressByPayload removeObjectForKey:key];
+        return all;
+    }
+}
+
+/// Drops every unanswered invitation.
+- (void)forgetInvitations {
+    @synchronized (self) {
+        [self.invitations removeAllObjects];
+    }
+}
+
+/// Records an invitation handler against the peer that sent it.
+- (void)rememberInvitation:(id)handler forPeer:(NSString *)pid {
+    @synchronized (self) {
+        [self.invitations setObject:handler forKey:pid];
+    }
+}
+
+/// Takes the invitation handler for a peer, retained past the removal so it
+/// survives being the dictionary's only owner.
+- (id)takeInvitationForPeer:(NSString *)pid {
+    if (pid == nil) {
+        return nil;
+    }
+    @synchronized (self) {
+        id handler = [[[self.invitations objectForKey:pid] retain] autorelease];
+        [self.invitations removeObjectForKey:pid];
+        return handler;
+    }
+}
+
+/// Records that a peer reached Connected, answering whether it is new.
+- (void)markEverConnected:(NSString *)pid {
+    @synchronized (self) {
+        [self.everConnected addObject:pid];
+    }
+}
+
+/// True when this peer had reached Connected, forgetting it either way.
+- (BOOL)takeEverConnected:(NSString *)pid {
+    @synchronized (self) {
+        if (![self.everConnected containsObject:pid]) {
+            return NO;
+        }
+        [self.everConnected removeObject:pid];
+        return YES;
     }
 }
 
 /// How many peers are connected across every session.
 - (NSUInteger)connectedPeerCount {
     NSUInteger n = 0;
-    for (MCSession *session in [self.sessionsById allValues]) {
+    NSArray *sessions;
+    @synchronized (self) {
+        sessions = [[[self.sessionsById allValues] copy] autorelease];
+    }
+    for (MCSession *session in sessions) {
         n += [session.connectedPeers count];
     }
     return n;
@@ -583,7 +675,10 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 /// Drops every session.
 - (void)closeAllSessions {
-    NSArray *keys = [self.sessionsById allKeys];
+    NSArray *keys;
+    @synchronized (self) {
+        keys = [[[self.sessionsById allKeys] copy] autorelease];
+    }
     for (NSString *key in keys) {
         [self closeSessionFor:key];
     }
@@ -593,23 +688,28 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 - (NSString *)encodePeer:(MCPeerID *)peer service:(NSString *)serviceId {
     NSString *pid = cn1nbIdForPeer(peer);
     if (serviceId != nil) {
-        [self.serviceIdByPeer setObject:serviceId forKey:pid];
+        @synchronized (self) {
+            [self.serviceIdByPeer setObject:serviceId forKey:pid];
+        }
     }
     return [self encodePeer:peer];
 }
 
 - (NSString *)encodePeer:(MCPeerID *)peer {
     NSString *pid = cn1nbIdForPeer(peer);
-    [self.peersById setObject:peer forKey:pid];
+    NSString *service;
+    @synchronized (self) {
+        [self.peersById setObject:peer forKey:pid];
     // The service this peer was actually seen on, not whichever of the two
     // was configured most recently. A peer reached through a session -- a
     // state change, an arriving payload -- was found by the browser or came
     // in through the advertiser earlier, and that is when the mapping was
     // recorded.
-    NSString *service = [self.serviceIdByPeer objectForKey:pid];
-    if (service == nil) {
-        service = self.discoverServiceId != nil ? self.discoverServiceId
-                : self.advertiseServiceId;
+        service = [self.serviceIdByPeer objectForKey:pid];
+        if (service == nil) {
+            service = self.discoverServiceId != nil ? self.discoverServiceId
+                    : self.advertiseServiceId;
+        }
     }
     return cn1nbJoin([NSArray arrayWithObjects:pid,
             peer.displayName == nil ? @"" : peer.displayName,
@@ -617,7 +717,12 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 }
 
 - (MCPeerID *)peerForId:(NSString *)pid {
-    return pid == nil ? nil : [self.peersById objectForKey:pid];
+    if (pid == nil) {
+        return nil;
+    }
+    @synchronized (self) {
+        return [self.peersById objectForKey:pid];
+    }
 }
 
 /// MultipeerConnectivity gives no comparison token, and this does not invent
@@ -652,7 +757,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         NSString *pid = cn1nbIdForPeer(peerID);
         NSString *encoded = [self encodePeer:peerID];
         if (state == MCSessionStateConnected) {
-            [self.everConnected addObject:pid];
+            [self markEverConnected:pid];
             com_codename1_impl_ios_IOSNearbyCallbacks_connectionResult___java_lang_String_boolean_int_java_lang_String(
                     getThreadLocalData(), cn1nbJString(encoded), JAVA_TRUE, 0,
                     JAVA_NULL);
@@ -663,8 +768,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // for a connected/failed answer that never came -- a rejected or
         // timed-out invitation lands here without ever having been connected.
         // Only a peer that actually reached Connected can disconnect.
-        if ([self.everConnected containsObject:pid]) {
-            [self.everConnected removeObject:pid];
+        if ([self takeEverConnected:pid]) {
             com_codename1_impl_ios_IOSNearbyCallbacks_disconnected___java_lang_String(
                     getThreadLocalData(), cn1nbJString(encoded));
             return;
@@ -830,8 +934,8 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
                                      service:self.advertiseServiceId];
         // Copied because the block outlives this call: it is answered when
         // the app calls accept or reject, which is at least an EDT hop away.
-        [self.invitations setObject:[[invitationHandler copy] autorelease]
-                             forKey:pid];
+        [self rememberInvitation:[[invitationHandler copy] autorelease]
+                         forPeer:pid];
         com_codename1_impl_ios_IOSNearbyCallbacks_connectionRequested___java_lang_String_java_lang_String(
                 getThreadLocalData(), cn1nbJString(encoded),
                 cn1nbJString([self tokenForPeer:peerID]));
@@ -1705,7 +1809,16 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
         // Recorded BEFORE the answer: didNotStartAdvertisingPeer can fire
         // after this returns, and it needs the id to fail.
         t.advertiseStrategy = (int)strategy;
+        // A start within the grace period of an earlier one replaces its
+        // pending id, and the earlier settler would then see a mismatch and
+        // return -- leaving that caller's AsyncResource pending for good.
+        // Answered on the way out: advertising did start, and the newer call
+        // is what changed it.
+        int superseded = t.pendingAdvertiseRequest;
         t.pendingAdvertiseRequest = requestId;
+        if (superseded != 0 && superseded != requestId) {
+            cn1nbTransportOk(superseded);
+        }
         [t.advertiser startAdvertisingPeer];
         cn1nbSettleTransportStart(t, YES, requestId);
         return;
@@ -1759,7 +1872,12 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
                 serviceType:t.discoverServiceType] autorelease];
         t.browser.delegate = t;
         t.discoverStrategy = (int)strategy;
+        // Answered for the reason the advertising path is.
+        int superseded = t.pendingDiscoverRequest;
         t.pendingDiscoverRequest = requestId;
+        if (superseded != 0 && superseded != requestId) {
+            cn1nbTransportOk(superseded);
+        }
         [t.browser startBrowsingForPeers];
         cn1nbSettleTransportStart(t, NO, requestId);
         return;
@@ -1852,8 +1970,7 @@ void com_codename1_impl_ios_IOSNative_nearbyAcceptConnection___int_java_lang_Str
         // entry first freed the block and calling it crashed.
         void (^handler)(BOOL, MCSession *) =
                 cn1nbTransport == nil ? nil
-                        : [[[cn1nbTransport.invitations objectForKey:pid]
-                                retain] autorelease];
+                        : [cn1nbTransport takeInvitationForPeer:pid];
         if (handler == nil) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
                     @"there is no invitation from that endpoint");
@@ -1865,14 +1982,12 @@ void com_codename1_impl_ios_IOSNative_nearbyAcceptConnection___int_java_lang_Str
         if (cn1nbTransport.advertiseStrategy
                         == CN1_NEARBY_STRATEGY_POINT_TO_POINT
                 && [cn1nbTransport connectedPeerCount] > 0) {
-            [cn1nbTransport.invitations removeObjectForKey:pid];
             handler(NO, nil);
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_BUSY,
                     @"POINT_TO_POINT allows one connection at a time;"
                      @" disconnect the current peer first");
             return;
         }
-        [cn1nbTransport.invitations removeObjectForKey:pid];
         handler(YES, [cn1nbTransport sessionFor:pid]);
         cn1nbTransportOk(requestId);
         return;
@@ -1891,10 +2006,8 @@ void com_codename1_impl_ios_IOSNative_nearbyRejectConnection___java_lang_String(
         }
         NSString *pid = toNSString(CN1_THREAD_STATE_PASS_ARG endpointId);
         void (^handler)(BOOL, MCSession *) =
-                [[[cn1nbTransport.invitations objectForKey:pid] retain]
-                        autorelease];
+                [cn1nbTransport takeInvitationForPeer:pid];
         if (handler != nil) {
-            [cn1nbTransport.invitations removeObjectForKey:pid];
             handler(NO, nil);
         }
     }
@@ -1953,11 +2066,20 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
            withCompletionHandler:^(NSError *error) {
                     @autoreleasepool {
                         NSString *encoded = [cn1nbTransport encodePeer:peer];
+                        // Cancellation is its own status, not a failure.
+                        // PayloadStatus.CANCELED exists precisely so an app
+                        // can tell "I stopped this" from "the link broke",
+                        // and mapping every error to FAILURE hid the one it
+                        // caused itself.
+                        JAVA_INT status = CN1_NEARBY_PAYLOAD_SUCCESS;
+                        if (error != nil) {
+                            status = cn1nbWasCancelled(error)
+                                    ? CN1_NEARBY_PAYLOAD_CANCELED
+                                    : CN1_NEARBY_PAYLOAD_FAILURE;
+                        }
                         com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                                 getThreadLocalData(), cn1nbJString(encoded),
-                                payloadId, 0, -1,
-                                error == nil ? CN1_NEARBY_PAYLOAD_SUCCESS
-                                        : CN1_NEARBY_PAYLOAD_FAILURE);
+                                payloadId, 0, -1, status);
                         // Only THIS recipient's transfer is finished. The
                         // others under the same payload id are still going,
                         // and dropping the whole entry here left them
@@ -1997,23 +2119,45 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
         if (data != nil) {
             [framed appendData:data];
         }
-        // One send per peer, because each has its own session now.
+        // One send per peer, because each has its own session now -- and one
+        // progress update per peer, reporting what happened to THAT peer.
+        //
+        // Reported per recipient rather than suppressed wholesale. Sending to
+        // three peers where the third fails still delivered the payload to
+        // the first two, and answering the aggregate request with a failure
+        // and then skipping the loop entirely meant neither the recipients
+        // that got it nor the one that did not produced any terminal update
+        // at all.
         NSError *err = nil;
         BOOL sent = [peers count] > 0;
+        NSMutableArray *outcomes = [NSMutableArray array];
         for (NSUInteger i = 0; i < [peers count]; i++) {
             MCSession *session = [cn1nbTransport
                     sessionFor:[peerIds objectAtIndex:i]];
             NSError *one = nil;
-            if (![session sendData:framed
-                           toPeers:[NSArray arrayWithObject:
-                                   [peers objectAtIndex:i]]
-                          withMode:MCSessionSendDataReliable
-                             error:&one]) {
+            BOOL ok = [session sendData:framed
+                                toPeers:[NSArray arrayWithObject:
+                                        [peers objectAtIndex:i]]
+                               withMode:MCSessionSendDataReliable
+                                  error:&one];
+            [outcomes addObject:[NSNumber numberWithBool:ok]];
+            if (!ok) {
                 sent = NO;
                 if (err == nil) {
                     err = one;
                 }
             }
+        }
+        for (NSUInteger i = 0; i < [peers count]; i++) {
+            BOOL ok = [[outcomes objectAtIndex:i] boolValue];
+            NSString *encoded = [cn1nbTransport
+                    encodePeer:[peers objectAtIndex:i]];
+            com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                    CN1_THREAD_STATE_PASS_ARG cn1nbJString(encoded), payloadId,
+                    ok ? (JAVA_LONG)[data length] : 0,
+                    (JAVA_LONG)[data length],
+                    ok ? CN1_NEARBY_PAYLOAD_SUCCESS
+                       : CN1_NEARBY_PAYLOAD_FAILURE);
         }
         if (!sent) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_IO_ERROR,
@@ -2021,13 +2165,6 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             return;
         }
         cn1nbTransportOk(requestId);
-        for (MCPeerID *peer in peers) {
-            NSString *encoded = [cn1nbTransport encodePeer:peer];
-            com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
-                    CN1_THREAD_STATE_PASS_ARG cn1nbJString(encoded), payloadId,
-                    (JAVA_LONG)[data length], (JAVA_LONG)[data length],
-                    CN1_NEARBY_PAYLOAD_SUCCESS);
-        }
         return;
     }
 #endif
@@ -2047,10 +2184,7 @@ void com_codename1_impl_ios_IOSNative_nearbyCancelPayload___int(
         // reports the failure. A byte payload cannot: sendData has left by the
         // time anything could ask, which is the same outcome an app gets from
         // cancelling one anywhere.
-        NSNumber *key = [NSNumber numberWithInt:payloadId];
-        NSArray *all = [[[cn1nbTransport.progressByPayload objectForKey:key]
-                copy] autorelease];
-        [cn1nbTransport.progressByPayload removeObjectForKey:key];
+        NSArray *all = [cn1nbTransport takeProgressesForPayload:payloadId];
         for (NSProgress *progress in all) {
             [progress cancel];
         }
@@ -2094,7 +2228,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStopAllTransport__(
             cn1nbTransport.browser = nil;
         }
         [cn1nbTransport closeAllSessions];
-        [cn1nbTransport.invitations removeAllObjects];
+        [cn1nbTransport forgetInvitations];
     }
 #endif
 }

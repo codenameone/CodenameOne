@@ -548,6 +548,14 @@ public class LocalNearbyBridge implements NearbyBridge {
             @Override
             public void run() {
                 if (generation != transportGeneration) {
+                    // Failed, not dropped. Returning silently left the
+                    // caller's AsyncResource pending for good -- a resource
+                    // that never settles is worse than one that fails, which
+                    // is the whole reason EdtResult exists.
+                    NearbyTransport.deliverRequestFailed(requestId,
+                            NearbyError.SESSION_INVALIDATED.ordinal(),
+                            "the transport was stopped before the connection"
+                            + " was answered");
                     return;
                 }
                 NearbyTransport.deliverRequestOk(requestId);

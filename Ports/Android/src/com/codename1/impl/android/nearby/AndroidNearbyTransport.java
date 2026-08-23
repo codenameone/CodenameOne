@@ -544,19 +544,24 @@ public class AndroidNearbyTransport implements NearbyBridge {
                                 != PayloadTransferUpdate.Status.SUCCESS) {
                     return;
                 }
-                java.io.File f = null;
-                try {
-                    if (file.asFile() != null) {
-                        f = file.asFile().asJavaFile();
-                    }
-                } catch (Throwable t) {
-                    // Older Play services expose the file only through a
-                    // ParcelFileDescriptor; nothing to hand the app then.
+                String path = localPathFor(file);
+                if (path == null) {
+                    // A payload whose only accessor cannot be used is worse
+                    // than one that failed: getPath() is all a file Payload
+                    // offers, so delivering it with a null path told the app
+                    // the transfer succeeded and then gave it nothing to
+                    // read. Reported as a failure instead, which is a state
+                    // the API already documents.
+                    NearbyTransport.deliverPayloadProgress(
+                            encode(endpointId, nameOf(endpointId)),
+                            senderIdOf(file), 0, update.getTotalBytes(),
+                            PayloadStatus.FAILURE.ordinal());
+                    return;
                 }
                 NearbyTransport.deliverPayloadReceived(
                         encode(endpointId, nameOf(endpointId)),
                         senderIdOf(file), NearbyBridge.PAYLOAD_FILE, null,
-                        f == null ? null : "file://" + f.getAbsolutePath());
+                        "file://" + path);
             }
         };
     }
@@ -611,6 +616,88 @@ public class AndroidNearbyTransport implements NearbyBridge {
         String service = endpointServices.get(endpointId);
         return sanitize(endpointId) + '\t' + sanitize(name) + '\t'
                 + sanitize(service == null ? "" : service);
+    }
+
+    /// A readable local path for a received file.
+    ///
+    /// asJavaFile() is the easy case and increasingly not the one that
+    /// happens: under scoped storage Nearby hands the file over as a content
+    /// Uri or a descriptor, and the app has no way to open either through the
+    /// portable API, whose file payload carries a path and nothing else. So
+    /// the content is copied into the app's own files directory and that path
+    /// is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the received payload
+    ///
+    /// #### Returns
+    ///
+    /// an absolute path the app can read, or null when the content could not
+    /// be reached at all
+    private String localPathFor(Payload file) {
+        try {
+            Payload.File f = file.asFile();
+            if (f == null) {
+                return null;
+            }
+            java.io.File local = f.asJavaFile();
+            if (local != null && local.exists()) {
+                return local.getAbsolutePath();
+            }
+            android.net.Uri uri = f.asUri();
+            if (uri == null) {
+                return null;
+            }
+            java.io.File out = new java.io.File(context.getFilesDir(),
+                    "cn1nearby-" + file.getId() + "-"
+                    + sanitizeFileName(uri.getLastPathSegment()));
+            java.io.InputStream in =
+                    context.getContentResolver().openInputStream(uri);
+            if (in == null) {
+                return null;
+            }
+            try {
+                java.io.OutputStream os = new java.io.FileOutputStream(out);
+                try {
+                    byte[] buffer = new byte[8192];
+                    int read = in.read(buffer);
+                    while (read > 0) {
+                        os.write(buffer, 0, read);
+                        read = in.read(buffer);
+                    }
+                } finally {
+                    os.close();
+                }
+            } finally {
+                in.close();
+            }
+            return out.getAbsolutePath();
+        } catch (Throwable unreadable) {
+            return null;
+        }
+    }
+
+    /// Reduces a remote-chosen name to something safe to append to a
+    /// directory. The name crossed the wire, so it is untrusted.
+    private static String sanitizeFileName(String name) {
+        if (name == null || name.length() == 0) {
+            return "payload";
+        }
+        StringBuilder out = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.' || c == '-'
+                    || c == '_') {
+                out.append(c);
+            }
+        }
+        String safe = out.toString();
+        if (safe.length() == 0 || ".".equals(safe) || "..".equals(safe)) {
+            return "payload";
+        }
+        return safe;
     }
 
     /// The marker that carries a sender's payload id in a file name.
