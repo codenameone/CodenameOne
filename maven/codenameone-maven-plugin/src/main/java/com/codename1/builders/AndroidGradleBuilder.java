@@ -6602,16 +6602,23 @@ public class AndroidGradleBuilder extends Executor {
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
                     compileSdkVersion, "36");
         }
-        if (usesNearbyTransport) {
-            // android:usesPermissionFlags is an API 31 manifest attribute,
-            // and the transport's permissions carry it whatever the app
-            // targets -- they have to, because a permission is requested
-            // according to the level the DEVICE runs. AAPT rejects an
-            // attribute the compile SDK has never heard of, so a legacy
-            // toolchain (build tools 30, android.useGradle8=false) failed on
-            // the manifest before it ever reached javac.
+        if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
+            // 33, and for ANY of the three clusters, not just the one whose
+            // own API level says 33.
+            //
+            // AndroidNearbyBackend and CN1CompanionDeviceService survive for
+            // every nearby build -- the deletion pass above removes only the
+            // two files that carry an optional gradle dependency -- and both
+            // compile against android.companion.AssociationInfo, which is API
+            // 33. So a transport-only or ranging-only app built against 32
+            // failed javac on a class it never asked for.
+            //
+            // This also covers android:usesPermissionFlags, an API 31
+            // manifest attribute the transport's permissions carry whatever
+            // the app targets; AAPT rejects an attribute the compile SDK has
+            // never heard of, which failed the build even earlier.
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
-                    compileSdkVersion, "31");
+                    compileSdkVersion, "33");
         }
         jcenter =
                 "      google()\n" +

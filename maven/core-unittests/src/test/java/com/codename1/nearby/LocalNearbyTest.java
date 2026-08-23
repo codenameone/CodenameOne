@@ -687,6 +687,44 @@ class LocalNearbyTest {
     }
 
     @Test
+    void anAcceptanceThePlatformRefusesIsReportedAsAConnectionFailure() {
+        // accept() returns void and its outcome is documented to arrive as
+        // connected or connectionFailed, so there is no AsyncResource for a
+        // port to fail. The port's failure used to be dropped: the id it
+        // reported had no pending entry, so an acceptance the platform
+        // refused produced no callback at all and the app waited forever.
+        final AtomicReference<IncomingConnection> held =
+                new AtomicReference<IncomingConnection>();
+        final List<NearbyException> failures = new ArrayList<NearbyException>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void connectionRequested(IncomingConnection request) {
+                held.set(request);
+            }
+
+            @Override
+            public void connectionFailed(Endpoint e, NearbyException error) {
+                failures.add(error);
+            }
+        });
+        NearbyTransport.deliverConnectionRequested(
+                "peer-9\tA Phone\tchat", "4321");
+        // The clock is held so the bridge's own success cannot settle the
+        // request before the refusal below, which is the ordering a real
+        // port produces: acceptConnection returns and fails later.
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        held.get().accept();
+
+        // The port refuses it after the fact, naming the request id it was
+        // handed -- which is the id accept() recorded.
+        NearbyTransport.deliverRequestFailed(bridge.getLastAcceptRequestId(),
+                NearbyError.PEER_UNAVAILABLE.ordinal(), "it went away");
+        assertEquals(1, failures.size());
+        assertSame(NearbyError.PEER_UNAVAILABLE, failures.get(0).getError());
+    }
+
+    @Test
     void aConnectionRequestNobodyHeardIsRejectedRatherThanLeftHanging() {
         // With no listener at all nobody will ever answer, and the far side
         // would sit in its connecting state until it timed out.

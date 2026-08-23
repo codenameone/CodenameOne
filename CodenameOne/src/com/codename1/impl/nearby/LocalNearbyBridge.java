@@ -116,6 +116,11 @@ public class LocalNearbyBridge implements NearbyBridge {
     /// is the point -- and that means a delayed acceptance really can outlive
     /// the stop() that was supposed to have ended it.
     private int transportGeneration;
+    /// The id of the most recent acceptConnection, so a test can answer it
+    /// the way a port would.
+    ///
+    /// @hidden not part of the public API; test-only.
+    private int lastAcceptRequestId;
     /// Where delayed deliveries go while a test drives the clock, or null in
     /// normal operation.
     ///
@@ -571,6 +576,7 @@ public class LocalNearbyBridge implements NearbyBridge {
 
     @Override
     public void acceptConnection(final int requestId, String endpointId) {
+        lastAcceptRequestId = requestId;
         // POINT_TO_POINT bounds the advertiser too -- one connection on each
         // side. STAR does not: accepting many is what makes this device the
         // centre of the star.
@@ -677,6 +683,17 @@ public class LocalNearbyBridge implements NearbyBridge {
     /// - `sink`: where to park deliveries, or null to run them as usual
     public void deferForTest(List<Runnable> sink) {
         deferred = sink;
+    }
+
+    /// The request id of the most recent [#acceptConnection].
+    ///
+    /// @hidden not part of the public API; test-only.
+    ///
+    /// #### Returns
+    ///
+    /// the id, or 0 when nothing has been accepted
+    public int getLastAcceptRequestId() {
+        return lastAcceptRequestId;
     }
 
     /// Whether [#startAdvertising] is in effect, for the simulator panel.

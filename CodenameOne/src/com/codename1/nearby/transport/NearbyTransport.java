@@ -34,7 +34,9 @@ import com.codename1.nearby.spi.NearbyBridge;
 import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /// Moving bytes and files to a device that is physically nearby, with no
 /// access point, no pairing and no internet.
@@ -86,6 +88,25 @@ import java.util.List;
 ///
 /// Every callback here is delivered on the EDT.
 public final class NearbyTransport {
+
+    /// Request id to the endpoint whose incoming connection is being
+    /// accepted.
+    ///
+    /// accept() answers the platform rather than the caller -- it returns
+    /// void, and the outcome is documented to arrive as connected or
+    /// connectionFailed -- so there is no AsyncResource for a port to fail.
+    /// Without this the port's failure was dropped on the floor: the id it
+    /// reported had no entry in PENDING, and an acceptance the platform
+    /// refused (the endpoint went away first, most often) produced no
+    /// callback of any kind and left the app waiting.
+    private static final Map<Integer, Endpoint> ACCEPTING =
+            new LinkedHashMap<Integer, Endpoint>();
+    /// Bounds ACCEPTING. Every entry is normally removed by the port's
+    /// answer, but a port that answers neither way would otherwise leave one
+    /// behind per acceptance for the life of the process. The oldest goes
+    /// first: an acceptance old enough to be evicted has already lost its
+    /// race with the platform's own timeout.
+    private static final int MAX_ACCEPTING = 64;
 
     private static final PendingMap<Boolean> PENDING =
             new PendingMap<Boolean>();
@@ -400,6 +421,9 @@ public final class NearbyTransport {
     ///
     /// @hidden not part of the public API; test-only.
     public static void resetForTest() {
+        synchronized (ACCEPTING) {
+            ACCEPTING.clear();
+        }
         NearbyException reset = new NearbyException(NearbyError.UNKNOWN,
                 "the nearby framework was reset");
         PENDING.failAll(reset);
@@ -421,9 +445,35 @@ public final class NearbyTransport {
     ///
     /// - `requestId`: the id the request was made with
     public static void deliverRequestOk(int requestId) {
+        // An accepted connection is not an outcome, only the platform taking
+        // the answer; the outcome still arrives through the lifecycle
+        // callback. Dropped here so the entry cannot outlive the request.
+        takeAcceptance(requestId);
         EdtResult<Boolean> r = PENDING.take(requestId);
         if (r != null) {
             r.complete(Boolean.TRUE);
+        }
+    }
+
+    /// Records that `requestId` belongs to an acceptance of `endpoint`.
+    ///
+    /// @hidden not part of the public API.
+    static void trackAcceptance(int requestId, Endpoint endpoint) {
+        if (endpoint == null) {
+            return;
+        }
+        synchronized (ACCEPTING) {
+            while (ACCEPTING.size() >= MAX_ACCEPTING) {
+                ACCEPTING.remove(ACCEPTING.keySet().iterator().next());
+            }
+            ACCEPTING.put(Integer.valueOf(requestId), endpoint);
+        }
+    }
+
+    /// The endpoint an acceptance request belongs to, removing it.
+    private static Endpoint takeAcceptance(int requestId) {
+        synchronized (ACCEPTING) {
+            return ACCEPTING.remove(Integer.valueOf(requestId));
         }
     }
 
@@ -439,7 +489,23 @@ public final class NearbyTransport {
     /// - `message`: a human-readable detail, may be null
     public static void deliverRequestFailed(int requestId, int errorOrdinal,
             String message) {
-        NearbyException ex = NearbyWire.decodeError(errorOrdinal, message);
+        final NearbyException ex =
+                NearbyWire.decodeError(errorOrdinal, message);
+        final Endpoint accepting = takeAcceptance(requestId);
+        if (accepting != null) {
+            // Reported the way the accept() javadoc promises the outcome
+            // arrives, because there is no resource to fail.
+            NearbyRequests.onEdt(new Runnable() {
+                @Override
+                public void run() {
+                    TransportListener[] ls = snapshot();
+                    for (TransportListener l : ls) {
+                        l.connectionFailed(accepting, ex);
+                    }
+                }
+            });
+            return;
+        }
         EdtResult<Boolean> r = PENDING.take(requestId);
         if (r != null) {
             r.error(ex);

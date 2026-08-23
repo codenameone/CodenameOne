@@ -97,7 +97,11 @@ public final class IncomingConnection {
         answered = true;
         NearbyBridge b = NearbyRequests.bridge();
         if (b != null) {
-            b.acceptConnection(NearbyRequests.nextId(), endpoint.getId());
+            // Recorded before the call, so a port that refuses the acceptance
+            // synchronously still finds the endpoint to report it against.
+            int requestId = NearbyRequests.nextId();
+            NearbyTransport.trackAcceptance(requestId, endpoint);
+            b.acceptConnection(requestId, endpoint.getId());
         }
     }
 

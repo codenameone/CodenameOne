@@ -672,6 +672,15 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
                     | b[3]);
             body = [data subdataWithRange:NSMakeRange(4, [data length] - 4)];
         }
+        // The terminal SUCCESS update, for the reason the file path emits
+        // one: a receiver that releases per-payload state or dismisses its
+        // transfer UI on the documented terminal status waited forever on
+        // every byte payload, which is the common case and the one Android
+        // has always reported.
+        com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                getThreadLocalData(), cn1nbJString(encoded), payloadId,
+                (JAVA_LONG)[body length], (JAVA_LONG)[body length],
+                CN1_NEARBY_PAYLOAD_SUCCESS);
         com_codename1_impl_ios_IOSNearbyCallbacks_payloadReceived___java_lang_String_int_int_byte_1ARRAY_java_lang_String(
                 getThreadLocalData(), cn1nbJString(encoded), payloadId,
                 CN1_NEARBY_PAYLOAD_BYTES, cn1nbJBytes(body), JAVA_NULL);
