@@ -239,9 +239,27 @@ public class InterpBundleWriter {
         // so the push was refused for missing source that had been supplied.
         String code = stripComments(decodeUnicodeEscapes(text));
         int i = 0;
+        // Track paren depth so a `{` inside an annotation's argument list
+        // (`@p.A({String.class}) package p;`) reads as an array-initializer
+        // token rather than the class-body opening brace. Only the
+        // top-level `{` -- the class or interface body -- means "past
+        // anywhere a package declaration can appear".
+        int parens = 0;
         while (i < code.length()) {
             char c = code.charAt(i);
-            if (c == '{') {
+            if (c == '(') {
+                parens++;
+                i++;
+                continue;
+            }
+            if (c == ')') {
+                if (parens > 0) {
+                    parens--;
+                }
+                i++;
+                continue;
+            }
+            if (c == '{' && parens == 0) {
                 break;
             }
             if (Character.isJavaIdentifierStart(c)) {

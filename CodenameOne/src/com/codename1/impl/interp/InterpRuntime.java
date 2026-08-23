@@ -2373,6 +2373,17 @@ public final class InterpRuntime {
         // typed array, recursively for multi-dimensional cases so covariance
         // through the outer type reaches the innermost element type too.
         Vector hostArrayPairs = null;
+        // Two-pass: collect every slot that needs a typed array, then per
+        // source pick the most specific type covering all its aliases, and
+        // materialise once. A single call site can pass the same `Button[]`
+        // as both `Component[]` and `Button[]`; Java hands the host one
+        // array whose covariance covers both slots, and two independently
+        // typed dsts (one per parameter type) would break that alias --
+        // `first != second`, writes through one invisible through the
+        // other. Picking `Button[]` at the narrowest end satisfies both
+        // parameters at once because a Button[] passes reflection's check
+        // for Component[] via array covariance.
+        Vector arrayIntents = null;   // triples (Integer argIndex, Object[] src, String elementDesc)
         for (int i = 0; i < args.length && i < params.length; i++) {
             if (!(args[i] instanceof Object[])) {
                 continue;
@@ -2401,25 +2412,47 @@ public final class InterpRuntime {
             if (!"[Ljava.lang.Object;".equals(src.getClass().getName())) {
                 continue;
             }
-            if (hostArrayPairs == null) {
-                hostArrayPairs = new Vector();
+            if (arrayIntents == null) {
+                arrayIntents = new Vector();
             }
-            Object[] dst = materializeTypedArray(src, elementDesc, hostArrayPairs);
-            if (dst == null) {
-                continue;
+            arrayIntents.addElement(Integer.valueOf(i));
+            arrayIntents.addElement(src);
+            arrayIntents.addElement(elementDesc);
+        }
+        if (arrayIntents != null) {
+            hostArrayPairs = new Vector();
+            Vector handledSrcs = new Vector();
+            for (int n = 0; n < arrayIntents.size(); n += 3) {
+                Object[] src = (Object[]) arrayIntents.elementAt(n + 1);
+                if (containsIdentity(handledSrcs, src)) {
+                    continue;
+                }
+                handledSrcs.addElement(src);
+                String bestDesc = (String) arrayIntents.elementAt(n + 2);
+                for (int m = n + 3; m < arrayIntents.size(); m += 3) {
+                    if (arrayIntents.elementAt(m + 1) != src) {   //NOPMD CompareObjectsWithEquals - identity is the point
+                        continue;
+                    }
+                    String cand = (String) arrayIntents.elementAt(m + 2);
+                    bestDesc = moreSpecificElement(bestDesc, cand);
+                }
+                Object[] dst = materializeTypedArray(src, bestDesc, hostArrayPairs);
+                if (dst == null) {
+                    continue;
+                }
+                if (!containsMaterialisation(hostArrayPairs, src, bestDesc)) {
+                    hostArrayPairs.addElement(src);
+                    hostArrayPairs.addElement(dst);
+                    hostArrayPairs.addElement(bestDesc);
+                }
+                for (int m = n; m < arrayIntents.size(); m += 3) {
+                    if (arrayIntents.elementAt(m + 1) != src) {   //NOPMD CompareObjectsWithEquals - identity is the point
+                        continue;
+                    }
+                    int argIdx = ((Integer) arrayIntents.elementAt(m)).intValue();
+                    args[argIdx] = dst;
+                }
             }
-            // The same array may reach the host through more than one slot
-            // (`fn(arr, arr)` or an aliased outer/inner). Record the triple
-            // once per (src, requested type) so the finally mirror copies
-            // just once for each dst; two slots at the *same* narrow type
-            // share the same dst, while a Component[] and a Button[] view
-            // of the same src get two dsts because they have to.
-            if (!containsMaterialisation(hostArrayPairs, src, elementDesc)) {
-                hostArrayPairs.addElement(src);
-                hostArrayPairs.addElement(dst);
-                hostArrayPairs.addElement(elementDesc);
-            }
-            args[i] = dst;
         }
         st.hostCallDepth++;
         // When this is the outermost host call, the wall clock it spends is not
@@ -2892,6 +2925,50 @@ public final class InterpRuntime {
     private static boolean containsMaterialisation(Vector pairs, Object src,
                                                    String elementDescriptor) {
         return existingMaterialisation(pairs, src, elementDescriptor) != null;
+    }
+
+    private static boolean containsIdentity(Vector items, Object o) {
+        for (int i = 0; i < items.size(); i++) {
+            if (items.elementAt(i) == o) {   //NOPMD CompareObjectsWithEquals - identity is the point
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The more specific of two array element descriptors -- `a` if it is
+    /// (transitively) a subtype of `b`, `b` if the reverse holds, and `a`
+    /// arbitrarily when the two are unrelated siblings. "More specific"
+    /// means the type whose array class satisfies both parameter slots via
+    /// Java's array covariance, so aliased Component[] and Button[] slots
+    /// of the same pushed Button[] can share a single Button[] dst and
+    /// keep alias identity intact.
+    private String moreSpecificElement(String a, String b) throws Throwable {
+        if (a.equals(b)) {
+            return a;
+        }
+        Object aArrayClass = linker.findClass("[" + a);
+        Object bArrayClass = linker.findClass("[" + b);
+        if (aArrayClass == null || bArrayClass == null) {
+            return a;
+        }
+        // A zero-length dummy of each type is cheap; the reflective
+        // isInstance check answers whether one array class is assignable
+        // to the other -- which is exactly the covariance rule Java uses
+        // to accept a wider array parameter.
+        Object bDummy = linker.newArray(b, 0);
+        if (linker.isInstance(aArrayClass, bDummy)) {
+            return b;   // b's array is-a a's array, so b is more specific
+        }
+        Object aDummy = linker.newArray(a, 0);
+        if (linker.isInstance(bArrayClass, aDummy)) {
+            return a;   // a's array is-a b's array, so a is more specific
+        }
+        // Unrelated (siblings that share only Object as an ancestor);
+        // pick one arbitrarily. The host will reject the mismatched slot
+        // -- but that mismatch is present in the pushed program, not
+        // introduced here.
+        return a;
     }
 
     /// A real `Class[]` built from an interpreter-owned Object[] used to

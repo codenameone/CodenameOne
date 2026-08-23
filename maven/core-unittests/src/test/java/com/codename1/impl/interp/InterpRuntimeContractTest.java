@@ -133,6 +133,14 @@ class InterpRuntimeContractTest {
         // one token.
         assertEquals("real.p", packageOf(
                 "@file:Tag(\"\"\"x\" package fake \"\"\")\npackage real.p\n\nfun main() {}\n"));
+        // A `package-info.java` annotation whose argument is an array
+        // initializer -- `@p.A({String.class}) package p;` -- contains a
+        // `{` before the package keyword. Stopping at the first `{`
+        // returned the default package for a file that declared one;
+        // paren tracking lets the scanner recognise the brace as part of
+        // the annotation's array value rather than the class body.
+        assertEquals("p", packageOf(
+                "@p.A({String.class})\npackage p;\n"));
     }
 
     private static String packageOf(String source) throws Exception {
