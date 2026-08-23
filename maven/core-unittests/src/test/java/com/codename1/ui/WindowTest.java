@@ -26,6 +26,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestWindowManager;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WindowEvent;
@@ -4269,6 +4270,91 @@ class WindowTest extends UITestBase {
                 "the window is still registered -- a later show() may ask the platform "
                         + "again; only its visibility and modality are given up");
         w.dispose();
+    }
+
+    /// A scrollable container that can be put into a glide, so a press can be made to
+    /// land on something still moving.
+    private static final class GlidingContainer extends Container {
+        GlidingContainer() {
+            super(new BorderLayout());
+            setScrollableY(true);
+        }
+
+        void startGliding() {
+            // The same field Form and Window both read to decide a container is still
+            // moving; setting it directly is what makes the state reachable in a test.
+            draggedMotionY = Motion.createLinearMotion(0, 1000, 10000);
+            draggedMotionY.start();
+        }
+
+        boolean isGliding() {
+            return draggedMotionY != null;
+        }
+    }
+
+    @FormTest
+    void aPressOnAGlidingContainerHandsTheScrollOverInsteadOfSwallowingTheGesture() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("glide", new BorderLayout());
+        w.setWindowSize(400, 300);
+        GlidingContainer scroller = new GlidingContainer();
+        DragCountingComponent c = new DragCountingComponent();
+        scroller.add(BorderLayout.CENTER, c);
+        w.add(BorderLayout.CENTER, scroller);
+        w.show();
+        w.asContainer().revalidate();
+        scroller.startGliding();
+
+        try {
+            // A press onto the moving container, then the rest of the physical gesture.
+            implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+            DisplayTest.flushEdt();
+            assertFalse(scroller.isGliding(), "the press has to stop the momentum scroll");
+            for (int iter = 0; iter < 12; iter++) {
+                implementation.windowPointerDraggedForTest(w.getWindowId(), 100, 100 + iter * 20);
+            }
+            DisplayTest.flushEdt();
+            assertTrue(c.drags > 0,
+                    "the same gesture must be able to take the scroll over; stopping the "
+                            + "motion with no drag target made the user lift and press again");
+        } finally {
+            // In a finally so a failure here cannot leave a window showing and time out
+            // the next test's setup.
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void aPressListenerThatBlocksDoesNotLeaveTheGestureLatched() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("nested", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        w.asContainer().revalidate();
+
+        // The handle has to exist by the time a listener runs, because a listener can
+        // enter a nested event loop and the matching release is processed inside it.
+        final Object[] seen = new Object[1];
+        w.addPointerPressedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                seen[0] = w.getCurrentPointerPress();
+            }
+        });
+        try {
+            implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+            DisplayTest.flushEdt();
+            assertNotNull(seen[0],
+                    "the press handle must be recorded before listeners run, or a listener "
+                            + "that blocks sees no gesture and the release inside it clears "
+                            + "nothing");
+            assertSame(seen[0], w.getCurrentPointerPress(),
+                    "and it must be the same gesture the rest of the press path uses");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
     }
 
     /// Counts pointer drags reaching a component.

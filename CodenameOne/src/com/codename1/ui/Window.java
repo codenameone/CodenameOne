@@ -2430,6 +2430,17 @@ public class Window extends Container implements TopLevelContainer {
         // Without this block at all, addPointerPressedListener on a Window never
         // fired -- and material pull to refresh broke with it, since Component
         // installs its refresh listeners on the top level.
+        // Recorded before the listeners run, which is Form's order and matters for the
+        // same reason the framework records its own press before dispatching: a pressed
+        // listener can enter a nested event loop -- showModal() does -- and the matching
+        // physical release is then processed inside it. With the handle created
+        // afterwards that nested release found no gesture to clear, and this method then
+        // installed a fresh press whose release had already happened, leaving the
+        // component latched until some later gesture freed it.
+        initialPressX = x;
+        initialPressY = y;
+        currentPointerPress = new Object();
+        dragged = null;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
             pointerPressedListeners.fireActionEvent(e);
@@ -2442,10 +2453,6 @@ public class Window extends Container implements TopLevelContainer {
         if (TooltipManager.getInstance() != null) {
             TooltipManager.getInstance().clearTooltip();
         }
-        initialPressX = x;
-        initialPressY = y;
-        currentPointerPress = new Object();
-        dragged = null;
         Component cmp = resolveComponentAt(x, y);
         // Gated exactly as Form.pointerPressed gates it. Many components -- Button
         // among them -- override pointerPressed without checking isEnabled
@@ -2455,10 +2462,26 @@ public class Window extends Container implements TopLevelContainer {
         // component also keeps the drag and release paths off it, since both start
         // from pressedCmp.
         if (cmp != null && isCurrentlyScrolling(cmp)) {
-            // A press landing on a container that is still gliding should stop the
-            // scroll rather than start an interaction, which is what Form does.
-            cmp.clearDrag();
-            pressedCmp = null;
+            // A press landing on a container that is still gliding stops the scroll and
+            // hands the gesture to the user, which is what Form.resumeDragAfterScrolling
+            // does (issue #2352). Stopping the motion and returning was only half of it:
+            // pressedCmp stayed null, so every drag packet in the same physical gesture
+            // had no target and the user could not take the scroll over without lifting
+            // and pressing again.
+            cancelScrolling(cmp);
+            cmp.initDragAndDrop(x, y);
+            // The component the scroll is handed to, so the rest of this physical
+            // gesture has a target. Form gets there differently -- its drag path
+            // re-resolves the component under the pointer when it has no pressed one --
+            // but this window's drag path dispatches through pressedCmp, and giving it
+            // the same fallback changed routing for every gesture, not just this one.
+            pressedCmp = cmp;
+            pointerPressedAgainDuringDrag = true;
+            // Re-entered through this window rather than Display.pointerDragged(), which
+            // Form uses: that one is the main surface's path and would deliver the drag
+            // to the current Form instead of here.
+            Display.getInstance().windowPointerDragged(getWindowId(),
+                    new int[] { x }, new int[] { y });
             return;
         }
         if (cmp != null && cmp.isEnabled()) {
@@ -2501,8 +2524,14 @@ public class Window extends Container implements TopLevelContainer {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
             }
         }
+        // Read and cleared here, exactly as Form does: the flag describes the drag that
+        // took a momentum scroll over, and leaving it set would tell every later drag in
+        // the session that it too continued out of a glide.
+        boolean pressedDuringDrag = pointerPressedAgainDuringDrag;
+        pointerPressedAgainDuringDrag = false;
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+            e.setPointerPressedDuringDrag(pressedDuringDrag);
             pointerDraggedListeners.fireActionEvent(e);
             if (e.isConsumed()) {
                 return;
@@ -2528,6 +2557,9 @@ public class Window extends Container implements TopLevelContainer {
         // multi touch, which is where pull to refresh loses its updates.
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x[0], y[0]);
+            // Reported but not cleared here, which is what Form's multi-pointer path
+            // does -- the scalar path above owns the reset.
+            e.setPointerPressedDuringDrag(pointerPressedAgainDuringDrag);
             pointerDraggedListeners.fireActionEvent(e);
             if (e.isConsumed()) {
                 return;
@@ -2694,6 +2726,25 @@ public class Window extends Container implements TopLevelContainer {
             LeadUtil.longPointerPress(target, x, y);
         }
     }
+
+    /// Stops any glide still running in the pressed component's ancestors, so the
+    /// press can take the scroll over. The counterpart of `isCurrentlyScrolling`,
+    /// ported from `Form.cancelScrolling`.
+    private void cancelScrolling(Component cmp) {
+        Container parent = cmp.getParent();
+        while (parent != null) {
+            if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
+                parent.draggedMotionX = null;
+                parent.draggedMotionY = null;
+            }
+            parent = parent.getParent();
+        }
+    }
+
+    /// Set when a press landed on a still-gliding container and took the scroll over.
+    /// Reported to drag listeners the way `Form` reports it, so a listener can tell a
+    /// fresh drag from one that continued out of a momentum scroll.
+    private boolean pointerPressedAgainDuringDrag;
 
     /// Whether any ancestor of the pressed component is still gliding from a
     /// previous drag. Ported from `Form`, which swallows the press in that case so a
