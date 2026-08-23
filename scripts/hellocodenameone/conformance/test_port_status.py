@@ -497,6 +497,29 @@ class PortStatusTest(unittest.TestCase):
         after["commit"] = "0123456789abcdef"
         self.assertEqual([], port_status.provenance_problems("android", before, after))
 
+    def test_provenance_rejects_edited_benchmark_measurements(self):
+        # The findings nobody can check by reading them. A benchmark duration is published as a
+        # measurement of a named run; rewriting one in place attributes an invented number to
+        # that run exactly the way the twelve invented passes did. Naming only tests and summary
+        # would have left performance as the one thing a branch could still edit.
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        workload = next(iter(after["performance"]["benchmarks"]))
+        after["performance"]["benchmarks"][workload]["duration_ns"] = 1
+        problems = port_status.provenance_problems("android", before, after)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("performance", problems[0])
+
+    def test_provenance_rejects_an_edited_completion_marker(self):
+        # suite_finished is what makes a port card say the suite completed rather than that the
+        # run stopped early.
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        after["suite_finished"] = not before["suite_finished"]
+        problems = port_status.provenance_problems("android", before, after)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("suite_finished", problems[0])
+
     def test_provenance_ignores_an_untouched_report(self):
         before = self.stored_reports()["android"]
         self.assertEqual([], port_status.provenance_problems("android", before, dict(before)))

@@ -518,24 +518,40 @@ PROVENANCE_FIELDS = ("generated_at", "commit", "run_url")
 
 
 def provenance_problems(port_id: str, before: dict, after: dict) -> list[str]:
-    """Refuse a hand-edited result.
+    """Refuse a hand-edited report.
 
-    A report says "at this commit, this run, at this time, these were the
-    results". Editing the results while leaving that provenance alone does not
+    A report says "at this commit, this run, at this time, this is what the port
+    did". Editing what it did while leaving that provenance alone does not
     correct the record, it forges it -- which is how twelve tests came to be
-    published as passing on ports that had never executed them. Changing results
-    is legitimate only as part of taking a new snapshot, and a new snapshot
-    carries a new stamp.
+    published as passing on ports that had never executed them. Changing the
+    findings is legitimate only as part of taking a new snapshot, and a new
+    snapshot carries a new stamp.
+
+    Everything except the provenance fields counts as a finding, not just the
+    test map: ``performance`` is the ten benchmark durations the page publishes
+    as measurements of that run, and ``suite_finished`` is what makes a port card
+    say the suite completed. Naming a subset here would leave the numbers most
+    worth doubting -- the ones nobody can check by reading them -- as the one
+    thing a branch could still rewrite in place.
     """
-    if before.get("tests") == after.get("tests") and before.get("summary") == after.get("summary"):
+    findings = tuple(
+        {key: value for key, value in report.items() if key not in PROVENANCE_FIELDS}
+        for report in (before, after)
+    )
+    if findings[0] == findings[1]:
         return []
     if any(before.get(field) != after.get(field) for field in PROVENANCE_FIELDS):
         return []
+    changed = sorted(
+        key
+        for key in set(findings[0]) | set(findings[1])
+        if findings[0].get(key) != findings[1].get(key)
+    )
     return [
-        f"{port_id}: test results changed but {', '.join(PROVENANCE_FIELDS)} did not. "
-        "These reports are CI output -- a branch never needs to edit one. Adding a "
-        "test needs no report change at all; each port picks it up on its next "
-        "master run."
+        f"{port_id}: {', '.join(changed)} changed but "
+        f"{', '.join(PROVENANCE_FIELDS)} did not. These reports are CI output -- "
+        "a branch never needs to edit one. Adding a test needs no report change "
+        "at all; each port picks it up on its next master run."
     ]
 
 
