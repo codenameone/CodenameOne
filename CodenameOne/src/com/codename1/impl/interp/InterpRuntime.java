@@ -2408,8 +2408,14 @@ public final class InterpRuntime {
             if (dst == null) {
                 continue;
             }
-            hostArrayPairs.addElement(src);
-            hostArrayPairs.addElement(dst);
+            // The same array may reach the host through more than one slot
+            // (`fn(arr, arr)` or an aliased outer/inner). Only record the
+            // (src, dst) pair the first time so the finally mirror copies
+            // once, and both slots keep sharing one dst identity here too.
+            if (!containsMaterialisation(hostArrayPairs, src)) {
+                hostArrayPairs.addElement(src);
+                hostArrayPairs.addElement(dst);
+            }
             args[i] = dst;
         }
         st.hostCallDepth++;
@@ -2810,6 +2816,20 @@ public final class InterpRuntime {
     /// aliases (`Component[] row = matrix[0]` still sees the reorder).
     private Object[] materializeTypedArray(Object[] src, String elementDescriptor,
                                            Vector innerPairs) throws Throwable {
+        // A nested source array may appear more than once -- the matrix
+        // `[[row, row]]` where both outer slots are the same inner array,
+        // or the same Component[] passed both as its own argument and
+        // reachable through another. Materialising each occurrence
+        // independently gives the host two dst arrays for one src, and
+        // any host write through the second is overwritten again when
+        // the finally-block mirror copies both back onto src in turn.
+        // Look for an existing (src, dst) pair before allocating -- the
+        // finally-mirror runs one copy per pair, so shared identity in
+        // gives shared identity out.
+        Object[] existing = existingMaterialisation(innerPairs, src);
+        if (existing != null) {
+            return existing;
+        }
         Object array = linker.newArray(elementDescriptor, src.length);
         if (!(array instanceof Object[])) {
             return null;
@@ -2826,7 +2846,7 @@ public final class InterpRuntime {
                 Object[] inner = materializeTypedArray((Object[]) el, innerDesc, innerPairs);
                 if (inner != null) {
                     dst[j] = inner;
-                    if (innerPairs != null) {
+                    if (innerPairs != null && !containsMaterialisation(innerPairs, el)) {
                         innerPairs.addElement(el);
                         innerPairs.addElement(inner);
                     }
@@ -2840,6 +2860,22 @@ public final class InterpRuntime {
             }
         }
         return dst;
+    }
+
+    private static Object[] existingMaterialisation(Vector pairs, Object src) {
+        if (pairs == null) {
+            return null;
+        }
+        for (int k = 0; k < pairs.size(); k += 2) {
+            if (pairs.elementAt(k) == src) {   //NOPMD CompareObjectsWithEquals - identity is the point
+                return (Object[]) pairs.elementAt(k + 1);
+            }
+        }
+        return null;
+    }
+
+    private static boolean containsMaterialisation(Vector pairs, Object src) {
+        return existingMaterialisation(pairs, src) != null;
     }
 
     /// A real `Class[]` built from an interpreter-owned Object[] used to
