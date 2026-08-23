@@ -297,7 +297,15 @@ public class MacWindowManager extends WindowManager {
                     changed = true;
                 }
             } else if (child.visible) {
-                child.hiddenByOwner = true;
+                // Hidden-by-owner only when the owner was taken down. A child whose
+                // owner never appeared went through Window.activationFailed(), which
+                // made its component hierarchy invisible and released its modality --
+                // and the only thing an owner's restore can send is showNotify(), which
+                // undoes neither. Marking it hidden-by-owner would therefore have the
+                // owner's next show() map a window that paints nothing and hold a modal
+                // registration it no longer has. A window that never appeared comes back
+                // through its own show(), which runs the whole lifecycle.
+                child.hiddenByOwner = !activationFailed;
                 child.visible = false;
                 IOSImplementation.nativeInstance.macWindowShow(child.slot, false);
                 changed = true;

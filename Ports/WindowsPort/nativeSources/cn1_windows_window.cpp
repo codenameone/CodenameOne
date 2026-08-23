@@ -475,6 +475,16 @@ void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int ke
         }
         if (cn1WinEvictInputLocked() || cn1WinEvictSupersededVisibilityLocked()) {
             next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
+        } else {
+            /* Nothing droppable and nothing superseded: the queue is protected events
+             * end to end. Reachable now that releases are protected -- sustained clicks
+             * against a blocked event dispatch thread evict every press in favour of its
+             * release, and the close or final release that arrives next would be the one
+             * thrown away. Give up the OLDEST entry instead, because between two events
+             * neither of which can be reconstructed, the newer one describes where the
+             * user actually is. */
+            cn1Win.eventHead = (cn1Win.eventHead + 1) % CN1_EVENT_QUEUE_CAPACITY;
+            next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
         }
     }
     if (next != cn1Win.eventHead) {
@@ -487,8 +497,9 @@ void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int ke
         cn1Win.eventTail = next;
         SetEvent(cn1Win.eventSignal);
     }
-    /* On overflow the oldest unread events are kept and the newest dropped;
-     * the EDT drains continuously so this is only a backstop. */
+    /* On overflow a droppable event is simply lost -- the newest is dropped and the
+     * queued ones kept, and the EDT drains continuously so this is only a backstop. A
+     * protected event never reaches here without room, having taken it above. */
     LeaveCriticalSection(&cn1Win.eventLock);
 }
 

@@ -195,6 +195,16 @@ void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) 
         }
         if (cn1LinuxEvictInputLocked() || cn1LinuxEvictSupersededVisibilityLocked()) {
             next = (cn1EventTail + 1) % CN1_EVENT_RING;
+        } else {
+            /* Nothing droppable and nothing superseded: the queue is protected events
+             * end to end. Reachable now that releases are protected -- sustained clicks
+             * against a blocked event dispatch thread evict every press in favour of its
+             * release, and the close or final release that arrives next would be the one
+             * thrown away. Give up the OLDEST entry instead, because between two events
+             * neither of which can be reconstructed, the newer one describes where the
+             * user actually is. */
+            cn1EventHead = (cn1EventHead + 1) % CN1_EVENT_RING;
+            next = (cn1EventTail + 1) % CN1_EVENT_RING;
         }
     }
     if (next != cn1EventHead) {
