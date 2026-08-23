@@ -397,6 +397,37 @@ def report_stamp(report: dict) -> datetime | None:
     return stamp if stamp.tzinfo else None
 
 
+def skip_is_documented(supplement: dict, port_id: str, test: str, reasons: list) -> bool:
+    """The page's rule for a green documented skip, applied to a report.
+
+    Mirrors port-status-feature-status.html deliberately: an erratum documents a
+    skip only when it names the test AND, where it lists reason codes, every
+    reason the run gave matches one of them from a port that code applies to.
+    Matching on the test name alone would let any future skip of a named test
+    read as documented -- an encoder that regressed would render green under an
+    erratum written about a simulator.
+    """
+    for item in supplement.get("skip_reasons", []):
+        if item.get("test") != test:
+            continue
+        codes = item.get("reason_codes")
+        if not codes:
+            return True
+        if not reasons:
+            continue
+        if all(
+            any(
+                (not code.get("ports") or port_id in code["ports"])
+                and isinstance(reason, str)
+                and reason.startswith(code.get("prefix", ""))
+                for code in codes
+            )
+            for reason in reasons
+        ):
+            return True
+    return False
+
+
 def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
     """Hold the *published* reports to "every registered test runs on every port".
 
@@ -412,8 +443,16 @@ def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
     happened earlier already knew about it, so a later run that does not is a
     test the port has dropped rather than one it has not reached. No history
     lookup and no grace period to tune; the reports date themselves.
+
+    A ``skip`` is the one permitted exception, and only with an erratum that
+    accounts for the reason the run actually gave. Reading skips out of the
+    checked-in fallbacks instead -- which is all validate() can see -- would let
+    a port start skipping a test, publish it, and pass this gate, with the
+    undocumented skip surfacing later as a failed website build rather than as
+    the name of the port that started skipping.
     """
     problems: list[str] = []
+    supplement = read_json(SUPPLEMENT)
     mapped = test_to_feature(manifest)
     stamps = {port: report_stamp(report) for port, report in reports.items()}
 
@@ -442,6 +481,21 @@ def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
         )
         if unrun:
             problems.append(f"{port}: reported no result for " + ", ".join(unrun))
+        undocumented = sorted(
+            name
+            for name, result in tests.items()
+            if isinstance(result, dict)
+            and result.get("status") == "skip"
+            and name in mapped
+            and not skip_is_documented(
+                supplement, port, name, result.get("reasons") or []
+            )
+        )
+        if undocumented:
+            problems.append(
+                f"{port}: skipped without an erratum that explains the reason given: "
+                + ", ".join(undocumented)
+            )
         stamp = stamps.get(port)
         if stamp is None:
             problems.append(f"{port}: report has no usable generated_at")

@@ -146,8 +146,18 @@ the nightly sweep holds the *published* reports to it. A test left at `not-run`
 fails the sweep, and so does a test missing from one port's report when an
 earlier run on another port already covered it -- that port dropped the test
 rather than merely predating it. The single permitted exception is a `skip` the
-suite itself emits, with an erratum in `port_status_supplement.json` explaining
-it.
+suite itself emits, and the sweep checks it against
+`port_status_supplement.json` the way the page does: the erratum has to name the
+test *and*, where it lists reason codes, account for the reason that run gave
+from a port that code applies to. A port that quietly starts skipping a test
+fails the sweep by name rather than surfacing later as a failed website build.
+
+The sweep's closing assertion treats contract drift as the ordinary state it is,
+matching the candidate loop above it. It used to count a port whose published
+report predates a newly registered test as a failure, so the nightly went red
+for a day after any test was added -- and returned before the coverage gate
+could read the reports whose "this run predates the test" case that gate exists
+to tolerate.
 
 The on-device AI rows are permanent assertion tests rather than screenshots.
 They validate immutable image, camera-frame, tensor, model-source, and options

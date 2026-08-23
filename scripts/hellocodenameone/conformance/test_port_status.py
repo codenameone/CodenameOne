@@ -353,17 +353,72 @@ class PortStatusTest(unittest.TestCase):
             problems,
         )
 
-    def test_coverage_accepts_a_test_the_port_skipped(self):
+    def test_coverage_accepts_a_documented_skip(self):
         # The distinction the rule turns on: a port that genuinely cannot do something reports
-        # "skip" from the suite itself, which is evidence rather than the absence of it.
+        # "skip" from the suite itself, which is evidence rather than the absence of it -- but
+        # only where an erratum accounts for the reason the run gave. The published reports
+        # carry these already, so the shipped data is the fixture.
+        reports = self.stored_reports()
+        documented = [
+            (port, name)
+            for port, report in reports.items()
+            for name, result in report["tests"].items()
+            if result.get("status") == "skip"
+        ]
+        self.assertTrue(documented)
+        self.assertEqual([], port_status.coverage_problems(self.manifest, reports))
+
+    def test_coverage_rejects_an_undocumented_skip(self):
+        # Otherwise a port can simply stop running a test: mark it skipped, publish, and this
+        # gate calls it a satisfactory result. validate() cannot catch it either -- it reads
+        # the checked-in fallbacks, not what the ports published -- so the first symptom would
+        # be a failed website build rather than the name of the port that started skipping.
         reports = self.stored_reports()
         victim = next(
             name
             for name, result in reports["android"]["tests"].items()
             if result.get("status") == "pass"
         )
-        reports["android"]["tests"][victim]["status"] = "skip"
-        self.assertEqual([], port_status.coverage_problems(self.manifest, reports))
+        reports["android"]["tests"][victim] = {
+            "feature": reports["android"]["tests"][victim]["feature"],
+            "status": "skip",
+            "reasons": ["something-nobody-wrote-down"],
+        }
+        problems = port_status.coverage_problems(self.manifest, reports)
+        self.assertTrue(
+            any("android" in problem and victim in problem for problem in problems),
+            problems,
+        )
+
+    def test_coverage_rejects_a_skip_reason_scoped_to_another_port(self):
+        # Matching the test name alone would let any future skip of a named test read as
+        # documented. CameraApiTest has errata, but the missing-webcam code is written about
+        # Windows; the same code from Linux says something nobody has explained.
+        reports = self.stored_reports()
+        reports["linux-x64"]["tests"]["CameraApiTest"] = {
+            "feature": "camera-access",
+            "status": "skip",
+            "reasons": ["no-host-webcam-capture-on-win"],
+        }
+        problems = port_status.coverage_problems(self.manifest, reports)
+        self.assertTrue(
+            any("linux-x64" in problem and "CameraApiTest" in problem for problem in problems),
+            problems,
+        )
+
+    def test_coverage_rejects_a_skip_carrying_no_reason(self):
+        # An erratum with reason codes documents the reasons it lists, not the test. A skip
+        # that names none matches nothing, which is what the page already decides.
+        reports = self.stored_reports()
+        reports["android"]["tests"]["CameraApiTest"] = {
+            "feature": "camera-access",
+            "status": "skip",
+        }
+        problems = port_status.coverage_problems(self.manifest, reports)
+        self.assertTrue(
+            any("android" in problem and "CameraApiTest" in problem for problem in problems),
+            problems,
+        )
 
     def test_coverage_accepts_a_report_older_than_the_test(self):
         # The state every port is in between the commit that registers a test and that port's
