@@ -2359,6 +2359,53 @@ public final class InterpRuntime {
                 toHostElements(arg, new Vector());
             }
         }
+        // A typed-array parameter (`Component[]`, `MyButton[]`, ...) needs
+        // an actual array of that host component type. The interpreter's
+        // representation is a plain `Object[]` -- `ANEWARRAY` cannot allocate
+        // a Sub[] whose leaf exists in the bundle, and even Sub[] whose leaf
+        // is a host class extending Component came out as Object[]. Method
+        // dispatch on the JVM rejects a plain Object[] passed to a
+        // `Component[]` slot with an argument-type mismatch, so materialise
+        // the array here and copy the (already peer-converted) elements
+        // across. Class[] is handled above; Object[] parameters need no
+        // conversion. Anything else with `[L...;` gets a typed array.
+        Vector hostArrayPairs = null;
+        for (int i = 0; i < args.length && i < params.length; i++) {
+            if (!(args[i] instanceof Object[])) {
+                continue;
+            }
+            String p = params[i];
+            if (!p.startsWith("[L") || !p.endsWith(";")) {
+                continue;
+            }
+            String component = p.substring(2, p.length() - 1);
+            if ("java/lang/Object".equals(component)
+                    || "java/lang/Class".equals(component)) {
+                continue;
+            }
+            Object[] src = (Object[]) args[i];
+            // Skip when the host already handed us a typed array (a
+            // `String[]` returned by an earlier call). Only the interpreter's
+            // own `ANEWARRAY` produces exactly plain `Object[]`; anything
+            // typed enough for the host to accept is already assignable.
+            if (!"[Ljava.lang.Object;".equals(src.getClass().getName())) {
+                continue;
+            }
+            Object array = linker.newArray("L" + component + ";", src.length);
+            if (!(array instanceof Object[])) {
+                continue;
+            }
+            Object[] dst = (Object[]) array;
+            for (int j = 0; j < src.length; j++) {
+                dst[j] = src[j];
+            }
+            if (hostArrayPairs == null) {
+                hostArrayPairs = new Vector();
+            }
+            hostArrayPairs.addElement(src);
+            hostArrayPairs.addElement(dst);
+            args[i] = dst;
+        }
         st.hostCallDepth++;
         // When this is the outermost host call, the wall clock it spends is not
         // the program's to answer for: invokeAndBlock, a network read or a
@@ -2418,6 +2465,21 @@ public final class InterpRuntime {
                 for (int i = 0; i < classArrayPairs.size(); i += 2) {
                     Object[] src = (Object[]) classArrayPairs.elementAt(i);
                     Object[] dst = (Object[]) classArrayPairs.elementAt(i + 1);
+                    int len = src.length < dst.length ? src.length : dst.length;
+                    for (int k = 0; k < len; k++) {
+                        src[k] = dst[k];
+                    }
+                }
+            }
+            // Same reasoning as classArrayPairs above: a host method that
+            // reorders or fills its `Component[]` needs those writes visible
+            // through the interpreter's original array. Copy peers back into
+            // the src; AALOAD's fromHost hop turns them back into wrappers
+            // for interpreted reads.
+            if (hostArrayPairs != null) {
+                for (int i = 0; i < hostArrayPairs.size(); i += 2) {
+                    Object[] src = (Object[]) hostArrayPairs.elementAt(i);
+                    Object[] dst = (Object[]) hostArrayPairs.elementAt(i + 1);
                     int len = src.length < dst.length ? src.length : dst.length;
                     for (int k = 0; k < len; k++) {
                         src[k] = dst[k];
