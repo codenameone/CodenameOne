@@ -57,6 +57,15 @@ typedef struct cn1_field_entry {
     int fieldId;
     int offset;
     char type;
+    /**
+     * 1 when the underlying storage is declared _Atomic (Java `volatile`).
+     * The interpreter's generic field accessors read this and use
+     * atomic_load_explicit / atomic_store_explicit with acquire / release
+     * ordering instead of a raw dereference; skipping that would race with
+     * host threads reading the same volatile through the generated
+     * accessors, and clang is free to reorder or tear the plain access.
+     */
+    char isVolatile;
     const char* name;
 } cn1_field_entry;
 

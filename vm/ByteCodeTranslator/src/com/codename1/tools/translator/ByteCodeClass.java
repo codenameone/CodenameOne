@@ -1573,7 +1573,9 @@ public class ByteCodeClass {
             b.append("    { ").append(fid)
               .append(", (int)offsetof(struct obj__").append(clsName)
               .append(", ").append(declCls).append("_").append(bf.getFieldName())
-              .append("), '").append(tc).append("', \"")
+              .append("), '").append(tc).append("', ")
+              .append(bf.isVolatile() ? 1 : 0)
+              .append(", \"")
               .append(bf.getFieldName()).append("\" },\n");
         }
         b.append("};\n");

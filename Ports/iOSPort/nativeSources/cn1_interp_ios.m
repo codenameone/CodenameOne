@@ -38,6 +38,7 @@
 
 #include "cn1_globals.h"
 #include "cn1_reflect.h"
+#include <stdatomic.h>
 #include "java_lang_String.h"
 /* The exceptions this file raises. Each __NEW_INSTANCE_ constructor is declared
    in its own generated header, and clang treats a missing declaration as an
@@ -283,30 +284,76 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_getFieldById___int_java_lang_
     }
     char* base = (char*)target;
     void* slot = base + entry->offset;
+    // A `volatile` field's backing storage is declared `_Atomic` by the
+    // translator, and host reads through the generated accessor use
+    // atomic_load_explicit with memory_order_acquire. A plain dereference
+    // here would race with a host write on another thread, and clang is
+    // free to tear or reorder the read. Match the accessor's ordering so
+    // interpreted reads see the same happens-before the host does.
+    JAVA_BOOLEAN vol = entry->isVolatile ? JAVA_TRUE : JAVA_FALSE;
     if (kind == K_OBJECT) {
+        if (vol) {
+            return atomic_load_explicit((_Atomic(JAVA_OBJECT)*)slot,
+                    memory_order_acquire);
+        }
         return *(JAVA_OBJECT*)slot;
     }
     if (resultOut != JAVA_NULL) {
         JAVA_ARRAY out = (JAVA_ARRAY)resultOut;
         JAVA_ARRAY_LONG* outData = (JAVA_ARRAY_LONG*)out->data;
         switch (entry->type) {
-            case 'J': outData[0] = (JAVA_ARRAY_LONG)(*(JAVA_LONG*)slot); break;
+            case 'J':
+                outData[0] = vol
+                        ? (JAVA_ARRAY_LONG)atomic_load_explicit(
+                                (_Atomic(JAVA_LONG)*)slot, memory_order_acquire)
+                        : (JAVA_ARRAY_LONG)(*(JAVA_LONG*)slot);
+                break;
             case 'D': {
                 uint64_t bits;
-                memcpy(&bits, slot, 8);
+                if (vol) {
+                    bits = (uint64_t)atomic_load_explicit(
+                            (_Atomic(uint64_t)*)slot, memory_order_acquire);
+                } else {
+                    memcpy(&bits, slot, 8);
+                }
                 outData[0] = (JAVA_ARRAY_LONG)bits;
                 break;
             }
             case 'F': {
                 uint32_t bits;
-                memcpy(&bits, slot, 4);
+                if (vol) {
+                    bits = (uint32_t)atomic_load_explicit(
+                            (_Atomic(uint32_t)*)slot, memory_order_acquire);
+                } else {
+                    memcpy(&bits, slot, 4);
+                }
                 outData[0] = (JAVA_ARRAY_LONG)bits;
                 break;
             }
-            case 'Z': case 'B': outData[0] = (JAVA_ARRAY_LONG)(*(JAVA_BYTE*)slot); break;
-            case 'C': outData[0] = (JAVA_ARRAY_LONG)(*(JAVA_CHAR*)slot); break;
-            case 'S': outData[0] = (JAVA_ARRAY_LONG)(*(JAVA_SHORT*)slot); break;
-            default:  outData[0] = (JAVA_ARRAY_LONG)(*(JAVA_INT*)slot); break;
+            case 'Z': case 'B':
+                outData[0] = vol
+                        ? (JAVA_ARRAY_LONG)atomic_load_explicit(
+                                (_Atomic(JAVA_BYTE)*)slot, memory_order_acquire)
+                        : (JAVA_ARRAY_LONG)(*(JAVA_BYTE*)slot);
+                break;
+            case 'C':
+                outData[0] = vol
+                        ? (JAVA_ARRAY_LONG)atomic_load_explicit(
+                                (_Atomic(JAVA_CHAR)*)slot, memory_order_acquire)
+                        : (JAVA_ARRAY_LONG)(*(JAVA_CHAR*)slot);
+                break;
+            case 'S':
+                outData[0] = vol
+                        ? (JAVA_ARRAY_LONG)atomic_load_explicit(
+                                (_Atomic(JAVA_SHORT)*)slot, memory_order_acquire)
+                        : (JAVA_ARRAY_LONG)(*(JAVA_SHORT*)slot);
+                break;
+            default:
+                outData[0] = vol
+                        ? (JAVA_ARRAY_LONG)atomic_load_explicit(
+                                (_Atomic(JAVA_INT)*)slot, memory_order_acquire)
+                        : (JAVA_ARRAY_LONG)(*(JAVA_INT*)slot);
+                break;
         }
     }
     return JAVA_NULL;
@@ -436,6 +483,13 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_setFieldById___int_java_lang_Ob
     }
     char* base = (char*)target;
     void* slot = base + entry->offset;
+    // Volatile fields need atomic_store_explicit with memory_order_release
+    // -- the pair to the acquire load in the getter above -- so a host
+    // thread reading the same volatile through its generated accessor
+    // sees the happens-before this write establishes. The reference
+    // write barriers still fire either way: they are about GC bookkeeping,
+    // not memory ordering.
+    JAVA_BOOLEAN vol = entry->isVolatile ? JAVA_TRUE : JAVA_FALSE;
     if (kind == K_OBJECT) {
         /* An interpreted PUTFIELD writes into a compiled object, so it owes the
            collector exactly what the translator's generated reference setter
@@ -455,25 +509,75 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_setFieldById___int_java_lang_Ob
            here against correctness. */
         CN1_WRITE_BARRIER(target, refValue);
         CN1_SATB_DELETE(slot);
-        *(JAVA_OBJECT*)slot = refValue;
+        if (vol) {
+            atomic_store_explicit((_Atomic(JAVA_OBJECT)*)slot, refValue,
+                    memory_order_release);
+        } else {
+            *(JAVA_OBJECT*)slot = refValue;
+        }
         return;
     }
     switch (entry->type) {
-        case 'J': *(JAVA_LONG*)slot = (JAVA_LONG)rawValue; break;
+        case 'J':
+            if (vol) {
+                atomic_store_explicit((_Atomic(JAVA_LONG)*)slot,
+                        (JAVA_LONG)rawValue, memory_order_release);
+            } else {
+                *(JAVA_LONG*)slot = (JAVA_LONG)rawValue;
+            }
+            break;
         case 'D': {
             uint64_t bits = (uint64_t)rawValue;
-            memcpy(slot, &bits, 8);
+            if (vol) {
+                atomic_store_explicit((_Atomic(uint64_t)*)slot, bits,
+                        memory_order_release);
+            } else {
+                memcpy(slot, &bits, 8);
+            }
             break;
         }
         case 'F': {
             uint32_t bits = (uint32_t)rawValue;
-            memcpy(slot, &bits, 4);
+            if (vol) {
+                atomic_store_explicit((_Atomic(uint32_t)*)slot, bits,
+                        memory_order_release);
+            } else {
+                memcpy(slot, &bits, 4);
+            }
             break;
         }
-        case 'Z': case 'B': *(JAVA_BYTE*)slot = (JAVA_BYTE)rawValue; break;
-        case 'C': *(JAVA_CHAR*)slot = (JAVA_CHAR)rawValue; break;
-        case 'S': *(JAVA_SHORT*)slot = (JAVA_SHORT)rawValue; break;
-        default:  *(JAVA_INT*)slot = (JAVA_INT)rawValue; break;
+        case 'Z': case 'B':
+            if (vol) {
+                atomic_store_explicit((_Atomic(JAVA_BYTE)*)slot,
+                        (JAVA_BYTE)rawValue, memory_order_release);
+            } else {
+                *(JAVA_BYTE*)slot = (JAVA_BYTE)rawValue;
+            }
+            break;
+        case 'C':
+            if (vol) {
+                atomic_store_explicit((_Atomic(JAVA_CHAR)*)slot,
+                        (JAVA_CHAR)rawValue, memory_order_release);
+            } else {
+                *(JAVA_CHAR*)slot = (JAVA_CHAR)rawValue;
+            }
+            break;
+        case 'S':
+            if (vol) {
+                atomic_store_explicit((_Atomic(JAVA_SHORT)*)slot,
+                        (JAVA_SHORT)rawValue, memory_order_release);
+            } else {
+                *(JAVA_SHORT*)slot = (JAVA_SHORT)rawValue;
+            }
+            break;
+        default:
+            if (vol) {
+                atomic_store_explicit((_Atomic(JAVA_INT)*)slot,
+                        (JAVA_INT)rawValue, memory_order_release);
+            } else {
+                *(JAVA_INT*)slot = (JAVA_INT)rawValue;
+            }
+            break;
     }
 #else
     throwException(threadStateData,
