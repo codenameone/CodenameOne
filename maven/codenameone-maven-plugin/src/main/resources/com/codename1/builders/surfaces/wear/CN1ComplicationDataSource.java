@@ -265,7 +265,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // content description, so shortening first handed the picker and TalkBack the same seven
         // characters the slot already displays -- the published path was fixed for exactly this
         // and the placeholder kept doing it.
-        return shortText(null, label, null, null);
+        return shortText(null, label, null, null, null);
     }
 
     /**
@@ -364,10 +364,14 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // Described by whichever part TICKS, for the reason the short-text branch gives: a
             // plain description of a moving value is announced wrong. The body is preferred when
             // both could, being the value rather than the label.
+            // Whichever part actually moves describes the whole, because a plain description of
+            // a moving value is announced wrong and nothing comes back to fix it. The body wins
+            // when both move, being the value rather than the label; the title is used whenever
+            // it is the only thing moving, with or without a body beside it.
             ComplicationText spokenText = plain(spoken);
             if (body.length() > 0 && bodyTicks) {
                 spokenText = bodyText;
-            } else if (body.length() == 0 && titleTicks) {
+            } else if (titleTicks) {
                 spokenText = titleText;
             }
             LongTextComplicationData.Builder builder =
@@ -385,9 +389,13 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                 // lets it fall back to another type rather than showing an empty ring.
                 return null;
             }
+            // Described by the ticking text when the value ticks, for the reason the short-text
+            // branch gives: a description resolved at request time is announced long after the
+            // face has moved on, and there is no later request to correct it.
+            ComplicationText rangedDescription = titleTicks && primary != null ? primary
+                    : plain(texts.isEmpty() ? getKindId() : texts.get(0));
             RangedValueComplicationData.Builder builder =
-                    new RangedValueComplicationData.Builder(value, 0f, 1f,
-                            plain(texts.isEmpty() ? getKindId() : texts.get(0)));
+                    new RangedValueComplicationData.Builder(value, 0f, 1f, rangedDescription);
             if (!texts.isEmpty()) {
                 builder.setText(primary != null ? primary : plain(shorten(texts.get(0))));
             }
@@ -414,8 +422,14 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // content description, so shortening first handed a screen reader the same seven
             // characters the slot already shows -- losing exactly the text the description exists
             // to supply.
+            // The second node can tick too -- it is displayed as the complication's title, and a
+            // countdown put there froze exactly as the primary one used to.
+            JSONObject titleNode = texts.size() > 1
+                    ? textNodeAt(nodes, reading.getState(), 1) : null;
+            ComplicationText tickingTitle = titleNode == null ? null
+                    : tickingText(titleNode, reading.getState(), asOf);
             return shortText(titleTicks ? primary : null, texts.get(0),
-                    texts.size() > 1 ? texts.get(1) : null, tap);
+                    texts.size() > 1 ? texts.get(1) : null, tickingTitle, tap);
         }
         return null;
     }
@@ -541,6 +555,13 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             long step = Math.max((to - from) / INTERVAL_SAMPLES, MIN_SAMPLE_GAP_MILLIS);
             for (long at = from + step; at < to; at += step) {
                 into.add(Long.valueOf(at));
+            }
+            // And the END itself, when the interval finishes inside this reading. The loop stops
+            // short of it, so a twelve-step gauge climbed to about eleven twelfths and stayed
+            // there: the last entry ran on indefinitely holding a partial value, and the one
+            // moment the bar is actually full was never shown.
+            if (to == node.optLong("end") && (windowEnd <= 0 || to < windowEnd)) {
+                into.add(Long.valueOf(to));
             }
         }
     }
@@ -684,7 +705,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
     }
 
     private ShortTextComplicationData shortText(ComplicationText ticking, String text,
-            String title, PendingIntent tap) {
+            String title, ComplicationText tickingTitle, PendingIntent tap) {
         // The untruncated strings become the content description, so a screen reader still hears
         // what the layout said even where the slot shows seven characters. BOTH of them: the
         // title is displayed too, and describing only the text announced half of what is on the
@@ -709,7 +730,9 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                 new ShortTextComplicationData.Builder(
                         ticking != null ? ticking : plain(shorten(text)), described);
         if (titled) {
-            builder.setTitle(plain(shorten(title)));
+            // Handed over whole when it ticks: shortening it would mean rendering it here, which
+            // is the freezing this avoids. The face sizes what it draws.
+            builder.setTitle(tickingTitle != null ? tickingTitle : plain(shorten(title)));
         }
         builder.setTapAction(tap);
         return builder.build();
