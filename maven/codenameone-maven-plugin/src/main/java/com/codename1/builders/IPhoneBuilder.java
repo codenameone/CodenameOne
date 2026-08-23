@@ -6952,9 +6952,18 @@ public class IPhoneBuilder extends Executor {
     static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
             File byName, String sdk, String configuration, String arch) {
         String winner = winningSetting(settings, "CODE_SIGN_ENTITLEMENTS", sdk, configuration, arch);
-        if (winner == null || winner.trim().length() == 0) {
+        if (winner == null) {
             return byName;
         }
+        if (winner.trim().length() == 0) {
+            // Declared and empty is not the same as not declared. An archive that sets
+            // CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] to nothing is telling Xcode to sign the
+            // device build with no entitlements file at all, and Xcode does -- so reading the
+            // by-name file here found a Wallet entitlement the target is not signed with and
+            // raised it to iOS 14 for something it does not carry.
+            return null;
+        }
+
         // With the archive's context, because $(CONFIGURATION)/Extension.entitlements is a
         // standard way to write this path; without it the path did not resolve and a different
         // file was read for the entitlement that sets the floor.
@@ -7069,10 +7078,28 @@ public class IPhoneBuilder extends Executor {
             // EXTENSION_MIN = 16.0 is a perfectly good iOS 16 target. Comparing the raw text made
             // "$(EXTENSION_MIN)" parse as no version at all, read as below the floor, and be
             // overwritten with 12.0 -- taking an extension that compiles against iOS 16 APIs down
-            // with it. A reference that resolves to nothing here is left exactly as written: this
-            // build cannot evaluate it, which is not the same as knowing it is wrong.
+            // with it. An identifier that resolves to nothing is left exactly as written: this
+            // build cannot evaluate it, which is not the same as knowing it is wrong. A
+            // deployment target is the other way round, for the reason below.
             String resolved = resolveSettingsInValue(value, flat);
             if (resolved.length() == 0) {
+                // Nothing left after expansion. For a deployment target that is not "cannot
+                // tell": Xcode expands the same missing reference to the same nothing, and an
+                // empty IPHONEOS_DEPLOYMENT_TARGET is not the base value -- it is no minimum at
+                // all, so the qualified entry overrides the clamped base with a blank and the
+                // floor is bypassed. Raised to the floor like any other under-floor value.
+                //
+                // Except $(inherited), which is not a setting this build failed to find but a
+                // directive: Xcode replaces it with the value from the level above, and writing
+                // the floor over it would pin an extension that inherits iOS 16 down to 12.
+                if (!isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
+                        || value.toLowerCase().indexOf("$(inherited)") >= 0
+                        || value.toLowerCase().indexOf("${inherited}") >= 0) {
+                    continue;
+                }
+                settings.put(key, floor);
+                notes.add(key + " = " + value + " resolves to nothing, and an empty deployment "
+                        + "target is no minimum at all, so it was set to " + floor);
                 continue;
             }
             if (isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
@@ -7158,8 +7185,23 @@ public class IPhoneBuilder extends Executor {
         for (int i = 0; i < 2 && developer != null; i++) {
             developer = developer.getParentFile();
         }
-        return developer != null && new File(developer, "usr/bin").isDirectory()
-                ? developer.getAbsolutePath() : null;
+        return isDeveloperDir(developer) ? developer.getAbsolutePath() : null;
+    }
+
+    /// Whether this really is an Xcode developer directory.
+    ///
+    /// Two levels up from /usr/bin/xcodebuild -- the shim most machines have on PATH, and what
+    /// `which xcodebuild` reports into XCODEBUILD -- is the filesystem root, where usr/bin exists
+    /// and is not a developer directory at all. Handing DEVELOPER_DIR=/ to xcrun makes it fail,
+    /// the SDK name falls back to the unversioned "iphoneos", and an exact [sdk=iphoneosNN]
+    /// condition is then decided by map order rather than by the SDK the archive is built with.
+    ///
+    /// Platforms is the thing no other directory has: the CommandLineTools tree carries usr/bin
+    /// without it, and so does the root.
+    static boolean isDeveloperDir(File developer) {
+        return developer != null
+                && new File(developer, "usr/bin/xcodebuild").isFile()
+                && new File(developer, "Platforms").isDirectory();
     }
 
     /// The archive's settings with every conditional resolved to the value THIS build gets.

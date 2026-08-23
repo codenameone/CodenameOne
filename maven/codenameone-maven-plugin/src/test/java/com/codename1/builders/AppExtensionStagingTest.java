@@ -151,4 +151,24 @@ public class AppExtensionStagingTest {
                 new File(extension, "Info.plist").toPath());
         assertNull(IPhoneBuilder.symlinkEscaping(extension, extension));
     }
+
+    @Test
+    public void theFilesystemRootIsNotADeveloperDirectory() throws Exception {
+        File fakeRoot = tmp.newFolder("fakeroot");
+        assertTrue(new File(fakeRoot, "usr/bin").mkdirs());
+        assertTrue(new File(fakeRoot, "usr/bin/xcodebuild").createNewFile());
+
+        // Two levels up from /usr/bin/xcodebuild -- the shim `which xcodebuild` reports -- is the
+        // root, which has usr/bin and is not a developer directory. DEVELOPER_DIR=/ makes xcrun
+        // fail, the SDK name falls back to the unversioned "iphoneos", and an exact
+        // [sdk=iphoneosNN] condition is then decided by map order.
+        assertFalse(IPhoneBuilder.isDeveloperDir(fakeRoot));
+
+        File developer = tmp.newFolder("Xcode.app-Contents-Developer");
+        assertTrue(new File(developer, "usr/bin").mkdirs());
+        assertTrue(new File(developer, "usr/bin/xcodebuild").createNewFile());
+        assertTrue(new File(developer, "Platforms").mkdirs());
+        assertTrue(IPhoneBuilder.isDeveloperDir(developer));
+        assertFalse(IPhoneBuilder.isDeveloperDir(null));
+    }
 }

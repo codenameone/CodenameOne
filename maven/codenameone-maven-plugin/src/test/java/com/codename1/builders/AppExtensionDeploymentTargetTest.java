@@ -951,4 +951,66 @@ public class AppExtensionDeploymentTargetTest {
             }
         }
     }
+
+    @Test
+    public void aQualifiedTargetThatResolvesToNothingIsClamped() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET", "14.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(MISSING_MIN)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Xcode expands the same missing reference to the same nothing, and an empty deployment
+        // target is not the base value -- it is no minimum at all, so the qualified entry
+        // overrides the clamped base with a blank and the floor is bypassed.
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
+
+    @Test
+    public void anInheritedTargetIsLeftToInherit() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(inherited)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Not a setting this build failed to find but a directive: Xcode replaces it with the
+        // value from the level above, and writing a floor over it pins an extension that
+        // inherits iOS 16 down to 12.
+        assertEquals("$(inherited)", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
+
+    @Test
+    public void anEmptyEntitlementsOverrideMeansNoEntitlements() throws Exception {
+        File dist = tmp.newFolder("dist50");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File byName = new File(extension, "WalletUIExtension.entitlements");
+        write(byName, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>\n"
+                + "<key>com.apple.developer.payment-pass-provisioning</key><true/>\n"
+                + "</dict></plist>\n");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("CODE_SIGN_ENTITLEMENTS", "WalletUIExtension/WalletUIExtension.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "");
+
+        // Declared and empty is not the same as not declared: Xcode signs the device build with
+        // no entitlements file, so reading the by-name one found a Wallet entitlement the target
+        // does not carry and raised it to iOS 14 for it.
+        assertNull(IPhoneBuilder.appExtensionSigningEntitlements(extension, settings, byName,
+                "iphoneos14.4", "Release", "arm64"));
+        assertEquals("12.0", IPhoneBuilder.appExtensionDeploymentFloor(
+                IPhoneBuilder.appExtensionSigningEntitlements(extension, settings, byName,
+                        "iphoneos14.4", "Release", "arm64")));
+
+        // And a missing winner still falls back to the file named after the extension.
+        settings.remove("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]");
+        settings.remove("CODE_SIGN_ENTITLEMENTS");
+        assertEquals(byName, IPhoneBuilder.appExtensionSigningEntitlements(extension, settings,
+                byName, "iphoneos14.4", "Release", "arm64"));
+    }
 }
