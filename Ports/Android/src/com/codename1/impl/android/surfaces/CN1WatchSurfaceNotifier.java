@@ -58,13 +58,12 @@ public final class CN1WatchSurfaceNotifier {
         if (ctx == null || kindId == null) {
             return;
         }
-        // Every name the build could have given this kind. Both requesters treat a missing
-        // class as "no such surface" and say nothing, so trying the candidates costs a failed
-        // Class.forName in the rare disambiguated case and nothing at all in the usual one.
-        for (String suffix : AndroidSurfaceBridge.classSuffixCandidates(kindId)) {
-            requestComplicationUpdate(ctx, "com.codename1.impl.android.CN1Complication_" + suffix);
-            requestTileUpdate(ctx, "com.codename1.impl.android.CN1Tile_" + suffix);
-        }
+        // The name the build gave THIS kind, from the map it wrote. Trying candidates instead
+        // would be wrong here for the same reason it is wrong for the widget provider: the plain
+        // name may well exist and belong to a different kind.
+        String suffix = AndroidSurfaceBridge.classSuffix(ctx, kindId);
+        requestComplicationUpdate(ctx, "com.codename1.impl.android.CN1Complication_" + suffix);
+        requestTileUpdate(ctx, "com.codename1.impl.android.CN1Tile_" + suffix);
     }
 
     private static void requestComplicationUpdate(Context ctx, String className) {

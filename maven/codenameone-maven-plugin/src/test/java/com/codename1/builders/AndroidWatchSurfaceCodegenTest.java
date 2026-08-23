@@ -374,28 +374,50 @@ class AndroidWatchSurfaceCodegenTest {
     }
 
     /// The runtime cannot recompute which kind won the plain name -- that is a property of the
-    /// whole declared set -- so it tries both names the build can produce. Read out of the port's
-    /// source rather than called, because the port class needs an Android runtime this test does
-    /// not have.
+    /// whole declared set -- so it READS the map the build wrote. It must not guess by probing
+    /// for a class that exists either: CN1Widget_Status exists for "status", so "status_"
+    /// probing the plain name first would find the other kind's provider and publish into it.
+    /// Read out of the port's source rather than called, because the port class needs an Android
+    /// runtime this test does not have.
     @Test
-    void theRuntimeTriesBothNamesTheBuildCanProduce() throws java.io.IOException {
+    void theRuntimeReadsTheMapRatherThanGuessing() throws java.io.IOException {
         java.io.File bridge = new java.io.File("../../Ports/Android/src/com/codename1/impl/"
                 + "android/surfaces/AndroidSurfaceBridge.java");
         assertTrue(bridge.isFile(), "the port must be readable: " + bridge.getAbsolutePath());
         String source = new String(java.nio.file.Files.readAllBytes(bridge.toPath()), "UTF-8");
 
-        int at = source.indexOf("static String[] classSuffixCandidates(String kindId) {");
-        assertTrue(at >= 0, "the runtime must offer both candidates");
+        int at = source.indexOf("static synchronized String classSuffix(Context ctx, String kindId) {");
+        assertTrue(at >= 0, "the runtime must resolve the name from the generated map");
         String body = source.substring(at, source.indexOf("\n    }\n", at));
-        assertTrue(body.contains("new String[] {plain, disambiguated}"), body);
-        assertTrue(body.contains("plain.equals(disambiguated) ? new String[] {plain}"),
-                "an id with no underscore has one candidate, not two:\n" + body);
+        assertTrue(body.contains("\"cn1_surface_kind_classes\""),
+                "it must read the array the build writes:\n" + body);
+        assertFalse(body.contains("getReceiverInfo"),
+                "resolving by what exists finds another kind's provider:\n" + body);
 
         // And the port's fold has to be the SHIPPED one, with no positions folded in.
         int fold = source.indexOf("static String toClassSuffix(String kindId) {");
         String foldBody = source.substring(fold, source.indexOf("\n    }\n", fold));
         assertFalse(foldBody.contains("positions"),
                 "toClassSuffix must stay the name shipped builds use:\n" + foldBody);
+    }
+
+    /// The map is the build's own table, written out -- not a second computation. The resource
+    /// name has to be the one the port looks up, and every declared kind has to be in it.
+    @Test
+    void theGeneratedMapNamesEveryKind() throws Exception {
+        java.io.File builder = new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java");
+        assertTrue(builder.isFile(), builder.getAbsolutePath());
+        String source = new String(java.nio.file.Files.readAllBytes(builder.toPath()), "UTF-8");
+
+        int at = source.indexOf("private void writeSurfaceKindClassMap(File resDir)");
+        assertTrue(at >= 0, "the build must write the map");
+        String body = source.substring(at, source.indexOf("\n    }\n", at));
+        assertTrue(body.contains("cn1_surface_kind_classes"),
+                "the array name must match what the port reads:\n" + body);
+        assertTrue(body.contains("surfaceKindClassNames.entrySet()"),
+                "it must be written from the table that named the classes, not recomputed:\n"
+                        + body);
     }
 
     // --- tiles ------------------------------------------------------------------

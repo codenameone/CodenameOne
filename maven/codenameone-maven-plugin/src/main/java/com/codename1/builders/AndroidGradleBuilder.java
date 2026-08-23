@@ -3485,6 +3485,7 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
             surfaceKindClassNames.putAll(surfaceKindClassSuffixes(declaredKindIds));
+            writeSurfaceKindClassMap(resDir);
             for (Map.Entry<String, String> named : surfaceKindClassNames.entrySet()) {
                 if (!named.getValue().equals(surfaceKindClassSuffix(named.getKey()))) {
                     // Never silently: this kind's provider is not found under the name its id
@@ -7187,6 +7188,46 @@ public class AndroidGradleBuilder extends Executor {
     private final Map<String, String> surfaceKindClassNames =
             new LinkedHashMap<String, String>();
 
+    /**
+     * Writes the kind-to-class map the runtime reads.
+     *
+     * <p>Which kind holds the plain folded name is a property of the whole declared set, so a
+     * runtime holding one kind id cannot work it out. Probing for a class that exists is not the
+     * answer either -- {@code CN1Widget_Status} exists for {@code status}, so {@code status_}
+     * probing the plain name first finds the OTHER kind's provider and publishes into it.</p>
+     *
+     * <p>So the build states it. This is data rather than a second copy of the algorithm: it is
+     * written from the very map that named the classes, so there is nothing for the two sides to
+     * disagree about. A build that writes no map -- an older APK -- leaves the runtime on the
+     * plain fold, which is exactly what that APK was built with.</p>
+     *
+     * @param resDir the module's resource root
+     */
+    private void writeSurfaceKindClassMap(File resDir) throws BuildException {
+        if (surfaceKindClassNames.isEmpty()) {
+            return;
+        }
+        StringBuilder items = new StringBuilder();
+        for (Map.Entry<String, String> named : surfaceKindClassNames.entrySet()) {
+            // "id=Suffix". A kind id is [a-z][a-z0-9_]* so it can never contain the separator.
+            items.append("        <item>").append(xmlize(named.getKey())).append('=')
+                    .append(xmlize(named.getValue())).append("</item>\n");
+        }
+        File values = new File(resDir, "values");
+        values.mkdirs();
+        try {
+            createFile(new File(values, "cn1_surfaces_kinds.xml"),
+                    ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                    + "<resources>\n"
+                    + "    <string-array name=\"cn1_surface_kind_classes\">\n"
+                    + items
+                    + "    </string-array>\n"
+                    + "</resources>\n").getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to write the surface kind class map", ex);
+        }
+    }
+
     /** The generated class-name suffix for a kind, as resolved for this build. */
     private String surfaceKindClassName(String kindId) {
         String resolved = surfaceKindClassNames.get(kindId);
@@ -7337,6 +7378,11 @@ public class AndroidGradleBuilder extends Executor {
         // The PHONE's res dir, deliberately, even in a companion build. CN1SurfaceMirror reads
         // this list on the PHONE to decide which kinds are worth sending, so putting it only in
         // the wear module would leave the sender unable to see it and nothing would ever mirror.
+        // The same kind-to-class map the phone module gets. In a companion build this resDir is
+        // the WATCH module's own, and the complication and Tile services look their class names
+        // up exactly as the widget path does -- so the map has to be here too or the watch half
+        // falls back to the plain fold and misses a disambiguated kind.
+        writeSurfaceKindClassMap(resDir);
         // The wear module shares the phone's res directory, so writing it here gives it to both.
         File values = new File(resDir, "values");
         values.mkdirs();
