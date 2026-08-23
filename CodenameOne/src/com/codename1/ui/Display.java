@@ -2587,15 +2587,19 @@ public final class Display extends CN1Constants {
     void keyRepeatedInternal(final int keyCode) {
     }
 
-    private void addPointerEvent(int type, int x, int y) {
+    /// #### Returns
+    ///
+    /// true if the event was queued, false if it was dropped -- the caller must not arm
+    /// anything off a press that was never accepted
+    private boolean addPointerEvent(int type, int x, int y) {
         synchronized (lock) {
             if (this.dropEvents) {
-                return;
+                return false;
             }
             if (isTerminationEvent(type)
                     ? !hasInputEventStackCapacity(3)
                     : !hasDroppableInputEventStackCapacity(3)) {
-                return;
+                return false;
             }
             pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
             inputEventStack[inputEventStackPointer] = type;
@@ -2605,18 +2609,22 @@ public final class Display extends CN1Constants {
             inputEventStack[inputEventStackPointer] = y;
             inputEventStackPointer++;
             lock.notifyAll();
+            return true;
         }
     }
 
-    private void addPointerEvent(int type, int[] x, int[] y) {
+    /// #### Returns
+    ///
+    /// true if the event was queued, false if it was dropped
+    private boolean addPointerEvent(int type, int[] x, int[] y) {
         synchronized (lock) {
             if (this.dropEvents) {
-                return;
+                return false;
             }
             if (isTerminationEvent(type)
                     ? !hasInputEventStackCapacity(3 + x.length + y.length)
                     : !hasDroppableInputEventStackCapacity(3 + x.length + y.length)) {
-                return;
+                return false;
             }
             pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
             inputEventStack[inputEventStackPointer] = type;
@@ -2634,6 +2642,7 @@ public final class Display extends CN1Constants {
                 inputEventStackPointer++;
             }
             lock.notifyAll();
+            return true;
         }
     }
 
@@ -2928,17 +2937,25 @@ public final class Display extends CN1Constants {
     }
 
     private void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
+        boolean accepted;
+        if (x.length == 1) {
+            accepted = addPointerEvent(POINTER_PRESSED | (windowId << 8), x[0], y[0]);
+        } else {
+            accepted = addPointerEvent(POINTER_PRESSED_MULTI | (windowId << 8), x, y);
+        }
+        if (!accepted) {
+            // Nothing may be armed off a press the queue refused. longPointerPress()
+            // is delivered straight to the top level, so a component that never
+            // received pointerPressed() would get a long press for a press it never
+            // saw. Same rule as the key path.
+            return;
+        }
         lastInteractionWasKeypad = false;
         chargeLongPress(windowId, x[0], y[0]);
         // Still tracked globally: this is "where the pointer last was", which
         // getCurrentPointerEvent reports and which is not per window.
         pointerX = x[0];
         pointerY = y[0];
-        if (x.length == 1) {
-            addPointerEvent(POINTER_PRESSED | (windowId << 8), x[0], y[0]);
-        } else {
-            addPointerEvent(POINTER_PRESSED_MULTI | (windowId << 8), x, y);
-        }
     }
 
     /// Pushes a pointer release event with the given coordinates into Codename One

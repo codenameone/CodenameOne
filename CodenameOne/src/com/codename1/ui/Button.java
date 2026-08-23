@@ -100,6 +100,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     private int releaseFadeDuration;
     /// Motion driving the release fade alpha (255 -> 0); non-null while fading.
     private Motion releaseFadeMotion;
+
+    /// The top level the release fade was registered on.
+    private TopLevelContainer releaseFadeHost;
     /// Snapshot of the pressed background, faded out over the settled background.
     private Image releaseFadeImage;
     /// A listener used to bind the state with another button.  When that button's state
@@ -1071,9 +1074,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             if (releaseFadeMotion.isFinished()) {
                 releaseFadeMotion = null;
                 releaseFadeImage = null;
-                TopLevelContainer f = getTopLevelContainer();
-                if (f != null) {
-                    f.deregisterAnimated(this);
+                if (releaseFadeHost != null) {
+                    releaseFadeHost.deregisterAnimated(this);
+                    releaseFadeHost = null;
                 }
             }
             a = true;
@@ -1122,6 +1125,10 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         releaseFadeMotion.start();
         TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
+            // Remembered so the fade comes off the top level that took it. A button
+            // removed or reparented before the fade ends resolves to null or somewhere
+            // else, and the original keeps the animation for good.
+            releaseFadeHost = f;
             f.registerAnimated(this);
         }
     }

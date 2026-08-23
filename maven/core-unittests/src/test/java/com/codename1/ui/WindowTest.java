@@ -4387,4 +4387,36 @@ class WindowTest extends UITestBase {
         assertFalse(anyKeyRepeatArmed(),
                 "and nothing may be armed off a press that was never accepted");
     }
+
+    @FormTest
+    void aRejectedPointerPressArmsNoLongPress() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+
+        java.lang.reflect.Field drop = Display.class.getDeclaredField("dropEvents");
+        drop.setAccessible(true);
+        java.lang.reflect.Field lp = Display.class.getDeclaredField("longPressWindows");
+        lp.setAccessible(true);
+        drop.setBoolean(Display.getInstance(), true);
+        try {
+            Display.getInstance().pointerPressed(new int[]{40}, new int[]{40});
+        } finally {
+            drop.setBoolean(Display.getInstance(), false);
+        }
+        DisplayTest.flushEdt();
+
+        // longPointerPress() is delivered straight to the top level, so arming it off a
+        // refused press sends a long press to a component that never got
+        // pointerPressed().
+        int[] armedWindows = (int[]) lp.get(Display.getInstance());
+        boolean anyArmed = false;
+        for (int iter = 0; iter < armedWindows.length; iter++) {
+            if (armedWindows[iter] != 0) {
+                anyArmed = true;
+            }
+        }
+        assertFalse(anyArmed,
+                "nothing may be armed off a pointer press that was never accepted");
+    }
 }

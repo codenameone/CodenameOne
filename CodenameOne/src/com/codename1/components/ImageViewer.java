@@ -1308,6 +1308,10 @@ public class ImageViewer extends Component {
             // animation unregistered there.
             TopLevelContainer topLevel = getTopLevelContainer();
             if (topLevel != null) {
+                // Recorded at every registration, not only the one in initComponent:
+                // the deregistration goes through this field, so a zoom that registers
+                // without setting it never comes off the animation list at all.
+                zoomAnimationHost = topLevel;
                 topLevel.registerAnimated(this);
             }
         } else {
@@ -1351,6 +1355,10 @@ public class ImageViewer extends Component {
             // animation unregistered there.
             TopLevelContainer topLevel = getTopLevelContainer();
             if (topLevel != null) {
+                // Recorded at every registration, not only the one in initComponent:
+                // the deregistration goes through this field, so a zoom that registers
+                // without setting it never comes off the animation list at all.
+                zoomAnimationHost = topLevel;
                 topLevel.registerAnimated(this);
             }
         } else {

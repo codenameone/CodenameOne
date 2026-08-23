@@ -8752,7 +8752,9 @@ public class Component implements Animation, StyleListener, Editable {
         // we are using bgpainter just to save the cost of creating another class
         TopLevelContainer top = getTopLevelContainer();
         if (top != null) {
-            top.registerAnimated(new BGPainter(wMotion, hMotion));
+            BGPainter growth = new BGPainter(wMotion, hMotion);
+            growth.animationHost = top;
+            top.registerAnimated(growth);
             top.asContainer().revalidate();
         }
     }
@@ -9278,6 +9280,14 @@ public class Component implements Animation, StyleListener, Editable {
             impl = Display.impl;
         }
 
+        /// The top level this painter was registered on as an animation, so it comes
+        /// off that one rather than off whatever the component resolves to when the
+        /// motion ends. A component removed or reparented in between resolves to null
+        /// or somewhere else, and the original keeps the animation for good -- its
+        /// hasAnimations() stays true, so the event dispatch thread never sleeps and
+        /// this branch runs on every frame.
+        private TopLevelContainer animationHost;
+
         public BGPainter() {
             impl = Display.impl;
         }
@@ -9467,8 +9477,9 @@ public class Component implements Animation, StyleListener, Editable {
         public boolean animate() {
             TopLevelContainer top = getTopLevelContainer();
             if (wMotion.isFinished() && hMotion.isFinished()) {
-                if (top != null) {
-                    top.deregisterAnimated(this);
+                if (animationHost != null) {
+                    animationHost.deregisterAnimated(this);
+                    animationHost = null;
                 }
                 setPreferredSize(null);
                 if (top != null) {
