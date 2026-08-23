@@ -420,12 +420,14 @@ public final class CN1SurfaceMirror {
      *
      * @param ctx any context
      * @param path the reserved application path that was deleted
+     * @return true when the descriptor is gone. A Data Layer deletion cannot be redelivered, so
+     *         a false answer is retried by the caller or the withdrawal never happens
      */
-    public static void remove(Context ctx, String path) {
+    public static boolean remove(Context ctx, String path) {
         try {
             String kindId = kindOf(path);
             if (kindId == null) {
-                return;
+                return false;
             }
             // kindDir always answers a File -- it composes a path and never looks at the disk --
             // so listFiles() returning null is how "there is nothing here" arrives, and there is
@@ -439,9 +441,12 @@ public final class CN1SurfaceMirror {
             // the phone withdrew.
             File timeline = new File(kindDir, "timeline.json");
             if (timeline.exists() && !timeline.delete()) {
-                Log.w(TAG, "Could not delete " + timeline + ", so the watch may keep showing a "
-                        + "surface the phone withdrew. The deletion cannot be redelivered; the "
-                        + "next publish of " + kindId + " will replace it.");
+                // REPORTED, not merely logged. A Data Layer deletion cannot be redelivered, so
+                // nothing will bring this tombstone back -- the caller has to retry it or the
+                // complication goes on showing content the phone withdrew for good.
+                Log.w(TAG, "Could not delete " + timeline + ", so the watch would keep showing a "
+                        + "surface the phone withdrew; the caller retries this.");
+                return false;
             }
             File[] files = kindDir.listFiles();
             if (files != null) {
@@ -455,8 +460,10 @@ public final class CN1SurfaceMirror {
                 Log.w(TAG, "Could not delete " + kindDir + " while withdrawing a mirror");
             }
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            return true;
         } catch (Throwable t) {
             Log.w(TAG, "Could not withdraw a mirrored surface from " + path, t);
+            return false;
         }
     }
 

@@ -453,6 +453,41 @@ public class CN1WearableListenerService extends WearableListenerService {
      * @param payload the descriptor payload, held for the retry
      * @param attempt 1 for the first re-attempt
      */
+    /**
+     * Re-attempts a mirrored withdrawal the watch could not carry out.
+     *
+     * <p>The mirror image of {@link #retryMirrorDescriptor}, and needed for a sharper reason: a
+     * descriptor that fails to apply is at least offered again by the next publish, while a
+     * deletion is offered once and never again.</p>
+     *
+     * @param path the reserved application path
+     * @param attempt 1 for the first re-attempt
+     * @param generation the mirror generation this withdrawal belongs to
+     */
+    private void retryMirrorRemoval(final String path, final int attempt, final long generation) {
+        if (mirrorGeneration(path) != generation) {
+            // Overtaken by a republish, which supersedes the withdrawal outright.
+            return;
+        }
+        if (attempt > MIRROR_WRITE_RETRIES) {
+            android.util.Log.w("CN1Surfaces", "gave up withdrawing the mirrored surface on "
+                    + path + " after " + MIRROR_WRITE_RETRIES + " attempts; the watch keeps "
+                    + "showing it until the phone publishes that kind again");
+            return;
+        }
+        final CN1WearableListenerService self = this;
+        CN1WearableBridge.scheduleFrameworkRetry(new Runnable() {
+            public void run() {
+                if (mirrorGeneration(path) != generation) {
+                    return;
+                }
+                if (!self.surfaceMirror("remove", path, null)) {
+                    self.retryMirrorRemoval(path, attempt + 1, generation);
+                }
+            }
+        }, MIRROR_WRITE_RETRY_MILLIS << (attempt - 1));
+    }
+
     private void retryMirrorDescriptor(final String path, final byte[] payload,
             final int attempt, final long generation) {
         if (mirrorGeneration(path) != generation) {
@@ -490,9 +525,15 @@ public class CN1WearableListenerService extends WearableListenerService {
         }
         try {
             if (payload == null && "remove".equals(method)) {
-                mirror.getMethod(method, android.content.Context.class, String.class)
+                Object removed = mirror
+                        .getMethod(method, android.content.Context.class, String.class)
                         .invoke(null, this, path);
-                return true;
+                // Its own answer. remove used to be void and this returned true regardless, so a
+                // withdrawal the watch could not carry out looked like one that had -- and a
+                // deletion is offered exactly once, so nothing would have tried again. A port
+                // still declaring the void form answers null here, which is treated as success
+                // exactly as it was before: it is the same old behaviour for the same old port.
+                return !(removed instanceof Boolean) || ((Boolean) removed).booleanValue();
             }
             Object answer = mirror
                     .getMethod(method, android.content.Context.class, String.class, byte[].class)
@@ -621,9 +662,17 @@ public class CN1WearableListenerService extends WearableListenerService {
                 if (deleted) {
                     // The tombstone is consumed either way, and deliberately. A Data Layer
                     // deletion is not redelivered -- unlike a changed item there is nothing left
-                    // to ask for -- so there is no later attempt to preserve it for. The mirror
-                    // deletes the descriptor first for that reason, and says so when it cannot.
-                    surfaceMirror("remove", appPath, null);
+                    // to ask for -- so there is no later attempt to preserve it for.
+                    //
+                    // Which is exactly why a FAILED removal has to be retried here rather than
+                    // dropped: nothing else will ever offer this deletion again, so a directory
+                    // that is momentarily unwritable would leave the complication showing content
+                    // the phone withdrew, permanently. Same generation guard as a descriptor
+                    // retry, so a republish landing meanwhile cancels the withdrawal instead of
+                    // racing it.
+                    if (!surfaceMirror("remove", appPath, null)) {
+                        retryMirrorRemoval(appPath, 1, generation);
+                    }
                 } else {
                     byte[] descriptor = readMirrorPayload(event);
                     if (!surfaceMirror("receive", appPath, descriptor)) {
