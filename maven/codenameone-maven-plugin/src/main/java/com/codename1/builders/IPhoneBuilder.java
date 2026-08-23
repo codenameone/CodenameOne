@@ -6786,6 +6786,76 @@ public class IPhoneBuilder extends Executor {
         return out.toArray(new File[out.size()]);
     }
 
+    /// Whether a plist fragment sets the given key to `<true/>`.
+    ///
+    /// Deliberately not a plist parse. This is a fragment the application supplied, its
+    /// shape is not ours, and the question is narrow: does this one key say true. The
+    /// value of a key is the element that follows it, so this looks at that element and
+    /// nothing else. Anything unrecognised answers false, which is the safe direction --
+    /// the build stops and says what is missing rather than producing a bundle whose
+    /// windows silently never work.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `key`: the key to look for
+    ///
+    /// #### Returns
+    ///
+    /// true if the key is present and its value is `<true/>`
+    static boolean plistKeyIsTrue(String plist, String key) {
+        String tag = "<key>" + key + "</key>";
+        int at = plist.indexOf(tag);
+        if (at < 0) {
+            return false;
+        }
+        int from = at + tag.length();
+        int t = plist.indexOf("<true/>", from);
+        if (t < 0) {
+            return false;
+        }
+        // Only if <true/> really is this key's value: a <false/> or another key in
+        // between means the <true/> found belongs to something else further down.
+        int f = plist.indexOf("<false/>", from);
+        if (f >= 0 && f < t) {
+            return false;
+        }
+        int nextKey = plist.indexOf("<key>", from);
+        return nextKey < 0 || t < nextKey;
+    }
+
+    /// Whether a plist fragment wires the application window scene role to Codename
+    /// One's scene delegate.
+    ///
+    /// A manifest can declare the role and hand it to somebody else's delegate, in
+    /// which case the secondary scenes a window needs are never adopted. The delegate
+    /// has to appear inside this role's own configuration, which is why the search
+    /// stops at the next scene role -- a CarPlay role naming its own delegate must not
+    /// be mistaken for this one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// true if the window scene role names `CodenameOne_GLSceneDelegate`
+    static boolean plistWiresWindowSceneDelegate(String plist) {
+        String tag = "<key>UIWindowSceneSessionRoleApplication</key>";
+        int role = plist.indexOf(tag);
+        if (role < 0) {
+            return false;
+        }
+        int afterKey = role + tag.length();
+        int delegate = plist.indexOf("CodenameOne_GLSceneDelegate", afterKey);
+        if (delegate < 0) {
+            return false;
+        }
+        int nextRole = plist.indexOf("SceneSessionRole", afterKey);
+        return nextRole < 0 || delegate < nextRole;
+    }
+
     private void injectToPlist(File tmpFile, File resDir, BuildRequest request)
             throws IOException, BuildException {
         File buildinRes = new File(tmpFile, "btres");
@@ -6988,19 +7058,21 @@ public class IPhoneBuilder extends Executor {
             // first "new Window(...)" throws in a build that had just asked for them.
             // Rather than merge into a fragment we did not write, and risk producing a
             // plist neither side intended, say plainly what is missing.
-            boolean supportsMultiple = inject.contains("UIApplicationSupportsMultipleScenes");
-            boolean hasWindowRole = inject.contains("UIWindowSceneSessionRoleApplication");
+            boolean supportsMultiple =
+                    plistKeyIsTrue(inject, "UIApplicationSupportsMultipleScenes");
+            boolean hasWindowRole = plistWiresWindowSceneDelegate(inject);
             if (!supportsMultiple || !hasWindowRole) {
                 throw new BuildException(
                         "macNative.enabled=true asks for com.codename1.ui.Window support, but "
                         + "ios.plistInject already supplies its own UIApplicationSceneManifest "
                         + "which is missing "
                         + (!supportsMultiple
-                                ? "<key>UIApplicationSupportsMultipleScenes</key><true/>" : "")
+                                ? "<key>UIApplicationSupportsMultipleScenes</key> set to <true/>"
+                                : "")
                         + (!supportsMultiple && !hasWindowRole ? " and " : "")
                         + (!hasWindowRole
-                                ? "a UIWindowSceneSessionRoleApplication configuration naming "
-                                + "CodenameOne_GLSceneDelegate" : "")
+                                ? "a UIWindowSceneSessionRoleApplication configuration whose "
+                                + "UISceneDelegateClassName is CodenameOne_GLSceneDelegate" : "")
                         + ". Add it to your injected manifest, or drop the manifest from "
                         + "ios.plistInject and let the build emit one.");
             }
