@@ -22,15 +22,9 @@
  */
 package com.codename1.maven;
 
-import org.apache.maven.model.Plugin;
-import org.apache.maven.model.PluginExecution;
-import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
 
 /// Covers the properties parsing in `MigrateBuildHintsMojo`.
@@ -110,63 +104,6 @@ public class MigrateBuildHintsPropertyParsingTest {
         String src = "/*\n * Copyright\n */\npublic class MyApp {\n}\n";
         assertEquals(src.indexOf("public class MyApp"),
                 MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
-    }
-
-    /// process-annotations scans only the output of the module it is bound to, so
-    /// a binding on a platform or utility module never sees the main class that
-    /// the common module compiles. Accepting one would let the migration delete
-    /// the properties and leave annotations nothing reads.
-    @Test
-    public void onlyAnEnabledExecutionOnTheOwningModuleCounts() {
-        assertTrue(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("process-annotations", "process-classes", false)));
-        // No phase means the goal's own default, process-classes.
-        assertTrue(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("process-annotations", null, false)));
-        assertFalse(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("css", "process-classes", false)));
-        // Declared but never run is the same as absent for this purpose.
-        assertFalse(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("process-annotations", "none", false)));
-    }
-
-    /// ProcessAnnotationsMojo returns immediately when skip is set, and again
-    /// when its output directory does not exist -- which is every phase before
-    /// compile. Such an execution emits no annotation resource, so migrating
-    /// against it would delete the properties and leave nothing behind.
-    @Test
-    public void anExecutionThatCannotSeeCompiledClassesDoesNotCount() {
-        assertFalse(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("process-annotations", "generate-sources", false)));
-        assertFalse(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("process-annotations", "process-resources", false)));
-        assertFalse(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("process-annotations", "process-classes", true)));
-        // compile is the earliest phase where target/classes exists.
-        assertTrue(MigrateBuildHintsMojo.bindsProcessAnnotations(
-                moduleBinding("process-annotations", "compile", false)));
-    }
-
-    private static MavenProject moduleBinding(String goal, String phase, boolean skip) {
-        PluginExecution e = new PluginExecution();
-        if (phase != null) {
-            e.setPhase(phase);
-        }
-        e.addGoal(goal);
-        if (skip) {
-            Xpp3Dom config = new Xpp3Dom("configuration");
-            Xpp3Dom flag = new Xpp3Dom("skip");
-            flag.setValue("true");
-            config.addChild(flag);
-            e.setConfiguration(config);
-        }
-        Plugin plugin = new Plugin();
-        plugin.setGroupId("com.codenameone");
-        plugin.setArtifactId("codenameone-maven-plugin");
-        plugin.addExecution(e);
-        MavenProject p = new MavenProject();
-        p.getBuild().addPlugin(plugin);
-        return p;
     }
 
     @Test

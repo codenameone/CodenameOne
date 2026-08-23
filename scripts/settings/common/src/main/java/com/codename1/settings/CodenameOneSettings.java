@@ -2101,7 +2101,12 @@ public class CodenameOneSettings extends Lifecycle {
             String url = ProjectIO.fsUrl(path);
             FileSystemStorage fs = FileSystemStorage.getInstance();
             if (!fs.exists(url)) {
-                return out;
+                // Not built yet. Read the annotations off the source instead --
+                // the window right after cn1:migrate-build-hints is exactly when
+                // the source declares them and no build has emitted anything, and
+                // treating them as unowned there would offer Add for a hint the
+                // annotations already set, which fails the next build.
+                return annotationOwnedHintsFromSource();
             }
             in = fs.openInputStream(url);
             String text = Util.readToString(in, "ISO-8859-1");
@@ -2124,5 +2129,141 @@ public class CodenameOneSettings extends Lifecycle {
             Util.cleanup(in);
         }
         return out;
+    }
+
+    /// Reads the build hint annotations straight off the main class.
+    ///
+    /// Only the attribute *names* are needed -- what each hint is set to does not
+    /// matter, only that an annotation owns it -- so this scans the annotation
+    /// list above the class declaration for `name =` at the top level of each
+    /// annotation's parentheses and maps those to hint names through the catalog.
+    /// Values are skipped wholesale, so a comma or bracket inside a string cannot
+    /// confuse it.
+    private java.util.Map<String, String> annotationOwnedHintsFromSource() {
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        String main = settings == null ? null : settings.get("codename1.mainName");
+        String pkg = settings == null ? null : settings.get("codename1.packageName");
+        if (binding == null || binding.projectDir() == null || main == null || main.isEmpty()) {
+            return out;
+        }
+        String rel = (pkg == null || pkg.isEmpty() ? "" : pkg.replace('.', '/') + "/") + main;
+        for (String ext : new String[]{".java", ".kt"}) {
+            for (String root : new String[]{"/src/main/java/", "/src/main/kotlin/", "/src/"}) {
+                String path = binding.projectDir() + root + rel + ext;
+                String text = readIfPresent(path);
+                if (text == null) {
+                    continue;
+                }
+                collectAnnotationOwnedHints(text, out);
+                return out;
+            }
+        }
+        return out;
+    }
+
+    private String readIfPresent(String path) {
+        InputStream in = null;
+        try {
+            String url = ProjectIO.fsUrl(path);
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            if (!fs.exists(url)) {
+                return null;
+            }
+            in = fs.openInputStream(url);
+            return Util.readToString(in, "UTF-8");
+        } catch (Exception ex) {
+            Log.e(ex);
+            return null;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
+    /// Maps every `@Group(attr = ...)` on the main class to the hints it sets.
+    static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out) {
+        for (com.codename1.build.shared.BuildHints.Hint h : com.codename1.build.shared.BuildHints.entries()) {
+            if (!h.isAnnotated()) {
+                continue;
+            }
+            String marker = "@" + h.group().annotationSimpleName();
+            int at = source.indexOf(marker);
+            while (at >= 0) {
+                int open = source.indexOf('(', at);
+                if (open < 0) {
+                    break;
+                }
+                String args = balancedArgs(source, open);
+                if (args != null && declaresAttribute(args, h.attr())) {
+                    out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
+                            marker + "(" + h.attr() + ")");
+                    break;
+                }
+                at = source.indexOf(marker, at + marker.length());
+            }
+        }
+    }
+
+    /// The text inside the parentheses starting at `open`, or null when unbalanced.
+    private static String balancedArgs(String source, int open) {
+        int depth = 0;
+        boolean inString = false;
+        for (int i = open; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (inString) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+            } else if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open + 1, i);
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Whether `args` assigns `attr` at the top level, ignoring anything inside a
+    /// nested value or a string.
+    private static boolean declaresAttribute(String args, String attr) {
+        int depth = 0;
+        boolean inString = false;
+        StringBuilder word = new StringBuilder();
+        for (int i = 0; i < args.length(); i++) {
+            char c = args.charAt(i);
+            if (inString) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+            } else if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+            } else if (depth == 0 && c == '=' && (i + 1 >= args.length() || args.charAt(i + 1) != '=')) {
+                if (word.toString().trim().equals(attr)) {
+                    return true;
+                }
+                word.setLength(0);
+            } else if (depth == 0 && c == ',') {
+                word.setLength(0);
+            } else if (depth == 0) {
+                word.append(c);
+            }
+        }
+        return false;
     }
 }

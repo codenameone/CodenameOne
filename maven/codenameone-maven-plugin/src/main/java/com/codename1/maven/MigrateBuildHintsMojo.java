@@ -26,6 +26,11 @@ import com.codename1.build.shared.BuildHints;
 import com.codename1.build.shared.HintType;
 
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.shared.invoker.DefaultInvocationRequest;
+import org.apache.maven.shared.invoker.DefaultInvoker;
+import org.apache.maven.shared.invoker.InvocationRequest;
+import org.apache.maven.shared.invoker.InvocationResult;
+import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -97,29 +102,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         File settingsFile = new File(projectDir, "codenameone_settings.properties");
         if (!settingsFile.isFile()) {
             throw new MojoExecutionException("No codenameone_settings.properties in " + projectDir);
-        }
-
-        // Nothing turns an annotation back into a build hint except the
-        // process-annotations goal, and a mojo's defaultPhase does not bind it to
-        // a project -- the project's own POM has to. Migrating without that
-        // binding deletes working properties and replaces them with annotations no
-        // goal ever reads, so the hints disappear from the build silently.
-        if (!processAnnotationsIsBound()) {
-            File owner = getCN1ProjectDir();
-            throw new MojoFailureException("The module that holds the main class"
-                    + (owner == null ? "" : " (" + owner + ")")
-                    + " does not run the cn1 process-annotations goal, so build hint annotations "
-                    + "would never be turned back into the codename1.arg.* pairs the builders "
-                    + "read, and migrating would silently drop them. The goal only scans the "
-                    + "module it is bound to, so binding it elsewhere in the reactor does not "
-                    + "help.\n\nAdd it to that module's POM first:\n"
-                    + "    <execution>\n"
-                    + "      <id>cn1-process-classes</id>\n"
-                    + "      <phase>process-classes</phase>\n"
-                    + "      <goals>\n"
-                    + "        <goal>process-annotations</goal>\n"
-                    + "      </goals>\n"
-                    + "    </execution>");
         }
 
         // The annotations ship in codenameone-core. A project pinned to a release
@@ -223,13 +205,71 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     + "migrated lines from " + settingsFile.getName() + ".");
         }
 
+        // Add the annotations, prove the build actually turns them back into hints,
+        // and only then delete the properties. Deciding that from the POM instead
+        // meant guessing whether process-annotations would run -- and the goal is
+        // skippable, bindable to a phase with no compiled classes, bindable to the
+        // wrong module, and skippable through a property expression. Observing the
+        // emitted resource answers all of those at once, and answers correctly for
+        // whatever the next way to not-run turns out to be.
+        // Apply the whole migration, prove the build turns the annotations back
+        // into hints, and roll both files back if it does not.
+        //
+        // Both files have to move together before the check: leaving the
+        // properties in place while the annotations are added *is* the
+        // duplicate-declaration case, so the build would fail for that reason and
+        // never tell us whether processing works at all.
+        //
+        // Deciding this from the POM instead meant guessing whether
+        // process-annotations would run, and the goal is skippable, bindable to a
+        // phase with no compiled classes, bindable to the wrong module, and
+        // skippable through a property expression. Observing the emitted resource
+        // answers all of those at once, and answers correctly for whatever the
+        // next way to not-run turns out to be.
+        File source = new File(mainSource);
+        String originalSource;
+        String originalSettings;
         try {
-            insertAnnotations(new File(mainSource), rendered.toString(),
+            originalSource = read(source);
+            originalSettings = read(settingsFile);
+            insertAnnotations(source, rendered.toString(),
                     settings.getProperty("codename1.mainName", "").trim());
             removeMigratedLines(settingsFile, migratedKeys);
         } catch (IOException ex) {
             throw new MojoExecutionException("Migration failed: " + ex.getMessage(), ex);
         }
+
+        String missing = verifyAnnotationsAreProcessed(projectDir, migratedKeys);
+        if (missing != null) {
+            StringBuilder restoreFailed = new StringBuilder();
+            try {
+                write(source, originalSource);
+            } catch (IOException ex) {
+                restoreFailed.append("\nCould not restore ").append(source).append(": ")
+                        .append(ex.getMessage());
+            }
+            try {
+                writeProperties(settingsFile, originalSettings);
+            } catch (IOException ex) {
+                restoreFailed.append("\nCould not restore ").append(settingsFile).append(": ")
+                        .append(ex.getMessage());
+            }
+            throw new MojoFailureException("The annotations were added but the build did not turn "
+                    + "them into build hints, so " + source.getName() + " and "
+                    + settingsFile.getName() + " have been put back as they were.\n\n"
+                    + missing + "\n\nThe usual cause is that this module does not run the cn1 "
+                    + "process-annotations goal, or runs it skipped or before compile. Add it and "
+                    + "try again:\n"
+                    + "    <execution>\n"
+                    + "      <id>cn1-process-classes</id>\n"
+                    + "      <phase>process-classes</phase>\n"
+                    + "      <goals>\n"
+                    + "        <goal>process-annotations</goal>\n"
+                    + "      </goals>\n"
+                    + "    </execution>"
+                    + restoreFailed);
+        }
+
         getLog().info("cn1: migrated " + migratedKeys.size() + " build hint(s) into "
                 + new File(mainSource).getName());
     }
@@ -242,120 +282,61 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * goal is an aggregator, so {@code project} is the root POM while the binding
      * lives in the common module.</p>
      */
-    private boolean processAnnotationsIsBound() {
-        return moduleOwningTheMainClass() != null;
-    }
-
     /**
-     * The reactor module that both holds the main class and runs
-     * {@code process-annotations} over it, or null.
+     * Runs the project's own build over the module that holds the main class and
+     * checks that every migrated hint came back out of it.
      *
-     * <p>Checking the reactor as a whole is not enough. {@code
-     * ProcessAnnotationsMojo} scans only the output directory of the module it is
-     * bound to, so a binding on a platform or utility module never sees the main
-     * class that {@code common} compiles. The migration would then delete the
-     * properties and leave annotations nothing ever reads.</p>
-     *
-     * <p>The owning module is the one whose base directory is the Codename One
-     * project directory -- the directory holding
-     * {@code codenameone_settings.properties}, which is also where
-     * {@link #findMainClassSource} looks.</p>
+     * @return null when all of them did, otherwise a description of what is
+     *         missing, suitable for showing to the developer
      */
-    private org.apache.maven.project.MavenProject moduleOwningTheMainClass() {
-        File projectDir = getCN1ProjectDir();
-        if (projectDir == null) {
-            return null;
-        }
-        java.util.List<org.apache.maven.project.MavenProject> projects = reactorProjects;
-        if (projects == null || projects.isEmpty()) {
-            projects = java.util.Collections.singletonList(project);
-        }
-        for (org.apache.maven.project.MavenProject p : projects) {
-            if (p.getBasedir() == null || !sameDirectory(p.getBasedir(), projectDir)) {
-                continue;
+    private String verifyAnnotationsAreProcessed(File projectDir, List<String> migratedKeys) {
+        getLog().info("cn1: building " + projectDir.getName()
+                + " to confirm the annotations produce the hints...");
+        File pom = new File(projectDir, "pom.xml");
+        InvocationRequest request = new DefaultInvocationRequest();
+        request.setPomFile(pom.isFile() ? pom : new File(project.getBasedir(), "pom.xml"));
+        request.setGoals(Collections.singletonList("process-classes"));
+        Properties props = new Properties();
+        props.setProperty("skipTests", "true");
+        request.setProperties(props);
+        request.setBatchMode(true);
+        try {
+            InvocationResult result = new DefaultInvoker().execute(request);
+            if (result.getExitCode() != 0) {
+                return "The build failed with exit code " + result.getExitCode()
+                        + ", so the annotations could not be checked.";
             }
-            return bindsProcessAnnotations(p) ? p : null;
+        } catch (MavenInvocationException ex) {
+            return "The build could not be run (" + ex.getMessage()
+                    + "), so the annotations could not be checked.";
+        }
+
+        File emitted = new File(projectDir, "target/classes/" + ANNOTATION_HINTS_RESOURCE);
+        if (!emitted.isFile()) {
+            return "No " + ANNOTATION_HINTS_RESOURCE + " was written under "
+                    + projectDir.getName() + "/target/classes.";
+        }
+        Properties produced = new Properties();
+        try (FileInputStream in = new FileInputStream(emitted)) {
+            produced.load(in);
+        } catch (IOException ex) {
+            return "Could not read " + emitted + ": " + ex.getMessage();
+        }
+        List<String> absent = new ArrayList<String>();
+        for (String key : migratedKeys) {
+            if (produced.getProperty(key) == null) {
+                absent.add(key);
+            }
+        }
+        if (!absent.isEmpty()) {
+            return "These hints were annotated but did not come back out of the build: " + absent;
         }
         return null;
     }
 
-    private static boolean sameDirectory(File a, File b) {
-        try {
-            return a.getCanonicalFile().equals(b.getCanonicalFile());
-        } catch (IOException ex) {
-            return a.getAbsoluteFile().equals(b.getAbsoluteFile());
-        }
-    }
-
-    /**
-     * Whether this module runs {@code process-annotations} somewhere it can
-     * actually see compiled classes.
-     *
-     * <p>Being declared is not enough. {@code ProcessAnnotationsMojo} returns
-     * immediately when {@code skip} is set, and again when its output directory
-     * does not exist -- which is the case for every phase before {@code compile}.
-     * An execution that is skipped, or bound to {@code generate-sources}, emits
-     * no annotation resource at all, so migrating against it would delete the
-     * working properties and leave nothing behind.</p>
-     */
-    static boolean bindsProcessAnnotations(org.apache.maven.project.MavenProject p) {
-        java.util.List<org.apache.maven.model.Plugin> plugins = p.getBuildPlugins();
-        if (plugins == null) {
-            return false;
-        }
-        for (org.apache.maven.model.Plugin plugin : plugins) {
-            if (!"codenameone-maven-plugin".equals(plugin.getArtifactId())) {
-                continue;
-            }
-            for (org.apache.maven.model.PluginExecution e : plugin.getExecutions()) {
-                if (e.getGoals() == null || !e.getGoals().contains("process-annotations")) {
-                    continue;
-                }
-                if (!phaseSeesCompiledClasses(e.getPhase())) {
-                    continue;
-                }
-                if (isSkipped(e.getConfiguration()) || isSkipped(plugin.getConfiguration())) {
-                    continue;
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * The default lifecycle from {@code compile} onward -- the phases by which
-     * {@code target/classes} exists.
-     */
-    private static final java.util.List<String> PHASES_WITH_CLASSES =
-            java.util.Arrays.asList("compile", "process-classes",
-                    "generate-test-sources", "process-test-sources",
-                    "generate-test-resources", "process-test-resources",
-                    "test-compile", "process-test-classes", "test",
-                    "prepare-package", "package",
-                    "pre-integration-test", "integration-test", "post-integration-test",
-                    "verify", "install", "deploy");
-
-    /**
-     * @param phase the execution's phase, or null to accept the goal's own
-     *              default of {@code process-classes}
-     */
-    private static boolean phaseSeesCompiledClasses(String phase) {
-        if (phase == null || phase.trim().length() == 0) {
-            return true;
-        }
-        return PHASES_WITH_CLASSES.contains(phase.trim().toLowerCase());
-    }
-
-    /** Reads {@code <skip>true</skip>} out of a plugin or execution configuration. */
-    private static boolean isSkipped(Object configuration) {
-        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
-            return false;
-        }
-        org.codehaus.plexus.util.xml.Xpp3Dom skip =
-                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("skip");
-        return skip != null && "true".equalsIgnoreCase(String.valueOf(skip.getValue()).trim());
-    }
+    /** Name of the resource the annotation processor emits into target/classes. */
+    private static final String ANNOTATION_HINTS_RESOURCE =
+            "META-INF/codenameone/build-hints.properties";
 
     /**
      * Whether the codenameone-core on this project's compile classpath actually
@@ -740,6 +721,11 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             r.close();
         }
         return sb.toString();
+    }
+
+    /** Restores a source file after a failed migration. */
+    private static void writeSource(File f, String content) throws IOException {
+        write(f, content);
     }
 
     private static void write(File f, String content) throws IOException {

@@ -157,6 +157,44 @@ public class BuildHintCatalogTest {
                 com.codename1.build.shared.BuildHints.canonicalName("ios.pods"));
     }
 
+    /**
+     * Right after cn1:migrate-build-hints the source declares the annotations and
+     * no build has emitted the manifest yet. Treating them as unowned there would
+     * offer Add for a hint the annotations already set, and the next build would
+     * fail on the duplicate declaration -- so the source is read directly.
+     */
+    @Test
+    public void annotationsAreFoundInSourceBeforeTheProjectIsBuilt() {
+        String src = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(pods = {\"A\", \"B\"}, teamId = \"T\")\n"
+                + "@Desktop(titleBar = DesktopTitleBar.NATIVE)\n"
+                + "public class MyApp extends Lifecycle {\n}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(pods)", owned.get("ios.pods"));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+        assertEquals("@Desktop(titleBar)", owned.get("desktop.titleBar"));
+        assertTrue(owned.get("ios.objC") == null, "an attribute nobody set is not owned");
+    }
+
+    /**
+     * Attribute detection must not be fooled by a value that contains an equals
+     * sign, a comma or a bracket -- android.xpermissions is XML, and gradleDep
+     * entries carry both.
+     */
+    @Test
+    public void valuesContainingSeparatorsDoNotCreatePhantomOwnership() {
+        String src = "@Android(xpermissions = \"<uses-permission android:name=\\\"X\\\"/>\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Android(xpermissions)", owned.get("android.xpermissions"));
+        assertTrue(owned.get("android.gradleDep") == null,
+                "nothing inside a string value may register as an attribute");
+        assertTrue(owned.get("android.debug") == null);
+    }
+
     @Test
     public void searchStillMatchesOnNameAndDescription() {
         BuildHintCatalog catalog = BuildHintCatalog.load();
