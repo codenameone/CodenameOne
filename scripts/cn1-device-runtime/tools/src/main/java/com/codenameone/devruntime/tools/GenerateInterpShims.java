@@ -1099,6 +1099,14 @@ public final class GenerateInterpShims {
         w.println("    /** Builds the peer for the superclass constructor the pushed class used. */");
         w.println("    public static Object create(InterpRuntime rt, InterpObject o,");
         w.println("                                String descriptor, Object[] args) throws Throwable {");
+        // Snapshot the pending-context stack depth so a super constructor
+        // that throws (invalid args, or a constructor-time interpreted
+        // override that failed) can't strand its `$captureCtx` push on the
+        // thread-local for the rest of the thread's life. On success the
+        // constructor's own `popPendingContext` has already brought the
+        // stack back here, so the trim is a no-op.
+        w.println("        int $pendingBefore = InterpRuntime.pendingContextDepth();");
+        w.println("        try {");
         for (Constructor<?> c : ctors) {
             Class<?>[] params = c.getParameterTypes();
             StringBuilder desc = new StringBuilder("(");
@@ -1110,17 +1118,20 @@ public final class GenerateInterpShims {
             for (int i = 0; i < params.length; i++) {
                 cast.append(", ").append(castFromObject(params[i], "args[" + i + "]"));
             }
-            w.println("        if (\"" + desc + "\".equals(descriptor)) {");
-            w.println("            return new " + simpleName + "(rt, o" + cast + ");");
-            w.println("        }");
+            w.println("            if (\"" + desc + "\".equals(descriptor)) {");
+            w.println("                return new " + simpleName + "(rt, o" + cast + ");");
+            w.println("            }");
         }
         // Anything else is a constructor this shim does not have -- one the
         // device's API lacks, or one the generator could not emit. Substituting
         // the no-argument peer would run a different constructor than the
         // program wrote, silently losing both its arguments and whatever that
         // constructor does; saying so names the class and the descriptor.
-        w.println("        throw new UnsupportedOperationException(\"" + typeName(target)
+        w.println("            throw new UnsupportedOperationException(\"" + typeName(target)
                 + " has no constructor \" + descriptor + \" on this device\");");
+        w.println("        } finally {");
+        w.println("            InterpRuntime.trimPendingContext($pendingBefore);");
+        w.println("        }");
         w.println("    }");
         w.println();
     }

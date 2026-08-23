@@ -412,6 +412,31 @@ public final class InterpRuntime {
         }
     }
 
+    /// The current depth of the pending-context stack -- captured before
+    /// entering peer construction so the factory can trim back to it in
+    /// its `finally` block, and a super constructor that throws does not
+    /// strand its `$captureCtx` push on the thread-local for the rest of
+    /// the thread's life.
+    public static int pendingContextDepth() {
+        Vector stack = (Vector) PENDING_SHIM_CONTEXT.get();
+        return stack == null ? 0 : stack.size();
+    }
+
+    /// Trims the pending-context stack back to the given depth, discarding
+    /// anything a constructor pushed but couldn't pop because its
+    /// `super(...)` threw. Success paths reach a normal `popPendingContext`
+    /// first and this becomes a no-op; failure paths reach here through the
+    /// factory's `finally` and prevent the leak.
+    public static void trimPendingContext(int depth) {
+        Vector stack = (Vector) PENDING_SHIM_CONTEXT.get();
+        if (stack == null) {
+            return;
+        }
+        while (stack.size() > depth) {
+            stack.removeElementAt(stack.size() - 1);
+        }
+    }
+
     /// Runs the interpreted override, falling back to the pending
     /// shim-construction context when the shim's own fields aren't set
     /// yet. Generated shims call this instead of the raw
