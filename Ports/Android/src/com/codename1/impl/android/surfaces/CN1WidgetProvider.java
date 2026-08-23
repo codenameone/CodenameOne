@@ -190,14 +190,17 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
             Intent intent = new Intent(context,
                     com.codename1.impl.android.BackgroundFetchHandler.class);
             intent.setData(android.net.Uri.parse("http://codenameone.com/a?" + listenerClass));
-            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (Build.VERSION.SDK_INT >= 23) {
-                flags |= FLAG_IMMUTABLE;
-            }
+            // A SERVICE PendingIntent. BackgroundFetchHandler is an IntentService declared as a
+            // <service>, so a broadcast one names a receiver that does not exist and the alarm
+            // fires into nothing. The port's own helper is used rather than a hand-rolled call,
+            // so the flags match what every other alarm-delivered start of this same handler
+            // uses. An alarm briefly allowlists the app, which is what lets the service start
+            // from here at all on API 26+.
+            //
             // Keyed by kind so two kinds do not replace each other's wake-up, and distinct from
             // the flip alarm's own request code for the same reason.
-            PendingIntent pi = PendingIntent.getBroadcast(context,
-                    ("reloadAtEnd:" + kindId).hashCode(), intent, flags);
+            PendingIntent pi = com.codename1.impl.android.AndroidImplementation.getPendingIntent(
+                    context, ("reloadAtEnd:" + kindId).hashCode(), intent);
             // INEXACT deliberately. This is "some time after the timeline runs out", not a
             // deadline, and an exact alarm costs the user a special permission for no benefit.
             if (Build.VERSION.SDK_INT >= 23) {

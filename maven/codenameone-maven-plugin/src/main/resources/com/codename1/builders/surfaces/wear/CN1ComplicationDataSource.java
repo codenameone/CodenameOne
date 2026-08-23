@@ -422,15 +422,22 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
      * @param reading the entry whose crossings are wanted
      * @param entries the timeline being assembled
      */
-    /// When the published timeline runs out, or 0 when it already has or never does.
+    /// When the published timeline runs out, or 0 when it already has.
     ///
-    /// The LAST reading's flip date: the entries are ordered, and the final one's end is the
-    /// moment there is nothing left to show.
+    /// The final reading's START, not its flip date. readTimeline computes each reading's flip
+    /// from the entries after it, so the last one's is ALWAYS zero -- reading it made this method
+    /// answer zero for every timeline and the scheduling branch unreachable, which is the whole
+    /// mechanism defeated by one wrong field.
+    ///
+    /// The start is also the right moment on its own terms: reload-at-end means "fetch when the
+    /// timeline is exhausted", and it is exhausted when the last entry takes over, since there is
+    /// nothing behind it.
     private static long timelineEnd(List<CN1WatchSurface.Reading> readings) {
-        if (readings.isEmpty()) {
+        if (readings.size() < 2) {
+            // One reading is the last one, and it is already current.
             return 0;
         }
-        return readings.get(readings.size() - 1).getNextFlipDate();
+        return readings.get(readings.size() - 1).getStart();
     }
 
     private long firstCrossingOf(CN1WatchSurface.Reading reading) {
