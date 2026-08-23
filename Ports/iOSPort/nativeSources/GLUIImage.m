@@ -205,12 +205,17 @@ extern int nextPowerOf2(int val);
         // a full re-rasterise of the picture -- through CGContextDrawImage, for
         // every image, after every foreground or memory warning -- and buys
         // nothing.
+        // A no-backing-copy image has nothing to re-decode FROM, and does not
+        // need to: its Java owner bumps a generation on suspend and builds a
+        // fresh image, peer and all, the next time the picture is asked for. So
+        // the recovery below is both impossible and unnecessary for it.
         int gen = CN1MetalTextureValidateGeneration();
-        if (mtlTextureGeneration != gen) {
+        if (mtlTextureGeneration != gen && !noBackingCopy) {
             mtlTextureGeneration = gen;
             [mtlTexture release];
             mtlTexture = nil;
         } else {
+            mtlTextureGeneration = gen;
             return mtlTexture;
         }
     }
@@ -228,11 +233,24 @@ extern int nextPowerOf2(int val);
     // Saving that second copy needs the size (and anything else the operations
     // reach for) cached on the peer first, and every consumer moved onto it.
     // Until that is done the copy stays.
+    if (noBackingCopy && mtlTexture != nil) {
+        // The pixels are on the GPU now. Letting the UIImage go takes
+        // CoreGraphics' decoded raster with it -- the second copy of this
+        // picture -- and the Java side is the recovery path.
+#ifndef CN1_USE_ARC
+        [img release];
+#endif
+        img = nil;
+    }
     // Track every GPU-backed image (not just mutable render targets) so the
     // suspend backup can drop/rebuild its texture too (issue #5349). The weak
     // registry drops the entry automatically on dealloc.
     CN1MetalRegisterMutableImage(self);
     return mtlTexture;
+}
+
+-(void)setNoBackingCopy:(BOOL)v {
+    noBackingCopy = v;
 }
 
 -(void)dropReadOnlyCachedTexture {

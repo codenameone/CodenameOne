@@ -3465,6 +3465,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
+    @Override
+    public Object createImageNoBackingCopy(byte[] bytes, int offset, int len) {
+        Object o = createImage(bytes, offset, len);
+        if (o instanceof NativeImage) {
+            // This port keeps the decoded UIImage alive so it can re-upload the
+            // texture after iOS discards it during a suspend, which means every
+            // picture on screen is resident twice: CoreGraphics' decoded raster
+            // and the GPU texture built from it. The caller here is an
+            // EncodedImage, which holds the encoded bytes and rebuilds the whole
+            // image on the generation bump in applicationDidEnterBackground, so
+            // the peer can drop the UIImage the moment its texture exists.
+            nativeInstance.markImageNoBackingCopy(((NativeImage) o).peer);
+        }
+        return o;
+    }
 
     private long createImage(byte[] data, int[] widthHeight) {
         return nativeInstance.createImage(data, widthHeight);
@@ -14047,6 +14062,14 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public static void applicationDidEnterBackground() {
         minimized = true;
+        // iOS may discard the GPU contents of any texture we uploaded while we
+        // are suspended, and images created through createImageNoBackingCopy no
+        // longer keep a decoded copy to re-upload from. Bumping the generation
+        // makes every EncodedImage decode itself again from its encoded bytes
+        // the next time it is used -- which is after we are back on screen.
+        // A counter bump, not a sweep: nothing is walked and nothing is touched
+        // until the picture is actually asked for.
+        com.codename1.ui.EncodedImage.invalidateDecodedImages();
         if(instance.life != null) {
             safeCallSerially(new Runnable() {
                 public void run() {
