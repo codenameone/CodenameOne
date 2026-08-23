@@ -495,6 +495,14 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 NearbyTransport.deliverEndpointFound(
                         encode(endpointId, nameOf(endpointId)), false);
                 discoveredEndpoints.remove(endpointId);
+                if (connectedEndpoints.contains(endpointId)) {
+                    // Still connected, so the metadata has to stay: payload
+                    // callbacks and the eventual onDisconnected encode this
+                    // endpoint through nameOf(), and dropping it here handed
+                    // the listener an empty name for the rest of a live
+                    // connection. onDisconnected does the final cleanup.
+                    return;
+                }
                 endpointNames.remove(endpointId);
                 // The service mapping goes with it. Nearby reuses endpoint
                 // ids, so a peer lost under the discovery service could come

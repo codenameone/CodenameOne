@@ -378,8 +378,22 @@ public class AndroidUwbRanging implements NearbyBridge {
             byte[] accessoryData) {
         // An accessory on Android is not a protocol, it is a set of session
         // parameters the accessory published out of band -- which is exactly
-        // what a token is. So the two paths are the same one, and the public
-        // API documents building the token with RangingToken.forUwbAddress.
+        // what a token is. So the radio work is the same as an ordinary
+        // start, and the public API documents building the token with
+        // RangingToken.forUwbAddress.
+        //
+        // The ANSWER is not the same, though, and delegating to startRanging
+        // sent it to the wrong place: startAccessory registers its resource
+        // in PENDING_ACCESSORY and deliverSessionStarted only looks in
+        // PENDING_SESSIONS, so the radio started and the caller waited for an
+        // answer that had already been given to nobody. Marked so the start
+        // is settled through deliverAccessoryConfiguration instead -- with no
+        // bytes, which is what the SPI documents for a platform that needs no
+        // handshake back.
+        Session session = sessions.get(Integer.valueOf(sessionHandle));
+        if (session != null) {
+            session.accessoryStart = true;
+        }
         startRanging(requestId, sessionHandle, accessoryData);
     }
 
@@ -444,6 +458,13 @@ public class AndroidUwbRanging implements NearbyBridge {
                                 // session isClosed() still reported as open.
                                 // The scope is still valid; only this
                                 // subscription failed.
+                                //
+                                // deliverRequestFailed looks in both pending
+                                // maps, so an accessory start is answered
+                                // here too -- but the flag is cleared so a
+                                // retry through the ordinary start does not
+                                // inherit it.
+                                session.accessoryStart = false;
                                 fail(pending, NearbyError.SESSION_FAILED,
                                         message(error));
                                 return;
@@ -464,9 +485,19 @@ public class AndroidUwbRanging implements NearbyBridge {
     /// Answers the start request if it is still waiting.
     private static void settleStarted(Session session) {
         int pending = session.startRequest.getAndSet(0);
-        if (pending != 0) {
-            Ranging.deliverSessionStarted(pending, session.handle);
+        if (pending == 0) {
+            return;
         }
+        if (session.accessoryStart) {
+            session.accessoryStart = false;
+            // No bytes: Android's accessory ranging is joining a session the
+            // accessory already published, so there is nothing to hand back
+            // to it. The SPI documents an empty array for exactly this.
+            Ranging.deliverAccessoryConfiguration(pending, session.handle,
+                    new byte[0]);
+            return;
+        }
+        Ranging.deliverSessionStarted(pending, session.handle);
     }
 
     /// How long a start is given to fail before it is called a success.
@@ -631,6 +662,9 @@ public class AndroidUwbRanging implements NearbyBridge {
         /// measurement, the first error, or the grace timer gets there.
         private final java.util.concurrent.atomic.AtomicInteger startRequest =
                 new java.util.concurrent.atomic.AtomicInteger();
+        /// Whether the pending start came from startAccessory, whose caller
+        /// waits on a different pending map.
+        private boolean accessoryStart;
 
         private Session(int handle, boolean controller) {
             this.handle = handle;
