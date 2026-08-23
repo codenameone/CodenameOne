@@ -4665,6 +4665,9 @@ public final class Display extends CN1Constants {
         int id = w.getWindowId();
         cancelKeyRepeat(id);
         cancelLongPress(id);
+        // The implementation holds its own per-window input state -- the drag
+        // activation slot -- which these records cannot reach.
+        impl.releaseWindowInputState(id);
         for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
             if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
                 keyPressTargets[iter] = null;
@@ -4695,6 +4698,9 @@ public final class Display extends CN1Constants {
         cancelKeyRepeat(w.getWindowId());
         cancelLongPress(w.getWindowId());
         releaseDragHistory(w.getWindowId());
+        // As above: a window disposed mid-press never delivers a release, and its
+        // drag slot would be held by an id that can never come back.
+        impl.releaseWindowInputState(w.getWindowId());
     }
 
     /// Whether input aimed at the given window is currently blocked by a modal.

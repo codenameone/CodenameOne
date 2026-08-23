@@ -220,6 +220,26 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    /// Drops any drag-activation state this implementation holds for a window.
+    ///
+    /// The slot is claimed on press and released on release, but a window can be
+    /// disposed or lose the native pointer while a press is still down, and then no
+    /// release ever arrives. Window ids are never reused, so the slot would be held by
+    /// a dead id for the life of the process -- and after eight of those there are no
+    /// slots left, `windowDragSlot` starts answering -1, and the passthrough it falls
+    /// into hands every window a pixel of jitter as a real drag. The framework calls
+    /// this from its own window input cancellation, which until now cleared only its
+    /// own records.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id; zero -- the main surface -- has no slot
+    public void releaseWindowInputState(int windowId) {
+        if (windowId > 0) {
+            releaseWindowDragSlot(windowId);
+        }
+    }
+
     private int dragActivationX = 0;
     private int dragActivationY = 0;
     private int dragStartPercentage = 3;
