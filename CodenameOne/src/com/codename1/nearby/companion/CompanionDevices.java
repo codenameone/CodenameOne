@@ -422,7 +422,7 @@ public final class CompanionDevices {
     private static void dispatchPresence(final CompanionDevice d,
             final boolean present) {
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 PresenceListener[] ls;
                 synchronized (LISTENERS) {

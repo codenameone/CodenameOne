@@ -243,7 +243,7 @@ public final class RangingSession {
                 hasDirection, azimuth, hasElevation, elevation, vector,
                 System.currentTimeMillis());
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 s.running = true;
                 RangingListener[] ls = s.snapshot();
@@ -273,7 +273,7 @@ public final class RangingSession {
                 reasonOrdinal >= 0 && reasonOrdinal < all.length
                         ? all[reasonOrdinal] : RangingRemovalReason.UNKNOWN;
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 RangingListener[] ls = s.snapshot();
                 for (RangingListener l : ls) {
@@ -296,7 +296,7 @@ public final class RangingSession {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 s.running = false;
                 RangingListener[] ls = s.snapshot();
@@ -320,7 +320,7 @@ public final class RangingSession {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 s.running = true;
                 RangingListener[] ls = s.snapshot();
@@ -353,7 +353,7 @@ public final class RangingSession {
         }
         final NearbyException ex = Ranging.toException(errorOrdinal, message);
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 s.running = false;
                 s.closed = true;

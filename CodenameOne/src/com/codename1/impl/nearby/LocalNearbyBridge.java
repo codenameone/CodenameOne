@@ -320,7 +320,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             return;
         }
         answer(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 s.running = true;
                 Ranging.deliverSessionStarted(requestId, sessionHandle);
@@ -339,7 +339,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             return;
         }
         answer(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 s.running = true;
                 // A real accessory handshake sends configuration back; the
@@ -369,7 +369,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void associate(final int requestId, final int profile,
             boolean singleDevice, final String[] filters) {
         answer(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 Candidate c = firstMatch(filters);
                 if (c == null) {
@@ -403,7 +403,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     @Override
     public void disassociate(final int requestId, final String associationId) {
         answer(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 observed.remove(associationId);
                 if (associations.remove(associationId) == null) {
@@ -479,7 +479,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             int strategy) {
         discovering = true;
         answer(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 NearbyTransport.deliverRequestOk(requestId);
                 for (SimEndpoint e : endpoints) {
@@ -505,13 +505,13 @@ public class LocalNearbyBridge implements NearbyBridge {
             return;
         }
         answer(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 NearbyTransport.deliverRequestOk(requestId);
                 // The simulated peer always accepts, one hop later, so the
                 // app sees the two-step shape the real platforms have.
                 answer(new Runnable() {
-    @Override
+                    @Override
                     public void run() {
                         connected.add(endpointId);
                         NearbyTransport.deliverConnectionResult(e.encode(),
@@ -540,7 +540,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             final int payloadId, final int payloadType, final byte[] bytes,
             final String path) {
         answer(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 NearbyTransport.deliverRequestOk(requestId);
                 for (String endpointId : endpointIds) {
@@ -622,7 +622,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             return;
         }
         later(TICK_MILLIS, new Runnable() {
-    @Override
+            @Override
             public void run() {
                 tick(s);
             }
@@ -703,7 +703,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             this.requestId = requestId;
         }
 
-    @Override
+        @Override
         public void run() {
             Ranging.deliverPermissionResult(requestId, true);
         }
@@ -723,7 +723,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             this.session = session;
         }
 
-    @Override
+        @Override
         public void run() {
             Ranging.deliverSessionPrepared(requestId, sessionHandle,
                     controller, RangingToken.PLATFORM_SIMULATED,
@@ -743,7 +743,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             this.message = message;
         }
 
-    @Override
+        @Override
         public void run() {
             Ranging.deliverRequestFailed(requestId, error.ordinal(), message);
         }
@@ -756,7 +756,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             this.requestId = requestId;
         }
 
-    @Override
+        @Override
         public void run() {
             NearbyTransport.deliverRequestOk(requestId);
         }
@@ -774,7 +774,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             this.message = message;
         }
 
-    @Override
+        @Override
         public void run() {
             NearbyTransport.deliverRequestFailed(requestId, error.ordinal(),
                     message);

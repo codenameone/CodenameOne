@@ -469,7 +469,7 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 TransportListener[] ls = snapshot();
                 for (TransportListener l : ls) {
@@ -499,7 +499,7 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 IncomingConnection r =
                         new IncomingConnection(e, authenticationToken);
@@ -537,7 +537,7 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 TransportListener[] ls = snapshot();
                 for (TransportListener l : ls) {
@@ -566,7 +566,7 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 TransportListener[] ls = snapshot();
                 for (TransportListener l : ls) {
@@ -597,7 +597,7 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 Payload p = Payload.received(payloadId,
                         payloadType == NearbyBridge.PAYLOAD_FILE
@@ -631,7 +631,7 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
-    @Override
+            @Override
             public void run() {
                 PayloadStatus[] all = PayloadStatus.values();
                 PayloadStatus s = statusOrdinal >= 0
