@@ -4873,7 +4873,12 @@ public class IPhoneBuilder extends Executor {
                             // Everything below matches conditional settings against these.
                             String archiveSdk = activeIosSdkName(request);
                             String archiveConfiguration = "Release";
-                            String archiveArch = "arm64";
+                            // Derived the same way ARCHS is, rather than assumed: a debug build
+                            // with ios.debug.archs=armv7 is handed ARCHS=armv7, and Xcode would
+                            // then pick an [arch=armv7] setting while this read the arm64 one.
+                            String archiveArch = request.getArg("ios.buildType", "debug").equals("debug")
+                                    && "armv7".equals(request.getArg("ios.debug.archs", null))
+                                            ? "armv7" : "arm64";
                             Map<String, String> declaredSettings = appExtensionBuildSettings(appExtension);
                             String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
                             // The identifier THIS archive gets: a qualified setting overrides the
@@ -6995,18 +7000,36 @@ public class IPhoneBuilder extends Executor {
             if (qualified && !conditionApplies(key, sdk, configuration, arch)) {
                 continue;
             }
-            int specificity = 0;
-            for (int i = 0; qualified && i < key.length(); i++) {
-                if (key.charAt(i) == '=') {
-                    specificity++;
-                }
-            }
+            int specificity = qualified ? conditionSpecificity(key) : 0;
             if (specificity > winningSpecificity) {
                 winningSpecificity = specificity;
                 winner = setting.getValue();
             }
         }
         return winner;
+    }
+
+    /// How specific a qualified key is, the way Xcode ranks it.
+    ///
+    /// More conditions beat fewer, and an EXACT value beats a wildcard: with
+    /// [sdk=iphoneos26.0] beside [sdk=iphoneos*], Xcode uses the exact one. Counting the '='
+    /// characters alone scored those equal and left the winner to Properties' iteration order --
+    /// which could read the wrong entitlements file, compute the wrong floor, or judge the wrong
+    /// identifier, all silently.
+    static int conditionSpecificity(String key) {
+        int open = key.indexOf('[');
+        if (open < 0) {
+            return 0;
+        }
+        int specificity = 0;
+        for (String condition : key.substring(open).split("[\\[\\],]")) {
+            int equals = condition.indexOf('=');
+            if (equals < 0) {
+                continue;
+            }
+            specificity += condition.substring(equals + 1).trim().endsWith("*") ? 1 : 2;
+        }
+        return specificity;
     }
 
     /// Whether a qualified setting's condition can apply to the build being made.

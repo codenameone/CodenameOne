@@ -660,4 +660,20 @@ public class AppExtensionDeploymentTargetTest {
         assertNull(IPhoneBuilder.resolveSettingsFully(
                 "com.example.app.$(PRODUCT_NAME:somethingNew)", settings));
     }
+
+    @Test
+    public void anExactConditionOutranksAWildcardOne() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        // Wildcard first, so iteration order would pick it if the two scored equal.
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "Wildcard.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos26.0]", "Exact.entitlements");
+
+        assertEquals("Exact.entitlements", IPhoneBuilder.winningSetting(settings,
+                "CODE_SIGN_ENTITLEMENTS", "iphoneos26.0", "Release", "arm64"));
+        assertTrue(IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos26.0]")
+                > IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos*]"));
+        // and more conditions still beat fewer
+        assertTrue(IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos*,config=Release]")
+                > IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos*]"));
+    }
 }
