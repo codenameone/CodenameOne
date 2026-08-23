@@ -6786,6 +6786,32 @@ public class IPhoneBuilder extends Executor {
         return out.toArray(new File[out.size()]);
     }
 
+    /// The text of the `UIApplicationSceneManifest` value element, or the empty string
+    /// when the fragment does not declare one.
+    ///
+    /// Scoping the manifest checks to this rather than to the whole injection is what
+    /// stops an unrelated dictionary answering for the manifest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// the manifest's value element, or ""
+    static String plistManifestScope(String plist) {
+        int key = plistKeyIndex(plist, "UIApplicationSceneManifest");
+        if (key < 0) {
+            return "";
+        }
+        int start = plistKeyEnd(plist, key);
+        if (start < 0) {
+            return "";
+        }
+        int end = plistValueElementEnd(plist, start);
+        return end < 0 ? "" : plist.substring(start, end);
+    }
+
     /// Whether a plist fragment sets the given key to `<true/>`.
     ///
     /// Deliberately not a plist parse. This is a fragment the application supplied, its
@@ -7373,9 +7399,16 @@ public class IPhoneBuilder extends Executor {
             // first "new Window(...)" throws in a build that had just asked for them.
             // Rather than merge into a fragment we did not write, and risk producing a
             // plist neither side intended, say plainly what is missing.
+            // Both questions are asked of the manifest's own dictionary rather than of
+            // the whole fragment. An unrelated dictionary elsewhere in the injection can
+            // carry a UIApplicationSupportsMultipleScenes of true, or something shaped
+            // like a window role, and answering from those accepts a manifest that
+            // enables and configures nothing -- the build passes and Window is still
+            // unsupported on the device.
+            String manifest = plistManifestScope(inject);
             boolean supportsMultiple =
-                    plistKeyIsTrue(inject, "UIApplicationSupportsMultipleScenes");
-            boolean hasWindowRole = plistWiresWindowSceneDelegate(inject);
+                    plistKeyIsTrue(manifest, "UIApplicationSupportsMultipleScenes");
+            boolean hasWindowRole = plistWiresWindowSceneDelegate(manifest);
             if (!supportsMultiple || !hasWindowRole) {
                 throw new BuildException(
                         "macNative.enabled=true asks for com.codename1.ui.Window support, but "

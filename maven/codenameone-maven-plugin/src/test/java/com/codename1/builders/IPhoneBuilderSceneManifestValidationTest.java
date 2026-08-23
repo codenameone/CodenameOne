@@ -323,4 +323,45 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "<keyboard>UIApplicationSceneManifest</keyboard>",
                 "UIApplicationSceneManifest"));
     }
+
+    @Test
+    void anUnrelatedDictionaryDoesNotAnswerForTheManifest() {
+        // A custom dictionary that happens to carry the multiple-scenes key as true, in
+        // front of a manifest that sets it to false. Asking the whole fragment accepts
+        // the build; asking the manifest rejects it, which is the truth of what the
+        // bundle will say.
+        String plist = "<key>MyCustomConfig</key><dict>"
+                + "<key>UIApplicationSupportsMultipleScenes</key><true/>"
+                + "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                + "<key>UISceneDelegateClassName</key>"
+                + "<string>CodenameOne_GLSceneDelegate</string></dict></array></dict>"
+                + "<key>UIApplicationSceneManifest</key><dict>"
+                + "<key>UIApplicationSupportsMultipleScenes</key><false/></dict>";
+        String scope = IPhoneBuilder.plistManifestScope(plist);
+        // The whole fragment answers true here, which is the false accept being fixed.
+        assertTrue(IPhoneBuilder.plistKeyIsTrue(plist,
+                "UIApplicationSupportsMultipleScenes"),
+                "unscoped, the unrelated dictionary answers -- this is the bug");
+        assertFalse(IPhoneBuilder.plistKeyIsTrue(scope,
+                "UIApplicationSupportsMultipleScenes"),
+                "the manifest says false, whatever the unrelated dictionary says");
+        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(scope),
+                "and the role in the unrelated dictionary is not the manifest's");
+    }
+
+    @Test
+    void theManifestsOwnConfigurationIsStillFound() {
+        String plist = "<key>UIApplicationSceneManifest</key><dict>"
+                + "<key>UIApplicationSupportsMultipleScenes</key><true/>"
+                + "<key>UISceneConfigurations</key><dict>"
+                + "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                + "<key>UISceneDelegateClassName</key>"
+                + "<string>CodenameOne_GLSceneDelegate</string></dict></array></dict></dict>";
+        String scope = IPhoneBuilder.plistManifestScope(plist);
+        assertTrue(IPhoneBuilder.plistKeyIsTrue(scope,
+                "UIApplicationSupportsMultipleScenes"));
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(scope),
+                "a nested UISceneConfigurations dictionary must not put the role out of "
+                        + "scope");
+    }
 }
