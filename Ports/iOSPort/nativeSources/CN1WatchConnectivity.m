@@ -155,6 +155,20 @@ static NSString *cn1WearableInboxDir(void) {
     return dir;
 }
 
+#if !TARGET_OS_WATCH
+/// Where complication payloads waiting their turn are parked, for the same reason received
+/// transfers are: the process does not own its own lifetime.
+static NSString *cn1PendingComplicationsPath(void) {
+    NSArray *dirs = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
+                                                        NSUserDomainMask, YES);
+    NSString *base = dirs.count > 0 ? dirs[0] : NSTemporaryDirectory();
+    NSString *dir = [base stringByAppendingPathComponent:@"cn1-surface-outbox"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES
+                                               attributes:nil error:NULL];
+    return [dir stringByAppendingPathComponent:@"pending.plist"];
+}
+#endif
+
 /// Writes the encoded transfer to the inbox and returns its file name, or nil.
 /// Entries whose durable write failed -- storage full, or unavailable behind data protection --
 /// keyed by the same token the durable copy would have used.
@@ -966,7 +980,73 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         s.delegate = self;
         [s activate];
     }
+#if !TARGET_OS_WATCH
+    // Anything that was still waiting its turn when the process last ended. Only the head of the
+    // queue is ever handed to WCSession -- the rest lived only in memory -- so a suspension or a
+    // termination during a background transfer lost them outright, and their complications stayed
+    // stale until something else published. Restored here because activation is the one thing
+    // that always happens, whatever brought the process up.
+    [self restorePendingComplications];
+#endif
 }
+
+#if !TARGET_OS_WATCH
+/// Writes the waiting queue to disk. Called with the monitor held.
+- (void)persistPendingComplicationsLocked {
+    @try {
+        if ([_pendingComplicationOrder count] == 0) {
+            [[NSFileManager defaultManager] removeItemAtPath:cn1PendingComplicationsPath()
+                                                       error:NULL];
+            return;
+        }
+        NSDictionary *doc = [NSDictionary dictionaryWithObjectsAndKeys:
+                [NSArray arrayWithArray:_pendingComplicationOrder], @"order",
+                [NSDictionary dictionaryWithDictionary:_pendingComplications], @"payloads", nil];
+        NSData *encoded = [NSPropertyListSerialization dataWithPropertyList:doc
+                format:NSPropertyListBinaryFormat_v1_0 options:0 error:nil];
+        if (encoded != nil) {
+            [encoded writeToFile:cn1PendingComplicationsPath() atomically:YES];
+        }
+    } @catch (NSException *ex) {
+        NSLog(@"[CN1Surfaces] could not park the pending complication queue: %@", ex.reason);
+    }
+}
+
+/// Reads back whatever the last process left waiting, and starts sending again.
+- (void)restorePendingComplications {
+    NSData *encoded = [NSData dataWithContentsOfFile:cn1PendingComplicationsPath()];
+    if (encoded == nil) {
+        return;
+    }
+    id doc = [NSPropertyListSerialization propertyListWithData:encoded options:0 format:NULL
+                                                         error:nil];
+    if (![doc isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    id order = [(NSDictionary *)doc objectForKey:@"order"];
+    id payloads = [(NSDictionary *)doc objectForKey:@"payloads"];
+    if (![order isKindOfClass:[NSArray class]] || ![payloads isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    @synchronized (self) {
+        for (id kind in (NSArray *)order) {
+            id payload = [(NSDictionary *)payloads objectForKey:kind];
+            if (![kind isKindOfClass:[NSString class]]
+                    || ![payload isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            // A kind published since the restore is NEWER than what was parked, so the parked
+            // one is dropped rather than overwriting it.
+            if ([_pendingComplications objectForKey:kind] != nil) {
+                continue;
+            }
+            [_pendingComplicationOrder addObject:kind];
+            [_pendingComplications setObject:payload forKey:kind];
+        }
+    }
+    [self sendNextComplicationUserInfo];
+}
+#endif
 
 - (WCSession *)session {
     return [WCSession isSupported] ? [WCSession defaultSession] : nil;
@@ -1043,6 +1123,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             [_pendingComplicationOrder addObject:kind];
         }
         [_pendingComplications setObject:info forKey:kind];
+        [self persistPendingComplicationsLocked];
     }
     [self sendNextComplicationUserInfo];
 }
@@ -1141,6 +1222,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             [_pendingComplicationOrder removeObject:kind];
             [_pendingComplicationOrder addObject:kind];
         }
+        [self persistPendingComplicationsLocked];
     }
     [self sendNextComplicationUserInfo];
 }

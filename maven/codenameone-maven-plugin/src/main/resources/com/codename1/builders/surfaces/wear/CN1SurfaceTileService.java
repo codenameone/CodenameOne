@@ -175,7 +175,7 @@ public abstract class CN1SurfaceTileService extends TileService {
                 // One refresh scheduled for that moment is enough: the rebuild then sees the
                 // interval running and asks for the periodic rate itself.
                 long wakeAt = earlierOf(reading.getNextFlipDate(),
-                        nextIntervalStart(reading.getLayout()));
+                        nextMovingStart(reading.getLayout(), reading.getState()));
                 freshness = freshnessFor(wakeAt,
                         hasMovingContent(reading.getLayout(), reading.getState()));
                 version = resourcesVersion(reading);
@@ -254,9 +254,15 @@ public abstract class CN1SurfaceTileService extends TileService {
                 // itself every minute to redraw the same string.
                 continue;
             }
-            if ("timerDown".equals(style)
-                    && CN1WatchSurface.dynamicDate(node, state) <= now) {
+            long target = CN1WatchSurface.dynamicDate(node, state);
+            if ("timerDown".equals(style) && target <= now) {
                 // An expired countdown is clamped at zero and equally still.
+                continue;
+            }
+            if ("timerUp".equals(style) && target > now) {
+                // A count-up toward a future target reads 0:00 until it arrives, so it is
+                // dormant in exactly the way a not-yet-started interval is. nextMovingStart
+                // brings the Tile back at the target rather than polling through the wait.
                 continue;
             }
             return true;
@@ -278,24 +284,33 @@ public abstract class CN1SurfaceTileService extends TileService {
     /**
      * When the first not-yet-started interval in this layout begins, or 0 when none does.
      *
-     * <p>An interval whose start is still ahead renders as an empty bar and does not move, so it
-     * earns no periodic refresh -- but something has to bring the Tile back when it does begin,
-     * and a reading with no flip date has nothing else that would.</p>
+     * <p>An interval whose start is still ahead renders as an empty bar, and a count-up toward a
+     * future target reads 0:00; neither moves, so neither earns a periodic refresh -- but
+     * something has to bring the Tile back when they do begin, and a reading with no flip date
+     * has nothing else that would.</p>
      *
      * @param layout the resolved layout root
      * @return the earliest future start, or 0
      */
-    private static long nextIntervalStart(JSONObject layout) {
+    private static long nextMovingStart(JSONObject layout, JSONObject state) {
         long now = System.currentTimeMillis();
         long earliest = 0;
         for (JSONObject node : CN1WatchSurface.flatten(layout)) {
-            if (!"prog".equals(node.optString("t", ""))
-                    || !node.has("start") || !node.has("end")) {
+            String type = node.optString("t", "");
+            if ("prog".equals(type) && node.has("start") && node.has("end")) {
+                long start = node.optLong("start");
+                if (start > now && now < node.optLong("end")) {
+                    earliest = earlierOf(earliest, start);
+                }
                 continue;
             }
-            long start = node.optLong("start");
-            if (start > now && now < node.optLong("end")) {
-                earliest = earlierOf(earliest, start);
+            // A count-up toward a future target is dormant for the same reason and wakes the
+            // same way: it reads 0:00 until the target, and then begins to move.
+            if ("dyn".equals(type) && "timerUp".equals(node.optString("style", "timerDown"))) {
+                long target = CN1WatchSurface.dynamicDate(node, state);
+                if (target > now) {
+                    earliest = earlierOf(earliest, target);
+                }
             }
         }
         return earliest;
