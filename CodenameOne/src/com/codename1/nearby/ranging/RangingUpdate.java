@@ -163,6 +163,7 @@ public final class RangingUpdate {
         return timestamp;
     }
 
+    @Override
     public String toString() {
         StringBuilder b = new StringBuilder("RangingUpdate[");
         if (hasDistance) {

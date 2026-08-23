@@ -117,6 +117,7 @@ public final class RangingSession {
         int id = NearbyRequests.nextId();
         EdtResult<RangingSession> out = Ranging.pendingSessions().open(id);
         starting = true;
+        Ranging.trackStarting(id, this);
         b.startRanging(id, handle, peerToken.toByteArray());
         return out;
     }
@@ -161,6 +162,7 @@ public final class RangingSession {
         int id = NearbyRequests.nextId();
         EdtResult<byte[]> out = Ranging.pendingAccessory().open(id);
         starting = true;
+        Ranging.trackStarting(id, this);
         b.startAccessoryRanging(id, handle, accessoryConfigurationData);
         return out;
     }
@@ -241,11 +243,12 @@ public final class RangingSession {
                 hasDirection, azimuth, hasElevation, elevation, vector,
                 System.currentTimeMillis());
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 s.running = true;
                 RangingListener[] ls = s.snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].updated(u);
+                for (RangingListener l : ls) {
+                    l.updated(u);
                 }
             }
         });
@@ -270,10 +273,11 @@ public final class RangingSession {
                 reasonOrdinal >= 0 && reasonOrdinal < all.length
                         ? all[reasonOrdinal] : RangingRemovalReason.UNKNOWN;
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 RangingListener[] ls = s.snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].peerRemoved(reason);
+                for (RangingListener l : ls) {
+                    l.peerRemoved(reason);
                 }
             }
         });
@@ -292,11 +296,12 @@ public final class RangingSession {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 s.running = false;
                 RangingListener[] ls = s.snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].suspended();
+                for (RangingListener l : ls) {
+                    l.suspended();
                 }
             }
         });
@@ -315,11 +320,12 @@ public final class RangingSession {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 s.running = true;
                 RangingListener[] ls = s.snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].resumed();
+                for (RangingListener l : ls) {
+                    l.resumed();
                 }
             }
         });
@@ -347,6 +353,7 @@ public final class RangingSession {
         }
         final NearbyException ex = Ranging.toException(errorOrdinal, message);
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 s.running = false;
                 s.closed = true;
@@ -354,8 +361,8 @@ public final class RangingSession {
                 synchronized (s.listeners) {
                     s.listeners.clear();
                 }
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].invalidated(ex);
+                for (RangingListener l : ls) {
+                    l.invalidated(ex);
                 }
             }
         });
@@ -398,6 +405,17 @@ public final class RangingSession {
 
     void markRunning() {
         running = true;
+        starting = false;
+    }
+
+    /// Clears the in-progress flag after a start that failed.
+    ///
+    /// Without this a session whose [#start] was rejected -- a corrupt token,
+    /// a peer that had already gone -- stayed `starting` forever, so every
+    /// retry answered `BUSY` and the prepared session was unusable for good.
+    /// The obvious retry after a bad token exchange is exactly the case that
+    /// hit it.
+    void markStartFailed() {
         starting = false;
     }
 

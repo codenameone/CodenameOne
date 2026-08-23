@@ -64,6 +64,7 @@ public final class Endpoint {
         return serviceId;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -75,10 +76,12 @@ public final class Endpoint {
         return id == null ? e.id == null : id.equals(e.id);
     }
 
+    @Override
     public int hashCode() {
         return id == null ? 0 : id.hashCode();
     }
 
+    @Override
     public String toString() {
         return "Endpoint[" + id + ", " + name + "]";
     }

@@ -105,6 +105,7 @@ public final class RangingCapabilities {
         return backgroundRanging;
     }
 
+    @Override
     public String toString() {
         return "RangingCapabilities[distance=" + distance
                 + ", direction=" + direction

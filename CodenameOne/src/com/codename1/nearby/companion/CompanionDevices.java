@@ -169,8 +169,8 @@ public final class CompanionDevices {
         }
         List<CompanionDevice> out =
                 new ArrayList<CompanionDevice>(rows.length);
-        for (int i = 0; i < rows.length; i++) {
-            CompanionDevice d = NearbyWire.decodeCompanionDevice(rows[i]);
+        for (String row : rows) {
+            CompanionDevice d = NearbyWire.decodeCompanionDevice(row);
             if (d != null) {
                 out.add(d);
             }
@@ -364,17 +364,18 @@ public final class CompanionDevices {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 PresenceListener[] ls;
                 synchronized (LISTENERS) {
                     ls = LISTENERS.toArray(
                             new PresenceListener[LISTENERS.size()]);
                 }
-                for (int i = 0; i < ls.length; i++) {
+                for (PresenceListener l : ls) {
                     if (present) {
-                        ls[i].deviceAppeared(d);
+                        l.deviceAppeared(d);
                     } else {
-                        ls[i].deviceDisappeared(d);
+                        l.deviceDisappeared(d);
                     }
                 }
             }

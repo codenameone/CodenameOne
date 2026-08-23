@@ -23,6 +23,11 @@
 package com.codename1.impl.android.nearby;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.os.Build;
+
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.ui.Display;
 
 import com.codename1.nearby.NearbyAvailability;
 import com.codename1.nearby.NearbyError;
@@ -48,6 +53,7 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -115,12 +121,64 @@ public class AndroidNearbyTransport implements NearbyBridge {
         return 0;
     }
 
-    public void requestPermissions(int requestId, int permissionBits) {
-        // The manifest permissions are injected at build time and the runtime
-        // grants are asked for by the Codename One permission machinery when
-        // the first scan happens, so there is nothing to raise here.
-        com.codename1.nearby.ranging.Ranging.deliverPermissionResult(requestId,
-                true);
+    public void requestPermissions(final int requestId, int permissionBits) {
+        // Actually ask. Nearby Connections drives Bluetooth, BLE and Wi-Fi and
+        // refuses to start without the runtime grants, and nothing on the
+        // startAdvertising/startDiscovery path checks them -- so answering a
+        // blanket true here made requestPermissions resolve while the first
+        // real operation failed for a permission the user was never asked
+        // about. AndroidBluetooth.requestPermissions is the shape this
+        // follows, down to running the blocking check on the EDT.
+        final ArrayList<String> perms = new ArrayList<String>();
+        if (Build.VERSION.SDK_INT >= 31) {
+            add(perms, "android.permission.BLUETOOTH_SCAN");
+            add(perms, "android.permission.BLUETOOTH_ADVERTISE");
+            add(perms, "android.permission.BLUETOOTH_CONNECT");
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            add(perms, "android.permission.NEARBY_WIFI_DEVICES");
+        } else {
+            // Below 33 Nearby Connections genuinely needs a location grant --
+            // it is not a scan-results technicality there, the API refuses to
+            // start without one.
+            add(perms, "android.permission.ACCESS_FINE_LOCATION");
+        }
+        if (perms.isEmpty()) {
+            com.codename1.nearby.ranging.Ranging.deliverPermissionResult(
+                    requestId, true);
+            return;
+        }
+        // checkForPermission blocks through invokeAndBlock and must run on the
+        // EDT.
+        Display.getInstance().callSerially(requestRunnable(requestId, perms));
+    }
+
+    /// Adds a permission the app has not already been granted.
+    private void add(ArrayList<String> perms, String permission) {
+        if (context.checkSelfPermission(permission)
+                != PackageManager.PERMISSION_GRANTED) {
+            perms.add(permission);
+        }
+    }
+
+    /// Static so the Runnable carries no synthetic outer reference, which
+    /// SpotBugs reports as SIC_INNER_SHOULD_BE_STATIC_ANON.
+    private static Runnable requestRunnable(final int requestId,
+            final ArrayList<String> perms) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                boolean all = true;
+                for (int i = 0; i < perms.size(); i++) {
+                    all = AndroidImplementation.checkForPermission(
+                            perms.get(i),
+                            "This is required to find and connect to nearby"
+                                    + " devices") && all;
+                }
+                com.codename1.nearby.ranging.Ranging.deliverPermissionResult(
+                        requestId, all);
+            }
+        };
     }
 
     // ------------------------------------------------------------------

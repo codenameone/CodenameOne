@@ -128,6 +128,7 @@ public final class Payload {
         return path;
     }
 
+    @Override
     public String toString() {
         return "Payload[" + id + ", "
                 + (type == TYPE_FILE ? "file " + path

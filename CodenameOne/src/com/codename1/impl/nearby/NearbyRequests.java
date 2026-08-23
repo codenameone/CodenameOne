@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.nearby;
 
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.async.PendingMap;
 import com.codename1.nearby.spi.NearbyBridge;
 import com.codename1.ui.Display;
 
@@ -37,6 +39,22 @@ public final class NearbyRequests {
     private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
 
     private static NearbyBridge testBridge;
+
+    /// Permission requests in flight, from EVERY facade.
+    ///
+    /// One map rather than one per facade, because there is one answer path:
+    /// a port reports the outcome through
+    /// `com.codename1.nearby.ranging.Ranging#deliverPermissionResult`
+    /// whichever entry point asked. A per-facade map meant a request opened by
+    /// `NearbyTransport.requestPermissions` was looked for in the ranging map,
+    /// not found, and dropped -- leaving the caller holding a resource that
+    /// never settled, which is precisely the failure the SPI documentation
+    /// calls worse than an outright error.
+    ///
+    /// Safe to share because request ids come from one counter, so an id is in
+    /// at most one map and an answer cannot be matched to the wrong operation.
+    private static final PendingMap<Boolean> PERMISSIONS =
+            new PendingMap<Boolean>();
 
     private NearbyRequests() {
     }
@@ -102,6 +120,42 @@ public final class NearbyRequests {
     /// a request id no other in-flight operation is using
     public static int nextId() {
         return NEXT_ID.getAndIncrement();
+    }
+
+    /// Registers a permission request and returns the resource its answer
+    /// will complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id the port will answer with
+    ///
+    /// #### Returns
+    ///
+    /// the resource to hand to the caller
+    public static EdtResult<Boolean> openPermissionRequest(int requestId) {
+        return PERMISSIONS.open(requestId);
+    }
+
+    /// Claims a permission request's resource, removing it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id being answered
+    ///
+    /// #### Returns
+    ///
+    /// the resource, or null when nothing is waiting on that id
+    public static EdtResult<Boolean> takePermissionRequest(int requestId) {
+        return PERMISSIONS.take(requestId);
+    }
+
+    /// Fails every permission request in flight.
+    ///
+    /// #### Parameters
+    ///
+    /// - `failure`: what to fail them with
+    public static void failPermissionRequests(Throwable failure) {
+        PERMISSIONS.failAll(failure);
     }
 
     /// Runs something on the EDT, immediately when already there.

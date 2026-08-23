@@ -336,6 +336,42 @@ static CN1NearbyTransport *cn1nbTransport = nil;
 /// app arrives here illegal. Folding it into something legal beats crashing,
 /// and the public API documents the constraint so an app can pick a name that
 /// survives the fold unchanged.
+/// The Bonjour service types the Info.plist declared, without their framing.
+///
+/// iOS 14 and later refuse to browse a service type the app did not declare in
+/// NSBonjourServices, and the refusal is a silent "no peers found" rather than
+/// an error. So the plist is the authority here: whatever the app passes as a
+/// service id is folded and then CHECKED against this list, and a type that is
+/// not on it fails the call with a message naming the build hint to add it to.
+/// Guessing instead -- registering the folded id and hoping -- is what produces
+/// a transport that never works with nothing in any log to explain it.
+static NSArray *cn1nbDeclaredServiceTypes(void) {
+    NSArray *declared = [[NSBundle mainBundle]
+            objectForInfoDictionaryKey:@"NSBonjourServices"];
+    if (![declared isKindOfClass:[NSArray class]]) {
+        return [NSArray array];
+    }
+    NSMutableArray *out = [NSMutableArray array];
+    for (id entry in declared) {
+        if (![entry isKindOfClass:[NSString class]]) {
+            continue;
+        }
+        // "_chat._tcp" -> "chat"
+        NSString *name = (NSString *)entry;
+        if ([name hasPrefix:@"_"]) {
+            name = [name substringFromIndex:1];
+        }
+        NSRange dot = [name rangeOfString:@"." options:NSBackwardsSearch];
+        if (dot.location != NSNotFound) {
+            name = [name substringToIndex:dot.location];
+        }
+        if ([name length] > 0 && ![out containsObject:name]) {
+            [out addObject:name];
+        }
+    }
+    return out;
+}
+
 static NSString *cn1nbServiceType(NSString *serviceId) {
     NSMutableString *out = [NSMutableString stringWithCapacity:15];
     NSString *lower = [serviceId lowercaseString];
@@ -544,6 +580,25 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 }
 
 @end
+
+/// True when the folded form of `serviceId` is one the Info.plist declared.
+static BOOL cn1nbServiceTypeIsDeclared(NSString *serviceId) {
+    NSArray *declared = cn1nbDeclaredServiceTypes();
+    return [declared containsObject:cn1nbServiceType(serviceId)];
+}
+
+/// The message an undeclared service type fails with. Names the hint to set,
+/// because the developer cannot otherwise tell why discovery found nothing.
+static NSString *cn1nbUndeclaredServiceMessage(NSString *serviceId) {
+    return [NSString stringWithFormat:
+            @"iOS only browses Bonjour service types declared in the app's "
+            @"Info.plist, and \"_%@._tcp\" is not one of them (declared: %@). "
+            @"Add \"%@\" to the ios.nearby.serviceType build hint, which "
+            @"accepts a comma-separated list.",
+            cn1nbServiceType(serviceId),
+            [cn1nbDeclaredServiceTypes() componentsJoinedByString:@", "],
+            serviceId == nil ? @"" : serviceId];
+}
 
 static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         NSString *localName) {
@@ -1148,6 +1203,11 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
 #ifdef CN1_NEARBY_HAS_MPC
     @autoreleasepool {
         NSString *sid = toNSString(CN1_THREAD_STATE_PASS_ARG serviceId);
+        if (!cn1nbServiceTypeIsDeclared(sid)) {
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_SESSION_FAILED,
+                    cn1nbUndeclaredServiceMessage(sid));
+            return;
+        }
         NSString *name = toNSString(CN1_THREAD_STATE_PASS_ARG localName);
         CN1NearbyTransport *t = cn1nbTransportInit(sid, name);
         if (t.advertiser != nil) {
@@ -1187,6 +1247,11 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
 #ifdef CN1_NEARBY_HAS_MPC
     @autoreleasepool {
         NSString *sid = toNSString(CN1_THREAD_STATE_PASS_ARG serviceId);
+        if (!cn1nbServiceTypeIsDeclared(sid)) {
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_SESSION_FAILED,
+                    cn1nbUndeclaredServiceMessage(sid));
+            return;
+        }
         CN1NearbyTransport *t = cn1nbTransportInit(sid, nil);
         if (t.browser != nil) {
             [t.browser stopBrowsingForPeers];

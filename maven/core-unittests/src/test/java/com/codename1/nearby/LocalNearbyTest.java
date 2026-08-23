@@ -652,6 +652,44 @@ class LocalNearbyTest {
         assertEquals(after, seen.get());
     }
 
+    @Test
+    void transportPermissionsSettleRatherThanHanging() {
+        // Regression: NearbyTransport.requestPermissions parked its resource
+        // in the transport's own pending map while every bridge answers
+        // through Ranging.deliverPermissionResult, which only searched the
+        // ranging map. The id was dropped and the caller waited forever --
+        // the exact failure the SPI documentation calls worse than an error.
+        assertTrue(value(NearbyTransport.requestPermissions(
+                NearbyPermission.DISCOVERY, NearbyPermission.CONNECT))
+                .booleanValue());
+    }
+
+    @Test
+    void aFailedStartLeavesTheSessionUsable() {
+        // Regression: the flag that makes a concurrent start answer BUSY was
+        // set before the bridge call and cleared only on success, so a
+        // rejected token wedged the session permanently -- and retrying after
+        // a bad token exchange is the obvious thing to do.
+        RangingSession s = value(Ranging.prepareSession(
+                RangingRole.CONTROLLER));
+        assertFailedWith(NearbyError.INVALID_TOKEN, s.start(
+                RangingToken.forPayload(RangingToken.PLATFORM_APPLE_NI,
+                        new byte[] {1, 2, 3})));
+        // The retry must reach the bridge, not bounce off BUSY.
+        RangingSession started = value(s.start(peerToken()));
+        assertSame(s, started);
+        assertTrue(s.isRunning());
+    }
+
+    @Test
+    void aFailedAccessoryStartAlsoLeavesTheSessionUsable() {
+        RangingSession s = value(Ranging.prepareSession(
+                RangingRole.CONTROLLER));
+        assertFailedWith(NearbyError.INVALID_TOKEN,
+                s.startAccessory(new byte[0]));
+        assertNotNull(value(s.startAccessory(new byte[] {1, 2, 3})));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

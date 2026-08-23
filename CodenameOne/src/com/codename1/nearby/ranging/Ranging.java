@@ -97,12 +97,12 @@ import com.codename1.util.AsyncResource;
 ///   fails with [NearbyError#NOT_SUPPORTED].
 public final class Ranging {
 
-    private static final PendingMap<Boolean> PENDING_PERMISSIONS =
-            new PendingMap<Boolean>();
     private static final PendingMap<RangingSession> PENDING_SESSIONS =
             new PendingMap<RangingSession>();
     private static final PendingMap<byte[]> PENDING_ACCESSORY =
             new PendingMap<byte[]>();
+    private static final java.util.Map<Integer, RangingSession> STARTING =
+            new java.util.HashMap<Integer, RangingSession>();
 
     private Ranging() {
     }
@@ -174,12 +174,12 @@ public final class Ranging {
         }
         int bits = 0;
         if (permissions != null) {
-            for (int i = 0; i < permissions.length; i++) {
-                bits |= permissionBit(permissions[i]);
+            for (NearbyPermission permission : permissions) {
+                bits |= permissionBit(permission);
             }
         }
         int id = NearbyRequests.nextId();
-        EdtResult<Boolean> out = PENDING_PERMISSIONS.open(id);
+        EdtResult<Boolean> out = NearbyRequests.openPermissionRequest(id);
         b.requestPermissions(id, bits);
         return out;
     }
@@ -218,7 +218,9 @@ public final class Ranging {
     // Port entry points
     // ------------------------------------------------------------------
 
-    /// Answers [#requestPermissions].
+    /// Answers a permission request from ANY entry point in this family --
+    /// ranging or transport. Ports report every permission outcome here, and
+    /// the pending map it reads is shared for that reason.
     ///
     /// @hidden not part of the public API; called by ports.
     ///
@@ -228,7 +230,7 @@ public final class Ranging {
     /// - `granted`: whether every requested permission was granted
     public static void deliverPermissionResult(int requestId,
             boolean granted) {
-        EdtResult<Boolean> r = PENDING_PERMISSIONS.take(requestId);
+        EdtResult<Boolean> r = NearbyRequests.takePermissionRequest(requestId);
         if (r != null) {
             r.complete(Boolean.valueOf(granted));
         }
@@ -275,6 +277,7 @@ public final class Ranging {
     /// - `sessionHandle`: the session that started
     public static void deliverSessionStarted(int requestId,
             int sessionHandle) {
+        untrackStarting(requestId);
         EdtResult<RangingSession> r = PENDING_SESSIONS.take(requestId);
         if (r != null) {
             RangingSession s = RangingSession.lookup(sessionHandle);
@@ -300,6 +303,7 @@ public final class Ranging {
     ///   empty where the platform needs no handshake
     public static void deliverAccessoryConfiguration(int requestId,
             int sessionHandle, byte[] shareableConfiguration) {
+        untrackStarting(requestId);
         EdtResult<byte[]> r = PENDING_ACCESSORY.take(requestId);
         if (r != null) {
             RangingSession s = RangingSession.lookup(sessionHandle);
@@ -329,15 +333,22 @@ public final class Ranging {
         NearbyException ex = toException(errorOrdinal, message);
         EdtResult<RangingSession> s = PENDING_SESSIONS.take(requestId);
         if (s != null) {
+            // A start that failed leaves the session prepared but idle, and
+            // it has to be told so: the flag that makes a concurrent start
+            // answer BUSY is set before the bridge call and cleared only on
+            // success, so without this the session answers BUSY to every
+            // retry forever.
+            releaseStarting(requestId);
             s.error(ex);
             return;
         }
         EdtResult<byte[]> a = PENDING_ACCESSORY.take(requestId);
         if (a != null) {
+            releaseStarting(requestId);
             a.error(ex);
             return;
         }
-        EdtResult<Boolean> p = PENDING_PERMISSIONS.take(requestId);
+        EdtResult<Boolean> p = NearbyRequests.takePermissionRequest(requestId);
         if (p != null) {
             p.error(ex);
         }
@@ -356,14 +367,57 @@ public final class Ranging {
     public static void resetForTest() {
         NearbyException reset = new NearbyException(NearbyError.UNKNOWN,
                 "the nearby framework was reset");
-        PENDING_PERMISSIONS.failAll(reset);
+        NearbyRequests.failPermissionRequests(reset);
         PENDING_SESSIONS.failAll(reset);
         PENDING_ACCESSORY.failAll(reset);
+        synchronized (STARTING) {
+            STARTING.clear();
+        }
     }
 
     // ------------------------------------------------------------------
     // Internals shared with RangingSession
     // ------------------------------------------------------------------
+
+    /// Clears the in-progress flag of whichever session issued this request.
+    ///
+    /// Tracked by request id rather than by handle because the failure path
+    /// only ever learns the id: `NearbyBridge` answers a failed start through
+    /// `deliverRequestFailed(requestId, ...)`, which names no session.
+    private static void releaseStarting(int requestId) {
+        RangingSession s;
+        synchronized (STARTING) {
+            s = STARTING.remove(Integer.valueOf(requestId));
+        }
+        if (s != null) {
+            s.markStartFailed();
+        }
+    }
+
+    /// The session behind each in-flight start, so a failure can find it.
+    ///
+    /// @hidden not part of the public API.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id of the start being issued
+    /// - `session`: the session issuing it
+    static void trackStarting(int requestId, RangingSession session) {
+        synchronized (STARTING) {
+            STARTING.put(Integer.valueOf(requestId), session);
+        }
+    }
+
+    /// Forgets a start that has settled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the id of the start that finished
+    static void untrackStarting(int requestId) {
+        synchronized (STARTING) {
+            STARTING.remove(Integer.valueOf(requestId));
+        }
+    }
 
     static PendingMap<RangingSession> pendingSessions() {
         return PENDING_SESSIONS;

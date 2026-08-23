@@ -97,6 +97,7 @@ public final class CompanionDevice {
         return present;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -108,10 +109,12 @@ public final class CompanionDevice {
         return id == null ? d.id == null : id.equals(d.id);
     }
 
+    @Override
     public int hashCode() {
         return id == null ? 0 : id.hashCode();
     }
 
+    @Override
     public String toString() {
         return "CompanionDevice[" + id + ", " + displayName
                 + ", profile=" + profile + ", present=" + present + "]";

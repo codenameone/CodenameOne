@@ -110,6 +110,7 @@ public final class IncomingConnection {
         }
     }
 
+    @Override
     public String toString() {
         return "IncomingConnection[" + endpoint + ", token="
                 + authenticationToken + "]";

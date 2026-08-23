@@ -73,6 +73,7 @@ public final class PayloadTransferUpdate {
         return status;
     }
 
+    @Override
     public String toString() {
         return "PayloadTransferUpdate[" + payloadId + ", " + bytesTransferred
                 + "/" + totalBytes + ", " + status + "]";

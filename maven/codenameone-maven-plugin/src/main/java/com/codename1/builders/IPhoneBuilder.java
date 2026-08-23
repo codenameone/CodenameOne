@@ -235,15 +235,28 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
-    /// The Bonjour service type MultipeerConnectivity will register under.
+    /// Every Bonjour service type this app may register, folded to what
+    /// MultipeerConnectivity will accept.
     ///
-    /// Derived from `ios.nearby.serviceType` when the developer set one, and
-    /// otherwise from the package name -- and folded through the same rule
-    /// `cn1nbServiceType` in CN1Nearby.m applies, because the value declared
-    /// in the plist has to be the value the runtime registers or iOS refuses
-    /// the browse. MultipeerConnectivity allows 1 to 15 characters of
-    /// lowercase ASCII letters, digits and non-adjacent hyphens, and raises
-    /// on anything else.
+    /// iOS 14 and later browse only the types declared in `NSBonjourServices`,
+    /// and a type that is missing produces a silent "no peers found" rather
+    /// than an error -- so what goes in the plist has to be a superset of what
+    /// the app passes to `startAdvertising`, and the build cannot see those
+    /// strings.
+    ///
+    /// `ios.nearby.serviceType` is therefore a comma-separated list of the
+    /// service ids the app uses, each folded here through exactly the rule
+    /// `cn1nbServiceType` in CN1Nearby.m applies. The runtime folds its own
+    /// argument the same way and checks the result against this list, failing
+    /// with an actionable message rather than browsing into the void.
+    ///
+    /// With no hint the package name is the only guess available, which is
+    /// right for an app whose service id is its package name and wrong for the
+    /// documented `startAdvertising("chat", ...)` -- so the caller logs the
+    /// derived value.
+    ///
+    /// MultipeerConnectivity allows 1 to 15 characters of lowercase ASCII
+    /// letters, digits and non-adjacent hyphens, and raises on anything else.
     ///
     /// #### Parameters
     ///
@@ -251,16 +264,44 @@ public class IPhoneBuilder extends Executor {
     ///
     /// #### Returns
     ///
-    /// a legal service type, never null or empty
-    static String bonjourServiceType(BuildRequest request) {
+    /// the folded service types, never empty and without duplicates
+    static java.util.List<String> bonjourServiceTypes(BuildRequest request) {
         String declared = request.getArg("ios.nearby.serviceType", null);
         String source = declared != null && declared.trim().length() > 0
                 ? declared.trim() : request.getPackageName();
         if (source == null) {
             source = "";
         }
+        java.util.List<String> out = new ArrayList<String>();
+        for (String entry : source.split(",")) {
+            String folded = foldBonjourServiceType(entry);
+            if (folded.length() > 0 && !out.contains(folded)) {
+                out.add(folded);
+            }
+        }
+        if (out.isEmpty()) {
+            out.add("cn1-nearby");
+        }
+        return out;
+    }
+
+    /// Folds one service id into a legal Bonjour service type. Must stay
+    /// identical to `cn1nbServiceType` in CN1Nearby.m; the two are compared by
+    /// NearbyBonjourServiceTypeTest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceId`: the id to fold
+    ///
+    /// #### Returns
+    ///
+    /// the folded type, or the empty string when nothing usable remains
+    static String foldBonjourServiceType(String serviceId) {
+        if (serviceId == null) {
+            return "";
+        }
         StringBuilder out = new StringBuilder();
-        String lower = source.toLowerCase();
+        String lower = serviceId.toLowerCase();
         for (int i = 0; i < lower.length() && out.length() < 15; i++) {
             char c = lower.charAt(i);
             if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
@@ -273,7 +314,7 @@ public class IPhoneBuilder extends Executor {
         while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
             out.setLength(out.length() - 1);
         }
-        return out.length() == 0 ? "cn1-nearby" : out.toString();
+        return out.toString();
     }
 
     /// Escapes the three characters that cannot sit in plist text content.
@@ -287,7 +328,7 @@ public class IPhoneBuilder extends Executor {
     /// - `value`: the text
     ///
     /// #### Returns
-    /// 
+    ///
     /// the escaped text
     private static String escapeNearbyPlistText(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;")
@@ -4360,28 +4401,33 @@ public class IPhoneBuilder extends Executor {
                     enableNearbyDefine(buildinRes, "CN1_NEARBY_TRANSPORT");
                     // iOS 14 refuses a MultipeerConnectivity browse whose
                     // Bonjour service types are not declared, and the refusal
-                    // is a silent "no peers found" rather than an error. The
-                    // service type is derived from the same id the app passes
-                    // to startAdvertising, folded the way CN1Nearby.m folds
-                    // it, so the two agree.
-                    String serviceType = bonjourServiceType(request);
-                    // Logged always, because the fold is lossy and silently
-                    // so: com.example.chat and com.example.charts both become
-                    // com-example-cha, and two apps sharing a service type
-                    // discover each other's peers. A developer who sees this
-                    // line can set ios.nearby.serviceType and stop guessing.
-                    log("Nearby transport registers Bonjour service type _"
-                            + serviceType + "._tcp / ._udp"
-                            + (request.getArg("ios.nearby.serviceType", "")
-                                    .trim().length() > 0
-                                    ? "" : " (derived from the package name;"
-                                            + " set ios.nearby.serviceType to"
-                                            + " choose it yourself)"));
+                    // is a silent "no peers found" rather than an error.
+                    java.util.List<String> serviceTypes =
+                            bonjourServiceTypes(request);
+                    boolean hintSet = request
+                            .getArg("ios.nearby.serviceType", "").trim()
+                            .length() > 0;
+                    // Logged always. iOS browses only what is declared here,
+                    // and the runtime now REFUSES an undeclared type rather
+                    // than browsing into the void -- so a developer whose
+                    // service id is not on this line gets a build log that
+                    // says what to add, instead of an app that finds no peers.
+                    log("Nearby transport declares Bonjour service type(s) "
+                            + serviceTypes
+                            + (hintSet ? ""
+                                    : " (derived from the package name; set"
+                                    + " ios.nearby.serviceType to a"
+                                    + " comma-separated list of the service"
+                                    + " ids this app passes to"
+                                    + " startAdvertising)"));
+                    String[] bonjour = new String[serviceTypes.size() * 2];
+                    for (int i = 0; i < serviceTypes.size(); i++) {
+                        bonjour[i * 2] = "_" + serviceTypes.get(i) + "._tcp";
+                        bonjour[i * 2 + 1] = "_" + serviceTypes.get(i)
+                                + "._udp";
+                    }
                     declareNearbyPlistArray(request, "NSBonjourServices",
-                            new String[] {
-                                "_" + serviceType + "._tcp",
-                                "_" + serviceType + "._udp"
-                            },
+                            bonjour,
                             "MultipeerConnectivity cannot browse without it");
                 }
                 if (usesNearbyCompanion) {

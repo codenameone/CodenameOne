@@ -153,6 +153,23 @@ class NearbyManifestFragmentsTest {
     }
 
     @Test
+    void theForegroundServiceExemptionArrivesWithApi31NotApi33() {
+        // It is a companion permission since API 31. Gating it on 33 left an
+        // Android 12/12L app unable to start a foreground service when the
+        // platform woke its CompanionDeviceService, which is what observing
+        // presence is for.
+        String twelve = NearbyManifestFragments.inject("", false, false, true,
+                true, false, 31);
+        assertTrue(twelve.contains("android.permission.REQUEST_COMPANION"
+                + "_START_FOREGROUND_SERVICES_FROM_BACKGROUND"));
+        // Still absent below the API that has it.
+        String eleven = NearbyManifestFragments.inject("", false, false, true,
+                true, false, 30);
+        assertFalse(eleven.contains(
+                "REQUEST_COMPANION_START_FOREGROUND_SERVICES"));
+    }
+
+    @Test
     void theWatchProfilePermissionIsOptInAndModernOnly() {
         assertFalse(NearbyManifestFragments.inject("", false, false, true,
                 false, false, 34)

@@ -43,7 +43,7 @@ public enum RangingUnit {
 
     private final double metersPerUnit;
 
-    private RangingUnit(double metersPerUnit) {
+    RangingUnit(double metersPerUnit) {
         this.metersPerUnit = metersPerUnit;
     }
 

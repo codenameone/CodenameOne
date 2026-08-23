@@ -38,18 +38,23 @@ import com.codename1.nearby.NearbyException;
 /// ```
 public class RangingAdapter implements RangingListener {
 
+    @Override
     public void updated(RangingUpdate update) {
     }
 
+    @Override
     public void peerRemoved(RangingRemovalReason reason) {
     }
 
+    @Override
     public void suspended() {
     }
 
+    @Override
     public void resumed() {
     }
 
+    @Override
     public void invalidated(NearbyException error) {
     }
 }

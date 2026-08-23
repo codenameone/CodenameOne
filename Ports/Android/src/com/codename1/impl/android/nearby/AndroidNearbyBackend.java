@@ -520,10 +520,15 @@ public class AndroidNearbyBackend implements NearbyBridge {
             case 1:
                 return AssociationRequest.DEVICE_PROFILE_WATCH;
             case 2:
-                return Build.VERSION.SDK_INT >= 33
+                // GLASSES is API 34 and COMPUTER is 33 -- not the other way
+                // round, which is the order the enum happens to declare them
+                // in. Passing the platform a profile string it does not know
+                // throws, so these two gates were checked against the SDK's
+                // own api-versions.xml rather than guessed from the ordinal.
+                return Build.VERSION.SDK_INT >= 34
                         ? AssociationRequest.DEVICE_PROFILE_GLASSES : null;
             case 3:
-                return Build.VERSION.SDK_INT >= 34
+                return Build.VERSION.SDK_INT >= 33
                         ? AssociationRequest.DEVICE_PROFILE_COMPUTER : null;
             default:
                 // GENERIC. Deliberately no profile at all rather than a

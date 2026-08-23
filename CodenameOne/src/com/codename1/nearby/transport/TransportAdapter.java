@@ -28,27 +28,35 @@ import com.codename1.nearby.NearbyException;
 /// interested in two events overrides two methods.
 public class TransportAdapter implements TransportListener {
 
+    @Override
     public void endpointFound(Endpoint endpoint) {
     }
 
+    @Override
     public void endpointLost(Endpoint endpoint) {
     }
 
+    @Override
     public void connectionRequested(IncomingConnection request) {
     }
 
+    @Override
     public void connected(Endpoint endpoint) {
     }
 
+    @Override
     public void connectionFailed(Endpoint endpoint, NearbyException error) {
     }
 
+    @Override
     public void disconnected(Endpoint endpoint) {
     }
 
+    @Override
     public void payloadReceived(Endpoint endpoint, Payload payload) {
     }
 
+    @Override
     public void payloadProgress(Endpoint endpoint,
             PayloadTransferUpdate update) {
     }

@@ -24,6 +24,8 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,6 +56,13 @@ class NearbyBonjourServiceTypeTest {
         return r;
     }
 
+    /** The single folded type, asserting the hint produced exactly one. */
+    private static String only(BuildRequest request) {
+        List<String> all = IPhoneBuilder.bonjourServiceTypes(request);
+        assertEquals(1, all.size(), "expected one service type, got " + all);
+        return all.get(0);
+    }
+
     private static void assertLegal(String type) {
         assertTrue(type.length() >= 1 && type.length() <= 15,
                 "1 to 15 characters, got " + type.length() + " in " + type);
@@ -66,7 +75,7 @@ class NearbyBonjourServiceTypeTest {
 
     @Test
     void anExplicitHintIsUsedAsGiven() {
-        assertEquals("chat", IPhoneBuilder.bonjourServiceType(
+        assertEquals("chat", only(
                 request("com.example.app", "chat")));
     }
 
@@ -74,7 +83,7 @@ class NearbyBonjourServiceTypeTest {
     void aReverseDnsPackageIsFoldedRatherThanRejected() {
         // Legal on Android and illegal here, which is exactly the case a
         // cross-platform app hits by writing the obvious thing.
-        String type = IPhoneBuilder.bonjourServiceType(
+        String type = only(
                 request("com.example.chat", null));
         assertLegal(type);
         // Sixteen characters folded, fifteen allowed -- so even this
@@ -86,7 +95,7 @@ class NearbyBonjourServiceTypeTest {
 
     @Test
     void anOverlongPackageIsTruncatedToTheLimit() {
-        String type = IPhoneBuilder.bonjourServiceType(
+        String type = only(
                 request("com.example.someverylongapplicationname", null));
         assertLegal(type);
         assertEquals(15, type.length());
@@ -96,14 +105,14 @@ class NearbyBonjourServiceTypeTest {
     void aTruncationThatLandsOnAHyphenDoesNotLeaveOne() {
         // "ab.cdefghijklm.x" folds to "ab-cdefghijklm-" at fifteen, and a
         // trailing hyphen is one of the things that makes the framework raise.
-        String type = IPhoneBuilder.bonjourServiceType(
+        String type = only(
                 request("ab.cdefghijklm.x", null));
         assertLegal(type);
     }
 
     @Test
     void runsOfIllegalCharactersCollapseToOneHyphen() {
-        String type = IPhoneBuilder.bonjourServiceType(
+        String type = only(
                 request("com...example___app", null));
         assertLegal(type);
         assertEquals("com-example-app", type);
@@ -111,21 +120,21 @@ class NearbyBonjourServiceTypeTest {
 
     @Test
     void uppercaseIsLowered() {
-        assertEquals("mychat", IPhoneBuilder.bonjourServiceType(
+        assertEquals("mychat", only(
                 request("com.example.app", "MyChat")));
     }
 
     @Test
     void somethingWithNoUsableCharactersFallsBackRatherThanRaising() {
-        assertEquals("cn1-nearby", IPhoneBuilder.bonjourServiceType(
+        assertEquals("cn1-nearby", only(
                 request("...", null)));
-        assertEquals("cn1-nearby", IPhoneBuilder.bonjourServiceType(
+        assertEquals("cn1-nearby", only(
                 request(null, null)));
     }
 
     @Test
     void ablankHintFallsBackToThePackageRatherThanToTheDefault() {
-        assertEquals("com-example-app", IPhoneBuilder.bonjourServiceType(
+        assertEquals("com-example-app", only(
                 request("com.example.app", "   ")));
     }
 
@@ -137,8 +146,62 @@ class NearbyBonjourServiceTypeTest {
             "MiXeD.CaSe.Name", "x.y", "com.example.APP"
         };
         for (String in : inputs) {
-            assertLegal(IPhoneBuilder.bonjourServiceType(request(in, null)));
-            assertLegal(IPhoneBuilder.bonjourServiceType(request("p", in)));
+            assertLegal(only(request(in, null)));
+            assertLegal(only(request("p", in)));
+        }
+    }
+
+    @Test
+    void aCommaSeparatedHintDeclaresEveryServiceTheAppUses() {
+        // The point of the list: iOS browses only what the plist declared, and
+        // the build cannot see the strings an app passes to startAdvertising.
+        List<String> types = IPhoneBuilder.bonjourServiceTypes(
+                request("com.example.app", "chat, files , telemetry"));
+        assertEquals(3, types.size());
+        assertEquals("chat", types.get(0));
+        assertEquals("files", types.get(1));
+        assertEquals("telemetry", types.get(2));
+        for (String t : types) {
+            assertLegal(t);
+        }
+    }
+
+    @Test
+    void idsThatFoldToTheSameTypeAreDeclaredOnce() {
+        List<String> types = IPhoneBuilder.bonjourServiceTypes(
+                request("com.example.app", "chat,chat,Chat"));
+        assertEquals(1, types.size());
+        assertEquals("chat", types.get(0));
+    }
+
+    @Test
+    void theFoldIsTheSameOneTheRuntimeApplies() {
+        // CN1Nearby.m folds the service id an app passes at runtime and then
+        // checks the result against NSBonjourServices. If these two folds ever
+        // disagree the app browses a type the plist does not declare, and iOS
+        // answers with silence rather than an error -- so the build-side fold
+        // is exposed on its own and pinned here.
+        assertEquals("chat", IPhoneBuilder.foldBonjourServiceType("chat"));
+        assertEquals("com-example-cha",
+                IPhoneBuilder.foldBonjourServiceType("com.example.chat"));
+        assertEquals("mychat", IPhoneBuilder.foldBonjourServiceType("MyChat"));
+        assertEquals("", IPhoneBuilder.foldBonjourServiceType("..."));
+        assertEquals("", IPhoneBuilder.foldBonjourServiceType(null));
+    }
+
+    @Test
+    void everyDeclaredTypeIsLegalWhateverTheHintSays() {
+        String[] hints = {
+            "a,b,c", "com.example.app,chat", "-,--,x", "A,B",
+            "com.example.a-very-long-name-indeed,y", ",,,", "1.2.3"
+        };
+        for (String hint : hints) {
+            List<String> types = IPhoneBuilder.bonjourServiceTypes(
+                    request("com.example.app", hint));
+            assertTrue(!types.isEmpty(), "never empty for hint " + hint);
+            for (String t : types) {
+                assertLegal(t);
+            }
         }
     }
 }

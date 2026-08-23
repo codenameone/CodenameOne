@@ -130,6 +130,7 @@ public final class DeviceFilter {
         return value;
     }
 
+    @Override
     public String toString() {
         return "DeviceFilter[kind=" + kind + ", value=" + value + "]";
     }

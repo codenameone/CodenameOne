@@ -145,7 +145,13 @@ final class NearbyManifestFragments {
                 out = addPermission(out,
                         "android.permission.REQUEST_COMPANION_USE_DATA_IN_BACKGROUND",
                         "");
-                if (tiramisu) {
+                // API 31, not 33. Gating this on the Tiramisu boundary
+                // left an Android 12/12L app unable to use the
+                // companion-device exemption when the platform woke its
+                // CN1CompanionDeviceService -- which is the whole point of
+                // observing presence. Verified against the SDK's own
+                // api-versions.xml, not inferred from the neighbours.
+                if (modern) {
                     out = addPermission(out, "android.permission"
                             + ".REQUEST_COMPANION_START_FOREGROUND_SERVICES"
                             + "_FROM_BACKGROUND", "");

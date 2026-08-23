@@ -149,12 +149,16 @@ public final class NearbyTransport {
         }
         int bits = 0;
         if (permissions != null) {
-            for (int i = 0; i < permissions.length; i++) {
-                bits |= bitFor(permissions[i]);
+            for (NearbyPermission permission : permissions) {
+                bits |= bitFor(permission);
             }
         }
         int id = NearbyRequests.nextId();
-        EdtResult<Boolean> out = PENDING.open(id);
+        // The SHARED permission map, not this class's own: a port answers
+        // every permission request through Ranging.deliverPermissionResult
+        // whichever entry point asked, so a request parked here would never
+        // be found and the caller would wait forever.
+        EdtResult<Boolean> out = NearbyRequests.openPermissionRequest(id);
         b.requestPermissions(id, bits);
         return out;
     }
@@ -435,9 +439,17 @@ public final class NearbyTransport {
     /// - `message`: a human-readable detail, may be null
     public static void deliverRequestFailed(int requestId, int errorOrdinal,
             String message) {
+        NearbyException ex = NearbyWire.decodeError(errorOrdinal, message);
         EdtResult<Boolean> r = PENDING.take(requestId);
         if (r != null) {
-            r.error(NearbyWire.decodeError(errorOrdinal, message));
+            r.error(ex);
+            return;
+        }
+        // A permission request lives in the shared map, so a port that fails
+        // one through this entry point still finds its caller.
+        EdtResult<Boolean> p = NearbyRequests.takePermissionRequest(requestId);
+        if (p != null) {
+            p.error(ex);
         }
     }
 
@@ -457,13 +469,14 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 TransportListener[] ls = snapshot();
-                for (int i = 0; i < ls.length; i++) {
+                for (TransportListener l : ls) {
                     if (found) {
-                        ls[i].endpointFound(e);
+                        l.endpointFound(e);
                     } else {
-                        ls[i].endpointLost(e);
+                        l.endpointLost(e);
                     }
                 }
             }
@@ -486,12 +499,13 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 IncomingConnection r =
                         new IncomingConnection(e, authenticationToken);
                 TransportListener[] ls = snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].connectionRequested(r);
+                for (TransportListener l : ls) {
+                    l.connectionRequested(r);
                 }
                 if (!r.isAnswered()) {
                     // Nobody was listening, so nobody will ever answer. The
@@ -523,13 +537,14 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 TransportListener[] ls = snapshot();
-                for (int i = 0; i < ls.length; i++) {
+                for (TransportListener l : ls) {
                     if (connected) {
-                        ls[i].connected(e);
+                        l.connected(e);
                     } else {
-                        ls[i].connectionFailed(e,
+                        l.connectionFailed(e,
                                 NearbyWire.decodeError(errorOrdinal, message));
                     }
                 }
@@ -551,10 +566,11 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 TransportListener[] ls = snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].disconnected(e);
+                for (TransportListener l : ls) {
+                    l.disconnected(e);
                 }
             }
         });
@@ -581,14 +597,15 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 Payload p = Payload.received(payloadId,
                         payloadType == NearbyBridge.PAYLOAD_FILE
                                 ? Payload.TYPE_FILE : Payload.TYPE_BYTES,
                         bytes, path);
                 TransportListener[] ls = snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].payloadReceived(e, p);
+                for (TransportListener l : ls) {
+                    l.payloadReceived(e, p);
                 }
             }
         });
@@ -614,6 +631,7 @@ public final class NearbyTransport {
             return;
         }
         NearbyRequests.onEdt(new Runnable() {
+    @Override
             public void run() {
                 PayloadStatus[] all = PayloadStatus.values();
                 PayloadStatus s = statusOrdinal >= 0
@@ -622,8 +640,8 @@ public final class NearbyTransport {
                 PayloadTransferUpdate u = new PayloadTransferUpdate(payloadId,
                         bytesTransferred, totalBytes, s);
                 TransportListener[] ls = snapshot();
-                for (int i = 0; i < ls.length; i++) {
-                    ls[i].payloadProgress(e, u);
+                for (TransportListener l : ls) {
+                    l.payloadProgress(e, u);
                 }
             }
         });

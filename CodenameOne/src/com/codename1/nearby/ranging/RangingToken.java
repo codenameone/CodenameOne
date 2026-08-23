@@ -205,6 +205,7 @@ public final class RangingToken {
                 payload == null ? new byte[0] : payload);
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -224,14 +225,16 @@ public final class RangingToken {
         return true;
     }
 
+    @Override
     public int hashCode() {
         int h = platform;
-        for (int i = 0; i < payload.length; i++) {
-            h = h * 31 + payload[i];
+        for (byte b : payload) {
+            h = h * 31 + b;
         }
         return h;
     }
 
+    @Override
     public String toString() {
         return "RangingToken[platform=" + platform
                 + ", " + payload.length + " bytes]";
