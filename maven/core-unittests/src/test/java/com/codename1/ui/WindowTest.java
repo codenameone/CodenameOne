@@ -4246,4 +4246,28 @@ class WindowTest extends UITestBase {
                 "a window that was never on screen cannot have gone off it");
         assertEquals(1, counts[1]);
     }
+
+    @FormTest
+    void anActivationFailureReportedOnTheEdtAppliesInThatSameTurn() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("refused", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        assertTrue(w.isWindowShowing());
+
+        // A port validates the failure against the request token it belongs to and then
+        // reports it. Queueing the framework half into a later turn lets a retrying
+        // show() run in between and be undone by a failure that no longer applies to
+        // it, so the report has to take effect in the turn that validated it.
+        Display.getInstance().windowActivationFailed(w.getWindowId());
+
+        assertFalse(w.isWindowShowing(),
+                "the failure has to take effect in the caller's own turn, not a later "
+                        + "one, or a retry started in between is the thing it lands on");
+        assertFalse(w.isWindowDisposed(),
+                "the window is still registered -- a later show() may ask the platform "
+                        + "again; only its visibility and modality are given up");
+        w.dispose();
+    }
 }

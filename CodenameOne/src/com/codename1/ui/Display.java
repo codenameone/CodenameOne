@@ -3066,8 +3066,22 @@ public final class Display extends CN1Constants {
     /// - `windowId`: the window whose native surface could not be created
     public void windowActivationFailed(int windowId) {
         if (windowId > 0) {
+            WindowCallback failure = new WindowCallback(windowId,
+                    WindowCallback.ACTIVATION_FAILED);
+            if (isEdt()) {
+                // Applied in the caller's own turn when it is already on the event
+                // dispatch thread. A port validates this failure against the request
+                // token it belongs to and then reports it, and queueing again splits
+                // those two steps across turns: a retrying show() can run in between,
+                // start a new request, and be marked hidden and stripped of its
+                // modality by a failure that no longer applies to it. Running here
+                // keeps the check and its consequence in one unit, which is what the
+                // check is for.
+                failure.run();
+                return;
+            }
             // Not droppable, for the same reason as the other lifecycle notifications.
-            callSerially(new WindowCallback(windowId, WindowCallback.ACTIVATION_FAILED));
+            callSerially(failure);
         }
     }
 
