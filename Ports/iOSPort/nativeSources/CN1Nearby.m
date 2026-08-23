@@ -1282,29 +1282,24 @@ static NSString *cn1nbAccessoryId(ASAccessory *accessory)
     if (self.session == nil || associationId == nil) {
         return nil;
     }
+    // Exactly one, or none.
+    //
+    // An accessory with no bluetoothIdentifier has no stable identifier in
+    // this API at all -- SSID and display name are the only handles, and two
+    // Wi-Fi accessories on one network, or two accessories sharing a name,
+    // derive the same id. Returning the first match let disassociate remove
+    // whichever happened to be encountered first, which is worse than not
+    // finding it: the app asked to forget one accessory and forgot another.
+    ASAccessory *match = nil;
     for (ASAccessory *a in self.session.accessories) {
         if ([cn1nbAccessoryId(a) isEqualToString:associationId]) {
-            return a;
+            if (match != nil) {
+                return nil;
+            }
+            match = a;
         }
     }
-    return nil;
-}
-
-- (void)handleEvent:(ASAccessoryEvent *)event {
-    @autoreleasepool {
-        if (event.accessory == nil) {
-            return;
-        }
-        BOOL added = event.eventType == ASAccessoryEventTypeAccessoryAdded;
-        BOOL removed = event.eventType == ASAccessoryEventTypeAccessoryRemoved;
-        if (!added && !removed) {
-            return;
-        }
-        com_codename1_impl_ios_IOSNearbyCallbacks_presenceChanged___java_lang_String_boolean(
-                getThreadLocalData(),
-                cn1nbJString([self encode:event.accessory present:added]),
-                added ? JAVA_TRUE : JAVA_FALSE);
-    }
+    return match;
 }
 
 - (void)activate {
@@ -1313,10 +1308,20 @@ static NSString *cn1nbAccessoryId(ASAccessory *accessory)
     }
     self.activated = YES;
     self.session = [[[ASAccessorySession alloc] init] autorelease];
-    CN1NearbyCompanion *weakSelf = self;
+    // The event handler is required to activate the session and is
+    // deliberately empty.
+    //
+    // AccessorySetupKit reports an accessory entering or leaving the app's
+    // SET, which is not the same event as it coming into or going out of
+    // RANGE -- and that difference is why startObservingPresence answers
+    // false on iOS and the public documentation calls presence Android-only.
+    // Forwarding these as presence reported an accessory sitting in a drawer
+    // as present the moment it was associated, and reported disassociation as
+    // walking out of range. Nothing else needs them either: the association
+    // is answered from the picker completion and getAssociations reads the
+    // set directly.
     [self.session activateWithQueue:dispatch_get_main_queue()
                        eventHandler:^(ASAccessoryEvent *event) {
-        [weakSelf handleEvent:event];
     }];
 }
 
@@ -1773,10 +1778,15 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                                 @"the picker returned no accessory");
                         return;
                     }
+                    // present:NO. Associating an accessory says the user
+                    // chose it, not that it is in range -- and this port
+                    // reports no presence at all, so claiming YES here was
+                    // the one place a CompanionDevice arrived on iOS
+                    // asserting something nothing would ever correct.
                     com_codename1_impl_ios_IOSNearbyCallbacks_associated___int_java_lang_String(
                             getThreadLocalData(), requestId,
                             cn1nbJString([companion encode:picked
-                                                   present:YES]));
+                                                   present:NO]));
                 }
             }];
             return;

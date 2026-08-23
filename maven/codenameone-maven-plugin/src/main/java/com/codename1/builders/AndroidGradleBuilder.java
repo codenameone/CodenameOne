@@ -2669,13 +2669,17 @@ public class AndroidGradleBuilder extends Executor {
             // legacy toolchain, is handed a DSL it does not have. Refused
             // here rather than left to fail during Gradle evaluation with a
             // message that names none of this.
-            if (!useGradle8 || gradleVersionInt < 8) {
+            // The Gradle that will actually run, not the hint that usually
+            // selects it. android.useGradle8=false does not always mean an
+            // old toolchain -- android.newFirebaseMessaging selects the
+            // modern one on its own -- so testing the hint rejected a
+            // configuration whose plugin was perfectly capable.
+            if (gradleVersionInt < 8) {
                 throw new BuildException(
                         "com.codename1.nearby needs to compile against"
                         + " Android SDK 33, which the Android Gradle plugin"
-                        + " for Gradle " + gradleVersion
-                        + " (android.useGradle8=" + useGradle8 + ") predates."
-                        + " Set android.useGradle8=true and leave"
+                        + " for Gradle " + gradleVersion + " predates. Set"
+                        + " android.useGradle8=true and leave"
                         + " android.gradleVersion unset to build a nearby"
                         + " app.");
             }
@@ -2700,15 +2704,15 @@ public class AndroidGradleBuilder extends Executor {
             // copy selects the plugin by exact Gradle version and has to
             // test for the modern pairing instead; the conditions differ
             // because the selections do.
-            if (!useGradle8 || gradleVersionInt < 8) {
+            if (gradleVersionInt < 8) {
                 throw new BuildException(
                         "com.codename1.nearby.ranging needs androidx.core.uwb,"
                         + " whose Android Gradle plugin floor is 8.9.1, but"
                         + " this build would use Gradle " + gradleVersion
-                        + " (android.useGradle8=" + useGradle8 + ") and an"
-                        + " older plugin with it. Set android.useGradle8=true"
-                        + " and leave android.gradleVersion unset to build a"
-                        + " ranging app.");
+                        + " and an older plugin with it. Set"
+                        + " android.useGradle8=true and leave"
+                        + " android.gradleVersion unset to build a ranging"
+                        + " app.");
             }
         }
 

@@ -67,7 +67,6 @@ final class IOSNearbyCallbacks {
         associated(0, null);
         disassociated(0);
         companionFailed(0, 0, null);
-        presenceChanged(null, false);
         transportOk(0);
         transportFailed(0, 0, null);
         endpointFound(null, false);
@@ -225,14 +224,6 @@ final class IOSNearbyCallbacks {
             return;
         }
         CompanionDevices.deliverRequestFailed(requestId, errorOrdinal, message);
-    }
-
-    /// Called from native when an observed accessory comes or goes.
-    static void presenceChanged(String encodedDevice, boolean present) {
-        if (dceGuard) {
-            return;
-        }
-        CompanionDevices.deliverPresenceChanged(encodedDevice, present);
     }
 
     /// Called from native when a transport request succeeds.
