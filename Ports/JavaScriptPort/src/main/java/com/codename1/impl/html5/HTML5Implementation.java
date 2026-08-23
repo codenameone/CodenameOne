@@ -131,6 +131,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.Writer;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -3684,6 +3686,46 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void systemOut(String content) {
         consoleLog(content);
+    }
+
+    /**
+     * Writes the throwable's trace into the log writer. Without this override the
+     * inherited implementation is an empty method, so {@code Log.e(t)} produced an
+     * entry with no trace in it at all -- half of issue #5519.
+     *
+     * <p>The other ports hand the writer to {@code Throwable.printStackTrace(PrintWriter)},
+     * but this port's {@code java.io} surface has no {@code PrintWriter}, and
+     * {@code getStackTrace()} deliberately returns no frames here: the field behind it
+     * holds a JavaScript {@code Error().stack} (captured for every throwable in
+     * {@code jvm.newObject}), which {@code Throwable.parseStackString} refuses to parse
+     * into Java frames rather than fabricate bogus ones. So capture what
+     * {@code printStackTrace(PrintStream)} renders -- that JavaScript stack, which is
+     * the only trace this port actually has -- and prefix it with {@code toString()} so
+     * the class and message are present the way the other ports print them.</p>
+     */
+    @Override
+    public void printStackTraceToStream(Throwable t, Writer o) {
+        if (t == null || o == null) {
+            return;
+        }
+        try {
+            ByteArrayOutputStream rendered = new ByteArrayOutputStream();
+            PrintStream out = new PrintStream(rendered);
+            t.printStackTrace(out);
+            out.close();
+            o.write(t.toString());
+            o.write("\n");
+            o.write(new String(rendered.toByteArray(), "UTF-8"));
+            o.write("\n");
+        } catch (Throwable err) {
+            // Deliberately Throwable, not IOException: this runs while a failure
+            // is already being reported, and Log.logThrowable only guards its
+            // call with catch(IOException). Letting anything escape here would
+            // turn "the log could not be written" into a second exception thrown
+            // at whoever called Log.e(). There is nowhere better to report it
+            // than the console.
+            consoleLog("printStackTraceToStream failed: " + err);
+        }
     }
     
     /**

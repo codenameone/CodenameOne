@@ -48,7 +48,7 @@
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 166,
+    "pass": 167,
     "fail": 0,
     "skip": 13,
     "not-run": 0
@@ -460,6 +460,10 @@
     },
     "LocalNotificationOverrideTest": {
       "feature": "notifications",
+      "status": "pass"
+    },
+    "LogSubclassCaptureTest": {
+      "feature": "logging-diagnostics",
       "status": "pass"
     },
     "LottieAnimatedScreenshotTest": {
