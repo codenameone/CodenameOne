@@ -2615,6 +2615,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 if (!key.startsWith("codename1.arg.")) {
                     continue;
                 }
+                // The processor refuses a hint declared as an annotation and as a
+                // properties line, but it can only refuse the builds it runs in.
+                // The fingerprint above covers the annotations and nothing else,
+                // so with processing skipped a line added to the properties file
+                // afterwards leaves a manifest that still matches -- and this
+                // overlay would quietly replace the value the developer just
+                // wrote, until the next clean build regenerated the manifest and
+                // failed. Same declaration, same answer, whether or not
+                // target/classes happened to be cleaned.
+                String conflict = conflictingPropertiesDeclaration(target, key, found);
+                if (conflict != null) {
+                    throw new MojoFailureException(conflict);
+                }
                 target.setProperty(key, found.getProperty(key));
                 applied++;
             }
@@ -2650,6 +2663,47 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     + "      </goals>\n"
                     + "    </execution>");
         }
+    }
+
+    /**
+     * The duplicate-declaration message for a hint set by an annotation and by a
+     * properties line, or null when there is no clash.
+     *
+     * <p>Only reached when the processor did not run this build; when it did, it
+     * has already failed for the same reason and with more to say -- it can point
+     * at the offending line. An alias counts as the same setting, matching what
+     * the processor checks, so declaring {@code and.captureRecord} in the file
+     * still collides with {@code @Android(captureRecord)}.</p>
+     */
+    private String conflictingPropertiesDeclaration(Properties settings, String key,
+                                                    Properties manifest) {
+        String name = key.substring("codename1.arg.".length());
+        java.util.Set<String> names = new java.util.LinkedHashSet<String>();
+        names.add(name);
+        for (com.codename1.build.shared.BuildHints.Hint h
+                : com.codename1.build.shared.BuildHints.entries()) {
+            if (name.equals(h.aliasOf())
+                    || name.equals(com.codename1.build.shared.BuildHints.canonicalName(h.name()))) {
+                names.add(h.name());
+            }
+        }
+        for (String candidate : names) {
+            String candidateKey = "codename1.arg." + candidate;
+            String fromFile = settings.getProperty(candidateKey);
+            if (fromFile == null) {
+                continue;
+            }
+            String origin = manifest.getProperty("cn1.buildHints.origin." + name);
+            return candidateKey + " is declared twice.\n"
+                    + "    annotation : " + (origin == null ? "on the main class" : origin)
+                    + " = " + manifest.getProperty(key) + "\n"
+                    + "    properties : codenameone_settings.properties\n"
+                    + "                 " + candidateKey + "=" + fromFile + "\n"
+                    + "    A build hint has one source of truth. Delete the properties line and "
+                    + "keep the annotation, or delete the annotation attribute and keep the line. "
+                    + "(-D" + candidateKey + "=... overrides either and is not a conflict.)";
+        }
+        return null;
     }
 
     /**

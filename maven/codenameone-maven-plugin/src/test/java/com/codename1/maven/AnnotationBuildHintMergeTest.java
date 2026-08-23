@@ -186,6 +186,54 @@ public class AnnotationBuildHintMergeTest {
         assertEquals("OLD", target.getProperty("codename1.arg.ios.teamId"));
     }
 
+    /**
+     * The fingerprint covers the annotations and nothing else, so editing the
+     * properties file cannot invalidate it. With processing skipped, a line added
+     * for a hint an annotation already sets left a manifest that still matched --
+     * and the overlay quietly replaced the value the developer had just written,
+     * until the next clean build regenerated the manifest and failed instead.
+     */
+    @Test
+    public void aPropertiesLineForAnAnnotatedHintIsRefusedNotOverwritten() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "cn1.buildHints.origin.ios.teamId=@Ios(teamId)\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        target.setProperty("codename1.arg.ios.teamId", "FROMFILE");
+        try {
+            merge(target, classes, "MyApp", "com.example");
+            fail("expected the duplicate declaration to be refused");
+        } catch (InvocationTargetException ex) {
+            String message = String.valueOf(ex.getCause().getMessage());
+            assertTrue(message, message.contains("declared twice"));
+            assertTrue(message, message.contains("@Ios(teamId)"));
+        }
+        assertEquals("the file's value must not have been replaced",
+                "FROMFILE", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
+    /** A hint only the file sets is not a conflict -- that is the escape hatch. */
+    @Test
+    public void aPropertiesLineForAnUnannotatedHintIsLeftAlone() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        target.setProperty("codename1.arg.ios.pods", "Alamofire");
+
+        merge(target, classes, "MyApp", "com.example");
+
+        assertEquals("Alamofire", target.getProperty("codename1.arg.ios.pods"));
+        assertEquals("ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
