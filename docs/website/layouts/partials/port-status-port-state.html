@@ -4,9 +4,20 @@
 {{- $now := .now -}}
 {{- $state := "unknown" -}}
 {{- $label := "No stored report" -}}
+{{- $awaiting := 0 -}}
 {{- if $report -}}
   {{- $failed := int (default 0 $report.summary.fail) -}}
   {{- $notRun := int (default 0 (index $report.summary "not-run")) -}}
+  {{- /* A report counts the tests it carries. Between the commit that registers
+         a test and this port's next run the report legitimately has no entry
+         for it, and summing only what the report holds would present that as a
+         complete answer to a contract it has not seen. Say how many tests this
+         port has yet to reach instead. */ -}}
+  {{- range $contract.features -}}
+    {{- range .tests -}}
+      {{- if not (index $report.tests .) -}}{{- $awaiting = add $awaiting 1 -}}{{- end -}}
+    {{- end -}}
+  {{- end -}}
   {{- $bootstrapComplete := and (eq $report.bootstrap_source "successful-master-workflow") (eq $report.workflow_conclusion "success") -}}
   {{- $complete := or $report.suite_finished $bootstrapComplete -}}
   {{- $generated := time.AsTime $report.generated_at -}}
@@ -41,7 +52,7 @@
   <p class="cn1-port-card__state">{{ $label }}</p>
   {{- if $report }}
   <p class="cn1-port-card__meta">
-    {{ $report.summary.pass }} passed · {{ $report.summary.skip }} skipped · {{ index $report.summary "not-run" }} not run
+    {{ $report.summary.pass }} passed · {{ $report.summary.skip }} skipped · {{ index $report.summary "not-run" }} not run{{ if gt $awaiting 0 }} · {{ $awaiting }} awaiting this port's next run{{ end }}
   </p>
   {{- end }}
 </article>

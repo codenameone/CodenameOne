@@ -124,6 +124,31 @@ When adding a conformance test:
 . Run the validator before pushing. The `Validate port status contract` workflow
   enforces the same rules in CI.
 
+**Do not touch `docs/website/data/port_status_reports/`.** Those files are CI
+output -- a snapshot of what one run measured -- and a branch has no result to
+put in them. Each port picks a newly registered test up on its next `master`
+run; until then the validator prints `checked-in snapshot <port>: report
+predates tests: <name>` and the public table shows that cell as not run, which
+is what is true. The reports the site actually serves come from the
+`port-status-data` branch, not from these.
+
+This is a deliberate reversal. The contract used to require every checked-in
+report to carry an entry for every registered test, so adding one test meant
+editing eleven report files and retyping their totals -- which made every
+test-adding branch conflict with every other one, and made the cheapest way to
+a green build typing `pass` next to a test no port had run. Twelve results
+reached `master` that way, attributed to runs that predated the tests. `Validate
+port status contract` now refuses a report whose results changed while the
+`generated_at`, `commit` and `run_url` naming the run stayed put.
+
+"All tests run on all ports" is still enforced, just where it cannot be typed:
+the nightly sweep holds the *published* reports to it. A test left at `not-run`
+fails the sweep, and so does a test missing from one port's report when an
+earlier run on another port already covered it -- that port dropped the test
+rather than merely predating it. The single permitted exception is a `skip` the
+suite itself emits, with an erratum in `port_status_supplement.json` explaining
+it.
+
 The on-device AI rows are permanent assertion tests rather than screenshots.
 They validate immutable image, camera-frame, tensor, model-source, and options
 contracts on every translated runtime; query every native analyzer or service;

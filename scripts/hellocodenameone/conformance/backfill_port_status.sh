@@ -404,12 +404,15 @@ echo "Port status sweep: published ${published} report(s), ${skipped} already cu
 # table, which is exactly the failure this sweep exists to prevent.
 stale_days="$(jq -r '.stale_after_days' "${MANIFEST}")"
 problems=()
+published_dir="${tmp_dir}/published"
+mkdir -p "${published_dir}"
 while IFS= read -r port; do
   if ! gh api "repos/${GITHUB_REPOSITORY}/contents/ports/${port}.json?ref=${DATA_BRANCH}" \
       --jq '.content' 2>/dev/null | decode_base64 > "${tmp_dir}/check.json" 2>/dev/null; then
     problems+=("${port}: no published report")
     continue
   fi
+  cp "${tmp_dir}/check.json" "${published_dir}/${port}.json"
   # Freshness alone is not enough: a published report the website rejects
   # leaves the column on its checked-in fallback, which is the state this
   # sweep exists to detect.
@@ -468,3 +471,12 @@ if [ ${#unusable[@]} -gt 0 ]; then
 fi
 
 echo "Every port in the contract has a report inside the ${stale_days}-day window."
+
+# Freshness says the port reported; it does not say the port reported on every
+# test. That obligation used to be enforced against the checked-in fallbacks,
+# where a branch could satisfy it by typing "pass" -- so it is enforced here
+# instead, against what the ports actually published, where nothing anyone
+# writes in a pull request can reach it. A registered test runs on every port,
+# and the only permitted exception is a skip the suite itself emits with an
+# erratum explaining it.
+python3 "${SCRIPT_DIR}/port_status.py" coverage --reports "${published_dir}"

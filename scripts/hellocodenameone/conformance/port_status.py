@@ -186,71 +186,16 @@ def validate(manifest: dict) -> dict:
         if owner is None:
             problems.append(f"Golden screenshot {name} is not mapped to a test")
 
-    skipped_tests: set[str] = set()
-    report_directory = manifest.get("report_directory")
-    if report_directory:
-        report_root = REPO_ROOT / report_directory
-        for port_id in port_ids:
-            report_path = report_root / f"{port_id}.json"
-            try:
-                report = read_json(report_path)
-            except ContractError as exc:
-                problems.append(str(exc))
-                continue
-            if report.get("schema_version") != manifest.get("schema_version"):
-                problems.append(f"Stored report {report_path} has the wrong schema version")
-            if report.get("port") != port_id:
-                problems.append(f"Stored report {report_path} identifies port {report.get('port')}")
-            report_tests = report.get("tests")
-            if not isinstance(report_tests, dict):
-                problems.append(f"Stored report {report_path} has no test result map")
-                continue
-            unknown_tests = sorted(set(report_tests) - set(mapped))
-            if unknown_tests:
-                problems.append(
-                    f"Stored report {report_path} contains unknown tests: "
-                    + ", ".join(unknown_tests)
-                )
-            missing_tests = sorted(set(mapped) - set(report_tests))
-            if missing_tests:
-                problems.append(
-                    f"Stored report {report_path} is missing tests: "
-                    + ", ".join(missing_tests)
-                )
-            unrun_tests = []
-            for test, result in report_tests.items():
-                if not isinstance(result, dict) or result.get("status") not in {
-                    "pass", "fail", "skip", "not-run"
-                }:
-                    problems.append(f"Stored report {report_path} has an invalid result for {test}")
-                elif result.get("status") == "skip":
-                    skipped_tests.add(test)
-                elif result.get("status") == "not-run":
-                    unrun_tests.append(test)
-            if unrun_tests:
-                # A registered test that never started is indistinguishable, on the page, from one
-                # that runs and passes -- nothing here objected to it, so a test could be
-                # published and quietly never executed on any port. A port that genuinely cannot
-                # do something reports "skip", from the suite itself, and is unaffected; "not-run"
-                # is the absence of evidence, and the answer to it is to run the suite and check
-                # the report in rather than to record the absence.
-                problems.append(
-                    f"Stored report {report_path} reports tests that never ran: "
-                    + ", ".join(sorted(unrun_tests))
-                )
-            actual_summary = Counter(
-                result.get("status")
-                for result in report_tests.values()
-                if isinstance(result, dict)
-            )
-            expected_summary = {
-                key: actual_summary.get(key, 0)
-                for key in ("pass", "fail", "skip", "not-run")
-            }
-            if report.get("summary") != expected_summary:
-                problems.append(
-                    f"Stored report {report_path} summary does not match its test results"
-                )
+    # The checked-in reports are a snapshot of what CI measured, not a second
+    # copy of the contract. Requiring them to carry exactly the manifest's test
+    # set made every test-adding PR hand-edit eleven files, and the cheapest way
+    # to satisfy that was to invent a result -- twelve "pass" entries reached
+    # master attributed to runs that never executed the test. Classify them with
+    # the same drift / malformed split publication uses: a snapshot that predates
+    # a test is drift and is reported, never fatal; a snapshot nothing can render
+    # is still a defect.
+    skipped_tests, snapshot_drift, snapshot_malformed = stored_report_problems(manifest)
+    problems.extend(snapshot_malformed)
 
     manual_feature_count = 0
     try:
@@ -273,7 +218,10 @@ def validate(manifest: dict) -> dict:
             "Skip errata references unknown tests: "
             + ", ".join(unknown_skip_reasons)
         )
-    missing_skip_reasons = sorted(skipped_tests - set(skip_reason_tests))
+    # Only tests the contract still defines. A snapshot taken before a test was
+    # retired still carries its skip, and demanding an erratum for something
+    # nobody can run again would be unfixable except by editing the snapshot.
+    missing_skip_reasons = sorted((skipped_tests & set(mapped)) - set(skip_reason_tests))
     if missing_skip_reasons:
         problems.append("Skipped tests without errata: " + ", ".join(missing_skip_reasons))
     for item in supplement.get("skip_reasons", []):
@@ -387,6 +335,7 @@ def validate(manifest: dict) -> dict:
     if problems:
         raise ContractError("\n".join(problems))
     return {
+        "drift": snapshot_drift,
         "ports": len(ports),
         "features": len(features),
         "tests": len(mapped),
@@ -396,6 +345,144 @@ def validate(manifest: dict) -> dict:
         "deployment_platforms": len(deployment_rows),
         "browser_engines": len(browsers),
     }
+
+
+def stored_report_problems(manifest: dict) -> tuple[set[str], list[str], list[str]]:
+    """Classify the checked-in fallback reports.
+
+    Returns (skipped tests, drift, malformed). The reports under
+    ``report_directory`` are produced by the port workflows and refreshed from
+    the data branch before Hugo runs; nothing about a pull request is supposed
+    to touch them. Read them exactly the way publication reads a persisted
+    report, so "this snapshot predates a test the branch just registered" is the
+    ordinary, expected state it already is everywhere else in this pipeline
+    rather than a build failure a human resolves by inventing a result.
+    """
+    skipped: set[str] = set()
+    drift: list[str] = []
+    malformed: list[str] = []
+    report_directory = manifest.get("report_directory")
+    if not report_directory:
+        return skipped, drift, malformed
+    root = REPO_ROOT / report_directory
+    for port in manifest.get("ports", []):
+        port_id = port.get("id")
+        if not port_id:
+            continue
+        try:
+            report = read_json(root / f"{port_id}.json")
+        except ContractError as exc:
+            malformed.append(str(exc))
+            continue
+        port_drift, port_malformed = publishable_report_problems(manifest, port_id, report)
+        drift.extend(f"{port_id}: {item}" for item in port_drift)
+        malformed.extend(f"{port_id}: {item}" for item in port_malformed)
+        tests = report.get("tests")
+        if not isinstance(tests, dict):
+            continue
+        for name, result in tests.items():
+            if isinstance(result, dict) and result.get("status") == "skip":
+                skipped.add(name)
+    return skipped, drift, malformed
+
+
+def report_stamp(report: dict) -> datetime | None:
+    raw = report.get("generated_at")
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo else None
+
+
+def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
+    """Hold the *published* reports to "every registered test runs on every port".
+
+    This is the gate that used to live, badly, in the checked-in snapshots. Two
+    rules, both decidable from the reports themselves:
+
+    ``not-run`` is always a defect. The suite reached that port, the test was in
+    its contract, and nothing reported back.
+
+    A test absent from a report is normally just a run that predates it -- the
+    port has not merged past the commit that registered the test yet. It becomes
+    a defect the moment some *older* report carries that test: a run that
+    happened earlier already knew about it, so a later run that does not is a
+    test the port has dropped rather than one it has not reached. No history
+    lookup and no grace period to tune; the reports date themselves.
+    """
+    problems: list[str] = []
+    mapped = test_to_feature(manifest)
+    stamps = {port: report_stamp(report) for port, report in reports.items()}
+
+    # The earliest run that proves a test was in the contract. Anything younger
+    # than this has no excuse for missing it.
+    known_since: dict[str, datetime] = {}
+    for port, report in reports.items():
+        stamp = stamps.get(port)
+        tests = report.get("tests")
+        if stamp is None or not isinstance(tests, dict):
+            continue
+        for name in tests:
+            if name in mapped and (name not in known_since or stamp < known_since[name]):
+                known_since[name] = stamp
+
+    for port in sorted(reports):
+        report = reports[port]
+        tests = report.get("tests")
+        if not isinstance(tests, dict):
+            problems.append(f"{port}: report has no test result map")
+            continue
+        unrun = sorted(
+            name
+            for name, result in tests.items()
+            if isinstance(result, dict) and result.get("status") == "not-run"
+        )
+        if unrun:
+            problems.append(f"{port}: reported no result for " + ", ".join(unrun))
+        stamp = stamps.get(port)
+        if stamp is None:
+            problems.append(f"{port}: report has no usable generated_at")
+            continue
+        dropped = sorted(
+            name
+            for name in set(mapped) - set(tests)
+            if name in known_since and known_since[name] < stamp
+        )
+        if dropped:
+            problems.append(
+                f"{port}: ran at {report.get('generated_at')} without "
+                + ", ".join(dropped)
+                + ", which an earlier run on another port already covered"
+            )
+    return problems
+
+
+PROVENANCE_FIELDS = ("generated_at", "commit", "run_url")
+
+
+def provenance_problems(port_id: str, before: dict, after: dict) -> list[str]:
+    """Refuse a hand-edited result.
+
+    A report says "at this commit, this run, at this time, these were the
+    results". Editing the results while leaving that provenance alone does not
+    correct the record, it forges it -- which is how twelve tests came to be
+    published as passing on ports that had never executed them. Changing results
+    is legitimate only as part of taking a new snapshot, and a new snapshot
+    carries a new stamp.
+    """
+    if before.get("tests") == after.get("tests") and before.get("summary") == after.get("summary"):
+        return []
+    if any(before.get(field) != after.get(field) for field in PROVENANCE_FIELDS):
+        return []
+    return [
+        f"{port_id}: test results changed but {', '.join(PROVENANCE_FIELDS)} did not. "
+        "These reports are CI output -- a branch never needs to edit one. Adding a "
+        "test needs no report change at all; each port picks it up on its next "
+        "master run."
+    ]
 
 
 def add_reason(entry: dict, reason: str) -> None:
@@ -911,6 +998,28 @@ def build_parser() -> argparse.ArgumentParser:
     accept_parser.add_argument("--port", required=True)
     accept_parser.add_argument("--report", required=True, type=Path)
 
+    coverage_parser = subparsers.add_parser(
+        "coverage",
+        help="hold published reports to running every registered test on every port",
+    )
+    coverage_parser.add_argument(
+        "--reports",
+        required=True,
+        type=Path,
+        help="directory of published <port>.json reports",
+    )
+
+    provenance_parser = subparsers.add_parser(
+        "provenance",
+        help="refuse a report whose results were edited without a new run",
+    )
+    provenance_parser.add_argument(
+        "--base",
+        required=True,
+        type=Path,
+        help="directory holding the base revision's reports",
+    )
+
     normalize_parser = subparsers.add_parser("normalize", help="write a normalized port report")
     normalize_parser.add_argument("--port", required=True)
     normalize_parser.add_argument("--log", action="append", type=Path, default=[])
@@ -939,6 +1048,52 @@ def main() -> int:
                 f"{counts['tests']} tests, {counts['features']} features, "
                 f"{counts['ports']} ports, {counts['goldens']} golden names."
             )
+            for item in counts["drift"]:
+                # Information, not a warning to be silenced. Every port reaches
+                # a newly registered test on its next master run, and the page
+                # shows the gap as "not run" until it does.
+                print(f"port-status: checked-in snapshot {item}")
+            return 0
+        if args.command == "coverage":
+            reports = {}
+            for port in manifest.get("ports", []):
+                port_id = port.get("id")
+                path = args.reports / f"{port_id}.json"
+                if not path.is_file():
+                    print(f"port-status: no published report for {port_id}", file=sys.stderr)
+                    return 1
+                reports[port_id] = read_json(path)
+            problems = coverage_problems(manifest, reports)
+            for problem in problems:
+                print(f"port-status coverage: {problem}", file=sys.stderr)
+            if problems:
+                print(
+                    "Every registered test runs on every port unless the suite itself "
+                    "reports a skip with an erratum. Fix the port or record the skip.",
+                    file=sys.stderr,
+                )
+                return 1
+            print(f"Every registered test reported a result on all {len(reports)} ports.")
+            return 0
+        if args.command == "provenance":
+            report_directory = manifest.get("report_directory")
+            problems = []
+            for port in manifest.get("ports", []):
+                port_id = port.get("id")
+                base_path = args.base / f"{port_id}.json"
+                if not base_path.is_file():
+                    continue
+                head_path = REPO_ROOT / report_directory / f"{port_id}.json"
+                problems.extend(
+                    provenance_problems(
+                        port_id, read_json(base_path), read_json(head_path)
+                    )
+                )
+            for problem in problems:
+                print(f"port-status: {problem}", file=sys.stderr)
+            if problems:
+                return 1
+            print("No port status report was edited by hand.")
             return 0
         if args.command == "accept":
             drift, malformed = publishable_report_problems(

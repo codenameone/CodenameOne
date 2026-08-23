@@ -16,24 +16,34 @@ class PortStatusTest(unittest.TestCase):
         cls.manifest = port_status.read_json(port_status.DEFAULT_MANIFEST)
 
     def test_contract_covers_registered_tests_and_goldens(self):
+        # Deliberately no literal totals. Every one of these used to be a magic
+        # number that each test-adding branch had to retype, so two branches
+        # adding a test conflicted here by construction -- on a line whose only
+        # content was a number neither author had a reason to think about. What
+        # is worth asserting is the relationship: the suite and the contract
+        # describe the same set of tests, and nothing is counted twice.
         counts = port_status.validate(self.manifest)
-        self.assertEqual(180, counts["tests"])
-        self.assertEqual(1, counts["performance_tests"])
-        self.assertGreaterEqual(counts["features"], 54)
-        self.assertEqual(11, counts["ports"])
-        self.assertEqual(20, counts["manual_features"])
+        registered = port_status.registered_tests()
+        mapped = port_status.test_to_feature(self.manifest)
+        performance = self.manifest["performance_tests"]
+
+        self.assertEqual(sorted(registered), sorted(set(registered)))
+        self.assertEqual(set(registered), set(mapped) | set(performance))
+        self.assertEqual(set(), set(mapped) & set(performance))
+        self.assertEqual(len(mapped), counts["tests"])
+        self.assertEqual(len(performance), counts["performance_tests"])
+        self.assertEqual(len(self.manifest["ports"]), counts["ports"])
+        self.assertEqual(len(self.manifest["features"]), counts["features"])
+        self.assertTrue(all(feature["tests"] for feature in self.manifest["features"]))
+
+        # Floors, not equalities: these guard against a collapse -- a manifest
+        # that lost its features, a golden directory that stopped resolving --
+        # and a branch that adds to any of them never has to touch this file.
+        self.assertGreater(counts["features"], 50)
+        self.assertGreater(counts["goldens"], 100)
+        self.assertGreater(counts["manual_features"], 15)
         self.assertEqual(8, counts["deployment_platforms"])
         self.assertEqual(3, counts["browser_engines"])
-        self.assertGreaterEqual(counts["goldens"], 100)
-        features = {feature["id"]: feature["tests"] for feature in self.manifest["features"]}
-        self.assertEqual(["ARApiTest", "MotionSensorDeviceTest"], features["ar-motion-sensors"])
-        self.assertEqual(["CameraApiTest"], features["camera-access"])
-        self.assertEqual(["VisionOnDeviceApiTest"], features["on-device-vision"])
-        self.assertEqual(["LanguageOnDeviceApiTest"], features["on-device-language"])
-        self.assertEqual(["InferenceOnDeviceApiTest"], features["on-device-inference"])
-        self.assertEqual(["CalendarApiTest"], features["calendar-integration"])
-        self.assertEqual(["VideoIODecodedFramesScreenshotTest"], features["video-decoding"])
-        self.assertEqual(["VideoIORoundTripTest"], features["video-round-trip"])
 
     def test_normalize_preserves_pass_skip_and_screenshot_failure(self):
         log_text = "\n".join(
@@ -313,58 +323,82 @@ class PortStatusTest(unittest.TestCase):
             )
             with self.assertRaisesRegex(
                 port_status.ContractError,
-                "summary does not match its test results",
+                "summary does not match the test results",
             ):
                 port_status.validate(manifest)
 
-    def test_validate_rejects_a_test_that_never_ran(self):
+    def stored_reports(self):
+        directory = port_status.REPO_ROOT / self.manifest["report_directory"]
+        return {
+            port["id"]: port_status.read_json(directory / (port["id"] + ".json"))
+            for port in self.manifest["ports"]
+        }
+
+    def test_coverage_rejects_a_test_that_never_ran(self):
         # A registered test left at "not-run" reads on the page exactly like one that runs and
-        # passes. Seven database tests were published that way -- added to the manifest, never
-        # run in any stored report -- and nothing here objected.
-        original_directory = self.manifest["report_directory"]
-        with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
-            report_root = Path(tmp)
-            for port in self.manifest["ports"]:
-                source = port_status.REPO_ROOT / original_directory / (
-                    port["id"] + ".json"
-                )
-                (report_root / source.name).write_text(
-                    source.read_text(encoding="utf-8"), encoding="utf-8"
-                )
-            android_path = report_root / "android.json"
-            android = port_status.read_json(android_path)
-            victim = next(
-                name
-                for name, result in android["tests"].items()
-                if result.get("status") == "pass"
-            )
-            android["tests"][victim]["status"] = "not-run"
-            android["summary"]["pass"] -= 1
-            android["summary"]["not-run"] += 1
-            android_path.write_text(
-                json.dumps(android, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            manifest = dict(self.manifest)
-            manifest["report_directory"] = str(
-                report_root.relative_to(port_status.REPO_ROOT)
-            )
-            with self.assertRaisesRegex(
-                port_status.ContractError,
-                "reports tests that never ran: " + victim,
-            ):
-                port_status.validate(manifest)
+        # passes. This used to be asserted against the checked-in snapshots, which is why every
+        # branch that registered a test had to edit eleven of them -- and why the cheapest way
+        # to go green was to type "pass" for a run that never happened. The obligation belongs
+        # to the reports the ports actually publish, where nothing a branch writes can satisfy it.
+        reports = self.stored_reports()
+        victim = next(
+            name
+            for name, result in reports["android"]["tests"].items()
+            if result.get("status") == "pass"
+        )
+        reports["android"]["tests"][victim]["status"] = "not-run"
+        problems = port_status.coverage_problems(self.manifest, reports)
+        self.assertTrue(
+            any("android" in problem and victim in problem for problem in problems),
+            problems,
+        )
 
-    def test_validate_accepts_a_test_the_port_skipped(self):
+    def test_coverage_accepts_a_test_the_port_skipped(self):
         # The distinction the rule turns on: a port that genuinely cannot do something reports
         # "skip" from the suite itself, which is evidence rather than the absence of it.
+        reports = self.stored_reports()
+        victim = next(
+            name
+            for name, result in reports["android"]["tests"].items()
+            if result.get("status") == "pass"
+        )
+        reports["android"]["tests"][victim]["status"] = "skip"
+        self.assertEqual([], port_status.coverage_problems(self.manifest, reports))
+
+    def test_coverage_accepts_a_report_older_than_the_test(self):
+        # The state every port is in between the commit that registers a test and that port's
+        # next master run. Failing here would put the old ritual straight back: the only way to
+        # merge a test would be to make eleven reports claim a result for it first.
+        reports = self.stored_reports()
+        newest = max(reports, key=lambda port: reports[port]["generated_at"])
+        oldest = min(reports, key=lambda port: reports[port]["generated_at"])
+        self.assertNotEqual(newest, oldest)
+        victim = next(iter(reports[newest]["tests"]))
+        del reports[oldest]["tests"][victim]
+        self.assertEqual([], port_status.coverage_problems(self.manifest, reports))
+
+    def test_coverage_rejects_a_test_a_later_run_dropped(self):
+        # The other half of the same comparison. A run that happened after another run which
+        # already covered the test has no "my contract predates it" excuse left.
+        reports = self.stored_reports()
+        newest = max(reports, key=lambda port: reports[port]["generated_at"])
+        oldest = min(reports, key=lambda port: reports[port]["generated_at"])
+        victim = next(iter(reports[oldest]["tests"]))
+        del reports[newest]["tests"][victim]
+        problems = port_status.coverage_problems(self.manifest, reports)
+        self.assertTrue(
+            any(newest in problem and victim in problem for problem in problems),
+            problems,
+        )
+
+    def test_validate_tolerates_a_snapshot_that_predates_a_test(self):
+        # Registering a test must not require touching a single report. This is the assertion
+        # that keeps it that way.
         original_directory = self.manifest["report_directory"]
         with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
             report_root = Path(tmp)
             for port in self.manifest["ports"]:
-                source = port_status.REPO_ROOT / original_directory / (
-                    port["id"] + ".json"
-                )
+                source = port_status.REPO_ROOT / original_directory / (port["id"] + ".json")
                 (report_root / source.name).write_text(
                     source.read_text(encoding="utf-8"), encoding="utf-8"
                 )
@@ -375,23 +409,42 @@ class PortStatusTest(unittest.TestCase):
                 for name, result in android["tests"].items()
                 if result.get("status") == "pass"
             )
-            android["tests"][victim]["status"] = "skip"
+            del android["tests"][victim]
             android["summary"]["pass"] -= 1
-            android["summary"]["skip"] += 1
             android_path.write_text(
-                json.dumps(android, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
+                json.dumps(android, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
             manifest = dict(self.manifest)
-            manifest["report_directory"] = str(
-                report_root.relative_to(port_status.REPO_ROOT)
-            )
-            # Asserted against this rule alone: a skip carries its own separate obligation --
-            # errata explaining it -- and that is what would be reported here instead.
-            try:
-                port_status.validate(manifest)
-            except port_status.ContractError as exc:
-                self.assertNotIn("never ran", str(exc))
+            manifest["report_directory"] = str(report_root.relative_to(port_status.REPO_ROOT))
+            counts = port_status.validate(manifest)
+        self.assertTrue(
+            any("android" in item and victim in item for item in counts["drift"]),
+            counts["drift"],
+        )
+
+    def test_provenance_rejects_results_edited_without_a_new_run(self):
+        # Exactly the edit twelve published "passes" were made by: a test entry appended to a
+        # report, its summary bumped, and the stamp naming the run left untouched.
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        after["tests"]["SomeBrandNewTest"] = {"feature": "crypto", "status": "pass"}
+        after["summary"]["pass"] += 1
+        problems = port_status.provenance_problems("android", before, after)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("CI output", problems[0])
+
+    def test_provenance_accepts_a_genuinely_newer_snapshot(self):
+        before = self.stored_reports()["android"]
+        after = json.loads(json.dumps(before))
+        after["tests"]["SomeBrandNewTest"] = {"feature": "crypto", "status": "pass"}
+        after["summary"]["pass"] += 1
+        after["generated_at"] = "2026-12-31T00:00:00Z"
+        after["commit"] = "0123456789abcdef"
+        self.assertEqual([], port_status.provenance_problems("android", before, after))
+
+    def test_provenance_ignores_an_untouched_report(self):
+        before = self.stored_reports()["android"]
+        self.assertEqual([], port_status.provenance_problems("android", before, dict(before)))
 
     def publishable_report(self, port_id, **overrides):
         mapped = port_status.test_to_feature(self.manifest)
@@ -799,17 +852,21 @@ class PortStatusTest(unittest.TestCase):
         self.assertTrue(
             any("performance status is" in item for item in malformed), malformed)
 
-    def test_publishable_matches_every_report_the_site_serves(self):
+    def test_every_report_the_site_serves_is_renderable(self):
+        # Only malformed. Drift is asserted against deliberately: a checked-in snapshot is a
+        # copy of a real run, and a branch that registers a test makes every one of them
+        # predate it. Demanding zero drift here is what turned "add a test" into "edit eleven
+        # reports", and what made inventing a result the path of least resistance. What the
+        # fallback owes the site is that Hugo can render it.
         for port in self.manifest["ports"]:
             report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (
                 port["id"] + ".json"
             )
             with self.subTest(port=port["id"]):
-                drift, malformed = port_status.publishable_report_problems(
+                _, malformed = port_status.publishable_report_problems(
                     self.manifest, port["id"], port_status.read_json(report_path)
                 )
                 self.assertEqual([], malformed)
-                self.assertEqual([], drift)
 
 
 if __name__ == "__main__":

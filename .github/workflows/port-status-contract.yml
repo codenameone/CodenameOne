@@ -75,6 +75,18 @@ jobs:
           python-version: '3.13'
       - name: Validate every test and golden mapping
         run: python3 scripts/hellocodenameone/conformance/port_status.py validate
+      # The reports under docs/website/data/port_status_reports are CI output.
+      # Nothing about registering a test requires editing one -- each port picks
+      # the test up on its next master run -- so a change to a report's results
+      # that keeps the stamp naming the run is a forged result, not a fix.
+      - name: Refuse hand-edited port status reports
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "${BASE_SHA}" ] && [ "${BASE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=1 origin "${BASE_SHA}" || true
+          fi
+          ./scripts/hellocodenameone/conformance/check_port_status_provenance.sh "${BASE_SHA:-HEAD^}"
       - name: Run normalizer tests
         working-directory: scripts/hellocodenameone/conformance
         run: python3 -m unittest -v test_port_status.py
