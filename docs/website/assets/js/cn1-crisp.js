@@ -187,6 +187,9 @@
   crispEvents.gettingStartedDwell = (data) => scheduleCrispEvent(
     "GettingStartedDwell", 20000, data
   );
+  crispEvents.initializrProjectDownloaded = (data) => requestCrispEvent(
+    "InitializrProjectDownloaded", data || { page: "/initializr/" }
+  );
   crispEvents.pricingEvaluator = (data) => {
     const firePricing = () => requestCrispEvent("PricingEvaluator", data);
     window.setTimeout(firePricing, 30000);
