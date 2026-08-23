@@ -282,6 +282,17 @@ final class BuildHintsApple {
                 .platform("watch")
                 .consumedBy("WatchNativeBuilder"));
 
+        h.add(new Hint("watchNative.surfaces.deploymentTarget")
+                .group(HintGroup.WATCH_NATIVE)
+                .type(HintType.STRING)
+                .def("10.0")
+                .platform("watch")
+                .consumedBy("IPhoneBuilder")
+                .doc("Deployment target of the WidgetKit extension that carries the watch complication. This "
+                        + "is the WATCH APP's floor rather than the extension's own: WidgetKit reaches back to "
+                        + "watchOS 9, but the extension is embedded in the watch app, so advertising a version "
+                        + "the app itself cannot install on claims support that does not exist."));
+
         h.add(new Hint("watchNative.mainClass")
                 .group(HintGroup.WATCH_NATIVE)
                 .type(HintType.STRING)

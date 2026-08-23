@@ -301,6 +301,17 @@ final class BuildHintsAndroid {
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Boolean true/false defaults to false. Disables the external storage (SD card) permission"));
 
+        h.add(new Hint("android.blockLabel")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Boolean true/false defaults to false. Leaves `android:label` off the generated "
+                        + "`<application>` tag so a label set through `android.xapplication_attr` or a merged "
+                        + "manifest is the one that survives. Honoured by the wear module's tag as well as the "
+                        + "phone's."));
+
         h.add(new Hint("android.blockReadMediaPermissions")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -1228,6 +1239,16 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 
+        h.add(new Hint("android.surfaces.complicationUpdateSeconds")
+                .group(HintGroup.ANDROID)
+                .type(HintType.INT)
+                .def("0")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("`UPDATE_PERIOD_SECONDS` on the generated complication service. Zero, the default, means "
+                        + "the system never polls on a timer and the complication updates only when the app "
+                        + "pushes new data."));
+
         h.add(new Hint("android.surfaces.exactAlarms")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -1337,12 +1358,78 @@ final class BuildHintsAndroid {
                 .doc("Allows overriding the auto generated version number with a custom internal version "
                         + "number specifically used for the XML attribute `android:versionCode`"));
 
+        h.add(new Hint("android.watchModule")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Boolean true/false defaults to true. Set to false to build the phone app alone in a "
+                        + "companion build: the wearable link stays, the watch module is not generated, and the "
+                        + "phone output is exactly what it was before the watch app existed."));
+
+        h.add(new Hint("android.watchVersionCode")
+                .group(HintGroup.ANDROID)
+                .type(HintType.INT)
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("The wear module's version code, stated outright. Play requires it to be higher than the "
+                        + "phone's, so a value that is not a whole number above `android.versionCode` fails the "
+                        + "build rather than being silently replaced. Unset, it is derived from "
+                        + "`android.watchVersionCodeOffset`."));
+
+        h.add(new Hint("android.watchVersionCodeOffset")
+                .group(HintGroup.ANDROID)
+                .type(HintType.INT)
+                .def("100000000")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("How far above the phone's version code the wear module's sits when "
+                        + "`android.watchVersionCode` is not set. The default leaves room for the phone app to "
+                        + "keep incrementing without ever catching up."));
+
         h.add(new Hint("android.wear")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
+
+        h.add(new Hint("android.wear.complicationsVersion")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("1.2.1")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Version of `androidx.wear.watchface:watchface-complications-data-source` added to the "
+                        + "wear module. Kept out of `android.gradleDependencies` because that hint feeds the "
+                        + "phone module too, and these libraries declare minSdk 26."));
+
+        h.add(new Hint("android.wear.guavaVersion")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("31.1-android")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Version of `com.google.guava:guava` added to the wear module alongside the tiles and "
+                        + "complications libraries, which need it at runtime."));
+
+        h.add(new Hint("android.wear.protoLayoutVersion")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("1.2.1")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Version of the `androidx.wear.protolayout` libraries the generated tile service builds "
+                        + "its layout with."));
+
+        h.add(new Hint("android.wear.tilesVersion")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("1.4.1")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Version of `androidx.wear.tiles` added to the wear module when the app declares a tile."));
 
         h.add(new Hint("android.wear.standalone")
                 .group(HintGroup.ANDROID)

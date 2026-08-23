@@ -220,6 +220,12 @@
 |_(none)_
 |Boolean true/false defaults to false. Disables the external storage (SD card) permission
 
+|android.blockLabel
+|boolean
+|`false`
+|_(none)_
+|Boolean true/false defaults to false. Leaves `android:label` off the generated `<application>` tag so a label set through `android.xapplication_attr` or a merged manifest is the one that survives. Honoured by the wear module's tag as well as the phone's.
+
 |android.blockReadMediaPermissions
 |boolean
 |_(none)_
@@ -1026,6 +1032,12 @@
 |_(none)_
 |
 
+|android.surfaces.complicationUpdateSeconds
+|int
+|`0`
+|_(none)_
+|`UPDATE_PERIOD_SECONDS` on the generated complication service. Zero, the default, means the system never polls on a timer and the complication updates only when the app pushes new data.
+
 |android.surfaces.exactAlarms
 |boolean
 |`false`
@@ -1110,17 +1122,59 @@
 |_(none)_
 |Allows overriding the auto generated version number with a custom internal version number specifically used for the XML attribute `android:versionCode`
 
+|android.watchModule
+|boolean
+|`true`
+|_(none)_
+|Boolean true/false defaults to true. Set to false to build the phone app alone in a companion build: the wearable link stays, the watch module is not generated, and the phone output is exactly what it was before the watch app existed.
+
+|android.watchVersionCode
+|int
+|_(none)_
+|_(none)_
+|The wear module's version code, stated outright. Play requires it to be higher than the phone's, so a value that is not a whole number above `android.versionCode` fails the build rather than being silently replaced. Unset, it is derived from `android.watchVersionCodeOffset`.
+
+|android.watchVersionCodeOffset
+|int
+|`100000000`
+|_(none)_
+|How far above the phone's version code the wear module's sits when `android.watchVersionCode` is not set. The default leaves room for the phone app to keep incrementing without ever catching up.
+
 |android.wear
 |boolean
 |`false`
 |_(none)_
 |
 
+|android.wear.complicationsVersion
+|string
+|`1.2.1`
+|_(none)_
+|Version of `androidx.wear.watchface:watchface-complications-data-source` added to the wear module. Kept out of `android.gradleDependencies` because that hint feeds the phone module too, and these libraries declare minSdk 26.
+
+|android.wear.guavaVersion
+|string
+|`31.1-android`
+|_(none)_
+|Version of `com.google.guava:guava` added to the wear module alongside the tiles and complications libraries, which need it at runtime.
+
+|android.wear.protoLayoutVersion
+|string
+|`1.2.1`
+|_(none)_
+|Version of the `androidx.wear.protolayout` libraries the generated tile service builds its layout with.
+
 |android.wear.standalone
 |string
 |_(none)_
 |_(none)_
 |
+
+|android.wear.tilesVersion
+|string
+|`1.4.1`
+|_(none)_
+|Version of `androidx.wear.tiles` added to the wear module when the app declares a tile.
 
 |android.web_loading_hidden
 |boolean
@@ -3053,6 +3107,12 @@
 |_(none)_
 |_(none)_
 |
+
+|watchNative.surfaces.deploymentTarget
+|string
+|`10.0`
+|_(none)_
+|Deployment target of the WidgetKit extension that carries the watch complication. This is the WATCH APP's floor rather than the extension's own: WidgetKit reaches back to watchOS 9, but the extension is embedded in the watch app, so advertising a version the app itself cannot install on claims support that does not exist.
 
 |win.desktop-vm
 |string
