@@ -298,8 +298,19 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 request.setDeviceProfile(deviceProfile);
             }
         }
+        // A supplied filter that cannot be installed FAILS the request. It
+        // used to be ignored, which quietly turned "show me only devices
+        // matching this" into "show me everything" -- and the user could then
+        // associate the wrong accessory from a picker that was never supposed
+        // to offer it. A malformed service UUID or name pattern is a mistake
+        // worth reporting, not one worth widening.
         for (int i = 0; filters != null && i < filters.length; i++) {
-            addFilter(request, filters[i]);
+            if (!addFilter(request, filters[i])) {
+                CompanionDevices.deliverRequestFailed(requestId,
+                        NearbyError.INVALID_TOKEN.ordinal(),
+                        "this device filter could not be used: " + filters[i]);
+                return;
+            }
         }
         // No filter is added when the caller gave none. An empty
         // BluetoothLeDeviceFilter is NOT the neutral choice it looks like: a

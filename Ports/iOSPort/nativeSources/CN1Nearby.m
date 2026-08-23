@@ -1606,11 +1606,14 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
             NSString *joined = toNSString(CN1_THREAD_STATE_PASS_ARG
                                           joinedFilters);
             NSMutableArray *items = [NSMutableArray array];
+            BOOL unsupportedFilter = NO;
+            NSUInteger filterCount = 0;
             for (NSString *line in cn1nbSplitLines(joined)) {
                 NSArray *fields = [line componentsSeparatedByString:@"\t"];
                 if ([fields count] < 2) {
                     continue;
                 }
+                filterCount++;
                 int kind = [[fields objectAtIndex:0] intValue];
                 NSString *value = [fields objectAtIndex:1];
                 ASDiscoveryDescriptor *descriptor =
@@ -1636,9 +1639,14 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                     descriptor.SSID = value;
                 } else {
                     // KIND_ADDRESS. AccessorySetupKit discovers accessories;
-                    // it has no way to be pointed at one identifier, and
-                    // widening the picker to everything would be worse than
-                    // skipping the filter.
+                    // it has no way to be pointed at one identifier. Skipping
+                    // the filter used to leave `items` empty, and the
+                    // fallback below then filled the picker from every
+                    // service the plist declares -- so an exact-device
+                    // reconnect offered unrelated accessories and could
+                    // associate one. Refused instead: an address filter this
+                    // platform cannot honour is not a filter it may ignore.
+                    unsupportedFilter = YES;
                     continue;
                 }
                 ASPickerDisplayItem *item = [[[ASPickerDisplayItem alloc]
@@ -1646,6 +1654,22 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                         productImage:[[[UIImage alloc] init] autorelease]
                           descriptor:descriptor] autorelease];
                 [items addObject:item];
+            }
+            if (unsupportedFilter) {
+                cn1nbFailCompanion(requestId, CN1_NEARBY_ERR_NOT_SUPPORTED,
+                        @"AccessorySetupKit cannot search for one exact"
+                         @" address; filter by service UUID or name instead");
+                return;
+            }
+            if ([items count] == 0 && filterCount > 0) {
+                // Filters were supplied and none produced an item, so the
+                // request asked for something this platform cannot express.
+                // The broad fallback below is for a genuinely EMPTY filter
+                // list, and using it here would answer a narrow request with
+                // the widest possible picker.
+                cn1nbFailCompanion(requestId, CN1_NEARBY_ERR_INVALID_TOKEN,
+                        @"none of the supplied device filters could be used");
+                return;
             }
             if ([items count] == 0) {
                 // No usable filter. The portable API documents an empty

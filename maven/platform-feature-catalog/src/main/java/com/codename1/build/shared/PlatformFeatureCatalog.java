@@ -682,6 +682,18 @@ public final class PlatformFeatureCatalog {
                 .iosPlist("NSLocalNetworkUsageDescription",
                          "Finds and connects to nearby devices running this"
                          + " app.")
+                // 21, and for the API rather than the artifact. It was
+                // suggested play-services-nearby 18.4.0 forces 23; it does
+                // not -- that AAR declares minSdkVersion 14, and so does
+                // every artifact in its transitive closure
+                // (play-services-base, -basement, -tasks, androidx.core
+                // 1.0.0), so no manifest merger rejects the builder's
+                // default of 19. What genuinely needs a floor is Nearby
+                // Connections itself: it advertises over BLE, which is API
+                // 21, and the newer play-services-nearby an app may resolve
+                // declares 21 too. Below that the dependency merges cleanly
+                // and the transport simply never starts.
+                .androidMinimumSdk(21)
                 .description("Nearby device-to-device transport"));
 
         e.add(new Entry("com/codename1/nearby/companion/")

@@ -60,9 +60,16 @@ public enum NearbyError {
     /// resumed. Start a new one.
     SESSION_INVALIDATED,
 
-    /// The supplied token, accessory configuration or endpoint identifier
-    /// could not be decoded, or came from a different platform. Tokens are
-    /// opaque and are not portable between iOS and Android.
+    /// The supplied token, accessory configuration, endpoint identifier or
+    /// device filter could not be decoded or used, or came from a different
+    /// platform. Tokens are opaque and are not portable between iOS and
+    /// Android.
+    ///
+    /// A device filter reports this rather than being dropped: an
+    /// association request whose filter cannot be installed would otherwise
+    /// offer the user every visible device instead of the ones asked for,
+    /// and they could associate the wrong accessory from a picker that was
+    /// never meant to show it.
     INVALID_TOKEN,
 
     /// The platform never delivered a completion callback within the safety

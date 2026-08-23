@@ -679,6 +679,10 @@ class PlatformFeatureCatalogTest {
         // Nearby Connections is added through the builder's own Play-services
         // table, which knows which version this build resolved.
         assertTrue(e.androidGradleDeps().isEmpty());
+        // Nearby Connections advertises over BLE, which is API 21. Below that
+        // the dependency merges cleanly and the transport never starts, which
+        // is the failure worth preventing at build time.
+        assertEquals(21, e.androidMinimumSdk());
     }
 
     @Test
