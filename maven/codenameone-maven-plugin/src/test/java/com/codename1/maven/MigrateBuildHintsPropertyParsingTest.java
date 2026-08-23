@@ -110,4 +110,33 @@ public class MigrateBuildHintsPropertyParsingTest {
     public void aValueOnlyLineHasNoSeparator() {
         assertEquals("bare", MigrateBuildHintsMojo.propertyKeyOf("bare"));
     }
+
+    /// `Properties.load` turns a `\\u20ac` in the settings file into a real euro
+    /// sign, and the migrated source is written back through ISO-8859-1 to keep
+    /// the untouched part of the file byte-identical. Emitting the character raw
+    /// would write `?` for anything ISO-8859-1 cannot map, and a high byte for
+    /// anything it can -- which corrupts a UTF-8 source. The verification build
+    /// would not notice: it checks that the hint came back, not its value.
+    @Test
+    public void aNonAsciiCharacterIsWrittenAsAnAsciiEscape() {
+        assertEquals("\"a\\u20acb\"", MigrateBuildHintsMojo.quoteFor("a\u20acb", false));
+        assertEquals("\"a\\u20acb\"", MigrateBuildHintsMojo.quoteFor("a\u20acb", true));
+        // Latin-1 is mappable and still escaped: the source may well be UTF-8.
+        assertEquals("\"caf\\u00e9\"", MigrateBuildHintsMojo.quoteFor("caf\u00e9", false));
+    }
+
+    /// A backslash before an escaped character has to stay a backslash. In Java a
+    /// unicode escape is recognised before parsing and only after an even number
+    /// of backslashes, so the doubled pair plus our own opener is what makes this
+    /// come out right rather than a coincidence.
+    @Test
+    public void aBackslashBeforeAnEscapedCharacterSurvives() {
+        assertEquals("\"\\\\\\u00e9\"", MigrateBuildHintsMojo.quoteFor("\\\u00e9", false));
+    }
+
+    /// Control characters without a short escape would otherwise go in raw.
+    @Test
+    public void aControlCharacterIsEscaped() {
+        assertEquals("\"\\u0001\"", MigrateBuildHintsMojo.quoteFor("\u0001", false));
+    }
 }

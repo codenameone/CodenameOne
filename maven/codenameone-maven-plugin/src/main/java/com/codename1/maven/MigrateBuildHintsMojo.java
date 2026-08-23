@@ -484,6 +484,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * {@code implementation "com.x:y:${'$'}{version}"} would either fail to
      * compile as an unresolved reference or silently resolve to something else.
      * Java has no such construct, so the escape is emitted only for Kotlin.</p>
+     *
+     * <p>Everything outside ASCII is written as a {@code \}{@code uXXXX} escape,
+     * which both languages accept. {@code Properties.load} turns a
+     * {@code \}{@code u20ac} in the file into a real euro sign, and the source is
+     * written back through ISO-8859-1 to keep the rest of the file byte-identical
+     * -- so emitting the character raw would replace it with {@code ?}, or write a
+     * high byte that corrupts a UTF-8 source. Neither shows up in the
+     * verification build, which checks that the hint came back, not what its
+     * value was.</p>
      */
     static String quoteFor(String s, boolean kotlin) {
         StringBuilder sb = new StringBuilder("\"");
@@ -498,7 +507,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 case '$':
                     sb.append(kotlin ? "\\$" : "$");
                     break;
-                default: sb.append(c);
+                default:
+                    if (c < 0x20 || c > 0x7e) {
+                        sb.append("\\u");
+                        for (int shift = 12; shift >= 0; shift -= 4) {
+                            sb.append(Character.forDigit((c >> shift) & 0xf, 16));
+                        }
+                    } else {
+                        sb.append(c);
+                    }
             }
         }
         return sb.append('"').toString();

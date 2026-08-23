@@ -129,6 +129,63 @@ public class AnnotationBuildHintMergeTest {
         assertNull(target.getProperty("codename1.arg.ios.pods"));
     }
 
+    /**
+     * The processor ran once and then stopped -- goal unbound, skipped, or moved
+     * to a phase that no longer runs -- and the annotation changed afterwards.
+     * Nothing clears {@code target/classes}, so the old manifest is still there,
+     * still naming the right main class. Trusting it ships the previous values
+     * and hides the fact that the goal is not running at all.
+     */
+    @Test
+    public void aManifestThatDoesNotMatchTheCompiledAnnotationsIsRefused() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest=" + digestOf("@Ios(teamId = \"OLD\")") + "\n"
+                + "codename1.arg.ios.teamId=OLD\n");
+        writeAnnotatedClass(classes);   // compiled with teamId = ABCDE12345
+
+        Properties target = new Properties();
+        try {
+            merge(target, classes, "MyApp", "com.example");
+            fail("expected the stale manifest to be refused");
+        } catch (InvocationTargetException ex) {
+            assertTrue(String.valueOf(ex.getCause().getMessage()),
+                    ex.getCause().getMessage().contains("left over from an earlier build"));
+        }
+        assertNull("the stale value must not have been applied",
+                target.getProperty("codename1.arg.ios.teamId"));
+    }
+
+    /** The fingerprint of the annotations the build actually compiled matches. */
+    @Test
+    public void aManifestGeneratedFromTheCompiledAnnotationsIsAccepted() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        merge(target, classes, "MyApp", "com.example");
+
+        assertEquals("ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
+    /**
+     * A manifest with no fingerprint in it cannot be judged, so it is taken at
+     * face value rather than refused on a guess.
+     */
+    @Test
+    public void aManifestWithNoFingerprintIsStillTrusted() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "codename1.arg.ios.teamId=OLD\n");
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        merge(target, classes, "MyApp", "com.example");
+
+        assertEquals("OLD", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
@@ -200,5 +257,23 @@ public class AnnotationBuildHintMergeTest {
             }
         }
         throw new NoSuchMethodException(name);
+    }
+
+    /** The fingerprint the processor would record for a main class annotated so. */
+    private String digestOf(String annotations) throws Exception {
+        File dir = tmp.newFolder();
+        com.codename1.maven.annotations.JavaSourceCompiler.compile(
+                com.codename1.maven.annotations.JavaSourceCompiler.singleSource(
+                        "com.example.MyApp",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.buildhints.*;\n"
+                                + annotations + "\n"
+                                + "public class MyApp {\n}\n"),
+                dir,
+                Arrays.asList(new File(Class.forName("com.codename1.annotations.buildhints.Ios")
+                        .getProtectionDomain().getCodeSource().getLocation().toURI())));
+        return com.codename1.maven.processors.BuildHintAnnotationProcessor.sourceDigest(
+                com.codename1.maven.annotations.ClassScanner.readClass(
+                        new File(dir, "com/example/MyApp.class")));
     }
 }

@@ -321,10 +321,22 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 getLog().debug("Could not read codenameone_settings.properties for hardening pre-flight", ex);
             }
         }
+        // A hint set by @Hardening reaches the settings only in createAntProject, which runs after
+        // the Android up-to-date short-circuit below and after hardeningCacheKey is read from it.
+        // Without this the early pass computes "unhardened" from the file while the completed build
+        // records "hardened:...", the two never match, and an up-to-date APK is rebuilt on every
+        // invocation -- and, worse, an unsupported hardening request made through an annotation
+        // escapes the refusal this early pass exists to perform.
+        try {
+            mergeAnnotationBuildHints(settings, project.getCompileClasspathElements());
+        } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
+            getLog().debug("Could not read annotation build hints for the hardening pre-flight", ex);
+        }
         // Overlay -D command-line hints (e.g. -Dcodename1.arg.harden.level=standard) so an explicit
         // hardening request made only on the command line is seen by this early check -- and, because this
         // runs before the Android up-to-date cache short-circuit, is not silently dropped when a prior APK
         // is newer than the sources (getSourcesModificationTime does not account for build hints).
+        // After the annotations, so -D still wins over one.
         overlayCommandLineBuildHints(settings);
         applyHardeningPreflight(settings);
     }
@@ -2569,6 +2581,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // count alone would read that as "never processed" and refuse a build that
         // is in fact perfectly configured.
         boolean processed = false;
+        String stale = null;
         for (String element : classpathElements) {
             Properties found = readAnnotationHints(new File(element));
             if (found == null) {
@@ -2580,6 +2593,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 // would apply another project's build configuration to this one.
                 getLog().debug("cn1: ignoring build hints from " + element
                         + " -- they were generated for " + stamped);
+                continue;
+            }
+            // The stamp says which class produced this file, not when. Nothing
+            // clears target/classes between builds, so a project that ran the
+            // processor once and then stopped -- goal unbound, skipped, or bound
+            // to a phase that no longer runs -- keeps a manifest naming the right
+            // class while the annotations beside it have changed. Comparing the
+            // recorded fingerprint against the compiled class is what tells those
+            // apart; without it the build silently ships the older values and the
+            // guard below never runs.
+            String mismatch = digestMismatch(new File(element), expectedMain, found);
+            if (mismatch != null) {
+                getLog().debug("cn1: ignoring build hints from " + element + " -- " + mismatch);
+                stale = mismatch;
                 continue;
             }
             processed = true;
@@ -2607,8 +2634,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // ships with every annotated hint missing. Refuse rather than build that.
         String annotated = classCarryingBuildHintAnnotations(classpathElements);
         if (annotated != null) {
-            throw new MojoFailureException(annotated + " carries build hint annotations, but no "
-                    + ANNOTATION_HINTS_RESOURCE + " was produced, so none of them reached this "
+            throw new MojoFailureException(annotated + " carries build hint annotations, but "
+                    + (stale == null
+                        ? "no " + ANNOTATION_HINTS_RESOURCE + " was produced"
+                        : "the only " + ANNOTATION_HINTS_RESOURCE + " on the classpath is left "
+                          + "over from an earlier build (" + stale + ")")
+                    + ", so none of them reached this "
                     + "build.\n\nThe cn1 process-annotations goal has to run on the module that "
                     + "compiles it:\n"
                     + "    <execution>\n"
@@ -2619,6 +2650,67 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     + "      </goals>\n"
                     + "    </execution>");
         }
+    }
+
+    /**
+     * Why a manifest cannot have come from the class beside it, or null when it can.
+     *
+     * <p>Answered only when both halves are actually available: with no
+     * {@code codename1.mainName}, no class file for it in this classpath element,
+     * or no recorded fingerprint, there is nothing to compare and the manifest is
+     * taken at face value -- the same as before this check existed. It refuses
+     * only on positive evidence of a mismatch.</p>
+     */
+    private String digestMismatch(File element, String expectedMain, Properties manifest) {
+        String recorded = manifest.getProperty(
+                com.codename1.maven.processors.BuildHintAnnotationProcessor.SOURCE_DIGEST_KEY);
+        if (expectedMain == null || recorded == null || recorded.length() == 0) {
+            return null;
+        }
+        try {
+            com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, expectedMain);
+            if (cls == null) {
+                return null;
+            }
+            String actual = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .sourceDigest(cls);
+            if (recorded.equals(actual)) {
+                return null;
+            }
+            return "it was generated from a different set of annotations on "
+                    + expectedMain + " than the one compiled into " + element;
+        } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
+            // Unreadable is not evidence of staleness.
+            getLog().debug("cn1: could not fingerprint " + expectedMain + " in " + element, ex);
+            return null;
+        }
+    }
+
+    /** Reads one compiled class out of a classpath directory or jar. */
+    private com.codename1.maven.annotations.AnnotatedClass readClass(File element, String binaryName)
+            throws IOException, com.codename1.maven.annotations.ProcessingException {
+        String path = binaryName.replace('.', '/') + ".class";
+        if (element.isDirectory()) {
+            File f = new File(element, path.replace('/', File.separatorChar));
+            if (!f.isFile()) {
+                return null;
+            }
+            try (InputStream in = new FileInputStream(f)) {
+                return com.codename1.maven.annotations.ClassScanner.readClass(in, f);
+            }
+        }
+        if (element.isFile() && element.getName().endsWith(".jar")) {
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
+                java.util.zip.ZipEntry entry = zip.getEntry(path);
+                if (entry == null) {
+                    return null;
+                }
+                try (InputStream in = zip.getInputStream(entry)) {
+                    return com.codename1.maven.annotations.ClassScanner.readClass(in, element);
+                }
+            }
+        }
+        return null;
     }
 
     /**

@@ -72,6 +72,18 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// foreign copy on the classpath can be recognised rather than merged.
     private static final String MAIN_CLASS_KEY = "cn1.buildHints.mainClass";
 
+    /// Digest of the annotations this file was generated from.
+    ///
+    /// The main-class stamp only says *which* class produced it, which is the
+    /// same class an out-of-date copy names. Nothing removes `target/classes`
+    /// between builds, so a project that ran this processor once and then stopped
+    /// -- the goal unbound, skipped, or bound to a phase that no longer runs --
+    /// keeps a manifest that looks entirely valid while the annotations beside it
+    /// have moved on. Recording what it was built from lets the consumer compare
+    /// it against the class file actually on the classpath and refuse instead of
+    /// shipping last week's configuration.
+    public static final String SOURCE_DIGEST_KEY = "cn1.buildHints.sourceDigest";
+
     /// hint name to value, sorted so the emitted bytes are stable.
     private final Map<String, String> hints = new TreeMap<String, String>();
     /// hint name to "@Ios(pods)".
@@ -358,6 +370,79 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Not `Properties.store`: it writes a timestamp comment, so the bytes would
     /// differ on every build. That churns the resource in every incremental
     /// build and defeats the staged-jar staleness comparison in `CN1BuildMojo`.
+    /// A stable fingerprint of every build hint annotation on `cls`.
+    ///
+    /// Taken over the raw annotation members rather than over the hints they
+    /// convert into, so it changes for anything the developer can change: a
+    /// different value, an added or removed attribute, a whole annotation
+    /// gained or lost. Two builds of the same source produce the same string;
+    /// there is no timestamp or path in it.
+    public static String sourceDigest(AnnotatedClass cls) throws ProcessingException {
+        StringBuilder sb = new StringBuilder();
+        Set<String> known = new HashSet<String>(BuildHintAnnotationBinding.descriptors());
+        // Sorted, because the class file's annotation order is the source's and a
+        // reordering is not a change.
+        for (String descriptor : new TreeMap<String, AnnotationValues>(
+                cls.getClassAnnotations()).keySet()) {
+            if (!known.contains(descriptor)) {
+                continue;
+            }
+            sb.append(descriptor).append('{');
+            AnnotationValues values = cls.getClassAnnotation(descriptor);
+            for (Map.Entry<String, Object> e
+                    : new TreeMap<String, Object>(values.all()).entrySet()) {
+                sb.append(e.getKey()).append('=');
+                renderForDigest(e.getValue(), sb);
+                sb.append(';');
+            }
+            sb.append('}');
+        }
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(sb.toString().getBytes("UTF-8"));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest) {
+                hex.append(Character.forDigit((b >> 4) & 0xf, 16));
+                hex.append(Character.forDigit(b & 0xf, 16));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException | UnsupportedEncodingException ex) {
+            throw new ProcessingException("Could not fingerprint the build hint annotations", ex);
+        }
+    }
+
+    /// The type is part of the rendering, so an int 1 and the string "1" -- which
+    /// print alike but are different annotations -- do not fingerprint alike.
+    private static void renderForDigest(Object value, StringBuilder sb) {
+        if (value == null) {
+            sb.append("null");
+        } else if (value instanceof String[]) {
+            // How ASM delivers an enum member: {descriptor, CONSTANT_NAME}.
+            String[] e = (String[]) value;
+            sb.append("enum:").append(e.length > 0 ? e[0] : "")
+              .append('.').append(e.length > 1 ? e[1] : "");
+        } else if (value instanceof List) {
+            sb.append('[');
+            for (Object item : (List<?>) value) {
+                renderForDigest(item, sb);
+                sb.append(',');
+            }
+            sb.append(']');
+        } else if (value instanceof AnnotationValues) {
+            AnnotationValues nested = (AnnotationValues) value;
+            sb.append(nested.getDescriptor()).append('{');
+            for (Map.Entry<String, Object> e
+                    : new TreeMap<String, Object>(nested.all()).entrySet()) {
+                sb.append(e.getKey()).append('=');
+                renderForDigest(e.getValue(), sb);
+                sb.append(';');
+            }
+            sb.append('}');
+        } else {
+            sb.append(value.getClass().getName()).append(':').append(value);
+        }
+    }
+
     private byte[] serialize(ProcessorContext ctx) throws ProcessingException {
         StringBuilder sb = new StringBuilder();
         sb.append("# Generated from build hint annotations by the Codename One Maven plugin.\n");
@@ -366,6 +451,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         if (main != null) {
             sb.append(MAIN_CLASS_KEY).append('=').append(escape(main)).append('\n');
         }
+        sb.append(SOURCE_DIGEST_KEY).append('=')
+          .append(sourceDigest(annotated.get(0))).append('\n');
         for (Map.Entry<String, String> e : hints.entrySet()) {
             sb.append(escape(BuildHints.ARG_PREFIX + e.getKey())).append('=')
               .append(escape(e.getValue())).append('\n');
