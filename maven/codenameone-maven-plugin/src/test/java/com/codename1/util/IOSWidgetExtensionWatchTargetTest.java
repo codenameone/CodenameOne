@@ -123,6 +123,30 @@ class IOSWidgetExtensionWatchTargetTest {
         assertFalse(swift.contains(".accessoryRectangular"), swift);
     }
 
+    /// Nor are the WidgetKit accessory spellings. SurfaceKindFamilies already says they are not
+    /// watch families -- a kind declaring only accessoryCircular produces no watch extension at
+    /// all -- so letting one INTO a watch extension that some other family opened would be the
+    /// system contradicting itself: this kind asked for a lock-screen circular and a rectangular
+    /// complication, and would have been given a circular complication it never asked for.
+    @Test
+    void accessoryFamiliesAreNotWatchFamiliesEither() throws IOException {
+        String swift = bundleOf(watchBuilder("accessoryCircular", "watchRectangular"));
+
+        assertTrue(swift.contains(".accessoryRectangular"), swift);
+        assertFalse(swift.contains(".accessoryCircular"), swift);
+    }
+
+    /// And nothing is lost by refusing them: every accessory family the watch can show has a
+    /// watch* name that maps to it, which is how a developer asks for it there.
+    @Test
+    void everyWatchAccessoryFamilyStaysReachableByItsWatchName() throws IOException {
+        String swift = bundleOf(watchBuilder("watchCircular", "watchRectangular", "watchInline"));
+
+        assertTrue(swift.contains(".accessoryCircular"), swift);
+        assertTrue(swift.contains(".accessoryRectangular"), swift);
+        assertTrue(swift.contains(".accessoryInline"), swift);
+    }
+
     /// Inside a watchOS-only target the corner family needs no platform guard; carrying one
     /// would be noise in a file that can only ever be compiled for the watch.
     @Test

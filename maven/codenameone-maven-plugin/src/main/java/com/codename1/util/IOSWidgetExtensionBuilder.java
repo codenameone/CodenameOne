@@ -714,6 +714,17 @@ public class IOSWidgetExtensionBuilder {
                     || "lockscreen".equals(family)) {
                 return null;
             }
+            // The accessory spellings too, and for the reason hasWatchFamily already encodes:
+            // they are NOT watch families here. A kind declaring only accessoryCircular produces
+            // no watch extension at all, so letting one INTO a watch extension that some other
+            // family opened is the system contradicting itself -- a kind asking for a lock-screen
+            // circular and a rectangular complication got a circular complication it never asked
+            // for. Nothing is lost by refusing them: every accessory family the watch can show
+            // has a watch* name that maps to it, which is how a developer says they want it there.
+            if ("accessoryCircular".equals(family) || "accessoryInline".equals(family)
+                    || "accessoryRectangular".equals(family)) {
+                return null;
+            }
         }
         if ("small".equals(family) || "systemSmall".equals(family)) {
             return ".systemSmall";
