@@ -4908,7 +4908,9 @@ public class IPhoneBuilder extends Executor {
                                 // and upload to be told the same thing later.
                                 throw new BuildException(outOfNamespace);
                             }
-                            stampAppExtensionInfoPlist(appExtension, request);
+                            stampAppExtensionInfoPlist(appExtension, request,
+                                    ArchiveContext.of(archiveSdk, archiveConfiguration, archiveArch,
+                                            appExtensionBuildSettings(appExtension)));
                             buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
                             buildSettingsMap.put("PROVISIONING_PROFILE", "$(NS_PROVISIONING_PROFILE)");
                             buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", codeSignEntitlements);
@@ -5844,8 +5846,9 @@ public class IPhoneBuilder extends Executor {
      * aligned here, and every change is logged: this edits a file the developer supplied. A value
      * that is already correct, and one written as a {@code $(...)} reference, are left alone.</p>
      */
-    private void stampAppExtensionInfoPlist(File appExtension, BuildRequest request) throws IOException {
-        Map<String, File> plists = appExtensionInfoPlists(appExtension);
+    private void stampAppExtensionInfoPlist(File appExtension, BuildRequest request,
+            ArchiveContext context) throws IOException {
+        Map<String, File> plists = appExtensionInfoPlists(appExtension, context);
         Set<String> stamped = new LinkedHashSet<String>();
         for (Map.Entry<String, File> candidate : plists.entrySet()) {
             File infoPlist = candidate.getValue();
@@ -6052,7 +6055,18 @@ public class IPhoneBuilder extends Executor {
     /// @return the raw setting value that named each plist, mapped to the resolved file, or to
     /// null when that value is unresolvable or lands outside the project directory
     static Map<String, File> appExtensionInfoPlists(File extensionFolder) {
-        Map<String, String> settings = appExtensionBuildSettings(extensionFolder);
+        return appExtensionInfoPlists(extensionFolder, null);
+    }
+
+    /// @param context this archive, so INFOPLIST_FILE = $(CONFIGURATION)/Info.plist resolves to
+    /// the plist Xcode actually processes. Without it the path came back unresolvable and the
+    /// stamping skipped the file that ships -- the same hole the entitlements path had.
+    static Map<String, File> appExtensionInfoPlists(File extensionFolder, ArchiveContext context) {
+        Map<String, String> declared = appExtensionBuildSettings(extensionFolder);
+        Map<String, String> settings = context == null ? declared
+                : extensionSettingsWithBuiltIns(extensionFolder, declared, context.configuration,
+                        context.sdk, context.arch);
+
         Map<String, File> out = new LinkedHashMap<String, File>();
         String base = settings.get("INFOPLIST_FILE");
         if (base == null || base.trim().length() == 0) {
@@ -6968,6 +6982,46 @@ public class IPhoneBuilder extends Executor {
                 ? developer.getAbsolutePath() : null;
     }
 
+    /// What this archive IS, for matching conditional build settings against.
+    ///
+    /// These four travelled as loose parameters and kept growing -- and the one that was NOT a
+    /// parameter, the build variant, was hard-coded to "normal" and turned out to be settable by
+    /// the archive (BUILD_VARIANTS). Held together here so the next dimension is one field rather
+    /// than a signature change in six places.
+    static final class ArchiveContext {
+        final String sdk;
+        final String configuration;
+        final String arch;
+        /// Every variant this build produces; a [variant=...] condition applies if it names one.
+        final List<String> variants;
+
+        ArchiveContext(String sdk, String configuration, String arch, List<String> variants) {
+            this.sdk = sdk;
+            this.configuration = configuration;
+            this.arch = arch;
+            this.variants = variants;
+        }
+
+        /// @param settings the extension's own, since BUILD_VARIANTS in them is copied onto the
+        /// target and decides which variants Xcode actually builds
+        static ArchiveContext of(String sdk, String configuration, String arch,
+                Map<String, String> settings) {
+            List<String> variants = new ArrayList<String>();
+            String declared = settings == null ? null : settings.get("BUILD_VARIANTS");
+            if (declared != null) {
+                for (String variant : declared.trim().split("\\s+")) {
+                    if (variant.length() > 0) {
+                        variants.add(variant);
+                    }
+                }
+            }
+            if (variants.isEmpty()) {
+                variants.add("normal");
+            }
+            return new ArchiveContext(sdk, configuration, arch, variants);
+        }
+    }
+
     /// The value of {@code name} that governs THIS archive.
     ///
     /// Xcode does not merge a qualified setting with the plain one, it OVERRIDES it: with both
@@ -6986,6 +7040,12 @@ public class IPhoneBuilder extends Executor {
 
     static String winningSetting(Map<String, String> settings, String name, String sdk,
             String configuration, String arch) {
+        return winningSetting(settings, name,
+                ArchiveContext.of(sdk, configuration, arch, settings));
+    }
+
+    static String winningSetting(Map<String, String> settings, String name,
+            ArchiveContext context) {
         if (settings == null) {
             return null;
         }
@@ -6997,7 +7057,7 @@ public class IPhoneBuilder extends Executor {
             if (!qualified && !name.equals(key)) {
                 continue;
             }
-            if (qualified && !conditionApplies(key, sdk, configuration, arch)) {
+            if (qualified && !conditionApplies(key, context)) {
                 continue;
             }
             long specificity = qualified ? conditionSpecificity(key) : 0;
@@ -7060,6 +7120,14 @@ public class IPhoneBuilder extends Executor {
     /// @param arch the architecture the archive is built for, so [arch=arm64] and [arch=x86_64]
     /// are not both counted applicable and then decided by map order
     static boolean conditionApplies(String key, String sdk, String configuration, String arch) {
+        return conditionApplies(key, new ArchiveContext(sdk, configuration, arch,
+                java.util.Collections.singletonList("normal")));
+    }
+
+    static boolean conditionApplies(String key, ArchiveContext context) {
+        String sdk = context.sdk;
+        String configuration = context.configuration;
+        String arch = context.arch;
         int open = key.indexOf('[');
         if (open < 0) {
             return true;
@@ -7081,15 +7149,19 @@ public class IPhoneBuilder extends Executor {
             if ("arch".equals(name) && arch != null && !matchesCondition(value, arch)) {
                 return false;
             }
-            // The build variant is not a parameter because it is never in doubt: this builder
-            // archives the normal variant, never Xcode's profile or debug variants. A
-            // [variant=profile] setting therefore belongs to a build that does not happen here,
-            // and letting it win -- it is more specific than the plain setting -- meant validating
-            // an identifier or reading entitlements Xcode would not use.
-            if ("variant".equals(name) && !matchesCondition(value, "normal")) {
-                return false;
+            // Against the variants this build actually produces. "normal" unless the extension's
+            // own BUILD_VARIANTS says otherwise -- that setting is copied onto the target, so an
+            // archive declaring profile really is built as profile and its [variant=profile]
+            // settings are the ones Xcode applies.
+            if ("variant".equals(name)) {
+                boolean matches = false;
+                for (String variant : context.variants) {
+                    matches |= matchesCondition(value, variant);
+                }
+                if (!matches) {
+                    return false;
+                }
             }
-
         }
         return true;
     }

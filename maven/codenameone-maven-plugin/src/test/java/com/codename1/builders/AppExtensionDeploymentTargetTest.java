@@ -704,4 +704,40 @@ public class AppExtensionDeploymentTargetTest {
         assertTrue(IPhoneBuilder.conditionApplies("X[variant=normal]", "iphoneos14.4",
                 "Release", "arm64"));
     }
+
+    @Test
+    public void anArchiveThatDeclaresItsVariantGetsThatVariantsSettings() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("BUILD_VARIANTS", "profile");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[variant=profile]", "com.example.app.Ext.profile");
+
+        // BUILD_VARIANTS is copied onto the target, so Xcode really does build the profile variant
+        // and apply its settings; hard-coding "normal" discarded them.
+        assertEquals("com.example.app.Ext.profile", IPhoneBuilder.winningSetting(settings,
+                "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos14.4", "Release", "arm64"));
+
+        java.util.Map<String, String> ordinary = new java.util.LinkedHashMap<String, String>();
+        ordinary.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        ordinary.put("PRODUCT_BUNDLE_IDENTIFIER[variant=profile]", "com.other.Ext");
+        assertEquals("com.example.app.Ext", IPhoneBuilder.winningSetting(ordinary,
+                "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos14.4", "Release", "arm64"));
+    }
+
+    @Test
+    public void anInfoPlistPathThroughTheConfigurationResolves() throws Exception {
+        File dist = tmp.newFolder("dist22");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File release = new File(extension, "Release.plist");
+        write(release, "<plist><dict/></plist>");
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/$(CONFIGURATION).plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // Unresolvable here meant the stamping skipped the plist that actually ships.
+        assertTrue(plists.toString(), plists.values().contains(release));
+    }
 }
