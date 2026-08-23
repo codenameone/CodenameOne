@@ -788,10 +788,12 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             // didChangeState from reaching takeAllAcksFromPeer, so a
             // deliberate close left an accepted send with no terminal status
             // at all -- and its bookkeeping alive until a full stop swept it.
-            for (NSNumber *stranded in [self takeAllAcksFromPeer:endpointId]) {
+            for (NSArray<NSNumber *> *stranded in
+                    [self takeAllAcksFromPeer:endpointId]) {
                 com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                         getThreadLocalData(), cn1nbJString(encoded),
-                        (JAVA_INT)[stranded intValue], 0, -1,
+                        (JAVA_INT)[[stranded objectAtIndex:0] intValue], 0,
+                        (JAVA_LONG)[[stranded objectAtIndex:1] longLongValue],
                         CN1_NEARBY_PAYLOAD_FAILURE);
             }
             com_codename1_impl_ios_IOSNearbyCallbacks_disconnected___java_lang_String(
@@ -992,7 +994,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 }
 
 /// Takes every payload still waiting on a peer, for a disconnect.
-- (NSArray *)takeAllAcksFromPeer:(NSString *)pid {
+- (NSArray<NSArray<NSNumber *> *> *)takeAllAcksFromPeer:(NSString *)pid {
     @synchronized (self) {
         NSMutableDictionary *ids = [self.awaitingAck objectForKey:pid];
         NSMutableArray *out = [NSMutableArray array];
@@ -1000,6 +1002,13 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // terminal updates -- the same count they would have got as acks.
         // Each is a pair of the payload id and the length it was sent with,
         // so a stranded send reports the same total its progress did.
+        //
+        // The return type spells the pair out. It used to be a flat array of
+        // ids, and when it became pairs one of the two callers went on
+        // sending intValue to what was now an NSArray -- an unrecognized
+        // selector, so a deliberate close of a session with a send in flight
+        // crashed before either the failure or the disconnection was
+        // delivered. An untyped NSArray * cannot catch that; this can.
         for (NSNumber *key in [ids allKeys]) {
             for (NSNumber *length in [ids objectForKey:key]) {
                 [out addObject:[NSArray arrayWithObjects:key, length, nil]];
@@ -1201,7 +1210,8 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         if ([self takeEverConnected:pid]) {
             // Anything still waiting on this peer will never be
             // acknowledged, so it is failed rather than left pending.
-            for (NSArray *stranded in [self takeAllAcksFromPeer:pid]) {
+            for (NSArray<NSNumber *> *stranded in
+                    [self takeAllAcksFromPeer:pid]) {
                 com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                         getThreadLocalData(), cn1nbJString(encoded),
                         (JAVA_INT)[[stranded objectAtIndex:0] intValue], 0,
