@@ -168,7 +168,15 @@ public abstract class CN1SurfaceTileService extends TileService {
                 root = text("No data yet");
             } else {
                 root = render(reading.getLayout(), reading.getState(), 0, false);
-                freshness = freshnessFor(reading.getNextFlipDate(),
+                // The flip date OR the moment something starts moving, whichever comes first.
+                // Refusing periodic refresh before an interval begins was right -- the bar is
+                // clamped at zero until then -- but on its own it left nothing to wake the Tile
+                // AT the start, so a reading with no flip date would have sat at zero for ever.
+                // One refresh scheduled for that moment is enough: the rebuild then sees the
+                // interval running and asks for the periodic rate itself.
+                long wakeAt = earlierOf(reading.getNextFlipDate(),
+                        nextIntervalStart(reading.getLayout()));
+                freshness = freshnessFor(wakeAt,
                         hasMovingContent(reading.getLayout(), reading.getState()));
                 version = resourcesVersion(reading);
                 // Kept for the resources request that follows, which asks about THIS version.
@@ -254,6 +262,43 @@ public abstract class CN1SurfaceTileService extends TileService {
             return true;
         }
         return false;
+    }
+
+    /// The earlier of two moments, treating 0 as "no such moment".
+    private static long earlierOf(long a, long b) {
+        if (a <= 0) {
+            return b;
+        }
+        if (b <= 0) {
+            return a;
+        }
+        return Math.min(a, b);
+    }
+
+    /**
+     * When the first not-yet-started interval in this layout begins, or 0 when none does.
+     *
+     * <p>An interval whose start is still ahead renders as an empty bar and does not move, so it
+     * earns no periodic refresh -- but something has to bring the Tile back when it does begin,
+     * and a reading with no flip date has nothing else that would.</p>
+     *
+     * @param layout the resolved layout root
+     * @return the earliest future start, or 0
+     */
+    private static long nextIntervalStart(JSONObject layout) {
+        long now = System.currentTimeMillis();
+        long earliest = 0;
+        for (JSONObject node : CN1WatchSurface.flatten(layout)) {
+            if (!"prog".equals(node.optString("t", ""))
+                    || !node.has("start") || !node.has("end")) {
+                continue;
+            }
+            long start = node.optLong("start");
+            if (start > now && now < node.optLong("end")) {
+                earliest = earlierOf(earliest, start);
+            }
+        }
+        return earliest;
     }
 
     private static long freshnessFor(long nextFlipDate, boolean hasDynamicText) {
