@@ -424,6 +424,23 @@ public class CN1WearableListenerService extends WearableListenerService {
     private static final int MIRROR_WRITE_RETRIES = 6;
     private static final long MIRROR_WRITE_RETRY_MILLIS = 20000L;
 
+    /// How many mirror events each reserved path has seen, so a delayed retry can tell whether it
+    /// has been overtaken. Small and bounded by the number of declared kinds.
+    private static final java.util.HashMap<String, Long> MIRROR_GENERATIONS =
+            new java.util.HashMap<String, Long>();
+
+    private static synchronized long bumpMirrorGeneration(String path) {
+        Long current = MIRROR_GENERATIONS.get(path);
+        long next = (current == null ? 0L : current.longValue()) + 1L;
+        MIRROR_GENERATIONS.put(path, Long.valueOf(next));
+        return next;
+    }
+
+    private static synchronized long mirrorGeneration(String path) {
+        Long current = MIRROR_GENERATIONS.get(path);
+        return current == null ? 0L : current.longValue();
+    }
+
     /**
      * Re-attempts a mirrored descriptor the watch could not store.
      *
@@ -437,7 +454,14 @@ public class CN1WearableListenerService extends WearableListenerService {
      * @param attempt 1 for the first re-attempt
      */
     private void retryMirrorDescriptor(final String path, final byte[] payload,
-            final int attempt) {
+            final int attempt, final long generation) {
+        if (mirrorGeneration(path) != generation) {
+            // Overtaken. A newer descriptor for this path -- or its tombstone -- has been handled
+            // since this retry was scheduled, so applying the payload now would either overwrite
+            // content that is newer than it or resurrect a surface the phone has withdrawn. The
+            // newer event has its own retry if it needs one.
+            return;
+        }
         if (payload == null || attempt > MIRROR_WRITE_RETRIES) {
             android.util.Log.w("CN1Surfaces", "gave up applying the mirrored surface on " + path
                     + " after " + MIRROR_WRITE_RETRIES + " attempts; the watch keeps what it had "
@@ -447,8 +471,13 @@ public class CN1WearableListenerService extends WearableListenerService {
         final CN1WearableListenerService self = this;
         CN1WearableBridge.scheduleFrameworkRetry(new Runnable() {
             public void run() {
+                if (mirrorGeneration(path) != generation) {
+                    // Checked again here, not only on entry: the overtaking event usually lands
+                    // while this task is sitting on the timer, which is the whole window.
+                    return;
+                }
                 if (!self.surfaceMirror("receive", path, payload)) {
-                    self.retryMirrorDescriptor(path, payload, attempt + 1);
+                    self.retryMirrorDescriptor(path, payload, attempt + 1, generation);
                 }
             }
         }, MIRROR_WRITE_RETRY_MILLIS << (attempt - 1));
@@ -585,6 +614,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // path's cache or its logical clock, and letting a tombstone go there left the
                 // descriptor CN1SurfaceMirror.receive wrote sitting on disk -- the complication
                 // kept showing content the phone had already withdrawn.
+                // Every mirror event for this path moves its generation on, which is what lets a
+                // scheduled retry tell that it has been overtaken. Bumped BEFORE the work, so a
+                // retry scheduled by this very event carries the current number.
+                long generation = bumpMirrorGeneration(appPath);
                 if (deleted) {
                     // The tombstone is consumed either way, and deliberately. A Data Layer
                     // deletion is not redelivered -- unlike a changed item there is nothing left
@@ -599,7 +632,7 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // has not changed produces no further callback, so the watch would keep
                         // showing content the phone has already replaced, indefinitely. The
                         // payload is in hand, so the retry needs no round trip.
-                        retryMirrorDescriptor(appPath, descriptor, 1);
+                        retryMirrorDescriptor(appPath, descriptor, 1, generation);
                     }
                 }
                 continue;

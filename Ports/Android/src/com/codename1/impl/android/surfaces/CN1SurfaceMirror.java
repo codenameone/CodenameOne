@@ -301,7 +301,15 @@ public final class CN1SurfaceMirror {
             // image leaves its predecessor behind for ever in the watch app's storage. Artwork
             // for the new descriptor that has not arrived yet is simply absent rather than
             // unreferenced, so this cannot delete an image the timeline is waiting for.
-            CN1SurfaceStore.deleteUnreferencedImages(kindDir, new String(json, "UTF-8"));
+            // With the SAME grace the image path uses, and for the mirrored side's own reason:
+            // the descriptor and the images are independent Data Layer items, so they can arrive
+            // out of order across publications. Artwork for publication B can already be staged
+            // when A's descriptor is handled, and a zero-grace collection here deletes it --
+            // permanently, because that transfer has been acknowledged and will not be resent, so
+            // when B's descriptor arrives its art is simply gone. Age keeps freshly staged blobs
+            // and still collects the genuinely superseded ones.
+            CN1SurfaceStore.deleteUnreferencedImages(kindDir, new String(json, "UTF-8"),
+                    STALE_IMAGE_GRACE_MILLIS);
             // A mirrored kind was never published by THIS process, so nothing else records it --
             // and reloadWidgets(null) walks the remembered set, so a reload-all on a watch whose
             // content only ever arrived from the phone skipped the complication entirely.

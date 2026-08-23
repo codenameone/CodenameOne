@@ -7814,6 +7814,14 @@ public class AndroidGradleBuilder extends Executor {
                 // the first frame.
                 + "        <activity android:name=\"." + stubName + "\" "
                 + "android:theme=\"" + launcherTheme() + "\" "
+                // The project's resolved launch mode, as the phone launcher gets. It defaults to
+                // singleTop, and the difference matters now that the custom intent filter is
+                // carried across: an app link arriving while the watch app is already running
+                // would otherwise start a SECOND stub and lifecycle under the default standard
+                // mode, where the same configuration delivers it to the running one through
+                // onNewIntent on the phone.
+                + "android:launchMode=\"" + request.getArg("android.activity.launchMode",
+                        "singleTop") + "\" "
                 + "android:exported=\"true\">\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"android.intent.action.MAIN\" />\n"

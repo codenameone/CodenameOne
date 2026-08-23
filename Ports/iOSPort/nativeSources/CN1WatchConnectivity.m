@@ -906,6 +906,13 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     /// finishes, so a NEWER payload queued for the same kind meanwhile is not mistaken for the
     /// one that was just delivered and discarded with it.
     NSDictionary *_complicationInFlightPayload;
+    /// The transfer object WCSession returned for it.
+    ///
+    /// The completion callback is told which TRANSFER finished, and matching on the kind alone is
+    /// not enough: the fallback transferUserInfo: path queues its own transfers for the same
+    /// kinds, and one of those completing would clear an unrelated newer transfer that is still
+    /// in flight -- after which the next publish displaces it before the watch ever sees it.
+    WCSessionUserInfoTransfer *_complicationInFlightTransfer;
     /// Guards the recurring tombstone sweep to a single pending chain; see pruneTombstonesNow.
     BOOL _tombstoneSweepScheduled;
     /// Guards the post-removal deadline sweep to one block, however many paths are removed.
@@ -1047,17 +1054,28 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         }
         _complicationInFlight = kind;
         _complicationInFlightPayload = info;
+        _complicationInFlightTransfer = nil;
     }
     WCSession *s = [self session];
     if (s == nil) {
         @synchronized (self) {
             _complicationInFlight = nil;
             _complicationInFlightPayload = nil;
+            _complicationInFlightTransfer = nil;
         }
         return;
     }
     @try {
-        [s transferCurrentComplicationUserInfo:info];
+        WCSessionUserInfoTransfer *handed = [s transferCurrentComplicationUserInfo:info];
+        @synchronized (self) {
+            // Only if this is still the transfer we started. A completion can land before this
+            // assignment does, and overwriting a cleared slot would leave the queue believing
+            // something is in flight for ever.
+            if (_complicationInFlight != nil && [_complicationInFlight isEqualToString:kind]
+                    && _complicationInFlightPayload == info) {
+                _complicationInFlightTransfer = handed;
+            }
+        }
     } @catch (NSException *ex) {
         // Raised for a payload the session will not carry. Drop this kind and carry on with the
         // rest: holding the queue for it would strand every kind behind it.
@@ -1082,6 +1100,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         if (_complicationInFlight != nil && [_complicationInFlight isEqualToString:kind]) {
             _complicationInFlight = nil;
             _complicationInFlightPayload = nil;
+            _complicationInFlightTransfer = nil;
         }
         NSDictionary *queued = [_pendingComplications objectForKey:kind];
         if (queued == nil || queued == sent) {
@@ -1514,9 +1533,21 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         // Not one of ours -- the wearable API's own transferUserInfo: traffic lands here too.
         return;
     }
+    // THIS transfer, not merely this kind. The fallback transferUserInfo: path queues transfers
+    // for the same kinds, and an old one of those completing would otherwise clear a newer
+    // complication transfer that is still in flight -- after which the next publish displaces it
+    // and the watch never sees it. A surfaces transfer we are not tracking needs no bookkeeping.
+    BOOL mine;
+    @synchronized (self) {
+        mine = _complicationInFlightTransfer != nil
+                && _complicationInFlightTransfer == userInfoTransfer;
+    }
     if (error != nil) {
         NSLog(@"[CN1Surfaces] the watch did not accept the update for \"%@\": %@", kind,
               error.localizedDescription);
+    }
+    if (!mine) {
+        return;
     }
     [self finishComplicationForKind:kind];
 }
