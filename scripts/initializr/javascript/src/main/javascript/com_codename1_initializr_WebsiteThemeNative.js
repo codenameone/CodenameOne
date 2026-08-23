@@ -89,6 +89,17 @@ var o = {};
         }
     };
 
+    o.notifyProjectDownloaded_ = function(callback) {
+        try {
+            if (window.parent && window.parent !== window && window.parent.postMessage) {
+                window.parent.postMessage({ type: "cn1-initializr-project-downloaded" }, "*");
+            }
+        } catch (ignored) {
+            // A download must never fail because the embedding page is unavailable.
+        }
+        callback.complete();
+    };
+
     // Horizontal clearance (CSS px) the host page's Crisp chat launcher needs at
     // the bottom-right, so the generate button can be nudged left of it. The
     // default Crisp launcher bubble (~64px) sits ~24px from the page edge;

@@ -182,7 +182,13 @@ jobs:
           test -f docs/website/public/playground/index.html
 
       - name: Validate Initializr JS bundle output
-        run: test -f docs/website/public/initializr-app/index.html
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/initializr-app/index.html
+          rg -q 'notifyProjectDownloaded' docs/website/public/initializr-app/translated_app.js
+          rg -q 'cn1-initializr-project-downloaded' \
+            docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
+          rg -q 'cn1-initializr-project-downloaded' docs/website/public/initializr/index.html
 
       - name: Validate Playground JS bundle output
         run: test -f docs/website/public/playground-app/index.html

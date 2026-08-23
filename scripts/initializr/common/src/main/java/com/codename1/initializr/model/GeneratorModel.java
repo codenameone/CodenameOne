@@ -23,8 +23,10 @@
 package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
+import com.codename1.initializr.WebsiteThemeNative;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.system.NativeLookup;
 import com.codename1.util.StringUtil;
 import net.sf.zipme.CRC32;
 import net.sf.zipme.ZipEntry;
@@ -165,6 +167,7 @@ public class GeneratorModel {
             return;
         }
         if (downloadBytesAsFile(fileName, bytes)) {
+            notifyWebsiteProjectDownloaded();
             return;
         }
 
@@ -189,6 +192,14 @@ public class GeneratorModel {
             }
         }
         execute(filePath);
+    }
+
+    /** Tell the embedding website only after the browser accepted the ZIP download. */
+    private static void notifyWebsiteProjectDownloaded() {
+        WebsiteThemeNative nativeBridge = NativeLookup.create(WebsiteThemeNative.class);
+        if (nativeBridge != null && nativeBridge.isSupported()) {
+            nativeBridge.notifyProjectDownloaded();
+        }
     }
 
     private static String describeError(Throwable ex) {

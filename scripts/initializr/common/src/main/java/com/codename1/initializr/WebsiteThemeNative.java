@@ -5,6 +5,7 @@ import com.codename1.system.NativeInterface;
 public interface WebsiteThemeNative extends NativeInterface {
     boolean isDarkMode();
     void notifyUiReady();
+    void notifyProjectDownloaded();
 
     /// Horizontal clearance, in CSS pixels, that the host page's chat launcher
     /// (Crisp) currently needs at the bottom-right, or 0 when it is hidden. The
