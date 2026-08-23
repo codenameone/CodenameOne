@@ -1819,6 +1819,12 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                 return;
             }
             CN1NearbyCompanion *companion = cn1nbCompanionInit();
+            // Taken BEFORE the picker opens, so the accessory it adds can be
+            // told apart from the ones this app already had.
+            NSMutableSet *before = [NSMutableSet set];
+            for (ASAccessory *a in companion.session.accessories) {
+                [before addObject:cn1nbAccessoryId(a)];
+            }
             [companion.session showPickerForDisplayItems:items
                                        completionHandler:^(NSError *error) {
                 @autoreleasepool {
@@ -1828,12 +1834,28 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                                 [error localizedDescription]);
                         return;
                     }
-                    ASAccessory *picked =
-                            [companion.session.accessories lastObject];
+                    // The one that is NEW, not the last in the array. The
+                    // accessories array documents no order, so an app that
+                    // already held associations could be handed one the user
+                    // did not pick -- and then persist or disassociate the
+                    // wrong device.
+                    ASAccessory *picked = nil;
+                    for (ASAccessory *a in companion.session.accessories) {
+                        if (![before containsObject:cn1nbAccessoryId(a)]) {
+                            if (picked != nil) {
+                                // Two arrived while the picker was open;
+                                // neither can be claimed as the user's pick.
+                                picked = nil;
+                                break;
+                            }
+                            picked = a;
+                        }
+                    }
                     if (picked == nil) {
                         cn1nbFailCompanion(requestId,
                                 CN1_NEARBY_ERR_USER_CANCELED,
-                                @"the picker returned no accessory");
+                                @"the picker added no accessory this app"
+                                 @" did not already have");
                         return;
                     }
                     // present:NO. Associating an accessory says the user

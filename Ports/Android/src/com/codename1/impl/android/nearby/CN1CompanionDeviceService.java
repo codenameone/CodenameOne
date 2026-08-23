@@ -139,9 +139,14 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
             return;
         }
         CharSequence name = info.getDisplayName();
+        // The profile the association was actually made under, not a
+        // hardcoded GENERIC -- the same record AndroidNearbyBackend builds,
+        // and it has to agree with it or one presence event would contradict
+        // the association the app already holds.
         String encoded = sanitize(id) + '\t'
                 + sanitize(name == null ? "" : name.toString()) + '\t'
-                + sanitize(mac == null ? "" : mac) + "\t0\t"
+                + sanitize(mac == null ? "" : mac) + '\t'
+                + AndroidNearbyBackend.profileOrdinalOf(info) + '\t'
                 + (present ? '1' : '0');
         CompanionDevices.deliverPresenceChanged(encoded, present);
     }

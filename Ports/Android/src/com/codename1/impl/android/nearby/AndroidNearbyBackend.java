@@ -856,6 +856,22 @@ public class AndroidNearbyBackend implements NearbyBridge {
     // Internals
     // ------------------------------------------------------------------
 
+    /// The platform profile role names, written out rather than referenced.
+    ///
+    /// AssociationRequest.DEVICE_PROFILE_GLASSES is API 34, and the nearby
+    /// compile-SDK floor is 33 -- so naming that constant would fail to
+    /// compile for an app built against exactly 33, which the builder allows.
+    /// These are compile-time String constants in the platform too, and their
+    /// values are stable role names, so the literal is what the constant
+    /// would have inlined anyway and it also works where the constant does
+    /// not exist yet.
+    private static final String PROFILE_WATCH =
+            "android.app.role.COMPANION_DEVICE_WATCH";
+    private static final String PROFILE_GLASSES =
+            "android.app.role.COMPANION_DEVICE_GLASSES";
+    private static final String PROFILE_COMPUTER =
+            "android.app.role.COMPANION_DEVICE_COMPUTER";
+
     private static String profileFor(int profile) {
         // The ordinals of com.codename1.nearby.companion.CompanionProfile.
         if (Build.VERSION.SDK_INT < 31) {
@@ -863,24 +879,56 @@ public class AndroidNearbyBackend implements NearbyBridge {
         }
         switch (profile) {
             case 1:
-                return AssociationRequest.DEVICE_PROFILE_WATCH;
+                return PROFILE_WATCH;
             case 2:
                 // GLASSES is API 34 and COMPUTER is 33 -- not the other way
                 // round, which is the order the enum happens to declare them
                 // in. Passing the platform a profile string it does not know
                 // throws, so these two gates were checked against the SDK's
                 // own api-versions.xml rather than guessed from the ordinal.
-                return Build.VERSION.SDK_INT >= 34
-                        ? AssociationRequest.DEVICE_PROFILE_GLASSES : null;
+                return Build.VERSION.SDK_INT >= 34 ? PROFILE_GLASSES : null;
             case 3:
-                return Build.VERSION.SDK_INT >= 33
-                        ? AssociationRequest.DEVICE_PROFILE_COMPUTER : null;
+                return Build.VERSION.SDK_INT >= 33 ? PROFILE_COMPUTER : null;
             default:
                 // GENERIC. Deliberately no profile at all rather than a
                 // harmless-looking one: a profile is a request for elevated
                 // privileges and shows the user a stronger prompt.
                 return null;
         }
+    }
+
+    /// The CompanionProfile ordinal an association was made under.
+    ///
+    /// #### Parameters
+    ///
+    /// - `info`: the association
+    ///
+    /// #### Returns
+    ///
+    /// the ordinal, or 0 for GENERIC and for anything this API does not model
+    static int profileOrdinalOf(AssociationInfo info) {
+        if (info == null || Build.VERSION.SDK_INT < 33) {
+            return 0;
+        }
+        String profile;
+        try {
+            profile = info.getDeviceProfile();
+        } catch (Throwable unreadable) {
+            return 0;
+        }
+        if (PROFILE_WATCH.equals(profile)) {
+            return 1;
+        }
+        if (PROFILE_GLASSES.equals(profile)) {
+            return 2;
+        }
+        if (PROFILE_COMPUTER.equals(profile)) {
+            return 3;
+        }
+        // Null, or one of the profiles the portable API does not model --
+        // app streaming, automotive projection. GENERIC is the honest answer
+        // for both.
+        return 0;
     }
 
     private static boolean addFilter(AssociationRequest.Builder request,
@@ -972,24 +1020,27 @@ public class AndroidNearbyBackend implements NearbyBridge {
         String mac = macOf(info);
         CharSequence name = info.getDisplayName();
         return join(idOf(info), name == null ? "" : name.toString(),
-                mac == null ? "" : mac, present);
+                mac == null ? "" : mac, profileOrdinalOf(info), present);
     }
 
     private static String encodeLegacy(String id, String mac,
             boolean present) {
+        // No AssociationInfo below API 33, so no profile to read either.
         return join(id, mac == null ? "" : mac, mac == null ? "" : mac,
-                present);
+                0, present);
     }
 
     /// Builds the record `com.codename1.impl.nearby.NearbyWire` decodes.
     ///
-    /// The profile field is always zero: Android does not report back which
-    /// profile an association was made under, and guessing would be worse
-    /// than saying GENERIC.
+    /// The profile is read back from the association rather than hardcoded to
+    /// GENERIC: AssociationInfo.getDeviceProfile reports the one the
+    /// association was made under from API 33, and reporting GENERIC for a
+    /// watch contradicted CompanionDevice.getProfile and left an app unable
+    /// to tell its profile-specific companions apart.
     private static String join(String id, String name, String address,
-            boolean present) {
+            int profileOrdinal, boolean present) {
         return sanitize(id) + '\t' + sanitize(name) + '\t' + sanitize(address)
-                + "\t0\t" + (present ? '1' : '0');
+                + '\t' + profileOrdinal + '\t' + (present ? '1' : '0');
     }
 
     private static String sanitize(String s) {

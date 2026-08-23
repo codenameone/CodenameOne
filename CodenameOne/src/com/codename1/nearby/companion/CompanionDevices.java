@@ -97,6 +97,16 @@ public final class CompanionDevices {
     /// not accumulate events forever; the oldest is dropped first, because the
     /// most recent sighting is the one worth reporting.
     private static final int MAX_PENDING_PRESENCE = 64;
+    /// True while a replay is handing the backlog to the EDT.
+    ///
+    /// Clearing the backlog under the lock is not enough on its own: an event
+    /// arriving after the lock is released but before the replay has finished
+    /// queueing sees an empty backlog, dispatches straight away, and can land
+    /// on the EDT ahead of parked events that are older than it. A parked
+    /// appearance followed by a live disappearance then arrived in the wrong
+    /// order and left the listener holding the wrong final state. While this
+    /// is set, everything parks and the replay loop picks it up.
+    private static boolean replayingPresence;
 
     /// One parked presence event. Static so it holds no implicit reference to
     /// anything but the device it carries.
@@ -273,21 +283,38 @@ public final class CompanionDevices {
         if (l == null) {
             return;
         }
-        List<PendingPresence> replay = null;
         synchronized (LISTENERS) {
             LISTENERS.add(l);
-            if (!PENDING_PRESENCE.isEmpty()) {
-                // Taking the backlog under the same monitor that
-                // deliverPresenceChanged parks into is what keeps the order
-                // right: an event arriving between the registration and the
-                // replay finds the queue still non-empty and parks behind the
-                // backlog rather than overtaking it on the EDT.
-                replay = new ArrayList<PendingPresence>(PENDING_PRESENCE);
+            if (PENDING_PRESENCE.isEmpty() || replayingPresence) {
+                // Nothing parked, or another registration is already draining
+                // it -- and that drain will pick up anything that arrives
+                // while it runs.
+                return;
+            }
+            replayingPresence = true;
+        }
+        replayPresence();
+    }
+
+    /// Hands the parked backlog to the EDT, oldest first, until nothing is
+    /// left.
+    ///
+    /// Loops rather than taking one batch: an event that arrives while the
+    /// batch is being dispatched parks behind it (deliverPresenceChanged sees
+    /// replayingPresence), and the next turn of this loop sends it on. That
+    /// is what keeps a live event from overtaking older parked ones.
+    private static void replayPresence() {
+        while (true) {
+            List<PendingPresence> batch;
+            synchronized (LISTENERS) {
+                if (PENDING_PRESENCE.isEmpty()) {
+                    replayingPresence = false;
+                    return;
+                }
+                batch = new ArrayList<PendingPresence>(PENDING_PRESENCE);
                 PENDING_PRESENCE.clear();
             }
-        }
-        if (replay != null) {
-            for (PendingPresence parked : replay) {
+            for (PendingPresence parked : batch) {
                 dispatchPresence(parked.device, parked.present);
             }
         }
@@ -322,6 +349,7 @@ public final class CompanionDevices {
         synchronized (LISTENERS) {
             LISTENERS.clear();
             PENDING_PRESENCE.clear();
+            replayingPresence = false;
         }
     }
 
@@ -407,7 +435,8 @@ public final class CompanionDevices {
             return;
         }
         synchronized (LISTENERS) {
-            if (LISTENERS.isEmpty() || !PENDING_PRESENCE.isEmpty()) {
+            if (LISTENERS.isEmpty() || !PENDING_PRESENCE.isEmpty()
+                    || replayingPresence) {
                 while (PENDING_PRESENCE.size() >= MAX_PENDING_PRESENCE) {
                     PENDING_PRESENCE.remove(0);
                 }
