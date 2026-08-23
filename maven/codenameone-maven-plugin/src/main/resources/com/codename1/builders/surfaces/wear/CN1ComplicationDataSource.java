@@ -472,7 +472,58 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                 crossings.add(Long.valueOf(at));
             }
         }
+        addIntervalSamples(nodes, windowStart, windowEnd, crossings);
         return new ArrayList<Long>(crossings);
+    }
+
+    /// How many times an interval-based gauge is stepped across the part of it we can see.
+    /// Enough that a bar visibly advances, few enough that a timeline stays small.
+    private static final int INTERVAL_SAMPLES = 12;
+
+    /// The shortest gap worth an entry. Below this the face would redraw more often than the
+    /// value meaningfully changes.
+    private static final long MIN_SAMPLE_GAP_MILLIS = 60L * 1000L;
+
+    /**
+     * Adds moments at which an interval-based progress value should be re-rendered.
+     *
+     * <p>A prog node carrying start and end derives its fraction from the clock, and
+     * progressValue snapshots it -- so a RANGED_VALUE complication showed one fraction for the
+     * whole reading while the same node on iOS advances. Crossings do not help: they exist for
+     * text changing sides, and a gauge has no side to change.</p>
+     *
+     * <p>The timeline is the only mechanism available, the provider having no update period, so
+     * the visible part of the interval is stepped. Bounded on both counts: at most
+     * {@link #INTERVAL_SAMPLES} entries, and none closer together than
+     * {@link #MIN_SAMPLE_GAP_MILLIS}, so a five-minute interval does not produce a timeline of
+     * hundreds and a week-long one still moves.</p>
+     *
+     * @param nodes the flattened layout
+     * @param windowStart the reading's own start
+     * @param windowEnd the reading's flip date, or 0 when it has none
+     * @param into the moments collected so far
+     */
+    private static void addIntervalSamples(List<JSONObject> nodes, long windowStart,
+            long windowEnd, java.util.TreeSet<Long> into) {
+        for (JSONObject node : nodes) {
+            if (!"prog".equals(node.optString("t", ""))
+                    || !node.has("start") || !node.has("end")) {
+                continue;
+            }
+            long from = Math.max(node.optLong("start"), windowStart);
+            long to = node.optLong("end");
+            if (windowEnd > 0) {
+                to = Math.min(to, windowEnd);
+            }
+            if (to <= from) {
+                // The interval is over, or outside this reading. A finished gauge does not move.
+                continue;
+            }
+            long step = Math.max((to - from) / INTERVAL_SAMPLES, MIN_SAMPLE_GAP_MILLIS);
+            for (long at = from + step; at < to; at += step) {
+                into.add(Long.valueOf(at));
+            }
+        }
     }
 
     private void addCrossings(ComplicationType type, CN1WatchSurface.Reading reading,

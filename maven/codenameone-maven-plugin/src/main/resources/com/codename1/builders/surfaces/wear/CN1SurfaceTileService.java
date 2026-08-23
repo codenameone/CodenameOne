@@ -169,7 +169,7 @@ public abstract class CN1SurfaceTileService extends TileService {
             } else {
                 root = render(reading.getLayout(), reading.getState(), 0, false);
                 freshness = freshnessFor(reading.getNextFlipDate(),
-                        hasDynamicText(reading.getLayout()));
+                        hasMovingContent(reading.getLayout()));
                 version = resourcesVersion(reading);
                 // Kept for the resources request that follows, which asks about THIS version.
                 remember(version, reading);
@@ -207,6 +207,30 @@ public abstract class CN1SurfaceTileService extends TileService {
      * is the same deal the phone platforms give a widget. Zero when the timeline is exhausted --
      * there is nothing further to show until the app publishes again.</p>
      */
+    /**
+     * Whether anything in this layout changes with the clock rather than with a timeline flip.
+     *
+     * <p>Dynamic text is the obvious case. Interval PROGRESS is the one that was missed: a prog
+     * node carrying start and end has its fraction snapshotted by progressValue at render time,
+     * exactly as a countdown's string is, so a Tile with a filling gauge and no dynamic text
+     * asked for no freshness at all and the bar stood still.</p>
+     *
+     * @param layout the resolved layout root
+     * @return true when the Tile should be rebuilt periodically
+     */
+    private static boolean hasMovingContent(JSONObject layout) {
+        if (hasDynamicText(layout)) {
+            return true;
+        }
+        for (JSONObject node : CN1WatchSurface.flatten(layout)) {
+            if ("prog".equals(node.optString("t", ""))
+                    && node.has("start") && node.has("end")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static long freshnessFor(long nextFlipDate, boolean hasDynamicText) {
         long delta = nextFlipDate > 0 ? nextFlipDate - System.currentTimeMillis() : Long.MAX_VALUE;
         if (nextFlipDate <= 0 && !hasDynamicText) {
