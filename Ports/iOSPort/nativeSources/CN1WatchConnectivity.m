@@ -1711,7 +1711,32 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 /// the wake is to refresh a complication, not to bring an application forward the user did not
 /// ask for. When the runtime IS up, Surfaces.publishRemote is called as well so the app's own
 /// diagnostics observe the update.
+/// How many times a mirrored surface the watch could not install is re-attempted, and the delay
+/// before the first. The delays double, so the last lands a little over twenty minutes out --
+/// past the transient conditions this is for, and short of holding a payload indefinitely.
+#define CN1_MIRROR_APPLY_RETRIES 6
+#define CN1_MIRROR_APPLY_DELAY_NS (20ull * NSEC_PER_SEC)
+
+/// Re-attempts a mirrored surface, on the same delegate-facing path as the original delivery.
+- (void)retryMirroredSurface:(NSDictionary<NSString *, id> *)info attempt:(int)attempt {
+    if (attempt > CN1_MIRROR_APPLY_RETRIES) {
+        NSLog(@"[CN1Surfaces] gave up installing a mirrored surface after %d attempts; the watch "
+              "keeps what it had until the phone publishes again", CN1_MIRROR_APPLY_RETRIES);
+        return;
+    }
+    __block NSDictionary *payload = info;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+            (int64_t)(CN1_MIRROR_APPLY_DELAY_NS << (attempt - 1))),
+            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [self applyMirroredSurface:payload attempt:attempt + 1];
+    });
+}
+
 - (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {
+    [self applyMirroredSurface:info attempt:1];
+}
+
+- (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info attempt:(int)attempt {
     NSString *kind = [info objectForKey:@"cn1.surfaces.kind"];
     NSData *json = [info objectForKey:@"cn1.surfaces.json"];
     if (![kind isKindOfClass:[NSString class]] || ![json isKindOfClass:[NSData class]]) {
@@ -1759,6 +1784,16 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // to publish again. A failed apply now leaves the mark where it was, so the next delivery of
     // this publication, or any later one, still lands.
     if (!cn1_watch_apply_mirrored_surface(kind, json, names, blobs)) {
+        // Retried, because nothing else will offer this payload again: didReceiveUserInfo is a
+        // one-shot delivery, and leaving the high-water mark alone only permits a LATER
+        // publication -- it does not bring this one back. If the phone publishes nothing further,
+        // the complication keeps its old content for good.
+        //
+        // In memory and bounded, the same shape the Android mirror uses: the condition this is
+        // for is transient (an App Group briefly unwritable, a full disk), and persisting the
+        // payload to survive a process death would mean writing to the storage that just refused
+        // a write.
+        [self retryMirroredSurface:info attempt:attempt];
         return;
     }
     if (sequenceKey != nil) {

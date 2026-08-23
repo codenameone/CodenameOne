@@ -164,12 +164,17 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // entries still to come the final one also has no flip date, so reading it here made the
         // request hours early and never again at the moment it was for.
         //
-        // What this cannot do is notice the end arriving later. A complication is asked once and
-        // handed the whole timeline; the system then swaps entries itself and never comes back,
-        // and UPDATE_PERIOD_SECONDS is 0 by design. So a timeline published with future entries
-        // is refreshed when the app next publishes or when something asks this service again --
-        // which for a push-driven surface is the normal course, and is why the widget's
-        // background-fetch request is the same throttled one rather than a schedule of its own.
+        // Asked NOW, whenever the timeline reloads at its end -- not only when it is already
+        // exhausted. This is the only moment the provider gets: it is handed the whole timeline
+        // once, the system swaps entries itself, and UPDATE_PERIOD_SECONDS is 0 by design, so
+        // nothing calls back when the last entry finally takes over. Waiting for exhaustion meant
+        // the request was never made for the timeline that needed it most -- one published WITH
+        // future entries -- and the final value then stood for ever.
+        //
+        // Asking early is safe because the request is throttled (tryClaimBackgroundFetch) and is
+        // a no-op for an app that declares no background-fetch listener, which is the same
+        // treatment the widget path gives it. The cost of asking early is one fetch; the cost of
+        // not asking is a complication frozen on its last entry.
         if (current == null && entries.isEmpty()) {
             // Nothing this type can render, now or later. Answering with a timeline of nothing
             // but no-data would replace whatever the face is showing with a blank slot, so the
@@ -177,7 +182,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             return null;
         }
         CN1WatchSurface.Reading active = readings.get(0);
-        if (active.getNextFlipDate() <= 0 && active.isReloadAtEnd()) {
+        if (active.isReloadAtEnd()) {
             CN1WidgetProvider.requestAppRefresh(this, getKindId());
         }
         return new ComplicationDataTimeline(current == null ? noData() : current, entries);
