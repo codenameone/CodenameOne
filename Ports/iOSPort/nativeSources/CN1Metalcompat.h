@@ -294,9 +294,6 @@ void CN1MetalFillGradient(int kind,
 id<MTLTexture> CN1MetalTextureFromUIImage(CN1Image *image);
 void CN1MetalDrawImageRounded(id<MTLTexture> texture, int alpha, int x, int y,
                               int width, int height, float cornerRadius);
-BOOL CN1MetalReadReadOnlyTexturePixels(GLUIImage *image, int *outARGB,
-                                       int x, int y, int w, int h,
-                                       int imgWidth, int imgHeight);
 
 // Global Metal device (from METALView's command queue); shared by anyone
 // who needs to allocate Metal resources.

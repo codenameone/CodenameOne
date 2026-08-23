@@ -206,12 +206,11 @@ extern int nextPowerOf2(int val);
         // every image, after every foreground or memory warning -- and buys
         // nothing.
         int gen = CN1MetalTextureValidateGeneration();
-        if (mtlTextureGeneration != gen && mtlTexture.storageMode != MTLStorageModeShared) {
+        if (mtlTextureGeneration != gen) {
             mtlTextureGeneration = gen;
             [mtlTexture release];
             mtlTexture = nil;
         } else {
-            mtlTextureGeneration = gen;
             return mtlTexture;
         }
     }
@@ -233,10 +232,6 @@ extern int nextPowerOf2(int val);
     // suspend backup can drop/rebuild its texture too (issue #5349). The weak
     // registry drops the entry automatically on dealloc.
     CN1MetalRegisterMutableImage(self);
-    return mtlTexture;
-}
-
--(id<MTLTexture>)existingMTLTexture {
     return mtlTexture;
 }
 
