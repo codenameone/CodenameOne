@@ -559,6 +559,15 @@
       ]
     },
     {
+      "id": "logging-diagnostics",
+      "category": "Application runtime",
+      "name": "Logging and diagnostics",
+      "description": "Checks that an installed Log subclass receives the application's own log output and that a caught throwable's trace reaches the writer it supplied.",
+      "tests": [
+        "LogSubclassCaptureTest"
+      ]
+    },
+    {
       "id": "threading",
       "category": "Application runtime",
       "name": "Threading and EDT enforcement",

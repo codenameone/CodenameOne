@@ -58,7 +58,7 @@
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 181,
+    "pass": 182,
     "skip": 5
   },
   "tests": {
@@ -462,6 +462,10 @@
     },
     "LocalNotificationOverrideTest": {
       "feature": "notifications",
+      "status": "pass"
+    },
+    "LogSubclassCaptureTest": {
+      "feature": "logging-diagnostics",
       "status": "pass"
     },
     "LottieAnimatedScreenshotTest": {

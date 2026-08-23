@@ -8120,9 +8120,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     
+    /// tvOS and watchOS have no rotatable device orientation. IOSNative's
+    /// lockOrientation compiles the rotation away on both of those slices and
+    /// only records the requested lock, so answering true here promised callers
+    /// something the port cannot deliver. Anything that then waited for the
+    /// rotation to land waited for an event that could never arrive: an Apple TV
+    /// frame is landscape by construction, so a poll for portrait never settles
+    /// and burns its entire budget before giving up. That is what pushed
+    /// OrientationLockScreenshotTest past the compliance suite's per-test
+    /// timeout on tvOS. Reporting the truth sends those callers down their
+    /// fixed-orientation path immediately instead.
     @Override
     public boolean canForceOrientation() {
-        return true;
+        return !isWatch() && !isTV();
     }
 
     /*@Override
@@ -13215,7 +13225,10 @@ public class IOSImplementation extends CodenameOneImplementation {
      *
      * <p>Hooking is left out for the same reason it is reported separately: a hooking
      * framework is evidence of instrumentation, which usually accompanies a jailbreak but
-     * is not one, and callers that want the broader question have the broader method.</p>
+     * is not one, and callers that want the broader question have the broader method.
+     * The one hooking signal that does count here is {@code hookedApi} -- the native
+     * probes catching each other being lied to -- because a detection-bypass tweak is not
+     * something that gets installed on a device that has nothing to hide.</p>
      */
     @Override
     public boolean isJailbrokenDevice() {
@@ -13229,19 +13242,51 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     /**
-     * The legacy probe. Only ever returns true when the app also declares cydia
-     * in ios.applicationQueriesSchemes -- on iOS 9 and up canOpenURL returns
-     * false for undeclared schemes regardless of what is installed. That is why
-     * it cannot be the primary signal, but apps that do declare it would
-     * regress if it were dropped.
+     * URL schemes registered by the apps a jailbreak installs. Only ever returns true
+     * when the app also declares the scheme in ios.applicationQueriesSchemes -- on iOS 9
+     * and up canOpenURL returns false for an undeclared scheme regardless of what is
+     * installed -- which is why this cannot be the primary signal. The
+     * {@code ios.detectJailbreak} build hint declares all of them for you.
+     *
+     * <p>Cydia alone was the whole list, and Cydia is the package manager of a rootful
+     * jailbreak nobody has shipped for current iOS. A rootless device runs Sileo, so the
+     * probe looked for the one front end that was certain not to be there.</p>
+     *
+     * <p>Most valuable first, matching {@code IPhoneBuilder.JAILBREAK_QUERY_SCHEMES},
+     * which declares only as many as the app's scheme budget has room for and takes them
+     * from the front. Reordering one list without the other means probing for a scheme
+     * that was never declared, which answers false and looks like a clean device.</p>
+     *
+     * <p>Kept deliberately short, and it must stay that way. Every entry is spent out of
+     * the app's LSApplicationQueriesSchemes budget, which iOS caps at 25 for an app linked
+     * against the iOS 27 SDK -- a secondary probe is not entitled to a quarter of it.
+     * Adding a scheme here means adding it to
+     * {@code IPhoneBuilder.JAILBREAK_QUERY_SCHEMES} too, or it is declared nowhere and
+     * silently answers false.</p>
+     *
+     * <p>This probe also has a shelf life: canOpenURL: is deprecated as of iOS 27. It
+     * still works and Apple has named no removal date, but the native probes in
+     * CN1JailbreakDetector are the ones to invest in.</p>
      */
-    private boolean cydiaProbe() {
-        try {
-            Boolean b = canExecute("cydia://package/com.example.package");
-            return b != null && b.booleanValue();
-        } catch (Throwable t) {
-            return false;
+    private static final String[] JAILBREAK_URL_SCHEMES = {
+        "sileo://package/com.example.package",
+        "filza://view",
+        "zbra://packages/com.example.package",
+        "cydia://package/com.example.package"
+    };
+
+    private boolean packageManagerProbe() {
+        for (int i = 0; i < JAILBREAK_URL_SCHEMES.length; i++) {
+            try {
+                Boolean b = canExecute(JAILBREAK_URL_SCHEMES[i]);
+                if (b != null && b.booleanValue()) {
+                    return true;
+                }
+            } catch (Throwable t) {
+                // A scheme the OS refuses to parse says nothing about the next one.
+            }
         }
+        return false;
     }
 
     /**
@@ -13262,6 +13307,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                     // framework so app code does not need a per-platform branch.
                     out.add("frida");
                 }
+            } else if ("hookedApi".equals(s)) {
+                // Counts as both. Something is hooking us, which is the "frida"
+                // bucket; and what it is hooking is jailbreak detection, which
+                // only happens on a device that has a jailbreak to hide.
+                if (!out.contains("frida")) {
+                    out.add("frida");
+                }
+                if (!jailbreakReported) {
+                    jailbreakReported = true;
+                    out.add("jailbreak");
+                }
             } else if ("traced".equals(s)) {
                 out.add("debugger");
             } else if (!jailbreakReported) {
@@ -13271,12 +13327,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         // Always, not only when the native probes found nothing. Those two sets of
         // evidence are independent: the native side checks hard-coded paths and dyld,
-        // and the cydia scheme catches installs those miss -- so gating one on the other
+        // and the URL schemes catch installs those miss -- so gating one on the other
         // being empty meant a single unrelated signal suppressed it. A debugger alone
         // was enough: `traced` made the list non-empty, the probe was skipped, and a
-        // jailbreak only cydia could see went unreported. Which is how a developer
+        // jailbreak only the scheme could see went unreported. Which is how a developer
         // running under Xcode ends up being told their jailbroken device is clean.
-        if (!jailbreakReported && cydiaProbe()) {
+        if (!jailbreakReported && packageManagerProbe()) {
             out.add("jailbreak");
         }
         return out.toArray(new String[out.size()]);

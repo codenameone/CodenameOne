@@ -146,6 +146,136 @@ public class IPhoneBuilder extends Executor {
     // pull in HealthKit or its entitlement.
     private boolean usesHealth;
     private boolean usesHealthStore;
+    /// The URL schemes a jailbreak's package managers and file browsers register.
+    /// Probed by IOSImplementation.getCompromiseReasons(), and dead weight without the
+    /// declaration below: since iOS 9, canOpenURL: answers false for any scheme the app
+    /// has not listed, whatever is installed. Cydia was the only one the runtime asked
+    /// about, and Cydia belongs to a rootful jailbreak nobody ships for current iOS --
+    /// a rootless device runs Sileo, so the probe looked for the one front end certain
+    /// not to be there.
+    ///
+    /// Four, not the obvious longer list. These entries are spent out of the app's
+    /// budget, not ours -- iOS caps the array, at 25 entries for an app linked against
+    /// the iOS 27 SDK -- so a secondary probe taking a quarter of it is not a reasonable
+    /// trade. `undecimus` and `activator` were dropped on that basis: unc0ver is the
+    /// iOS 11-14 era and Activator is a tweak rather than evidence of one. What is left
+    /// covers rootless (sileo), the file browser almost every jailbroken device carries
+    /// (filza), the alternative package manager (zbra) and rootful (cydia).
+    ///
+    /// THE ORDER IS LOAD-BEARING, most valuable first. When the cap below leaves room for
+    /// only some of these, the ones at the front are the ones declared. Cydia was first
+    /// and it is the worst of the four: it belongs to a rootful jailbreak nobody ships
+    /// for current iOS, so an app with one slot left spent it on the obsolete probe and
+    /// dropped Sileo -- silently reproducing, in the fix, the exact rootless blind spot
+    /// the fix is for.
+    static final String[] JAILBREAK_QUERY_SCHEMES = {
+        "sileo", "filza", "zbra", "cydia"
+    };
+
+    /// How many LSApplicationQueriesSchemes entries iOS honours.
+    ///
+    /// The cap keys off the SDK the app was LINKED against, not the OS it runs on: 50 for
+    /// iOS 15 and later, 25 for iOS 27 and later. Going over does not fail the build --
+    /// canOpenURL: simply answers false for the entries past the cap, which is the same
+    /// silent wrong answer this declaration exists to prevent, except now it is the app's
+    /// own schemes that quietly stop resolving.
+    private int applicationQueriesSchemeCap() {
+        return xcodeVersion >= 27 ? 25 : 50;
+    }
+
+    /// Entries the Info.plist renderer appends to this array on its own, after every
+    /// caller here has had its say.
+    ///
+    /// Counted rather than ignored because a ceiling that the renderer then walks past is
+    /// not a ceiling. The renderer adds `fbauth2` and `gplus` off exactly these two hints,
+    /// so an app within two of the cap and using Facebook or Google sign-in would have
+    /// been told its schemes fit and then shipped a plist where they did not.
+    private int reservedApplicationQueriesSchemes(BuildRequest request) {
+        int reserved = 0;
+        if (request.getArg("facebook.appId", null) != null) {
+            reserved++;
+        }
+        if (request.getArg("ios.gplus.clientId", null) != null) {
+            reserved++;
+        }
+        return reserved;
+    }
+
+    /// Adds `schemes` to ios.applicationQueriesSchemes, entry by entry.
+    ///
+    /// Entry by entry rather than as a substring, because a project that already queries
+    /// `sileo-installer` contains "sileo", and skipping on that basis leaves the exact
+    /// scheme canOpenURL: is asked about undeclared -- which is the failure this exists
+    /// to prevent, and it fails silently.
+    ///
+    /// A project that declares the array through ios.plistInject is left alone and told
+    /// so. The plist renderer emits its own LSApplicationQueriesSchemes key for this hint
+    /// without looking at the injected fragment, so writing the hint as well would put
+    /// the key in the plist twice -- and a plist with a duplicate key is not a plist that
+    /// reliably keeps either value.
+    private void declareApplicationQueriesSchemes(BuildRequest request,
+            String[] schemes, String why) {
+        java.util.List<String> alreadyInjected =
+                WatchNativeBuilder.injectedPlistKeys(request)
+                        .contains("LSApplicationQueriesSchemes")
+                        ? WatchNativeBuilder.injectedPlistStringArray(request,
+                                "LSApplicationQueriesSchemes")
+                        : null;
+        String queries = request.getArg("ios.applicationQueriesSchemes", "");
+        java.util.List<String> declared = new ArrayList<String>();
+        for (String entry : queries.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.length() > 0) {
+                declared.add(trimmed);
+            }
+        }
+        java.util.List<String> missing = new ArrayList<String>();
+        java.util.List<String> overCap = new ArrayList<String>();
+        int cap = applicationQueriesSchemeCap() - reservedApplicationQueriesSchemes(request);
+        for (String scheme : schemes) {
+            if (declared.contains(scheme)) {
+                continue;
+            }
+            if (alreadyInjected != null) {
+                if (!alreadyInjected.contains(scheme)) {
+                    missing.add(scheme);
+                }
+                continue;
+            }
+            // Ours are the ones that give way. A project near the cap is already
+            // spending it on schemes its features need, and appending past the cap
+            // would not buy this probe anything anyway -- iOS ignores the overflow --
+            // while pushing the app's own entries into the ignored region.
+            if (declared.size() >= cap) {
+                overCap.add(scheme);
+                continue;
+            }
+            declared.add(scheme);
+        }
+        if (!overCap.isEmpty()) {
+            log("ios.applicationQueriesSchemes already holds " + declared.size()
+                    + " entries and this build has room for " + cap
+                    + " (iOS honours at most " + applicationQueriesSchemeCap()
+                    + " for this SDK), so " + overCap + " was not added. " + why);
+        }
+        if (alreadyInjected != null) {
+            if (!missing.isEmpty()) {
+                log("ios.plistInject already declares LSApplicationQueriesSchemes, so "
+                        + missing + " was not added for you. Add those entries to that "
+                        + "array or " + why);
+            }
+            return;
+        }
+        StringBuilder joined = new StringBuilder();
+        for (String entry : declared) {
+            if (joined.length() > 0) {
+                joined.append(",");
+            }
+            joined.append(entry);
+        }
+        request.putArgument("ios.applicationQueriesSchemes", joined.toString());
+    }
+
     /// Treats a blank hint as missing.
     private static String trimToNull(String v) {
         if (v == null) {
@@ -2968,6 +3098,10 @@ public class IPhoneBuilder extends Executor {
             File jailbreakH = new File(buildinRes, "CN1JailbreakDetector.h");
             if (jailbreakH.exists() && detectJailbreak) {
                 replaceInFile(jailbreakH, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
+                // The native probes in that header need nothing from the plist. The
+                // URL-scheme probe on the Java side does, and its declaration is made
+                // further down, just before the plist is rendered -- see the call beside
+                // injectToPlist().
             }
 
             // ios.appAttest compiles the DeviceCheck-backed App Attest native code
@@ -5338,6 +5472,25 @@ public class IPhoneBuilder extends Executor {
                         replaceAllInFile(pbx, "SDKROOT = iphoneos;", "OTHER_LDFLAGS = \"-ObjC\";\n				SDKROOT = iphoneos;");
 
                     }
+                }
+
+                // Last, deliberately, and this is the only correct place for it.
+                //
+                // These schemes exist so canOpenURL: can answer honestly about a
+                // jailbroken device; without the declaration iOS answers false
+                // whatever is installed. But they are also the LOWEST priority thing
+                // in the array, because iOS honours a limited number of entries and
+                // ignores the rest -- so everything the app actually needs has to
+                // claim its slots first. Declared beside the jailbreak header
+                // instead, this ran before the Smart Home block appended
+                // com.apple.Home, and a project at the cap got sileo as its last
+                // honoured entry and com.apple.Home as an ignored one: a security
+                // probe silently costing the app a feature it asked for. Anything
+                // else that adds a scheme belongs above this line.
+                if (detectJailbreak) {
+                    declareApplicationQueriesSchemes(request, JAILBREAK_QUERY_SCHEMES,
+                            "DeviceIntegrity.getCompromiseReasons() will not see a "
+                            + "jailbreak that only its package manager reveals.");
                 }
 
                 injectToPlist(tmpFile, resDir, request);
