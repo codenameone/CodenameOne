@@ -542,6 +542,18 @@ public class DeviceRuntimeService {
         }
     }
 
+    private static void closeQuietly(OutputStream os) {
+        if (os == null) {
+            return;
+        }
+        try {
+            os.close();
+        } catch (Throwable alreadyGone) {
+            // Same as the InputStream overload: this is a refusal path, not
+            // an error report.
+        }
+    }
+
     private static void closeQuietly(InputStream is) {
         if (is == null) {
             return;
@@ -746,6 +758,17 @@ public class DeviceRuntimeService {
     void handleAccepted(InputStream is, OutputStream os) {
         Watched w = new Watched(is);
         synchronized (accepted) {
+            if (accepted.size() >= MAX_ACCEPTED) {
+                // Refuse before spending a framework connection thread on
+                // reading the header. `reservePreAuth` alone was not enough:
+                // it only kicks in once the peer id and challenge response
+                // have been read, so a burst of drip-fed or silent sockets
+                // could still exhaust file descriptors and threads faster
+                // than the five-second watchdog closes them.
+                closeQuietly(is);
+                closeQuietly(os);
+                return;
+            }
             accepted.addElement(w);
             if (!watchdogRunning) {
                 watchdogRunning = true;
@@ -792,6 +815,16 @@ public class DeviceRuntimeService {
     /// Four bytes of magic is not much to ask for, and a peer that cannot send
     /// them is not a push tool -- it is a port scanner, or a crash.
     private static final int SILENT_ACCEPT_TIMEOUT_MS = 5000;
+
+    /// The absolute number of accepted connections in flight, per device.
+    /// The pre-auth reservation cap protects the byte budget and only trips
+    /// after the header, challenge and length have been read; a burst of
+    /// silent or drip-fed sockets never reaches it. Refusing at accept keeps
+    /// the framework's connection threads and file descriptors bounded even
+    /// when nobody sends anything. Sized to comfortably cover a legitimate
+    /// desktop's few concurrent PING + PUSH probes while cutting off a
+    /// flood.
+    private static final int MAX_ACCEPTED = 16;
 
     private final Vector accepted = new Vector();
 
