@@ -449,6 +449,13 @@ static void cn1nbSettleRangingStart(CN1NearbyRangingSession *entry)
 /// ended up holding two sessions under STAR or POINT_TO_POINT with neither
 /// call ever told BUSY.
 @property (nonatomic, retain) NSMutableSet *inviting;
+/// Peers the browser lost while they were still connected.
+///
+/// forgetPeer refuses to drop a connected peer's mappings, because a send to
+/// it must still resolve -- so a peer lost mid-session was never forgotten at
+/// all: the disconnect that followed cleared everConnected and nothing
+/// retried. Remembered here and dropped when the session ends.
+@property (nonatomic, retain) NSMutableSet *lostWhileConnected;
 @property (nonatomic, assign) int pendingAdvertiseRequest;
 @property (nonatomic, assign) int pendingDiscoverRequest;
 /// The advertising and discovery services are tracked SEPARATELY.
@@ -682,6 +689,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_progressByPayload release];
     [_everConnected release];
     [_inviting release];
+    [_lostWhileConnected release];
     [_advertiseServiceType release];
     [_advertiseServiceId release];
     [_discoverServiceType release];
@@ -873,12 +881,21 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// longer see it, which says nothing about an open session -- dropping the
 /// mapping there would have broken sending to a peer that is still connected.
 - (void)forgetPeer:(NSString *)pid {
-    if (pid == nil || [self isEverConnected:pid]) {
+    if (pid == nil) {
+        return;
+    }
+    if ([self isEverConnected:pid]) {
+        // Still connected, so the mappings have to stay -- but the loss is
+        // remembered, because nothing else would ever come back for it.
+        @synchronized (self) {
+            [self.lostWhileConnected addObject:pid];
+        }
         return;
     }
     @synchronized (self) {
         [self.peersById removeObjectForKey:pid];
         [self.serviceIdByPeer removeObjectForKey:pid];
+        [self.lostWhileConnected removeObject:pid];
     }
 }
 
@@ -889,6 +906,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         [self.serviceIdByPeer removeAllObjects];
         [self.everConnected removeAllObjects];
         [self.inviting removeAllObjects];
+        [self.lostWhileConnected removeAllObjects];
     }
 }
 
@@ -1013,7 +1031,16 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // for a connected/failed answer that never came -- a rejected or
         // timed-out invitation lands here without ever having been connected.
         // Only a peer that actually reached Connected can disconnect.
+        BOOL lostWhileUp;
+        @synchronized (self) {
+            lostWhileUp = [self.lostWhileConnected containsObject:pid];
+        }
         if ([self takeEverConnected:pid]) {
+            if (lostWhileUp) {
+                // The browser lost it before the session ended, so this is
+                // the moment its mappings can finally go.
+                [self forgetPeer:pid];
+            }
             com_codename1_impl_ios_IOSNearbyCallbacks_disconnected___java_lang_String(
                     getThreadLocalData(), cn1nbJString(encoded));
             return;
@@ -1358,6 +1385,7 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.progressByPayload = [NSMutableDictionary dictionary];
         cn1nbTransport.everConnected = [NSMutableSet set];
         cn1nbTransport.inviting = [NSMutableSet set];
+        cn1nbTransport.lostWhileConnected = [NSMutableSet set];
         cn1nbTransport.sessionsById = [NSMutableDictionary dictionary];
         cn1nbTransport.serviceIdByPeer = [NSMutableDictionary dictionary];
     }
@@ -2343,6 +2371,12 @@ void com_codename1_impl_ios_IOSNative_nearbyAcceptConnection___int_java_lang_Str
                      @" disconnect the current peer first");
             return;
         }
+        // Reserved on ACCEPT, not only on invite. Two incoming invitations
+        // accepted before either session reaches Connected both saw a held
+        // count of zero -- taking the invitation adds it to nothing -- so
+        // POINT_TO_POINT allowed the second one through. Released by the
+        // state change, whichever way it goes.
+        [cn1nbTransport markInviting:pid];
         handler(YES, [cn1nbTransport sessionFor:pid]);
         cn1nbTransportOk(requestId);
         return;

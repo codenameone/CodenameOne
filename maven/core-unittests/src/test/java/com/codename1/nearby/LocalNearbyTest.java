@@ -793,6 +793,29 @@ class LocalNearbyTest {
     }
 
     @Test
+    void aSecondConnectionRequestIsRefusedWhileTheFirstIsStillInFlight() {
+        // Both requests saw an empty connected list, because the first
+        // acceptance had not run yet -- so the simulator established two
+        // connections the real ports refuse, which is exactly the topology
+        // bug a simulator exists to surface rather than hide.
+        List<Endpoint> found = discoverAll(TransportStrategy.POINT_TO_POINT);
+        assertTrue(found.size() >= 2, "need two synthetic peers to test this");
+
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        AsyncResource<Boolean> first =
+                NearbyTransport.requestConnection(found.get(0), "me");
+        // Made while the first is still queued, which is the whole point.
+        AsyncResource<Boolean> second =
+                NearbyTransport.requestConnection(found.get(1), "me");
+        // The refusal is delayed like everything else here, so both answers
+        // arrive on the drain rather than inline.
+        drain(queue);
+        assertTrue(value(first).booleanValue());
+        assertFailedWith(NearbyError.BUSY, second);
+    }
+
+    @Test
     void clusterAllowsTheSecondConnectionPointToPointRefuses() {
         List<Endpoint> found = discoverAll(TransportStrategy.CLUSTER);
         assertTrue(value(NearbyTransport.requestConnection(found.get(0), "me"))

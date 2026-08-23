@@ -105,6 +105,14 @@ public class LocalNearbyBridge implements NearbyBridge {
     /// Endpoints whose connection requests were rejected. Recorded so a
     /// test can tell an immediate refusal from silence.
     private final List<String> rejected = new ArrayList<String>();
+    /// Endpoints invited and not yet answered.
+    ///
+    /// Counted with the connected ones when a strategy limit is enforced.
+    /// Two requestConnection calls made before the first delayed acceptance
+    /// ran both saw an empty connected list, so the simulator established two
+    /// connections the real ports refuse -- which is exactly the topology bug
+    /// a simulator exists to surface rather than hide.
+    private final List<String> connecting = new ArrayList<String>();
     /// The topology each half was started with, as a TransportStrategy
     /// ordinal. CLUSTER is the default, which is also what a caller that
     /// passed no strategy is given.
@@ -589,12 +597,15 @@ public class LocalNearbyBridge implements NearbyBridge {
         // centre. A simulator that let an app hold three connections under
         // POINT_TO_POINT would teach it a topology no device will honour.
         if (discoverStrategy != TransportStrategy.CLUSTER.ordinal()
-                && !connected.isEmpty()) {
+                && !(connected.isEmpty() && connecting.isEmpty())) {
             answer(new TransportFailure(requestId, NearbyError.BUSY,
                     "this strategy allows one connection at a time;"
                     + " disconnect the current peer first"));
             return;
         }
+        // Reserved before the first hop is queued, released when the request
+        // settles either way.
+        connecting.add(endpointId);
         final int generation = transportGeneration;
         answer(new Runnable() {
             @Override
@@ -604,6 +615,7 @@ public class LocalNearbyBridge implements NearbyBridge {
                     // caller's AsyncResource pending for good -- a resource
                     // that never settles is worse than one that fails, which
                     // is the whole reason EdtResult exists.
+                    connecting.remove(endpointId);
                     NearbyTransport.deliverRequestFailed(requestId,
                             NearbyError.SESSION_INVALIDATED.ordinal(),
                             "the transport was stopped before the connection"
@@ -622,6 +634,7 @@ public class LocalNearbyBridge implements NearbyBridge {
                         // adding the endpoint then reported a connection on
                         // a transport that had been stopped and never
                         // restarted.
+                        connecting.remove(endpointId);
                         if (generation != transportGeneration) {
                             return;
                         }
@@ -641,7 +654,7 @@ public class LocalNearbyBridge implements NearbyBridge {
         // side. STAR does not: accepting many is what makes this device the
         // centre of the star.
         if (advertiseStrategy == TransportStrategy.POINT_TO_POINT.ordinal()
-                && !connected.isEmpty()
+                && !(connected.isEmpty() && connecting.isEmpty())
                 && !connected.contains(endpointId)) {
             rejectConnection(endpointId);
             answer(new TransportFailure(requestId, NearbyError.BUSY,
@@ -780,6 +793,7 @@ public class LocalNearbyBridge implements NearbyBridge {
         transportGeneration++;
         discoverGeneration++;
         advertiseGeneration++;
+        connecting.clear();
         cancelledPayloads.clear();
         pendingPayloads.clear();
         List<String> doomed = new ArrayList<String>(connected);
