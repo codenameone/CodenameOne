@@ -107,6 +107,12 @@ class InterpRuntimeContractTest {
         // key, and the entire push was refused as missing source.
         assertEquals("com.is.foo",
                 packageOf("package com.`is`.foo\n\nfun main() {}\n"));
+        // Whitespace *inside* backticks is part of the escaped segment;
+        // kotlinc keeps it, so the writer has to as well. Stripping every
+        // space folded `com.`foo bar`.baz` to `com.foobar.baz` and the
+        // reader then asked for a key nobody had written.
+        assertEquals("com.foo bar.baz",
+                packageOf("package com.`foo bar`.baz\n\nfun main() {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {

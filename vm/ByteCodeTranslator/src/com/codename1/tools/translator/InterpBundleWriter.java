@@ -265,15 +265,17 @@ public class InterpBundleWriter {
                         }
                         end++;
                     }
-                    // Kotlin escapes reserved words in identifiers with
-                    // backticks (``package com.`is`.foo``), which kotlinc
-                    // strips from the class's internal name and its
-                    // `SourceFile` attribute. Storing the source at
-                    // `com/` `is`/Foo.kt` would then miss the reader's lookup
-                    // for `com/is/Foo.kt` and the whole push would be refused
-                    // as source-less. Whitespace goes for the usual reason:
-                    // ``package com . foo`` is one identifier to the compiler.
-                    return code.substring(i, end).replaceAll("\\s|`", "");
+                    // Kotlin escapes non-identifier segments with backticks
+                    // (``package com.`is`.foo``), and kotlinc keeps whatever
+                    // is inside the backticks -- spaces and all -- as the
+                    // segment's name while dropping the backticks themselves.
+                    // Formatting whitespace outside the backticks is not part
+                    // of the name (``package com . foo`` is one identifier).
+                    // Stripping every space would fold ``com.`foo bar`.baz``
+                    // to ``com.foobar.baz`` while the compiler keeps the
+                    // space, so the source would be keyed at a path the
+                    // reader never looks up and the push would be refused.
+                    return stripFormattingWhitespace(code.substring(i, end));
                 }
                 if ("import".equals(token) || "class".equals(token)
                         || "interface".equals(token) || "enum".equals(token)) {
@@ -285,6 +287,26 @@ public class InterpBundleWriter {
             i++;
         }
         return "";
+    }
+
+    /// Removes whitespace outside backtick-escaped segments and drops the
+    /// backticks. See the caller for why: kotlinc keeps whitespace *inside*
+    /// backticks as part of the segment name.
+    private static String stripFormattingWhitespace(String raw) {
+        StringBuilder sb = new StringBuilder(raw.length());
+        boolean escaped = false;
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '`') {
+                escaped = !escaped;
+                continue;
+            }
+            if (!escaped && Character.isWhitespace(c)) {
+                continue;
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 
     /**
