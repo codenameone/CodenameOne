@@ -2656,6 +2656,14 @@ public class AndroidGradleBuilder extends Executor {
             // The version that will actually run, not the flag that usually
             // selects it: android.gradleVersion overrides the choice, which is
             // the same trap the Health Connect gate below documents.
+            //
+            // The Gradle MAJOR is the right test here, and only here: the
+            // dependency branch in this builder gives every Gradle 8 build
+            // ANDROID_GRADLE_PLUGIN_8_VERSION, which is well past the floor,
+            // so the major really does decide the plugin. The BuildDaemon
+            // copy selects the plugin by exact Gradle version and has to
+            // test for the modern pairing instead; the conditions differ
+            // because the selections do.
             if (!useGradle8 || gradleVersionInt < 8) {
                 throw new BuildException(
                         "com.codename1.nearby.ranging needs androidx.core.uwb,"
