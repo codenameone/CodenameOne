@@ -8115,6 +8115,12 @@ public class AndroidGradleBuilder extends Executor {
                 + "    }\n\n"
                 + "    public static Class getAppStubClass() {\n"
                 + "        return " + watchStub + ".class;\n"
+                + "    }\n\n"
+                // getMain too: every bundled CN1FirebaseMessagingService template calls it, so a
+                // replacement without it fails the wear build on a class the developer never
+                // wrote. Package-private and returning Object, exactly as the phone's copy is.
+                + "    static Object getMain() {\n"
+                + "        return " + watchStub + ".getAppInstance();\n"
                 + "    }\n"
                 + "}\n";
         File dir = new File(wearSrc, "com/codename1/impl/android");
@@ -8158,7 +8164,15 @@ public class AndroidGradleBuilder extends Executor {
                 // answers, so the shared copy sent both to the phone lifecycle from inside the
                 // watch app. Excluded here and replaced by the watch-specific one written beside
                 // the watch stub; two copies of one class would not compile.
-                + "        java.exclude '**/com/codename1/impl/android/StubUtil.java'\n"
+                // Scoped to the PHONE root by absolute path, not a bare pattern. An exclude
+                // applies to the whole source set, and both roots hold the same relative path --
+                // so '**/StubUtil.java' removed the watch-specific replacement as well as the
+                // phone's, leaving the shared messaging service referencing a class that was no
+                // longer compiled at all.
+                + "        java.exclude { \n"
+                + "            it.file.absolutePath.replace('\\\\', '/')\n"
+                + "                    .endsWith('/app/src/main/java/com/codename1/impl/android/StubUtil.java')\n"
+                + "        }\n"
                 + "        res.srcDirs = ['../app/src/main/res', 'src/main/res']\n"
                 + "        assets.srcDirs = ['../app/src/main/assets']\n"
                 // ../app/src/main/JAVA, matching what the phone module declares. The generated
