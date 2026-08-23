@@ -487,7 +487,12 @@ public class IOSWidgetExtensionBuilder {
             // 4 is the watch device family. Without it the extension builds for the phone
             // families and is rejected when the watch app tries to embed it.
             sb.append("TARGETED_DEVICE_FAMILY=4\n");
-            sb.append("ARCHS[sdk=watchos*]=arm64_32\n");
+            // The '=' inside the KEY is escaped, because this file is read back with
+            // Properties.load and that treats the first unescaped '=' as the separator: the key
+            // parsed as "ARCHS[sdk" with value "watchos*]=arm64_32", so the conditional setting
+            // Xcode needs was never applied and the extension took whatever architectures the
+            // containing project supplies -- phone ones, for a watch target.
+            sb.append("ARCHS[sdk\\=watchos*]=arm64_32\n");
         } else {
             sb.append("IPHONEOS_DEPLOYMENT_TARGET=").append(deploymentTarget).append("\n");
         }

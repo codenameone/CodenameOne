@@ -32,6 +32,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -121,6 +122,22 @@ class IOSWidgetExtensionWatchTargetTest {
 
         assertTrue(swift.contains(".accessoryInline"), swift);
         assertFalse(swift.contains(".accessoryRectangular"), swift);
+    }
+
+    /// buildSettings.properties is read back with Properties.load, which takes the first
+    /// unescaped '=' as the separator -- so a conditional Xcode key has to escape its own. Loaded
+    /// rather than string-matched, because the whole failure was that the text looked right and
+    /// parsed wrong: the key became "ARCHS[sdk" and the extension silently built for the
+    /// containing project's architectures.
+    @Test
+    void theConditionalArchsKeySurvivesAPropertiesLoad() throws Exception {
+        IOSWidgetExtensionBuilder b = watchBuilder("watchCircular");
+        String text = new String(b.buildFileMap().get("buildSettings.properties"), "UTF-8");
+
+        java.util.Properties props = new java.util.Properties();
+        props.load(new java.io.StringReader(text));
+        assertEquals("arm64_32", props.getProperty("ARCHS[sdk=watchos*]"), text);
+        assertNull(props.getProperty("ARCHS[sdk"), text);
     }
 
     /// Nor are the WidgetKit accessory spellings. SurfaceKindFamilies already says they are not
@@ -213,7 +230,10 @@ class IOSWidgetExtensionWatchTargetTest {
         assertTrue(props.contains("SDKROOT=watchos"), props);
         assertTrue(props.contains("SUPPORTED_PLATFORMS=watchos watchsimulator"), props);
         assertTrue(props.contains("TARGETED_DEVICE_FAMILY=4"), props);
-        assertTrue(props.contains("ARCHS[sdk=watchos*]=arm64_32"), props);
+        // Escaped, because Properties.load reads this file back and would otherwise split the
+        // key at the first '='. theConditionalArchsKeySurvivesAPropertiesLoad asserts what it
+        // PARSES as; this line only pins what is written.
+        assertTrue(props.contains("ARCHS[sdk\\=watchos*]=arm64_32"), props);
         assertFalse(props.contains("IPHONEOS_DEPLOYMENT_TARGET"), props);
     }
 

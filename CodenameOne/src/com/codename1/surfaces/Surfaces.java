@@ -235,6 +235,18 @@ public final class Surfaces {
         if (b == null || !b.areWidgetsSupported() || kindId == null || timelineJson == null) {
             return;
         }
+        // The KIND is input here too, and a worse one to get wrong than an image name: every
+        // platform composes it into a directory path -- iOS as container + "/cn1surfaces/" +
+        // kindId -- so "../activities/foo" writes the timeline AND its imagery outside the kind
+        // directory, over whatever is there. publish() cannot produce such an id because
+        // WidgetKind refuses it at construction; a descriptor that arrived from a server or from
+        // the watch mirror never passed through that check, so it gets it here. The same
+        // validator, not a second copy of the grammar.
+        if (!WidgetKind.isValidId(kindId)) {
+            Log.p("Surfaces: refusing a remote publish for a kind id that is not [a-z][a-z0-9_]*: "
+                    + kindId);
+            return;
+        }
         b.publishWidgetTimeline(kindId, timelineJson, safeImageNames(images));
     }
 
@@ -264,6 +276,14 @@ public final class Surfaces {
                     || name.indexOf('\0') >= 0 || ".".equals(name) || "..".equals(name)) {
                 Log.p("Surfaces: dropping a remote image whose name is not a plain blob name: "
                         + name);
+                continue;
+            }
+            if (e.getValue() == null) {
+                // A name with no bytes -- one attachment of several failing to decode is the
+                // ordinary way to get one. Android skips a null value; the iOS bridge writes it
+                // straight to an OutputStream and the NullPointerException escapes its IOException
+                // catch, so one missing blob aborted a publish whose timeline was otherwise fine.
+                Log.p("Surfaces: dropping a remote image with no bytes: " + name);
                 continue;
             }
             safe.put(name, e.getValue());
