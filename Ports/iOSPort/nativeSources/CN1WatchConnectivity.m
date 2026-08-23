@@ -1071,7 +1071,26 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // surfaces and never calls the wearable API.
     CN1WatchConnectivity *self_ = [CN1WatchConnectivity shared];
     WCSession *s = [self_ session];
-    if (s == nil || !s.isPaired || !s.isWatchAppInstalled) {
+    if (s == nil) {
+        return;
+    }
+    NSString *kind = [info objectForKey:@"cn1.surfaces.kind"];
+    if (kind == nil) {
+        kind = @"";
+    }
+    if (s.activationState != WCSessionActivationStateActivated) {
+        // NOT YET JUDGED. shared activates the session asynchronously, so the first publish in a
+        // fresh process arrives before activation completes -- and until it does, isPaired and
+        // isWatchAppInstalled are not reliable and a transfer may be refused outright. Deciding
+        // here would discard the only copy of that payload on the strength of an answer the
+        // session was not ready to give.
+        //
+        // Queued instead, which also parks it on disk, and activationDidCompleteWithState sends
+        // it once the session can actually be asked.
+        [self_ enqueueComplicationUserInfo:info forKind:kind];
+        return;
+    }
+    if (!s.isPaired || !s.isWatchAppInstalled) {
         // No watch, or no watch app to receive it. Not a failure: most installs are this.
         return;
     }
@@ -1101,10 +1120,6 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
         }
         return;
-    }
-    NSString *kind = [info objectForKey:@"cn1.surfaces.kind"];
-    if (kind == nil) {
-        kind = @"";
     }
     [self_ enqueueComplicationUserInfo:info forKind:kind];
 #endif
@@ -1147,7 +1162,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         _complicationInFlightTransfer = nil;
     }
     WCSession *s = [self session];
-    if (s == nil) {
+    // Not before the session can be asked. The restore on activation calls this too, and a queue
+    // drained against an unactivated session would spend its payloads on transfers that may be
+    // refused -- which is the discard this queue exists to prevent.
+    if (s == nil || s.activationState != WCSessionActivationStateActivated) {
         @synchronized (self) {
             _complicationInFlight = nil;
             _complicationInFlightPayload = nil;
@@ -1692,6 +1710,15 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // only thing that will ever look at that batch again.
     [self pruneTombstonesNow];
     cn1_wearable_notifyStateChanged();
+#if !TARGET_OS_WATCH
+    // Complication payloads queued BEFORE the session finished activating. A publish in a fresh
+    // process reaches the mirror before this callback, and the session's pairing and installed-app
+    // answers are not reliable until now -- so those payloads waited rather than being judged
+    // against an unformed session, and this is where they go.
+    if (activationState == WCSessionActivationStateActivated) {
+        [self sendNextComplicationUserInfo];
+    }
+#endif
 }
 
 #if !TARGET_OS_WATCH
