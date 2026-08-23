@@ -88,7 +88,8 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
         if (info == null || Build.VERSION.SDK_INT < 31) {
             return;
         }
-        String mac = info.getDeviceMacAddressAsString();
+        android.net.MacAddress address = info.getDeviceMacAddress();
+        String mac = address == null ? null : address.toString();
         String id = mac != null ? mac : Integer.toString(info.getId());
         if (!OBSERVED.isEmpty() && !OBSERVED.contains(id)) {
             // The platform keeps watching until told otherwise, and it

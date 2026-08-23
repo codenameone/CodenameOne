@@ -36,6 +36,7 @@ import android.content.IntentSender;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.net.MacAddress;
 import android.os.ParcelUuid;
 
 import com.codename1.impl.android.CodenameOneActivity;
@@ -594,13 +595,25 @@ public class AndroidNearbyBackend implements NearbyBridge {
         return u;
     }
 
+    /// The association's MAC address as a string, or null when it has none.
+    ///
+    /// `AssociationInfo.getDeviceMacAddress()` returns an `android.net
+    /// .MacAddress`, not a string -- the string-returning form is a hidden
+    /// API that a normal app cannot call. Its `toString()` is the
+    /// colon-separated lowercase form, which is what
+    /// `startObservingDevicePresence` and `disassociate` take.
+    private static String macOf(AssociationInfo info) {
+        MacAddress address = info.getDeviceMacAddress();
+        return address == null ? null : address.toString();
+    }
+
     private static String idOf(AssociationInfo info) {
-        String mac = info.getDeviceMacAddressAsString();
+        String mac = macOf(info);
         return mac != null ? mac : Integer.toString(info.getId());
     }
 
     private static String encode(AssociationInfo info, boolean present) {
-        String mac = info.getDeviceMacAddressAsString();
+        String mac = macOf(info);
         CharSequence name = info.getDisplayName();
         return join(idOf(info), name == null ? "" : name.toString(),
                 mac == null ? "" : mac, present);
@@ -636,7 +649,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
             List<AssociationInfo> all = cdm.getMyAssociations();
             for (int i = 0; all != null && i < all.size(); i++) {
                 if (idOf(all.get(i)).equals(id)) {
-                    String mac = all.get(i).getDeviceMacAddressAsString();
+                    String mac = macOf(all.get(i));
                     if (mac != null) {
                         return mac;
                     }
