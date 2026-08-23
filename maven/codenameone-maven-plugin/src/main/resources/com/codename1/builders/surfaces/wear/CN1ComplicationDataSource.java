@@ -342,6 +342,32 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         return Icon.createWithBitmap(bitmap);
     }
 
+    /**
+     * A request code for a tap intent, derived from its data string.
+     *
+     * <p>A PendingIntent request code is an {@code int} by API, so this cannot be widened the way
+     * the tile resource ids were. What it can avoid is String.hashCode's constructible
+     * collisions -- the ones short human-chosen strings actually hit, "Aa" and "BB" being the
+     * standard example. Extras are not part of {@code filterEquals}, so two complications whose
+     * data strings collided here would share one PendingIntent and the later would overwrite the
+     * earlier's extras; a digest makes that an accident nobody has managed to have rather than
+     * something a pair of kind ids can stumble into.</p>
+     *
+     * @param data the intent's data string
+     * @return the request code
+     */
+    private static int requestCode(String data) {
+        String material = data == null ? "" : data;
+        try {
+            byte[] bytes = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(material.getBytes("UTF-8"));
+            return ((bytes[0] & 0xff) << 24) | ((bytes[1] & 0xff) << 16)
+                    | ((bytes[2] & 0xff) << 8) | (bytes[3] & 0xff);
+        } catch (Exception noDigest) {
+            return material.hashCode();
+        }
+    }
+
     private PendingIntent tapIntent(JSONObject layout) {
         Intent intent = CN1WatchSurface.rootAction(this, getKindId(), layout);
         if (intent == null) {
@@ -353,7 +379,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             flags |= 0x04000000;
         }
         try {
-            return PendingIntent.getActivity(this, intent.getDataString().hashCode(), intent,
+            return PendingIntent.getActivity(this, requestCode(intent.getDataString()), intent,
                     flags);
         } catch (Throwable t) {
             Log.w(TAG, "Could not build the complication tap action for " + getKindId(), t);

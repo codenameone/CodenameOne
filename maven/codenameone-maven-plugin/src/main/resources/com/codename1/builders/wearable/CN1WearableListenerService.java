@@ -633,11 +633,22 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // Confirmed only if it was actually stored. The helper catches whatever
                         // the mirror throws -- a directory that is momentarily unwritable, say --
                         // and a claim made anyway is durable: the sender stops retrying and the
-                        // artwork is gone for good. An unconfirmed transfer is redelivered, which
-                        // is the whole point of the acknowledgement.
-                        CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq,
-                                surfaceMirror("receiveFile", transfer.logicalPath,
-                                        transfer.payload));
+                        // artwork is gone for good.
+                        if (surfaceMirror("receiveFile", transfer.logicalPath, transfer.payload)) {
+                            CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq,
+                                    true);
+                        } else {
+                            // RELINQUISHED, not merely left unconfirmed. Passing false to
+                            // confirmTransferDelivered returns without touching the in-memory
+                            // claim claimTransfer already made, and that claim then suppresses
+                            // every retry -- while the DataItem is unchanged, so nothing
+                            // generates a fresh callback either. The artwork would be missing
+                            // until the process restarted. relinquishTransfer drops the claim
+                            // AND goes back to read the item, which is the same thing the
+                            // tracked-delivery path below does when the listener never got the
+                            // payload.
+                            CN1WearableBridge.relinquishTransfer(this, uri);
+                        }
                         continue;
                     }
                     if (!started) {

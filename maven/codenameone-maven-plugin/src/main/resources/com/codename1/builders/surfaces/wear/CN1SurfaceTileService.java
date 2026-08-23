@@ -944,7 +944,11 @@ public abstract class CN1SurfaceTileService extends TileService {
             return name + "_" + node.optInt("w", 0) + "x" + node.optInt("h", 0)
                     + "_" + node.optString("scale", "fit");
         }
-        return ROOT_ID + "_vec" + Integer.toHexString(node.toString().hashCode());
+        // Digested, not hashCode: the id IS the identity of a rendered vector, and imageNodes
+        // keys its map by it -- so two distinct nodes colliding on a 32-bit hash lose one
+        // mapping and both elements draw the second one's artwork. The node's JSON is
+        // user-controlled text, where a collision is something to construct rather than wait for.
+        return ROOT_ID + "_vec" + digest(node.toString());
     }
 
     private static Map<String, JSONObject> imageNodes(JSONObject root) {
