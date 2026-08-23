@@ -181,12 +181,20 @@ trust whoever answered first.
 Answer every `connectionRequested` without delay. A request that's never answered
 holds radio resources open on both sides until the far end times out.
 
-Keep the service id short. On iOS it also becomes the Bonjour service type,
-which the platform restricts to fifteen characters of lowercase letters, digits
-and hyphens -- so a reverse-DNS string that's legal on Android is
-folded to fit, and `com.example.chat` and `com.example.charts` fold to the same
-thing. Set `ios.nearby.serviceType` yourself rather than letting two apps
-discover each other's peers. The build log names the service type it registered.
+*On iOS, list your service ids at build time.* The service id becomes a Bonjour
+service type there, and iOS browses only the types an app declared in its
+`Info.plist` -- a type that isn't declared produces no peers and no error. The
+build can't see the strings you pass to `startAdvertising`, so name them in
+`ios.nearby.serviceType` as a comma-separated list. Miss one and the call fails
+with a message telling you which id to add, which beats an app that finds
+nothing and says nothing.
+
+Keep each id short. The platform restricts the folded type to fifteen
+characters of lowercase letters, digits and hyphens, so a reverse-DNS string
+that's legal on Android is folded to fit -- and `com.example.chat` and
+`com.example.charts` fold to the same thing, which would have two unrelated
+apps discovering each other's peers. The build log names every type it
+declared.
 
 Byte payloads are capped at `NearbyTransport.getMaxPayloadSize()`, a few
 kilobytes on both platforms; anything larger goes as a file payload, which
@@ -219,7 +227,7 @@ the simulator drives instead.
 [options="header"]
 |===
 | Hint | Default | What it does
-| `ios.nearby.serviceType` | derived from the package name | The Bonjour service type the transport registers. Fifteen characters of lowercase letters, digits and hyphens.
+| `ios.nearby.serviceType` | derived from the package name | Comma-separated list of the service ids the app passes to `startAdvertising`. Each is folded to a Bonjour service type and declared; the runtime refuses an id that isn't on the list.
 | `ios.nearby.accessoryServices` | unset | Comma-separated Bluetooth service UUIDs the association picker may discover. Required for the picker to find anything on iOS.
 | `ios.nearby.background` | `false` | Requests the `com.apple.developer.nearby-interaction` entitlement and the matching background mode. Enable the capability on the App ID first.
 | `android.nearby.watchProfile` | `false` | Declares the watch companion profile permission, for an app that associates with `CompanionProfile.WATCH`.
