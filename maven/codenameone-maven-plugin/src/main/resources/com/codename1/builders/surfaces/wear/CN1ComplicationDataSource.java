@@ -163,6 +163,11 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                     new TimeInterval(Instant.ofEpochMilli(reading.getStart()),
                             end > reading.getStart() ? Instant.ofEpochMilli(end) : Instant.MAX),
                     entry));
+            // Crossings for THIS reading too, not only for the active one. A future entry with a
+            // relative target inside its own window would otherwise take over as a countdown and
+            // stay one past its target -- the same freeze the active entry's crossing exists to
+            // prevent, deferred by an hour.
+            addCrossings(type, reading, entries);
         }
         // Exhausted NOW -- the entry being shown is the last one -- and the app asked to be woken
         // when that happened. Asked from the ACTIVE reading and not the final one: with future
@@ -187,28 +192,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             return null;
         }
         CN1WatchSurface.Reading active = readings.get(0);
-        // A relative countdown has to change SIDES when it reaches its target: "in 5m" becomes
-        // "5m ago", which is what formatRelative does everywhere else. The direction is fixed by
-        // the reference type handed to TimeDifferenceComplicationText, so one text cannot span
-        // both -- and nothing would rebuild it, the provider being asked once with no update
-        // period. The timeline is the mechanism for exactly this: a second entry starting at the
-        // target, composed as the moment after it, carries the count-up form.
-        long crossing = relativeCrossing(active);
-        long until = active.getNextFlipDate();
-        // Only INSIDE the active reading's own window. A crossing at or after the next flip
-        // belongs to an entry this one has already handed over to, and an interval running to
-        // Instant.MAX from there would overlap every later entry and compete with them -- a stale
-        // reading resurfacing after it stopped being current. The entry that is active then will
-        // compute its own crossing when it is built.
-        if (crossing > 0 && (until <= 0 || crossing < until)) {
-            ComplicationData after = build(type, active, crossing + 1);
-            if (after != null) {
-                entries.add(new TimelineEntry(
-                        new TimeInterval(Instant.ofEpochMilli(crossing),
-                                until > crossing ? Instant.ofEpochMilli(until) : Instant.MAX),
-                        after));
-            }
-        }
+        addCrossings(type, active, entries);
         if (active.isReloadAtEnd()) {
             CN1WidgetProvider.requestAppRefresh(this, getKindId());
         }
@@ -376,38 +360,61 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // characters the slot already shows -- losing exactly the text the description exists
             // to supply.
             return shortText(primary, texts.get(0),
-                    texts.size() > 1 ? shorten(texts.get(1)) : null, tap);
+                    texts.size() > 1 ? texts.get(1) : null, tap);
         }
         return null;
     }
 
     /**
-     * When this reading's primary text stops counting down and starts counting up, or 0.
+     * Adds an entry for each moment this reading's relative text changes sides.
      *
-     * <p>Only a {@code relative} node crosses: a timer counts one way by definition, and a clock
-     * or a date does not move at all. Only a target still in the FUTURE matters -- one already
-     * past is counting up from the start and never changes side again.</p>
+     * <p>A relative value counting down to a target has to become "ago" when it reaches it --
+     * that is what formatRelative does everywhere else -- and the direction is fixed by the
+     * reference type handed to TimeDifferenceComplicationText, so one text cannot span both.
+     * Nothing would rebuild it either: the provider is asked once and sets no update period. The
+     * timeline is the mechanism, and each crossing needs its OWN entry.</p>
      *
-     * @param reading the entry being rendered
-     * @return the crossing moment in epoch millis, or 0 when nothing crosses
+     * <p>Every ticking node, not merely the earliest: a long-text layout can carry two relative
+     * values with different targets, and keeping only the first left the second counting down
+     * past its own. Each entry is composed as the moment after its crossing, so every node is on
+     * the side it should be by then.</p>
+     *
+     * <p>Bounded to the reading's own window. A crossing at or after the next flip belongs to the
+     * entry that replaces this one, which computes its own.</p>
+     *
+     * @param type the complication type being built
+     * @param reading the entry whose crossings are wanted
+     * @param entries the timeline being assembled
      */
-    private long relativeCrossing(CN1WatchSurface.Reading reading) {
+    private void addCrossings(ComplicationType type, CN1WatchSurface.Reading reading,
+            List<TimelineEntry> entries) {
         if (reading == null) {
-            return 0;
+            return;
         }
+        long windowEnd = reading.getNextFlipDate();
+        java.util.TreeSet<Long> crossings = new java.util.TreeSet<Long>();
         List<JSONObject> nodes = CN1WatchSurface.flatten(reading.getLayout());
-        // BOTH nodes that can be handed over as ticking text, not only the first: a rectangular
-        // layout routinely puts the label first and the moving value beneath it, and the body
-        // ticks too. The earliest crossing wins, since that is when the timeline first differs.
-        long first = relativeCrossingOf(firstTextNode(nodes), reading);
-        long second = relativeCrossingOf(secondTextNode(nodes), reading);
-        if (first <= 0) {
-            return second;
+        for (JSONObject node : new JSONObject[] {firstTextNode(nodes), secondTextNode(nodes)}) {
+            long at = relativeCrossingOf(node, reading);
+            if (at > 0 && (windowEnd <= 0 || at < windowEnd)) {
+                crossings.add(Long.valueOf(at));
+            }
         }
-        if (second <= 0) {
-            return first;
+        java.util.List<Long> ordered = new ArrayList<Long>(crossings);
+        for (int i = 0; i < ordered.size(); i++) {
+            long at = ordered.get(i).longValue();
+            ComplicationData after = build(type, reading, at + 1);
+            if (after == null) {
+                continue;
+            }
+            // Until the NEXT crossing, so two nodes changing sides at different moments each get
+            // their own stretch rather than the first one's entry covering both.
+            long until = i + 1 < ordered.size() ? ordered.get(i + 1).longValue() : windowEnd;
+            entries.add(new TimelineEntry(
+                    new TimeInterval(Instant.ofEpochMilli(at),
+                            until > at ? Instant.ofEpochMilli(until) : Instant.MAX),
+                    after));
         }
-        return Math.min(first, second);
     }
 
     /// One node's crossing moment, or 0 when it has none.
@@ -513,16 +520,21 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
 
     private ShortTextComplicationData shortText(ComplicationText ticking, String text,
             String title, PendingIntent tap) {
-        // The untruncated string becomes the content description, so a screen reader still hears
-        // what the layout said even where the slot shows seven characters.
+        // The untruncated strings become the content description, so a screen reader still hears
+        // what the layout said even where the slot shows seven characters. BOTH of them: the
+        // title is displayed too, and describing only the text announced half of what is on the
+        // face. The title arrives whole now and is shortened here, where its visual form is made
+        // -- it used to be shortened by the caller, which left nothing full to describe with.
         //
         // A ticking value is handed over whole: shortening it would mean rendering it here, which
         // is the freezing this exists to avoid. The face sizes what it draws.
+        boolean titled = title != null && title.length() > 0;
         ShortTextComplicationData.Builder builder =
                 new ShortTextComplicationData.Builder(
-                        ticking != null ? ticking : plain(shorten(text)), plain(text));
-        if (title != null && title.length() > 0) {
-            builder.setTitle(plain(title));
+                        ticking != null ? ticking : plain(shorten(text)),
+                        plain(titled ? text + ", " + title : text));
+        if (titled) {
+            builder.setTitle(plain(shorten(title)));
         }
         builder.setTapAction(tap);
         return builder.build();
