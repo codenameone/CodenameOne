@@ -6558,6 +6558,18 @@ public class AndroidGradleBuilder extends Executor {
             supportLibVersion = "28";
         }
         compileSdkVersion = ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
+        if (usesNearbyRanging) {
+            // androidx.core.uwb declares minCompileSdk=36 in its AAR metadata,
+            // and Gradle rejects the project outright rather than compiling
+            // it -- so a ranging build whose compile SDK came from an older
+            // build-tools or target never got as far as javac. Raised
+            // independently of targetSdkVersion, which is the whole point:
+            // ranging is supported on a target-30 app and that app still has
+            // to COMPILE against 36. (The AAR also wants AGP 8.9.1 or newer;
+            // ANDROID_GRADLE_PLUGIN_8_VERSION is well past that.)
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, "36");
+        }
         jcenter =
                 "      google()\n" +
                         "     jcenter()\n" +

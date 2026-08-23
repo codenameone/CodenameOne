@@ -326,6 +326,14 @@ public class AndroidNearbyBackend implements NearbyBridge {
             @Override
             public void onFailure(CharSequence error) {
                 pendingAssociateRequest = 0;
+                // The listener was installed before associate() was called,
+                // and installing one marks CodenameOneActivity as waiting for
+                // a result. Leaving it there when no chooser is ever launched
+                // wedges the whole activity-result channel: the camera, the
+                // scanner and every other startActivityForResult caller then
+                // cannot install their own listener and their results arrive
+                // here instead.
+                releaseResultListener();
                 CompanionDevices.deliverRequestFailed(requestId,
                         NearbyError.PEER_UNAVAILABLE.ordinal(),
                         error == null ? null : error.toString());
@@ -339,8 +347,19 @@ public class AndroidNearbyBackend implements NearbyBridge {
                     ASSOCIATE_REQUEST, null, 0, 0, 0);
         } catch (IntentSender.SendIntentException e) {
             pendingAssociateRequest = 0;
+            // Same as the onFailure path: nothing will come back through the
+            // listener, so it must not stay installed.
+            releaseResultListener();
             CompanionDevices.deliverRequestFailed(requestId,
                     NearbyError.UNKNOWN.ordinal(), e.getMessage());
+        }
+    }
+
+    /// Hands the activity-result channel back, so the next
+    /// startActivityForResult caller can install its own listener.
+    private void releaseResultListener() {
+        if (activity instanceof CodenameOneActivity) {
+            ((CodenameOneActivity) activity).restoreIntentResultListener();
         }
     }
 

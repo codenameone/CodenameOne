@@ -336,6 +336,13 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
 @property (nonatomic, assign) int pendingAdvertiseRequest;
 @property (nonatomic, assign) int pendingDiscoverRequest;
 @property (nonatomic, retain) NSString *serviceType;
+/// The service id the CALLER passed, unfolded.
+///
+/// Endpoint.getServiceId() documents the id the app used, and reporting the
+/// folded Bonjour type instead ("com-example-cha" for "com.example.chat")
+/// made a comparison against the argument to startDiscovery fail on iOS
+/// alone.
+@property (nonatomic, retain) NSString *serviceId;
 @end
 
 static CN1NearbyTransport *cn1nbTransport = nil;
@@ -424,6 +431,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_progressByPayload release];
     [_everConnected release];
     [_serviceType release];
+    [_serviceId release];
     [super dealloc];
 }
 
@@ -481,7 +489,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [self.peersById setObject:peer forKey:pid];
     return cn1nbJoin([NSArray arrayWithObjects:pid,
             peer.displayName == nil ? @"" : peer.displayName,
-            self.serviceType == nil ? @"" : self.serviceType, nil]);
+            self.serviceId == nil ? @"" : self.serviceId, nil]);
 }
 
 - (MCPeerID *)peerForId:(NSString *)pid {
@@ -597,7 +605,21 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // move below would then delete and overwrite files elsewhere in the
         // container. Reduced to its last path component, and anything that
         // still looks like traversal or a separator is replaced outright.
-        NSString *safe = [resourceName lastPathComponent];
+        // The sender framed its payload id into the name; strip it back off
+        // before the name is used for anything else.
+        JAVA_INT filePayloadId = 0;
+        NSString *bare = resourceName;
+        if ([bare hasPrefix:@"cn1id-"]) {
+            NSRange dash = [bare rangeOfString:@"-"
+                                       options:0
+                                         range:NSMakeRange(6, [bare length] - 6)];
+            if (dash.location != NSNotFound) {
+                filePayloadId = (JAVA_INT)[[bare substringWithRange:
+                        NSMakeRange(6, dash.location - 6)] intValue];
+                bare = [bare substringFromIndex:dash.location + 1];
+            }
+        }
+        NSString *safe = [bare lastPathComponent];
         if (safe == nil || [safe length] == 0
                 || [safe isEqualToString:@"."]
                 || [safe isEqualToString:@".."]
@@ -629,7 +651,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             return;
         }
         com_codename1_impl_ios_IOSNearbyCallbacks_payloadReceived___java_lang_String_int_int_byte_1ARRAY_java_lang_String(
-                getThreadLocalData(), cn1nbJString(encoded), 0,
+                getThreadLocalData(), cn1nbJString(encoded), filePayloadId,
                 CN1_NEARBY_PAYLOAD_FILE, JAVA_NULL,
                 cn1nbJString([@"file://" stringByAppendingString:target]));
     }
@@ -816,6 +838,7 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         // browser below are rebuilt per call and read this, so the id the
         // caller passed is the one that takes effect.
         cn1nbTransport.serviceType = cn1nbServiceType(serviceId);
+        cn1nbTransport.serviceId = serviceId;
     }
     cn1nbApplyLocalName(cn1nbTransport, localName);
     return cn1nbTransport;
@@ -1280,9 +1303,47 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                 [items addObject:item];
             }
             if ([items count] == 0) {
+                // No usable filter. The portable API documents an empty
+                // filter list as "offer every visible device", and the facade
+                // builds exactly that for associate(null) -- so failing here
+                // rejected the API's own default request. AccessorySetupKit
+                // cannot discover anything it was not told about ahead of
+                // time, but the app HAS told it: NSAccessorySetupBluetoothServices
+                // in the Info.plist is the complete set it is allowed to see,
+                // which is as close to "everything visible" as this platform
+                // has.
+                NSArray *declared = [[NSBundle mainBundle]
+                        objectForInfoDictionaryKey:
+                                @"NSAccessorySetupBluetoothServices"];
+                if ([declared isKindOfClass:[NSArray class]]) {
+                    for (id entry in declared) {
+                        if (![entry isKindOfClass:[NSString class]]) {
+                            continue;
+                        }
+                        ASDiscoveryDescriptor *d =
+                                [[[ASDiscoveryDescriptor alloc] init]
+                                        autorelease];
+                        d.supportedOptions =
+                                ASAccessorySupportBluetoothPairingLE;
+                        @try {
+                            d.bluetoothServiceUUID =
+                                    [CBUUID UUIDWithString:(NSString *)entry];
+                        } @catch (NSException *bad) {
+                            continue;
+                        }
+                        [items addObject:[[[ASPickerDisplayItem alloc]
+                                initWithName:(NSString *)entry
+                                productImage:[[[UIImage alloc] init]
+                                        autorelease]
+                                  descriptor:d] autorelease]];
+                    }
+                }
+            }
+            if ([items count] == 0) {
                 cn1nbFailCompanion(requestId, CN1_NEARBY_ERR_NOT_SUPPORTED,
-                        @"AccessorySetupKit needs at least one Bluetooth"
-                        @" service, name or SSID filter to show a picker");
+                        @"AccessorySetupKit shows only accessories declared up"
+                        @" front: pass a DeviceFilter, or set the"
+                        @" ios.nearby.accessoryServices build hint");
                 return;
             }
             CN1NearbyCompanion *companion = cn1nbCompanionInit();
@@ -1608,12 +1669,17 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                 p = [p substringFromIndex:7];
             }
             NSURL *url = [NSURL fileURLWithPath:p];
+            // The sender's payload id rides in the resource NAME: a resource
+            // transfer carries no other metadata, and the receiver otherwise
+            // had nothing to report but zero.
+            NSString *sentName = [NSString stringWithFormat:@"cn1id-%d-%@",
+                    (int)payloadId, [p lastPathComponent]];
             for (NSUInteger i = 0; i < [peers count]; i++) {
                 MCPeerID *peer = [peers objectAtIndex:i];
                 MCSession *session = [cn1nbTransport
                         sessionFor:[peerIds objectAtIndex:i]];
-                [session sendResourceAtURL:url
-                        withName:[p lastPathComponent]
+                NSProgress *progress = [session sendResourceAtURL:url
+                        withName:sentName
                           toPeer:peer
            withCompletionHandler:^(NSError *error) {
                     @autoreleasepool {
@@ -1623,8 +1689,18 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                                 payloadId, 0, -1,
                                 error == nil ? CN1_NEARBY_PAYLOAD_SUCCESS
                                         : CN1_NEARBY_PAYLOAD_FAILURE);
+                        [cn1nbTransport.progressByPayload removeObjectForKey:
+                                [NSNumber numberWithInt:(int)payloadId]];
                     }
                 }];
+                // Retained so cancel() can actually stop a large transfer.
+                // Without it cancelling did nothing at all: the file kept
+                // going, kept using the radio, and could still report success.
+                if (progress != nil) {
+                    [cn1nbTransport.progressByPayload
+                            setObject:progress
+                               forKey:[NSNumber numberWithInt:(int)payloadId]];
+                }
             }
             cn1nbTransportOk(requestId);
             return;
@@ -1683,10 +1759,25 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
 
 void com_codename1_impl_ios_IOSNative_nearbyCancelPayload___int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT payloadId) {
-    // MultipeerConnectivity offers no cancellation for sendData, and the
-    // NSProgress a resource transfer returns is not retained here. Silently
-    // doing nothing is the same outcome an app gets from cancelling a
-    // byte payload that has already left, which is the common case.
+#ifdef CN1_NEARBY_HAS_MPC
+    @autoreleasepool {
+        if (cn1nbTransport == nil) {
+            return;
+        }
+        // A file transfer CAN be cancelled -- sendResourceAtURL hands back an
+        // NSProgress for exactly that -- so it is, and the completion handler
+        // reports the failure. A byte payload cannot: sendData has left by the
+        // time anything could ask, which is the same outcome an app gets from
+        // cancelling one anywhere.
+        NSNumber *key = [NSNumber numberWithInt:payloadId];
+        NSProgress *progress = [cn1nbTransport.progressByPayload
+                objectForKey:key];
+        if (progress != nil) {
+            [cn1nbTransport.progressByPayload removeObjectForKey:key];
+            [progress cancel];
+        }
+    }
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_nearbyDisconnect___java_lang_String(

@@ -294,7 +294,15 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 if (p != null && p.startsWith("file://")) {
                     p = p.substring(7);
                 }
-                payload = Payload.fromFile(new File(p));
+                // The sender's payload id rides in the file NAME, because a
+                // FILE payload has nowhere else to put it and getId() on the
+                // receiving side is otherwise Google's own local id -- a
+                // different number from the one the sender was handed, and a
+                // long truncated into an int besides.
+                File source = new File(p);
+                payload = Payload.fromFile(source);
+                payload.setFileName(ID_PREFIX + payloadId + "-"
+                        + source.getName());
             } else {
                     // Framed with the sender's payload id. Nearby Connections
                 // mints its own id on each side, so without this the
@@ -511,7 +519,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 }
                 NearbyTransport.deliverPayloadReceived(
                         encode(endpointId, nameOf(endpointId)),
-                        (int) file.getId(), NearbyBridge.PAYLOAD_FILE, null,
+                        senderIdOf(file), NearbyBridge.PAYLOAD_FILE, null,
                         f == null ? null : "file://" + f.getAbsolutePath());
             }
         };
@@ -567,6 +575,39 @@ public class AndroidNearbyTransport implements NearbyBridge {
         String service = endpointServices.get(endpointId);
         return sanitize(endpointId) + '\t' + sanitize(name) + '\t'
                 + sanitize(service == null ? "" : service);
+    }
+
+    /// The marker that carries a sender's payload id in a file name.
+    private static final String ID_PREFIX = "cn1id-";
+
+    /// The sender's payload id for an incoming file, recovered from the name
+    /// it was sent under.
+    ///
+    /// Falls back to Google's local id when the name carries no marker, which
+    /// is what a file from an older build would look like -- wrong, but no
+    /// worse than it was before, and better than zero.
+    private static int senderIdOf(Payload file) {
+        String name = null;
+        try {
+            if (file.asFile() != null) {
+                name = file.asFile().asJavaFile() == null ? null
+                        : file.asFile().asJavaFile().getName();
+            }
+        } catch (Throwable t) {
+            name = null;
+        }
+        if (name != null && name.startsWith(ID_PREFIX)) {
+            int dash = name.indexOf('-', ID_PREFIX.length());
+            if (dash > ID_PREFIX.length()) {
+                try {
+                    return Integer.parseInt(
+                            name.substring(ID_PREFIX.length(), dash));
+                } catch (NumberFormatException notAnId) {
+                    // Fall through to the local id.
+                }
+            }
+        }
+        return (int) file.getId();
     }
 
     private static String sanitize(String s) {
