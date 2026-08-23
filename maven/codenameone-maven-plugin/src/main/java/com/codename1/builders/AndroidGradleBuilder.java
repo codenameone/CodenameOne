@@ -7778,6 +7778,14 @@ public class AndroidGradleBuilder extends Executor {
                 + "    <uses-feature android:name=\"android.hardware.type.watch\" "
                 + "android:required=\"true\" />\n"
                 + sharedPermissions
+                // The package-visibility queries, for the same reason the permissions above are
+                // here: this manifest is selected outright rather than merged with the phone's,
+                // so nothing else supplies them. The watch module compiles the SAME sources, and
+                // on API 30+ an undeclared query means resolveActivity and queryIntentActivities
+                // return filtered results -- so code that finds a package on the phone silently
+                // finds nothing on the watch, which reads as a broken feature rather than a
+                // missing declaration.
+                + "  " + xQueries
                 // android.xapplication_attr and android.xapplication carried across. This
                 // manifest is selected outright by the module's sourceSets rather than merged
                 // with the phone's, so a project that names a custom android:name Application --

@@ -278,17 +278,20 @@ public final class CN1SurfaceMirror {
      * @param ctx any context
      * @param path the reserved application path the item arrived on
      * @param payload the item's payload
+     * @return true when the descriptor was written. A false answer is retried by the caller: the
+     *         Data Layer item does not change after a failed write, so nothing else would ever
+     *         offer this descriptor again and the watch would keep the content it already had
      */
-    public static void receive(Context ctx, String path, byte[] payload) {
+    public static boolean receive(Context ctx, String path, byte[] payload) {
         try {
             String kindId = kindOf(path);
             if (kindId == null || payload == null) {
-                return;
+                return false;
             }
             WearableMessage message = WearableMessage.fromByteArray(path, payload);
             byte[] json = message.getBytes("json", null);
             if (json == null) {
-                return;
+                return false;
             }
             File kindDir = CN1SurfaceStore.kindDir(ctx, kindId);
             mkdirs(kindDir);
@@ -304,8 +307,10 @@ public final class CN1SurfaceMirror {
             // content only ever arrived from the phone skipped the complication entirely.
             CN1SurfaceStore.rememberKind(ctx, kindId);
             CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            return true;
         } catch (Throwable t) {
             Log.w(TAG, "Could not apply a mirrored surface from " + path, t);
+            return false;
         }
     }
 

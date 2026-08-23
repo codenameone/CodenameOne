@@ -3519,6 +3519,26 @@ public class CN1WearableBridge implements WearableBridge {
     private static final java.util.concurrent.ScheduledThreadPoolExecutor transferTimer =
             newTransferWorker();
 
+    /**
+     * Runs a piece of framework bookkeeping later, on the transfer worker.
+     *
+     * <p>Exposed for the surface mirror's write retry, which is the same shape as the transfer
+     * retries this worker already carries: a Data Layer item that does not change after a failed
+     * apply, so nothing offers it again and something here has to ask. Ordering with the rest of
+     * the transfer bookkeeping is preserved because it is the same single thread.</p>
+     *
+     * @param task the work
+     * @param delayMillis how long to wait
+     */
+    static void scheduleFrameworkRetry(Runnable task, long delayMillis) {
+        try {
+            transferTimer.schedule(task, delayMillis, TimeUnit.MILLISECONDS);
+        } catch (Throwable rejected) {
+            // The worker is shutting down with the process. Nothing to retry into.
+            android.util.Log.w("CN1Wearable", "could not schedule a framework retry", rejected);
+        }
+    }
+
     private static java.util.concurrent.ScheduledThreadPoolExecutor newTransferWorker() {
         java.util.concurrent.ScheduledThreadPoolExecutor worker =
                 new java.util.concurrent.ScheduledThreadPoolExecutor(1,

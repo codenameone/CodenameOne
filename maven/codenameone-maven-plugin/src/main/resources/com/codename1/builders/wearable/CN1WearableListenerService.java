@@ -417,6 +417,43 @@ public class CN1WearableListenerService extends WearableListenerService {
      *         that acknowledges delivery has to know the difference, because an acknowledgement
      *         is durable and stops the sender retrying
      */
+    /// How many times a failed mirrored descriptor write is re-attempted, and the delay before
+    /// the first. The delays double, so the last attempt is a little over twenty minutes out --
+    /// long enough to outlast the transient conditions this is for (storage momentarily full, a
+    /// directory briefly unwritable) without holding the payload for ever.
+    private static final int MIRROR_WRITE_RETRIES = 6;
+    private static final long MIRROR_WRITE_RETRY_MILLIS = 20000L;
+
+    /**
+     * Re-attempts a mirrored descriptor the watch could not store.
+     *
+     * <p>Bounded, and in memory. What it cannot cover is the process dying mid-outage: the
+     * payload goes with it and the unchanged Data Layer item produces no fresh callback, so that
+     * descriptor waits for the phone's next publish. Persisting it to survive that would mean
+     * writing to the storage that just refused a write, which is the condition being retried.</p>
+     *
+     * @param path the reserved application path
+     * @param payload the descriptor payload, held for the retry
+     * @param attempt 1 for the first re-attempt
+     */
+    private void retryMirrorDescriptor(final String path, final byte[] payload,
+            final int attempt) {
+        if (payload == null || attempt > MIRROR_WRITE_RETRIES) {
+            android.util.Log.w("CN1Surfaces", "gave up applying the mirrored surface on " + path
+                    + " after " + MIRROR_WRITE_RETRIES + " attempts; the watch keeps what it had "
+                    + "until the phone publishes again");
+            return;
+        }
+        final CN1WearableListenerService self = this;
+        CN1WearableBridge.scheduleFrameworkRetry(new Runnable() {
+            public void run() {
+                if (!self.surfaceMirror("receive", path, payload)) {
+                    self.retryMirrorDescriptor(path, payload, attempt + 1);
+                }
+            }
+        }, MIRROR_WRITE_RETRY_MILLIS << (attempt - 1));
+    }
+
     private boolean surfaceMirror(String method, String path, byte[] payload) {
         Class<?> mirror = mirrorClass();
         if (mirror == null) {
@@ -555,7 +592,15 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // deletes the descriptor first for that reason, and says so when it cannot.
                     surfaceMirror("remove", appPath, null);
                 } else {
-                    surfaceMirror("receive", appPath, readMirrorPayload(event));
+                    byte[] descriptor = readMirrorPayload(event);
+                    if (!surfaceMirror("receive", appPath, descriptor)) {
+                        // The write failed -- storage momentarily full is the case this is for.
+                        // Nothing else will offer this descriptor again: a Data Layer item that
+                        // has not changed produces no further callback, so the watch would keep
+                        // showing content the phone has already replaced, indefinitely. The
+                        // payload is in hand, so the retry needs no round trip.
+                        retryMirrorDescriptor(appPath, descriptor, 1);
+                    }
                 }
                 continue;
             }
