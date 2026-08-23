@@ -23,6 +23,7 @@
 package com.codename1.util;
 
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -167,5 +168,44 @@ class SurfaceKindFamiliesTest {
         assertFalse(SurfaceKindFamilies.hasWatchFamily(null));
         assertFalse(SurfaceKindFamilies.isWatchOnly(null));
         assertFalse(SurfaceKindFamilies.isWatch(null));
+    }
+
+    /// The portable key wins when PRESENT, not merely when well-formed. A manifest mid-migration
+    /// is the one case carrying both keys, so falling through to the legacy list on a malformed
+    /// portable value silently built the surface the author had just replaced.
+    @Test
+    void aMalformedFamiliesValueDoesNotResurrectTheLegacyList() {
+        Map<String, Object> kind = new LinkedHashMap<String, Object>();
+        kind.put("id", "status");
+        kind.put("families", Integer.valueOf(7));
+        kind.put("iosFamilies", Arrays.asList("small"));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> SurfaceKindFamilies.read(kind));
+        assertTrue(ex.getMessage().contains("status"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("families"), ex.getMessage());
+    }
+
+    /// A bare string is the obvious shorthand and the obvious mistype, so it is read the way it
+    /// was plainly meant rather than refused.
+    @Test
+    void aSingleFamilyNameIsReadAsOneFamily() {
+        Map<String, Object> kind = new LinkedHashMap<String, Object>();
+        kind.put("id", "status");
+        kind.put("families", "watchCircular");
+        kind.put("iosFamilies", Arrays.asList("small"));
+
+        assertEquals(Arrays.asList("watchCircular"), SurfaceKindFamilies.read(kind));
+    }
+
+    /// The legacy key keeps its old tolerance: manifests carrying it predate this check, and
+    /// refusing one now would fail a build that has always worked.
+    @Test
+    void aMalformedLegacyValueStillDegradesQuietly() {
+        Map<String, Object> kind = new LinkedHashMap<String, Object>();
+        kind.put("id", "status");
+        kind.put("iosFamilies", Integer.valueOf(7));
+
+        assertTrue(SurfaceKindFamilies.read(kind).isEmpty());
     }
 }

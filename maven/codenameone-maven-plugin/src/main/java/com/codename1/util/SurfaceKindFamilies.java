@@ -51,8 +51,8 @@ public final class SurfaceKindFamilies {
     /**
      * The families a kind's JSON object declares.
      *
-     * <p>{@code families} wins outright when present; {@code iosFamilies} is the legacy
-     * spelling and is read only in its absence. They are not merged, because a manifest
+     * <p>{@code families} wins outright when PRESENT -- well-formed or not. {@code iosFamilies}
+     * is the legacy spelling and is read only in its absence. They are not merged, because a manifest
      * carrying both is far more likely to be mid-migration than to mean the union, and
      * silently unioning would resurrect a family the author had just removed.</p>
      *
@@ -63,12 +63,47 @@ public final class SurfaceKindFamilies {
         if (kindJson == null) {
             return Collections.emptyList();
         }
-        Object declared = kindJson.get("families");
-        if (!(declared instanceof List)) {
-            declared = kindJson.get("iosFamilies");
+        Object portable = kindJson.get("families");
+        if (portable != null) {
+            // PRESENT is what decides, not well-formed. Falling through to iosFamilies when the
+            // portable value could not be read meant a manifest mid-migration -- the one case
+            // carrying both keys -- silently built the legacy list the author had just replaced,
+            // shipping a surface they had removed. Present and unusable is an authoring mistake,
+            // and it is said rather than absorbed.
+            List<String> read = asFamilyList(portable);
+            if (read == null) {
+                throw new IllegalArgumentException("The \"families\" value of surface kind \""
+                        + kindJson.get("id") + "\" must be a list of family names (or a single "
+                        + "name), but was: " + portable);
+            }
+            return read;
+        }
+        // The legacy key keeps its old tolerance. Nothing in the wild carries "families" yet, so
+        // tightening that one breaks nothing; manifests carrying iosFamilies predate this check
+        // and refusing one now would fail a build that has always worked.
+        List<String> legacy = asFamilyList(kindJson.get("iosFamilies"));
+        return legacy == null ? Collections.<String>emptyList() : legacy;
+    }
+
+    /**
+     * One declaration's family names, or null when the value is not a family declaration at all.
+     *
+     * <p>A bare string counts as a single family: it is the obvious shorthand and the obvious way
+     * to mistype the key, and reading it the way the author plainly meant beats refusing it.</p>
+     *
+     * @param declared the raw manifest value
+     * @return the names, or null when the value cannot be read as a declaration
+     */
+    private static List<String> asFamilyList(Object declared) {
+        if (declared instanceof String) {
+            List<String> single = new ArrayList<String>(1);
+            if (((String) declared).length() > 0) {
+                single.add((String) declared);
+            }
+            return single;
         }
         if (!(declared instanceof List)) {
-            return Collections.emptyList();
+            return null;
         }
         List<String> out = new ArrayList<String>();
         for (Object family : (List<?>) declared) {
