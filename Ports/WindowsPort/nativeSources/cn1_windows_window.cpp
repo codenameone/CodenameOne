@@ -461,6 +461,28 @@ static int cn1WinEvictSupersededVisibilityLocked(void) {
     return 0;
 }
 
+/* Last resort before giving up an entry outright: drop the oldest *termination*.
+ *
+ * When the queue cannot grow, the question is only which loss costs least, and the
+ * order is droppable input, then a state a later event already supersedes, then a
+ * termination, then a lifecycle event. A lost release latches one component; a lost
+ * close or hide loses a whole window -- the close operation never runs, or the
+ * framework goes on painting a window that is not on screen. So a queued close or
+ * visibility transition outranks any number of releases behind it. */
+static int cn1WinEvictOldestTerminationLocked(void) {
+    LONG idx = cn1Win.eventHead;
+    while (idx != cn1Win.eventTail) {
+        CN1EventType t = (CN1EventType) cn1Win.events[idx].type;
+        if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
+                || t == CN1_EVENT_WINDOW_FOCUS) {
+            cn1WinRemoveAtLocked(idx);
+            return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    return 0;
+}
+
 void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode) {
     EnterCriticalSection(&cn1Win.eventLock);
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
@@ -473,16 +495,14 @@ void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int ke
             LeaveCriticalSection(&cn1Win.eventLock);
             return;
         }
-        if (cn1WinEvictInputLocked() || cn1WinEvictSupersededVisibilityLocked()) {
+        if (cn1WinEvictInputLocked() || cn1WinEvictSupersededVisibilityLocked()
+                || cn1WinEvictOldestTerminationLocked()) {
             next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
         } else {
-            /* Nothing droppable and nothing superseded: the queue is protected events
-             * end to end. Reachable now that releases are protected -- sustained clicks
-             * against a blocked event dispatch thread evict every press in favour of its
-             * release, and the close or final release that arrives next would be the one
-             * thrown away. Give up the OLDEST entry instead, because between two events
-             * neither of which can be reconstructed, the newer one describes where the
-             * user actually is. */
+            /* Nothing left but lifecycle events -- closes and visibility transitions
+             * for more distinct windows than the queue can hold, which needs more
+             * windows open than any application has. Giving up the oldest is all that
+             * remains, and the newer event at least describes the more recent state. */
             cn1Win.eventHead = (cn1Win.eventHead + 1) % CN1_EVENT_QUEUE_CAPACITY;
             next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
         }

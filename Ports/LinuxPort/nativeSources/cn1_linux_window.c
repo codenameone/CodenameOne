@@ -181,6 +181,28 @@ static int cn1LinuxEvictSupersededVisibilityLocked(void) {
     return 0;
 }
 
+/* Last resort before giving up an entry outright: drop the oldest *termination*.
+ *
+ * When the queue cannot grow, the question is only which loss costs least, and the
+ * order is droppable input, then a state a later event already supersedes, then a
+ * termination, then a lifecycle event. A lost release latches one component; a lost
+ * close or hide loses a whole window -- the close operation never runs, or the
+ * framework goes on painting a window that is not on screen. So a queued close or
+ * visibility transition outranks any number of releases behind it. */
+static int cn1LinuxEvictOldestTerminationLocked(void) {
+    int idx = cn1EventHead;
+    while (idx != cn1EventTail) {
+        int t = cn1EventRing[idx].type;
+        if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
+                || t == CN1_EVENT_WINDOW_FOCUS) {
+            cn1LinuxRemoveAtLocked(idx);
+            return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_RING;
+    }
+    return 0;
+}
+
 void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
@@ -193,16 +215,14 @@ void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) 
             pthread_mutex_unlock(&cn1EventLock);
             return;
         }
-        if (cn1LinuxEvictInputLocked() || cn1LinuxEvictSupersededVisibilityLocked()) {
+        if (cn1LinuxEvictInputLocked() || cn1LinuxEvictSupersededVisibilityLocked()
+                || cn1LinuxEvictOldestTerminationLocked()) {
             next = (cn1EventTail + 1) % CN1_EVENT_RING;
         } else {
-            /* Nothing droppable and nothing superseded: the queue is protected events
-             * end to end. Reachable now that releases are protected -- sustained clicks
-             * against a blocked event dispatch thread evict every press in favour of its
-             * release, and the close or final release that arrives next would be the one
-             * thrown away. Give up the OLDEST entry instead, because between two events
-             * neither of which can be reconstructed, the newer one describes where the
-             * user actually is. */
+            /* Nothing left but lifecycle events -- closes and visibility transitions
+             * for more distinct windows than the ring can hold, which needs more windows
+             * open than any application has. Giving up the oldest is all that remains,
+             * and the newer event at least describes the more recent state. */
             cn1EventHead = (cn1EventHead + 1) % CN1_EVENT_RING;
             next = (cn1EventTail + 1) % CN1_EVENT_RING;
         }
