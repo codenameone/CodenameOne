@@ -275,86 +275,13 @@ JAVA
     "$WORK/classes" "$MAIN_OVERRIDE" "$SOURCE_ROOT" "$WORK/program.cn1ip"
 
 echo "awaiting the device on 127.0.0.1:$PORT"
-cat > "$WORK/Push.java" <<'JAVA'
-import java.io.*;
-import java.net.*;
-import java.nio.file.*;
-
-/**
- * Sends a bundle to a device runtime over loopback.
- *
- * Unauthenticated on purpose, and only over loopback: reaching this listener
- * means `adb reverse` on a USB-authorised device or the iOS simulator's own
- * loopback, so possession of the device is the authentication, and going
- * through a pairing dialog for every push during framework work would be pure
- * friction. The device refuses this protocol on any connection that did not
- * arrive over loopback.
- *
- * A push to a phone over Wi-Fi is a different thing and belongs to a different
- * tool: DevicePush pairs, derives a shared secret and answers a challenge on
- * every connection. This helper deliberately does not, rather than carrying a
- * third copy of the crypto that would drift from the other two.
- */
-public final class Push {
-    private static final int MAGIC = 0x434E3150;   // "CN1P"
-    private static final int V1 = 1;
-
-    public static void main(String[] a) throws Exception {
-        byte[] payload = Files.readAllBytes(Paths.get(a[0]));
-        send(Integer.parseInt(a[1]), payload);
-    }
-
-    /**
-     * Waits for the device to dial in, then sends the frame.
-     *
-     * The desktop listens and the device connects out, not the other way round.
-     * A socket the device listens on is unreachable from the host inside the
-     * iOS simulator -- the app binds it and reports success while every
-     * connection attempt is refused -- and a phone on a real network cannot
-     * accept inbound connections at all. The device retries every couple of
-     * seconds, so starting this first is all the synchronisation needed.
-     */
-    private static void send(int port, byte[] payload) throws Exception {
-        ServerSocket server = new ServerSocket();
-        server.setReuseAddress(true);
-        server.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port));
-        server.setSoTimeout(120000);
-        Socket s;
-        try {
-            System.out.println("waiting for the device to connect on 127.0.0.1:" + port);
-            s = server.accept();
-        } catch (java.net.SocketTimeoutException e) {
-            System.out.println("FAILED: the device never connected. Is the app running, "
-                    + "and is `adb reverse tcp:" + port + " tcp:" + port + "` set on Android?");
-            System.exit(1);
-            return;
-        } finally {
-            server.close();
-        }
-        try {
-            s.setSoTimeout(120000);
-            DataOutputStream out = new DataOutputStream(s.getOutputStream());
-            out.writeInt(MAGIC);
-            out.writeInt(V1);
-            out.writeInt(payload.length);
-            out.write(payload);
-            out.flush();
-            if (!report(s)) {
-                System.exit(1);
-            }
-        } finally {
-            s.close();
-        }
-    }
-
-    private static boolean report(Socket s) throws IOException {
-        DataInputStream in = new DataInputStream(s.getInputStream());
-        int ok = in.readByte();
-        String message = in.readUTF();
-        System.out.println((ok == 1 ? "OK: " : "FAILED: ") + message);
-        return ok == 1;
-    }
-}
-JAVA
-"$JDK/bin/javac" -nowarn -d "$WORK" "$WORK/Push.java"
-"$JDK/bin/java" -cp "$WORK" Push "$WORK/program.cn1ip" "$PORT"
+# Delegate the push to the shipping DevicePush entry point rather than a
+# stripped-down local V1 helper. Android apps share the TCP loopback
+# namespace, so the runtime no longer treats loopback as authentication and
+# refuses V1 anywhere but the JavaSE simulator; the same V3 pairing flow
+# now covers both USB (adb reverse) and Wi-Fi, and DevicePush already knows
+# how to run it (challenge/response, secret persistence, retry after
+# pairing). --bundle skips DevicePush's own packaging and hands the .cn1ip
+# we already produced.
+"$JDK/bin/java" -cp "$PARPAR_JAR" com.codename1.tools.translator.DevicePush \
+    --bundle "$WORK/program.cn1ip" --port "$PORT"

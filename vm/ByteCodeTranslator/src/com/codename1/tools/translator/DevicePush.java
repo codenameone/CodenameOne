@@ -91,10 +91,13 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public final class DevicePush {
     private static final int MAGIC = 0x434E3150;   // "CN1P"
-    private static final int V1 = 1;
 
     /**
-     * Challenge-response push. There was a v2 in which the peer id alone
+     * Challenge-response push. The device still accepts a v1 (unauthenticated)
+     * frame from the JavaSE simulator on loopback, but this tool never sends
+     * one -- Android apps share the TCP loopback namespace, so v1 loopback
+     * trust is not authentication of the peer, and the same v3 flow covers USB
+     * (adb reverse) and Wi-Fi. There was a v2 in which the peer id alone
      * authorised a push -- a plaintext bearer token on a LAN -- and it is gone
      * rather than deprecated.
      */
@@ -127,6 +130,7 @@ public final class DevicePush {
         int port = 18234;
         boolean lan = false;
         String device = null;
+        File prepackaged = null;
 
         for (int i = 0; i < args.length; i++) {
             String a = args[i];
@@ -143,24 +147,40 @@ public final class DevicePush {
             } else if ("--device".equals(a) && i + 1 < args.length) {
                 device = args[++i];
                 lan = true;
+            } else if ("--bundle".equals(a) && i + 1 < args.length) {
+                // A pre-packaged .cn1ip file, so the caller can do its own
+                // packaging (cn1-push.sh has its own scanner for framework-dev
+                // sources) and reuse this tool for just the push -- including
+                // the v3 pairing dance, which used to live only in the
+                // network path but is now the only authenticated way to reach
+                // the runtime even over adb-reverse loopback.
+                prepackaged = new File(args[++i]);
             } else if ("--help".equals(a)) {
                 usage();
                 return;
             }
         }
-        if (sources.isEmpty()) {
-            // The default retains the classic single-root behaviour for a
-            // caller that never passes --source. A caller with more than
-            // one root passes each explicitly.
-            sources.add(new File("src/main/java"));
+        byte[] bundle;
+        if (prepackaged != null) {
+            if (!prepackaged.isFile()) {
+                System.err.println("no bundle at " + prepackaged.getAbsolutePath());
+                System.exit(2);
+            }
+            bundle = java.nio.file.Files.readAllBytes(prepackaged.toPath());
+        } else {
+            if (sources.isEmpty()) {
+                // The default retains the classic single-root behaviour for a
+                // caller that never passes --source. A caller with more than
+                // one root passes each explicitly.
+                sources.add(new File("src/main/java"));
+            }
+            if (!classes.isDirectory()) {
+                System.err.println("no compiled classes at " + classes.getAbsolutePath()
+                        + " -- build the project first");
+                System.exit(2);
+            }
+            bundle = buildBundle(classes, sources, mainClass);
         }
-        if (!classes.isDirectory()) {
-            System.err.println("no compiled classes at " + classes.getAbsolutePath()
-                    + " -- build the project first");
-            System.exit(2);
-        }
-
-        byte[] bundle = buildBundle(classes, sources, mainClass);
         System.out.println("bundle " + bundle.length + " bytes");
 
         if (lan) {
@@ -355,17 +375,17 @@ public final class DevicePush {
     // ----------------------------------------------------------- the transport
 
     private static void push(byte[] payload, int port, boolean lan) throws Exception {
-        if (!lan) {
-            // Loopback: the only thing that can answer is a USB-authorised
-            // device or a simulator on this machine, so there is nothing for a
-            // pairing step to establish that possession has not already.
-            send(payload, port, null, true);
-            return;
-        }
+        // Loopback used to be treated as authenticated by physical presence,
+        // but Android apps share the TCP loopback namespace: any local app
+        // could otherwise dial the device runtime over 127.0.0.1 and get an
+        // unpaired bundle run. Both USB (adb reverse, `loopback=true`) and
+        // Wi-Fi (`loopback=false`) now use the same v3 pairing flow; the
+        // difference is only where the desktop accepts the connection from.
+        boolean loopback = !lan;
         String peerId = peerId();
         String peerName = System.getProperty("user.name") + "@"
                 + InetAddress.getLocalHost().getHostName();
-        if (send(payload, port, peerId, false)) {
+        if (send(payload, port, peerId, loopback)) {
             return;
         }
         if (!rejectedAsUnpaired()) {
@@ -387,11 +407,11 @@ public final class DevicePush {
             System.out.println("    Type it on the device now and press Pair.");
             System.out.println("    This computer is " + describeAddresses(port) + ".");
             System.out.println();
-            if (!pair(port, peerId, peerName, code)) {
+            if (!pair(port, peerId, peerName, code, loopback)) {
                 System.exit(1);
             }
             System.out.println("paired; pushing");
-            if (!send(payload, port, peerId, false)) {
+            if (!send(payload, port, peerId, loopback)) {
                 System.exit(1);
             }
         }
@@ -405,9 +425,9 @@ public final class DevicePush {
      * inputs and is never transmitted. What this sends is an HMAC over the
      * device's nonce, which authenticates this exchange and no other.</p>
      */
-    private static boolean pair(int port, String peerId, String peerName, String code)
-            throws Exception {
-        Socket s = accept(port, false, 180000);
+    private static boolean pair(int port, String peerId, String peerName, String code,
+                                boolean loopback) throws Exception {
+        Socket s = accept(port, loopback, 180000);
         try {
             s.setSoTimeout(180000);   // the user has to read the code and type it
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
@@ -441,13 +461,13 @@ public final class DevicePush {
     }
 
     /**
-     * Sends a bundle.
-     *
-     * <p>Over loopback this is v1 and unauthenticated, because possession of
-     * the USB cable or of this machine already is the authentication. Over a
-     * network it is v3: the device names itself and issues a nonce, and the
-     * answer covers the bundle as well as the nonce, so what runs on the phone
-     * is what left this process.</p>
+     * Sends a bundle over v3: the device names itself and issues a nonce, and
+     * the answer covers the bundle as well as the nonce, so what runs on the
+     * phone is what left this process. {@code loopbackOnly} only decides where
+     * this end accepts the connection from -- USB (adb reverse) binds
+     * 127.0.0.1, Wi-Fi binds every interface -- and does not weaken the
+     * authentication: Android apps share the TCP loopback namespace, so
+     * loopback address is not proof of identity.
      */
     private static boolean send(byte[] payload, int port, String peerId,
                                 boolean loopbackOnly) throws Exception {
@@ -458,22 +478,6 @@ public final class DevicePush {
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
             DataInputStream in = new DataInputStream(s.getInputStream());
             out.writeInt(MAGIC);
-            if (loopbackOnly) {
-                out.writeInt(V1);
-                out.writeInt(payload.length);
-                out.write(payload);
-                out.flush();
-                // The bundle is away; what follows is the device installing it
-                // and entering the program, which takes as long as the program
-                // takes. Timing out here would leave the desktop reporting a
-                // failed push for a program that is running.
-                s.setSoTimeout(0);
-                boolean ok = report(s);
-                if (!ok) {
-                    System.exit(1);
-                }
-                return ok;
-            }
             String desktopChallenge = hex(randomBytes(32));
             out.writeInt(V3);
             out.writeInt(FRAME_PUSH);
