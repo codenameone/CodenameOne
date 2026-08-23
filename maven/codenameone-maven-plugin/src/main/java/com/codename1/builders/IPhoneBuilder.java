@@ -6990,7 +6990,7 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         String winner = null;
-        int winningSpecificity = -1;
+        long winningSpecificity = -1;
         for (Map.Entry<String, String> setting : settings.entrySet()) {
             String key = setting.getKey();
             boolean qualified = isQualified(key, name);
@@ -7000,7 +7000,7 @@ public class IPhoneBuilder extends Executor {
             if (qualified && !conditionApplies(key, sdk, configuration, arch)) {
                 continue;
             }
-            int specificity = qualified ? conditionSpecificity(key) : 0;
+            long specificity = qualified ? conditionSpecificity(key) : 0;
             if (specificity > winningSpecificity) {
                 winningSpecificity = specificity;
                 winner = setting.getValue();
@@ -7016,21 +7016,36 @@ public class IPhoneBuilder extends Executor {
     /// characters alone scored those equal and left the winner to Properties' iteration order --
     /// which could read the wrong entitlements file, compute the wrong floor, or judge the wrong
     /// identifier, all silently.
-    static int conditionSpecificity(String key) {
+    static long conditionSpecificity(String key) {
         int open = key.indexOf('[');
         if (open < 0) {
             return 0;
         }
-        int specificity = 0;
+        long conditions = 0;
+        long precision = 0;
         for (String condition : key.substring(open).split("[\\[\\],]")) {
             int equals = condition.indexOf('=');
             if (equals < 0) {
                 continue;
             }
-            specificity += condition.substring(equals + 1).trim().endsWith("*") ? 1 : 2;
+            conditions++;
+            String value = condition.substring(equals + 1).trim();
+            // An exact value beats any wildcard; between wildcards the longer prefix is the
+            // narrower pattern, which is the one Xcode picks: [sdk=iphoneos14.*] over
+            // [sdk=iphoneos*] for an iphoneos14.4 archive. Scoring every wildcard alike left that
+            // to Properties' iteration order.
+            precision += value.endsWith("*") ? value.length() - 1 : PRECISION_EXACT;
         }
-        return specificity;
+        // Conditions first, precision as the tiebreak: two conditions describe a narrower build
+        // than one, however precisely that one is written.
+        return conditions * PRECISION_SCALE + Math.min(precision, PRECISION_SCALE - 1);
     }
+
+    /// A value with no wildcard is as precise as a condition gets.
+    private static final long PRECISION_EXACT = 1000;
+
+    /// Wide enough that the precision sum cannot reach into the condition count above it.
+    private static final long PRECISION_SCALE = 1000000;
 
     /// Whether a qualified setting's condition can apply to the build being made.
     ///
@@ -7066,6 +7081,15 @@ public class IPhoneBuilder extends Executor {
             if ("arch".equals(name) && arch != null && !matchesCondition(value, arch)) {
                 return false;
             }
+            // The build variant is not a parameter because it is never in doubt: this builder
+            // archives the normal variant, never Xcode's profile or debug variants. A
+            // [variant=profile] setting therefore belongs to a build that does not happen here,
+            // and letting it win -- it is more specific than the plain setting -- meant validating
+            // an identifier or reading entitlements Xcode would not use.
+            if ("variant".equals(name) && !matchesCondition(value, "normal")) {
+                return false;
+            }
+
         }
         return true;
     }
@@ -7167,13 +7191,18 @@ public class IPhoneBuilder extends Executor {
                 ? declared.trim()
                 : appTarget;
         if (chosen != null && chosen.indexOf('$') >= 0) {
-            // Written through another setting. What it resolves to decides whether it clears the
-            // floor; the declared text is what the target keeps, because Xcode resolves it there
-            // and a reference this build cannot evaluate is not one to overwrite with a guess.
+            // Written through another setting. What it RESOLVES to decides: a reference that lands
+            // on a version clearing the floor is kept as written, because Xcode resolves it on the
+            // target and that is the archive author's expression to keep.
             String resolved = extensionFolder == null ? "" : resolveSettingsInValue(chosen,
                     extensionSettingsWithBuiltIns(extensionFolder, settings));
-            return resolved.length() > 0 && isDeploymentTargetBelow(resolved, floor)
-                    ? floor : chosen;
+            if (resolved.length() == 0) {
+                // And a reference to a setting nothing defines is not "unknown" -- Xcode expands
+                // it to the empty string, so the extension would declare no minimum at all. The
+                // floor is the answer, not the expression.
+                return floor;
+            }
+            return isDeploymentTargetBelow(resolved, floor) ? floor : chosen;
         }
         return isDeploymentTargetBelow(chosen, floor) ? floor : normalizeVersion(chosen.trim());
     }

@@ -311,18 +311,13 @@ public class AppExtensionDeploymentTargetTest {
     }
 
     @Test
-    public void aReferenceThisBuildCannotResolveIsLeftAsWritten() throws Exception {
-        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
-        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(SOMETHING_ELSE)");
-        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "$(SOMETHING_ELSE)");
-
-        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
-                "com.example.app", "14.0");
-
-        // Not evaluable here is not the same as known to be wrong.
-        assertEquals("$(SOMETHING_ELSE)", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
-        assertTrue(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
-        assertTrue(notes.isEmpty());
+    public void aReferenceToNothingIsNotAMinimumAtAll() throws Exception {
+        File extension = tmp.newFolder("dist21", "WalletUIExtension");
+        // Xcode expands a reference nothing defines to the empty string, so the extension would
+        // declare no minimum -- which is why this is the floor's answer and not the expression's.
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentTarget("$(SOMETHING_ELSE)",
+                walletEntitlements(), "11", extension,
+                new java.util.LinkedHashMap<String, String>()));
     }
 
     @Test
@@ -675,5 +670,38 @@ public class AppExtensionDeploymentTargetTest {
         // and more conditions still beat fewer
         assertTrue(IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos*,config=Release]")
                 > IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos*]"));
+    }
+
+    @Test
+    public void aNarrowerWildcardOutranksABroaderOne() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        // Broader first, so iteration order would pick it if the two scored equal.
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "Broad.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos14.*]", "Narrow.entitlements");
+
+        assertEquals("Narrow.entitlements", IPhoneBuilder.winningSetting(settings,
+                "CODE_SIGN_ENTITLEMENTS", "iphoneos14.4", "Release", "arm64"));
+        assertTrue(IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos14.*]")
+                > IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos*]"));
+        // and an exact value still beats both
+        assertTrue(IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos14.4]")
+                > IPhoneBuilder.conditionSpecificity("X[sdk=iphoneos14.*]"));
+    }
+
+    @Test
+    public void aVariantThisBuilderNeverArchivesDoesNotWin() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[variant=profile]", "com.other.Ext");
+
+        // This builder archives the normal variant, so a profile-variant setting belongs to a
+        // build that does not happen here -- and it is more specific than the plain one, so
+        // accepting it let it win.
+        assertEquals("com.example.app.Ext", IPhoneBuilder.winningSetting(settings,
+                "PRODUCT_BUNDLE_IDENTIFIER", "iphoneos14.4", "Release", "arm64"));
+        assertFalse(IPhoneBuilder.conditionApplies("X[variant=profile]", "iphoneos14.4",
+                "Release", "arm64"));
+        assertTrue(IPhoneBuilder.conditionApplies("X[variant=normal]", "iphoneos14.4",
+                "Release", "arm64"));
     }
 }
