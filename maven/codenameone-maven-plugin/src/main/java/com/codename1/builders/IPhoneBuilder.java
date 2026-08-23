@@ -5848,7 +5848,7 @@ public class IPhoneBuilder extends Executor {
      * aligned here, and every change is logged: this edits a file the developer supplied. A value
      * that is already correct, and one written as a {@code $(...)} reference, are left alone.</p>
      */
-    private void stampAppExtensionInfoPlist(File appExtension, BuildRequest request,
+    void stampAppExtensionInfoPlist(File appExtension, BuildRequest request,
             ArchiveContext context) throws IOException {
         Map<String, File> plists = appExtensionInfoPlists(appExtension, context);
         Set<String> stamped = new LinkedHashSet<String>();
@@ -5891,9 +5891,18 @@ public class IPhoneBuilder extends Executor {
                         + "it is; point INFOPLIST_FILE at a plist inside the extension.");
                 continue;
             }
-            if (!stamped.add(infoPlist.getCanonicalPath())) {
-                // Two settings naming the same file. Stamping is idempotent, but saying so twice
-                // in the log reads like two files were touched.
+            ArchiveContext candidateContext = infoPlistCandidateContext(candidate.getKey(), context);
+            if (!stamped.add(infoPlist.getCanonicalPath() + "\u0000" + candidateContext)) {
+                // Two settings naming the same file IN THE SAME CONTEXT. Stamping is idempotent,
+                // and saying so twice in the log reads like two files were touched.
+                //
+                // The context is part of the key because one physical plist is routinely named by
+                // the base setting and by a qualified one: a $(MARKETING_VERSION) in it resolves
+                // to the app's version under Release and to a stale 1.0 under
+                // [config=Debug], and the file cannot be right for both while the reference
+                // stands. Deduplicating on the path alone let the Release pass leave the
+                // reference and skipped the Debug pass that would have replaced it, so the Debug
+                // build off these sources shipped 1.0.
                 continue;
             }
             // Through the shared resolvers rather than buildVersion / the ios.bundleVersion hint
@@ -5916,8 +5925,7 @@ public class IPhoneBuilder extends Executor {
             // host-mismatch rejection this stamping exists to prevent.
             List<String> changes = stampPlistFile(infoPlist, embeddedExtensionShortVersion(request),
                     embeddedExtensionBundleVersion(request), request.getPackageName(),
-                    flattenForContext(settings,
-                            infoPlistCandidateContext(candidate.getKey(), context)));
+                    flattenForContext(settings, candidateContext));
             if (changes == null) {
                 debug("Could not read " + appExtension.getName() + "/" + infoPlist.getName()
                         + " as an XML property list, so its bundle identity was left as it is. If "
@@ -7260,6 +7268,13 @@ public class IPhoneBuilder extends Executor {
             this.configuration = configuration;
             this.arch = arch;
             this.variants = variants;
+        }
+
+        /// The four dimensions, for logs and for use as a map key.
+        @Override
+        public String toString() {
+            return "sdk=" + sdk + ",config=" + configuration + ",arch=" + arch
+                    + ",variants=" + variants;
         }
 
         /// @param settings the extension's own, since BUILD_VARIANTS in them is copied onto the

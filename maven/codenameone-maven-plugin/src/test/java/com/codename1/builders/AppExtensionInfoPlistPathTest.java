@@ -211,4 +211,38 @@ public class AppExtensionInfoPlistPathTest {
         assertFalse(IPhoneBuilder.isHostAppInfoPlist(ownPlist, dist, "MyApp"));
         assertFalse(IPhoneBuilder.isHostAppInfoPlist(hostPlist, dist, null));
     }
+
+    @Test
+    public void oneFileNamedByTwoConditionsIsStampedInBoth() throws Exception {
+        File dist = tmp.newFolder("shared-plist");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File shared = new File(extension, "Info.plist");
+        write(shared, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\">\n<dict>\n"
+                + "\t<key>CFBundleShortVersionString</key>\n\t<string>$(MARKETING_VERSION)</string>\n"
+                + "\t<key>CFBundleVersion</key>\n\t<string>$(MARKETING_VERSION)</string>\n"
+                + "\t<key>CFBundleIdentifier</key>\n\t<string>com.example.app.WalletUIExtension</string>\n"
+                + "</dict>\n</plist>\n");
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/Info.plist\n"
+                + "INFOPLIST_FILE[config\\=Debug] = WalletUIExtension/Info.plist\n"
+                + "MARKETING_VERSION = 5.4\n"
+                + "MARKETING_VERSION[config\\=Debug] = 1.0\n");
+
+        BuildRequest request = new BuildRequest();
+        request.setMainClass("MyApp");
+        request.setPackageName("com.example.app");
+        request.setVersion("5.4");
+        new IPhoneBuilder().stampAppExtensionInfoPlist(extension, request,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // One physical plist, named by the base setting and by a Debug-qualified one. Under
+        // Release the reference already resolves to the app's 5.4 and is left; deduplicating on
+        // the path alone then skipped the Debug pass, and the Debug build off these sources
+        // shipped $(MARKETING_VERSION) = 1.0. The file cannot be right for both while the
+        // reference stands, so the literal has to win.
+        String stamped = new String(Files.readAllBytes(shared.toPath()), "UTF-8");
+        assertTrue(stamped, stamped.contains("<key>CFBundleShortVersionString</key>\n\t<string>5.4</string>"));
+        assertFalse(stamped, stamped.contains("$(MARKETING_VERSION)"));
+    }
 }
