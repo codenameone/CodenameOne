@@ -227,7 +227,11 @@ public abstract class CN1SurfaceTileService extends TileService {
                 // completed value for ever, so treating its mere presence as movement asked for
                 // a rebuild every minute until the app published again -- spending the Tile
                 // refresh budget and the battery to redraw an identical bar.
-                if (now < node.optLong("end")) {
+                // RUNNING, which means started as well as unfinished. A reading published hours
+                // ahead has an interval that has not begun, and its fraction is clamped at zero
+                // until it does -- asking for a rebuild every minute through all of that spends
+                // the refresh budget and the battery redrawing an empty bar.
+                if (now >= node.optLong("start") && now < node.optLong("end")) {
                     return true;
                 }
                 continue;

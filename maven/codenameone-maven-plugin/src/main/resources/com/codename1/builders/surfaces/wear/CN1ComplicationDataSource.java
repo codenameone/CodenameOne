@@ -543,7 +543,14 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                     || !node.has("start") || !node.has("end")) {
                 continue;
             }
-            long from = Math.max(node.optLong("start"), windowStart);
+            // Never before NOW. The active reading's own start is in the past, so sampling from
+            // there emitted entries whose intervals already cover the present -- and one of them
+            // then overrides the default, which is the only value built for the current moment.
+            // A week-long interval sampled twelve times would show a gauge fourteen hours stale
+            // the instant it appeared. A future reading is unaffected: now is before its start,
+            // so the clamp does nothing there.
+            long from = Math.max(Math.max(node.optLong("start"), windowStart),
+                    System.currentTimeMillis());
             long to = node.optLong("end");
             if (windowEnd > 0) {
                 to = Math.min(to, windowEnd);
