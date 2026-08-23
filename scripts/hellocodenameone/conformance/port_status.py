@@ -474,10 +474,17 @@ def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
         if not isinstance(tests, dict):
             problems.append(f"{port}: report has no test result map")
             continue
+        # `name in mapped`, the same filter the skip check below uses. Scanning
+        # every entry meant a report that predates a test's retirement and
+        # carries it as not-run failed this gate over a test nobody can run any
+        # more -- and the same report is tolerated as drift everywhere else, so
+        # the sweep stayed red until that port happened to rerun.
         unrun = sorted(
             name
             for name, result in tests.items()
-            if isinstance(result, dict) and result.get("status") == "not-run"
+            if isinstance(result, dict)
+            and result.get("status") == "not-run"
+            and name in mapped
         )
         if unrun:
             problems.append(f"{port}: reported no result for " + ", ".join(unrun))

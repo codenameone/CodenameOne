@@ -42,6 +42,14 @@
   {{- else if $stale -}}
     {{- $state = "partial" -}}
     {{- $label = "Report is stale" -}}
+  {{- else if gt $awaiting 0 -}}
+    {{- /* Last in the chain because it is the mildest of these, but not absent
+           from it: the feature cell for a test this run predates already renders
+           partial, and leaving the card green said "Suite completed" directly
+           above a column that is missing an answer. The suite did complete --
+           against a contract that has since grown. */ -}}
+    {{- $state = "partial" -}}
+    {{- $label = printf "%d test%s awaiting this port's next run" $awaiting (cond (eq $awaiting 1) "" "s") -}}
   {{- end -}}
 {{- end -}}
 <article class="cn1-port-card is-{{ $state }}" data-port-card="{{ $port.id }}">

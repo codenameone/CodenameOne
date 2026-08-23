@@ -353,6 +353,18 @@ class PortStatusTest(unittest.TestCase):
             problems,
         )
 
+    def test_coverage_ignores_a_retired_test_left_at_not_run(self):
+        # A report that predates a test's retirement still carries the test, and if that run
+        # never reached it the entry is "not-run". Reporting that is holding a port to an
+        # obligation the contract has withdrawn -- the same report is tolerated as drift
+        # everywhere else, so the sweep would have stayed red until the port happened to rerun.
+        reports = self.stored_reports()
+        reports["android"]["tests"]["RetiredApiTest"] = {
+            "feature": "crypto",
+            "status": "not-run",
+        }
+        self.assertEqual([], port_status.coverage_problems(self.manifest, reports))
+
     def test_coverage_accepts_a_documented_skip(self):
         # The distinction the rule turns on: a port that genuinely cannot do something reports
         # "skip" from the suite itself, which is evidence rather than the absence of it -- but
