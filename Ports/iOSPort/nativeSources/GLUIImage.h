@@ -91,6 +91,11 @@
 // (Phase 3 mutable-image render target), that is returned instead -- it
 // is the freshest pixel source.
 -(id<MTLTexture>)getMTLTexture;
+/// The cached read-only texture IF one has already been built, without building
+/// one. Pixel readers use this to take bytes from a texture that exists anyway,
+/// rather than forcing a decode; they must not create a texture for an image
+/// that was never drawn.
+-(id<MTLTexture>)existingMTLTexture;
 
 // issue #5349: drop the cached read-only mtlTexture so the next getMTLTexture
 // re-decodes it from the retained UIImage. Called from the suspend backup for

@@ -1548,6 +1548,84 @@ id<MTLTexture> CN1MetalTextureFromUIImage(CN1Image *image) {
         texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
         width:w height:h mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
+
+    // DECODE STRAIGHT INTO THE TEXTURE. On a unified-memory device the texture
+    // can be a view onto an MTLBuffer, and CoreGraphics can be pointed at that
+    // buffer's contents -- so the picture is rasterised once, into the memory
+    // the GPU will sample, and that is the only copy that exists. The previous
+    // shape allocated a full-size scratch buffer, drew into it, and then copied
+    // the whole thing again through replaceRegion: two full-size buffers live at
+    // once and one redundant memcpy per image. That mattered beyond the copy
+    // itself -- on this platform libmalloc never returns the pages a peak
+    // touched, so a transient buffer per image at start-up is charged to the
+    // process for its whole life.
+    //
+    // Unified memory only. On a discrete GPU a linear shared-storage texture
+    // lives in system memory and every sample crosses the bus, which trades a
+    // one-off copy for a permanent sampling cost.
+    id<MTLBuffer> backing = nil;
+    NSUInteger rowBytes = (NSUInteger)w * 4;
+    if (device.hasUnifiedMemory) {
+        // Linear textures constrain bytesPerRow; CoreGraphics accepts any row
+        // stride, so round up and let it write the padding.
+        NSUInteger align = [device minimumLinearTextureAlignmentForPixelFormat:MTLPixelFormatRGBA8Unorm];
+        if (align > 1) {
+            rowBytes = ((rowBytes + align - 1) / align) * align;
+        }
+        backing = [device newBufferWithLength:rowBytes * (NSUInteger)h
+                                      options:MTLResourceStorageModeShared];
+    }
+
+    if (backing != nil) {
+        desc.storageMode = MTLStorageModeShared;
+        CGContextRef ctx = CGBitmapContextCreate(backing.contents, w, h, 8, rowBytes, cs,
+            kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+        CGColorSpaceRelease(cs);
+        if (ctx != NULL) {
+            CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), image.CGImage);
+            // FLUSH before anything reads the buffer. CoreGraphics may still be
+            // holding drawing back when the context is only released -- the old
+            // shape got away without this because replaceRegion copied the bytes
+            // out through CoreGraphics' own accounting, whereas the texture here
+            // IS that memory. Without the flush the texture comes out with
+            // scattered holes: a self-check against the CoreGraphics reader
+            // caught 4344 of 215040 pixels reading back as zero on two runs in
+            // twenty, which is exactly the shape of a bug that survives testing
+            // and shows up as an occasional torn image in the field.
+            CGContextFlush(ctx);
+            CGContextRelease(ctx);
+            // newTexture... is the NARC "new" family: +1, which is exactly what
+            // this function's callers expect. The texture retains the buffer, so
+            // release our own reference to it and let the texture own it.
+            id<MTLTexture> texture = [backing newTextureWithDescriptor:desc
+                                                               offset:0
+                                                          bytesPerRow:rowBytes];
+            if (texture != nil) {
+#ifndef CN1_USE_ARC
+                [backing release];
+#endif
+                return texture;
+            }
+        }
+        // Fall through to the copying path.
+#ifndef CN1_USE_ARC
+        [backing release];
+#endif
+        backing = nil;
+    } else {
+        CGColorSpaceRelease(cs);
+    }
+
+    CGColorSpaceRef cs2 = CGColorSpaceCreateDeviceRGB();
+    void *rawData = calloc((size_t)h * (size_t)w * 4, sizeof(uint8_t));
+    CGContextRef ctx = CGBitmapContextCreate(rawData, w, h, 8, (size_t)w * 4, cs2,
+        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(cs2);
+    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), image.CGImage);
+    CGContextRelease(ctx);
+
+    // Storage mode deliberately left at the descriptor's default: replaceRegion
+    // is not legal on a private texture.
     id<MTLTexture> texture = [device newTextureWithDescriptor:desc];
     CN1_TEX_NOTE("textureFromUIImage", texture);
     [texture replaceRegion:MTLRegionMake2D(0, 0, w, h)
@@ -2014,6 +2092,69 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
     // round-trip leaks a full-resolution staging texture.
     [shared release];
 #endif
+    return YES;
+}
+
+/**
+ * Reads pixels out of an image's already-built read-only texture, if that can be
+ * done without touching CoreGraphics.
+ *
+ * <p>The CoreGraphics route rasterises the picture through CGContextDrawImage on
+ * every call, and the decoded copy CoreGraphics caches to do it stays resident
+ * next to the Metal texture we already uploaded -- the picture ends up in memory
+ * twice, which is where this port's "CG raster data" sits against a competing
+ * toolchain's zero. When the texture is buffer-backed shared storage its bytes
+ * ARE ordinary memory, so the same pixels can be copied straight out.</p>
+ *
+ * <p>Returns NO whenever anything does not line up -- no texture yet, private
+ * storage, an unexpected pixel format, or a scaled request -- and the caller
+ * falls back to the CoreGraphics path unchanged.</p>
+ */
+BOOL CN1MetalReadReadOnlyTexturePixels(GLUIImage *image, int *outARGB,
+                                       int x, int y, int w, int h,
+                                       int imgWidth, int imgHeight) {
+    if (image == nil || outARGB == NULL || w <= 0 || h <= 0) return NO;
+    if ([image mtlMutableTexture] != nil) return NO;   // has its own reader
+    id<MTLTexture> tex = [image existingMTLTexture];
+    if (tex == nil) return NO;
+    if (tex.storageMode != MTLStorageModeShared) return NO;
+    if (tex.pixelFormat != MTLPixelFormatRGBA8Unorm) return NO;
+
+    int texW = (int)tex.width;
+    int texH = (int)tex.height;
+    // Only the unscaled case. Scaling is CoreGraphics' job and it does it better
+    // than a nearest-neighbour loop would.
+    if (imgWidth != texW || imgHeight != texH) return NO;
+    if (x < 0 || y < 0 || x + w > texW || y + h > texH) return NO;
+
+    // The texture is stored BOTTOM-UP: CN1MetalTextureFromUIImage deliberately
+    // draws without a CTM flip, so texture memory row 0 is the source's LAST row
+    // (that is the layout the sampler's V=0-at-top mapping is built around, and
+    // the orientation this port's assets are designed for). Source row r is
+    // therefore texture row texH-1-r, and the rows come back in reverse.
+    NSUInteger rowBytes = (NSUInteger)w * 4;
+    uint8_t *bytes = (uint8_t *)malloc(rowBytes * (NSUInteger)h);
+    if (bytes == NULL) return NO;
+    int texY = texH - (y + h);
+    [tex getBytes:bytes bytesPerRow:rowBytes
+       fromRegion:MTLRegionMake2D((NSUInteger)x, (NSUInteger)texY,
+                                  (NSUInteger)w, (NSUInteger)h)
+      mipmapLevel:0];
+
+    for (int row = 0; row < h; row++) {
+        const uint8_t *src = bytes + (size_t)(h - 1 - row) * rowBytes;
+        int *dst = outARGB + (size_t)row * w;
+        for (int col = 0; col < w; col++) {
+            // RGBA8Unorm, premultiplied -- the same premultiplied convention the
+            // CoreGraphics path produces, so only the channel order changes.
+            uint8_t r = src[col * 4 + 0];
+            uint8_t g = src[col * 4 + 1];
+            uint8_t b = src[col * 4 + 2];
+            uint8_t a = src[col * 4 + 3];
+            dst[col] = ((int)a << 24) | ((int)r << 16) | ((int)g << 8) | (int)b;
+        }
+    }
+    free(bytes);
     return YES;
 }
 

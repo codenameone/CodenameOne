@@ -198,8 +198,15 @@ extern int nextPowerOf2(int val);
         // The no-backing-copy exemption that used to live here only made sense
         // while the image was being released, and it left such a peer returning
         // a texture the OS may already have discarded.
+        //
+        // Only PRIVATE storage is at risk, which is what the storageMode test
+        // below is for. A buffer-backed shared-storage texture is ordinary
+        // CPU-visible memory that iOS does not discard, so revalidating one costs
+        // a full re-rasterise of the picture -- through CGContextDrawImage, for
+        // every image, after every foreground or memory warning -- and buys
+        // nothing.
         int gen = CN1MetalTextureValidateGeneration();
-        if (mtlTextureGeneration != gen) {
+        if (mtlTextureGeneration != gen && mtlTexture.storageMode != MTLStorageModeShared) {
             mtlTextureGeneration = gen;
             [mtlTexture release];
             mtlTexture = nil;
@@ -226,6 +233,10 @@ extern int nextPowerOf2(int val);
     // suspend backup can drop/rebuild its texture too (issue #5349). The weak
     // registry drops the entry automatically on dealloc.
     CN1MetalRegisterMutableImage(self);
+    return mtlTexture;
+}
+
+-(id<MTLTexture>)existingMTLTexture {
     return mtlTexture;
 }
 

@@ -3047,6 +3047,52 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
             }
             return;
         }
+        // No mutable target: if this image already has a read-only texture whose
+        // bytes are CPU-addressable, take the pixels from there. The path below
+        // rasterises through CGContextDrawImage every time, and the decoded copy
+        // CoreGraphics caches to do it stays resident alongside the Metal texture
+        // we uploaded from the same picture -- the image ends up in memory twice.
+        //
+        // CN1_VERIFY_RGB runs BOTH and reports any pixel that differs. This
+        // reader has to agree with CoreGraphics on channel order, premultiply
+        // convention and row order, and none of those are visible in a stack
+        // trace when they are wrong -- the picture just comes out mirrored or
+        // blue. Set it once on a device after touching either path.
+        static int verifyRgb = -1;
+        if (verifyRgb < 0) {
+            verifyRgb = getenv("CN1_VERIFY_RGB") ? 1 : 0;
+        }
+        if (verifyRgb) {
+            // Build the texture if this image has not been drawn yet, so the
+            // check actually exercises the reader. Diagnostic only -- the fast
+            // path itself never creates a texture for an image nobody drew.
+            if ([gl existingMTLTexture] == nil) {
+                (void)[gl getMTLTexture];
+            }
+            int n = width * height;
+            int *fast = (int *)malloc((size_t)n * sizeof(int));
+            if (fast != NULL) {
+                if (CN1MetalReadReadOnlyTexturePixels(gl, fast, x, y, width, height, imgWidth, imgHeight)) {
+                    Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl(
+                        peer, arr, x, y, width, height, imgWidth, imgHeight);
+                    int bad = 0, first = -1;
+                    for (int i = 0; i < n; i++) {
+                        if (fast[i] != arr[i]) { if (first < 0) first = i; bad++; }
+                    }
+                    if (bad != 0) {
+                        CN1Log(@"CN1_VERIFY_RGB: %i/%i pixels differ (first at %i: fast=%08x cg=%08x) for %ix%i",
+                               bad, n, first, (unsigned)fast[first], (unsigned)arr[first], width, height);
+                    } else {
+                        CN1Log(@"CN1_VERIFY_RGB: %ix%i matches", width, height);
+                    }
+                    free(fast);
+                    return;
+                }
+                free(fast);
+            }
+        } else if (CN1MetalReadReadOnlyTexturePixels(gl, arr, x, y, width, height, imgWidth, imgHeight)) {
+            return;
+        }
     }
 #endif
     Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayCGImpl(
