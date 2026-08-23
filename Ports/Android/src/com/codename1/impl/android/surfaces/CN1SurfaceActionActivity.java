@@ -67,7 +67,14 @@ public class CN1SurfaceActionActivity extends Activity {
     ///
     /// - `ctx`: any context
     ///
-    /// Returns the token, generating it on first use.
+    /// Returns the token, generating it on first use, or null when it could not be stored.
+    ///
+    /// A token that was not persisted is worse than none. The tap it authenticates is handled
+    /// later -- often by another process -- which reads the preference, finds nothing, generates
+    /// a different value and rejects the very action this app drew. Two nodes rendered in one
+    /// pass could even carry different unusable tokens. So a failed commit returns null and the
+    /// caller leaves the action off: the surface still renders and the tap does nothing, which is
+    /// the honest outcome when the device cannot keep a secret for us.
     public static synchronized String token(Context ctx) {
         SharedPreferences prefs = ctx.getSharedPreferences(TOKEN_PREFS, Context.MODE_PRIVATE);
         String existing = prefs.getString(TOKEN_KEY, null);
@@ -75,7 +82,14 @@ public class CN1SurfaceActionActivity extends Activity {
             return existing;
         }
         String fresh = new BigInteger(130, new SecureRandom()).toString(32);
-        prefs.edit().putString(TOKEN_KEY, fresh).commit();
+        // commit() and not apply(), because the answer is the point: apply() is asynchronous and
+        // reports nothing, so there would be no moment at which this could know.
+        if (!prefs.edit().putString(TOKEN_KEY, fresh).commit()) {
+            Log.w(TAG, "Could not persist the surface action token; actions on this surface are "
+                    + "left unauthenticated and will not dispatch. The device is most likely out "
+                    + "of storage.");
+            return null;
+        }
         return fresh;
     }
 
@@ -85,7 +99,13 @@ public class CN1SurfaceActionActivity extends Activity {
     /// - `ctx`: any context
     /// - `intent`: the action intent being built
     static void authenticate(Context ctx, Intent intent) {
-        intent.putExtra(EXTRA_TOKEN, token(ctx));
+        String token = token(ctx);
+        if (token != null) {
+            intent.putExtra(EXTRA_TOKEN, token);
+        }
+        // Absent when the token could not be stored. An intent without it is rejected by
+        // trusted() exactly as an untrusted caller's would be, which is the intended outcome:
+        // better a tap that does nothing than one that dispatches without the check.
     }
 
     /// Whether this activity is reachable from outside the app, which is true exactly when a

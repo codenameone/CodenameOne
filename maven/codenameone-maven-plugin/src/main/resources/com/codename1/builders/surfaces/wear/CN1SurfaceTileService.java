@@ -672,10 +672,15 @@ public abstract class CN1SurfaceTileService extends TileService {
         ModifiersBuilders.Modifiers.Builder mods = new ModifiersBuilders.Modifiers.Builder();
         JSONObject action = node == null ? null : node.optJSONObject("action");
         if (action != null && action.optString("id", "").length() > 0) {
-            mods.setClickable(new ModifiersBuilders.Clickable.Builder()
-                    .setId(action.optString("id"))
-                    .setOnClick(launchAction(action))
-                    .build());
+            // Null when the action token could not be persisted; the node is then left
+            // unclickable rather than clickable-and-inert. See launchAction.
+            androidx.wear.protolayout.ActionBuilders.LaunchAction launch = launchAction(action);
+            if (launch != null) {
+                mods.setClickable(new ModifiersBuilders.Clickable.Builder()
+                        .setId(action.optString("id"))
+                        .setOnClick(launch)
+                        .build());
+            }
         }
         return mods.build();
     }
@@ -832,10 +837,15 @@ public abstract class CN1SurfaceTileService extends TileService {
         // Per-node tap actions work on a Tile, which a small iOS widget cannot do.
         JSONObject action = node.optJSONObject("action");
         if (action != null && action.optString("id", "").length() > 0) {
-            mods.setClickable(new ModifiersBuilders.Clickable.Builder()
-                    .setId(action.optString("id"))
-                    .setOnClick(launchAction(action))
-                    .build());
+            // Null when the action token could not be persisted; the node is then left
+            // unclickable rather than clickable-and-inert. See launchAction.
+            androidx.wear.protolayout.ActionBuilders.LaunchAction launch = launchAction(action);
+            if (launch != null) {
+                mods.setClickable(new ModifiersBuilders.Clickable.Builder()
+                        .setId(action.optString("id"))
+                        .setOnClick(launch)
+                        .build());
+            }
         }
         return mods.build();
     }
@@ -850,16 +860,25 @@ public abstract class CN1SurfaceTileService extends TileService {
      * three a widget tap sends.</p>
      */
     private androidx.wear.protolayout.ActionBuilders.LaunchAction launchAction(JSONObject action) {
+        // The trampoline is exported so the tile host can start it, which means any app on the
+        // watch can too. The token says the tap came from a surface THIS app drew; see
+        // CN1SurfaceActionActivity.token. The layout carrying it goes to the tile host and
+        // nowhere else.
+        //
+        // Null when it could not be persisted, and then there is no action to build: the
+        // trampoline would reject the tap anyway, and a Clickable that starts an activity which
+        // immediately finishes is worse than a node that was never clickable -- it looks broken
+        // rather than inert.
+        String token = CN1SurfaceActionActivity.token(this);
+        if (token == null) {
+            return null;
+        }
         androidx.wear.protolayout.ActionBuilders.AndroidActivity.Builder activity =
                 new androidx.wear.protolayout.ActionBuilders.AndroidActivity.Builder()
                         .setPackageName(getPackageName())
                         .setClassName(CN1SurfaceActionActivity.class.getName());
-        // The trampoline is exported so the tile host can start it, which means any app on the
-        // watch can too. This says the tap came from a surface THIS app drew; see
-        // CN1SurfaceActionActivity.token. The layout carrying it goes to the tile host and
-        // nowhere else.
         activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_TOKEN,
-                stringExtra(CN1SurfaceActionActivity.token(this)));
+                stringExtra(token));
         activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_SOURCE,
                 stringExtra(getKindId()));
         activity.addKeyToExtraMapping(CN1SurfaceActionActivity.EXTRA_ACTION_ID,

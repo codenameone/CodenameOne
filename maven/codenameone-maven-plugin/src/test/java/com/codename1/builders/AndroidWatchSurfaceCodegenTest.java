@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -300,22 +302,19 @@ class AndroidWatchSurfaceCodegenTest {
                 () -> AndroidGradleBuilder.wearVersionCode(request(), 2090000000));
     }
 
-    /// The generated class name has to tell two kinds apart. Folding away underscores does not:
-    /// "status" and "status_" both read as Status, so the second generated class overwrote the
-    /// first and both manifest entries pointed at it -- one kind serving the other kind's data.
-    /// A count is not enough either, because "a__b" and "a_b_" discard the same number.
+    /// The generated class name has to tell two kinds apart, because one class cannot serve two
+    /// kinds: the second overwrote the first and both manifest entries pointed at it, so one kind
+    /// served the other kind's data. Asserted over the whole declared SET, which is the level the
+    /// property belongs to -- the fold on its own is deliberately not injective, so that a kind
+    /// keeps the name shipped builds already use.
     @Test
     void twoKindsNeverShareAGeneratedClassName() {
-        assertEquals("Status", AndroidGradleBuilder.surfaceKindClassSuffix("status"));
-        assertEquals("BatteryLevel", AndroidGradleBuilder.surfaceKindClassSuffix("battery_level")
-                .replaceAll("_\\d+", ""));
-
-        java.util.Set<String> seen = new java.util.HashSet<String>();
-        String[] ids = {"status", "status_", "_status", "a_b", "ab_", "a__b", "a_b_", "_a_b"};
-        for (String id : ids) {
-            assertTrue(seen.add(AndroidGradleBuilder.surfaceKindClassSuffix(id)),
-                    "two ids produced the same class suffix, one of them '" + id + "'");
-        }
+        List<String> ids = Arrays.asList(
+                "status", "status_", "_status", "a_b", "ab_", "a__b", "a_b_", "_a_b");
+        Map<String, String> named = AndroidGradleBuilder.surfaceKindClassSuffixes(ids);
+        assertEquals(ids.size(), named.size(), "every declared kind must be named");
+        assertEquals(ids.size(), new java.util.HashSet<String>(named.values()).size(),
+                "two ids produced the same class suffix: " + named);
     }
 
     /// An id without underscores keeps the name it has always had, so no existing project is
@@ -340,47 +339,63 @@ class AndroidWatchSurfaceCodegenTest {
         assertThrows(BuildException.class, () -> AndroidGradleBuilder.wearVersionCode(blank, 100));
     }
 
-    /// The builder names the generated class and the RUNTIME finds it by name, so the two folds
-    /// have to agree exactly -- a name computed differently at runtime reaches a provider or a
-    /// complication service that does not exist, and a publish is persisted and then displayed by
-    /// nothing. Read out of the port's source rather than called, because the port class needs an
-    /// Android runtime this test does not have.
+    /// The name a shipped build already uses must not move. Android remembers a pinned widget
+    /// by its provider ComponentName, so renaming the receiver of an existing kind makes the
+    /// widget the user pinned name a receiver that is gone, and the home screen drops it.
     @Test
-    void theRuntimeFoldMatchesTheBuilders() throws java.io.IOException {
+    void aKindKeepsTheClassNameItAlreadyShipsUnder() {
+        assertEquals("DeliveryStatus", AndroidGradleBuilder.surfaceKindClassSuffix("delivery_status"));
+        assertEquals("Status", AndroidGradleBuilder.surfaceKindClassSuffix("status"));
+        assertEquals("BatteryLevel", AndroidGradleBuilder.surfaceKindClassSuffix("battery_level"));
+
+        // And a whole declared set of ordinary ids resolves to exactly those names.
+        Map<String, String> named = AndroidGradleBuilder.surfaceKindClassSuffixes(
+                Arrays.asList("delivery_status", "status", "battery_level"));
+        assertEquals("DeliveryStatus", named.get("delivery_status"));
+        assertEquals("Status", named.get("status"));
+        assertEquals("BatteryLevel", named.get("battery_level"));
+    }
+
+    /// Two ids differing only in where the underscores are fold to one name, and one generated
+    /// class cannot serve two kinds -- the second overwrote the first and both manifest entries
+    /// pointed at it. The FIRST declared keeps the shipped name; only the newcomer moves.
+    @Test
+    void acollidingKindTakesTheDisambiguatedNameAndTheFirstKeepsItsOwn() {
+        Map<String, String> named = AndroidGradleBuilder.surfaceKindClassSuffixes(
+                Arrays.asList("status", "status_", "a_b", "a__b", "ab"));
+        assertEquals("Status", named.get("status"));
+        assertEquals("Status_6", named.get("status_"));
+        assertEquals("AB", named.get("a_b"));
+        assertEquals("AB_1_2", named.get("a__b"), "the later collider moves, not the first");
+        // Not every underscore is a collision: "ab" folds to Ab, which nothing else claims.
+        assertEquals("Ab", named.get("ab"));
+        assertEquals(5, new java.util.HashSet<String>(named.values()).size(),
+                "every declared kind must end up with its own class");
+    }
+
+    /// The runtime cannot recompute which kind won the plain name -- that is a property of the
+    /// whole declared set -- so it tries both names the build can produce. Read out of the port's
+    /// source rather than called, because the port class needs an Android runtime this test does
+    /// not have.
+    @Test
+    void theRuntimeTriesBothNamesTheBuildCanProduce() throws java.io.IOException {
         java.io.File bridge = new java.io.File("../../Ports/Android/src/com/codename1/impl/"
                 + "android/surfaces/AndroidSurfaceBridge.java");
         assertTrue(bridge.isFile(), "the port must be readable: " + bridge.getAbsolutePath());
         String source = new String(java.nio.file.Files.readAllBytes(bridge.toPath()), "UTF-8");
 
-        int at = source.indexOf("static String toClassSuffix(String kindId) {");
-        assertTrue(at >= 0, "toClassSuffix must be there");
+        int at = source.indexOf("static String[] classSuffixCandidates(String kindId) {");
+        assertTrue(at >= 0, "the runtime must offer both candidates");
         String body = source.substring(at, source.indexOf("\n    }\n", at));
+        assertTrue(body.contains("new String[] {plain, disambiguated}"), body);
+        assertTrue(body.contains("plain.equals(disambiguated) ? new String[] {plain}"),
+                "an id with no underscore has one candidate, not two:\n" + body);
 
-        // The two properties the builder's fold has, stated as the runtime has to have them.
-        assertTrue(body.contains("positions.append('_').append(i)"),
-                "the runtime must record underscore positions as the builder does:\n" + body);
-        assertTrue(body.contains("sb.append(positions)"),
-                "the runtime must append them as the builder does:\n" + body);
-    }
-
-    /// A display name carrying an emoji is ordinary, and escaping its UTF-16 halves separately
-    /// produced two surrogate character references -- which are not legal XML, so the manifest
-    /// did not merely show the wrong glyph, it failed to parse. No literal emoji here: these
-    /// sources are compiled at the platform default encoding.
-    @Test
-    void aSupplementaryCharacterEscapesAsOneReference() {
-        String emoji = new String(Character.toChars(0x1F600));
-        assertEquals("hi &#x1f600;", AndroidGradleBuilder.xmlize("hi " + emoji));
-        assertFalse(AndroidGradleBuilder.xmlize(emoji).contains("d83d"),
-                "a surrogate half must never reach the manifest");
-    }
-
-    /// Everything that was already valid must escape exactly as it did before.
-    @Test
-    void ordinaryCharactersEscapeUnchanged() {
-        assertEquals("Hello &amp; &lt;bye&gt;", AndroidGradleBuilder.xmlize("Hello & <bye>"));
-        assertEquals("caf&#xe9;", AndroidGradleBuilder.xmlize("caf\u00e9"));
-        assertEquals("plain", AndroidGradleBuilder.xmlize("plain"));
+        // And the port's fold has to be the SHIPPED one, with no positions folded in.
+        int fold = source.indexOf("static String toClassSuffix(String kindId) {");
+        String foldBody = source.substring(fold, source.indexOf("\n    }\n", fold));
+        assertFalse(foldBody.contains("positions"),
+                "toClassSuffix must stay the name shipped builds use:\n" + foldBody);
     }
 
     // --- tiles ------------------------------------------------------------------

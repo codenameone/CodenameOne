@@ -58,9 +58,13 @@ public final class CN1WatchSurfaceNotifier {
         if (ctx == null || kindId == null) {
             return;
         }
-        String suffix = classSuffix(kindId);
-        requestComplicationUpdate(ctx, "com.codename1.impl.android.CN1Complication_" + suffix);
-        requestTileUpdate(ctx, "com.codename1.impl.android.CN1Tile_" + suffix);
+        // Every name the build could have given this kind. Both requesters treat a missing
+        // class as "no such surface" and say nothing, so trying the candidates costs a failed
+        // Class.forName in the rare disambiguated case and nothing at all in the usual one.
+        for (String suffix : AndroidSurfaceBridge.classSuffixCandidates(kindId)) {
+            requestComplicationUpdate(ctx, "com.codename1.impl.android.CN1Complication_" + suffix);
+            requestTileUpdate(ctx, "com.codename1.impl.android.CN1Tile_" + suffix);
+        }
     }
 
     private static void requestComplicationUpdate(Context ctx, String className) {
@@ -93,14 +97,4 @@ public final class CN1WatchSurfaceNotifier {
         }
     }
 
-    /**
-     * The class-name suffix the build derives from a kind id.
-     *
-     * <p>Delegates to the port's own copy rather than repeating it: this and
-     * {@code AndroidGradleBuilder.surfaceKindClassSuffix} name the same generated class from
-     * opposite sides of the build, and a mismatch is a silent miss rather than an error.</p>
-     */
-    private static String classSuffix(String kindId) {
-        return AndroidSurfaceBridge.toClassSuffix(kindId);
-    }
 }

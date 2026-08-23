@@ -223,16 +223,18 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
 
     /// Maps a widget kind id to the simple name suffix of its generated provider class:
     /// underscore-separated words become CamelCase (`delivery_status` -> `DeliveryStatus`).
-    /// The identical logic lives in the Android builder's widget codegen; keep them in sync.
+    ///
+    /// This is the name every shipped build uses and it must not change: Android remembers a
+    /// pinned widget by its provider `ComponentName`, so a kind whose receiver is renamed leaves
+    /// the widget the user pinned naming a receiver that no longer exists, and the home screen
+    /// drops it.
     static String toClassSuffix(String kindId) {
         StringBuilder sb = new StringBuilder(kindId.length());
-        StringBuilder positions = new StringBuilder();
         boolean upper = true;
         for (int i = 0; i < kindId.length(); i++) {
             char c = kindId.charAt(i);
             if (c == '_') {
                 upper = true;
-                positions.append('_').append(i);
                 continue;
             }
             if (upper) {
@@ -242,21 +244,59 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
                 sb.append(c);
             }
         }
-        // MUST match AndroidGradleBuilder.surfaceKindClassSuffix exactly. That is where the class
-        // is named at build time and this is where it is found at runtime, and the two agreeing is
-        // the whole contract: a name computed differently here reaches a provider or a
-        // complication service that does not exist, and a publish is persisted and then displayed
-        // by nothing.
-        //
-        // The underscore POSITIONS, because folding them away is not injective -- "status" and
-        // "status_" would otherwise both be Status and two kinds would share one class. Absent
-        // for an id without underscores, so nothing an existing project publishes changes name.
-        return sb.append(positions).toString();
+        return sb.toString();
+    }
+
+    /// The name the build falls back to when two kinds fold to one name.
+    ///
+    /// Appends where the underscores were, which is the only thing the fold discards. Mirrors
+    /// `AndroidGradleBuilder.surfaceKindClassSuffixDisambiguated`.
+    static String toDisambiguatedClassSuffix(String kindId) {
+        StringBuilder positions = new StringBuilder();
+        for (int i = 0; i < kindId.length(); i++) {
+            if (kindId.charAt(i) == '_') {
+                positions.append('_').append(i);
+            }
+        }
+        return toClassSuffix(kindId) + positions;
+    }
+
+    /// Every name the build could have given this kind, best first.
+    ///
+    /// The build hands a kind the plain folded name unless another declared kind already holds
+    /// it, in which case this one gets the positional form -- a property of the whole declared
+    /// set, which a runtime holding one id cannot recompute. Rather than shipping the mapping
+    /// and trusting two copies to agree, the caller tries the candidates and takes the one that
+    /// exists; that is a decision no build can drift away from. An id with no underscore folds
+    /// to itself, so it has exactly one candidate and nothing is tried twice.
+    static String[] classSuffixCandidates(String kindId) {
+        String plain = toClassSuffix(kindId);
+        String disambiguated = toDisambiguatedClassSuffix(kindId);
+        return plain.equals(disambiguated) ? new String[] {plain}
+                : new String[] {plain, disambiguated};
     }
 
     private static ComponentName providerComponent(Context ctx, String kindId) {
-        return new ComponentName(ctx.getPackageName(),
-                "com.codename1.impl.android.CN1Widget_" + toClassSuffix(kindId));
+        ComponentName first = null;
+        for (String suffix : classSuffixCandidates(kindId)) {
+            ComponentName candidate = new ComponentName(ctx.getPackageName(),
+                    "com.codename1.impl.android.CN1Widget_" + suffix);
+            if (first == null) {
+                first = candidate;
+            }
+            try {
+                ctx.getPackageManager().getReceiverInfo(candidate, 0);
+                return candidate;
+            } catch (Exception missing) {
+                // Not this one. The next candidate is the disambiguated name, which the build
+                // uses only when another kind already holds the plain one.
+                continue;
+            }
+        }
+        // Neither exists -- a watch-only kind has no receiver at all, and registerWidgetKind
+        // reports a kind that is genuinely absent. The plain name is the honest answer to
+        // report, and broadcasting to it is the no-op it already was.
+        return first;
     }
 
     private static void broadcastUpdate(Context ctx, String kindId) {

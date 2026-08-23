@@ -134,7 +134,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // them away permanently. A complication is asked once and handed the whole timeline, and
         // UPDATE_PERIOD_SECONDS is 0 by design -- so nothing would ever ask again, and a
         // RANGED_VALUE slot whose progress node only appears in the next entry stayed empty for
-        // good. No-data covers the gap until the first renderable entry starts, which is exactly
+        // good. No-data covers the stretch before the first renderable entry, which is exactly
         // what the default in a ComplicationDataTimeline is for.
         ComplicationData current = build(type, readings.get(0));
         List<TimelineEntry> entries = new ArrayList<TimelineEntry>();
@@ -142,10 +142,12 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             CN1WatchSurface.Reading reading = readings.get(i);
             ComplicationData entry = build(type, reading);
             if (entry == null) {
-                // A later entry this type cannot render is skipped rather than ending the
-                // timeline: the entries after it may well be renderable, and the face falls back
-                // to the default in the gap.
-                continue;
+                // No-data for its interval, not a skipped entry. Skipping it leaves no entry
+                // covering that stretch, and what shows then is the timeline's DEFAULT -- which
+                // is the current reading. So a published timeline that moved to an entry with
+                // nothing this type can show kept displaying the old value as though it were
+                // still current, which is worse than showing nothing.
+                entry = noData();
             }
             long end = reading.getNextFlipDate();
             entries.add(new TimelineEntry(
