@@ -275,6 +275,36 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // ID and an app carrying it without cause fails codesigning for no reason.
 //#define CN1_INCLUDE_HOMEKIT
 
+// CN1_INCLUDE_NEARBY gates the com.codename1.nearby native bridge
+// (CN1Nearby.{h,m}: Nearby Interaction ranging, MultipeerConnectivity
+// transport and AccessorySetupKit association). IPhoneBuilder uncomments this
+// only when the classpath scanner saw com.codename1.nearby.*, so an app that
+// never asks how far away anything is ships without those symbols and without
+// the privacy strings they oblige.
+//#define CN1_INCLUDE_NEARBY
+
+// The three halves are gated separately because they are available on
+// different slices, and because an app that references one package must not
+// link the frameworks the other two need. IPhoneBuilder uncomments each from
+// its own scanner flag.
+//#define CN1_NEARBY_RANGING
+//#define CN1_NEARBY_TRANSPORT
+//#define CN1_NEARBY_COMPANION
+
+// NearbyInteraction does not exist on tvOS, on the watchOS slice or under Mac
+// Catalyst, and neither does AccessorySetupKit. MultipeerConnectivity is
+// absent on watchOS. Undoing the defines here, in the header every nearby
+// translation unit includes first, compiles those halves out rather than
+// leaving each function to guard itself -- and the public API then reports
+// them unsupported, which is the answer an app on an Apple TV should get.
+#if TARGET_OS_TV || TARGET_OS_WATCH || TARGET_OS_MACCATALYST || TARGET_OS_OSX
+#undef CN1_NEARBY_RANGING
+#undef CN1_NEARBY_COMPANION
+#endif
+#if TARGET_OS_WATCH
+#undef CN1_NEARBY_TRANSPORT
+#endif
+
 // CN1_INCLUDE_MATTER_SETUP gates the MatterSupport add-device flow, which is
 // much more expensive than the rest: it needs its own app-extension target,
 // the com.apple.developer.matter.allow-setup-payload entitlement, an app group

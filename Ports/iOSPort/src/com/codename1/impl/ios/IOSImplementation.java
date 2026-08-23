@@ -386,6 +386,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         return homeBridge;
     }
 
+    private IOSNearbyBridge nearbyBridge;
+
+    @Override
+    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        // Only meaningful in builds that linked the nearby natives
+        // (CN1_INCLUDE_NEARBY, flipped by the builder when the app references
+        // com.codename1.nearby). Always returned rather than conditionally null, for the same
+        // reason getHomeBridge() is: the bridge's own isRangingSupported() / isCompanionSupported()
+        // / isTransportSupported() answer honestly through the natives, which stub to unsupported
+        // when the defines are off -- so an app built without any of it reports NOT_SUPPORTED
+        // without this getter having to know how the app was built. The three answer separately,
+        // which is what lets a tvOS build report a working transport and no ranging.
+        if (nearbyBridge == null) {
+            nearbyBridge = IOSNearbyCallbacks.getBridge(nativeInstance);
+        }
+        return nearbyBridge;
+    }
+
     private IOSWearableBridge wearableBridge;
 
     @Override
