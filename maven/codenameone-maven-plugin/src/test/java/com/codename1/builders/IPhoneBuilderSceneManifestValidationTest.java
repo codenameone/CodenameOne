@@ -262,4 +262,41 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "<key>UIApplicationSceneManifestOther</key><dict/>",
                 "UIApplicationSceneManifest"));
     }
+
+    @Test
+    void aKeyWhoseNameMerelyContainsSceneSessionRoleDoesNotEndTheRole() {
+        // A custom key declared inside the role, whose name happens to contain the
+        // words. Ending the role there stops the search before the delegate and rejects
+        // a manifest that is correctly wired.
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>MySceneSessionRoleMetadata</key><string>x</string>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
+                "a key inside the role must not be taken for the next role");
+    }
+
+    @Test
+    void theRoleStillEndsAtItsOwnArray() {
+        // The boundary still has to hold: a CarPlay role after this one, naming our
+        // delegate, must not vouch for a window role that names somebody else.
+        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>SomeoneElsesSceneDelegate</string></dict></array>"
+                        + "<key>CPTemplateApplicationSceneSessionRoleApplication</key>"
+                        + "<array><dict><key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
+                "the delegate in the CarPlay role is outside this role's array");
+    }
+
+    @Test
+    void nestedArraysInsideTheRoleDoNotEndItEarly() {
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>SomeList</key><array><string>a</string></array>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
+                "a nested array must not be mistaken for the role's closing array");
+    }
 }

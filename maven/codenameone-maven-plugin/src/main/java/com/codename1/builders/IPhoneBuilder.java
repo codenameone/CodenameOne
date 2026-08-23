@@ -7014,13 +7014,12 @@ public class IPhoneBuilder extends Executor {
             return false;
         }
         int afterKey = plistKeyEnd(plist, role);
-        // Bounded by the next scene role, so a CarPlay configuration naming its own
-        // delegate cannot answer for this one. A declared key rather than the text: the
-        // words "SceneSessionRole" inside some string value would otherwise cut this
-        // role's range short and hide a delegate that really is wired, failing a build
-        // that was going to work.
-        int nextRole = nextSceneRoleKeyIndex(plist, afterKey);
-        int end = nextRole < 0 ? plist.length() : nextRole;
+        // Bounded by this role's own value element, so a CarPlay configuration cannot
+        // answer for it and nothing declared inside the role can end it early.
+        int end = plistValueElementEnd(plist, afterKey);
+        if (end < 0) {
+            end = plist.length();
+        }
         // Bound to its key rather than found anywhere in the role. The class name can
         // appear as some other live value -- a UISceneConfigurationName of
         // "CodenameOne_GLSceneDelegate" is legal -- while UISceneDelegateClassName
@@ -7036,30 +7035,61 @@ public class IPhoneBuilder extends Executor {
         return false;
     }
 
-    /// Index of the next declared key naming a scene role, or -1.
+    /// Index just past the element that is the value at `from`, honouring nesting, or
+    /// -1 when there is no element there.
+    ///
+    /// This is what bounds a scene role: the role's value is its own array, so the
+    /// configurations belonging to it are exactly the ones inside that element. Bounding
+    /// by the next key whose *name* looks like a role instead was wrong twice over -- a
+    /// string mentioning the words ended the role early, and so did an unrelated key
+    /// like "MySceneSessionRoleMetadata" declared inside it, which made the build reject
+    /// a manifest that was correctly wired.
     ///
     /// #### Parameters
     ///
     /// - `plist`: the injected plist fragment
     ///
-    /// - `from`: index to start looking from
+    /// - `from`: index just past the key whose value is wanted
     ///
     /// #### Returns
     ///
-    /// the index of the next scene-role key, or -1
-    static int nextSceneRoleKeyIndex(String plist, int from) {
-        int at = plistIndexOfLive(plist, "<key>", from);
-        while (at >= 0) {
-            int close = plist.indexOf("</key>", at);
-            if (close < 0) {
+    /// the index just past the value element, or -1
+    static int plistValueElementEnd(String plist, int from) {
+        String name = nextElementName(plist, from);
+        if (name == null) {
+            return -1;
+        }
+        int open = plistIndexOfLive(plist, "<" + name, from);
+        if (open < 0) {
+            return -1;
+        }
+        int gt = plist.indexOf('>', open);
+        if (gt < 0) {
+            return -1;
+        }
+        if (plist.charAt(gt - 1) == '/') {
+            return gt + 1;
+        }
+        String openTag = "<" + name + ">";
+        String closeTag = "</" + name + ">";
+        int depth = 0;
+        int scan = gt;
+        while (true) {
+            int nextOpen = plist.indexOf(openTag, scan + 1);
+            int nextClose = plist.indexOf(closeTag, scan + 1);
+            if (nextClose < 0) {
                 return -1;
             }
-            if (plist.substring(at + "<key>".length(), close).contains("SceneSessionRole")) {
-                return at;
+            if (nextOpen >= 0 && nextOpen < nextClose) {
+                depth++;
+                scan = nextOpen;
+            } else if (depth == 0) {
+                return nextClose + closeTag.length();
+            } else {
+                depth--;
+                scan = nextClose;
             }
-            at = plistIndexOfLive(plist, "<key>", close);
         }
-        return -1;
     }
 
     /// The text of the `<string>` element that follows `from`, or null when the next
