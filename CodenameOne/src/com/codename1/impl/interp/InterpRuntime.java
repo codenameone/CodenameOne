@@ -2689,6 +2689,34 @@ public final class InterpRuntime {
                         clusterReps.addElement(cand);
                     }
                 }
+                // A descriptor added later may bridge two clusters that
+                // were separate when they were formed -- an `A[]` slot
+                // and a `B[]` slot for unrelated interfaces, followed by
+                // a `HostBoth[]` where HostBoth implements both. The
+                // initial pass merges HostBoth into whichever cluster it
+                // meets first, leaving the other stranded; a stranded
+                // cluster still materialises an array that never gets
+                // handed to the host and whose finally-block mirror
+                // overwrites the mutations the host made through the one
+                // it did receive. Iterate to a fixed point so every pair
+                // that shares a common subtype ends up in one cluster.
+                boolean changed = true;
+                while (changed) {
+                    changed = false;
+                    for (int i = 0; i < clusterReps.size() && !changed; i++) {
+                        String repI = (String) clusterReps.elementAt(i);
+                        for (int j = i + 1; j < clusterReps.size(); j++) {
+                            String repJ = (String) clusterReps.elementAt(j);
+                            String merged = moreSpecificElement(repI, repJ);
+                            if (merged != null) {
+                                clusterReps.setElementAt(merged, i);
+                                clusterReps.removeElementAt(j);
+                                changed = true;
+                                break;
+                            }
+                        }
+                    }
+                }
                 for (int c = 0; c < clusterReps.size(); c++) {
                     String rep = (String) clusterReps.elementAt(c);
                     Object[] dst = materializeTypedArray(src, rep, hostArrayPairs);
@@ -4141,6 +4169,22 @@ public final class InterpRuntime {
         Failure prev = st.lastFailure;
         boolean rethrow = prev != null                             //NOPMD CompareObjectsWithEquals - identity is the point
                 && (prev.thrown == t || prev.original == t);
+        String[] rethrowStack = rethrow ? prev.stack : null;
+        if (!rethrow && t instanceof Throwable) {
+            // The `lastFailure` slot only remembers the most recent throw
+            // on this thread. A `catch (Exception e) { try { risky(); }
+            // catch (Exception ignored) {} throw e; }` overwrites it with
+            // `ignored`, so an identity match against `prev` would miss
+            // the outer rethrow of `e`. The identity-keyed registry keeps
+            // every still-reachable failure, so if this throwable has an
+            // entry there we recognise the rethrow and keep the original
+            // recorded stack.
+            FailureInfo info = getFailureInfo((Throwable) t);
+            if (info != null) {
+                rethrow = true;
+                rethrowStack = info.stack;
+            }
+        }
         if (t instanceof Throwable) {
             // Deliberately not wrapped. A framework method that calls
             // interpreted code and catches IllegalStateException has to keep
@@ -4152,7 +4196,7 @@ public final class InterpRuntime {
             }
             return (Throwable) t;
         }
-        InterpThrowable wrapped = new InterpThrowable(t, rethrow ? prev.stack : snapshotStack());
+        InterpThrowable wrapped = new InterpThrowable(t, rethrow ? rethrowStack : snapshotStack());
         // Record BOTH identities: `thrown` = wrapper (what host code sees
         // and passes to [#interpretedStackFor]) and `original` = the
         // InterpObject (what a subsequent interpreted `throw e` pops off

@@ -311,8 +311,14 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_getFieldById___int_java_lang_
             case 'D': {
                 uint64_t bits;
                 if (vol) {
-                    bits = (uint64_t)atomic_load_explicit(
-                            (_Atomic(uint64_t)*)slot, memory_order_acquire);
+                    // The storage is _Atomic(JAVA_DOUBLE); casting through
+                    // _Atomic(uint64_t)* is an incompatible atomic object
+                    // type under C aliasing and clang is free to miscompile
+                    // it. Load the declared floating type, then memcpy to
+                    // the raw bits the caller wants.
+                    JAVA_DOUBLE value = atomic_load_explicit(
+                            (_Atomic(JAVA_DOUBLE)*)slot, memory_order_acquire);
+                    memcpy(&bits, &value, 8);
                 } else {
                     memcpy(&bits, slot, 8);
                 }
@@ -322,8 +328,9 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_getFieldById___int_java_lang_
             case 'F': {
                 uint32_t bits;
                 if (vol) {
-                    bits = (uint32_t)atomic_load_explicit(
-                            (_Atomic(uint32_t)*)slot, memory_order_acquire);
+                    JAVA_FLOAT value = atomic_load_explicit(
+                            (_Atomic(JAVA_FLOAT)*)slot, memory_order_acquire);
+                    memcpy(&bits, &value, 4);
                 } else {
                     memcpy(&bits, slot, 4);
                 }
@@ -529,7 +536,13 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_setFieldById___int_java_lang_Ob
         case 'D': {
             uint64_t bits = (uint64_t)rawValue;
             if (vol) {
-                atomic_store_explicit((_Atomic(uint64_t)*)slot, bits,
+                // The storage is _Atomic(JAVA_DOUBLE); storing through
+                // _Atomic(uint64_t)* is an incompatible atomic object type
+                // under C aliasing. Round-trip through the declared
+                // floating type instead.
+                JAVA_DOUBLE value;
+                memcpy(&value, &bits, 8);
+                atomic_store_explicit((_Atomic(JAVA_DOUBLE)*)slot, value,
                         memory_order_release);
             } else {
                 memcpy(slot, &bits, 8);
@@ -539,7 +552,9 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_setFieldById___int_java_lang_Ob
         case 'F': {
             uint32_t bits = (uint32_t)rawValue;
             if (vol) {
-                atomic_store_explicit((_Atomic(uint32_t)*)slot, bits,
+                JAVA_FLOAT value;
+                memcpy(&value, &bits, 4);
+                atomic_store_explicit((_Atomic(JAVA_FLOAT)*)slot, value,
                         memory_order_release);
             } else {
                 memcpy(slot, &bits, 4);
