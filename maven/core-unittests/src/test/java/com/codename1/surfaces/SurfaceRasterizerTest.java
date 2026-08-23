@@ -122,6 +122,62 @@ class SurfaceRasterizerTest {
         assertSame(defaultLayout, SurfaceRasterizer.layoutForSize(doc, null));
     }
 
+    /// A corner complication is round and Wear OS has no corner slot at all, so the circular
+    /// layout is the closest thing to what the developer designed -- closer than "default",
+    /// which may well be a rectangular phone widget. The platform renderers substitute the same
+    /// way, and this is what keeps a preview honest about what the device will show.
+    @Test
+    void watchCornerFallsBackToCircularBeforeDefault() {
+        Map<String, Object> defaultLayout = new LinkedHashMap<String, Object>();
+        defaultLayout.put("t", "col");
+        Map<String, Object> circular = new LinkedHashMap<String, Object>();
+        circular.put("t", "vec");
+        Map<String, Object> layouts = new LinkedHashMap<String, Object>();
+        layouts.put("default", defaultLayout);
+        layouts.put("watchCircular", circular);
+        Map<String, Object> doc = new LinkedHashMap<String, Object>();
+        doc.put("layouts", layouts);
+
+        assertSame(circular, SurfaceRasterizer.layoutForSize(doc, "watchCorner"));
+        assertSame(circular, SurfaceRasterizer.layoutForSize(doc, "watchCircular"));
+        // No circular layout to borrow: default, as before.
+        layouts.remove("watchCircular");
+        assertSame(defaultLayout, SurfaceRasterizer.layoutForSize(doc, "watchCorner"));
+    }
+
+    /// watchRectangular and lockscreen are the same WidgetKit family on Apple, so an app that
+    /// published only one of them still gets a layout designed for that shape.
+    @Test
+    void watchRectangularFallsBackToLockscreen() {
+        Map<String, Object> defaultLayout = new LinkedHashMap<String, Object>();
+        defaultLayout.put("t", "col");
+        Map<String, Object> lockscreen = new LinkedHashMap<String, Object>();
+        lockscreen.put("t", "row");
+        Map<String, Object> layouts = new LinkedHashMap<String, Object>();
+        layouts.put("default", defaultLayout);
+        layouts.put("lockscreen", lockscreen);
+        Map<String, Object> doc = new LinkedHashMap<String, Object>();
+        doc.put("layouts", layouts);
+
+        assertSame(lockscreen, SurfaceRasterizer.layoutForSize(doc, "watchRectangular"));
+    }
+
+    /// An explicit layout always wins over a substitute.
+    @Test
+    void anExplicitWatchLayoutIsNeverSubstituted() {
+        Map<String, Object> circular = new LinkedHashMap<String, Object>();
+        circular.put("t", "vec");
+        Map<String, Object> corner = new LinkedHashMap<String, Object>();
+        corner.put("t", "text");
+        Map<String, Object> layouts = new LinkedHashMap<String, Object>();
+        layouts.put("watchCircular", circular);
+        layouts.put("watchCorner", corner);
+        Map<String, Object> doc = new LinkedHashMap<String, Object>();
+        doc.put("layouts", layouts);
+
+        assertSame(corner, SurfaceRasterizer.layoutForSize(doc, "watchCorner"));
+    }
+
     @Test
     void layoutForSizeReturnsNullWhenAbsent() {
         assertNull(SurfaceRasterizer.layoutForSize(null, "small"));

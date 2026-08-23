@@ -1,0 +1,12 @@
+package android.content;
+public class Context {
+    public static final int MODE_PRIVATE = 0;
+    public String getPackageName() { return ""; }
+    public SharedPreferences getSharedPreferences(String n, int m) { return null; }
+    public void startActivity(Intent i) { }
+    public java.io.File getFilesDir() { return null; }
+    public java.io.File getCacheDir() { return null; }
+    public Context getApplicationContext() { return this; }
+    public android.content.pm.ApplicationInfo getApplicationInfo() { return null; }
+    public android.content.pm.PackageManager getPackageManager() { return null; }
+}

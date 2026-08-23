@@ -1,0 +1,9 @@
+package com.google.android.gms.wearable;
+public class PutDataMapRequest {
+    public static PutDataMapRequest create(String path) { return null; }
+    public static PutDataMapRequest createWithAutoAppendedId(String path) { return null; }
+    public DataMap getDataMap() { return null; }
+    public android.net.Uri getUri() { return null; }
+    public PutDataMapRequest setUrgent() { return this; }
+    public PutDataRequest asPutDataRequest() { return null; }
+}

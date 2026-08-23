@@ -1,0 +1,15 @@
+package androidx.wear.protolayout;
+public final class TimelineBuilders {
+    public static class TimelineEntry {
+        public static class Builder {
+            public Builder setLayout(LayoutElementBuilders.Layout l) { return this; }
+            public TimelineEntry build() { return null; }
+        }
+    }
+    public static class Timeline {
+        public static class Builder {
+            public Builder addTimelineEntry(TimelineEntry e) { return this; }
+            public Timeline build() { return null; }
+        }
+    }
+}

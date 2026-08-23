@@ -127,6 +127,32 @@ BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/I
 [ -z "$BUNDLE_ID" ] && { rw_log "Could not read CFBundleIdentifier from $APP_PATH"; exit 5; }
 rw_log "Built $APP_PATH (bundle $BUNDLE_ID)"
 
+# --- The complication extension --------------------------------------------
+# The suite's surfaces.json declares watch families, so the watch app must carry a
+# CN1WatchWidgets.appex in its PlugIns folder. Checking it here is what proves the target was
+# created, built for watchOS and embedded at the right nesting -- none of which the screenshot
+# comparison can see, and none of which simctl can exercise (there is no API to place a
+# complication on a watch face). A Swift portability break in the shared surfaces sources fails
+# the xcodebuild above; this catches the wiring instead.
+APPEX="$APP_PATH/PlugIns/CN1WatchWidgets.appex"
+if [ ! -d "$APPEX" ]; then
+  rw_log "watch complication extension missing at $APPEX"
+  rw_log "PlugIns contains: $(ls "$APP_PATH/PlugIns" 2>/dev/null || echo '<no PlugIns folder>')"
+  exit 5
+fi
+APPEX_POINT="$(/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' \
+  "$APPEX/Info.plist" 2>/dev/null || true)"
+if [ "$APPEX_POINT" != "com.apple.widgetkit-extension" ]; then
+  rw_log "complication extension declares '$APPEX_POINT', expected com.apple.widgetkit-extension"
+  exit 5
+fi
+# Without the app group the extension has no container to read the published timeline from, so
+# it would launch and render its placeholder forever.
+APPEX_GROUP="$(/usr/libexec/PlistBuddy -c 'Print :CN1SurfacesAppGroup' "$APPEX/Info.plist" \
+  2>/dev/null || true)"
+[ -z "$APPEX_GROUP" ] && { rw_log "complication extension declares no CN1SurfacesAppGroup"; exit 5; }
+rw_log "Complication extension embedded: $APPEX (app group $APPEX_GROUP)"
+
 # --- Screenshot capture: host WS sink + the streaming watch app -------------
 JAVA_BIN="${JAVA17_BIN:-$(command -v java)}"
 cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"

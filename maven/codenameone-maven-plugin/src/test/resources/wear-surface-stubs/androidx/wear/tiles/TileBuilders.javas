@@ -1,0 +1,12 @@
+package androidx.wear.tiles;
+import androidx.wear.protolayout.TimelineBuilders;
+public final class TileBuilders {
+    public static class Tile {
+        public static class Builder {
+            public Builder setResourcesVersion(String v) { return this; }
+            public Builder setFreshnessIntervalMillis(long m) { return this; }
+            public Builder setTileTimeline(TimelineBuilders.Timeline t) { return this; }
+            public Tile build() { return null; }
+        }
+    }
+}

@@ -86,16 +86,28 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
             try {
                 ctx.getPackageManager().getReceiverInfo(provider, 0);
             } catch (Exception missing) {
-                Log.e(TAG, "Widget kind '" + kindId + "' was registered at runtime but is not "
-                        + "declared in surfaces.json; the build compiles widget kinds into the "
-                        + "app, so this kind cannot appear in the widget gallery. Add it to "
-                        + "surfaces.json and rebuild.");
+                // A missing receiver is not proof the kind is missing. A kind declaring only
+                // watch families gets no CN1Widget_ receiver ON PURPOSE -- that is the whole
+                // point of the split, and iOS refuses to host one for the same declaration --
+                // so the build-time list of watch kinds has to be consulted before calling this
+                // a mistake. Without it every correct watch-only registration produced this
+                // error and told the developer to add a kind that is already there.
+                if (!CN1WatchSurface.isWatchKind(ctx, kindId)) {
+                    Log.e(TAG, "Widget kind '" + kindId + "' was registered at runtime but is "
+                            + "not declared in surfaces.json; the build compiles widget kinds "
+                            + "into the app, so this kind cannot appear in the widget gallery. "
+                            + "Add it to surfaces.json and rebuild.");
+                }
             }
         } catch (Throwable t) {
             Log.w(TAG, "Failed to register widget kind", t);
         }
     }
 
+    // The store write and the mirror below are one operation, and they are safe to write as one
+    // because Surfaces serializes publishes of a kind against each other. Nothing here
+    // re-establishes that: interleave two of these and the later write pairs with the earlier
+    // mirror, leaving the watch on a descriptor the phone has replaced.
     @Override
     public void publishWidgetTimeline(String kindId, String timelineJson,
             Map<String, byte[]> images) {
@@ -111,6 +123,10 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
             CN1SurfaceStore.rememberBackgroundFetchClass(ctx,
                     AndroidImplementation.getBackgroundFetchListenerClassName());
             broadcastUpdate(ctx, kindId);
+            // After the local write, so neither can leave the phone's own widget wrong. Both are
+            // no-ops unless this build declared watch families.
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            CN1SurfaceMirror.onPublished(ctx, kindId, timelineJson, images);
         } catch (Throwable t) {
             Log.w(TAG, "Failed to publish the timeline of widget kind " + kindId, t);
         }
@@ -124,10 +140,22 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
         }
         if (kindId != null) {
             broadcastUpdate(ctx, kindId);
+            // broadcastUpdate reaches home-screen providers and nothing else, so without this a
+            // reload of a watch-only kind did nothing at all and a mixed kind refreshed only its
+            // phone half. Same pairing as the publish path above, and the same no-op unless this
+            // build declared watch families.
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kindId);
+            // ...and the paired watch, which the notifier above cannot reach in a companion
+            // build: its complication and Tile services live in the wear module, so a reflective
+            // lookup from the phone process finds nothing. Both calls are no-ops unless this
+            // build declared watch families.
+            CN1SurfaceMirror.requestWatchReload(ctx, kindId);
             return;
         }
         for (String kind : CN1SurfaceStore.getRememberedKinds(ctx)) {
             broadcastUpdate(ctx, kind);
+            CN1WatchSurfaceNotifier.requestUpdate(ctx, kind);
+            CN1SurfaceMirror.requestWatchReload(ctx, kind);
         }
     }
 
@@ -199,7 +227,11 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
 
     /// Maps a widget kind id to the simple name suffix of its generated provider class:
     /// underscore-separated words become CamelCase (`delivery_status` -> `DeliveryStatus`).
-    /// The identical logic lives in the Android builder's widget codegen; keep them in sync.
+    ///
+    /// This is the name every shipped build uses and it must not change: Android remembers a
+    /// pinned widget by its provider `ComponentName`, so a kind whose receiver is renamed leaves
+    /// the widget the user pinned naming a receiver that no longer exists, and the home screen
+    /// drops it.
     static String toClassSuffix(String kindId) {
         StringBuilder sb = new StringBuilder(kindId.length());
         boolean upper = true;
@@ -219,9 +251,45 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
         return sb.toString();
     }
 
+    /// The class-name suffix the build gave this kind.
+    ///
+    /// Read from the map the build wrote, not recomputed. Which kind holds the plain folded name
+    /// is a property of the whole declared set, so a runtime holding one id cannot work it out --
+    /// and probing for a class that exists is worse than useless: `CN1Widget_Status` exists for
+    /// `status`, so `status_` probing the plain name first finds the OTHER kind's provider and
+    /// publishes into it.
+    ///
+    /// The map is data written from the same table that named the classes, so there is no second
+    /// algorithm to drift. An APK built before the map existed has no such resource and falls
+    /// back to the plain fold, which is exactly what that APK was built with.
+    static synchronized String classSuffix(Context ctx, String kindId) {
+        if (classSuffixes == null) {
+            classSuffixes = new java.util.HashMap<String, String>();
+            try {
+                int id = ctx.getResources().getIdentifier("cn1_surface_kind_classes", "array",
+                        ctx.getPackageName());
+                if (id != 0) {
+                    for (String entry : ctx.getResources().getStringArray(id)) {
+                        int eq = entry == null ? -1 : entry.indexOf('=');
+                        if (eq > 0) {
+                            classSuffixes.put(entry.substring(0, eq), entry.substring(eq + 1));
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not read the surface kind class map; using the plain fold", t);
+            }
+        }
+        String mapped = kindId == null ? null : classSuffixes.get(kindId);
+        return mapped != null ? mapped : toClassSuffix(kindId);
+    }
+
+    /// Cached for the process: the map is build-time data and cannot change under a running app.
+    private static java.util.Map<String, String> classSuffixes;
+
     private static ComponentName providerComponent(Context ctx, String kindId) {
         return new ComponentName(ctx.getPackageName(),
-                "com.codename1.impl.android.CN1Widget_" + toClassSuffix(kindId));
+                "com.codename1.impl.android.CN1Widget_" + classSuffix(ctx, kindId));
     }
 
     private static void broadcastUpdate(Context ctx, String kindId) {

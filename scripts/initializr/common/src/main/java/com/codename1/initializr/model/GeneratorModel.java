@@ -23,8 +23,10 @@
 package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
+import com.codename1.initializr.WebsiteThemeNative;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.system.NativeLookup;
 import com.codename1.util.StringUtil;
 import net.sf.zipme.CRC32;
 import net.sf.zipme.ZipEntry;
@@ -164,6 +166,9 @@ public class GeneratorModel {
             ToastBar.showErrorMessage("Couldn't build the project: " + describeError(ex));
             return;
         }
+        if (downloadWebsiteProject(fileName, bytes)) {
+            return;
+        }
         if (downloadBytesAsFile(fileName, bytes)) {
             return;
         }
@@ -189,6 +194,21 @@ public class GeneratorModel {
             }
         }
         execute(filePath);
+    }
+
+    /** Use the website bridge so the metric is emitted only after its download handler succeeds. */
+    private static boolean downloadWebsiteProject(String fileName, byte[] bytes) {
+        WebsiteThemeNative nativeBridge = NativeLookup.create(WebsiteThemeNative.class);
+        if (nativeBridge == null || !nativeBridge.isSupported()) {
+            return false;
+        }
+        try {
+            String dataUrl = "data:application/octet-stream;base64,"
+                    + com.codename1.util.Base64.encodeNoNewline(bytes);
+            return nativeBridge.downloadProject(fileName, dataUrl);
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static String describeError(Throwable ex) {

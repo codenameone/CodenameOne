@@ -85,6 +85,20 @@ public class CN1WearableBridge implements WearableBridge {
     static final String CAPABILITY_NAME = "cn1_wearable";
     /** The key the payload bytes live under inside a DataItem. */
     private static final String PAYLOAD_KEY = "cn1.payload";
+
+    /**
+     * The DataMap key a replicated value's payload lives under.
+     *
+     * <p>Exposed for the listener service's surface-mirror branch, which reads a mirrored
+     * complication descriptor straight from the map: a mirror is a replacement rather than a
+     * replicated value with a logical clock, so it does not go through the ordering machinery
+     * that owns this constant everywhere else.</p>
+     *
+     * @return the payload key
+     */
+    static String payloadKey() {
+        return PAYLOAD_KEY;
+    }
     /** The publication order of a value or transfer, so the newer of two items wins. */
     private static final String SEQUENCE_KEY = "cn1.seq";
     /**
@@ -3504,6 +3518,70 @@ public class CN1WearableBridge implements WearableBridge {
      */
     private static final java.util.concurrent.ScheduledThreadPoolExecutor transferTimer =
             newTransferWorker();
+
+    /**
+     * Runs a piece of framework bookkeeping later, on the transfer worker.
+     *
+     * <p>Exposed for the surface mirror's write retry, which is the same shape as the transfer
+     * retries this worker already carries: a Data Layer item that does not change after a failed
+     * apply, so nothing offers it again and something here has to ask. Ordering with the rest of
+     * the transfer bookkeeping is preserved because it is the same single thread.</p>
+     *
+     * @param task the work
+     * @param delayMillis how long to wait
+     */
+    /// The reserved path a watch asks the phone to republish a mirrored surface on.
+    ///
+    /// Framework traffic, so it is routed before anything app-visible and never reaches a
+    /// WearableMessageListener -- the same treatment /cn1surface descriptors get.
+    static String surfaceReloadPath() {
+        return "/cn1surfacereload/";
+    }
+
+    /**
+     * Asks the phone to publish a mirrored kind again.
+     *
+     * <p>A mirrored surface is produced on the phone, so the watch cannot refresh it by asking
+     * itself -- it has no content and no background-fetch listener of its own. This sends the ask
+     * back up the link the descriptor came down.</p>
+     *
+     * <p>Best effort by contract: no watch, no phone half, or no reachable node is the ordinary
+     * case for most installs, and a complication keeping what it already has is the right
+     * outcome there.</p>
+     *
+     * @param context any context
+     * @param kindId the kind wanting fresh content
+     */
+    public static void requestSurfaceReload(Context context, String kindId) {
+        if (context == null || kindId == null || kindId.length() == 0) {
+            return;
+        }
+        try {
+            // The same live-or-build pattern sweepAfterAcknowledgement uses: this runs in a
+            // service process the system may have started cold, where no bridge exists yet.
+            CN1WearableBridge live = current;
+            if (live == null) {
+                live = new CN1WearableBridge(context);
+            }
+            String wire = surfaceReloadPath() + kindId;
+            for (Node n : Tasks.await(
+                    Wearable.getNodeClient(context.getApplicationContext()).getConnectedNodes(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                live.messageClient.sendMessage(n.getId(), wire, new byte[0]);
+            }
+        } catch (Throwable t) {
+            android.util.Log.w("CN1Surfaces", "could not ask the phone to republish " + kindId, t);
+        }
+    }
+
+    static void scheduleFrameworkRetry(Runnable task, long delayMillis) {
+        try {
+            transferTimer.schedule(task, delayMillis, TimeUnit.MILLISECONDS);
+        } catch (Throwable rejected) {
+            // The worker is shutting down with the process. Nothing to retry into.
+            android.util.Log.w("CN1Wearable", "could not schedule a framework retry", rejected);
+        }
+    }
 
     private static java.util.concurrent.ScheduledThreadPoolExecutor newTransferWorker() {
         java.util.concurrent.ScheduledThreadPoolExecutor worker =

@@ -1,0 +1,7 @@
+package com.google.android.gms.wearable;
+public class Wearable {
+    public static DataClient getDataClient(android.content.Context c) { return null; }
+    public static MessageClient getMessageClient(android.content.Context c) { return null; }
+    public static NodeClient getNodeClient(android.content.Context c) { return null; }
+    public static CapabilityClient getCapabilityClient(android.content.Context c) { return null; }
+}

@@ -146,6 +146,136 @@ public class IPhoneBuilder extends Executor {
     // pull in HealthKit or its entitlement.
     private boolean usesHealth;
     private boolean usesHealthStore;
+    /// The URL schemes a jailbreak's package managers and file browsers register.
+    /// Probed by IOSImplementation.getCompromiseReasons(), and dead weight without the
+    /// declaration below: since iOS 9, canOpenURL: answers false for any scheme the app
+    /// has not listed, whatever is installed. Cydia was the only one the runtime asked
+    /// about, and Cydia belongs to a rootful jailbreak nobody ships for current iOS --
+    /// a rootless device runs Sileo, so the probe looked for the one front end certain
+    /// not to be there.
+    ///
+    /// Four, not the obvious longer list. These entries are spent out of the app's
+    /// budget, not ours -- iOS caps the array, at 25 entries for an app linked against
+    /// the iOS 27 SDK -- so a secondary probe taking a quarter of it is not a reasonable
+    /// trade. `undecimus` and `activator` were dropped on that basis: unc0ver is the
+    /// iOS 11-14 era and Activator is a tweak rather than evidence of one. What is left
+    /// covers rootless (sileo), the file browser almost every jailbroken device carries
+    /// (filza), the alternative package manager (zbra) and rootful (cydia).
+    ///
+    /// THE ORDER IS LOAD-BEARING, most valuable first. When the cap below leaves room for
+    /// only some of these, the ones at the front are the ones declared. Cydia was first
+    /// and it is the worst of the four: it belongs to a rootful jailbreak nobody ships
+    /// for current iOS, so an app with one slot left spent it on the obsolete probe and
+    /// dropped Sileo -- silently reproducing, in the fix, the exact rootless blind spot
+    /// the fix is for.
+    static final String[] JAILBREAK_QUERY_SCHEMES = {
+        "sileo", "filza", "zbra", "cydia"
+    };
+
+    /// How many LSApplicationQueriesSchemes entries iOS honours.
+    ///
+    /// The cap keys off the SDK the app was LINKED against, not the OS it runs on: 50 for
+    /// iOS 15 and later, 25 for iOS 27 and later. Going over does not fail the build --
+    /// canOpenURL: simply answers false for the entries past the cap, which is the same
+    /// silent wrong answer this declaration exists to prevent, except now it is the app's
+    /// own schemes that quietly stop resolving.
+    private int applicationQueriesSchemeCap() {
+        return xcodeVersion >= 27 ? 25 : 50;
+    }
+
+    /// Entries the Info.plist renderer appends to this array on its own, after every
+    /// caller here has had its say.
+    ///
+    /// Counted rather than ignored because a ceiling that the renderer then walks past is
+    /// not a ceiling. The renderer adds `fbauth2` and `gplus` off exactly these two hints,
+    /// so an app within two of the cap and using Facebook or Google sign-in would have
+    /// been told its schemes fit and then shipped a plist where they did not.
+    private int reservedApplicationQueriesSchemes(BuildRequest request) {
+        int reserved = 0;
+        if (request.getArg("facebook.appId", null) != null) {
+            reserved++;
+        }
+        if (request.getArg("ios.gplus.clientId", null) != null) {
+            reserved++;
+        }
+        return reserved;
+    }
+
+    /// Adds `schemes` to ios.applicationQueriesSchemes, entry by entry.
+    ///
+    /// Entry by entry rather than as a substring, because a project that already queries
+    /// `sileo-installer` contains "sileo", and skipping on that basis leaves the exact
+    /// scheme canOpenURL: is asked about undeclared -- which is the failure this exists
+    /// to prevent, and it fails silently.
+    ///
+    /// A project that declares the array through ios.plistInject is left alone and told
+    /// so. The plist renderer emits its own LSApplicationQueriesSchemes key for this hint
+    /// without looking at the injected fragment, so writing the hint as well would put
+    /// the key in the plist twice -- and a plist with a duplicate key is not a plist that
+    /// reliably keeps either value.
+    private void declareApplicationQueriesSchemes(BuildRequest request,
+            String[] schemes, String why) {
+        java.util.List<String> alreadyInjected =
+                WatchNativeBuilder.injectedPlistKeys(request)
+                        .contains("LSApplicationQueriesSchemes")
+                        ? WatchNativeBuilder.injectedPlistStringArray(request,
+                                "LSApplicationQueriesSchemes")
+                        : null;
+        String queries = request.getArg("ios.applicationQueriesSchemes", "");
+        java.util.List<String> declared = new ArrayList<String>();
+        for (String entry : queries.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.length() > 0) {
+                declared.add(trimmed);
+            }
+        }
+        java.util.List<String> missing = new ArrayList<String>();
+        java.util.List<String> overCap = new ArrayList<String>();
+        int cap = applicationQueriesSchemeCap() - reservedApplicationQueriesSchemes(request);
+        for (String scheme : schemes) {
+            if (declared.contains(scheme)) {
+                continue;
+            }
+            if (alreadyInjected != null) {
+                if (!alreadyInjected.contains(scheme)) {
+                    missing.add(scheme);
+                }
+                continue;
+            }
+            // Ours are the ones that give way. A project near the cap is already
+            // spending it on schemes its features need, and appending past the cap
+            // would not buy this probe anything anyway -- iOS ignores the overflow --
+            // while pushing the app's own entries into the ignored region.
+            if (declared.size() >= cap) {
+                overCap.add(scheme);
+                continue;
+            }
+            declared.add(scheme);
+        }
+        if (!overCap.isEmpty()) {
+            log("ios.applicationQueriesSchemes already holds " + declared.size()
+                    + " entries and this build has room for " + cap
+                    + " (iOS honours at most " + applicationQueriesSchemeCap()
+                    + " for this SDK), so " + overCap + " was not added. " + why);
+        }
+        if (alreadyInjected != null) {
+            if (!missing.isEmpty()) {
+                log("ios.plistInject already declares LSApplicationQueriesSchemes, so "
+                        + missing + " was not added for you. Add those entries to that "
+                        + "array or " + why);
+            }
+            return;
+        }
+        StringBuilder joined = new StringBuilder();
+        for (String entry : declared) {
+            if (joined.length() > 0) {
+                joined.append(",");
+            }
+            joined.append(entry);
+        }
+        request.putArgument("ios.applicationQueriesSchemes", joined.toString());
+    }
+
     /// Treats a blank hint as missing.
     private static String trimToNull(String v) {
         if (v == null) {
@@ -298,6 +428,13 @@ public class IPhoneBuilder extends Executor {
     // ios.surfaces.extension=false the whole iOS lowering is skipped (no define flip, no
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
     private boolean surfacesExtensionEnabled;
+    /// True when a watch target exists and at least one kind declares a complication family, so
+    /// the watch app gets a CN1WatchWidgets extension of its own.
+    ///
+    /// Deliberately INDEPENDENT of surfacesExtensionEnabled. A manifest whose every kind is a
+    /// complication produces no iOS extension and no phone app-group entitlement, and must still
+    /// produce a watch one -- that is the whole case the surfaces watch families exist for.
+    private boolean surfacesWatchEnabled;
     // Resolved app group: surfaces.json appGroup > ios.surfaces.appGroup hint > group.<package>.
     private String surfacesAppGroup;
     private boolean surfacesLiveActivities;
@@ -2968,6 +3105,10 @@ public class IPhoneBuilder extends Executor {
             File jailbreakH = new File(buildinRes, "CN1JailbreakDetector.h");
             if (jailbreakH.exists() && detectJailbreak) {
                 replaceInFile(jailbreakH, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
+                // The native probes in that header need nothing from the plist. The
+                // URL-scheme probe on the Java side does, and its declaration is made
+                // further down, just before the plist is rendered -- see the call beside
+                // injectToPlist().
             }
 
             // ios.appAttest compiles the DeviceCheck-backed App Attest native code
@@ -2992,7 +3133,12 @@ public class IPhoneBuilder extends Executor {
             // the shared CodenameOne_GLViewController.h so it is visible to every surfaces
             // translation unit (IOSNative.m and CodenameOne_GLAppDelegate.m), mirroring
             // CN1_USE_CARPLAY. Skipped when ios.surfaces.extension=false.
-            if (surfacesExtensionEnabled) {
+            // The watch half counts too, and independently: a manifest whose every kind is a
+            // complication produces no iOS extension, and the WATCH slice still needs these
+            // natives. Without the define its own Surfaces.publish() is a no-op AND
+            // cn1_watch_apply_mirrored_surface -- which the WatchConnectivity delegate calls -- is
+            // compiled out, so the watch slice fails to link rather than merely doing nothing.
+            if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WIDGETS", "#define CN1_USE_WIDGETS");
             }
 
@@ -3001,7 +3147,11 @@ public class IPhoneBuilder extends Executor {
             // lives in the shared CodenameOne_GLViewController.h so it reaches every wearable
             // translation unit, and unlike the widgets define it deliberately survives on the watch
             // slice: both halves of a pair run the same symmetric code.
-            if (usesWearable) {
+            // surfacesWatchEnabled counts too. Mirroring a phone-side publish to the watch
+            // rides WCSession, and the app that publishes need never have written a line of
+            // com.codename1.wearable -- so the scan alone would leave the mirror with no
+            // transport in exactly the apps that want one.
+            if (usesWearable || surfacesWatchEnabled) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WATCHCONNECTIVITY", "#define CN1_USE_WATCHCONNECTIVITY");
             }
 
@@ -4111,7 +4261,7 @@ public class IPhoneBuilder extends Executor {
             // link WatchConnectivity.framework in lockstep with the scan. It exists on both iOS and
             // watchOS, which is why it is a plain link rather than one of the watch slice's
             // weak-linked frameworks.
-            if (usesWearable) {
+            if (usesWearable || surfacesWatchEnabled) {
                 String wearableLib = "WatchConnectivity.framework";
                 if (addLibs == null || addLibs.length() == 0) {
                     addLibs = wearableLib;
@@ -4157,9 +4307,16 @@ public class IPhoneBuilder extends Executor {
             // cloud builder's entitlement generator consumes; local Xcode builds supply the app
             // entitlements externally via $(APP_CODE_SIGN_ENTITLEMENTS), matching the wallet
             // extension flow.
-            if (surfacesExtensionEnabled) {
+            // surfacesWatchEnabled counts too. Without the entitlement the group container does
+            // not resolve on the phone, so areWidgetsSupported() answers false and
+            // Surfaces.publish() returns before the bridge is reached at all -- taking the watch
+            // mirror with it. A manifest of nothing but complications would then be unable to
+            // update the very complications it declares, which is the one case this feature is
+            // for. The group is genuinely part of the plumbing on both bundles, not an unused
+            // capability.
+            if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 String appGroups = request.getArg("ios.app_groups", "");
-                if (!appGroups.contains(surfacesAppGroup)) {
+                if (!declaresAppGroup(appGroups, surfacesAppGroup)) {
                     request.putArgument("ios.app_groups", appGroups.length() == 0
                             ? surfacesAppGroup : appGroups + "," + surfacesAppGroup);
                 }
@@ -5036,6 +5193,7 @@ public class IPhoneBuilder extends Executor {
                             + "      file_name = f.path || f.name || f.display_name\n"
                             + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
                             + SURFACES_EXTENSION_NAME + "/') && !file_name.start_with?('"
+                            + SURFACES_WATCH_EXTENSION_NAME + "/') && !file_name.start_with?('"
                             + MatterExtensionBuilder.EXTENSION_NAME + "/') && !file_name.include?('/"
                             + WatchNativeBuilder.WATCH_SRC_DIR + "/')\n"
                             + "    end\n"
@@ -5340,6 +5498,25 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
 
+                // Last, deliberately, and this is the only correct place for it.
+                //
+                // These schemes exist so canOpenURL: can answer honestly about a
+                // jailbroken device; without the declaration iOS answers false
+                // whatever is installed. But they are also the LOWEST priority thing
+                // in the array, because iOS honours a limited number of entries and
+                // ignores the rest -- so everything the app actually needs has to
+                // claim its slots first. Declared beside the jailbreak header
+                // instead, this ran before the Smart Home block appended
+                // com.apple.Home, and a project at the cap got sileo as its last
+                // honoured entry and com.apple.Home as an ignored one: a security
+                // probe silently costing the app a feature it asked for. Anything
+                // else that adds a scheme belongs above this line.
+                if (detectJailbreak) {
+                    declareApplicationQueriesSchemes(request, JAILBREAK_QUERY_SCHEMES,
+                            "DeviceIntegrity.getCompromiseReasons() will not see a "
+                            + "jailbreak that only its package manager reveals.");
+                }
+
                 injectToPlist(tmpFile, resDir, request);
 
                 addLocalizedIconsBuildSetting(pbxprojFile);
@@ -5364,6 +5541,11 @@ public class IPhoneBuilder extends Executor {
 
                 if (watchNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    // Before the plist and the Xcode script, both of which describe it. Generated
+                    // here rather than alongside the iOS extension because the watch APP target
+                    // does not exist yet when the schemes ruby runs -- and the complication
+                    // extension is embedded in that target, not the phone's.
+                    writeWatchWidgetExtension(request, new File(tmpFile, "dist"), appSrcDir);
                     watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
                     watchNativeBuilder.writeStubHeaders(appSrcDir);
@@ -5987,15 +6169,8 @@ public class IPhoneBuilder extends Executor {
         // The host's own versions, through the helpers the watch builder uses
         // for the same rule: an embedded extension whose marketing or build
         // version differs from its containing app fails archive validation.
-        String injectedShort = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleShortVersionString");
-        String extShort = injectedShort != null ? injectedShort
-                : WatchNativeBuilder.shortVersion(request);
-        String injectedBundle = WatchNativeBuilder.injectedPlistString(request,
-                "CFBundleVersion");
-        String extBundle = injectedBundle != null ? injectedBundle
-                : request.getArg("ios.bundleVersion",
-                        WatchNativeBuilder.shortVersion(request));
+        String extShort = embeddedExtensionShortVersion(request);
+        String extBundle = embeddedExtensionBundleVersion(request);
         // The hint is an override, not the only way in: an app whose
         // setCommissionToThisApp(true) the scanner saw needs no hint, and one
         // that reaches the API through reflection has no other way to say so.
@@ -6153,6 +6328,9 @@ public class IPhoneBuilder extends Executor {
         sb.append("}\n");
         sb.append("end\n");
     }
+
+    /** Xcode target / folder name of the generated watchOS complication extension. */
+    static final String SURFACES_WATCH_EXTENSION_NAME = "CN1WatchWidgets";
 
     /** Xcode target / folder name of the generated WidgetKit extension. */
     static final String SURFACES_EXTENSION_NAME = "CN1Widgets";
@@ -6547,13 +6725,26 @@ public class IPhoneBuilder extends Executor {
                 if (kindMap.get("preview") instanceof String) {
                     kind.setPreviewName((String) kindMap.get("preview"));
                 }
-                if (kindMap.get("iosFamilies") instanceof List) {
-                    List<String> families = new ArrayList<String>();
-                    for (Object family : (List<Object>) kindMap.get("iosFamilies")) {
-                        if (family instanceof String) {
-                            families.add((String) family);
-                        }
+                // "families" is the portable spelling and "iosFamilies" the legacy one; the
+                // shared reader picks between them so Android resolves a kind's families the
+                // same way rather than parsing a key with "ios" in its name.
+                List<String> families = com.codename1.util.SurfaceKindFamilies.read(kindMap);
+                // Refused here as well as on Android, and for a worse failure than the one there.
+                // A name this framework does not know is not a watch family, so the kind reads as
+                // an iPhone surface -- and familiesSwift cannot map it either, so it falls back to
+                // all three home-screen sizes. A typo therefore SHIPS three widgets the manifest
+                // never asked for, rather than shipping none.
+                for (String declared : families) {
+                    if (!com.codename1.util.SurfaceKindFamilies.isKnown(declared)) {
+                        throw new BuildException("Widget kind '" + kind.getId()
+                                + "' in surfaces.json declares the family '" + declared
+                                + "', which is not one this framework knows. The watch families "
+                                + "are watchCircular, watchRectangular, watchInline and "
+                                + "watchCorner; the phone families are small, medium, large and "
+                                + "lockscreen.");
                     }
+                }
+                if (!families.isEmpty()) {
                     kind.setIosFamilies(families);
                 }
                 surfacesKinds.add(kind);
@@ -6576,6 +6767,17 @@ public class IPhoneBuilder extends Executor {
                 break;
             }
         }
+        // Whether a complication reaches a device is a separate question from whether an iOS
+        // widget does, and it is answered separately: a watch-only manifest produces no iOS
+        // extension and must still produce a watch one.
+        boolean anyWatchSurface = false;
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            if (IOSWidgetExtensionBuilder.hasWatchFamily(kind)) {
+                anyWatchSurface = true;
+                break;
+            }
+        }
+        surfacesWatchEnabled = anyWatchSurface && watchTargetEnabled(request);
         if (!anyIosSurface) {
             // Said HERE, and in full. Turning the flag off is what stops widgetExtensionBuilder
             // from ever being created, and the watch-only notice at the extension-generation site
@@ -6589,20 +6791,41 @@ public class IPhoneBuilder extends Executor {
                 }
                 names.append(kind.getId());
             }
-            log("[surfaces] NOTE: these kinds declare only watch complication families and will "
-                    + "NOT appear on any device in this build: " + names + ". The watchOS widget "
-                    + "extension target and the Wear OS complication data source are not generated "
-                    + "yet, so nothing emits them. Declare a phone family alongside them if you "
-                    + "need a surface today.");
-            log("[surfaces] No iOS extension is generated and the iOS surface lowering is skipped "
-                    + "entirely -- no app group, no widget support compiled into the app.");
+            if (surfacesWatchEnabled) {
+                log("[surfaces] These kinds declare only watch complication families and are "
+                        + "hosted by the watch app's " + SURFACES_WATCH_EXTENSION_NAME
+                        + " extension: " + names + ". No iOS extension is generated, because "
+                        + "there is no iPhone surface to put them on.");
+            } else if (anyWatchSurface) {
+                log("[surfaces] NOTE: these kinds declare only watch complication families and "
+                        + "will NOT appear on any device in this build: " + names + ". They are "
+                        + "hosted by the watch app, and this project declares no "
+                        + "codename1.watchMain -- add one, or declare a phone family alongside "
+                        + "them.");
+            } else {
+                log("[surfaces] NOTE: these kinds declare no family this build can host and will "
+                        + "NOT appear on any device: " + names + ".");
+            }
             surfacesExtensionEnabled = false;
-            // Nothing further to prepare, and in particular no xcodeproj gem to require: that
-            // check exists for wiring an extension into the project, and there is no extension.
-            return;
+            if (!surfacesWatchEnabled) {
+                log("[surfaces] No iOS extension is generated and the iOS surface lowering is "
+                        + "skipped entirely -- no app group, no widget support compiled into the "
+                        + "app.");
+                // Nothing further to prepare, and in particular no xcodeproj gem to require: that
+                // check exists for wiring an extension into the project, and there is no
+                // extension.
+                return;
+            }
+            // Deliberately falling through with surfacesExtensionEnabled false. The watch
+            // extension still has to be wired into the project, which needs the xcodeproj gem
+            // checked below and an app group validated -- and the group is now something this
+            // build genuinely uses, even though the PHONE gets neither an entitlement for it nor
+            // an extension to use it.
+            log("[surfaces] The watch app publishes surfaces; the phone app does not.");
         }
-        // Only now, with an iOS surface confirmed, is the app group something this build actually
-        // uses -- and only now is rejecting a malformed one the right answer.
+        // Only now, with a surface confirmed on one platform or the other, is the app group
+        // something this build actually uses -- and only now is rejecting a malformed one the
+        // right answer.
         if (!surfacesAppGroup.startsWith("group.")) {
             throw new BuildException("The surfaces app group must start with 'group.' (Apple "
                     + "requirement); found '" + surfacesAppGroup + "' (from surfaces.json "
@@ -6617,6 +6840,107 @@ public class IPhoneBuilder extends Executor {
     }
 
     /**
+     * Generates the watchOS complication extension under dist/ and hands it to
+     * {@link WatchNativeBuilder}, which embeds it in the watch app target.
+     *
+     * <p>Deliberately NOT part of {@link #appendWidgetExtensionTargets}. That path runs inside
+     * the schemes ruby, at a point where the watch app target does not exist yet -- and this
+     * extension is embedded in the watch app, not the phone app. So it is generated here,
+     * immediately before the watch builder runs its own xcodeproj script, and wired by that
+     * script instead.</p>
+     *
+     * <p>The app-side Swift glue goes into the same {@code <MainClass>-src} folder the phone's
+     * does. The two are the same files, and the watch script adds them to the watch target by
+     * name; the schemes script's sweep of that folder into the PHONE target is what already
+     * handles the case where the watch shares the phone's translation.</p>
+     *
+     * @param request the build
+     * @param distDir the generated project's dist folder
+     * @param appSrcDir the {@code <MainClass>-src} folder
+     */
+    /**
+     * The marketing version an embedded bundle must declare to match this app.
+     *
+     * <p>Not simply the project version: {@code ios.plistInject} REPLACES the phone's default
+     * version injection where it sets the key, so a project that overrides the version there
+     * ships an app whose version is not {@code shortVersion(request)} at all. An embedded bundle
+     * whose versions differ from its container is rejected by App Store validation, which is the
+     * one failure that shows up only at submission.</p>
+     *
+     * @param request the build being generated
+     * @return the CFBundleShortVersionString the app itself will declare
+     */
+    private static String embeddedExtensionShortVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request,
+                "CFBundleShortVersionString");
+        return injected != null ? injected : WatchNativeBuilder.shortVersion(request);
+    }
+
+    /**
+     * The build version an embedded bundle must declare to match this app.
+     *
+     * <p>The fallback is {@code shortVersion(request)} and deliberately NOT
+     * {@link #embeddedExtensionShortVersion}: the two keys are independent, the app's CFBundleVersion is
+     * {@code ios.bundleVersion} defaulting to the build version, and it does not follow an
+     * injected marketing version. Deriving one from the other produces the very mismatch this
+     * exists to prevent.</p>
+     *
+     * @param request the build being generated
+     * @return the CFBundleVersion the app itself will declare
+     */
+    private static String embeddedExtensionBundleVersion(BuildRequest request) {
+        String injected = WatchNativeBuilder.injectedPlistString(request, "CFBundleVersion");
+        return injected != null ? injected
+                : request.getArg("ios.bundleVersion", WatchNativeBuilder.shortVersion(request));
+    }
+
+    private void writeWatchWidgetExtension(BuildRequest request, File distDir, File appSrcDir)
+            throws IOException {
+        if (!surfacesWatchEnabled) {
+            return;
+        }
+        IOSWidgetExtensionBuilder watchBuilder = new IOSWidgetExtensionBuilder()
+                .setVersions(embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request))
+                .setWatchTarget(true)
+                .setExtensionName(SURFACES_WATCH_EXTENSION_NAME)
+                // The extension is nested in the watch app, so its bundle id extends the WATCH
+                // bundle id rather than the phone's.
+                .setHostBundleId(request.getPackageName() + ".watchkitapp")
+                .setAppGroupId(surfacesAppGroup)
+                // The WATCH APP's target, not the extension's own floor. WidgetKit goes back to
+                // watchOS 9 and the extension can build there, but it is embedded in the watch
+                // app -- a watch that cannot install the app cannot show its complication, so
+                // defaulting to the lower number advertised support that does not exist. The
+                // extension's floor stays where it is for a project that lowers both.
+                .setDeploymentTarget(request.getArg("watchNative.surfaces.deploymentTarget",
+                        WatchNativeBuilder.MIN_DEPLOYMENT_TARGET));
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            watchBuilder.addKind(kind);
+        }
+        if (!watchBuilder.hasWatchSurface()) {
+            // Cannot happen -- surfacesWatchEnabled was decided from the same predicate -- but
+            // generating an empty WidgetBundle would break the watch build rather than degrade,
+            // so the check is worth its two lines.
+            return;
+        }
+        File extensionDir = new File(distDir, SURFACES_WATCH_EXTENSION_NAME);
+        IOSWalletExtensionBuilder.writeFileMap(watchBuilder.buildFileMap(), extensionDir);
+        IOSWalletExtensionBuilder.writeFileMap(watchBuilder.buildAppTargetFileMap(), appSrcDir);
+        watchNativeBuilder.setWidgetExtension(extensionDir, surfacesAppGroup,
+                watchBuilder.getDeploymentTarget());
+        int complications = 0;
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            if (IOSWidgetExtensionBuilder.hasWatchFamily(kind)) {
+                complications++;
+            }
+        }
+        log("Adding watchOS complication extension target " + SURFACES_WATCH_EXTENSION_NAME
+                + " (" + complications + " complication kind(s), watchOS "
+                + watchBuilder.getDeploymentTarget() + ")");
+    }
+
+    /**
      * Generates the CN1Widgets WidgetKit extension folder under dist/, drops the app-side
      * Swift glue into &lt;MainClass&gt;-src (the schemes ruby sweeps *.swift there into the
      * APP target) and appends the ruby that wires the extension target into the generated
@@ -6624,6 +6948,8 @@ public class IPhoneBuilder extends Executor {
      */
     private void appendWidgetExtensionTargets(StringBuilder sb, BuildRequest request, File distDir) throws IOException {
         IOSWidgetExtensionBuilder widgetBuilder = new IOSWidgetExtensionBuilder()
+                .setVersions(embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request))
                 .setExtensionName(SURFACES_EXTENSION_NAME)
                 .setHostBundleId(request.getPackageName())
                 .setAppGroupId(surfacesAppGroup)
@@ -6632,11 +6958,10 @@ public class IPhoneBuilder extends Executor {
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             widgetBuilder.addKind(kind);
         }
-        // Named out loud, every time, whether or not the extension is generated. A watch-only kind
-        // is silently dropped from the iOS bundle and NOTHING else emits it -- there is no watchOS
-        // widget extension target and no Wear complication data source yet -- so a developer who
-        // declares one and says nothing about it gets no surface on any platform and no clue why.
-        // The limitation is documented in the Wearables guide; this is the build-time half of it.
+        // Named out loud, every time, whether or not the extension is generated. A watch-only
+        // kind is silently dropped from the iOS bundle, so a developer who declares one and hears
+        // nothing has to work out for themselves where it went -- and, when there is no watch
+        // target, that it went nowhere at all.
         StringBuilder watchOnly = new StringBuilder();
         for (IOSWidgetExtensionBuilder.Kind watchKind : surfacesKinds) {
             if (IOSWidgetExtensionBuilder.isWatchOnly(watchKind)) {
@@ -6647,17 +6972,23 @@ public class IPhoneBuilder extends Executor {
             }
         }
         if (watchOnly.length() > 0) {
-            log("[surfaces] NOTE: these kinds declare only watch complication families and will "
-                    + "NOT appear on any device in this build: " + watchOnly + ". The watchOS "
-                    + "widget extension target and the Wear OS complication data source are not "
-                    + "generated yet. Declare a phone family alongside them if you need a surface "
-                    + "today.");
+            if (surfacesWatchEnabled) {
+                log("[surfaces] These kinds declare only watch complication families and are "
+                        + "hosted by " + SURFACES_WATCH_EXTENSION_NAME + " rather than by the iOS "
+                        + "extension: " + watchOnly + ".");
+            } else {
+                log("[surfaces] NOTE: these kinds declare only watch complication families and "
+                        + "will NOT appear on any device in this build: " + watchOnly + ". They "
+                        + "are hosted by the watch app, and this project declares no "
+                        + "codename1.watchMain -- add one, or declare a phone family alongside "
+                        + "them.");
+            }
         }
         if (!widgetBuilder.hasIosSurface()) {
-            // Every declared kind is a watch complication and there is no live activity, so the iOS
-            // extension would host nothing -- and a WidgetBundle with an empty body does not compile.
-            // Declaring only complications is legitimate; it simply produces no iOS surface until the
-            // watchOS extension target exists, so skip the extension instead of failing the build.
+            // Every declared kind is a watch complication and there is no live activity, so the
+            // iOS extension would host nothing -- and a WidgetBundle with an empty body does not
+            // compile. Declaring only complications is legitimate: those kinds are hosted by the
+            // watch extension instead, so skip this one rather than failing the build.
             log("Skipping the WidgetKit extension target: surfaces.json declares only watch "
                     + "complication families, which the iOS extension cannot host");
             return;
@@ -7199,14 +7530,34 @@ public class IPhoneBuilder extends Executor {
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
         // shared App Group container through this key; the CN1Widgets extension carries its own
         // copy in its generated Info.plist. See surfaces.json / the ios.surfaces.* build hints.
-        if (surfacesExtensionEnabled) {
+        if (surfacesExtensionEnabled || surfacesWatchEnabled) {
             if (!inject.contains("CN1SurfacesAppGroup")) {
                 inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";
+            }
+            // Which kinds are worth mirroring to the watch, decided here rather than at runtime.
+            // The phone cannot write into the watch's App Group container -- the same identifier
+            // resolves to a directory of its own there -- so a phone-side publish only reaches a
+            // complication if the descriptor travels over WCSession, and that is budgeted. Naming
+            // the kinds means a publish of a phone-only kind costs one dictionary lookup instead.
+            if (surfacesWatchEnabled && !inject.contains("CN1SurfacesWatchKinds")) {
+                StringBuilder watchKinds = new StringBuilder();
+                for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+                    if (IOSWidgetExtensionBuilder.hasWatchFamily(kind)) {
+                        if (watchKinds.length() > 0) {
+                            watchKinds.append(",");
+                        }
+                        watchKinds.append(kind.getId());
+                    }
+                }
+                inject += "\n<key>CN1SurfacesWatchKinds</key><string>" + watchKinds + "</string>";
             }
             // The extension's deployment target: the runtime gates areWidgetsSupported() on it
             // (the extension cannot run or appear in the widget gallery below this version, so
             // WidgetKit's own iOS 14 floor is not the right check).
-            if (!inject.contains("CN1SurfacesMinOS")) {
+            // The PHONE's floor, always -- the watch bundle carries its own, lower one, written
+            // by WatchNativeBuilder. Both are compared against the OS actually running, so one
+            // shared value would be wrong on one of the two.
+            if (surfacesExtensionEnabled && !inject.contains("CN1SurfacesMinOS")) {
                 inject += "\n<key>CN1SurfacesMinOS</key><string>"
                         + request.getArg("ios.surfaces.deploymentTarget", "16.1") + "</string>";
             }
@@ -7219,14 +7570,31 @@ public class IPhoneBuilder extends Executor {
                     inject += "\n<key>NSSupportsLiveActivitiesFrequentUpdates</key><true/>";
                 }
             }
-            // Widget taps deep link back through cn1surface:// (handled by the app delegate and
+            // Widget taps deep link back through <scheme>:// (handled by the app delegate and
             // never stored in AppArg). Register the scheme by appending to ios.urlSchemes so it
             // rides the existing CFBundleURLTypes injection below, whichever branch runs.
-            if (!inject.contains("cn1surface")) {
-                String urlSchemes = request.getArg("ios.urlSchemes", request.getArg("ios.urlScheme", ""));
-                if (!urlSchemes.contains("cn1surface")) {
-                    request.putArgument("ios.urlSchemes", urlSchemes + "<string>cn1surface</string>");
-                }
+            //
+            // BOTH the app's own cn1surface.<bundle id> -- which is what the widget generates
+            // now, and the only one the watch registers -- and the bare cn1surface, which this
+            // app has always registered and which something may still hold a link built with.
+            // Keeping the bare one on the phone costs nothing; dropping it could break a link
+            // that works today.
+            String ownScheme = IOSWidgetExtensionBuilder.surfaceScheme(request.getPackageName());
+            String urlSchemes = request.getArg("ios.urlSchemes",
+                    request.getArg("ios.urlScheme", ""));
+            String added = "";
+            if (!inject.contains(ownScheme) && !urlSchemes.contains(ownScheme)) {
+                added += "<string>" + ownScheme + "</string>";
+            }
+            // Matched as a whole element, because the qualified scheme CONTAINS the bare one as
+            // a prefix -- a substring test would read the qualified registration as the bare one
+            // already being present.
+            if (!inject.contains("<string>cn1surface</string>")
+                    && !urlSchemes.contains("<string>cn1surface</string>")) {
+                added += "<string>cn1surface</string>";
+            }
+            if (added.length() > 0) {
+                request.putArgument("ios.urlSchemes", urlSchemes + added);
             }
         }
 
@@ -8059,6 +8427,36 @@ public class IPhoneBuilder extends Executor {
                 set.add(trimmed);
             }
         }
+    }
+
+    /**
+     * Whether a declared app-group list already contains a group, compared as a whole token.
+     *
+     * <p>The same trap the profile check documents, one layer up: a project already declaring
+     * {@code group.com.example.shared} contains the string {@code group.com.example}, so a
+     * substring test read the surfaces group as present and left the entitlement out. The
+     * container then fails to resolve, {@code areWidgetsSupported()} answers false, and
+     * {@code Surfaces.publish()} returns before the bridge -- taking the watch mirror with it, in
+     * the watch-only configuration this entitlement was widened for.</p>
+     *
+     * <p>Split on both separators because the two builders spell the list differently -- comma
+     * here, space on the build server -- and a value pasted from one into the other should not
+     * change the answer.</p>
+     *
+     * @param declared the existing ios.app_groups value
+     * @param group the group being added
+     * @return true when the group is already declared
+     */
+    static boolean declaresAppGroup(String declared, String group) {
+        if (declared == null || group == null || group.length() == 0) {
+            return false;
+        }
+        for (String token : declared.split("[,\\s]+")) {
+            if (group.equals(token.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

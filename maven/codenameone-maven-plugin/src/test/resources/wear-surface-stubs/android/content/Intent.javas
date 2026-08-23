@@ -1,0 +1,7 @@
+package android.content;
+public class Intent {
+    public Intent(Context c, Class<?> k) { }
+    public Intent putExtra(String n, String v) { return this; }
+    public void setData(android.net.Uri u) { }
+    public String getDataString() { return ""; }
+}

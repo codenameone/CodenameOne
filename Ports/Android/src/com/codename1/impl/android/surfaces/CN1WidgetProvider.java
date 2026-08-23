@@ -143,10 +143,118 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
     /// publish -- and at most once per 15 minutes per kind. Failures are swallowed: modern
     /// Android may refuse a background service start, in which case the widget simply keeps
     /// showing the last entry until the app's own fetch schedule catches up.
-    private static void requestAppRefresh(Context context, String kindId) {
+    /// Package-private rather than private: a Tile reaching the end of its timeline needs the
+    /// same throttled request, and reimplementing it there would give the two surfaces different
+    /// refresh behaviour for one published document.
+    /**
+     * Asks for the same background fetch, but AT a stated moment rather than now.
+     *
+     * <p>A complication is handed its whole timeline once and the system swaps entries itself, so
+     * nothing calls the provider when the last entry finally takes over -- which is exactly when
+     * a reload-at-end timeline wants more content. Asking at build time instead can spend the
+     * one throttled fetch hours early and republish over entries the user has not seen yet.</p>
+     *
+     * <p>An alarm carrying the same broadcast the immediate path sends. It targets
+     * BackgroundFetchHandler, which every manifest that has background fetch already declares --
+     * so this needs no new component -- and an alarm survives the process the way a posted
+     * Runnable does not.</p>
+     *
+     * @param context any context
+     * @param kindId the kind wanting fresh content
+     * @param whenMillis when the timeline runs out
+     */
+    static void scheduleAppRefresh(Context context, String kindId, long whenMillis) {
         try {
             String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
             if (listenerClass == null) {
+                // A mirrored kind on the watch; see requestAppRefresh. The phone is asked NOW
+                // rather than at the timeline's end, because the alarm below needs a local
+                // component to deliver to and this build has none -- the throttle is what keeps
+                // that from being chatty. Asking early costs one phone-side publish; not asking
+                // leaves the complication on its final entry.
+                CN1WatchSurfaceNotifier.requestPhoneReload(context, kindId);
+                return;
+            }
+            if (whenMillis <= System.currentTimeMillis()) {
+                return;
+            }
+            // The cast sits INSIDE the instanceof branch, which is the shape the cast-semantics
+            // verifier recognises -- and the reason for the rule is real here: a failed CHECKCAST
+            // does not throw on ParparVM, so the catch below would never run for one.
+            Object service = context.getSystemService(Context.ALARM_SERVICE);
+            if (service instanceof AlarmManager) {
+                scheduleFetchAlarm(context, (AlarmManager) service, kindId, listenerClass,
+                        whenMillis);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not schedule the reload-at-end fetch for " + kindId, t);
+        }
+    }
+
+    /// The alarm itself, once the manager is known to be one. Separate so the cast above is the
+    /// last thing its own method does and no cast sits under the catch.
+    private static void scheduleFetchAlarm(Context context, AlarmManager am, String kindId,
+            String listenerClass, long whenMillis) {
+        try {
+            Intent intent = new Intent(context,
+                    com.codename1.impl.android.BackgroundFetchHandler.class);
+            intent.setData(android.net.Uri.parse("http://codenameone.com/a?" + listenerClass));
+            // A SERVICE PendingIntent. BackgroundFetchHandler is an IntentService declared as a
+            // <service>, so a broadcast one names a receiver that does not exist and the alarm
+            // fires into nothing. The port's own helper is used rather than a hand-rolled call,
+            // so the flags match what every other alarm-delivered start of this same handler
+            // uses. An alarm briefly allowlists the app, which is what lets the service start
+            // from here at all on API 26+.
+            //
+            // Keyed by kind so two kinds do not replace each other's wake-up, and distinct from
+            // the flip alarm's own request code for the same reason.
+            PendingIntent pi = com.codename1.impl.android.AndroidImplementation.getPendingIntent(
+                    context, ("reloadAtEnd:" + kindId).hashCode(), intent);
+            // INEXACT deliberately. This is "some time after the timeline runs out", not a
+            // deadline, and an exact alarm costs the user a special permission for no benefit.
+            if (Build.VERSION.SDK_INT >= 23) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC, whenMillis, pi);
+            } else {
+                am.set(AlarmManager.RTC, whenMillis, pi);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not schedule the reload-at-end fetch for " + kindId, t);
+        }
+    }
+
+    static void requestAppRefresh(Context context, String kindId) {
+        requestAppRefresh(context, kindId, true);
+    }
+
+    /**
+     * As above, but able to refuse the peer fallback.
+     *
+     * <p>{@code mayAskPeer} is false when this IS the answer to a peer's request. Without that
+     * the two devices bounce: a watch with no listener asks the phone, a phone with no listener
+     * answers by asking the watch, and neither ever acquires one -- an unthrottled message loop
+     * waking both processes until they disconnect. The device that was asked either has content
+     * to produce or has nothing to say, and saying nothing is the end of it.</p>
+     *
+     * @param context any context
+     * @param kindId the kind wanting fresh content
+     * @param mayAskPeer whether a device with no listener of its own may ask the other one
+     */
+    static void requestAppRefresh(Context context, String kindId, boolean mayAskPeer) {
+        try {
+            String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
+            if (listenerClass == null) {
+                if (!mayAskPeer) {
+                    // Answering a peer. It asked because it has nothing; this device has nothing
+                    // either, so there is no one left to ask.
+                    return;
+                }
+                // Nothing local to run. On a WATCH this is the normal case for a mirrored kind:
+                // the preference is recorded by publishWidgetTimeline, which the watch never
+                // runs -- its descriptors arrive through CN1SurfaceMirror.receive instead. The
+                // content belongs to the phone, so the phone is who to ask, and the request goes
+                // back over the same Data Layer the descriptor came down. A no-op everywhere
+                // else, including a phone with no background fetch declared.
+                CN1WatchSurfaceNotifier.requestPhoneReload(context, kindId);
                 return;
             }
             if (!CN1SurfaceStore.tryClaimBackgroundFetch(context, kindId,

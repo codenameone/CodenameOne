@@ -1,0 +1,6 @@
+package com.google.android.gms.wearable;
+public class DataMapItem {
+    public static DataMapItem fromDataItem(DataItem item) { return null; }
+    public android.net.Uri getUri() { return null; }
+    public DataMap getDataMap() { return null; }
+}

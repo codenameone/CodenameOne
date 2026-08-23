@@ -189,9 +189,19 @@ if [ ! -x "$PATCH_GRADLE_JAVA" ]; then
   exit 1
 fi
 
+PATCH_GRADLE_MODULES=(--app "$APP_BUILD_GRADLE")
+# A companion Wear build adds a second application module. It needs the same compileSdk pin as
+# the phone one: unpinned it picks the newest platform on the runner, and an API the port still
+# compiles against can be gone there (FingerprintManager is absent from API 37).
+WEAR_BUILD_GRADLE="$GRADLE_PROJECT_DIR/wear/build.gradle"
+if [ -f "$WEAR_BUILD_GRADLE" ]; then
+  ba_log "Wear module present; pinning its SDK levels too"
+  PATCH_GRADLE_MODULES+=(--app "$WEAR_BUILD_GRADLE")
+fi
+
 "$PATCH_GRADLE_JAVA" "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" \
   --root "$ROOT_BUILD_GRADLE" \
-  --app "$APP_BUILD_GRADLE" \
+  "${PATCH_GRADLE_MODULES[@]}" \
   --compile-sdk 36 \
   --target-sdk 36
 # --- END: robust Gradle patch ---
@@ -225,7 +235,17 @@ export JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
 )
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
-APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" | head -n 1 || true)
+# The PHONE module's APK, named explicitly. A companion build assembles two application
+# modules, so an unqualified find returns whichever the filesystem happened to walk first --
+# and traversal order is not a contract about which artifact is the product. Callers install
+# what this reports, so picking the watch-only APK would hand them the wrong app.
+APK_PATH=$(find "$GRADLE_PROJECT_DIR/app" -path "*/outputs/apk/debug/*.apk" 2>/dev/null | head -n 1 || true)
+if [ -z "$APK_PATH" ]; then
+  # A project whose module is not called "app" -- or a layout without one -- falls back to the
+  # old search, minus anything under a wear module, which is never the phone artifact.
+  APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" \
+      -not -path "*/wear/*" | head -n 1 || true)
+fi
 [ -n "$APK_PATH" ] || { ba_log "Gradle build completed but no APK was found" >&2; exit 1; }
 ba_log "Successfully built Android APK at $APK_PATH"
 

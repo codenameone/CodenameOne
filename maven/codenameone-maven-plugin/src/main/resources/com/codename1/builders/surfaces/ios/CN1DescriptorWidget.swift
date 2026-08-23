@@ -71,6 +71,12 @@ struct CN1WidgetEntryView: View {
 /// lock-screen layout otherwise -- an app that only publishes "lockscreen" still gets a
 /// complication, and one that publishes both gets the layout it designed for each surface.
 func cn1LayoutForFamily(_ layouts: [String: Any], family: WidgetFamily) -> [String: Any]? {
+    // The four system families are @available(watchOS, unavailable) -- not merely absent at
+    // runtime, but unnameable -- so the whole switch has to go behind the platform guard
+    // rather than relying on `default`.
+#if os(watchOS)
+    var keys: [String] = []
+#else
     var keys: [String]
     switch family {
     case .systemSmall:
@@ -82,6 +88,7 @@ func cn1LayoutForFamily(_ layouts: [String: Any], family: WidgetFamily) -> [Stri
     default:
         keys = []
     }
+#endif
     if #available(iOS 16.0, watchOS 9.0, *) {
         switch family {
         case .accessoryCircular:
@@ -117,12 +124,19 @@ func cn1LayoutForFamily(_ layouts: [String: Any], family: WidgetFamily) -> [Stri
 /// Per-node Link actions only work on medium and larger home-screen families; everywhere
 /// else the tap target is the whole widget via widgetURL.
 func cn1FamilyAllowsLinks(_ family: WidgetFamily) -> Bool {
+    // Same reason as above: the system families cannot be named on watchOS. The answer is
+    // false there in any case -- every watch family is an accessory family, and none of them
+    // supports a per-node Link.
+#if os(watchOS)
+    return false
+#else
     switch family {
     case .systemMedium, .systemLarge, .systemExtraLarge:
         return true
     default:
         return false
     }
+#endif
 }
 
 extension View {
@@ -130,7 +144,10 @@ extension View {
     /// placeholder). The surfaces node tree draws its own backgrounds, so declare a
     /// clear one; earlier versions pass through unchanged.
     @ViewBuilder func cn1WidgetContainerBackground() -> some View {
-        if #available(iOS 17.0, *) {
+        // watchOS 10.0 is spelled out rather than left to `*`: the watch extension's floor is
+        // exactly 10.0, so an unqualified `*` would compile today and silently stop guarding
+        // if that floor were ever lowered.
+        if #available(iOS 17.0, watchOS 10.0, *) {
             self.containerBackground(for: .widget) {
                 Color.clear
             }

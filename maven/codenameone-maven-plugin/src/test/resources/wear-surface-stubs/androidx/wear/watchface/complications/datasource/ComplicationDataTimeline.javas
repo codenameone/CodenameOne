@@ -1,0 +1,6 @@
+package androidx.wear.watchface.complications.datasource;
+import androidx.wear.watchface.complications.data.ComplicationData;
+public final class ComplicationDataTimeline {
+    public ComplicationDataTimeline(ComplicationData defaultData,
+            java.util.Collection<TimelineEntry> entries) { }
+}

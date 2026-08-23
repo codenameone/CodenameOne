@@ -1412,6 +1412,16 @@ typedef struct CN1BibopPage {
                                           //  idempotent across parallel markers)
     int gcGraceEpoch;                     // upper bound on survivor epochs as of the last
                                           //  full walk (GC-thread only)
+    _Atomic int gcGraceMarked;            // slots on this page that were marked live BY A
+                                          //  GRACE PASS, i.e. whose previous mark was -1
+                                          //  (never reached from a root this cycle). They
+                                          //  survive, but nothing has PROVEN them live, so
+                                          //  cn1BibopAdaptAfterSweep must not read them as
+                                          //  survivors -- an allocation-rate-driven number
+                                          //  masquerading as a live set is what made a pure
+                                          //  garbage workload look survivor-heavy and
+                                          //  diverted it onto the legacy heap. Reset as the
+                                          //  sweep reaches the page; relaxed, idempotent
     JAVA_BOOLEAN gcMajorSpliced;          // pulled from a PARTIAL pool by the major sweep, so
                                           //  its slots are a one-off deep-sweep sample rather
                                           //  than the steady-state retirement sample the

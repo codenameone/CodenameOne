@@ -1,0 +1,14 @@
+package androidx.wear.watchface.complications.datasource;
+import android.content.Context;
+import androidx.wear.watchface.complications.data.ComplicationData;
+import androidx.wear.watchface.complications.data.ComplicationType;
+public abstract class ComplicationDataSourceService extends Context {
+    public interface ComplicationRequestListener {
+        void onComplicationData(ComplicationData d);
+        // Default in the real API, which is why a service that overrides neither still compiles;
+        // this is the one a timeline answer uses.
+        void onComplicationDataTimeline(ComplicationDataTimeline t);
+    }
+    public abstract void onComplicationRequest(ComplicationRequest r, ComplicationRequestListener l);
+    public abstract ComplicationData getPreviewData(ComplicationType type);
+}

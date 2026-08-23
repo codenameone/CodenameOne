@@ -1,0 +1,11 @@
+package com.google.android.gms.wearable;
+public class PutDataRequest {
+    public static final String WEAR_URI_SCHEME = "wear";
+    public static PutDataRequest create(String path) { return null; }
+    public static PutDataRequest createWithAutoAppendedId(String path) { return null; }
+    public PutDataRequest setData(byte[] data) { return this; }
+    public PutDataRequest putAsset(String key, Asset asset) { return this; }
+    public PutDataRequest setUrgent() { return this; }
+    public android.net.Uri getUri() { return null; }
+    public byte[] getData() { return null; }
+}

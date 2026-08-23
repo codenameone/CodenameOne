@@ -1748,7 +1748,27 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             resultDir.mkdir();
             unzip.setDest(resultDir);
             unzip.execute();
-            for (File child : resultDir.listFiles()) {
+            File[] resultFiles = resultDir.listFiles();
+            // Every returned base, by extension, collected BEFORE anything is classified: see
+            // roleSuffixFor, which needs to know whether a suffixed entry names an artifact that
+            // is also here.
+            java.util.Map<String, java.util.Set<String>> basesByExtension =
+                    new java.util.HashMap<String, java.util.Set<String>>();
+            for (File child : resultFiles) {
+                String name = child.getName();
+                int dot = name.lastIndexOf(".");
+                if (dot < 0) {
+                    continue;
+                }
+                String ext = name.substring(dot);
+                java.util.Set<String> bases = basesByExtension.get(ext);
+                if (bases == null) {
+                    bases = new java.util.HashSet<String>();
+                    basesByExtension.put(ext, bases);
+                }
+                bases.add(name.substring(0, dot));
+            }
+            for (File child : resultFiles) {
                 String name = child.getName();
                 int dotpos = name.lastIndexOf(".");
                 if (dotpos < 0) {
@@ -1756,9 +1776,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
                 String extension = name.substring(dotpos);
                 String base = name.substring(0, dotpos);
-                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + extension);
+                // The role suffix has to survive into the copied name. Every entry used to land on
+                // target/<finalName><extension>, keyed on the extension alone, so a build that
+                // returns two artifacts of the same kind -- a phone APK and its companion Wear APK
+                // -- collapsed both onto one path and the last one written won. That is silent and
+                // it corrupts the primary artifact, not merely the secondary one.
+                String roleSuffix = roleSuffixFor(base, extension, basesByExtension);
+                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + roleSuffix + extension);
                 FileUtils.copyFile(child, copyTo);
-                if (".war".equals(extension)) {
+                if (roleSuffix.length() > 0) {
+                    // Attached with a classifier so the companion artifact is installed and
+                    // deployed beside the primary one rather than being an orphan in target/.
+                    projectHelper.attachArtifact(project, extension.substring(1),
+                            roleSuffix.substring(1), copyTo);
+                } else if (".war".equals(extension)) {
                     projectHelper.attachArtifact(project, "war", copyTo);
                 } else if (".zip".equals(extension) && "javascript".equals(buildTarget)) {
                     projectHelper.attachArtifact(project, "zip", "webapp", copyTo);
@@ -2478,6 +2509,76 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     protected void afterBuild() {
 
+    }
+
+    /**
+     * Role suffixes a returned artifact may carry, longest first so a future
+     * "-wear-debug" cannot be shadowed by "-wear".
+     *
+     * <p>Kept deliberately closed. Anything not on this list is the primary artifact and
+     * keeps the plain {@code <finalName><extension>} name it has always had, so adding a
+     * role here is the only way to change where a file lands.</p>
+     */
+    // Longest first: "-wear-debug" ends with neither "-wear" nor anything else here, but a
+    // future suffix that is a tail of another would match the shorter one if it came first.
+    /**
+     * The role a result entry plays, given what else came back.
+     *
+     * <p>A role suffix is a claim about a SET, not about a name, and the question it answers is
+     * "is there something here that this one is the companion TO". An app called
+     * {@code fitness-wear} returns one APK whose base ends in {@code -wear} and it is the primary
+     * artifact; the same app with a companion returns {@code fitness-wear} and
+     * {@code fitness-wear-wear}, where the second is not. Neither reading the name alone nor
+     * asking whether any unsuffixed entry exists separates those two cases -- in the second, no
+     * entry is unsuffixed at all.</p>
+     *
+     * <p>What does separate them is the artifact the suffix points at: strip it, and a companion
+     * names something else in the set while a primary names nothing.</p>
+     *
+     * @param base the entry's name with its extension removed
+     * @param extension the entry's extension, including the dot
+     * @param basesByExtension every returned base, keyed by extension
+     * @return the role suffix including its leading dash, or an empty string
+     */
+    static String roleSuffixFor(String base, String extension,
+            java.util.Map<String, java.util.Set<String>> basesByExtension) {
+        String suffix = roleSuffixOf(base);
+        if (suffix.length() == 0 || basesByExtension == null) {
+            return "";
+        }
+        java.util.Set<String> siblings = basesByExtension.get(extension);
+        if (siblings == null) {
+            return "";
+        }
+        return siblings.contains(base.substring(0, base.length() - suffix.length()))
+                ? suffix : "";
+    }
+
+    private static final String[] ARTIFACT_ROLE_SUFFIXES = {"-wear-debug", "-wear"};
+
+    /**
+     * The role suffix carried by a result entry's base name, or an empty string when it is
+     * the primary artifact.
+     *
+     * <p>A build may hand back more than one artifact of the same kind -- an Android
+     * companion build returns the phone APK and the Wear APK beside it -- and the two
+     * cannot share a destination path. The builder names the secondary one with a role
+     * suffix; this recovers it so the copy keeps it and the artifact can be attached
+     * under a matching classifier.</p>
+     *
+     * @param base the result file's name with its extension already removed
+     * @return the matching role suffix including its leading dash, or an empty string
+     */
+    static String roleSuffixOf(String base) {
+        if (base == null) {
+            return "";
+        }
+        for (String suffix : ARTIFACT_ROLE_SUFFIXES) {
+            if (base.endsWith(suffix)) {
+                return suffix;
+            }
+        }
+        return "";
     }
 
     private static class LibraryPropertiesException extends Exception {
