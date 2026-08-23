@@ -68,6 +68,9 @@ public class EditorView extends Component implements TextInputClient {
     private long lastBlink;
     private boolean animRegistered;
 
+    /// The top level the caret animation was registered on.
+    private TopLevelContainer caretAnimationHost;
+
     private Object inputHandle;
     private boolean inputActive;
 
@@ -1405,6 +1408,7 @@ public class EditorView extends Component implements TextInputClient {
         // there entirely and the caret never blinked.
         TopLevelContainer focusTop = getTopLevelContainer();
         if (!animRegistered && focusTop != null) {
+            caretAnimationHost = focusTop;
             focusTop.registerAnimated(this);
             animRegistered = true;
         }
@@ -1432,9 +1436,13 @@ public class EditorView extends Component implements TextInputClient {
         // Deregistration is driven by animRegistered rather than by an enclosing
         // Form, so an editor that registered inside a Window is also released.
         if (animRegistered) {
-            TopLevelContainer blurTop = getTopLevelContainer();
-            if (blurTop != null) {
-                blurTop.deregisterAnimated(this);
+            // The top level that took the registration, not whatever this editor
+            // resolves to now: focus can be lost *because* the editor was removed, in
+            // which case resolving again answers null and the caret animation stays on
+            // the original for good.
+            if (caretAnimationHost != null) {
+                caretAnimationHost.deregisterAnimated(this);
+                caretAnimationHost = null;
             }
             animRegistered = false;
         }

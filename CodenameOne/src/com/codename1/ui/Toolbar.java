@@ -3015,6 +3015,7 @@ public class Toolbar extends Container {
             }
         }
         hideShowMotion = Motion.createSplineMotion(getY(), -getHeight(), 300);
+        hideShowHost = top;
         top.registerAnimated(this);
         hideShowMotion.start();
     }
@@ -3037,8 +3038,25 @@ public class Toolbar extends Container {
             return;
         }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
+        hideShowHost = top;
         top.registerAnimated(this);
         hideShowMotion.start();
+    }
+
+    /// The top level the hide/show animation was registered on.
+    ///
+    /// Resolved again at cleanup, a toolbar removed or reparented mid-animation
+    /// answered null or named a different surface, so the one holding the animation
+    /// never gave it up -- its hasAnimations() stays true, the event dispatch thread
+    /// never sleeps, and this method runs on every frame.
+    private TopLevelContainer hideShowHost;
+
+    /// Releases the hide/show animation from whichever top level took it.
+    private void releaseHideShowRegistration() {
+        if (hideShowHost != null) {
+            hideShowHost.deregisterAnimated(this);
+            hideShowHost = null;
+        }
     }
 
     @Override
@@ -3048,7 +3066,10 @@ public class Toolbar extends Container {
             final Container actualPane = TopLevelSupport.actualPaneOf(top);
             if (actualPane == null) {
                 // Removed from its hierarchy mid-animation. Nothing left to move, and
-                // dereferencing the top level here is what used to throw.
+                // dereferencing the top level here is what used to throw. The
+                // registration still has to be released, or the top level that took it
+                // keeps the toolbar in its animation list for good.
+                releaseHideShowRegistration();
                 hideShowMotion = null;
                 return false;
             }
@@ -3062,7 +3083,7 @@ public class Toolbar extends Container {
             top.asContainer().repaint();
             boolean finished = hideShowMotion.isFinished();
             if (finished) {
-                top.deregisterAnimated(this);
+                releaseHideShowRegistration();
                 hideShowMotion = null;
             }
             return !finished;
