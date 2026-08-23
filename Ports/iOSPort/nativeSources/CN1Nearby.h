@@ -104,6 +104,13 @@
 #define CN1_NEARBY_CAP_BACKGROUND 32
 
 // com.codename1.nearby.spi.NearbyBridge payload types.
+/// The transport's own frame header: one kind byte then a four-byte payload
+/// id. Both ends of a MultipeerConnectivity session are this port, so the
+/// framing is symmetric by construction.
+#define CN1_NEARBY_FRAME_HEADER 5
+#define CN1_NEARBY_FRAME_DATA 0
+#define CN1_NEARBY_FRAME_ACK 1
+
 #define CN1_NEARBY_PAYLOAD_BYTES 0
 #define CN1_NEARBY_PAYLOAD_FILE 1
 

@@ -456,6 +456,14 @@ static void cn1nbSettleRangingStart(CN1NearbyRangingSession *entry)
 /// all: the disconnect that followed cleared everConnected and nothing
 /// retried. Remembered here and dropped when the session ends.
 @property (nonatomic, retain) NSMutableSet *lostWhileConnected;
+/// Peer id to the payload ids sent to it and not yet acknowledged.
+///
+/// sendData succeeding means the bytes were QUEUED, not that they arrived --
+/// and PayloadStatus.SUCCESS documents that every byte arrived, which is what
+/// Android reports because Nearby tells it so. MultipeerConnectivity has no
+/// such signal, so the receiving end sends one back and the terminal status
+/// waits for it.
+@property (nonatomic, retain) NSMutableDictionary *awaitingAck;
 @property (nonatomic, assign) int pendingAdvertiseRequest;
 @property (nonatomic, assign) int pendingDiscoverRequest;
 /// The advertising and discovery services are tracked SEPARATELY.
@@ -690,6 +698,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_everConnected release];
     [_inviting release];
     [_lostWhileConnected release];
+    [_awaitingAck release];
     [_advertiseServiceType release];
     [_advertiseServiceId release];
     [_discoverServiceType release];
@@ -848,6 +857,64 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     return [self connectedPeerCount] + pending;
 }
 
+/// Sends the one-frame acknowledgement for a received payload.
+///
+/// Best effort: if it cannot be sent the sender falls back to its disconnect
+/// handling, which is the same outcome as the peer going away.
+- (void)sendAck:(JAVA_INT)payloadId toPeer:(MCPeerID *)peer
+      inSession:(MCSession *)session {
+    unsigned char frame[CN1_NEARBY_FRAME_HEADER];
+    frame[0] = CN1_NEARBY_FRAME_ACK;
+    frame[1] = (unsigned char)((payloadId >> 24) & 0xff);
+    frame[2] = (unsigned char)((payloadId >> 16) & 0xff);
+    frame[3] = (unsigned char)((payloadId >> 8) & 0xff);
+    frame[4] = (unsigned char)(payloadId & 0xff);
+    NSError *ignored = nil;
+    [session sendData:[NSData dataWithBytes:frame
+                                     length:CN1_NEARBY_FRAME_HEADER]
+              toPeers:[NSArray arrayWithObject:peer]
+             withMode:MCSessionSendDataReliable
+                error:&ignored];
+}
+
+/// Records a payload sent to a peer and waiting for its acknowledgement.
+- (void)awaitAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid {
+    @synchronized (self) {
+        NSMutableSet *ids = [self.awaitingAck objectForKey:pid];
+        if (ids == nil) {
+            ids = [NSMutableSet set];
+            [self.awaitingAck setObject:ids forKey:pid];
+        }
+        [ids addObject:[NSNumber numberWithInt:(int)payloadId]];
+    }
+}
+
+/// Takes the acknowledgement for one payload, answering whether it was
+/// outstanding -- so a duplicate or unknown ack reports nothing.
+- (BOOL)takeAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid {
+    @synchronized (self) {
+        NSMutableSet *ids = [self.awaitingAck objectForKey:pid];
+        NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
+        if (![ids containsObject:key]) {
+            return NO;
+        }
+        [ids removeObject:key];
+        if ([ids count] == 0) {
+            [self.awaitingAck removeObjectForKey:pid];
+        }
+        return YES;
+    }
+}
+
+/// Takes every payload still waiting on a peer, for a disconnect.
+- (NSArray *)takeAllAcksFromPeer:(NSString *)pid {
+    @synchronized (self) {
+        NSArray *ids = [[[self.awaitingAck objectForKey:pid] allObjects] copy];
+        [self.awaitingAck removeObjectForKey:pid];
+        return [ids autorelease];
+    }
+}
+
 /// Records an invitation this device is about to send.
 - (void)markInviting:(NSString *)pid {
     @synchronized (self) {
@@ -907,6 +974,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         [self.everConnected removeAllObjects];
         [self.inviting removeAllObjects];
         [self.lostWhileConnected removeAllObjects];
+        [self.awaitingAck removeAllObjects];
     }
 }
 
@@ -1036,6 +1104,14 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             lostWhileUp = [self.lostWhileConnected containsObject:pid];
         }
         if ([self takeEverConnected:pid]) {
+            // Anything still waiting on this peer will never be
+            // acknowledged, so it is failed rather than left pending.
+            for (NSNumber *stranded in [self takeAllAcksFromPeer:pid]) {
+                com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                        getThreadLocalData(), cn1nbJString(encoded),
+                        (JAVA_INT)[stranded intValue], 0, -1,
+                        CN1_NEARBY_PAYLOAD_FAILURE);
+            }
             if (lostWhileUp) {
                 // The browser lost it before the session ended, so this is
                 // the moment its mappings can finally go.
@@ -1063,14 +1139,35 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // could tell two of them apart, or match one to its progress events --
         // which Payload.getId() promises it can. Both ends of an MPC session
         // are Codename One, so the framing is symmetric by construction.
-        JAVA_INT payloadId = 0;
-        NSData *body = data;
-        if ([data length] >= 4) {
-            const unsigned char *b = (const unsigned char *)[data bytes];
-            payloadId = (JAVA_INT)((b[0] << 24) | (b[1] << 16) | (b[2] << 8)
-                    | b[3]);
-            body = [data subdataWithRange:NSMakeRange(4, [data length] - 4)];
+        // Frame: one kind byte, four id bytes, then the body. The kind
+        // distinguishes a payload from the acknowledgement the receiver sends
+        // back, which is what lets the SENDER report a terminal SUCCESS that
+        // means "arrived" rather than "queued".
+        if ([data length] < CN1_NEARBY_FRAME_HEADER) {
+            return;
         }
+        const unsigned char *b = (const unsigned char *)[data bytes];
+        unsigned char kind = b[0];
+        JAVA_INT payloadId = (JAVA_INT)((b[1] << 24) | (b[2] << 16)
+                | (b[3] << 8) | b[4]);
+        NSString *pid = cn1nbIdForPeer(peerID);
+        if (kind == CN1_NEARBY_FRAME_ACK) {
+            // The far side has the bytes. Reported once: a duplicate or
+            // unknown ack is dropped rather than emitting a second terminal
+            // status for a payload already finished.
+            if ([self takeAck:payloadId fromPeer:pid]) {
+                com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                        getThreadLocalData(), cn1nbJString(encoded), payloadId,
+                        0, -1, CN1_NEARBY_PAYLOAD_SUCCESS);
+            }
+            return;
+        }
+        NSData *body = [data subdataWithRange:
+                NSMakeRange(CN1_NEARBY_FRAME_HEADER,
+                        [data length] - CN1_NEARBY_FRAME_HEADER)];
+        // Acknowledged before the payload is handed up, so a listener that
+        // takes a while cannot delay the sender's terminal status.
+        [self sendAck:payloadId toPeer:peerID inSession:session];
         // The terminal SUCCESS update, for the reason the file path emits
         // one: a receiver that releases per-payload state or dismisses its
         // transfer UI on the documented terminal status waited forever on
@@ -1391,6 +1488,7 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.everConnected = [NSMutableSet set];
         cn1nbTransport.inviting = [NSMutableSet set];
         cn1nbTransport.lostWhileConnected = [NSMutableSet set];
+        cn1nbTransport.awaitingAck = [NSMutableDictionary dictionary];
         cn1nbTransport.sessionsById = [NSMutableDictionary dictionary];
         cn1nbTransport.serviceIdByPeer = [NSMutableDictionary dictionary];
     }
@@ -1460,6 +1558,17 @@ API_AVAILABLE(ios(18.0))
 @interface CN1NearbyCompanion : NSObject
 @property (nonatomic, retain) ASAccessorySession *session;
 @property (nonatomic, assign) BOOL activated;
+/// Signalled when the session reports itself active.
+///
+/// activateWithQueue returns before the session is usable, and the event
+/// saying so arrives on the queue it was given. Showing a picker or reading
+/// accessories before then made the first association of a fresh process fail
+/// and getAssociations answer with an empty list for an app that had
+/// associations.
+@property (nonatomic, assign) dispatch_semaphore_t activeSignal;
+@property (nonatomic, assign) BOOL active;
+- (BOOL)awaitActive;
+- (void)activate;
 @end
 
 // Typed as id rather than CN1NearbyCompanion *: a file-scope variable of an
@@ -1471,7 +1580,32 @@ static id cn1nbCompanion = nil;
 
 - (void)dealloc {
     [_session release];
+    if (_activeSignal != NULL) {
+        dispatch_release(_activeSignal);
+    }
     [super dealloc];
+}
+
+/// Blocks briefly for the session to become active.
+///
+/// Bounded, and never called on the main thread: the activation event is
+/// delivered on the main queue, so waiting there would deadlock. Codename One
+/// natives run on the EDT, which on iOS is a thread of its own.
+- (BOOL)awaitActive {
+    if (self.active) {
+        return YES;
+    }
+    if (self.activeSignal == NULL || [NSThread isMainThread]) {
+        return self.active;
+    }
+    dispatch_semaphore_wait(self.activeSignal,
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2ull * NSEC_PER_SEC)));
+    // Signalled back, because more than one caller may be waiting and the
+    // semaphore is a latch rather than a queue.
+    if (self.active) {
+        dispatch_semaphore_signal(self.activeSignal);
+    }
+    return self.active;
 }
 
 /// Encodes an accessory the way NearbyWire.decodeCompanionDevice expects.
@@ -1543,9 +1677,10 @@ static NSString *cn1nbAccessoryId(ASAccessory *accessory)
         return;
     }
     self.activated = YES;
+    self.activeSignal = dispatch_semaphore_create(0);
     self.session = [[[ASAccessorySession alloc] init] autorelease];
-    // The event handler is required to activate the session and is
-    // deliberately empty.
+    CN1NearbyCompanion *weakSelf = self;
+    // The handler records ACTIVATION and nothing else.
     //
     // AccessorySetupKit reports an accessory entering or leaving the app's
     // SET, which is not the same event as it coming into or going out of
@@ -1558,6 +1693,10 @@ static NSString *cn1nbAccessoryId(ASAccessory *accessory)
     // set directly.
     [self.session activateWithQueue:dispatch_get_main_queue()
                        eventHandler:^(ASAccessoryEvent *event) {
+        if (event.eventType == ASAccessoryEventTypeActivated) {
+            weakSelf.active = YES;
+            dispatch_semaphore_signal(weakSelf.activeSignal);
+        }
     }];
 }
 
@@ -1569,6 +1708,9 @@ static CN1NearbyCompanion *cn1nbCompanionInit(void) API_AVAILABLE(ios(18.0)) {
     }
     CN1NearbyCompanion *companion = (CN1NearbyCompanion *)cn1nbCompanion;
     [companion activate];
+    // Waited for here rather than at each call site, so nothing reaches
+    // showPicker or session.accessories before the session is usable.
+    [companion awaitActive];
     return companion;
 }
 
@@ -2446,6 +2588,7 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             // had nothing to report but zero.
             NSString *sentName = [NSString stringWithFormat:@"cn1id-%d-%@",
                     (int)payloadId, [p lastPathComponent]];
+            NSUInteger started = 0;
             for (NSUInteger i = 0; i < [peers count]; i++) {
                 MCPeerID *peer = [peers objectAtIndex:i];
                 MCSession *session = [cn1nbTransport
@@ -2491,10 +2634,29 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                 // kept only the last, so cancel() stopped one transfer and
                 // the other two ran to completion reporting success.
                 if (progress != nil) {
+                    started++;
                     [progressHolder addObject:progress];
                     [cn1nbTransport rememberProgress:progress
                                           forPayload:payloadId];
+                } else {
+                    // No NSProgress means the framework did not take the
+                    // transfer -- the peer went away, or it could not be
+                    // scheduled -- so the completion handler will never run
+                    // for it. Reported per recipient, like a failed byte send.
+                    com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                            getThreadLocalData(),
+                            cn1nbJString([cn1nbTransport encodePeer:peer]),
+                            payloadId, 0, -1, CN1_NEARBY_PAYLOAD_FAILURE);
                 }
+            }
+            if (started == 0) {
+                // Nothing was handed to the platform, so answering the
+                // request successfully promised a transfer that will never
+                // report anything at all.
+                cn1nbFailTransport(requestId, CN1_NEARBY_ERR_IO_ERROR,
+                        @"the file could not be handed to any of those"
+                         @" endpoints");
+                return;
             }
             cn1nbTransportOk(requestId);
             return;
@@ -2502,14 +2664,16 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
         NSData *data = cn1nbDataFromJavaArray(bytes);
         // Framed with the payload id -- see didReceiveData for why.
         NSMutableData *framed = [NSMutableData dataWithCapacity:
-                (data == nil ? 0 : [data length]) + 4];
-        unsigned char header[4] = {
+                (data == nil ? 0 : [data length])
+                        + CN1_NEARBY_FRAME_HEADER];
+        unsigned char header[CN1_NEARBY_FRAME_HEADER] = {
+            CN1_NEARBY_FRAME_DATA,
             (unsigned char)((payloadId >> 24) & 0xff),
             (unsigned char)((payloadId >> 16) & 0xff),
             (unsigned char)((payloadId >> 8) & 0xff),
             (unsigned char)(payloadId & 0xff)
         };
-        [framed appendBytes:header length:4];
+        [framed appendBytes:header length:CN1_NEARBY_FRAME_HEADER];
         if (data != nil) {
             [framed appendData:data];
         }
@@ -2546,12 +2710,25 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             BOOL ok = [[outcomes objectAtIndex:i] boolValue];
             NSString *encoded = [cn1nbTransport
                     encodePeer:[peers objectAtIndex:i]];
+            if (!ok) {
+                com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                        CN1_THREAD_STATE_PASS_ARG cn1nbJString(encoded),
+                        payloadId, 0, (JAVA_LONG)[data length],
+                        CN1_NEARBY_PAYLOAD_FAILURE);
+                continue;
+            }
+            // Queued, not delivered. sendData returning YES says the message
+            // was accepted for sending, and PayloadStatus.SUCCESS documents
+            // that every byte ARRIVED -- which is what Android reports,
+            // because Nearby tells it so. So this reports progress now and
+            // the terminal status when the receiver's acknowledgement comes
+            // back, or FAILURE if the peer disconnects first.
+            [cn1nbTransport awaitAck:payloadId
+                            fromPeer:[peerIds objectAtIndex:i]];
             com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                     CN1_THREAD_STATE_PASS_ARG cn1nbJString(encoded), payloadId,
-                    ok ? (JAVA_LONG)[data length] : 0,
-                    (JAVA_LONG)[data length],
-                    ok ? CN1_NEARBY_PAYLOAD_SUCCESS
-                       : CN1_NEARBY_PAYLOAD_FAILURE);
+                    (JAVA_LONG)[data length], (JAVA_LONG)[data length],
+                    CN1_NEARBY_PAYLOAD_IN_PROGRESS);
         }
         if (!sent) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_IO_ERROR,

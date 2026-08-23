@@ -237,6 +237,12 @@ kilobytes on both platforms; anything larger goes as a file payload, which
 streams and reports progress. Call `NearbyTransport.stop()` when the feature's
 UI closes -- both platforms keep the radios busy until something says stop.
 
+A terminal `PayloadStatus.SUCCESS` means the bytes reached the peer, not that
+they were handed to the radio. Watch for it rather than treating a resolved
+`send()` as delivery: the resource resolves when the platform accepts the
+payload, which is earlier. If the peer disappears between the two you get
+`FAILURE`, so every send reaches one terminal status or the other.
+
 === Developing Without Hardware
 
 The simulator, the desktop ports and the JavaScript port carry a working
