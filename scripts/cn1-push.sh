@@ -46,14 +46,27 @@ if [ -z "$JDK" ]; then
     exit 1
 fi
 
-# `|| true` because a checkout without .m2-local is the normal case, and `ls`
-# failing there would end the script under `set -e` before reaching the
-# ~/.m2 fallback two lines down.
-CORE_JAR="$(ls "$REPO_ROOT"/.m2-local/com/codenameone/codenameone-core/*/codenameone-core-*.jar 2>/dev/null | head -1 || true)"
+# Selects the highest version of a Maven artifact from a per-version tree,
+# excluding classified attachments (-sources, -javadoc, -bundle) whose names
+# often sort before the plain binary jar and would poison a `head -1`. A
+# missing directory returns nothing rather than tripping `set -e`.
+pick_latest_artifact() {
+    local dir="$1" prefix="$2" v
+    [ -d "$dir" ] || return 0
+    for v in $(ls "$dir" 2>/dev/null | sort -V -r); do
+        local candidate="$dir/$v/$prefix-$v.jar"
+        if [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+}
+
+CORE_JAR="$(pick_latest_artifact "$REPO_ROOT/.m2-local/com/codenameone/codenameone-core" codenameone-core)"
 if [ -z "$CORE_JAR" ]; then
-    CORE_JAR="$(ls "$HOME"/.m2/repository/com/codenameone/codenameone-core/*/codenameone-core-*.jar 2>/dev/null | head -1 || true)"
+    CORE_JAR="$(pick_latest_artifact "$HOME/.m2/repository/com/codenameone/codenameone-core" codenameone-core)"
 fi
-PARPAR_JAR="$(ls "$REPO_ROOT"/.m2-local/com/codenameone/codenameone-parparvm/*/codenameone-parparvm-*.jar 2>/dev/null | grep -v -- '-sources\|-javadoc\|-bundle' | head -1 || true)"
+PARPAR_JAR="$(pick_latest_artifact "$REPO_ROOT/.m2-local/com/codenameone/codenameone-parparvm" codenameone-parparvm)"
 if [ -z "$PARPAR_JAR" ]; then
     echo "codenameone-parparvm not found in .m2-local; build it first:" >&2
     echo "  mvn -pl parparvm install -f maven/pom.xml" >&2

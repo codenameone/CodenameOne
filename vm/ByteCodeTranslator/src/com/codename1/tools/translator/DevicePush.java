@@ -40,10 +40,15 @@ import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -749,19 +754,55 @@ public final class DevicePush {
         }
         p.setProperty(deviceId, hex(secret));
         createParent(f);
-        OutputStream out = Files.newOutputStream(f);
-        try {
-            p.store(out, "Codename One device runtime -- shared secrets, one per paired device");
-        } finally {
-            out.close();
+        // The secret authorises running code on somebody's phone. Writing
+        // directly to `f` first would open it with the process umask -- 0644
+        // on most POSIX defaults -- and only chmod it afterward, leaving a
+        // window in which another local user could read the secret and
+        // authenticate pushes to the paired device. Write to a sibling temp
+        // file created with owner-only permissions from the start, then move
+        // it into place: the target ends up owning the temp's mode (0600 on
+        // POSIX), and an existing file with laxer permissions is replaced
+        // rather than reopened.
+        Path parent = f.getParent();
+        if (parent == null) {
+            parent = f.toAbsolutePath().getParent();
         }
-        // It authorises running code on somebody's phone; nobody else on this
-        // machine needs to read it.
-        try {
-            Files.setPosixFilePermissions(f,
-                    PosixFilePermissions.fromString("rw-------"));
-        } catch (UnsupportedOperationException notPosix) {
+        boolean posix = f.getFileSystem().supportedFileAttributeViews().contains("posix");
+        Path tmp;
+        if (posix) {
+            FileAttribute<Set<PosixFilePermission>> ownerOnly =
+                    PosixFilePermissions.asFileAttribute(
+                            PosixFilePermissions.fromString("rw-------"));
+            tmp = Files.createTempFile(parent, "devruntime-secrets-", ".tmp", ownerOnly);
+        } else {
             // Windows: the default ACL is the user's own, which is the intent.
+            tmp = Files.createTempFile(parent, "devruntime-secrets-", ".tmp");
+        }
+        try {
+            OutputStream out = Files.newOutputStream(tmp);
+            try {
+                p.store(out, "Codename One device runtime -- shared secrets, one per paired device");
+            } finally {
+                out.close();
+            }
+            try {
+                Files.move(tmp, f, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException atomicUnsupported) {
+                // Cross-device or a filesystem without rename atomicity;
+                // the plain move still replaces the target with our
+                // owner-only temp file.
+                Files.move(tmp, f, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException ignore) {
+                // The move above already consumed the temp on success; a
+                // failed write leaves it behind and the deleteIfExists here
+                // tidies up. Ignore secondary failure -- the primary error is
+                // what the caller needs.
+            }
         }
     }
 

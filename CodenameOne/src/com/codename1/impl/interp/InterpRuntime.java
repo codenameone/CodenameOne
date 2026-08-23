@@ -1332,13 +1332,13 @@ public final class InterpRuntime {
             } catch (Throwable hostThrown) {
                 // Something the host raised while we were inside it. It is a
                 // real Java throwable, and interpreted `catch` clauses have to
-                // be able to see it.
+                // be able to see it. InterpCancelled cannot reach this arm --
+                // its constructor is package-private and every creation site
+                // wraps it in InterpThrowable, which the catch above handles
+                // -- so no cancelCaughtOnce update is needed here.
                 int handler = findHandler(m, insn, hostThrown, false);
                 if (handler < 0) {
                     throw hostThrown;
-                }
-                if (hostThrown instanceof InterpCancelled) {
-                    state().cancelCaughtOnce = true;
                 }
                 f.sp = 0;
                 f.pushRef(hostThrown);
