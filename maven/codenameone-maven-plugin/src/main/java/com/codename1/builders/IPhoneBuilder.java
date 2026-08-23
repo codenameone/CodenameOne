@@ -7152,8 +7152,12 @@ public class IPhoneBuilder extends Executor {
         int depth = 0;
         int scan = gt;
         while (true) {
-            int nextOpen = plist.indexOf(openTag, scan + 1);
-            int nextClose = plist.indexOf(closeTag, scan + 1);
+            // Live tags only. A comment containing "</dict>" would otherwise close the
+            // element early and truncate the range, so validation would read a prefix of
+            // the manifest and reject a build that is correctly configured -- the same
+            // rule the key and element searches already follow.
+            int nextOpen = plistIndexOfLive(plist, openTag, scan + 1);
+            int nextClose = plistIndexOfLive(plist, closeTag, scan + 1);
             if (nextClose < 0) {
                 return -1;
             }

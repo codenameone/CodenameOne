@@ -364,4 +364,23 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "a nested UISceneConfigurations dictionary must not put the role out of "
                         + "scope");
     }
+
+    @Test
+    void aCommentedClosingTagDoesNotEndTheManifest() {
+        // A comment containing "</dict>" ahead of the live configuration. Treating it as
+        // the close truncates the range, so validation reads a prefix and rejects a
+        // build that is correctly configured.
+        String plist = "<key>UIApplicationSceneManifest</key><dict>"
+                + "<!-- was </dict> here -->"
+                + "<key>UIApplicationSupportsMultipleScenes</key><true/>"
+                + "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                + "<key>UISceneDelegateClassName</key>"
+                + "<string>CodenameOne_GLSceneDelegate</string></dict></array></dict>";
+        String scope = IPhoneBuilder.plistManifestScope(plist);
+        assertTrue(IPhoneBuilder.plistKeyIsTrue(scope,
+                "UIApplicationSupportsMultipleScenes"),
+                "the commented closing tag must not end the manifest");
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(scope),
+                "and the role after it is still inside the manifest");
+    }
 }

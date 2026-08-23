@@ -2350,6 +2350,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// pre-release) the sweep is fixed at the full ring.
     private long modernSpinStartTime = 0L;
 
+    /// The spinner's repaint animation, kept so the same instance is registered each
+    /// frame and can be released when spinning ends.
+    private Animation modernSpinnerAnimation;
+
+    /// The top level that animation was registered on.
+    private TopLevelContainer modernSpinnerHost;
+
     public void drawModernPullToRefresh(Graphics g, Component cmp, boolean taskExecuted) {
         final int height = getPullToRefreshHeight();
         final int scrollY = cmp.getScrollY();
@@ -2381,10 +2388,29 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             // after one paint pass.
             TopLevelContainer f = cmp.getTopLevelContainer();
             if (f != null) {
-                f.registerAnimated(modernSpinnerRepaintAnimation(cmp));
+                // One animation for the spinner, not one per paint. registerAnimated
+                // de-duplicates by identity, and a fresh instance every frame is never
+                // the one already registered -- so the list grew by one per frame and
+                // none of them ever came off, keeping the event dispatch thread awake
+                // for good once a refresh had run.
+                if (modernSpinnerAnimation == null) {
+                    modernSpinnerAnimation = modernSpinnerRepaintAnimation(cmp);
+                }
+                modernSpinnerHost = f;
+                f.registerAnimated(modernSpinnerAnimation);
             }
         } else {
             modernSpinStartTime = 0L;
+            // Spinning has stopped, so the repaint animation has no more work. Released
+            // from the top level that took it rather than from wherever the component
+            // resolves to now.
+            if (modernSpinnerAnimation != null) {
+                if (modernSpinnerHost != null) {
+                    modernSpinnerHost.deregisterAnimated(modernSpinnerAnimation);
+                    modernSpinnerHost = null;
+                }
+                modernSpinnerAnimation = null;
+            }
             // Pull fraction 0..1 over the threshold height.
             float pull = pullDistance / (float) Math.max(1, height);
             float clamped = Math.min(1f, Math.max(0f, pull));
