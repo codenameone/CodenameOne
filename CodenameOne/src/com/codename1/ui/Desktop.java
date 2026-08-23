@@ -47,6 +47,10 @@ import java.util.ArrayList;
 public final class Desktop {
 
     private static final Desktop INSTANCE = new Desktop();
+
+    /// Dots per inch of the medium-density baseline, used when there is no
+    /// implementation to ask.
+    private static final int MEDIUM_DENSITY_DPI = 160;
     private static final int[] BOUNDS_SCRATCH = new int[4];
 
     private final ArrayList<Window> windows = new ArrayList<Window>();
@@ -219,12 +223,20 @@ public final class Desktop {
     }
 
     private Monitor fallbackMonitor() {
-        int w = Display.impl == null ? 0 : Display.impl.getDisplayWidth();
-        int h = Display.impl == null ? 0 : Display.impl.getDisplayHeight();
+        // Every value here has to survive Display having no implementation yet. This
+        // method is the documented answer during startup, so guarding the size and then
+        // asking the same missing implementation for the density and the dots per inch
+        // -- which is what getDeviceDensity() and convertToPixels() do -- threw exactly
+        // when the fallback was supposed to be returned.
+        boolean uninitialized = Display.impl == null;
+        int w = uninitialized ? 0 : Display.impl.getDisplayWidth();
+        int h = uninitialized ? 0 : Display.impl.getDisplayHeight();
         Rectangle r = new Rectangle(0, 0, w, h);
-        int density = Display.getInstance().getDeviceDensity();
-        return new Monitor(0, r, new Rectangle(r), density, 1.0,
-                Display.getInstance().convertToPixels(254, true) / 10, "main", true);
+        int density = uninitialized
+                ? Display.DENSITY_MEDIUM : Display.getInstance().getDeviceDensity();
+        int dotsPerInch = uninitialized
+                ? MEDIUM_DENSITY_DPI : Display.getInstance().convertToPixels(254, true) / 10;
+        return new Monitor(0, r, new Rectangle(r), density, 1.0, dotsPerInch, "main", true);
     }
 
     // ---- windows ----------------------------------------------------------------
@@ -259,7 +271,15 @@ public final class Desktop {
         // Touching the manager is what makes a port start watching for display
         // changes; without it a listener registered before anything else looked at
         // the windowing system would never hear about one.
-        Display.impl.getWindowManager();
+        //
+        // Guarded, because registering a listener before Codename One is initialized is
+        // a reasonable thing to do -- it is the point at which an application knows it
+        // wants to hear about monitors -- and it used to throw. The listener stays
+        // registered either way, and the port starts watching when something else
+        // reaches the manager after initialization.
+        if (Display.impl != null) {
+            Display.impl.getWindowManager();
+        }
     }
 
     /// Removes a previously added monitor listener.

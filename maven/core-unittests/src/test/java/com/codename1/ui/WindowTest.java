@@ -4419,4 +4419,28 @@ class WindowTest extends UITestBase {
         assertFalse(anyArmed,
                 "nothing may be armed off a pointer press that was never accepted");
     }
+
+    @FormTest
+    void desktopAnswersBeforeDisplayHasAnImplementation() throws Exception {
+        // The fallback monitor and the monitor listener are both documented to work
+        // during startup, which is when an application knows it wants them. Both used
+        // to dereference Display.impl and throw at exactly that moment.
+        java.lang.reflect.Field impl = Display.class.getDeclaredField("impl");
+        impl.setAccessible(true);
+        Object saved = impl.get(null);
+        impl.set(null, null);
+        try {
+            Monitor[] monitors = Desktop.getInstance().getMonitors();
+            assertEquals(1, monitors.length,
+                    "an uninitialized platform still reports its single display");
+            assertNotNull(Desktop.getInstance().getPrimaryMonitor());
+            Desktop.getInstance().addMonitorListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                }
+            });
+        } finally {
+            impl.set(null, saved);
+        }
+    }
 }

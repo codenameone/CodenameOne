@@ -233,4 +233,33 @@ class IPhoneBuilderSceneManifestValidationTest {
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
                 "a string mentioning the words must not end the role's range");
     }
+
+    @Test
+    void aKeyElementMayCarryWhitespaceAroundItsName() {
+        // Valid XML. Requiring the tags and the name to be contiguous reported the key
+        // absent, and the build then appended a second UIApplicationSceneManifest beside
+        // the application's own -- duplicate keys in an ordinary iOS build, not just a
+        // Catalyst one.
+        assertTrue(IPhoneBuilder.plistDeclaresKey(
+                "<key>\n    UIApplicationSceneManifest\n</key><dict/>",
+                "UIApplicationSceneManifest"),
+                "a key element with whitespace around its name is still that key");
+        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+                "<key> UIApplicationSupportsMultipleScenes </key><true/>",
+                "UIApplicationSupportsMultipleScenes"),
+                "and its value is still readable");
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>\n UIWindowSceneSessionRoleApplication \n</key><array><dict>"
+                        + "<key> UISceneDelegateClassName </key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
+                "and so is the delegate beneath it");
+    }
+
+    @Test
+    void aDifferentKeyIsStillNotAMatch() {
+        // The trim must not turn every key into every other key.
+        assertFalse(IPhoneBuilder.plistDeclaresKey(
+                "<key>UIApplicationSceneManifestOther</key><dict/>",
+                "UIApplicationSceneManifest"));
+    }
 }

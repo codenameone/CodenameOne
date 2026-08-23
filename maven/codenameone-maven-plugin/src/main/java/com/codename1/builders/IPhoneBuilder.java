@@ -6805,7 +6805,6 @@ public class IPhoneBuilder extends Executor {
     ///
     /// true if the key is present and its value is `<true/>`
     static boolean plistKeyIsTrue(String plist, String key) {
-        String tag = "<key>" + key + "</key>";
         int at = plistKeyIndex(plist, key);
         if (at < 0) {
             return false;
@@ -6815,7 +6814,7 @@ public class IPhoneBuilder extends Executor {
         // "<true></true>" are the same element, and rejecting the ones with a space in
         // them would fail a build over valid XML -- worse than the misconfiguration
         // this check exists to catch, because it stops a build that would have worked.
-        return "true".equals(nextElementName(plist, at + tag.length()));
+        return "true".equals(nextElementName(plist, plistKeyEnd(plist, at)));
     }
 
     /// Whether the fragment actually declares the given key.
@@ -6853,7 +6852,57 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the index of the `<key>` element, or -1
     static int plistKeyIndex(String plist, String key) {
-        return plistIndexOfLive(plist, "<key>" + key + "</key>", 0);
+        return plistKeyIndex(plist, key, 0);
+    }
+
+    /// As above, starting the search at `from`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `key`: the key name to look for
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the index of the key element, or -1
+    static int plistKeyIndex(String plist, String key, int from) {
+        int at = plistIndexOfLive(plist, "<key>", from);
+        while (at >= 0) {
+            int close = plist.indexOf("</key>", at);
+            if (close < 0) {
+                return -1;
+            }
+            // The element's text, trimmed. "<key>\n  UIApplicationSceneManifest\n</key>"
+            // is the same key as the contiguous spelling, and requiring the tags and the
+            // name to be adjacent reported it absent -- which made the build append a
+            // second manifest beside the application's own, leaving duplicate keys.
+            if (key.equals(plist.substring(at + "<key>".length(), close).trim())) {
+                return at;
+            }
+            at = plistIndexOfLive(plist, "<key>", close);
+        }
+        return -1;
+    }
+
+    /// Index just past the `</key>` closing the key element that starts at `keyIndex`,
+    /// or -1. Callers need this rather than adding a fixed tag length, since the
+    /// element may carry whitespace around its name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `keyIndex`: index of the key element's `<key>`
+    ///
+    /// #### Returns
+    ///
+    /// the index just past `</key>`, or -1
+    static int plistKeyEnd(String plist, int keyIndex) {
+        int close = plist.indexOf("</key>", keyIndex);
+        return close < 0 ? -1 : close + "</key>".length();
     }
 
     /// Index of the first occurrence of `needle` at or after `from` that is not inside
@@ -6960,12 +7009,11 @@ public class IPhoneBuilder extends Executor {
     ///
     /// true if the window scene role names `CodenameOne_GLSceneDelegate`
     static boolean plistWiresWindowSceneDelegate(String plist) {
-        String tag = "<key>UIWindowSceneSessionRoleApplication</key>";
         int role = plistKeyIndex(plist, "UIWindowSceneSessionRoleApplication");
         if (role < 0) {
             return false;
         }
-        int afterKey = role + tag.length();
+        int afterKey = plistKeyEnd(plist, role);
         // Bounded by the next scene role, so a CarPlay configuration naming its own
         // delegate cannot answer for this one. A declared key rather than the text: the
         // words "SceneSessionRole" inside some string value would otherwise cut this
@@ -6977,14 +7025,13 @@ public class IPhoneBuilder extends Executor {
         // appear as some other live value -- a UISceneConfigurationName of
         // "CodenameOne_GLSceneDelegate" is legal -- while UISceneDelegateClassName
         // names somebody else, and a manifest like that cannot adopt a window.
-        String delegateKey = "<key>UISceneDelegateClassName</key>";
-        int at = plistIndexOfLive(plist, delegateKey, afterKey);
+        int at = plistKeyIndex(plist, "UISceneDelegateClassName", afterKey);
         while (at >= 0 && at < end) {
             if ("CodenameOne_GLSceneDelegate".equals(
-                    plistStringValueAfter(plist, at + delegateKey.length()))) {
+                    plistStringValueAfter(plist, plistKeyEnd(plist, at)))) {
                 return true;
             }
-            at = plistIndexOfLive(plist, delegateKey, at + delegateKey.length());
+            at = plistKeyIndex(plist, "UISceneDelegateClassName", plistKeyEnd(plist, at));
         }
         return false;
     }
