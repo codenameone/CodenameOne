@@ -423,6 +423,20 @@ static void cn1nbSettleRangingStart(CN1NearbyRangingSession *entry)
 
 #ifdef CN1_NEARBY_HAS_MPC
 
+/// How long a sent byte payload waits for the receiver's acknowledgement.
+///
+/// The acknowledgement is what turns a queued send into SUCCESS, and it is
+/// itself an ordinary reliable send on the far side -- it can fail to leave
+/// the receiver without the session going down, and the frame can be lost
+/// with the peer still connected. Either way nothing would arrive here and
+/// the send would never reach a terminal status at all, which is worse than
+/// reporting it late: an app waiting on that update waits forever.
+///
+/// Thirty seconds is far longer than the round trip for a payload small
+/// enough to travel in one frame, so a timeout means something really is
+/// wrong rather than that the link is slow.
+#define CN1_NEARBY_ACK_TIMEOUT_NS (30ull * NSEC_PER_SEC)
+
 @interface CN1NearbyTransport : NSObject <MCSessionDelegate,
         MCNearbyServiceAdvertiserDelegate, MCNearbyServiceBrowserDelegate>
 @property (nonatomic, retain) MCPeerID *localPeer;
@@ -876,8 +890,10 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 /// Sends the one-frame acknowledgement for a received payload.
 ///
-/// Best effort: if it cannot be sent the sender falls back to its disconnect
-/// handling, which is the same outcome as the peer going away.
+/// Best effort: a failure here cannot be reported to the sender, which is
+/// precisely why the sender does not wait on it forever. If the frame never
+/// leaves, or leaves and is lost, the sender's own acknowledgement timeout
+/// fails that send rather than leaving it outstanding.
 - (void)sendAck:(JAVA_INT)payloadId toPeer:(MCPeerID *)peer
       inSession:(MCSession *)session {
     unsigned char frame[CN1_NEARBY_FRAME_HEADER];
@@ -892,6 +908,28 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
               toPeers:[NSArray arrayWithObject:peer]
              withMode:MCSessionSendDataReliable
                 error:&ignored];
+}
+
+/// Fails a send whose acknowledgement has not arrived in time.
+///
+/// Scheduled for every recorded send. It is a no-op in the normal case --
+/// by then the acknowledgement, or the peer's disconnection, has already
+/// taken the entry, and taking it is what decides who reports the terminal
+/// status.
+- (void)scheduleAckTimeout:(JAVA_INT)payloadId fromPeer:(NSString *)pid
+                   encoded:(NSString *)encoded {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                    (int64_t)CN1_NEARBY_ACK_TIMEOUT_NS),
+            dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            if (![self takeAck:payloadId fromPeer:pid]) {
+                return;
+            }
+            com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                    getThreadLocalData(), cn1nbJString(encoded), payloadId,
+                    0, -1, CN1_NEARBY_PAYLOAD_FAILURE);
+        }
+    });
 }
 
 /// Records a payload sent to a peer and waiting for its acknowledgement.
@@ -1345,6 +1383,18 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         withContext:(NSData *)context
         invitationHandler:(void (^)(BOOL, MCSession *))invitationHandler {
     @autoreleasepool {
+        if (advertiser != self.advertiser) {
+            // From an advertiser that has since been replaced. Labelling it
+            // with the CURRENT advertiseServiceId would have handed the app
+            // an invitation attributed to a service it was never advertised
+            // on, and accepting it would have joined a peer that answered a
+            // different advertisement. Declined rather than dropped: the
+            // handler is what the remote side is waiting on, and dropping it
+            // leaves that peer hanging until MultipeerConnectivity times the
+            // invitation out.
+            invitationHandler(NO, nil);
+            return;
+        }
         NSString *pid = cn1nbIdForPeer(peerID);
         NSString *encoded = [self encodePeer:peerID
                                      service:self.advertiseServiceId];
@@ -1389,6 +1439,13 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         foundPeer:(MCPeerID *)peerID
         withDiscoveryInfo:(NSDictionary<NSString *, NSString *> *)info {
     @autoreleasepool {
+        if (browser != self.browser) {
+            // A sighting from a browser that has since been replaced,
+            // reported under the service id of its replacement. The app
+            // would then hold an endpoint the live browser never found and
+            // will never report lost.
+            return;
+        }
         NSString *encoded = [self encodePeer:peerID
                                      service:self.discoverServiceId];
         com_codename1_impl_ios_IOSNearbyCallbacks_endpointFound___java_lang_String_boolean(
@@ -1399,6 +1456,12 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 - (void)browser:(MCNearbyServiceBrowser *)browser
         lostPeer:(MCPeerID *)peerID {
     @autoreleasepool {
+        if (browser != self.browser) {
+            // The other half of the same mislabelling, and the peer is NOT
+            // forgotten here either: the mapping is shared with the live
+            // browser, which may have found this peer under its own service.
+            return;
+        }
         NSString *encoded = [self encodePeer:peerID
                                      service:self.discoverServiceId];
         com_codename1_impl_ios_IOSNearbyCallbacks_endpointFound___java_lang_String_boolean(
@@ -1607,7 +1670,10 @@ API_AVAILABLE(ios(18.0))
 /// associations.
 @property (nonatomic, assign) dispatch_semaphore_t activeSignal;
 @property (nonatomic, assign) BOOL active;
+/// Blocks queued by whenActive: while the session is still coming up.
+@property (nonatomic, retain) NSMutableArray *activationWaiters;
 - (BOOL)awaitActive;
+- (void)whenActive:(void (^)(BOOL active))handler;
 - (void)activate;
 @end
 
@@ -1620,6 +1686,7 @@ static id cn1nbCompanion = nil;
 
 - (void)dealloc {
     [_session release];
+    [_activationWaiters release];
     if (_activeSignal != NULL) {
         dispatch_release(_activeSignal);
     }
@@ -1631,6 +1698,14 @@ static id cn1nbCompanion = nil;
 /// Bounded, and never called on the main thread: the activation event is
 /// delivered on the main queue, so waiting there would deadlock. Codename One
 /// natives run on the EDT, which on iOS is a thread of its own.
+///
+/// This is the LAST resort and only getAssociations still uses it. Everything
+/// that can be resumed later goes through whenActive: instead, because the
+/// EDT is the thread that draws: waiting on it stalls input and rendering for
+/// as long as activation takes. getAssociations cannot follow, because the
+/// portable API returns the associations from the call -- there is nowhere to
+/// resume to, and answering empty on the way past is the very bug the wait
+/// was added for, an app with associations told it had none.
 - (BOOL)awaitActive {
     if (self.active) {
         return YES;
@@ -1712,6 +1787,48 @@ static NSString *cn1nbAccessoryId(ASAccessory *accessory)
     return match;
 }
 
+/// Runs `handler` once the session is active, WITHOUT blocking the caller.
+///
+/// Called with NO when activation does not arrive in time, so a queued
+/// operation always settles rather than being forgotten. The handler runs on
+/// the caller's thread when the session is already active and on the main
+/// queue otherwise, which is where the activation event and the timeout both
+/// land.
+- (void)whenActive:(void (^)(BOOL active))handler {
+    [self activate];
+    if (self.active) {
+        handler(YES);
+        return;
+    }
+    @synchronized (self) {
+        if (self.activationWaiters == nil) {
+            self.activationWaiters = [NSMutableArray array];
+        }
+        [self.activationWaiters addObject:[[handler copy] autorelease]];
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                    (int64_t)(2ull * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            // Drains whatever is still queued, which is nothing at all in the
+            // ordinary case: activation got there first and took them.
+            [self drainWaiters:self.active];
+        }
+    });
+}
+
+/// Hands every queued block the activation outcome, exactly once each.
+- (void)drainWaiters:(BOOL)activeNow {
+    NSArray *waiting;
+    @synchronized (self) {
+        waiting = [[self.activationWaiters copy] autorelease];
+        [self.activationWaiters removeAllObjects];
+    }
+    for (void (^handler)(BOOL) in waiting) {
+        handler(activeNow);
+    }
+}
+
 - (void)activate {
     if (self.activated) {
         return;
@@ -1736,11 +1853,28 @@ static NSString *cn1nbAccessoryId(ASAccessory *accessory)
         if (event.eventType == ASAccessoryEventTypeActivated) {
             weakSelf.active = YES;
             dispatch_semaphore_signal(weakSelf.activeSignal);
+            [weakSelf drainWaiters:YES];
         }
     }];
 }
 
 @end
+
+/// Hands the activated session to `handler`, or nil when it never activated.
+///
+/// The deferring counterpart of cn1nbCompanionInit, for the operations that
+/// have somewhere to resume to -- everything with a requestId, which is every
+/// companion operation except the synchronous read.
+static void cn1nbCompanionWhenActive(void (^handler)(CN1NearbyCompanion *))
+        API_AVAILABLE(ios(18.0)) {
+    if (cn1nbCompanion == nil) {
+        cn1nbCompanion = [[CN1NearbyCompanion alloc] init];
+    }
+    CN1NearbyCompanion *companion = (CN1NearbyCompanion *)cn1nbCompanion;
+    [companion whenActive:^(BOOL active) {
+        handler(active ? companion : nil);
+    }];
+}
 
 static CN1NearbyCompanion *cn1nbCompanionInit(void) API_AVAILABLE(ios(18.0)) {
     if (cn1nbCompanion == nil) {
@@ -2203,63 +2337,70 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                         @" ios.nearby.accessoryServices build hint");
                 return;
             }
-            CN1NearbyCompanion *companion = cn1nbCompanionInit();
-            if (companion == nil) {
-                cn1nbFailCompanion(requestId,
-                        CN1_NEARBY_ERR_RADIO_UNAVAILABLE,
-                        @"AccessorySetupKit did not become active");
-                return;
-            }
-            // Taken BEFORE the picker opens, so the accessory it adds can be
-            // told apart from the ones this app already had.
-            NSMutableSet *before = [NSMutableSet set];
-            for (ASAccessory *a in companion.session.accessories) {
-                [before addObject:cn1nbAccessoryId(a)];
-            }
-            [companion.session showPickerForDisplayItems:items
-                                       completionHandler:^(NSError *error) {
-                @autoreleasepool {
-                    if (error != nil) {
-                        cn1nbFailCompanion(requestId,
-                                CN1_NEARBY_ERR_USER_CANCELED,
-                                [error localizedDescription]);
-                        return;
-                    }
-                    // The one that is NEW, not the last in the array. The
-                    // accessories array documents no order, so an app that
-                    // already held associations could be handed one the user
-                    // did not pick -- and then persist or disassociate the
-                    // wrong device.
-                    ASAccessory *picked = nil;
-                    for (ASAccessory *a in companion.session.accessories) {
-                        if (![before containsObject:cn1nbAccessoryId(a)]) {
-                            if (picked != nil) {
-                                // Two arrived while the picker was open;
-                                // neither can be claimed as the user's pick.
-                                picked = nil;
-                                break;
-                            }
-                            picked = a;
-                        }
-                    }
-                    if (picked == nil) {
-                        cn1nbFailCompanion(requestId,
-                                CN1_NEARBY_ERR_USER_CANCELED,
-                                @"the picker added no accessory this app"
-                                 @" did not already have");
-                        return;
-                    }
-                    // present:NO. Associating an accessory says the user
-                    // chose it, not that it is in range -- and this port
-                    // reports no presence at all, so claiming YES here was
-                    // the one place a CompanionDevice arrived on iOS
-                    // asserting something nothing would ever correct.
-                    com_codename1_impl_ios_IOSNearbyCallbacks_associated___int_java_lang_String(
-                            getThreadLocalData(), requestId,
-                            cn1nbJString([companion encode:picked
-                                                   present:NO]));
+            // Resumed from the activation handler rather than waited for.
+            // The session is not usable until AccessorySetupKit says it is,
+            // and the thread that reached here is the EDT -- the thread that
+            // draws. Blocking it for as long as activation takes froze input
+            // and rendering on the first companion call of a process, which
+            // is exactly when an app is likely to make one.
+            cn1nbCompanionWhenActive(^(CN1NearbyCompanion *companion) {
+                if (companion == nil) {
+                    cn1nbFailCompanion(requestId,
+                            CN1_NEARBY_ERR_RADIO_UNAVAILABLE,
+                            @"AccessorySetupKit did not become active");
+                    return;
                 }
-            }];
+                // Taken BEFORE the picker opens, so the accessory it adds can be
+                // told apart from the ones this app already had.
+                NSMutableSet *before = [NSMutableSet set];
+                for (ASAccessory *a in companion.session.accessories) {
+                    [before addObject:cn1nbAccessoryId(a)];
+                }
+                [companion.session showPickerForDisplayItems:items
+                                           completionHandler:^(NSError *error) {
+                    @autoreleasepool {
+                        if (error != nil) {
+                            cn1nbFailCompanion(requestId,
+                                    CN1_NEARBY_ERR_USER_CANCELED,
+                                    [error localizedDescription]);
+                            return;
+                        }
+                        // The one that is NEW, not the last in the array. The
+                        // accessories array documents no order, so an app that
+                        // already held associations could be handed one the user
+                        // did not pick -- and then persist or disassociate the
+                        // wrong device.
+                        ASAccessory *picked = nil;
+                        for (ASAccessory *a in companion.session.accessories) {
+                            if (![before containsObject:cn1nbAccessoryId(a)]) {
+                                if (picked != nil) {
+                                    // Two arrived while the picker was open;
+                                    // neither can be claimed as the user's pick.
+                                    picked = nil;
+                                    break;
+                                }
+                                picked = a;
+                            }
+                        }
+                        if (picked == nil) {
+                            cn1nbFailCompanion(requestId,
+                                    CN1_NEARBY_ERR_USER_CANCELED,
+                                    @"the picker added no accessory this app"
+                                     @" did not already have");
+                            return;
+                        }
+                        // present:NO. Associating an accessory says the user
+                        // chose it, not that it is in range -- and this port
+                        // reports no presence at all, so claiming YES here was
+                        // the one place a CompanionDevice arrived on iOS
+                        // asserting something nothing would ever correct.
+                        com_codename1_impl_ios_IOSNearbyCallbacks_associated___int_java_lang_String(
+                                getThreadLocalData(), requestId,
+                                cn1nbJString([companion encode:picked
+                                                       present:NO]));
+                    }
+                }];
+            });
             return;
         }
     }
@@ -2298,34 +2439,39 @@ void com_codename1_impl_ios_IOSNative_nearbyDisassociate___int_java_lang_String(
 #ifdef CN1_NEARBY_HAS_ASK
     if (@available(iOS 18.0, *)) {
         @autoreleasepool {
-            CN1NearbyCompanion *companion = cn1nbCompanionInit();
-            if (companion == nil) {
-                // Distinguished from "no such association", which is what an
-                // inactive session used to look like.
-                cn1nbFailCompanion(requestId,
-                        CN1_NEARBY_ERR_RADIO_UNAVAILABLE,
-                        @"AccessorySetupKit did not become active");
-                return;
-            }
+            // Resolved on this thread, because toNSString needs the thread
+            // state the native was entered with and the block below does not
+            // run on that thread.
             NSString *aid = toNSString(CN1_THREAD_STATE_PASS_ARG associationId);
-            ASAccessory *accessory = [companion accessoryForId:aid];
-            if (accessory == nil) {
-                cn1nbFailCompanion(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
-                        @"no such association");
-                return;
-            }
-            [companion.session removeAccessory:accessory
-                             completionHandler:^(NSError *error) {
-                @autoreleasepool {
-                    if (error != nil) {
-                        cn1nbFailCompanion(requestId, CN1_NEARBY_ERR_UNKNOWN,
-                                [error localizedDescription]);
-                    } else {
-                        com_codename1_impl_ios_IOSNearbyCallbacks_disassociated___int(
-                                getThreadLocalData(), requestId);
-                    }
+            // Deferred for the reason associate is.
+            cn1nbCompanionWhenActive(^(CN1NearbyCompanion *companion) {
+                if (companion == nil) {
+                    // Distinguished from "no such association", which is what an
+                    // inactive session used to look like.
+                    cn1nbFailCompanion(requestId,
+                            CN1_NEARBY_ERR_RADIO_UNAVAILABLE,
+                            @"AccessorySetupKit did not become active");
+                    return;
                 }
-            }];
+                ASAccessory *accessory = [companion accessoryForId:aid];
+                if (accessory == nil) {
+                    cn1nbFailCompanion(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
+                            @"no such association");
+                    return;
+                }
+                [companion.session removeAccessory:accessory
+                                 completionHandler:^(NSError *error) {
+                    @autoreleasepool {
+                        if (error != nil) {
+                            cn1nbFailCompanion(requestId, CN1_NEARBY_ERR_UNKNOWN,
+                                    [error localizedDescription]);
+                        } else {
+                            com_codename1_impl_ios_IOSNearbyCallbacks_disassociated___int(
+                                    getThreadLocalData(), requestId);
+                        }
+                    }
+                }];
+            });
             return;
         }
     }
@@ -2820,6 +2966,9 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             // back, or FAILURE if the peer disconnects first.
             [cn1nbTransport awaitAck:payloadId
                             fromPeer:[peerIds objectAtIndex:i]];
+            [cn1nbTransport scheduleAckTimeout:payloadId
+                                      fromPeer:[peerIds objectAtIndex:i]
+                                       encoded:encoded];
             com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                     CN1_THREAD_STATE_PASS_ARG cn1nbJString(encoded), payloadId,
                     (JAVA_LONG)[data length], (JAVA_LONG)[data length],

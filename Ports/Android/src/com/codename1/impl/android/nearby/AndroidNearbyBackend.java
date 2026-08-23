@@ -485,7 +485,31 @@ public class AndroidNearbyBackend implements NearbyBridge {
                     + " it has finished");
             return;
         }
-        cdm.associate(request.build(), new CompanionDeviceManager.Callback() {
+        // associate() can refuse SYNCHRONOUSLY -- a SecurityException for a
+        // profile whose REQUEST_COMPANION_PROFILE_* permission the manifest
+        // does not declare, which happens when the matching
+        // android.nearby.*Profile hint was not set. Unguarded, that escaped
+        // past this method with pendingAssociateRequest still set and the
+        // result listener still installed: the AsyncResource never settled
+        // and every later association answered BUSY.
+        try {
+            associateNow(cdm, request.build(), requestId);
+        } catch (Throwable refused) {
+            pendingAssociateRequest = 0;
+            releaseResultListener();
+            CompanionDevices.deliverRequestFailed(requestId,
+                    NearbyError.NOT_SUPPORTED.ordinal(),
+                    "the platform refused this association request: "
+                    + refused.getMessage());
+        }
+    }
+
+    /// The associate call itself, split out so the caller can catch a
+    /// synchronous refusal without wrapping the callback wiring too.
+    @SuppressLint("MissingPermission")
+    private void associateNow(CompanionDeviceManager cdm,
+            AssociationRequest request, final int requestId) {
+        cdm.associate(request, new CompanionDeviceManager.Callback() {
             @Override
             public void onDeviceFound(IntentSender chooserLauncher) {
                 launch(chooserLauncher, requestId);
