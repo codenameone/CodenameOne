@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -76,8 +77,11 @@ class NearbyBonjourServiceTypeTest {
 
     @Test
     void anExplicitHintIsUsedAsGiven() {
-        assertEquals("chat", only(
-                request("com.example.app", "chat")));
+        // The readable half is the hint; the four-character suffix keeps two
+        // different ids from folding onto one type.
+        String type = only(request("com.example.app", "chat"));
+        assertLegal(type);
+        assertEquals("chat-" + IPhoneBuilder.bonjourSuffix("chat"), type);
     }
 
     @Test
@@ -87,11 +91,12 @@ class NearbyBonjourServiceTypeTest {
         String type = only(
                 request("com.example.chat", null));
         assertLegal(type);
-        // Sixteen characters folded, fifteen allowed -- so even this
-        // unremarkable package name is truncated, which is why the builder
-        // logs the derived type and the guide tells you to set
-        // ios.nearby.serviceType yourself.
-        assertEquals("com-example-cha", type);
+        // Ten readable characters plus the suffix, because the fold is lossy
+        // and the truncation is brutal -- which is why the builder logs the
+        // derived type and the guide tells you to set ios.nearby.serviceType
+        // yourself.
+        assertEquals("com-exampl-"
+                + IPhoneBuilder.bonjourSuffix("com.example.chat"), type);
     }
 
     @Test
@@ -116,27 +121,31 @@ class NearbyBonjourServiceTypeTest {
         String type = only(
                 request("com...example___app", null));
         assertLegal(type);
-        assertEquals("com-example-app", type);
+        assertEquals("com-exampl-"
+                + IPhoneBuilder.bonjourSuffix("com...example___app"), type);
     }
 
     @Test
     void uppercaseIsLowered() {
-        assertEquals("mychat", only(
-                request("com.example.app", "MyChat")));
+        assertEquals("mychat-" + IPhoneBuilder.bonjourSuffix("MyChat"),
+                only(request("com.example.app", "MyChat")));
     }
 
     @Test
     void somethingWithNoUsableCharactersFallsBackRatherThanRaising() {
-        assertEquals("cn1-nearby", only(
-                request("...", null)));
-        assertEquals("cn1-nearby", only(
-                request(null, null)));
+        // Nothing readable survives, so the type is the fallback plus the
+        // suffix -- still legal, and still distinct per id.
+        assertLegal(only(request("...", null)));
+        assertTrue(only(request("...", null)).startsWith("cn1-"),
+                only(request("...", null)));
+        assertLegal(only(request(null, null)));
     }
 
     @Test
     void ablankHintFallsBackToThePackageRatherThanToTheDefault() {
-        assertEquals("com-example-app", only(
-                request("com.example.app", "   ")));
+        assertEquals("com-exampl-"
+                + IPhoneBuilder.bonjourSuffix("com.example.app"),
+                only(request("com.example.app", "   ")));
     }
 
     @Test
@@ -159,9 +168,12 @@ class NearbyBonjourServiceTypeTest {
         List<String> types = IPhoneBuilder.bonjourServiceTypes(
                 request("com.example.app", "chat, files , telemetry"));
         assertEquals(3, types.size());
-        assertEquals("chat", types.get(0));
-        assertEquals("files", types.get(1));
-        assertEquals("telemetry", types.get(2));
+        assertEquals("chat-" + IPhoneBuilder.bonjourSuffix("chat"),
+                types.get(0));
+        assertEquals("files-" + IPhoneBuilder.bonjourSuffix("files"),
+                types.get(1));
+        assertEquals("telemetry-" + IPhoneBuilder.bonjourSuffix("telemetry"),
+                types.get(2));
         for (String t : types) {
             assertLegal(t);
         }
@@ -169,10 +181,13 @@ class NearbyBonjourServiceTypeTest {
 
     @Test
     void idsThatFoldToTheSameTypeAreDeclaredOnce() {
+        // "Chat" is the same service as "chat" -- the suffix is
+        // ASCII-lowercased before hashing precisely so case does not split a
+        // service in two.
         List<String> types = IPhoneBuilder.bonjourServiceTypes(
                 request("com.example.app", "chat,chat,Chat"));
         assertEquals(1, types.size());
-        assertEquals("chat", types.get(0));
+        assertEquals("chat-4xwr", types.get(0));
     }
 
     @Test
@@ -182,12 +197,18 @@ class NearbyBonjourServiceTypeTest {
         // disagree the app browses a type the plist does not declare, and iOS
         // answers with silence rather than an error -- so the build-side fold
         // is exposed on its own and pinned here.
-        assertEquals("chat", IPhoneBuilder.foldBonjourServiceType("chat"));
-        assertEquals("com-example-cha",
+        assertEquals("chat-4xwr",
+                IPhoneBuilder.foldBonjourServiceType("chat"));
+        assertEquals("com-exampl-jd3q",
                 IPhoneBuilder.foldBonjourServiceType("com.example.chat"));
-        assertEquals("mychat", IPhoneBuilder.foldBonjourServiceType("MyChat"));
-        assertEquals("", IPhoneBuilder.foldBonjourServiceType("..."));
+        // Case-insensitive, suffix included: these are one service.
+        assertEquals(IPhoneBuilder.foldBonjourServiceType("mychat"),
+                IPhoneBuilder.foldBonjourServiceType("MyChat"));
         assertEquals("", IPhoneBuilder.foldBonjourServiceType(null));
+        // The literals above are the values CN1Nearby.m's cn1nbServiceType
+        // produces for the same input, checked by compiling and running it.
+        // If either side changes, this fails rather than the app silently
+        // browsing a type its own plist does not declare.
     }
 
     @Test
@@ -229,8 +250,11 @@ class NearbyBonjourServiceTypeTest {
 
     @Test
     void anIdThatAlreadyHasALetterIsNotPrefixed() {
-        assertEquals("chat", IPhoneBuilder.foldBonjourServiceType("chat"));
-        assertEquals("a1", IPhoneBuilder.foldBonjourServiceType("a1"));
+        // The readable half is untouched; only the suffix is appended.
+        assertTrue(IPhoneBuilder.foldBonjourServiceType("chat")
+                .startsWith("chat-"));
+        assertTrue(IPhoneBuilder.foldBonjourServiceType("a1")
+                .startsWith("a1-"));
     }
 
     private static boolean hasLetter(String s) {
@@ -241,5 +265,44 @@ class NearbyBonjourServiceTypeTest {
             }
         }
         return false;
+    }
+
+    @Test
+    void idsThatFoldTheSameStillGetDifferentServiceTypes() {
+        // The fold is lossy and the truncation is brutal: these three all
+        // reduced to "com-example-cha", so three unrelated apps discovered
+        // and connected to each other while NearbyTransport promises service
+        // ids match exactly.
+        String a = IPhoneBuilder.foldBonjourServiceType("com.example.chat");
+        String b = IPhoneBuilder.foldBonjourServiceType("com-example-chat");
+        String c = IPhoneBuilder.foldBonjourServiceType("com.example.charts");
+        assertNotEquals(a, b);
+        assertNotEquals(a, c);
+        assertNotEquals(b, c);
+        for (String t : new String[] {a, b, c}) {
+            assertTrue(t.length() <= 15, t);
+            assertTrue(t.startsWith("com-exampl"), "still recognisable: " + t);
+        }
+    }
+
+    @Test
+    void theSameIdAlwaysFoldsToTheSameType() {
+        // The device registers this type and the build declares it in the
+        // Info.plist; if they ever disagreed iOS would drop the traffic.
+        assertEquals(IPhoneBuilder.foldBonjourServiceType("com.example.chat"),
+                IPhoneBuilder.foldBonjourServiceType("com.example.chat"));
+    }
+
+    @Test
+    void theSuffixIsFourLowercaseAlphanumerics() {
+        for (String id : new String[] {"chat", "123", "a", "com.example.x"}) {
+            String suffix = IPhoneBuilder.bonjourSuffix(id);
+            assertEquals(4, suffix.length(), suffix);
+            for (int i = 0; i < suffix.length(); i++) {
+                char ch = suffix.charAt(i);
+                assertTrue((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z'),
+                        suffix);
+            }
+        }
     }
 }

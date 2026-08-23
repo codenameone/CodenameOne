@@ -320,6 +320,26 @@ public class IPhoneBuilder extends Executor {
         while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
             out.setLength(out.length() - 1);
         }
+        // A stable suffix derived from the WHOLE id, because the fold above
+        // is lossy and the truncation is brutal: "com.example.chat",
+        // "com-example-chat" and "com.example.charts" all reduce to
+        // "com-example-cha", so three unrelated apps would have discovered
+        // and connected to each other while NearbyTransport promises service
+        // ids match exactly. Ten characters of the readable fold plus four of
+        // hash keeps the type recognisable in a packet trace and inside the
+        // fifteen Apple allows.
+        if (out.length() > 10) {
+            out.setLength(10);
+        }
+        while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
+            out.setLength(out.length() - 1);
+        }
+        if (out.length() == 0) {
+            out.append("cn1");
+        }
+        out.append('-').append(bonjourSuffix(serviceId));
+        // NOTE: bonjourSuffix trims and ASCII-lowercases, so the suffix
+        // matches whatever the runtime computes for the same logical id.
         // At least one ASCII LETTER, not merely one legal character. Apple
         // requires it, and an all-digit id like "123" folded to "123" -- which
         // reads as legal and makes MCNearbyServiceAdvertiser RAISE rather than
@@ -344,6 +364,56 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return out.toString();
+    }
+
+    /// Four base-36 characters derived from the whole service id.
+    ///
+    /// FNV-1a over the id's UTF-8 bytes, written out rather than borrowed so
+    /// that `cn1nbServiceType` in CN1Nearby.m can compute the identical value
+    /// -- the type this build declares in the Info.plist has to be the type
+    /// the device registers, or iOS drops the traffic. NearbyBonjourServiceTypeTest
+    /// compares the two.
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceId`: the caller's id, unfolded
+    ///
+    /// #### Returns
+    ///
+    /// exactly four characters of `[0-9a-z]`
+    static String bonjourSuffix(String serviceId) {
+        int hash = 0x811c9dc5;
+        // Trimmed, because a comma-separated hint hands this " files " while
+        // the runtime is handed "files" -- and the two have to agree.
+        String id = serviceId == null ? "" : serviceId.trim();
+        // StandardCharsets rather than the String name, so there is no
+        // unreachable catch whose fallback would silently use the platform
+        // default encoding and produce a different suffix on a different
+        // machine.
+        byte[] bytes = id.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        for (int i = 0; i < bytes.length; i++) {
+            int b = bytes[i] & 0xff;
+            // ASCII-lowercased before hashing, so the suffix is as
+            // case-insensitive as the fold above -- "Chat" and "chat" are one
+            // service, and always were. Done here rather than with
+            // toLowerCase so the Objective-C side can do exactly the same
+            // thing to exactly the same bytes.
+            if (b >= 'A' && b <= 'Z') {
+                b += 'a' - 'A';
+            }
+            hash ^= b;
+            hash *= 16777619;
+        }
+        long positive = ((long) hash) & 0xffffffffL;
+        long value = positive % 1679616L;
+        char[] digits = new char[4];
+        for (int i = 3; i >= 0; i--) {
+            int digit = (int) (value % 36);
+            digits[i] = (char) (digit < 10 ? ('0' + digit)
+                    : ('a' + digit - 10));
+            value /= 36;
+        }
+        return new String(digits);
     }
 
     /// Escapes the three characters that cannot sit in plist text content.

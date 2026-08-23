@@ -549,6 +549,39 @@ static NSString *cn1nbPeerName(NSString *name) {
     return @"Codename One";
 }
 
+/// Four base-36 characters derived from the whole service id.
+///
+/// FNV-1a over the id's UTF-8 bytes. Must stay identical to
+/// `IPhoneBuilder.bonjourSuffix`: the type this device registers has to be the
+/// type the build declared in the Info.plist, or iOS drops the traffic.
+static NSString *cn1nbBonjourSuffix(NSString *serviceId) {
+    uint32_t hash = 0x811c9dc5u;
+    const char *bytes = [serviceId UTF8String];
+    if (bytes != NULL) {
+        for (const unsigned char *p = (const unsigned char *)bytes;
+                *p != '\0'; p++) {
+            unsigned int b = (unsigned int)*p;
+            // ASCII-lowercased before hashing, so the suffix is as
+            // case-insensitive as the fold -- "Chat" and "chat" are one
+            // service. The builder does exactly this to exactly these bytes.
+            if (b >= 'A' && b <= 'Z') {
+                b += 'a' - 'A';
+            }
+            hash ^= (uint32_t)b;
+            hash *= 16777619u;
+        }
+    }
+    uint32_t value = hash % 1679616u;
+    char digits[5];
+    digits[4] = '\0';
+    for (int i = 3; i >= 0; i--) {
+        uint32_t digit = value % 36u;
+        digits[i] = (char)(digit < 10 ? ('0' + digit) : ('a' + digit - 10));
+        value /= 36u;
+    }
+    return [NSString stringWithUTF8String:digits];
+}
+
 static NSString *cn1nbServiceType(NSString *serviceId) {
     NSMutableString *out = [NSMutableString stringWithCapacity:15];
     NSString *lower = [serviceId lowercaseString];
@@ -566,6 +599,24 @@ static NSString *cn1nbServiceType(NSString *serviceId) {
     while ([out hasSuffix:@"-"]) {
         [out deleteCharactersInRange:NSMakeRange([out length] - 1, 1)];
     }
+    // A stable suffix derived from the WHOLE id, because the fold above is
+    // lossy and the truncation is brutal: "com.example.chat",
+    // "com-example-chat" and "com.example.charts" all reduce to
+    // "com-example-cha", so three unrelated apps would have discovered and
+    // connected to each other while NearbyTransport promises service ids
+    // match exactly. Ten characters of the readable fold plus four of hash
+    // keeps the type recognisable and inside the fifteen Apple allows.
+    if ([out length] > 10) {
+        [out deleteCharactersInRange:NSMakeRange(10, [out length] - 10)];
+    }
+    while ([out hasSuffix:@"-"]) {
+        [out deleteCharactersInRange:NSMakeRange([out length] - 1, 1)];
+    }
+    if ([out length] == 0) {
+        [out appendString:@"cn1"];
+    }
+    [out appendString:@"-"];
+    [out appendString:cn1nbBonjourSuffix(serviceId)];
     // At least one ASCII LETTER, not merely one legal character. Apple
     // requires it, and an all-digit id like "123" folded to "123" -- which
     // reads as legal and makes MCNearbyServiceAdvertiser RAISE rather than

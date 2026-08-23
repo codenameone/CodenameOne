@@ -216,12 +216,14 @@ build can't see the strings you pass to `startAdvertising`, so name them in
 with a message telling you which id to add, which beats an app that finds
 nothing and says nothing.
 
-Keep each id short. The platform restricts the folded type to fifteen
-characters of lowercase letters, digits and hyphens, so a reverse-DNS string
-that's legal on Android is folded to fit -- and `com.example.chat` and
-`com.example.charts` fold to the same thing, which would have two unrelated
-apps discovering each other's peers. The build log names every type it
-declared.
+The platform restricts the type to fifteen characters of lowercase letters,
+digits and hyphens, so a reverse-DNS string that's legal on Android is folded
+to fit: `com.example.chat` becomes something like `com-exampl-jd3q`. The last
+four characters are derived from the whole id, because the fold alone is lossy
+-- `com.example.chat` and `com.example.charts` both reduce to
+`com-example-cha`, and without the suffix two unrelated apps would discover
+each other's peers. Case doesn't split a service: `Chat` and `chat` are the
+same id and get the same type. The build log names every type it declared.
 
 Byte payloads are capped at `NearbyTransport.getMaxPayloadSize()`, a few
 kilobytes on both platforms; anything larger goes as a file payload, which

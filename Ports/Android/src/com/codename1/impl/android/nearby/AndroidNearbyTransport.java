@@ -416,8 +416,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public void disconnect(String endpointId) {
+        // The name stays until onDisconnected has used it. That callback
+        // encodes the endpoint through nameOf(), and clearing the cache here
+        // handed the listener an endpoint with an empty name instead of the
+        // peer's advertised one -- and onDisconnected already removes both
+        // mappings itself.
         client().disconnectFromEndpoint(endpointId);
-        endpointNames.remove(endpointId);
     }
 
     public void stopAllTransport() {
