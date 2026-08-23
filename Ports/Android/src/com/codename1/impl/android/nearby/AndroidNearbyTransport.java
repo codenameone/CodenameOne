@@ -356,6 +356,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
         payloadRecipients.put(Long.valueOf(payload.getId()),
                 Integer.valueOf(endpointIds.length));
         java.util.List<String> targets = java.util.Arrays.asList(endpointIds);
+        final Long platformKey = Long.valueOf(payload.getId());
         client().sendPayload(targets, payload)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
@@ -364,6 +365,14 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     public void onFailure(Exception e) {
+                        // The mappings go with the failure. Nearby rejected
+                        // the handoff, so no transfer update will ever arrive
+                        // to clear them -- and every failed send left a pair
+                        // of entries behind for the life of the process, with
+                        // cancelPayload scanning stale payloads for good
+                        // measure.
+                        payloadIds.remove(platformKey);
+                        payloadRecipients.remove(platformKey);
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.IO_ERROR.ordinal(), e.getMessage());
                     }

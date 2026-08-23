@@ -110,12 +110,20 @@ public class LocalNearbyBridge implements NearbyBridge {
     /// passed no strategy is given.
     private int advertiseStrategy = TransportStrategy.CLUSTER.ordinal();
     private int discoverStrategy = TransportStrategy.CLUSTER.ordinal();
-    /// Bumped by every stop, so work queued by an earlier run of the
-    /// transport can tell that it is answering for a transport that has
-    /// since been stopped. Nothing in the simulation completes inline, which
-    /// is the point -- and that means a delayed acceptance really can outlive
-    /// the stop() that was supposed to have ended it.
+    /// Bumped when connections are dropped, so work queued by an earlier run
+    /// of the transport can tell that it is answering for a transport that
+    /// has since been stopped. Nothing in the simulation completes inline,
+    /// which is the point -- and that means a delayed acceptance really can
+    /// outlive the stop() that was supposed to have ended it.
+    ///
+    /// One counter per operation, because advertising, discovery and
+    /// connections are independent. A single shared counter meant
+    /// stopAdvertising() invalidated an unrelated discovery that was still
+    /// starting, and an in-flight connection request with it -- failing calls
+    /// the app never asked to stop.
     private int transportGeneration;
+    private int discoverGeneration;
+    private int advertiseGeneration;
     /// The id of the most recent acceptConnection, so a test can answer it
     /// the way a port would.
     ///
@@ -496,13 +504,28 @@ public class LocalNearbyBridge implements NearbyBridge {
             String localName, int strategy) {
         advertising = true;
         advertiseStrategy = strategy;
-        answerOk(requestId);
+        final int generation = advertiseGeneration;
+        answer(new Runnable() {
+            @Override
+            public void run() {
+                // Stopped before the start was answered, the same race
+                // discovery has: the answer is queued, and a stop can land
+                // in front of it.
+                if (!advertising || generation != advertiseGeneration) {
+                    NearbyTransport.deliverRequestFailed(requestId,
+                            NearbyError.SESSION_INVALIDATED.ordinal(),
+                            "advertising was stopped before it started");
+                    return;
+                }
+                NearbyTransport.deliverRequestOk(requestId);
+            }
+        });
     }
 
     @Override
     public void stopAdvertising() {
         advertising = false;
-        transportGeneration++;
+        advertiseGeneration++;
     }
 
     @Override
@@ -510,7 +533,7 @@ public class LocalNearbyBridge implements NearbyBridge {
             int strategy) {
         discovering = true;
         discoverStrategy = strategy;
-        final int generation = transportGeneration;
+        final int generation = discoverGeneration;
         answer(new Runnable() {
             @Override
             public void run() {
@@ -518,7 +541,7 @@ public class LocalNearbyBridge implements NearbyBridge {
                 // discovery to report into. Reporting endpoints anyway had
                 // the stopped simulator announcing peers nobody had asked
                 // for, which is not what a device does.
-                if (!discovering || generation != transportGeneration) {
+                if (!discovering || generation != discoverGeneration) {
                     NearbyTransport.deliverRequestFailed(requestId,
                             NearbyError.SESSION_INVALIDATED.ordinal(),
                             "discovery was stopped before it started");
@@ -537,8 +560,9 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void stopDiscovery() {
         discovering = false;
         // Bumped so a start still queued for this run of discovery can tell
-        // that it has been stopped, the same way stopAllTransport does.
-        transportGeneration++;
+        // that it has been stopped -- and only THIS counter, so an unrelated
+        // advertise or connection in flight is left alone.
+        discoverGeneration++;
     }
 
     @Override
@@ -620,6 +644,22 @@ public class LocalNearbyBridge implements NearbyBridge {
             connected.add(endpointId);
         }
         answerOk(requestId);
+        // The lifecycle event, which on a real platform arrives from the
+        // connection callback and here had no other source. accept()
+        // documents its outcome as connected or connectionFailed, and
+        // answering the request alone left a listener waiting for an event
+        // that was never going to come.
+        final String accepted = endpointId;
+        answer(new Runnable() {
+            @Override
+            public void run() {
+                SimEndpoint e = findEndpoint(accepted);
+                if (e != null && connected.contains(accepted)) {
+                    NearbyTransport.deliverConnectionResult(e.encode(), true,
+                            0, null);
+                }
+            }
+        });
     }
 
     @Override
@@ -718,7 +758,11 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void stopAllTransport() {
         advertising = false;
         discovering = false;
+        // All three: stop() ends every operation, so anything queued for any
+        // of them is answering for a transport that no longer exists.
         transportGeneration++;
+        discoverGeneration++;
+        advertiseGeneration++;
         cancelledPayloads.clear();
         List<String> doomed = new ArrayList<String>(connected);
         connected.clear();

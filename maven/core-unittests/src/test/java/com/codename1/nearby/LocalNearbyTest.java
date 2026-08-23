@@ -25,6 +25,7 @@ package com.codename1.nearby;
 import com.codename1.impl.nearby.LocalNearbyBridge;
 import com.codename1.util.AsyncResource;
 import com.codename1.impl.nearby.NearbyRequests;
+import com.codename1.impl.nearby.NearbyWire;
 import com.codename1.impl.nearby.SyntheticNearby;
 import com.codename1.nearby.companion.AssociationRequest;
 import com.codename1.nearby.companion.CompanionDevice;
@@ -816,6 +817,70 @@ class LocalNearbyTest {
                 NearbyError.PEER_UNAVAILABLE.ordinal(), "it went away");
         assertEquals(1, failures.size());
         assertSame(NearbyError.PEER_UNAVAILABLE, failures.get(0).getError());
+    }
+
+    @Test
+    void acceptingAnIncomingRequestReportsTheConnection() {
+        // accept() documents its outcome as connected or connectionFailed. On
+        // a real platform the connection callback supplies it; here nothing
+        // did, so a listener waited for an event that was never coming.
+        final AtomicReference<IncomingConnection> held =
+                new AtomicReference<IncomingConnection>();
+        final List<Endpoint> connected = new ArrayList<Endpoint>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void connectionRequested(IncomingConnection request) {
+                held.set(request);
+            }
+
+            @Override
+            public void connected(Endpoint e) {
+                connected.add(e);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        assertNotNull(e);
+        NearbyTransport.deliverConnectionRequested(
+                NearbyWire.encodeEndpoint(e), "9876");
+        held.get().accept();
+        assertEquals(1, connected.size());
+        assertEquals(e.getId(), connected.get(0).getId());
+    }
+
+    @Test
+    void stoppingBeforeAdvertisingStartsFailsThatStart() {
+        // The same race discovery has: the answer is queued, and a stop can
+        // land in front of it.
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        AsyncResource<Boolean> pending = NearbyTransport.startAdvertising(
+                "chat", "me", TransportStrategy.CLUSTER);
+        NearbyTransport.stopAdvertising();
+        drain(queue);
+        assertFailedWith(NearbyError.SESSION_INVALIDATED, pending);
+    }
+
+    @Test
+    void stoppingAdvertisingLeavesAStartingDiscoveryAlone() {
+        // Advertising, discovery and connections are independent. One shared
+        // generation counter meant stopAdvertising() failed an unrelated
+        // discovery that was still starting.
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        AsyncResource<Boolean> discovery = NearbyTransport.startDiscovery(
+                "chat", TransportStrategy.CLUSTER);
+        NearbyTransport.stopAdvertising();
+        drain(queue);
+        // value() asserts it succeeded, naming the failure when it did not.
+        assertTrue(value(discovery).booleanValue(),
+                "an unrelated stop must not fail discovery");
     }
 
     @Test
