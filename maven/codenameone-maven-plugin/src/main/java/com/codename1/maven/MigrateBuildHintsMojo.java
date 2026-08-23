@@ -105,10 +105,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // binding deletes working properties and replaces them with annotations no
         // goal ever reads, so the hints disappear from the build silently.
         if (!processAnnotationsIsBound()) {
-            throw new MojoFailureException("This project does not run the cn1 process-annotations "
-                    + "goal, so build hint annotations would never be turned back into the "
-                    + "codename1.arg.* pairs the builders read, and migrating would silently drop "
-                    + "them.\n\nAdd it to the common module's POM first:\n"
+            File owner = getCN1ProjectDir();
+            throw new MojoFailureException("The module that holds the main class"
+                    + (owner == null ? "" : " (" + owner + ")")
+                    + " does not run the cn1 process-annotations goal, so build hint annotations "
+                    + "would never be turned back into the codename1.arg.* pairs the builders "
+                    + "read, and migrating would silently drop them. The goal only scans the "
+                    + "module it is bound to, so binding it elsewhere in the reactor does not "
+                    + "help.\n\nAdd it to that module's POM first:\n"
                     + "    <execution>\n"
                     + "      <id>cn1-process-classes</id>\n"
                     + "      <phase>process-classes</phase>\n"
@@ -239,24 +243,73 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * lives in the common module.</p>
      */
     private boolean processAnnotationsIsBound() {
+        return moduleOwningTheMainClass() != null;
+    }
+
+    /**
+     * The reactor module that both holds the main class and runs
+     * {@code process-annotations} over it, or null.
+     *
+     * <p>Checking the reactor as a whole is not enough. {@code
+     * ProcessAnnotationsMojo} scans only the output directory of the module it is
+     * bound to, so a binding on a platform or utility module never sees the main
+     * class that {@code common} compiles. The migration would then delete the
+     * properties and leave annotations nothing ever reads.</p>
+     *
+     * <p>The owning module is the one whose base directory is the Codename One
+     * project directory -- the directory holding
+     * {@code codenameone_settings.properties}, which is also where
+     * {@link #findMainClassSource} looks.</p>
+     */
+    private org.apache.maven.project.MavenProject moduleOwningTheMainClass() {
+        File projectDir = getCN1ProjectDir();
+        if (projectDir == null) {
+            return null;
+        }
         java.util.List<org.apache.maven.project.MavenProject> projects = reactorProjects;
         if (projects == null || projects.isEmpty()) {
             projects = java.util.Collections.singletonList(project);
         }
         for (org.apache.maven.project.MavenProject p : projects) {
-            java.util.List<org.apache.maven.model.Plugin> plugins = p.getBuildPlugins();
-            if (plugins == null) {
+            if (p.getBasedir() == null || !sameDirectory(p.getBasedir(), projectDir)) {
                 continue;
             }
-            for (org.apache.maven.model.Plugin plugin : plugins) {
-                if (!"codenameone-maven-plugin".equals(plugin.getArtifactId())) {
+            return bindsProcessAnnotations(p) ? p : null;
+        }
+        return null;
+    }
+
+    private static boolean sameDirectory(File a, File b) {
+        try {
+            return a.getCanonicalFile().equals(b.getCanonicalFile());
+        } catch (IOException ex) {
+            return a.getAbsoluteFile().equals(b.getAbsoluteFile());
+        }
+    }
+
+    /**
+     * Whether this module runs {@code process-annotations} in a real phase.
+     *
+     * <p>An execution bound to {@code none} is declared but never runs, which for
+     * this purpose is the same as not being declared at all.</p>
+     */
+    static boolean bindsProcessAnnotations(org.apache.maven.project.MavenProject p) {
+        java.util.List<org.apache.maven.model.Plugin> plugins = p.getBuildPlugins();
+        if (plugins == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"codenameone-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution e : plugin.getExecutions()) {
+                if (e.getGoals() == null || !e.getGoals().contains("process-annotations")) {
                     continue;
                 }
-                for (org.apache.maven.model.PluginExecution e : plugin.getExecutions()) {
-                    if (e.getGoals() != null && e.getGoals().contains("process-annotations")) {
-                        return true;
-                    }
+                if ("none".equalsIgnoreCase(String.valueOf(e.getPhase()))) {
+                    continue;
                 }
+                return true;
             }
         }
         return false;
