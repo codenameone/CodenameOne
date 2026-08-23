@@ -130,4 +130,25 @@ public class AppExtensionStagingTest {
             out.close();
         }
     }
+
+    @Test
+    public void anInTreeDirectoryCycleIsRefused() throws Exception {
+        File extension = tmp.newFolder("dist", "WalletUIExtension");
+        File sub = new File(extension, "sub");
+        assertTrue(sub.mkdirs());
+        // sub/loop -> . escapes nothing, and every walk over the folder follows it until the
+        // stack ends the build.
+        Files.createSymbolicLink(new File(sub, "loop").toPath(), extension.toPath());
+
+        assertTrue(IPhoneBuilder.symlinkEscaping(extension, extension) != null);
+    }
+
+    @Test
+    public void anInTreeFileLinkIsStillFine() throws Exception {
+        File extension = tmp.newFolder("dist2", "WalletUIExtension");
+        write(new File(extension, "Info.plist"));
+        Files.createSymbolicLink(new File(extension, "alias.plist").toPath(),
+                new File(extension, "Info.plist").toPath());
+        assertNull(IPhoneBuilder.symlinkEscaping(extension, extension));
+    }
 }

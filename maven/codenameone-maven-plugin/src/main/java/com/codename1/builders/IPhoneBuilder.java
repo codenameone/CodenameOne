@@ -4956,7 +4956,16 @@ public class IPhoneBuilder extends Executor {
                             File signingEntitlements = appExtensionSigningEntitlements(appExtension,
                                     buildSettingsMap, extEntitlementsFile, archiveSdk,
                                     archiveConfiguration, archiveArch);
+                            // The BASE setting is copied into every Xcode configuration, so
+                            // writing the archive's answer there hands Debug a minimum belonging
+                            // to Release; it gets the base value, clamped on its own. The
+                            // archive's own answer is what the target is created with.
                             String extDeploymentTarget = appExtensionDeploymentTarget(
+                                    buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
+                                    signingEntitlements,
+                                    request.getArg("ios.deployment_target", null),
+                                    appExtension, buildSettingsMap);
+                            String archiveDeploymentTarget = appExtensionDeploymentTarget(
                                     winningSetting(buildSettingsMap, "IPHONEOS_DEPLOYMENT_TARGET",
                                             archiveSdk, archiveConfiguration, archiveArch),
                                     signingEntitlements,
@@ -4973,7 +4982,7 @@ public class IPhoneBuilder extends Executor {
                             // Guarded so the post-dependency re-run of fix_xcode_schemes.rb
                             // doesn't create duplicate extension targets.
                             sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
-                                    + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '" + extDeploymentTarget + "')\n"
+                                    + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '" + archiveDeploymentTarget + "')\n"
                                     + "xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|e| \n"
                                     + "  e.build_settings['PROVISIONING_PROFILE']='$(APP_PROVISIONING_PROFILE)'\n"
                                     + "  e.build_settings['CODE_SIGN_ENTITLEMENTS']='$(APP_CODE_SIGN_ENTITLEMENTS)'\n"
@@ -6525,8 +6534,12 @@ public class IPhoneBuilder extends Executor {
                 return f;
             }
             if (Files.isSymbolicLink(f.toPath())) {
-                // Inside the folder, so harmless as a path -- but a link to a directory would let
-                // the walk below leave through it, and it is not something an archive needs.
+                if (f.isDirectory()) {
+                    // In-tree, so it escapes nothing -- but sub/loop -> . is a cycle, and every
+                    // other walk over this folder follows it until the stack ends the build. A
+                    // directory symlink is not something an extension needs.
+                    return f;
+                }
                 continue;
             }
             if (f.isDirectory()) {
@@ -7437,8 +7450,12 @@ public class IPhoneBuilder extends Executor {
     }
 
     /// A build-setting reference in either spelling Xcode accepts.
+    /// A build-setting reference, modifiers included: $(NAME), ${NAME} and
+    /// ${NAME:rfc1034identifier}. Without the modifier form an identifier written that way looked
+    /// like plain text -- "fully resolved" -- and the literal expression was recorded as a bundle
+    /// id while Xcode archived the expansion of it.
     private static final Pattern BUILD_SETTING_REFERENCE =
-            Pattern.compile("\\$[({][A-Za-z0-9_]+[)}]");
+            Pattern.compile("\\$[({][A-Za-z0-9_]+(?::[A-Za-z0-9_]+)*[)}]");
 
     /// Expansion passes before a value is called unresolvable. Settings nest a level or two in
     /// practice; the cap is what stops A = $(B), B = $(A) from spinning.
@@ -7446,7 +7463,49 @@ public class IPhoneBuilder extends Executor {
 
     /// One build setting, in either of the two spellings Xcode accepts for a reference.
     private static String replaceBuildSetting(String path, String name, String value) {
-        return path.replace("$(" + name + ")", value).replace("${" + name + "}", value);
+        String out = path.replace("$(" + name + ")", value).replace("${" + name + "}", value);
+        return applyModifiers(out, name, value);
+    }
+
+    /// Expands $(NAME:modifier) for the modifiers Xcode defines and this can reproduce.
+    ///
+    /// rfc1034identifier is the one that matters here: it is how an extension's identifier is
+    /// ordinarily written from a product name, ${PRODUCT_NAME:rfc1034identifier}, and Xcode
+    /// archives the expansion. A modifier this does not know is left in place, which keeps the
+    /// value "not fully resolved" rather than recording an expression as an identifier.
+    private static String applyModifiers(String value, String name, String settingValue) {
+        Matcher reference = Pattern.compile("\\$[({]" + Pattern.quote(name)
+                + "((?::[A-Za-z0-9_]+)+)[)}]").matcher(value);
+        StringBuffer out = new StringBuffer();
+        while (reference.find()) {
+            String expanded = settingValue;
+            boolean known = true;
+            for (String modifier : reference.group(1).split(":")) {
+                if (modifier.length() == 0) {
+                    continue;
+                }
+                if ("lower".equalsIgnoreCase(modifier)) {
+                    expanded = expanded.toLowerCase(java.util.Locale.ENGLISH);
+                } else if ("upper".equalsIgnoreCase(modifier)) {
+                    expanded = expanded.toUpperCase(java.util.Locale.ENGLISH);
+                } else if ("rfc1034identifier".equalsIgnoreCase(modifier)) {
+                    // Anything outside a host-name label becomes a hyphen, which is what Xcode
+                    // does to make a product name usable in a bundle identifier.
+                    expanded = expanded.replaceAll("[^A-Za-z0-9.-]", "-");
+                } else if ("identifier".equalsIgnoreCase(modifier)
+                        || "c99extidentifier".equalsIgnoreCase(modifier)) {
+                    expanded = expanded.replaceAll("[^A-Za-z0-9_]", "_");
+                } else {
+                    known = false;
+                    break;
+                }
+            }
+            reference.appendReplacement(out, known
+                    ? Matcher.quoteReplacement(expanded)
+                    : Matcher.quoteReplacement(reference.group()));
+        }
+        reference.appendTail(out);
+        return out.toString();
     }
 
     /**

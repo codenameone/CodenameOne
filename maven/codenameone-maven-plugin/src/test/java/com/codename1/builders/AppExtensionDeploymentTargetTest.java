@@ -640,4 +640,24 @@ public class AppExtensionDeploymentTargetTest {
                 "iphoneos14.4", "Release", "arm64");
         assertTrue(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]"));
     }
+
+    @Test
+    public void aModifierReferenceResolvesAsXcodeExpandsIt() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_NAME", "Wallet UI");
+        // ${PRODUCT_NAME:rfc1034identifier} is the ordinary way to write this, and treating it as
+        // plain text recorded the expression itself as the bundle identifier.
+        assertEquals("com.example.app.Wallet-UI", IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.${PRODUCT_NAME:rfc1034identifier}", settings));
+        assertEquals("com.example.app.wallet ui", IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.$(PRODUCT_NAME:lower)", settings));
+    }
+
+    @Test
+    public void aModifierThisBuildDoesNotKnowIsNotCalledResolved() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_NAME", "Wallet");
+        assertNull(IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.$(PRODUCT_NAME:somethingNew)", settings));
+    }
 }
