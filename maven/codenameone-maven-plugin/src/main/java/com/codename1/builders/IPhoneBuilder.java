@@ -6121,12 +6121,18 @@ public class IPhoneBuilder extends Executor {
     ///
     /// @return the archive's own context for an unqualified candidate
     static ArchiveContext infoPlistCandidateContext(String candidateKey, ArchiveContext context) {
-        int open = candidateKey == null ? -1 : candidateKey.indexOf('[');
-        int close = open < 0 ? -1 : candidateKey.indexOf(']', open);
-        if (close < 0) {
+        if (candidateKey == null) {
             return context;
         }
-        return contextForCondition(candidateKey.substring(0, close + 1), context);
+        // Everything up to the " = " this method's callers append, and no less. Cutting at the
+        // first ']' instead dropped every qualifier group after the first, so
+        // INFOPLIST_FILE[config=Debug][sdk=iphonesimulator*] was read as a Debug candidate on the
+        // archive's own SDK -- and an SDK-qualified version helper inside that plist then looked
+        // correct and was left, while the build that uses the file expands it to another value.
+        // A settings key cannot contain " = ", so the first occurrence is the separator.
+        int separator = candidateKey.indexOf(" = ");
+        String key = separator < 0 ? candidateKey : candidateKey.substring(0, separator);
+        return key.indexOf('[') < 0 ? context : contextForCondition(key, context);
     }
 
     /// @param context this archive, so INFOPLIST_FILE = $(CONFIGURATION)/Info.plist resolves to

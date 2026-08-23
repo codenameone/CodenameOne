@@ -587,4 +587,32 @@ public class AppExtensionInfoPlistTest {
                 "INFOPLIST_FILE = WalletUIExtension/Info.plist", release));
         assertSame(release, IPhoneBuilder.infoPlistCandidateContext("Info.plist", release));
     }
+
+    @Test
+    public void everyQualifierGroupReachesTheCandidatesContext() {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        IPhoneBuilder.ArchiveContext release = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", settings);
+
+        // Cut at the first ']' this read as a Debug candidate on the archive's own SDK, so an
+        // SDK-qualified helper inside that plist was judged against the device values and left
+        // as it was.
+        IPhoneBuilder.ArchiveContext both = IPhoneBuilder.infoPlistCandidateContext(
+                "INFOPLIST_FILE[config=Debug][sdk=iphonesimulator*] = $(CONFIGURATION)/Info.plist",
+                release);
+        assertEquals("Debug", both.configuration);
+        assertEquals("iphonesimulator*", both.sdk);
+
+        // One group, and the grouped form Xcode also accepts.
+        assertEquals("Debug", IPhoneBuilder.infoPlistCandidateContext(
+                "INFOPLIST_FILE[config=Debug] = Debug/Info.plist", release).configuration);
+        IPhoneBuilder.ArchiveContext commaSeparated = IPhoneBuilder.infoPlistCandidateContext(
+                "INFOPLIST_FILE[config=Debug,arch=x86_64] = Debug/Info.plist", release);
+        assertEquals("Debug", commaSeparated.configuration);
+        assertEquals("x86_64", commaSeparated.arch);
+
+        // And a path that happens to contain a bracket is not a qualifier.
+        assertSame(release, IPhoneBuilder.infoPlistCandidateContext(
+                "INFOPLIST_FILE = Wallet[beta]/Info.plist", release));
+    }
 }
