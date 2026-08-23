@@ -50,6 +50,7 @@ import com.codename1.nearby.companion.CompanionDevices;
 import com.codename1.nearby.spi.NearbyBridge;
 import com.codename1.ui.Display;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -72,16 +73,30 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// the port's own IntentResultListener constants.
     private static final int ASSOCIATE_REQUEST = 0x4E42;
 
-    /// The activity this backend was built with, used only when the port has
-    /// no current one.
-    private final Activity initialActivity;
+    /// The activity this backend was built with, used only when the port
+    /// has no current one.
+    ///
+    /// WEAK. This backend is built once and cached for the life of the
+    /// process, while Android destroys and recreates the activity freely --
+    /// so a strong field here pinned the very first activity, its context
+    /// and its whole view hierarchy in memory until the process died, for an
+    /// app that associated one accessory at startup and never came back.
+    /// Everything with a lifetime of its own uses appContext instead.
+    private final WeakReference<Activity> initialActivity;
+
+    /// The application context, which outlives every activity and leaks
+    /// nothing by being held.
+    private final Context appContext;
     private final NearbyBridge ranging;
     private final NearbyBridge transport;
 
     private int pendingAssociateRequest;
 
     public AndroidNearbyBackend(Activity activity) {
-        this.initialActivity = activity;
+        this.initialActivity = new WeakReference<Activity>(activity);
+        Context app = activity == null ? null : activity
+                .getApplicationContext();
+        this.appContext = app != null ? app : activity;
         this.ranging = load("com.codename1.impl.android.nearby."
                 + "AndroidUwbRanging");
         this.transport = load("com.codename1.impl.android.nearby."
@@ -90,7 +105,17 @@ public class AndroidNearbyBackend implements NearbyBridge {
 
     /// The activity the association's result listener is installed on, or
     /// null when none is.
-    private Activity listeningOn;
+    ///
+    /// Weak for the reason initialActivity is, and cleared as soon as the
+    /// result settles: an association that completed normally used to leave
+    /// its host activity referenced here until the next association replaced
+    /// it, which for most apps is never.
+    private WeakReference<Activity> listeningOn;
+
+    /// The activity listeningOn refers to, or null once it is gone.
+    private Activity listeningActivity() {
+        return listeningOn == null ? null : listeningOn.get();
+    }
 
     /// Re-installs the association result listener on the activity that
     /// replaced the one it was on.
@@ -107,7 +132,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
             return;
         }
         Activity current = currentActivity();
-        if (current == null || current == listeningOn) {
+        if (current == null || current == listeningActivity()) {
             return;
         }
         CompanionDeviceManager cdm = manager();
@@ -136,7 +161,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// a host nothing would ever deliver to.
     private Activity currentActivity() {
         Activity current = AndroidImplementation.getActivity();
-        return current != null ? current : initialActivity;
+        return current != null ? current : initialActivity.get();
     }
 
     /// The context the optional backends hold.
@@ -145,12 +170,8 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// bridge does and use it only for package manager, permission and
     /// content-resolver lookups, so holding a destroyed activity would be a
     /// leak with no upside.
-    private android.content.Context contextForBackends() {
-        if (initialActivity == null) {
-            return null;
-        }
-        android.content.Context app = initialActivity.getApplicationContext();
-        return app != null ? app : initialActivity;
+    private Context contextForBackends() {
+        return appContext;
     }
 
     private NearbyBridge load(String className) {
@@ -583,7 +604,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // told apart from the ones this app already had.
         final Set<String> before = associationKeys(cdm);
         final CodenameOneActivity host = (CodenameOneActivity) current;
-        listeningOn = current;
+        listeningOn = new WeakReference<Activity>(current);
         host.setIntentResultListener(new IntentResultListener() {
             public void onActivityResult(int requestCode, int resultCode,
                     Intent data) {
@@ -591,6 +612,9 @@ public class AndroidNearbyBackend implements NearbyBridge {
                     return;
                 }
                 host.restoreIntentResultListener();
+                // Dropped here, not only when the next association replaces
+                // it: the flow this listener belongs to is over.
+                listeningOn = null;
                 pendingAssociateRequest = 0;
                 if (resultCode != Activity.RESULT_OK) {
                     CompanionDevices.deliverRequestFailed(requestId,

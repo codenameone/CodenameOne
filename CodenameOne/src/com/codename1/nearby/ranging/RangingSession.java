@@ -109,7 +109,7 @@ public final class RangingSession {
             return failedSession(NearbyError.INVALID_TOKEN,
                     "a peer token is required");
         }
-        NearbyException busy = checkStartable();
+        NearbyException busy = reserveStart();
         if (busy != null) {
             EdtResult<RangingSession> out = new EdtResult<RangingSession>();
             out.error(busy);
@@ -118,7 +118,6 @@ public final class RangingSession {
         NearbyBridge b = NearbyRequests.bridge();
         int id = NearbyRequests.nextId();
         EdtResult<RangingSession> out = Ranging.pendingSessions().open(id);
-        starting = true;
         Ranging.trackStarting(id, this);
         b.startRanging(id, handle, peerToken.toByteArray());
         return out;
@@ -154,7 +153,7 @@ public final class RangingSession {
                     "accessory configuration data is required"));
             return out;
         }
-        NearbyException busy = checkStartable();
+        NearbyException busy = reserveStart();
         if (busy != null) {
             EdtResult<byte[]> out = new EdtResult<byte[]>();
             out.error(busy);
@@ -163,7 +162,6 @@ public final class RangingSession {
         NearbyBridge b = NearbyRequests.bridge();
         int id = NearbyRequests.nextId();
         EdtResult<byte[]> out = Ranging.pendingAccessory().open(id);
-        starting = true;
         Ranging.trackStarting(id, this);
         b.startAccessoryRanging(id, handle, accessoryConfigurationData);
         return out;
@@ -438,8 +436,8 @@ public final class RangingSession {
     void markRunning() {
         synchronized (SESSIONS) {
             running = true;
+            starting = false;
         }
-        starting = false;
     }
 
     /// True once [#stop] or an invalidation has finished this session.
@@ -462,7 +460,9 @@ public final class RangingSession {
     /// The obvious retry after a bad token exchange is exactly the case that
     /// hit it.
     void markStartFailed() {
-        starting = false;
+        synchronized (SESSIONS) {
+            starting = false;
+        }
     }
 
     private RangingListener[] snapshot() {
@@ -471,20 +471,38 @@ public final class RangingSession {
         }
     }
 
-    private NearbyException checkStartable() {
-        if (isClosed()) {
-            return new NearbyException(NearbyError.SESSION_INVALIDATED,
-                    "this session has been stopped; prepare another");
+    /// Claims this session for a start, or says why it cannot be claimed.
+    ///
+    /// The check and the reservation are ONE operation, under the monitor
+    /// that guards these flags. As two, `start` and `startAccessory` racing
+    /// from different threads both passed the check before either set the
+    /// flag, and both went on to issue a native start for the same session:
+    /// on iOS the second replaced the first pendingStartRequest and left
+    /// that AsyncResource pending for good, and on Android the second
+    /// subscription replaced the first, so the session measured but nothing
+    /// answered the call that asked for it.
+    ///
+    /// #### Returns
+    ///
+    /// null when the caller now owns the start, otherwise the reason it
+    /// does not -- and in that case nothing was reserved
+    private NearbyException reserveStart() {
+        synchronized (SESSIONS) {
+            if (closed) {
+                return new NearbyException(NearbyError.SESSION_INVALIDATED,
+                        "this session has been stopped; prepare another");
+            }
+            if (running || starting) {
+                return new NearbyException(NearbyError.BUSY,
+                        "this session is already ranging");
+            }
+            if (NearbyRequests.bridge() == null) {
+                return new NearbyException(NearbyError.NOT_SUPPORTED,
+                        "this platform does not support precision ranging");
+            }
+            starting = true;
+            return null;
         }
-        if (running || starting) {
-            return new NearbyException(NearbyError.BUSY,
-                    "this session is already ranging");
-        }
-        if (NearbyRequests.bridge() == null) {
-            return new NearbyException(NearbyError.NOT_SUPPORTED,
-                    "this platform does not support precision ranging");
-        }
-        return null;
     }
 
     private AsyncResource<RangingSession> failedSession(NearbyError error,
