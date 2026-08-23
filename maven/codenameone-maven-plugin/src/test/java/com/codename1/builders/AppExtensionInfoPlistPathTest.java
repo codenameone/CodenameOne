@@ -32,6 +32,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
 
 public class AppExtensionInfoPlistPathTest {
@@ -184,5 +186,29 @@ public class AppExtensionInfoPlistPathTest {
         } finally {
             out.close();
         }
+    }
+
+    @Test
+    public void theContainingAppsPlistIsNotStamped() throws Exception {
+        File dist = tmp.newFolder("hostplist");
+        File appSrc = new File(dist, "MyApp-src");
+        assertTrue(appSrc.mkdirs());
+        File hostPlist = new File(appSrc, "MyApp-Info.plist");
+        assertTrue(hostPlist.createNewFile());
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File ownPlist = new File(extension, "Info.plist");
+        assertTrue(ownPlist.createNewFile());
+
+        // Everything under the project directory is writable on purpose, so an extension setting
+        // that names the app's own plist -- by relative path or through a reference -- reaches
+        // the stamper like any other candidate. What would be written there is an EXTENSION's
+        // identity: the app's version, or its identifier handed to a $(PRODUCT_BUNDLE_IDENTIFIER)
+        // that means something else in the app target.
+        assertTrue(IPhoneBuilder.isHostAppInfoPlist(hostPlist, dist, "MyApp"));
+        assertTrue(IPhoneBuilder.isHostAppInfoPlist(
+                new File(extension, "../MyApp-src/MyApp-Info.plist"), dist, "MyApp"));
+        assertFalse(IPhoneBuilder.isHostAppInfoPlist(ownPlist, dist, "MyApp"));
+        assertFalse(IPhoneBuilder.isHostAppInfoPlist(hostPlist, dist, null));
     }
 }

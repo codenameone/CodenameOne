@@ -5870,6 +5870,27 @@ public class IPhoneBuilder extends Executor {
                         + ".ios.appext archive.");
                 continue;
             }
+            if (isHostAppInfoPlist(infoPlist, appExtension.getParentFile(), request.getMainClass())) {
+                // The app's OWN plist, named by one of the extension's settings. Everything under
+                // the project directory is writable on purpose -- an extension may share a plist
+                // that sits beside its folder -- but the identity written here is an EXTENSION's,
+                // and putting it in the container rewrites the app's version or hands its
+                // identifier to $(PRODUCT_BUNDLE_IDENTIFIER), which for the app target is a
+                // different value entirely.
+                //
+                // Note this is about the FILE, not about the condition. Every candidate is
+                // stamped, applicable or not, because the generated project keeps them all and a
+                // Debug rebuild off sources.tar.bz2 ships whichever one it names -- an unstamped
+                // one then carries the stale identity Apple rejects. Skipping the inactive ones
+                // instead would leave that hole open AND leave this one, since an ACTIVE setting
+                // naming the app's plist would still be written. Do not swap this guard for a
+                // conditionApplies() filter without a test that covers both.
+                debug("The " + appExtension.getName() + " app extension names '" + candidate.getKey()
+                        + "' as an Info.plist, and that is the containing app's own plist. An "
+                        + "extension's bundle identity does not belong in it, so it was left as "
+                        + "it is; point INFOPLIST_FILE at a plist inside the extension.");
+                continue;
+            }
             if (!stamped.add(infoPlist.getCanonicalPath())) {
                 // Two settings naming the same file. Stamping is idempotent, but saying so twice
                 // in the log reads like two files were touched.
@@ -6067,6 +6088,28 @@ public class IPhoneBuilder extends Executor {
     /// null when that value is unresolvable or lands outside the project directory
     static Map<String, File> appExtensionInfoPlists(File extensionFolder) {
         return appExtensionInfoPlists(extensionFolder, null);
+    }
+
+    /// Whether this path is the containing app's own Info.plist.
+    ///
+    /// The generated project puts it at {@code <dist>/<MainClass>-src/<MainClass>-Info.plist},
+    /// which is inside the project directory and therefore writable -- so an extension setting
+    /// that names it, by relative path or through a reference, reaches the stamper like any
+    /// other candidate.
+    ///
+    /// @return false when anything here is unknown, since a path that cannot be compared is not
+    /// one to declare safe
+    static boolean isHostAppInfoPlist(File candidate, File distDir, String mainClass) {
+        if (candidate == null || distDir == null || mainClass == null
+                || mainClass.length() == 0) {
+            return false;
+        }
+        File host = new File(new File(distDir, mainClass + "-src"), mainClass + "-Info.plist");
+        try {
+            return candidate.getCanonicalPath().equals(host.getCanonicalPath());
+        } catch (IOException cannotResolve) {
+            return false;
+        }
     }
 
     /// The context a candidate from {@link #appExtensionInfoPlists} belongs to.
