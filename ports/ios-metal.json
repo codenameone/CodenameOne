@@ -1,36 +1,36 @@
 {
-  "commit": "c2732fd24ff606421f361f239792cc2d717ce47d",
-  "generated_at": "2026-08-23T10:35:55Z",
+  "commit": "73bd710543cba1d6728b9e0e92d436fb0d95580a",
+  "generated_at": "2026-08-23T14:48:34Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 312898000
+        "duration_ns": 293811000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 23531000
+        "duration_ns": 23683000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 142431000
+        "duration_ns": 150891000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 94978000
+        "duration_ns": 77822000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 393993000
+        "duration_ns": 301359000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 139869000
+        "duration_ns": 125000000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 175892000
+        "duration_ns": 162534000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-metal",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32613256755",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32636698135",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 175,
+    "pass": 176,
     "skip": 4
   },
   "tests": {
@@ -451,6 +451,10 @@
     },
     "LocalNotificationOverrideTest": {
       "feature": "notifications",
+      "status": "pass"
+    },
+    "LogSubclassCaptureTest": {
+      "feature": "logging-diagnostics",
       "status": "pass"
     },
     "LottieAnimatedScreenshotTest": {
