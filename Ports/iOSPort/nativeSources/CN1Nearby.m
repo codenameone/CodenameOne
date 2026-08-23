@@ -149,6 +149,18 @@ static void cn1nbTransportOk(int requestId) {
             getThreadLocalData(), requestId);
 }
 
+/// How long a start is given to fail before it is called a success.
+///
+/// MultipeerConnectivity accepts startAdvertisingPeer and
+/// startBrowsingForPeers synchronously and rejects them later, through
+/// didNotStartAdvertisingPeer / didNotStartBrowsingForPeers -- an unavailable
+/// radio, a service type it will not take. Answering the caller straight away
+/// meant the AsyncResource had already resolved true by the time the refusal
+/// arrived, so the refusal had nowhere to go and the app was left believing
+/// it was advertising. The refusals that do come, come immediately; half a
+/// second is long enough to catch them and short enough not to be felt.
+#define CN1_NEARBY_START_GRACE_NS (500ull * NSEC_PER_MSEC)
+
 // =====================================================================
 // Ranging -- Nearby Interaction
 // =====================================================================
@@ -354,6 +366,10 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
 @property (nonatomic, retain) NSString *discoverServiceId;
 /// Peer id to the unfolded service id the peer was seen on.
 @property (nonatomic, retain) NSMutableDictionary *serviceIdByPeer;
+/// Counts received files, so two with the same name get different paths.
+/// Read and written under @synchronized(self): MultipeerConnectivity
+/// delivers from a queue per session, so two arrivals really can race.
+@property (nonatomic, assign) int receiveSequence;
 @end
 
 static CN1NearbyTransport *cn1nbTransport = nil;
@@ -481,13 +497,48 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 /// Drops one endpoint's session and forgets it.
 - (void)closeSessionFor:(NSString *)endpointId {
-    MCSession *session = [self.sessionsById objectForKey:endpointId];
+    // Retained across the removal. The dictionary is ordinarily the only
+    // owner of this session -- it was created autoreleased and the pool it
+    // was created in has long since drained -- so removing the entry first
+    // released it, and the two messages below then went to freed memory.
+    MCSession *session = [[[self.sessionsById objectForKey:endpointId] retain]
+            autorelease];
     if (session == nil) {
         return;
     }
     [self.sessionsById removeObjectForKey:endpointId];
     session.delegate = nil;
     [session disconnect];
+}
+
+/// Records one recipient's transfer so cancel can reach it.
+///
+/// #### Parameters
+///
+/// - `progress`: the transfer
+/// - `payloadId`: the payload every recipient of this send shares
+- (void)rememberProgress:(NSProgress *)progress forPayload:(JAVA_INT)payloadId {
+    NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
+    NSMutableArray *all = [self.progressByPayload objectForKey:key];
+    if (all == nil) {
+        all = [NSMutableArray array];
+        [self.progressByPayload setObject:all forKey:key];
+    }
+    [all addObject:progress];
+}
+
+/// Forgets the transfers in `holder`, and the payload entry once the last
+/// recipient is done with it.
+- (void)forgetProgress:(NSArray *)holder forPayload:(JAVA_INT)payloadId {
+    NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
+    NSMutableArray *all = [self.progressByPayload objectForKey:key];
+    if (all == nil) {
+        return;
+    }
+    [all removeObjectsInArray:holder];
+    if ([all count] == 0) {
+        [self.progressByPayload removeObjectForKey:key];
+    }
 }
 
 /// How many peers are connected across every session.
@@ -670,15 +721,25 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         }
         NSString *docs = [NSSearchPathForDirectoriesInDomains(
                 NSDocumentDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+        // Unique per transfer, not per name. Built from the basename alone,
+        // a second "photo.jpg" from any peer overwrote the first -- and the
+        // first Payload had already been handed to the app as an immutable
+        // path, so its contents changed under it. The payload id is not
+        // enough on its own either: two peers can each send their own id 1.
+        int received;
+        @synchronized (self) {
+            received = ++self->_receiveSequence;
+        }
         NSString *target = [docs stringByAppendingPathComponent:
-                [NSString stringWithFormat:@"cn1nearby-%@", safe]];
+                [NSString stringWithFormat:@"cn1nearby-%d-%d-%@",
+                        (int)filePayloadId, received, safe]];
         // Belt and braces: whatever the name folded to, the result has to
         // stay inside the directory it was built from.
         if (![[target stringByStandardizingPath]
                 hasPrefix:[docs stringByStandardizingPath]]) {
             com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
-                    getThreadLocalData(), cn1nbJString(encoded), 0, 0, -1,
-                    CN1_NEARBY_PAYLOAD_FAILURE);
+                    getThreadLocalData(), cn1nbJString(encoded),
+                    filePayloadId, 0, -1, CN1_NEARBY_PAYLOAD_FAILURE);
             return;
         }
         [[NSFileManager defaultManager] removeItemAtPath:target error:nil];
@@ -687,9 +748,13 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
                                                 toPath:target
                                                  error:&moveError];
         if (moveError != nil) {
+            // The recovered id, not zero. The sender's id has already been
+            // parsed out of the resource name at this point, and reporting
+            // the failure under 0 left the receiver unable to match it to the
+            // payload or to the progress it had been watching.
             com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
-                    getThreadLocalData(), cn1nbJString(encoded), 0, 0, -1,
-                    CN1_NEARBY_PAYLOAD_FAILURE);
+                    getThreadLocalData(), cn1nbJString(encoded),
+                    filePayloadId, 0, -1, CN1_NEARBY_PAYLOAD_FAILURE);
             return;
         }
         com_codename1_impl_ios_IOSNearbyCallbacks_payloadReceived___java_lang_String_int_int_byte_1ARRAY_java_lang_String(
@@ -893,6 +958,41 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
     }
     cn1nbApplyLocalName(cn1nbTransport, localName);
     return cn1nbTransport;
+}
+
+/// Answers a start request once the framework has had its chance to refuse it.
+///
+/// A second answer is harmless -- the Java side takes a pending request out of
+/// its map, so whichever of this and the delegate's failure arrives first
+/// wins and the other is dropped -- which is what makes the race between them
+/// safe rather than merely unlikely.
+///
+/// #### Parameters
+///
+/// - `t`: the transport
+/// - `advertising`: YES for advertising, NO for discovery
+/// - `requestId`: the request to answer
+static void cn1nbSettleTransportStart(CN1NearbyTransport *t, BOOL advertising,
+        int requestId) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                    (int64_t)CN1_NEARBY_START_GRACE_NS),
+            dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            int pending = advertising ? t.pendingAdvertiseRequest
+                    : t.pendingDiscoverRequest;
+            if (pending != requestId) {
+                // Already failed by the delegate, already answered by a stop,
+                // or superseded by a newer start. Not ours to answer.
+                return;
+            }
+            if (advertising) {
+                t.pendingAdvertiseRequest = 0;
+            } else {
+                t.pendingDiscoverRequest = 0;
+            }
+            cn1nbTransportOk(requestId);
+        }
+    });
 }
 
 #endif // CN1_NEARBY_HAS_MPC
@@ -1540,7 +1640,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
         // after this returns, and it needs the id to fail.
         t.pendingAdvertiseRequest = requestId;
         [t.advertiser startAdvertisingPeer];
-        cn1nbTransportOk(requestId);
+        cn1nbSettleTransportStart(t, YES, requestId);
         return;
     }
 #endif
@@ -1556,7 +1656,16 @@ void com_codename1_impl_ios_IOSNative_nearbyStopAdvertising__(
             [cn1nbTransport.advertiser stopAdvertisingPeer];
             cn1nbTransport.advertiser.delegate = nil;
             cn1nbTransport.advertiser = nil;
+            // Answered on the way out. Advertising DID start -- the framework
+            // took it -- and stopping before the grace period elapsed would
+            // otherwise leave the start's AsyncResource unresolved for good,
+            // because the deferred answer only fires for a request that is
+            // still pending.
+            int pending = cn1nbTransport.pendingAdvertiseRequest;
             cn1nbTransport.pendingAdvertiseRequest = 0;
+            if (pending != 0) {
+                cn1nbTransportOk(pending);
+            }
         }
     }
 #endif
@@ -1584,7 +1693,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
         t.browser.delegate = t;
         t.pendingDiscoverRequest = requestId;
         [t.browser startBrowsingForPeers];
-        cn1nbTransportOk(requestId);
+        cn1nbSettleTransportStart(t, NO, requestId);
         return;
     }
 #endif
@@ -1600,7 +1709,12 @@ void com_codename1_impl_ios_IOSNative_nearbyStopDiscovery__(
             [cn1nbTransport.browser stopBrowsingForPeers];
             cn1nbTransport.browser.delegate = nil;
             cn1nbTransport.browser = nil;
+            // Answered on the way out, for the reason stopAdvertising is.
+            int pending = cn1nbTransport.pendingDiscoverRequest;
             cn1nbTransport.pendingDiscoverRequest = 0;
+            if (pending != 0) {
+                cn1nbTransportOk(pending);
+            }
         }
     }
 #endif
@@ -1651,9 +1765,14 @@ void com_codename1_impl_ios_IOSNative_nearbyAcceptConnection___int_java_lang_Str
 #ifdef CN1_NEARBY_HAS_MPC
     @autoreleasepool {
         NSString *pid = toNSString(CN1_THREAD_STATE_PASS_ARG endpointId);
+        // Retained across the removal. The dictionary is the only owner of
+        // the copied block by the time the app answers -- the pool the
+        // delegate autoreleased it into drained long ago -- so removing the
+        // entry first freed the block and calling it crashed.
         void (^handler)(BOOL, MCSession *) =
                 cn1nbTransport == nil ? nil
-                        : [cn1nbTransport.invitations objectForKey:pid];
+                        : [[[cn1nbTransport.invitations objectForKey:pid]
+                                retain] autorelease];
         if (handler == nil) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
                     @"there is no invitation from that endpoint");
@@ -1678,7 +1797,8 @@ void com_codename1_impl_ios_IOSNative_nearbyRejectConnection___java_lang_String(
         }
         NSString *pid = toNSString(CN1_THREAD_STATE_PASS_ARG endpointId);
         void (^handler)(BOOL, MCSession *) =
-                [cn1nbTransport.invitations objectForKey:pid];
+                [[[cn1nbTransport.invitations objectForKey:pid] retain]
+                        autorelease];
         if (handler != nil) {
             [cn1nbTransport.invitations removeObjectForKey:pid];
             handler(NO, nil);
@@ -1729,6 +1849,10 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                 MCPeerID *peer = [peers objectAtIndex:i];
                 MCSession *session = [cn1nbTransport
                         sessionFor:[peerIds objectAtIndex:i]];
+                // Captured by the completion block so it can forget exactly
+                // its own progress. A block cannot capture the __block-free
+                // NSProgress before it exists, so the holder stands in.
+                NSMutableArray *progressHolder = [NSMutableArray array];
                 NSProgress *progress = [session sendResourceAtURL:url
                         withName:sentName
                           toPeer:peer
@@ -1740,17 +1864,26 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                                 payloadId, 0, -1,
                                 error == nil ? CN1_NEARBY_PAYLOAD_SUCCESS
                                         : CN1_NEARBY_PAYLOAD_FAILURE);
-                        [cn1nbTransport.progressByPayload removeObjectForKey:
-                                [NSNumber numberWithInt:(int)payloadId]];
+                        // Only THIS recipient's transfer is finished. The
+                        // others under the same payload id are still going,
+                        // and dropping the whole entry here left them
+                        // uncancellable.
+                        [cn1nbTransport forgetProgress:progressHolder
+                                            forPayload:payloadId];
                     }
                 }];
                 // Retained so cancel() can actually stop a large transfer.
                 // Without it cancelling did nothing at all: the file kept
                 // going, kept using the radio, and could still report success.
+                //
+                // One entry per RECIPIENT. Keyed by payload id alone, a send
+                // to three peers stored three progresses under one key and
+                // kept only the last, so cancel() stopped one transfer and
+                // the other two ran to completion reporting success.
                 if (progress != nil) {
-                    [cn1nbTransport.progressByPayload
-                            setObject:progress
-                               forKey:[NSNumber numberWithInt:(int)payloadId]];
+                    [progressHolder addObject:progress];
+                    [cn1nbTransport rememberProgress:progress
+                                          forPayload:payloadId];
                 }
             }
             cn1nbTransportOk(requestId);
@@ -1821,10 +1954,10 @@ void com_codename1_impl_ios_IOSNative_nearbyCancelPayload___int(
         // time anything could ask, which is the same outcome an app gets from
         // cancelling one anywhere.
         NSNumber *key = [NSNumber numberWithInt:payloadId];
-        NSProgress *progress = [cn1nbTransport.progressByPayload
-                objectForKey:key];
-        if (progress != nil) {
-            [cn1nbTransport.progressByPayload removeObjectForKey:key];
+        NSArray *all = [[[cn1nbTransport.progressByPayload objectForKey:key]
+                copy] autorelease];
+        [cn1nbTransport.progressByPayload removeObjectForKey:key];
+        for (NSProgress *progress in all) {
             [progress cancel];
         }
     }

@@ -108,23 +108,27 @@ final class NearbyManifestFragments {
                     legacyCap);
             out = addPermission(out, "android.permission.BLUETOOTH_ADMIN",
                     legacyCap);
-            if (modern) {
-                out = addPermission(out, "android.permission.BLUETOOTH_SCAN",
-                        " android:usesPermissionFlags=\"neverForLocation\"");
-                out = addPermission(out,
-                        "android.permission.BLUETOOTH_ADVERTISE", "");
-                out = addPermission(out, "android.permission.BLUETOOTH_CONNECT",
-                        "");
-            }
+            // Declared whatever the app targets, for the same reason
+            // UWB_RANGING above is. A permission is asked for at RUNTIME
+            // according to the level the app is actually running under, and
+            // requesting one the manifest does not declare is refused
+            // instantly with no prompt -- so a target-30 app on Android 12
+            // could not ask for BLUETOOTH_SCAN at all. A device below 31
+            // ignores permissions it has never heard of, so declaring them
+            // costs an older device nothing.
+            out = addPermission(out, "android.permission.BLUETOOTH_SCAN",
+                    " android:usesPermissionFlags=\"neverForLocation\"");
+            out = addPermission(out,
+                    "android.permission.BLUETOOTH_ADVERTISE", "");
+            out = addPermission(out, "android.permission.BLUETOOTH_CONNECT",
+                    "");
             out = addPermission(out, "android.permission.ACCESS_WIFI_STATE",
                     "");
             out = addPermission(out, "android.permission.CHANGE_WIFI_STATE",
                     "");
-            if (tiramisu) {
-                out = addPermission(out,
-                        "android.permission.NEARBY_WIFI_DEVICES",
-                        " android:usesPermissionFlags=\"neverForLocation\"");
-            }
+            out = addPermission(out,
+                    "android.permission.NEARBY_WIFI_DEVICES",
+                    " android:usesPermissionFlags=\"neverForLocation\"");
             // Nearby Connections genuinely needs a location grant up to API
             // 32 -- it is not a scan-results technicality there, the API
             // refuses to start without it. Capped so 33 and later use

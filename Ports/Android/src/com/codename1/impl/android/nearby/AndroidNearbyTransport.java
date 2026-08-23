@@ -117,6 +117,20 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public int getTransportAvailability() {
+        // Reported honestly rather than as a flat AVAILABLE. Nearby
+        // Connections needs Bluetooth and, depending on the level, nearby-WiFi
+        // or location; without them advertising and discovery fail on the
+        // first call. Saying AVAILABLE anyway made getAvailability() unable to
+        // return the UNAUTHORIZED the public API documents, so an app showed
+        // the feature as ready right up to the failure and had nothing to
+        // prompt from.
+        if (!NearbyPermissions.allGranted(context,
+                NearbyPermissions.transportPermissions(context,
+                        NearbyBridge.PERMISSION_DISCOVERY
+                                | NearbyBridge.PERMISSION_ADVERTISE
+                                | NearbyBridge.PERMISSION_CONNECT))) {
+            return NearbyAvailability.UNAUTHORIZED.ordinal();
+        }
         return NearbyAvailability.AVAILABLE.ordinal();
     }
 
@@ -452,6 +466,14 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         System.arraycopy(body, 4, trimmed, 0, trimmed.length);
                         body = trimmed;
                     }
+                    // Recorded so the terminal transfer update for this
+                    // payload reports the SENDER's id too. payloadIds was
+                    // written only by our own sendPayload, so an incoming
+                    // transfer fell back to Google's receiver-local id and
+                    // PayloadTransferUpdate.getPayloadId() disagreed with the
+                    // Payload.getId() the app had just been handed.
+                    payloadIds.put(Long.valueOf(payload.getId()),
+                            Integer.valueOf(senderId));
                     NearbyTransport.deliverPayloadReceived(
                             encode(endpointId, nameOf(endpointId)),
                             senderId, NearbyBridge.PAYLOAD_BYTES, body, null);
@@ -466,6 +488,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
                     // told about one that later failed or was cancelled.
                     // Held until the terminal SUCCESS update names this id.
                     incomingFiles.put(Long.valueOf(payload.getId()), payload);
+                    // Same reason as the BYTES branch: progress for an
+                    // incoming file has to be reported under the id the
+                    // sender framed into the name, which is the id the
+                    // delivered Payload will carry.
+                    payloadIds.put(Long.valueOf(payload.getId()),
+                            Integer.valueOf(senderIdOf(payload)));
                 }
             }
 

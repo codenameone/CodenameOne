@@ -112,12 +112,15 @@ class NearbyManifestFragmentsTest {
                 "android:name=\"android.permission.ACCESS_FINE_LOCATION\""
                 + " android:maxSdkVersion=\"32\""));
 
-        // Below 33 there is no NEARBY_WIFI_DEVICES, and Nearby Connections
-        // genuinely refuses to start without a location grant -- so it must
-        // NOT be capped there.
+        // Below a target of 33 the CAP is what changes, not the
+        // declaration. Nearby Connections refuses to start without a location
+        // grant there, and the app runs under its target's rules whatever
+        // device it is on -- so location must not be capped. The permission
+        // is still declared, because the app may run on a 13 device and the
+        // runtime asks for what THAT device requires.
         String older = NearbyManifestFragments.inject("", false, true, false,
                 false, false, 31);
-        assertFalse(older.contains("NEARBY_WIFI_DEVICES"));
+        assertTrue(older.contains("NEARBY_WIFI_DEVICES"));
         assertTrue(older.contains(
                 "android:name=\"android.permission.ACCESS_FINE_LOCATION\" />"));
     }
@@ -128,8 +131,25 @@ class NearbyManifestFragmentsTest {
                 false, false, 30);
         assertTrue(out.contains(
                 "android:name=\"android.permission.BLUETOOTH\" />"));
-        assertFalse(out.contains("BLUETOOTH_SCAN"));
-        assertFalse(out.contains("BLUETOOTH_ADVERTISE"));
+    }
+
+    @Test
+    void theSplitPermissionsAreDeclaredEvenForALegacyTarget() {
+        // A permission is requested at RUNTIME according to the level the
+        // app is actually running under, and requesting one the manifest
+        // does not declare is refused instantly with no prompt -- so a
+        // target-30 app on Android 12 could not ask for these at all. A
+        // device below 31 ignores permissions it has never heard of.
+        String out = NearbyManifestFragments.inject("", false, true, false,
+                false, false, 30);
+        assertTrue(out.contains("BLUETOOTH_SCAN"), out);
+        assertTrue(out.contains("BLUETOOTH_ADVERTISE"), out);
+        assertTrue(out.contains("BLUETOOTH_CONNECT"), out);
+        assertTrue(out.contains("NEARBY_WIFI_DEVICES"), out);
+        // The legacy pair stays uncapped for a legacy target: that is what
+        // Android 12 actually honours for such an app.
+        assertTrue(out.contains(
+                "android:name=\"android.permission.BLUETOOTH\" />"), out);
     }
 
     @Test

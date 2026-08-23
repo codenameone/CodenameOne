@@ -163,24 +163,17 @@ public class AndroidNearbyBackend implements NearbyBridge {
                         | NearbyBridge.PERMISSION_ADVERTISE
                         | NearbyBridge.PERMISSION_CONNECT)) != 0;
         if (transportBits) {
-            if (Build.VERSION.SDK_INT >= 31) {
-                if ((permissionBits & NearbyBridge.PERMISSION_DISCOVERY) != 0) {
-                    add(perms, "android.permission.BLUETOOTH_SCAN");
-                }
-                if ((permissionBits & NearbyBridge.PERMISSION_ADVERTISE) != 0) {
-                    add(perms, "android.permission.BLUETOOTH_ADVERTISE");
-                }
-                if ((permissionBits & NearbyBridge.PERMISSION_CONNECT) != 0) {
-                    add(perms, "android.permission.BLUETOOTH_CONNECT");
-                }
-            }
-            if (Build.VERSION.SDK_INT >= 33) {
-                add(perms, "android.permission.NEARBY_WIFI_DEVICES");
-            } else {
-                // Below 33 Nearby Connections genuinely refuses to start
-                // without a location grant; it is not a scan-results
-                // technicality there.
-                add(perms, "android.permission.ACCESS_FINE_LOCATION");
+            // Worked out by NearbyPermissions, which AndroidNearbyTransport
+            // also uses to answer getTransportAvailability -- one list, so
+            // the two cannot disagree about what "ready" means. It keys off
+            // the app's TARGET as well as the device level, because Android's
+            // Bluetooth permission model does: an app targeting 30 on Android
+            // 12 uses the legacy permissions and location, and asking it for
+            // BLUETOOTH_SCAN left the grant it needed unrequested.
+            List<String> transport = NearbyPermissions.transportPermissions(
+                    activity, permissionBits);
+            for (int i = 0; i < transport.size(); i++) {
+                add(perms, transport.get(i));
             }
         }
         if (perms.isEmpty()) {
