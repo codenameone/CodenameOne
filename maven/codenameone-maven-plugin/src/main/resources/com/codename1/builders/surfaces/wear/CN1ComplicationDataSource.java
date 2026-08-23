@@ -129,10 +129,14 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         if (readings.isEmpty()) {
             return null;
         }
+        // A current entry this type cannot render does NOT end the search, for the same reason a
+        // later one does not: the entries after it may be renderable, and giving up here threw
+        // them away permanently. A complication is asked once and handed the whole timeline, and
+        // UPDATE_PERIOD_SECONDS is 0 by design -- so nothing would ever ask again, and a
+        // RANGED_VALUE slot whose progress node only appears in the next entry stayed empty for
+        // good. No-data covers the gap until the first renderable entry starts, which is exactly
+        // what the default in a ComplicationDataTimeline is for.
         ComplicationData current = build(type, readings.get(0));
-        if (current == null) {
-            return null;
-        }
         List<TimelineEntry> entries = new ArrayList<TimelineEntry>();
         for (int i = 1; i < readings.size(); i++) {
             CN1WatchSurface.Reading reading = readings.get(i);
@@ -160,11 +164,17 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // is refreshed when the app next publishes or when something asks this service again --
         // which for a push-driven surface is the normal course, and is why the widget's
         // background-fetch request is the same throttled one rather than a schedule of its own.
+        if (current == null && entries.isEmpty()) {
+            // Nothing this type can render, now or later. Answering with a timeline of nothing
+            // but no-data would replace whatever the face is showing with a blank slot, so the
+            // caller's own fallback is the better answer.
+            return null;
+        }
         CN1WatchSurface.Reading active = readings.get(0);
         if (active.getNextFlipDate() <= 0 && active.isReloadAtEnd()) {
             CN1WidgetProvider.requestAppRefresh(this, getKindId());
         }
-        return new ComplicationDataTimeline(current, entries);
+        return new ComplicationDataTimeline(current == null ? noData() : current, entries);
     }
 
     @Override

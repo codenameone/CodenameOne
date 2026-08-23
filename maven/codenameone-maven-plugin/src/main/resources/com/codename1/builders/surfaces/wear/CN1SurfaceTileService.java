@@ -83,6 +83,12 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// value CN1SurfaceRenderer tints a widget's progress bar with.
     private static final int ACCENT = 0xff007aff;
 
+    /// The whole resource response travels in one Binder transaction, whose ceiling is about a
+    /// megabyte and is SHARED with everything else in flight on the binder. This is deliberately
+    /// well under it: exceeding the ceiling fails the request outright rather than degrading, and
+    /// a tile of this size is already far past what a watch face shows legibly.
+    private static final int RESOURCE_BUDGET_BYTES = 600 * 1024;
+
     /// How many recent readings stay available for a resources callback; see `served`.
     private static final int MAX_REMEMBERED_READINGS = 8;
 
@@ -321,6 +327,8 @@ public abstract class CN1SurfaceTileService extends TileService {
                     : CN1WatchSurface.read(this, getKindId(), "watchRectangular");
             if (reading != null) {
                 version = resourcesVersion(reading);
+                int spent = 0;
+                int dropped = 0;
                 for (Map.Entry<String, JSONObject> e
                         : imageNodes(reading.getLayout()).entrySet()) {
                     Bitmap bitmap = CN1WatchSurface.bitmap(this, getKindId(), e.getValue(),
@@ -339,6 +347,17 @@ public abstract class CN1SurfaceTileService extends TileService {
                     // nothing and a renderer that wants them has them.
                     ByteArrayOutputStream out = new ByteArrayOutputStream();
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                    // The whole response has to fit one Binder transaction, and the renderer's
+                    // budget cannot see that: it is reset for every bitmap() call, so each image
+                    // is measured alone and a handful of individually acceptable ones still add
+                    // up past the limit. Over it the host does not render a partial tile, it
+                    // fails the request -- so dropping the images that do not fit is strictly
+                    // better than sending all of them: a tile with a gap beats no tile.
+                    if (spent + out.size() > RESOURCE_BUDGET_BYTES) {
+                        dropped++;
+                        continue;
+                    }
+                    spent += out.size();
                     builder.addIdToImageMapping(e.getKey(),
                             new ResourceBuilders.ImageResource.Builder()
                                     .setInlineResource(
@@ -349,6 +368,12 @@ public abstract class CN1SurfaceTileService extends TileService {
                                                     .setFormat(ResourceBuilders.IMAGE_FORMAT_UNDEFINED)
                                                     .build())
                                     .build());
+                }
+                if (dropped > 0) {
+                    Log.w(TAG, "Tile \"" + getKindId() + "\" sent " + spent + " byte(s) of "
+                            + "imagery and dropped " + dropped + " image(s) that would not fit "
+                            + "one Binder transaction. Publish smaller artwork, or fewer images, "
+                            + "for the watchRectangular layout.");
                 }
             }
         } catch (Throwable t) {
@@ -421,13 +446,17 @@ public abstract class CN1SurfaceTileService extends TileService {
             // corner radius and an action all come from modifiers(node), and a Spacer has no
             // setModifiers of its own -- so returning the bare element dropped them on Tiles
             // alone, where the widget and SwiftUI renderers apply the same pass to a spacer.
-            return new LayoutElementBuilders.Box.Builder()
+            // Through sized() like every other branch. A spacer inherits setSize from SurfaceNode
+            // and the descriptor carries the result as w/h, so an explicitly sized spacer was the
+            // one node whose declared size Tiles ignored -- min is the spacer's OWN length, not a
+            // replacement for the shared contract.
+            return sized(new LayoutElementBuilders.Box.Builder()
                     .addContent(new LayoutElementBuilders.Spacer.Builder()
                     .setWidth(inRow ? along : across)
                     .setHeight(inRow ? across : along)
                     .build())
                     .setModifiers(modifiers(node))
-                    .build();
+                    .build(), node);
         }
         if ("img".equals(type) || "vec".equals(type)) {
             String name = imageId(node);

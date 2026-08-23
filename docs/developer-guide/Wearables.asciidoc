@@ -449,9 +449,12 @@ Play listing, where an Apple one is embedded inside the phone app.
 The Wear artifact carries a higher version code than the phone's. On a watch Play
 picks among the APKs the device supports by version code, so the wear one has to
 outrank it; on a phone the required watch feature filters the wear APK out
-entirely. The default is the phone's code plus one, which suits the usual
-numbering; `android.watchVersionCodeOffset` widens the gap and
-`android.watchVersionCode` sets it outright.
+entirely. The default is the phone's code plus 100,000,000, which sounds
+extravagant and isn't: the gap has to be wide enough that the phone's own
+next release never catches up to a watch code it already published, and
+plus one is consumed by the next phone build.
+`android.watchVersionCodeOffset` changes the gap and
+`android.watchVersionCode` sets the watch code outright.
 
 Set `android.watchModule=false` if you want the wearable link but no watch app of
 your own -- your phone build is then exactly what it was.

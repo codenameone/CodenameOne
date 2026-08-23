@@ -256,7 +256,7 @@ In a desktop build the app shows a tray icon whose menu pins a floating widget p
 | `android.surfaces.complicationUpdateSeconds` | `0` | How often the system polls a Wear complication data source. Zero means never: the timeline model is push-driven, so a poll spends watch battery asking a question the app has already answered
 | `android.wear.complicationsVersion` / `android.wear.tilesVersion` / `android.wear.protoLayoutVersion` | pinned | Override the `androidx.wear` library versions the generated complication and Tile services compile against
 | `android.watchModule` | `true` | Set to `false` to keep the wearable link without generating a companion Wear module; the phone build is then unchanged
-| `android.watchVersionCode` / `android.watchVersionCodeOffset` | `+1` | The Wear artifact's version code, which must outrank the phone's for Play to pick it on a watch
+| `android.watchVersionCode` / `android.watchVersionCodeOffset` | `+100000000` | The Wear artifact's version code, which must outrank the phone's for Play to pick it on a watch. The offset is wide so the phone's next release can't catch up to a watch code already published
 | `windows.msix` | `false` | Wrap the Windows build in an MSIX package with a Widgets Board provider
 | `windows.msix.identityName` | package name | MSIX package identity name
 | `windows.msix.publisher` | `CN=<display name>` | MSIX identity publisher; must match the signing certificate subject
