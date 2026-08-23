@@ -84,6 +84,41 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
         deliver(associationInfo, false);
     }
 
+    /// The API 31 and 32 form of the same event.
+    ///
+    /// The AssociationInfo overloads above arrived in API 33, and
+    /// startObservingPresence accepts 31 and later -- so on Android 12 and 12L
+    /// the platform called these and the two above were never invoked, losing
+    /// every appearance and disappearance while still reporting the watch as
+    /// accepted. Deprecated upstream, and overridden anyway, because those two
+    /// releases have no other delivery path.
+    @Override
+    public void onDeviceAppeared(String address) {
+        deliverByAddress(address, true);
+    }
+
+    @Override
+    public void onDeviceDisappeared(String address) {
+        deliverByAddress(address, false);
+    }
+
+    /// Delivers an event that names only a MAC address.
+    ///
+    /// The address IS the association id below API 33 -- that is what
+    /// AndroidNearbyBackend encodes there, having no AssociationInfo to take
+    /// an id from -- so no lookup is needed to match the two up.
+    private void deliverByAddress(String address, boolean present) {
+        if (address == null) {
+            return;
+        }
+        if (!OBSERVED.isEmpty() && !OBSERVED.contains(address)) {
+            return;
+        }
+        String encoded = sanitize(address) + '\t' + sanitize(address) + '\t'
+                + sanitize(address) + "\t0\t" + (present ? '1' : '0');
+        CompanionDevices.deliverPresenceChanged(encoded, present);
+    }
+
     private void deliver(AssociationInfo info, boolean present) {
         if (info == null || Build.VERSION.SDK_INT < 31) {
             return;

@@ -470,29 +470,36 @@ public class AndroidUwbRanging implements NearbyBridge {
                 throw new IllegalArgumentException(
                         "this token was minted by another platform");
             }
-            int length = readInt(framed, 6);
+            int length = readInt(framed, 6, "payload length");
             if (length < 0 || 10 + length > framed.length) {
                 throw new IllegalArgumentException("truncated ranging token");
             }
+            // Every read is bounds-checked, including the four-byte ints.
+            // RangingToken.fromByteArray only validates the OUTER frame, so a
+            // peer can hand over a well-formed envelope whose payload is two
+            // bytes long -- and an ArrayIndexOutOfBoundsException from in here
+            // is not an IllegalArgumentException, so it would escape
+            // startRanging's handler into application code and leave the start
+            // resource pending forever.
             Peer peer = new Peer();
             int p = 10;
-            int addressLength = readInt(framed, p);
+            int addressLength = readInt(framed, p, "address length");
             p += 4;
-            if (addressLength < 0 || p + addressLength > framed.length) {
+            if (addressLength < 0 || addressLength > framed.length - p) {
                 throw new IllegalArgumentException("truncated ranging token");
             }
             peer.address = new byte[addressLength];
             System.arraycopy(framed, p, peer.address, 0, addressLength);
             p += addressLength;
-            peer.channel = readInt(framed, p);
+            peer.channel = readInt(framed, p, "channel");
             p += 4;
-            peer.preamble = readInt(framed, p);
+            peer.preamble = readInt(framed, p, "preamble index");
             p += 4;
-            peer.sessionId = readInt(framed, p);
+            peer.sessionId = readInt(framed, p, "session id");
             p += 4;
-            int keyLength = readInt(framed, p);
+            int keyLength = readInt(framed, p, "session key length");
             p += 4;
-            if (keyLength < 0 || p + keyLength > framed.length) {
+            if (keyLength < 0 || keyLength > framed.length - p) {
                 throw new IllegalArgumentException("truncated ranging token");
             }
             peer.sessionKey = new byte[keyLength];
@@ -509,7 +516,16 @@ public class AndroidUwbRanging implements NearbyBridge {
         return p + 4;
     }
 
-    private static int readInt(byte[] b, int p) {
+    /// Reads four bytes, refusing rather than running off the end.
+    ///
+    /// The `what` is in the message because a truncated token is something a
+    /// developer debugging an out-of-band exchange has to locate, and "field
+    /// X starts past the end" says where to look.
+    private static int readInt(byte[] b, int p, String what) {
+        if (p < 0 || p > b.length - 4) {
+            throw new IllegalArgumentException(
+                    "truncated ranging token: " + what + " starts past the end");
+        }
         return ((b[p] & 0xff) << 24) | ((b[p + 1] & 0xff) << 16)
                 | ((b[p + 2] & 0xff) << 8) | (b[p + 3] & 0xff);
     }

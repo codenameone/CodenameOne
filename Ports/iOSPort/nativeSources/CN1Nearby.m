@@ -492,9 +492,23 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         fromPeer:(MCPeerID *)peerID {
     @autoreleasepool {
         NSString *encoded = [self encodePeer:peerID];
+        // MultipeerConnectivity carries raw bytes and nothing else, so the
+        // sender's payload id is framed into the first four bytes and stripped
+        // here. Without it every received payload arrived as id 0 and no app
+        // could tell two of them apart, or match one to its progress events --
+        // which Payload.getId() promises it can. Both ends of an MPC session
+        // are Codename One, so the framing is symmetric by construction.
+        JAVA_INT payloadId = 0;
+        NSData *body = data;
+        if ([data length] >= 4) {
+            const unsigned char *b = (const unsigned char *)[data bytes];
+            payloadId = (JAVA_INT)((b[0] << 24) | (b[1] << 16) | (b[2] << 8)
+                    | b[3]);
+            body = [data subdataWithRange:NSMakeRange(4, [data length] - 4)];
+        }
         com_codename1_impl_ios_IOSNearbyCallbacks_payloadReceived___java_lang_String_int_int_byte_1ARRAY_java_lang_String(
-                getThreadLocalData(), cn1nbJString(encoded), 0,
-                CN1_NEARBY_PAYLOAD_BYTES, cn1nbJBytes(data), JAVA_NULL);
+                getThreadLocalData(), cn1nbJString(encoded), payloadId,
+                CN1_NEARBY_PAYLOAD_BYTES, cn1nbJBytes(body), JAVA_NULL);
     }
 }
 
@@ -641,6 +655,77 @@ static NSString *cn1nbUndeclaredServiceMessage(NSString *serviceId) {
             serviceId == nil ? @"" : serviceId];
 }
 
+/// Gives the local peer the name the caller asked for.
+///
+/// MCPeerID is immutable and the session, advertiser and browser are all bound
+/// to it, so a rename is a rebuild of the lot. Only done when nothing is
+/// connected: renaming under a live session would drop it, and an app that
+/// passes a different name to a later call did not ask for that.
+///
+/// This exists because an app that discovers first and names itself only in
+/// requestConnection -- the ordinary initiator flow -- showed the peer its
+/// device name instead, the identity having been built at discovery time.
+static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
+    NSString *wanted = localName == nil || [localName length] == 0
+            ? nil : localName;
+    // MCPeerID rejects a display name longer than 63 UTF-8 bytes.
+    if (wanted != nil
+            && [wanted lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > 63) {
+        wanted = [wanted substringToIndex:20];
+    }
+    if (t.localPeer != nil && wanted != nil
+            && ![t.localPeer.displayName isEqualToString:wanted]
+            && [t.session.connectedPeers count] == 0) {
+        BOOL wasAdvertising = t.advertiser != nil;
+        BOOL wasBrowsing = t.browser != nil;
+        if (wasAdvertising) {
+            [t.advertiser stopAdvertisingPeer];
+            t.advertiser.delegate = nil;
+            t.advertiser = nil;
+        }
+        if (wasBrowsing) {
+            [t.browser stopBrowsingForPeers];
+            t.browser.delegate = nil;
+            t.browser = nil;
+        }
+        t.session.delegate = nil;
+        [t.session disconnect];
+        t.session = nil;
+        t.localPeer = [[[MCPeerID alloc] initWithDisplayName:wanted]
+                autorelease];
+        t.session = [[[MCSession alloc] initWithPeer:t.localPeer
+                                    securityIdentity:nil
+                                encryptionPreference:MCEncryptionRequired]
+                autorelease];
+        t.session.delegate = t;
+        if (wasAdvertising) {
+            t.advertiser = [[[MCNearbyServiceAdvertiser alloc]
+                    initWithPeer:t.localPeer
+                   discoveryInfo:nil
+                     serviceType:t.serviceType] autorelease];
+            t.advertiser.delegate = t;
+            [t.advertiser startAdvertisingPeer];
+        }
+        if (wasBrowsing) {
+            t.browser = [[[MCNearbyServiceBrowser alloc]
+                    initWithPeer:t.localPeer
+                     serviceType:t.serviceType] autorelease];
+            t.browser.delegate = t;
+            [t.browser startBrowsingForPeers];
+        }
+        return;
+    }
+    if (t.localPeer == nil) {
+        NSString *name = wanted != nil ? wanted
+                : [[UIDevice currentDevice] name];
+        if ([name lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > 63) {
+            name = [name substringToIndex:20];
+        }
+        t.localPeer = [[[MCPeerID alloc] initWithDisplayName:name]
+                autorelease];
+    }
+}
+
 static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         NSString *localName) {
     if (cn1nbTransport == nil) {
@@ -659,16 +744,7 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         // caller passed is the one that takes effect.
         cn1nbTransport.serviceType = cn1nbServiceType(serviceId);
     }
-    if (cn1nbTransport.localPeer == nil) {
-        NSString *name = localName == nil || [localName length] == 0
-                ? [[UIDevice currentDevice] name] : localName;
-        // MCPeerID rejects a display name longer than 63 UTF-8 bytes.
-        if ([name lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > 63) {
-            name = [name substringToIndex:20];
-        }
-        cn1nbTransport.localPeer =
-                [[[MCPeerID alloc] initWithDisplayName:name] autorelease];
-    }
+    cn1nbApplyLocalName(cn1nbTransport, localName);
     if (cn1nbTransport.session == nil) {
         cn1nbTransport.session = [[[MCSession alloc]
                 initWithPeer:cn1nbTransport.localPeer
@@ -1056,6 +1132,21 @@ void com_codename1_impl_ios_IOSNative_nearbyStopSession___int(
         @autoreleasepool {
             CN1NearbyRangingSession *entry = cn1nbSessionFor(sessionHandle);
             if (entry != nil) {
+                // A start still waiting for its answer has to be failed FIRST.
+                // startAccessory is answered from
+                // didGenerateShareableConfigurationData, and clearing the
+                // delegate below silences both that and
+                // didInvalidateWithError -- so stopping mid-handshake left the
+                // caller's AsyncResource pending with nothing left alive to
+                // settle it.
+                int pending = entry.pendingStartRequest;
+                entry.pendingStartRequest = 0;
+                if (pending != 0) {
+                    cn1nbFailRanging(pending,
+                            CN1_NEARBY_ERR_SESSION_INVALIDATED,
+                            @"the session was stopped before the accessory"
+                            @" handshake completed");
+                }
                 // Cleared before invalidate so the delegate callback that
                 // invalidation triggers finds nothing left to report -- the
                 // app asked for this and does not need to be told.
@@ -1354,6 +1445,16 @@ void com_codename1_impl_ios_IOSNative_nearbyRequestConnection___int_java_lang_St
                     @"no such endpoint");
             return;
         }
+        // The name the caller wants the invited peer to see. Applied before
+        // the invitation goes out, or it would carry the previous identity.
+        cn1nbApplyLocalName(cn1nbTransport,
+                toNSString(CN1_THREAD_STATE_PASS_ARG localName));
+        peer = [cn1nbTransport peerForId:pid];
+        if (peer == nil || cn1nbTransport.browser == nil) {
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_PEER_UNAVAILABLE,
+                    @"the endpoint was lost while renaming this device");
+            return;
+        }
         [cn1nbTransport.browser invitePeer:peer
                                  toSession:cn1nbTransport.session
                                withContext:nil
@@ -1458,9 +1559,21 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             return;
         }
         NSData *data = cn1nbDataFromJavaArray(bytes);
+        // Framed with the payload id -- see didReceiveData for why.
+        NSMutableData *framed = [NSMutableData dataWithCapacity:
+                (data == nil ? 0 : [data length]) + 4];
+        unsigned char header[4] = {
+            (unsigned char)((payloadId >> 24) & 0xff),
+            (unsigned char)((payloadId >> 16) & 0xff),
+            (unsigned char)((payloadId >> 8) & 0xff),
+            (unsigned char)(payloadId & 0xff)
+        };
+        [framed appendBytes:header length:4];
+        if (data != nil) {
+            [framed appendData:data];
+        }
         NSError *err = nil;
-        BOOL sent = [cn1nbTransport.session sendData:data == nil
-                        ? [NSData data] : data
+        BOOL sent = [cn1nbTransport.session sendData:framed
                                              toPeers:peers
                                             withMode:MCSessionSendDataReliable
                                                error:&err];
