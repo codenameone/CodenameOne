@@ -722,9 +722,27 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return read(f, PROPERTIES_ENCODING);
     }
 
+    /**
+     * Reads a source file byte-transparently.
+     *
+     * <p>ISO-8859-1 maps every byte 0-255 to the same char, so decoding with it,
+     * splicing in text that is pure ASCII, and encoding back reproduces the
+     * original bytes exactly -- whatever the project's real source encoding is.
+     * Hard-coding UTF-8 here reinterpreted the whole file, so a raw byte in a
+     * comment or a string literal came back changed even when the migration
+     * succeeded, and reading {@code project.build.sourceEncoding} would only
+     * narrow that to projects that declare it correctly.</p>
+     *
+     * <p>The markers this class searches for -- {@code package}, {@code import},
+     * the class declaration -- are ASCII, and every ASCII-compatible encoding
+     * decodes them identically under this scheme.</p>
+     */
     private static String read(File f) throws IOException {
-        return read(f, "UTF-8");
+        return read(f, SOURCE_BYTE_TRANSPARENT_ENCODING);
     }
+
+    /** See {@link #read(File)}: byte-transparent, not a claim about the file. */
+    private static final String SOURCE_BYTE_TRANSPARENT_ENCODING = "ISO-8859-1";
 
     private static String read(File f, String encoding) throws IOException {
         StringBuilder sb = new StringBuilder();
@@ -746,7 +764,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     }
 
     private static void write(File f, String content) throws IOException {
-        Writer w = new OutputStreamWriter(new FileOutputStream(f), "UTF-8");
+        Writer w = new OutputStreamWriter(new FileOutputStream(f), SOURCE_BYTE_TRANSPARENT_ENCODING);
         try {
             w.write(content);
         } finally {

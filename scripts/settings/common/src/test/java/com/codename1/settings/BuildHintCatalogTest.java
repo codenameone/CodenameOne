@@ -195,6 +195,38 @@ public class BuildHintCatalogTest {
         assertTrue(owned.get("android.debug") == null);
     }
 
+    /**
+     * A comment inside an annotation can carry an unmatched delimiter. Counting
+     * it as syntax loses the annotation's boundary, and the hint it owns stays
+     * editable -- so Add writes the duplicate the next build refuses.
+     */
+    @Test
+    public void commentsInsideAnAnnotationDoNotBreakOwnership() {
+        String src = "@Ios(/* required for issue ( */ teamId = \"T\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
+
+    @Test
+    public void lineCommentsAndCharLiteralsDoNotBreakOwnership() {
+        String src = "@Ios(\n"
+                + "    // a stray ) in a line comment\n"
+                + "    teamId = \"T\",\n"
+                + "    urlScheme = \"x\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+        assertEquals("@Ios(urlScheme)", owned.get("ios.urlScheme"));
+
+        String withChar = "@Android(xpermissions = \"a\") // ')'\npublic class MyApp {}\n";
+        java.util.Map<String, String> owned2 = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(withChar, owned2);
+        assertEquals("@Android(xpermissions)", owned2.get("android.xpermissions"));
+    }
+
     @Test
     public void searchStillMatchesOnNameAndDescription() {
         BuildHintCatalog catalog = BuildHintCatalog.load();

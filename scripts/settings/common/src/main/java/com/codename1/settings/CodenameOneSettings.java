@@ -2212,22 +2212,21 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     /// The text inside the parentheses starting at `open`, or null when unbalanced.
+    ///
+    /// Skips strings, character literals and comments. A comment inside an
+    /// annotation can carry an unmatched delimiter --
+    /// `@Ios(/* required for issue ( */ teamId = "x")` -- and counting it as
+    /// syntax loses the annotation's boundary, leaving an owned hint editable.
     private static String balancedArgs(String source, int open) {
         int depth = 0;
-        boolean inString = false;
         for (int i = open; i < source.length(); i++) {
-            char c = source.charAt(i);
-            if (inString) {
-                if (c == '\\') {
-                    i++;
-                } else if (c == '"') {
-                    inString = false;
-                }
+            int skipped = skipNonCode(source, i);
+            if (skipped > i) {
+                i = skipped - 1;
                 continue;
             }
-            if (c == '"') {
-                inString = true;
-            } else if (c == '(' || c == '{' || c == '[') {
+            char c = source.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
                 depth++;
             } else if (c == ')' || c == '}' || c == ']') {
                 depth--;
@@ -2240,28 +2239,23 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     /// Whether `args` assigns `attr` at the top level, ignoring anything inside a
-    /// nested value or a string.
+    /// nested value, a string, a character literal or a comment.
     private static boolean declaresAttribute(String args, String attr) {
         int depth = 0;
-        boolean inString = false;
         StringBuilder word = new StringBuilder();
         for (int i = 0; i < args.length(); i++) {
-            char c = args.charAt(i);
-            if (inString) {
-                if (c == '\\') {
-                    i++;
-                } else if (c == '"') {
-                    inString = false;
-                }
+            int skipped = skipNonCode(args, i);
+            if (skipped > i) {
+                i = skipped - 1;
                 continue;
             }
-            if (c == '"') {
-                inString = true;
-            } else if (c == '(' || c == '{' || c == '[') {
+            char c = args.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
                 depth++;
             } else if (c == ')' || c == '}' || c == ']') {
                 depth--;
-            } else if (depth == 0 && c == '=' && (i + 1 >= args.length() || args.charAt(i + 1) != '=')) {
+            } else if (depth == 0 && c == '='
+                    && (i + 1 >= args.length() || args.charAt(i + 1) != '=')) {
                 if (word.toString().trim().equals(attr)) {
                     return true;
                 }
@@ -2273,5 +2267,43 @@ public class CodenameOneSettings extends Lifecycle {
             }
         }
         return false;
+    }
+
+    /// If a string, character literal or comment starts at `i`, the index just
+    /// past it; otherwise `i`.
+    private static int skipNonCode(String s, int i) {
+        char c = s.charAt(i);
+        if (c == '"') {
+            for (int j = i + 1; j < s.length(); j++) {
+                if (s.charAt(j) == '\\') {
+                    j++;
+                } else if (s.charAt(j) == '"') {
+                    return j + 1;
+                }
+            }
+            return s.length();
+        }
+        if (c == '\'') {
+            for (int j = i + 1; j < s.length(); j++) {
+                if (s.charAt(j) == '\\') {
+                    j++;
+                } else if (s.charAt(j) == '\'') {
+                    return j + 1;
+                }
+            }
+            return s.length();
+        }
+        if (c == '/' && i + 1 < s.length()) {
+            char n = s.charAt(i + 1);
+            if (n == '/') {
+                int nl = s.indexOf('\n', i);
+                return nl < 0 ? s.length() : nl;
+            }
+            if (n == '*') {
+                int close = s.indexOf("*/", i + 2);
+                return close < 0 ? s.length() : close + 2;
+            }
+        }
+        return i;
     }
 }
