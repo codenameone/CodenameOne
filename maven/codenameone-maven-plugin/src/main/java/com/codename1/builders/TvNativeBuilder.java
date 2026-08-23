@@ -109,7 +109,20 @@ class TvNativeBuilder {
             // HealthKit does not exist on tvOS at all. The iOS slice links it when the app
             // references com.codename1.health, so weak-link it here or the tvOS slice fails
             // to link. CN1Health.m additionally compiles itself out via TARGET_OS_TV.
-            + "HealthKit.framework";
+            + "HealthKit.framework;"
+            // NearbyInteraction and AccessorySetupKit are absent from the
+            // tvOS SDK; the iOS slice links them when the app references
+            // com.codename1.nearby.ranging or .companion, so weak-link them
+            // here or the tvOS slice fails while resolving the framework.
+            // CN1Nearby.m already compiles both halves out via the
+            // TARGET_OS_TV undefs in CodenameOne_GLViewController.h, so
+            // nothing on the tvOS slice calls into them.
+            //
+            // MultipeerConnectivity is deliberately NOT here, and that was
+            // measured rather than assumed: the tvOS SDK ships it, so the
+            // transport links normally and weak-linking would only obscure
+            // that. Same distinction the CoreSpotlight note below draws.
+            + "NearbyInteraction.framework;AccessorySetupKit.framework";
     // CoreSpotlight is deliberately NOT in this list, although the watch list carries it.
     //
     // The two platforms differ, and it was measured rather than reasoned about. On the

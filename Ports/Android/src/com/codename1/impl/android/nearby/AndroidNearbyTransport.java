@@ -170,7 +170,16 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     /// Adds a permission the app has not already been granted.
+    ///
+    /// Below API 23 nothing is ever outstanding: permissions are granted at
+    /// install time, and Context.checkSelfPermission does not exist there --
+    /// calling it threw NoSuchMethodError rather than answering, which a
+    /// transport app on Android 5.0 or 5.1 can reach, since the transport's
+    /// minimum is 21.
     private void add(ArrayList<String> perms, String permission) {
+        if (Build.VERSION.SDK_INT < 23) {
+            return;
+        }
         if (context.checkSelfPermission(permission)
                 != PackageManager.PERMISSION_GRANTED) {
             perms.add(permission);
