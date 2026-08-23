@@ -159,9 +159,16 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
                 entry = noData();
             }
             long end = reading.getNextFlipDate();
+            // The base entry stops at this reading's FIRST crossing, where the entry addCrossings
+            // adds takes over. Running it to the reading's own end instead left two entries
+            // covering the same stretch, and a host handed overlapping intervals may reject the
+            // timeline outright or go on selecting the countdown it already had.
+            long firstCrossing = firstCrossingOf(reading);
+            long baseEnd = firstCrossing > 0 ? firstCrossing : end;
             entries.add(new TimelineEntry(
                     new TimeInterval(Instant.ofEpochMilli(reading.getStart()),
-                            end > reading.getStart() ? Instant.ofEpochMilli(end) : Instant.MAX),
+                            baseEnd > reading.getStart() ? Instant.ofEpochMilli(baseEnd)
+                                    : Instant.MAX),
                     entry));
             // Crossings for THIS reading too, not only for the active one. A future entry with a
             // relative target inside its own window would otherwise take over as a countdown and
@@ -194,7 +201,18 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         CN1WatchSurface.Reading active = readings.get(0);
         addCrossings(type, active, entries);
         if (active.isReloadAtEnd()) {
-            CN1WidgetProvider.requestAppRefresh(this, getKindId());
+            // AT the end, not now. Asking immediately spends the one throttled fetch hours early
+            // and can republish over entries the user has not seen yet; asking only when the
+            // timeline is already exhausted never happens, because nothing calls this provider
+            // when the last entry takes over. An alarm is the only thing that survives both --
+            // and it survives the process too, which a posted Runnable does not.
+            long end = timelineEnd(readings);
+            if (end <= 0) {
+                // Already exhausted, or ending without a stated moment. Now is the only answer.
+                CN1WidgetProvider.requestAppRefresh(this, getKindId());
+            } else {
+                CN1WidgetProvider.scheduleAppRefresh(this, getKindId(), end);
+            }
         }
         return new ComplicationDataTimeline(current == null ? noData() : current, entries);
     }
@@ -309,8 +327,26 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             // is exactly one node, though: a join of several is a string, and there is nothing to
             // hand a face that would advance part of it.
             ComplicationText bodyText = texts.size() == 2
-                    ? textFor(textNodeAt(nodes, reading.getState(), 1), reading.getState(), texts.get(1), asOf)
+                    ? textFor(textNodeAt(nodes, reading.getState(), 1), reading.getState(),
+                            texts.get(1), asOf)
                     : plain(body);
+            // A body that JOINS several nodes cannot tick, and this is a real limitation rather
+            // than an oversight: a ticking value is an object the face advances, not a string, so
+            // there is nothing to hand it that would advance one part of a joined sentence. The
+            // androidx builder offers no verified way to surround a time difference with text --
+            // nothing in the shipped API states one -- and guessing at a placeholder convention
+            // would risk rendering the wrong thing rather than a stale one.
+            //
+            // A relative value still moves, because its crossing rebuilds the whole string; a
+            // timer does not. So the developer is told once, with the fix: put the moving value
+            // in its own second node and the rest in the title.
+            if (texts.size() > 2 && hasDynamicNode(nodes)) {
+                Log.i(TAG, "Complication \"" + getKindId() + "\" joins " + (texts.size() - 1)
+                        + " text nodes into its long-text body, so a countdown or timer among "
+                        + "them is shown frozen: a joined string is not a value the watch face "
+                        + "can advance. Put the moving value in the second text node on its own "
+                        + "to have the face tick it.");
+            }
             // The whole value, not just the title. TalkBack reads this instead of the layout, so
             // omitting the body announced the label of a complication without the thing it says
             // -- the order status, the message, the number the user actually wanted.
@@ -386,30 +422,59 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
      * @param reading the entry whose crossings are wanted
      * @param entries the timeline being assembled
      */
+    /// When the published timeline runs out, or 0 when it already has or never does.
+    ///
+    /// The LAST reading's flip date: the entries are ordered, and the final one's end is the
+    /// moment there is nothing left to show.
+    private static long timelineEnd(List<CN1WatchSurface.Reading> readings) {
+        if (readings.isEmpty()) {
+            return 0;
+        }
+        return readings.get(readings.size() - 1).getNextFlipDate();
+    }
+
+    private long firstCrossingOf(CN1WatchSurface.Reading reading) {
+        java.util.List<Long> ordered = crossingsOf(reading);
+        return ordered.isEmpty() ? 0 : ordered.get(0).longValue();
+    }
+
+    /// Every moment this reading's text changes sides, in order. One computation, used both to
+    /// end the base entry and to build the entries that follow it, so the two cannot disagree
+    /// about where one stops and the next begins.
+    ///
+    /// Bounded at BOTH ends by the reading's own window. A crossing at or after the next flip
+    /// belongs to the entry that replaces this one, and one before the reading begins has already
+    /// happened by the time it takes over -- the entry is built as of its own start, so it is
+    /// already on the right side.
+    ///
+    /// EVERY displayed node contributes, not the first two: a long-text body joins every value
+    /// from index one, so a relative node third or later is shown as well, and without a crossing
+    /// it stays on its pre-target wording for good.
+    private java.util.List<Long> crossingsOf(CN1WatchSurface.Reading reading) {
+        java.util.TreeSet<Long> crossings = new java.util.TreeSet<Long>();
+        if (reading == null) {
+            return new ArrayList<Long>();
+        }
+        long windowEnd = reading.getNextFlipDate();
+        long windowStart = reading.getStart();
+        List<JSONObject> nodes = CN1WatchSurface.flatten(reading.getLayout());
+        JSONObject state = reading.getState();
+        for (JSONObject node : textNodes(nodes, state)) {
+            long at = relativeCrossingOf(node, reading);
+            if (at > 0 && at > windowStart && (windowEnd <= 0 || at < windowEnd)) {
+                crossings.add(Long.valueOf(at));
+            }
+        }
+        return new ArrayList<Long>(crossings);
+    }
+
     private void addCrossings(ComplicationType type, CN1WatchSurface.Reading reading,
             List<TimelineEntry> entries) {
         if (reading == null) {
             return;
         }
         long windowEnd = reading.getNextFlipDate();
-        // The reading's own START is the lower bound, not just its end. A future entry beginning
-        // in an hour can name a target thirty minutes away, and an entry starting AT that target
-        // would carry the future reading's content from before it is current -- overlapping the
-        // entry actually on screen and showing tomorrow's state today. A crossing before the
-        // reading begins has already happened by the time the reading takes over, and the entry
-        // is built as of its own start, so it is already on the right side.
-        long windowStart = reading.getStart();
-        java.util.TreeSet<Long> crossings = new java.util.TreeSet<Long>();
-        List<JSONObject> nodes = CN1WatchSurface.flatten(reading.getLayout());
-        JSONObject state = reading.getState();
-        for (JSONObject node : new JSONObject[] {textNodeAt(nodes, state, 0),
-                textNodeAt(nodes, state, 1)}) {
-            long at = relativeCrossingOf(node, reading);
-            if (at > 0 && at > windowStart && (windowEnd <= 0 || at < windowEnd)) {
-                crossings.add(Long.valueOf(at));
-            }
-        }
-        java.util.List<Long> ordered = new ArrayList<Long>(crossings);
+        java.util.List<Long> ordered = crossingsOf(reading);
         for (int i = 0; i < ordered.size(); i++) {
             long at = ordered.get(i).longValue();
             ComplicationData after = build(type, reading, at + 1);

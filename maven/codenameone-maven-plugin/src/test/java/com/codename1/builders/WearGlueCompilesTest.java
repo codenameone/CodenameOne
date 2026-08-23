@@ -93,7 +93,7 @@ public class WearGlueCompilesTest {
         collectJava(stubs.toFile(), sources);
         assertTrue(sources.size() > 20, "the stub tree must be there: " + STUBS);
 
-        // The two port classes CN1WatchSurface calls into are stubbed rather than compiled: they
+        // The port classes CN1WatchSurface calls into are stubbed rather than compiled: they
         // pull in the whole RemoteViews renderer, and what matters here is that the services
         // agree with the reader, not that the renderer builds -- which the port's own build
         // already proves.
@@ -107,6 +107,15 @@ public class WearGlueCompilesTest {
                         + "    public static File kindDir(Context c, String k) { return null; }\n"
                         + "    public static String readWidgetTimeline(Context c, String k) "
                         + "{ return null; }\n"
+                        + "}\n").getBytes("UTF-8"));
+        // The mirror, for the stale-image collection the reader triggers. Reading is the durable
+        // hook for that sweep -- a process the system stops at will loses anything scheduled --
+        // so the reader calls it, and this test has to know that.
+        Files.write(shims.resolve("CN1SurfaceMirror.java"),
+                ("package com.codename1.impl.android.surfaces;\n"
+                        + "import android.content.Context;\n"
+                        + "public class CN1SurfaceMirror {\n"
+                        + "    public static void collectStaleImages(Context c, String k) { }\n"
                         + "}\n").getBytes("UTF-8"));
         Files.write(shims.resolve("CN1SurfaceRenderer.java"),
                 ("package com.codename1.impl.android.surfaces;\n"
@@ -138,6 +147,9 @@ public class WearGlueCompilesTest {
                         + "import android.content.Context;\n"
                         + "public class CN1WidgetProvider {\n"
                         + "    static void requestAppRefresh(Context c, String k) { }\n"
+                        // The scheduled form, for a reload-at-end timeline whose end is in the
+                        // future: asking now would spend the throttled fetch hours early.
+                        + "    static void scheduleAppRefresh(Context c, String k, long w) { }\n"
                         + "}\n").getBytes("UTF-8"));
         Files.write(shims.resolve("CN1SurfaceActionActivity.java"),
                 ("package com.codename1.impl.android.surfaces;\n"

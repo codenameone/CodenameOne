@@ -146,6 +146,70 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
     /// Package-private rather than private: a Tile reaching the end of its timeline needs the
     /// same throttled request, and reimplementing it there would give the two surfaces different
     /// refresh behaviour for one published document.
+    /**
+     * Asks for the same background fetch, but AT a stated moment rather than now.
+     *
+     * <p>A complication is handed its whole timeline once and the system swaps entries itself, so
+     * nothing calls the provider when the last entry finally takes over -- which is exactly when
+     * a reload-at-end timeline wants more content. Asking at build time instead can spend the
+     * one throttled fetch hours early and republish over entries the user has not seen yet.</p>
+     *
+     * <p>An alarm carrying the same broadcast the immediate path sends. It targets
+     * BackgroundFetchHandler, which every manifest that has background fetch already declares --
+     * so this needs no new component -- and an alarm survives the process the way a posted
+     * Runnable does not.</p>
+     *
+     * @param context any context
+     * @param kindId the kind wanting fresh content
+     * @param whenMillis when the timeline runs out
+     */
+    static void scheduleAppRefresh(Context context, String kindId, long whenMillis) {
+        try {
+            String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
+            if (listenerClass == null || whenMillis <= System.currentTimeMillis()) {
+                return;
+            }
+            // The cast sits INSIDE the instanceof branch, which is the shape the cast-semantics
+            // verifier recognises -- and the reason for the rule is real here: a failed CHECKCAST
+            // does not throw on ParparVM, so the catch below would never run for one.
+            Object service = context.getSystemService(Context.ALARM_SERVICE);
+            if (service instanceof AlarmManager) {
+                scheduleFetchAlarm(context, (AlarmManager) service, kindId, listenerClass,
+                        whenMillis);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not schedule the reload-at-end fetch for " + kindId, t);
+        }
+    }
+
+    /// The alarm itself, once the manager is known to be one. Separate so the cast above is the
+    /// last thing its own method does and no cast sits under the catch.
+    private static void scheduleFetchAlarm(Context context, AlarmManager am, String kindId,
+            String listenerClass, long whenMillis) {
+        try {
+            Intent intent = new Intent(context,
+                    com.codename1.impl.android.BackgroundFetchHandler.class);
+            intent.setData(android.net.Uri.parse("http://codenameone.com/a?" + listenerClass));
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= FLAG_IMMUTABLE;
+            }
+            // Keyed by kind so two kinds do not replace each other's wake-up, and distinct from
+            // the flip alarm's own request code for the same reason.
+            PendingIntent pi = PendingIntent.getBroadcast(context,
+                    ("reloadAtEnd:" + kindId).hashCode(), intent, flags);
+            // INEXACT deliberately. This is "some time after the timeline runs out", not a
+            // deadline, and an exact alarm costs the user a special permission for no benefit.
+            if (Build.VERSION.SDK_INT >= 23) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC, whenMillis, pi);
+            } else {
+                am.set(AlarmManager.RTC, whenMillis, pi);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not schedule the reload-at-end fetch for " + kindId, t);
+        }
+    }
+
     static void requestAppRefresh(Context context, String kindId) {
         try {
             String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);

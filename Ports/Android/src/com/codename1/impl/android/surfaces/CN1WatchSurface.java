@@ -147,6 +147,11 @@ public final class CN1WatchSurface {
         if (json == null || json.length() == 0) {
             return null;
         }
+        // Stale mirrored artwork is collected here, on the read, because reading is the one thing
+        // guaranteed to happen again. The mirror's own write-time sweep cannot collect the blob
+        // that triggered it -- it is inside the grace by definition -- and a delayed in-memory
+        // pass dies with a process the system stops at will.
+        CN1SurfaceMirror.collectStaleImages(ctx, kindId);
         try {
             JSONObject doc = new JSONObject(json);
             JSONObject layout = pickLayout(doc.optJSONObject("layouts"), family);
