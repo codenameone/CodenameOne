@@ -4965,7 +4965,8 @@ public class IPhoneBuilder extends Executor {
                             buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
                             for (String note : repairQualifiedExtensionSettings(buildSettingsMap,
                                     request.getPackageName(),
-                                    appExtensionDeploymentFloor(signingEntitlements))) {
+                                    appExtensionDeploymentFloor(signingEntitlements),
+                                    archiveSdk, archiveConfiguration, archiveArch)) {
                                 debug("The " + extensionName + " app extension: " + note + ".");
                             }
 
@@ -6832,10 +6833,24 @@ public class IPhoneBuilder extends Executor {
     /// @return a note per change, for the log
     static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
             String hostPackage, String floor) {
+        return repairQualifiedExtensionSettings(settings, hostPackage, floor, null, null, null);
+    }
+
+    /// @param sdk, {@code configuration} and {@code arch} the archive being built, so a setting
+    /// belonging to some OTHER build is left exactly as its author wrote it. The floor here was
+    /// computed from the entitlements THIS archive is signed with, and applying it to a Debug or
+    /// simulator condition raised a target that has nothing to do with those entitlements -- the
+    /// edit then lives on in the generated project and in sources.tar.bz2, so a later Debug build
+    /// loses iOS 12 and 13 for a Wallet entitlement it never carried.
+    static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
+            String hostPackage, String floor, String sdk, String configuration, String arch) {
         List<String> notes = new ArrayList<String>();
         for (Map.Entry<String, String> setting : new ArrayList<Map.Entry<String, String>>(
                 settings.entrySet())) {
             String key = setting.getKey();
+            if (!conditionApplies(key, sdk, configuration, arch)) {
+                continue;
+            }
             String value = setting.getValue() == null ? "" : setting.getValue().trim();
             // What the value RESOLVES to, since a qualified setting may be written through another
             // one -- IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] = $(EXTENSION_MIN) with
@@ -6870,10 +6885,10 @@ public class IPhoneBuilder extends Executor {
     /// answers when it is set; otherwise xcrun is asked, and if that cannot answer either the
     /// bare platform name is used, which matches any version of it.
     String activeIosSdkName(BuildRequest request) {
-        String declared = request.getArg("ios.sdk", null);
-        if (declared != null && declared.trim().length() > 0) {
-            return "iphoneos" + declared.trim();
-        }
+        // Deliberately NOT the ios.sdk hint. This builder passes no -sdk to xcodebuild -- the
+        // destination picks the active SDK -- and the hint has no other use in this module, so it
+        // does not control the archive. Matching an exact [sdk=iphoneos14.4] condition against a
+        // stale hint under Xcode 26 selects settings the build never applies.
         try {
             // Through the Xcode this build actually uses. resolveXcodebuild honours XCODEBUILD,
             // DEVELOPER_DIR and XCODE_APP, and asking the system default instead can report a

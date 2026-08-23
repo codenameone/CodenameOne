@@ -612,4 +612,32 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Release-Wallet", IPhoneBuilder.resolveSettingsFully(
                 "com.example.app.$(PRODUCT_NAME)", settings));
     }
+
+    @Test
+    public void repairsLeaveOtherBuildsSettingsAlone() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "10.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]", "10.0");
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[config=Debug]", "10.0");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0", "iphoneos14.4", "Release", "arm64");
+
+        // The floor came from the entitlements THIS archive is signed with. Applying it to a
+        // simulator or Debug condition edits a target those entitlements have nothing to do with,
+        // and the edit lives on in the generated project.
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals("10.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]"));
+        assertEquals("10.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[config=Debug]"));
+        assertEquals(1, notes.size());
+    }
+
+    @Test
+    public void anIdentifierForAnotherBuildIsNotDroppedEither() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]", "com.other.Sim");
+        IPhoneBuilder.repairQualifiedExtensionSettings(settings, "com.example.app", "12.0",
+                "iphoneos14.4", "Release", "arm64");
+        assertTrue(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]"));
+    }
 }
