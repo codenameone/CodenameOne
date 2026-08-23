@@ -6967,8 +6967,11 @@ public class IPhoneBuilder extends Executor {
         }
         int afterKey = role + tag.length();
         // Bounded by the next scene role, so a CarPlay configuration naming its own
-        // delegate cannot answer for this one.
-        int nextRole = plistIndexOfLive(plist, "SceneSessionRole", afterKey);
+        // delegate cannot answer for this one. A declared key rather than the text: the
+        // words "SceneSessionRole" inside some string value would otherwise cut this
+        // role's range short and hide a delegate that really is wired, failing a build
+        // that was going to work.
+        int nextRole = nextSceneRoleKeyIndex(plist, afterKey);
         int end = nextRole < 0 ? plist.length() : nextRole;
         // Bound to its key rather than found anywhere in the role. The class name can
         // appear as some other live value -- a UISceneConfigurationName of
@@ -6984,6 +6987,32 @@ public class IPhoneBuilder extends Executor {
             at = plistIndexOfLive(plist, delegateKey, at + delegateKey.length());
         }
         return false;
+    }
+
+    /// Index of the next declared key naming a scene role, or -1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the index of the next scene-role key, or -1
+    static int nextSceneRoleKeyIndex(String plist, int from) {
+        int at = plistIndexOfLive(plist, "<key>", from);
+        while (at >= 0) {
+            int close = plist.indexOf("</key>", at);
+            if (close < 0) {
+                return -1;
+            }
+            if (plist.substring(at + "<key>".length(), close).contains("SceneSessionRole")) {
+                return at;
+            }
+            at = plistIndexOfLive(plist, "<key>", close);
+        }
+        return -1;
     }
 
     /// The text of the `<string>` element that follows `from`, or null when the next

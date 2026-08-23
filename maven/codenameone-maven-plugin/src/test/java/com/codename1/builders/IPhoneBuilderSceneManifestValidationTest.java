@@ -218,4 +218,19 @@ class IPhoneBuilderSceneManifestValidationTest {
                         + "<dict><key>UISceneDelegateClassName</key>"
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"));
     }
+
+    @Test
+    void aStringMentioningSceneSessionRoleDoesNotEndTheRole() {
+        // Found by re-reading the guard rather than reported. The role's range was
+        // bounded by the *text* "SceneSessionRole", so a string value containing those
+        // words cut it short and hid a delegate that really is wired -- failing a build
+        // that was going to work, which is the expensive direction.
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>CFBundleName</key>"
+                        + "<string>notes about SceneSessionRole handling</string>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
+                "a string mentioning the words must not end the role's range");
+    }
 }
