@@ -248,6 +248,32 @@ public abstract class CN1SurfaceTileService extends TileService {
      * @param reading the timeline entry being rendered
      * @return the resources version
      */
+    /**
+     * Finds the entry that advertised a version, by re-deriving the versions from what is stored.
+     *
+     * <p>The version is a pure function of an entry, so this cannot guess wrong: an entry either
+     * hashes to the requested version or it is not the one being asked about.</p>
+     *
+     * @param requested the version the host is asking for, possibly null
+     * @return the entry that advertised it, or null when nothing stored does
+     */
+    private CN1WatchSurface.Reading rebuild(String requested) {
+        if (requested == null || requested.length() == 0) {
+            return null;
+        }
+        try {
+            for (CN1WatchSurface.Reading entry
+                    : CN1WatchSurface.readAllEntries(this, getKindId(), "watchRectangular")) {
+                if (requested.equals(resourcesVersion(entry))) {
+                    return entry;
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not rebuild tile resources for version " + requested, t);
+        }
+        return null;
+    }
+
     private static String resourcesVersion(CN1WatchSurface.Reading reading) {
         return String.valueOf((imageNames(reading.getLayout()).toString()
                 + "|" + String.valueOf(reading.getState())).hashCode());
@@ -263,8 +289,22 @@ public abstract class CN1SurfaceTileService extends TileService {
      * should be, on a Tile that had just been refreshed.</p>
      *
      * <p>So the reading the last tile was built from is kept, and used when the host asks for its
-     * version. Anything else falls back to the current entry, which is the best available answer
-     * for a version this process has no memory of.</p>
+     * version. That memory is in this process, though, and neither of the two things that make
+     * the host ask for an old version respects a process: the service can be torn down between
+     * onTileRequest and onTileResourcesRequest, and the map is bounded so a busy timeline evicts.
+     * Both leave a request this instance has never seen.</p>
+     *
+     * <p>The published descriptor outlives all of that, so a miss is answered by rebuilding from
+     * it: every entry is re-read -- including the ones already superseded, which is why this
+     * needs readAllEntries rather than readTimeline -- and the one whose version matches is the
+     * entry the host is showing. Falling back to the current entry instead would answer a
+     * DIFFERENT version, and then the displayed layout's image ids are either absent from the map
+     * or mapped to artwork rasterized against the wrong state; the first renders a blank and the
+     * second renders the wrong thing, and neither corrects itself until the next flip.</p>
+     *
+     * <p>Only a publish that replaced the descriptor outright leaves nothing to find. The current
+     * entry is then genuinely all there is, and the publish has already requested a tile update,
+     * so the mismatch is about to be replaced rather than left on screen.</p>
      *
      * @param requested the version the host is asking for, possibly null
      * @return the resources, whose version is the one being served
@@ -274,6 +314,9 @@ public abstract class CN1SurfaceTileService extends TileService {
         String version = "0";
         try {
             CN1WatchSurface.Reading remembered = recall(requested);
+            if (remembered == null) {
+                remembered = rebuild(requested);
+            }
             CN1WatchSurface.Reading reading = remembered != null ? remembered
                     : CN1WatchSurface.read(this, getKindId(), "watchRectangular");
             if (reading != null) {

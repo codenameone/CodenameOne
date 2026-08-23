@@ -227,6 +227,53 @@ public final class CN1WatchSurface {
     }
 
     /**
+     * Reads every entry a kind published, including the ones already superseded.
+     *
+     * <p>Unlike {@link #readTimeline} this does not drop the past, because its caller is not
+     * asking what to show -- it is asking what it already showed. A Tile host requests resources
+     * for the version the layout it is displaying advertised, and that layout can be an entry
+     * behind by the time the request lands. The published descriptor is the only record of what
+     * that entry was, so answering from it is what makes the answer survive a flip, a cache
+     * eviction, and the service being torn down and rebuilt between the two callbacks.</p>
+     *
+     * @param ctx any context
+     * @param kindId the widget kind
+     * @param family the portable family name, e.g. {@code watchRectangular}
+     * @return every entry, in published order, or an empty list when nothing has been published
+     */
+    public static List<Reading> readAllEntries(Context ctx, String kindId, String family) {
+        List<Reading> out = new ArrayList<Reading>();
+        String json = CN1SurfaceStore.readWidgetTimeline(ctx, kindId);
+        if (json == null || json.length() == 0) {
+            return out;
+        }
+        try {
+            JSONObject doc = new JSONObject(json);
+            JSONObject layout = pickLayout(doc.optJSONObject("layouts"), family);
+            if (layout == null) {
+                return out;
+            }
+            boolean reloadAtEnd = !"never".equals(doc.optString("reload", "atEnd"));
+            JSONArray entries = doc.optJSONArray("entries");
+            for (int i = 0; entries != null && i < entries.length(); i++) {
+                JSONObject e = entries.optJSONObject(i);
+                if (e == null) {
+                    continue;
+                }
+                long date = e.optLong("date", 0);
+                JSONObject state = e.optJSONObject("state");
+                out.add(new Reading(layout, state == null ? new JSONObject() : state,
+                        nextFlipDate(entries, date), date, reloadAtEnd));
+            }
+        } catch (Throwable t) {
+            // Same contract as read(): a malformed descriptor leaves the face showing whatever it
+            // had rather than taking the watch face down with the data source.
+            Log.w(TAG, "Could not read the published timeline for watch kind " + kindId, t);
+        }
+        return out;
+    }
+
+    /**
      * Picks the layout for a family, substituting the way every other platform does.
      *
      * <p>{@code watchCorner} borrows the circular layout because Wear OS has no corner slot at
