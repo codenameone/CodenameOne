@@ -149,11 +149,27 @@ class InterpRuntimeContractTest {
         // next line as source-less.
         assertEquals("real.pkg", packageOf(
                 "@file:com.foo.`package`.Ann\npackage real.pkg\n\nfun main() {}\n"));
+        // Java's backslash-u preprocessing runs before tokenisation and
+        // would decode an escape spelled 005c u 0022 (a quote) into a bare
+        // quote before comments and strings are stripped. Kotlin does not
+        // preprocess -- the escape only lives inside a string literal.
+        // Running the Java expansion on a Kotlin source turns that inner
+        // escape into a synthetic quote delimiter that swallows the real
+        // `package` line and refuses the push.
+        String kotlin = "@file:Suppress(\"" + "\\" + "u0022 package fake\")\n"
+                + "package real.p\n\nfun main() {}\n";
+        assertEquals("real.p", packageOfKotlin(kotlin));
     }
 
     private static String packageOf(String source) throws Exception {
         Class<?> writer = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
         return (String) writer.getMethod("packageOf", String.class).invoke(null, source);
+    }
+
+    private static String packageOfKotlin(String source) throws Exception {
+        Class<?> writer = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
+        return (String) writer.getMethod("packageOf", String.class, String.class)
+                .invoke(null, source, "Foo.kt");
     }
 
     /**
@@ -205,6 +221,35 @@ class InterpRuntimeContractTest {
                 null, new Object[0]));
         assertEquals("b", rt.invoke(b.declaredMethod("own", "()Ljava/lang/String;"),
                 null, new Object[0]));
+    }
+
+    /**
+     * `invokevirtual A.m` on `abstract class A implements I {}` where I.m is
+     * abstract must still resolve; reflection's virtual dispatch will run
+     * the concrete override on the receiver. Filtering abstracts out of the
+     * interface-candidate pool made this throw NoSuchMethodException and
+     * killed any pushed call to a method inherited only through an
+     * interface via an abstract superclass.
+     */
+    @Test
+    @DisplayName("class-owner resolution finds an interface method inherited only as abstract")
+    void classOwnerResolutionFindsInheritedAbstractInterfaceMethod() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        Object r = linker.invokeVirtual(new SiblingConcrete(),
+                "com/codename1/impl/interp/InterpRuntimeContractTest$SiblingAbstract",
+                "compute", "()I", new Object[0]);
+        assertEquals(Integer.valueOf(42), r);
+    }
+
+    interface SiblingProducer {
+        int compute();
+    }
+
+    abstract static class SiblingAbstract implements SiblingProducer {
+    }
+
+    static class SiblingConcrete extends SiblingAbstract {
+        public int compute() { return 42; }
     }
 
     /**

@@ -2628,29 +2628,64 @@ public final class InterpRuntime {
                     continue;
                 }
                 handledSrcs.addElement(src);
-                String bestDesc = (String) arrayIntents.elementAt(n + 2);
-                for (int m = n + 3; m < arrayIntents.size(); m += 3) {
+                // Cluster this src's requested descriptors by array
+                // covariance. Each cluster is represented by its most
+                // specific descriptor and materialised once, so
+                // Component[] and Button[] slots of the same Button[] src
+                // still share one Button[] dst. Two unrelated siblings
+                // (a class implementing two disjoint interfaces passed as
+                // both A[] and B[]) form separate clusters -- neither
+                // array class satisfies the other's slot, so a shared dst
+                // would let reflection reject the mismatched arg.
+                Vector clusterReps = new Vector();
+                for (int m = n; m < arrayIntents.size(); m += 3) {
                     if (arrayIntents.elementAt(m + 1) != src) {   //NOPMD CompareObjectsWithEquals - identity is the point
                         continue;
                     }
                     String cand = (String) arrayIntents.elementAt(m + 2);
-                    bestDesc = moreSpecificElement(bestDesc, cand);
+                    int mergedInto = -1;
+                    for (int c = 0; c < clusterReps.size(); c++) {
+                        String rep = (String) clusterReps.elementAt(c);
+                        String merged = moreSpecificElement(cand, rep);
+                        if (merged != null) {
+                            clusterReps.setElementAt(merged, c);
+                            mergedInto = c;
+                            break;
+                        }
+                    }
+                    if (mergedInto < 0) {
+                        clusterReps.addElement(cand);
+                    }
                 }
-                Object[] dst = materializeTypedArray(src, bestDesc, hostArrayPairs);
-                if (dst == null) {
-                    continue;
-                }
-                if (!containsMaterialisation(hostArrayPairs, src, bestDesc)) {
-                    hostArrayPairs.addElement(src);
-                    hostArrayPairs.addElement(dst);
-                    hostArrayPairs.addElement(bestDesc);
+                for (int c = 0; c < clusterReps.size(); c++) {
+                    String rep = (String) clusterReps.elementAt(c);
+                    Object[] dst = materializeTypedArray(src, rep, hostArrayPairs);
+                    if (dst == null) {
+                        continue;
+                    }
+                    if (!containsMaterialisation(hostArrayPairs, src, rep)) {
+                        hostArrayPairs.addElement(src);
+                        hostArrayPairs.addElement(dst);
+                        hostArrayPairs.addElement(rep);
+                    }
                 }
                 for (int m = n; m < arrayIntents.size(); m += 3) {
                     if (arrayIntents.elementAt(m + 1) != src) {   //NOPMD CompareObjectsWithEquals - identity is the point
                         continue;
                     }
                     int argIdx = ((Integer) arrayIntents.elementAt(m)).intValue();
-                    args[argIdx] = dst;
+                    String slotDesc = (String) arrayIntents.elementAt(m + 2);
+                    for (int c = 0; c < clusterReps.size(); c++) {
+                        String rep = (String) clusterReps.elementAt(c);
+                        if (moreSpecificElement(slotDesc, rep) == null) {
+                            continue;
+                        }
+                        Object[] dst = existingMaterialisation(hostArrayPairs, src, rep);
+                        if (dst != null) {
+                            args[argIdx] = dst;
+                        }
+                        break;
+                    }
                 }
             }
         }
@@ -3137,12 +3172,15 @@ public final class InterpRuntime {
     }
 
     /// The more specific of two array element descriptors -- `a` if it is
-    /// (transitively) a subtype of `b`, `b` if the reverse holds, and `a`
-    /// arbitrarily when the two are unrelated siblings. "More specific"
-    /// means the type whose array class satisfies both parameter slots via
-    /// Java's array covariance, so aliased Component[] and Button[] slots
-    /// of the same pushed Button[] can share a single Button[] dst and
-    /// keep alias identity intact.
+    /// (transitively) a subtype of `b`, `b` if the reverse holds, and null
+    /// when the two are unrelated siblings (both only related through
+    /// Object, e.g. two disjoint interfaces). "More specific" means the
+    /// type whose array class satisfies both parameter slots via Java's
+    /// array covariance, so aliased Component[] and Button[] slots of the
+    /// same pushed Button[] can share a single Button[] dst and keep alias
+    /// identity intact. A null answer signals the caller to materialise
+    /// each descriptor separately -- neither array class is assignable to
+    /// the other, so no single dst satisfies both slots.
     private String moreSpecificElement(String a, String b) throws Throwable {
         if (a.equals(b)) {
             return a;
@@ -3150,7 +3188,7 @@ public final class InterpRuntime {
         Object aArrayClass = linker.findClass("[" + a);
         Object bArrayClass = linker.findClass("[" + b);
         if (aArrayClass == null || bArrayClass == null) {
-            return a;
+            return null;
         }
         // A zero-length dummy of each type is cheap; the reflective
         // isInstance check answers whether one array class is assignable
@@ -3164,11 +3202,11 @@ public final class InterpRuntime {
         if (linker.isInstance(bArrayClass, aDummy)) {
             return a;   // a's array is-a b's array, so a is more specific
         }
-        // Unrelated (siblings that share only Object as an ancestor);
-        // pick one arbitrarily. The host will reject the mismatched slot
-        // -- but that mismatch is present in the pushed program, not
-        // introduced here.
-        return a;
+        // Unrelated siblings share only Object as an ancestor. Reflection
+        // will reject either descriptor's dst for the other's slot, so
+        // the caller must materialise each descriptor separately rather
+        // than pick one arbitrarily and lose the other slot.
+        return null;
     }
 
     /// A real `Class[]` built from an interpreter-owned Object[] used to

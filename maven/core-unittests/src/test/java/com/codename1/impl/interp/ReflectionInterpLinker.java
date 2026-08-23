@@ -203,23 +203,37 @@ public class ReflectionInterpLinker implements InterpLinker {
         if (count == 0) {
             return null;
         }
-        if (count == 1) {
-            return candidates.get(0);
+        // Prefer concrete over abstract. Abstract candidates stay in the
+        // collection so that `invokevirtual A.m` on
+        // `abstract A implements I` resolves to I.m even when it is
+        // abstract; reflection's virtual dispatch runs the receiver's
+        // concrete override. When both are present, JVMS 5.4.3.3 picks
+        // the concrete default.
+        java.util.ArrayList<Method> concrete = new java.util.ArrayList<Method>();
+        for (int i = 0; i < count; i++) {
+            if (!Modifier.isAbstract(candidates.get(i).getModifiers())) {
+                concrete.add(candidates.get(i));
+            }
+        }
+        java.util.List<Method> pool = concrete.isEmpty() ? candidates : concrete;
+        int psz = pool.size();
+        if (psz == 1) {
+            return pool.get(0);
         }
         java.util.ArrayList<Method> maximal = new java.util.ArrayList<Method>();
         java.util.HashSet<Class> seenDeclaring = new java.util.HashSet<Class>();
-        for (int i = 0; i < count; i++) {
-            Method mi = candidates.get(i);
+        for (int i = 0; i < psz; i++) {
+            Method mi = pool.get(i);
             Class declaringA = mi.getDeclaringClass();
             if (!seenDeclaring.add(declaringA)) {
                 continue;
             }
             boolean dominated = false;
-            for (int j = 0; j < count; j++) {
+            for (int j = 0; j < psz; j++) {
                 if (i == j) {
                     continue;
                 }
-                Class declaringB = candidates.get(j).getDeclaringClass();
+                Class declaringB = pool.get(j).getDeclaringClass();
                 if (!declaringA.equals(declaringB)
                         && declaringA.isAssignableFrom(declaringB)) {
                     dominated = true;
@@ -233,9 +247,11 @@ public class ReflectionInterpLinker implements InterpLinker {
         if (maximal.size() == 1) {
             return maximal.get(0);
         }
-        if (maximal.size() > 1) {
+        if (maximal.size() > 1 && !concrete.isEmpty()) {
             // JVMS 5.4.3.3: multiple non-abstract maximally specific methods
             // that do not dominate each other is IncompatibleClassChangeError.
+            // All-abstract pools do not conflict this way; virtual dispatch
+            // on the receiver picks the concrete override.
             StringBuilder message = new StringBuilder();
             for (int i = 0; i < maximal.size(); i++) {
                 if (i > 0) {
@@ -246,7 +262,7 @@ public class ReflectionInterpLinker implements InterpLinker {
             throw new IncompatibleClassChangeError("conflicting default methods for "
                     + name + " on " + c.getName() + ": " + message);
         }
-        return candidates.get(0);
+        return pool.get(0);
     }
 
     private void collectInterfaceCandidates(Class iface, String name, Class[] types,
@@ -258,12 +274,14 @@ public class ReflectionInterpLinker implements InterpLinker {
         try {
             Method m = iface.getDeclaredMethod(name, types);
             int mods = m.getModifiers();
-            // Static, private, and abstract declarations do not compete as
-            // interface defaults: static/private are not inherited through
-            // an interface, and abstract contributes no body. Filtering
-            // here matches JVMS 5.4.3.3 "non-abstract maximally specific".
-            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)
-                    && !Modifier.isAbstract(mods)) {
+            // Static and private declarations are never inheritable, so
+            // they cannot serve as interface defaults. Abstract methods do
+            // stay in the pool: `invokevirtual A.m` on
+            // `abstract A implements I` resolves to I.m even when it is
+            // abstract, and reflection dispatches virtually on the
+            // receiver. `findInInterfaces` prefers concrete siblings over
+            // abstracts when both are present.
+            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
                 candidates.add(m);
             }
         } catch (NoSuchMethodException ignore) {

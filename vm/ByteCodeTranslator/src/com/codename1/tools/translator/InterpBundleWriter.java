@@ -202,7 +202,7 @@ public class InterpBundleWriter {
                 addSourceTree(f);
             } else if (isSourceFile(f.getName())) {
                 String text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-                addSource(sourceKey(packageOf(text), f.getName()), text);
+                addSource(sourceKey(packageOf(text, f.getName()), f.getName()), text);
             }
         }
     }
@@ -233,11 +233,24 @@ public class InterpBundleWriter {
      * inferred from its path -- a source root is not always the package root.
      */
     public static String packageOf(String text) {
+        return packageOf(text, "unknown.java");
+    }
+
+    /// Overload aware of the source file name. Only Java lexing runs the
+    /// `\ uXXXX` preprocessing before tokenisation (no space in real
+    /// source, split here so this comment stays a comment), so a Kotlin
+    /// file whose pre-declaration annotation contains an escaped quote
+    /// inside a string literal must not have that escape expanded before
+    /// `stripComments` runs, or the synthetic quote turns the annotation
+    /// into a real string literal that swallows the real `package` line
+    /// and the push is refused as missing source.
+    public static String packageOf(String text, String fileName) {
+        boolean java = fileName != null && fileName.endsWith(".java");
         // Tokens, not line starts. `/* license */ package com.example;` is one
         // line of perfectly ordinary Java, and reading it as the default
         // package stored the source under a key the runtime never looks up --
         // so the push was refused for missing source that had been supplied.
-        String code = stripComments(decodeUnicodeEscapes(text));
+        String code = stripComments(java ? decodeUnicodeEscapes(text) : text);
         int i = 0;
         // Track paren depth so a `{` inside an annotation's argument list
         // (`@p.A({String.class}) package p;`) reads as an array-initializer
