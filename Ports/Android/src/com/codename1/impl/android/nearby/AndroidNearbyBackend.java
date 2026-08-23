@@ -1043,17 +1043,31 @@ public class AndroidNearbyBackend implements NearbyBridge {
             }
         }
         if (kind == 2) {
-            request.addDeviceFilter(
-                    new android.companion.BluetoothDeviceFilter.Builder()
-                            .setAddress(value)
-                            .build());
-            return true;
+            // Guarded like the two above. setAddress and build() throw
+            // IllegalArgumentException for anything that is not a MAC, and
+            // this was the one branch that let it escape -- past the caller,
+            // out of the backend, and into application code, leaving the
+            // AsyncResource that associate() had already registered orphaned
+            // instead of failing with INVALID_TOKEN.
+            try {
+                request.addDeviceFilter(
+                        new android.companion.BluetoothDeviceFilter.Builder()
+                                .setAddress(value)
+                                .build());
+                return true;
+            } catch (Throwable notAnAddress) {
+                return false;
+            }
         }
         if (kind == 3) {
-            request.addDeviceFilter(new WifiDeviceFilter.Builder()
-                    .setNamePattern(Pattern.compile(Pattern.quote(value)))
-                    .build());
-            return true;
+            try {
+                request.addDeviceFilter(new WifiDeviceFilter.Builder()
+                        .setNamePattern(Pattern.compile(Pattern.quote(value)))
+                        .build());
+                return true;
+            } catch (Throwable notUsable) {
+                return false;
+            }
         }
         return false;
     }

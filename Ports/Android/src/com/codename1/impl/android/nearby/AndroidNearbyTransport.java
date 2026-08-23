@@ -95,6 +95,14 @@ public class AndroidNearbyTransport implements NearbyBridge {
     /// discovering service A had the later call overwrite it, and endpoints
     /// found under A were then encoded as B -- which Endpoint.getServiceId()
     /// documents as the service they were found under.
+    /// Endpoints currently connected.
+    ///
+    /// stop() has to clear the metadata of endpoints nothing will call back
+    /// about, and leave alone the metadata onDisconnected still needs. Only
+    /// this tells the two apart.
+    private final java.util.Set<String> connectedEndpoints =
+            java.util.Collections.synchronizedSet(
+                    new java.util.HashSet<String>());
     private final Map<String, String> endpointServices =
             Collections.synchronizedMap(new HashMap<String, String>());
     private String advertisingServiceId = "";
@@ -434,8 +442,22 @@ public class AndroidNearbyTransport implements NearbyBridge {
         client().stopAdvertising();
         client().stopDiscovery();
         client().stopAllEndpoints();
-        endpointNames.clear();
-        endpointServices.clear();
+        // Only the endpoints nothing will call back about. stopAllEndpoints
+        // disconnects asynchronously and onDisconnected encodes each endpoint
+        // through nameOf(), so clearing everything handed those callbacks an
+        // endpoint with an empty name and service id -- the same defect the
+        // single-endpoint disconnect() path had. A connected endpoint's
+        // metadata is removed by its own callback; a merely discovered one
+        // has no callback coming and is dropped here.
+        synchronized (connectedEndpoints) {
+            List<String> discoveredOnly = new ArrayList<String>(
+                    endpointNames.keySet());
+            discoveredOnly.removeAll(connectedEndpoints);
+            for (String id : discoveredOnly) {
+                endpointNames.remove(id);
+                endpointServices.remove(id);
+            }
+        }
         payloadIds.clear();
         payloadRecipients.clear();
         incomingFiles.clear();
@@ -495,6 +517,11 @@ public class AndroidNearbyTransport implements NearbyBridge {
                     ConnectionResolution resolution) {
                 boolean ok = resolution.getStatus().getStatusCode()
                         == ConnectionsStatusCodes.STATUS_OK;
+                if (ok) {
+                    connectedEndpoints.add(endpointId);
+                } else {
+                    connectedEndpoints.remove(endpointId);
+                }
                 NearbyTransport.deliverConnectionResult(
                         encode(endpointId, nameOf(endpointId)), ok,
                         ok ? 0 : NearbyError.SESSION_FAILED.ordinal(),
@@ -505,6 +532,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
             public void onDisconnected(String endpointId) {
                 NearbyTransport.deliverDisconnected(
                         encode(endpointId, nameOf(endpointId)));
+                connectedEndpoints.remove(endpointId);
                 endpointNames.remove(endpointId);
                 // Cleared with the name, for the reason onEndpointLost does.
                 endpointServices.remove(endpointId);
