@@ -218,11 +218,13 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
     /// The identical logic lives in the Android builder's widget codegen; keep them in sync.
     static String toClassSuffix(String kindId) {
         StringBuilder sb = new StringBuilder(kindId.length());
+        StringBuilder positions = new StringBuilder();
         boolean upper = true;
         for (int i = 0; i < kindId.length(); i++) {
             char c = kindId.charAt(i);
             if (c == '_') {
                 upper = true;
+                positions.append('_').append(i);
                 continue;
             }
             if (upper) {
@@ -232,7 +234,16 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
                 sb.append(c);
             }
         }
-        return sb.toString();
+        // MUST match AndroidGradleBuilder.surfaceKindClassSuffix exactly. That is where the class
+        // is named at build time and this is where it is found at runtime, and the two agreeing is
+        // the whole contract: a name computed differently here reaches a provider or a
+        // complication service that does not exist, and a publish is persisted and then displayed
+        // by nothing.
+        //
+        // The underscore POSITIONS, because folding them away is not injective -- "status" and
+        // "status_" would otherwise both be Status and two kinds would share one class. Absent
+        // for an id without underscores, so nothing an existing project publishes changes name.
+        return sb.append(positions).toString();
     }
 
     private static ComponentName providerComponent(Context ctx, String kindId) {

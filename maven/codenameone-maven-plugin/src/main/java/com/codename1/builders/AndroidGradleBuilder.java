@@ -7659,6 +7659,13 @@ public class AndroidGradleBuilder extends Executor {
                 + "                <action android:name=\"android.intent.action.MAIN\" />\n"
                 + "                <category android:name=\"android.intent.category.LAUNCHER\" />\n"
                 + "            </intent-filter>\n"
+                // Whatever else the project registered on its launcher -- an app link, a custom
+                // URI scheme, a share target. The phone activity gets this same fragment, and
+                // the two halves are ONE app to the system: they share an applicationId, so an
+                // intent the phone resolves is an intent the watch has to be able to resolve
+                // too. Without it a link opened on the watch has nowhere to go, and the watch
+                // half of a companion cannot be reached by anything but its launcher icon.
+                + request.getArg("android.xintent_filter", "")
                 + "        </activity>\n"
                 // The Data Layer listener. This manifest is selected outright by the module's
                 // sourceSets rather than merged with the phone's, so anything the watch needs has

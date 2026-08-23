@@ -340,6 +340,29 @@ class AndroidWatchSurfaceCodegenTest {
         assertThrows(BuildException.class, () -> AndroidGradleBuilder.wearVersionCode(blank, 100));
     }
 
+    /// The builder names the generated class and the RUNTIME finds it by name, so the two folds
+    /// have to agree exactly -- a name computed differently at runtime reaches a provider or a
+    /// complication service that does not exist, and a publish is persisted and then displayed by
+    /// nothing. Read out of the port's source rather than called, because the port class needs an
+    /// Android runtime this test does not have.
+    @Test
+    void theRuntimeFoldMatchesTheBuilders() throws java.io.IOException {
+        java.io.File bridge = new java.io.File("../../Ports/Android/src/com/codename1/impl/"
+                + "android/surfaces/AndroidSurfaceBridge.java");
+        assertTrue(bridge.isFile(), "the port must be readable: " + bridge.getAbsolutePath());
+        String source = new String(java.nio.file.Files.readAllBytes(bridge.toPath()), "UTF-8");
+
+        int at = source.indexOf("static String toClassSuffix(String kindId) {");
+        assertTrue(at >= 0, "toClassSuffix must be there");
+        String body = source.substring(at, source.indexOf("\n    }\n", at));
+
+        // The two properties the builder's fold has, stated as the runtime has to have them.
+        assertTrue(body.contains("positions.append('_').append(i)"),
+                "the runtime must record underscore positions as the builder does:\n" + body);
+        assertTrue(body.contains("sb.append(positions)"),
+                "the runtime must append them as the builder does:\n" + body);
+    }
+
     // --- tiles ------------------------------------------------------------------
 
     /// Only the rectangular family is roomy enough for a layout rather than a readout, so it is
