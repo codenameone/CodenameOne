@@ -632,6 +632,70 @@ public final class PlatformFeatureCatalog {
                 .androidMinimumSdk(23)
                 .description("Encrypted SQLite databases (SQLCipher)"));
 
+        // Nearby devices (com.codename1.nearby.*). Three entries, because
+        // the three packages cost three different things and the scanner
+        // matches on a prefix with no way to express an exclusion -- so the
+        // package boundary is the only opt-in a developer performs.
+        //
+        // NOTE the Android permissions are deliberately NOT listed on any of
+        // these. UWB_RANGING exists only from API 31, and the transport needs
+        // the Android 12 Bluetooth split with maxSdkVersion caps and
+        // usesPermissionFlags="neverForLocation" -- attributes this table
+        // cannot express. NearbyManifestFragments injects all of them
+        // instead, exactly as BluetoothManifestFragments does.
+        //
+        // The three CN1_NEARBY_* define flips likewise happen in
+        // IPhoneBuilder, which is also where the AccessorySetupKit plist
+        // arrays and the optional nearby-interaction entitlement live.
+        e.add(new Entry("com/codename1/nearby/ranging/")
+                .iosFrameworks("NearbyInteraction")
+                // Both keys. NSNearbyInteractionUsageDescription is the iOS 14
+                // form and NSNearbyInteractionAllowOnceUsageDescription the
+                // iOS 15 one; iOS 14 checks the older key before letting a
+                // session start, so an app on the supported floor that carried
+                // only the newer one was terminated. The Bluetooth entry above
+                // carries both of its own keys for the same reason.
+                .iosPlist("NSNearbyInteractionAllowOnceUsageDescription",
+                         "Measures how far away a nearby device is.")
+                .iosPlist("NSNearbyInteractionUsageDescription",
+                         "Measures how far away a nearby device is.")
+                .androidGradle("androidx.core.uwb:uwb:1.0.0")
+                // The Java-facing wrapper. The base library is Kotlin
+                // coroutines -- prepareSession returns a Flow -- and the port
+                // is Java, so AndroidUwbRanging consumes the Observable this
+                // provides instead of hand-writing a Continuation.
+                .androidGradle("androidx.core.uwb:uwb-rxjava3:1.0.0")
+                // Declared optional, so the app still installs on the many
+                // devices with no UWB radio. Ranging.isSupported() is what an
+                // app branches on there.
+                .androidFeatures("android.hardware.uwb")
+                // The AAR's own floor. NOT 31, which is where UWB_RANGING and
+                // the platform UwbManager arrive: androidx.core.uwb runs down
+                // to 23 and reports the feature absent below 31, so raising
+                // the whole app's minSdk to 31 would cost far more than the
+                // feature is worth.
+                .androidMinimumSdk(23)
+                .description("Ultra-wideband precision ranging"));
+
+        e.add(new Entry("com/codename1/nearby/transport/")
+                .iosFrameworks("MultipeerConnectivity")
+                .iosPlist("NSLocalNetworkUsageDescription",
+                         "Finds and connects to nearby devices running this"
+                         + " app.")
+                .description("Nearby device-to-device transport"));
+
+        e.add(new Entry("com/codename1/nearby/companion/")
+                // AccessorySetupKit is iOS 18 and CoreBluetooth carries the
+                // CBUUID its discovery descriptor takes. Naming a framework
+                // newer than the deployment target is safe: its headers are
+                // availability-annotated, so clang weak-imports the symbols
+                // and the @available guards in CN1Nearby.m keep an older OS
+                // from touching them.
+                .iosFrameworks("AccessorySetupKit", "CoreBluetooth")
+                .androidFeatures("android.software.companion_device_setup")
+                .androidMinimumSdk(26)
+                .description("Companion-device association and presence"));
+
         e.add(new Entry("com/codename1/ar/")
                 .iosFrameworks("ARKit", "SceneKit")
                 .iosPlist("NSCameraUsageDescription",

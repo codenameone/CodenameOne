@@ -647,6 +647,18 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesHomeCommissioning;
     private String smartHomeQueriesFragment = "";
 
+    // Nearby devices (com.codename1.nearby.*). Three flags rather than one,
+    // because the three packages cost three different dependency and
+    // permission sets and the package prefix is the only opt-in a developer
+    // performs. usesNearbyPresence is separate again: presence observation is
+    // what earns the background companion permissions, and asking for those
+    // without it is asking a user for background privileges with nothing to
+    // show for them.
+    private boolean usesNearbyRanging;
+    private boolean usesNearbyTransport;
+    private boolean usesNearbyCompanion;
+    private boolean usesNearbyPresence;
+
     private boolean integrateMoPub = false;
 
     private static final boolean isMac;
@@ -2058,6 +2070,15 @@ public class AndroidGradleBuilder extends Executor {
                             usesHealthWrite = true;
                         }
                     }
+                    if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
+                        usesNearbyRanging = true;
+                    }
+                    if (cls.indexOf("com/codename1/nearby/transport/") == 0) {
+                        usesNearbyTransport = true;
+                    }
+                    if (cls.indexOf("com/codename1/nearby/companion/") == 0) {
+                        usesNearbyCompanion = true;
+                    }
                     if (cls.indexOf("com/codename1/bluetooth/") == 0) {
                         usesBluetooth = true;
                         if (cls.indexOf("com/codename1/bluetooth/le/server/") == 0) {
@@ -2136,6 +2157,17 @@ public class AndroidGradleBuilder extends Executor {
                     // cannot see it -- and without this the build skipped the
                     // type validation and shipped a manifest with no per-type
                     // permissions, leaving those calls unauthorized.
+                    // Presence observation is a method call, not a class
+                    // reference: an app that associates a device and one that
+                    // also asks the platform to watch for it name exactly the
+                    // same classes. Only the call tells them apart, and only
+                    // the second should carry the background permissions.
+                    if ("com/codename1/nearby/companion/CompanionDevices"
+                            .equals(cls)
+                            && method.contains("ObservingPresence")) {
+                        usesNearbyCompanion = true;
+                        usesNearbyPresence = true;
+                    }
                     if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                         usesHealth = true;
                         usesHealthStore = true;
@@ -2526,6 +2558,43 @@ public class AndroidGradleBuilder extends Executor {
                     usesBluetoothScan, usesBluetoothConnect,
                     usesBluetoothPeripheral, usesBluetoothClassic,
                     neverForLocation, bleRequired, targetSDKVersionInt);
+        }
+
+        // Nearby devices (com.codename1.nearby.*). The permissions live in
+        // NearbyManifestFragments rather than in PlatformFeatureCatalog
+        // because they are version-conditional in three different ways --
+        // UWB_RANGING is API 31 and later, the transport needs the Android 12
+        // Bluetooth split with maxSdkVersion caps, and NEARBY_WIFI_DEVICES
+        // needs usesPermissionFlags from 33 -- and a flat list cannot say any
+        // of that.
+        //
+        // android.nearby.watchProfile is a hint rather than something the
+        // scanner works out: the profile arrives as an enum constant, which
+        // is a field reference, and Executor.visitFieldInsn is an empty
+        // override. Defaulted false because REQUEST_COMPANION_PROFILE_WATCH
+        // is a strong permission to ask for on a guess.
+        if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
+            boolean watchProfile = "true".equalsIgnoreCase(
+                    request.getArg("android.nearby.watchProfile", "false"));
+            log("Nearby fragments version "
+                    + NearbyManifestFragments.FRAGMENT_VERSION
+                    + (usesNearbyRanging ? " ranging" : "")
+                    + (usesNearbyTransport ? " transport" : "")
+                    + (usesNearbyCompanion ? " companion" : "")
+                    + (usesNearbyPresence ? " presence" : ""));
+            xPermissions = NearbyManifestFragments.inject(xPermissions,
+                    usesNearbyRanging, usesNearbyTransport,
+                    usesNearbyCompanion, usesNearbyPresence, watchProfile,
+                    targetSDKVersionInt);
+            String presenceService =
+                    NearbyManifestFragments.presenceService(usesNearbyPresence);
+            if (presenceService.length() > 0
+                    && !request.getArg("android.xapplication", "")
+                            .contains("CN1CompanionDeviceService")) {
+                request.putArgument("android.xapplication",
+                        request.getArg("android.xapplication", "")
+                                + presenceService);
+            }
         }
 
         // Smart home (com.codename1.home.*).
@@ -3015,6 +3084,15 @@ public class AndroidGradleBuilder extends Executor {
         }
         playServicesVision = !request.getArg("android.playService.vision", "false").equals("false");
         playServicesNearBy = !request.getArg("android.playService.nearby", "false").equals("false");
+        // The nearby transport IS Nearby Connections, so referencing
+        // com.codename1.nearby.transport turns the same Play service on.
+        // Routed through this flag rather than through a PlatformFeatureCatalog
+        // androidGradle entry so the artifact keeps the version the builder's
+        // own Play-services table decides, instead of one pinned in a table
+        // that has no idea which Play services this build resolved.
+        if (usesNearbyTransport) {
+            playServicesNearBy = true;
+        }
         playServicesSafetyPanorama = !request.getArg("android.playService.panorama", "false").equals("false");
         playServicesGames = !request.getArg("android.playService.games", "false").equals("false");
         playServicesSafetyNet = !request.getArg("android.playService.safetynet", "false").equals("false");
@@ -3666,6 +3744,38 @@ public class AndroidGradleBuilder extends Executor {
         if (!shouldIncludeGoogleImpl) {
             File fb = new File(srcDir, "com/codename1/social/GoogleImpl.java");
             fb.delete();
+        }
+
+        // The nearby package compiles against a modern SDK plus, for two of
+        // its three files, gradle dependencies that only exist when the
+        // matching catalog entry matched. Each is deleted on its own rather
+        // than the package as a whole, so an app that uses one half keeps it
+        // and loses the other -- AndroidNearbyBackend reaches both
+        // reflectively and treats a missing one as unsupported.
+        File nearbyPackage = new File(srcDir,
+                "com/codename1/impl/android/nearby");
+        if (!usesNearbyRanging && !usesNearbyTransport
+                && !usesNearbyCompanion) {
+            File[] nearbyFiles = nearbyPackage.listFiles();
+            if (nearbyFiles != null) {
+                for (File f : nearbyFiles) {
+                    f.delete();
+                }
+            }
+            nearbyPackage.delete();
+        } else {
+            if (!usesNearbyRanging) {
+                new File(nearbyPackage, "AndroidUwbRanging.java").delete();
+            }
+            if (!usesNearbyTransport) {
+                new File(nearbyPackage, "AndroidNearbyTransport.java").delete();
+            }
+            if (!usesNearbyPresence) {
+                // Nothing binds it, and it extends an API 31 class; leaving it
+                // costs a compile against a service the manifest never names.
+                new File(nearbyPackage,
+                        "CN1CompanionDeviceService.java").delete();
+            }
         }
 
         if (!arSupport) {
