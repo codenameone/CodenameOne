@@ -788,9 +788,13 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("Debug", own.configuration);
         assertEquals("iphoneos14.4", own.sdk);
         assertEquals("arm64", own.arch);
-        // a pattern names a family; its stem is the closest thing to a value
-        assertEquals("iphonesimulator", IPhoneBuilder.contextForCondition(
+        // A pattern names a FAMILY and is kept as one. Its stem was standing in for a value:
+        // $(SDK_NAME) then expanded to "iphonesimulator", while the simulator build the setting
+        // belongs to expands it to a versioned iphonesimulator18.0 -- a path nothing is at.
+        assertEquals("iphonesimulator*", IPhoneBuilder.contextForCondition(
                 "X[sdk=iphonesimulator*]", active).sdk);
+        assertTrue(IPhoneBuilder.isFamilyPattern("iphonesimulator*"));
+        assertFalse(IPhoneBuilder.isFamilyPattern("iphoneos14.4"));
     }
 
     @Test
@@ -895,5 +899,56 @@ public class AppExtensionDeploymentTargetTest {
                                 settings)),
                 IPhoneBuilder.extensionSettingsWithBuiltIns(extension, settings, "Release",
                         "iphoneos14.4", "arm64")));
+    }
+
+    @Test
+    public void anIdentifierWrittenThroughTheProjectNameResolves() throws Exception {
+        File dist = tmp.newFolder("dist40");
+        assertTrue(new File(dist, "MyApp.xcodeproj").mkdirs());
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.$(PROJECT_NAME)");
+
+        // $(PROJECT_NAME) is an Xcode built-in like $(TARGET_NAME), and not supplying it left the
+        // identifier unresolvable -- recorded for the export-options dictionary as its own source
+        // text, which names no bundle and matches no profile.
+        assertEquals("com.example.app.MyApp", IPhoneBuilder.resolveSettingsFully(
+                "com.example.app.$(PROJECT_NAME)",
+                IPhoneBuilder.extensionSettingsWithBuiltIns(extension, settings, "Release",
+                        "iphoneos14.4", "arm64")));
+    }
+
+    @Test
+    public void twoProjectsInTheFolderLeaveTheProjectNameUnknown() throws Exception {
+        File dist = tmp.newFolder("dist41");
+        assertTrue(new File(dist, "MyApp.xcodeproj").mkdirs());
+        assertEquals("MyApp", IPhoneBuilder.singleXcodeProjectName(dist));
+
+        // Two would be a guess, and a guessed identifier is the thing being fixed here.
+        assertTrue(new File(dist, "OtherApp.xcodeproj").mkdirs());
+        assertNull(IPhoneBuilder.singleXcodeProjectName(dist));
+    }
+
+    @Test
+    public void anInactiveWildcardDoesNotBecomeAConcreteSdk() throws Exception {
+        File dist = tmp.newFolder("dist42");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE[sdk\\=iphonesimulator*] = WalletUIExtension/$(SDK_NAME)/Info.plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // The simulator build this file belongs to expands SDK_NAME to a versioned
+        // iphonesimulator18.0, so the stem named a path nothing is ever at: the wrong file was
+        // reported missing and the real one was never stamped. Unresolvable is the honest
+        // answer, and it is reported as one this build will not edit.
+        for (java.util.Map.Entry<String, File> candidate : plists.entrySet()) {
+            if (candidate.getKey().contains("iphonesimulator")) {
+                assertNull(candidate.getKey(), candidate.getValue());
+            }
+        }
     }
 }

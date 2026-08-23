@@ -6835,10 +6835,29 @@ public class IPhoneBuilder extends Executor {
         if (!out.containsKey("PROJECT_DIR")) {
             out.put("PROJECT_DIR", projectPath);
         }
-        if (configuration != null && !out.containsKey("CONFIGURATION")) {
+        // A project name is one of these too, and not knowing it is what left
+        // com.example.host.$(PROJECT_NAME) unresolvable: the identifier was then recorded as its
+        // own source text, which names no bundle and matches no profile. It is the .xcodeproj in
+        // the project directory -- the same directory SRCROOT and PROJECT_DIR come from -- and
+        // only when there is exactly one, since two would be a guess.
+        String projectName = singleXcodeProjectName(projectDir);
+        if (projectName != null) {
+            if (!out.containsKey("PROJECT_NAME")) {
+                out.put("PROJECT_NAME", projectName);
+            }
+            if (!out.containsKey("PROJECT")) {
+                out.put("PROJECT", projectName);
+            }
+        }
+        // Family patterns are not values. A context taken from [sdk=iphonesimulator*] that this
+        // archive does not match knows the family and NOT the SDK the build will use, so
+        // $(SDK_NAME) is left unexpanded and the candidate is reported as one this build cannot
+        // resolve -- which is true -- rather than resolved to a path nothing will ever be at.
+        if (configuration != null && !isFamilyPattern(configuration)
+                && !out.containsKey("CONFIGURATION")) {
             out.put("CONFIGURATION", configuration);
         }
-        if (sdk != null) {
+        if (sdk != null && !isFamilyPattern(sdk)) {
             if (!out.containsKey("SDK_NAME")) {
                 out.put("SDK_NAME", sdk);
             }
@@ -6846,7 +6865,7 @@ public class IPhoneBuilder extends Executor {
                 out.put("PLATFORM_NAME", platformOf(sdk));
             }
         }
-        if (arch != null) {
+        if (arch != null && !isFamilyPattern(arch)) {
             if (!out.containsKey("CURRENT_ARCH")) {
                 out.put("CURRENT_ARCH", arch);
             }
@@ -6864,6 +6883,38 @@ public class IPhoneBuilder extends Executor {
                 : resolveSettingsInValue(productName, out);
         out.put("PRODUCT_NAME", resolvedProductName.length() > 0 ? resolvedProductName : targetName);
         return out;
+    }
+
+    /// Whether this context value is a family rather than a value: "iphonesimulator*", from a
+    /// condition that describes some build other than this one.
+    static boolean isFamilyPattern(String value) {
+        return value != null && value.endsWith("*");
+    }
+
+    /// The name of the Xcode project in this directory, or null when there is not exactly one.
+    ///
+    /// $(PROJECT_NAME) is an Xcode built-in like $(TARGET_NAME), and an identifier written
+    /// through it is ordinary. Not supplying it left the identifier unresolvable, and what got
+    /// recorded for the export-options dictionary was the expression itself.
+    static String singleXcodeProjectName(File projectDir) {
+        if (projectDir == null) {
+            return null;
+        }
+        File[] entries = projectDir.listFiles();
+        if (entries == null) {
+            return null;
+        }
+        String found = null;
+        for (File entry : entries) {
+            if (entry.getName().endsWith(".xcodeproj")) {
+                if (found != null) {
+                    return null;
+                }
+                found = entry.getName().substring(0,
+                        entry.getName().length() - ".xcodeproj".length());
+            }
+        }
+        return found == null || found.length() == 0 ? null : found;
     }
 
     /// Every entitlements file this target may be signed with: the plain CODE_SIGN_ENTITLEMENTS
@@ -7161,7 +7212,13 @@ public class IPhoneBuilder extends Executor {
                 if (archiveValue != null && matchesCondition(value, archiveValue)) {
                     continue;
                 }
-                value = value.substring(0, value.length() - 1);
+                // The pattern is kept whole, star and all. Stripped to its stem it read as a
+                // concrete value and was expanded as one: [sdk=iphonesimulator*] with
+                // Wallet/$(SDK_NAME)/Info.plist went looking for Wallet/iphonesimulator, while
+                // the simulator build that file belongs to expands SDK_NAME to a versioned
+                // iphonesimulator18.0 -- so the wrong path was reported missing and the real
+                // plist was never stamped. As a pattern it still matches the family for
+                // conditionApplies, and the built-ins it cannot supply are simply not supplied.
             }
             if (value.length() == 0) {
                 continue;
