@@ -96,6 +96,22 @@ final class NearbyPermissions {
                 out.add("android.permission.BLUETOOTH_CONNECT");
             }
         }
+        // The nearby-Wi-Fi and location grants belong to the operations that
+        // SCAN or BROADCAST, so an app asking only to CONNECT to an endpoint
+        // it has already discovered is not made to answer for them -- and no
+        // longer fails because it declined something it never needed.
+        //
+        // It was suggested these belong to DISCOVERY alone. Advertising needs
+        // them too: Nearby Connections advertises over BLE and brings up
+        // Wi-Fi to carry the payload, which is the same radio use discovery
+        // asks about, and an advertise that cannot use them does not start.
+        // So the gate is discovery OR advertise, not discovery alone.
+        boolean scansOrBroadcasts = (permissionBits
+                & (NearbyBridge.PERMISSION_DISCOVERY
+                        | NearbyBridge.PERMISSION_ADVERTISE)) != 0;
+        if (!scansOrBroadcasts) {
+            return out;
+        }
         if (sdk >= 33) {
             out.add("android.permission.NEARBY_WIFI_DEVICES");
         } else {

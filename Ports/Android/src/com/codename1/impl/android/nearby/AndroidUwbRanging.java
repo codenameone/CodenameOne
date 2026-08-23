@@ -368,6 +368,13 @@ public class AndroidUwbRanging implements NearbyBridge {
         try {
             peer = Peer.decode(peerToken);
         } catch (IllegalArgumentException e) {
+            // The marker goes with the failure. It is set before this point
+            // by startAccessoryRanging, and a token that will not decode
+            // never reaches the subscription that would clear it -- so an
+            // ordinary start() retried on the same still-open session was
+            // mistaken for an accessory start and answered into
+            // PENDING_ACCESSORY, leaving the real resource unsettled.
+            session.accessoryStart = false;
             fail(requestId, NearbyError.INVALID_TOKEN, e.getMessage());
             return;
         }
@@ -478,6 +485,10 @@ public class AndroidUwbRanging implements NearbyBridge {
                     });
             scheduleStartGrace(session);
         } catch (Throwable t) {
+            // Cleared for the reason the token failure above clears it: this
+            // start never reached the subscription.
+            session.accessoryStart = false;
+            session.startRequest.set(0);
             fail(requestId, NearbyError.SESSION_FAILED, message(t));
         }
     }
