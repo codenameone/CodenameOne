@@ -107,11 +107,11 @@ public final class InterpRuntime {
     /// The stored value is a [FailureInfo] that holds only the stack and
     /// host-call name; it deliberately does *not* keep a reference to
     /// the throwable, so the [IdentityWeakRef] weak key can be reclaimed
-    /// when the caller drops the throwable and the entry follows via the
-    /// reference queue. Wrapped in `Collections.synchronizedMap` because
-    /// both entry and lookup can happen from any thread.
-    private final java.lang.ref.ReferenceQueue failuresQueue =
-            new java.lang.ref.ReferenceQueue();
+    /// when the caller drops the throwable and the entry is swept on the
+    /// next put. Wrapped in `Collections.synchronizedMap` because both
+    /// entry and lookup can happen from any thread. CLDC's
+    /// `java.lang.ref` has no `ReferenceQueue`, so cleared entries are
+    /// discovered by walking the map's own keys during the sweep.
     private final java.util.Map failuresByThrown =
             java.util.Collections.synchronizedMap(new java.util.HashMap());
 
@@ -138,9 +138,8 @@ public final class InterpRuntime {
     private static final class IdentityWeakRef extends java.lang.ref.WeakReference {
         private final int hash;
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        IdentityWeakRef(Object referent, java.lang.ref.ReferenceQueue queue) {
-            super(referent, queue);
+        IdentityWeakRef(Object referent) {
+            super(referent);
             this.hash = System.identityHashCode(referent);
         }
 
@@ -560,6 +559,29 @@ public final class InterpRuntime {
             // back -- the array is the caller's now, and interpreted code
             // reading an element converts on the way in.
             toHostElements(result, new Vector());
+            // An interpreted override of `Component[] getSelected()` runs and
+            // allocates `new MyButton[n]` -- represented as Object[] because
+            // MyButton is interpreted, or because it is host-typed but the
+            // allocator produced an interpreter-owned Object[]. The generated
+            // shim then casts `$r` to Component[]; a plain `[Ljava.lang.Object;`
+            // is not assignable to `[Lcom.codename1.ui.Component;` and the
+            // cast fails. Rebuild as a typed array matching the declared
+            // return so the shim's cast succeeds. Only when the declared
+            // return is a reference-element array; leaf types the bundle
+            // owns keep their Object[] representation (documented deviation).
+            String ret = InterpValuesAccess.returnType(m.getDescriptor());
+            if (ret.startsWith("[")
+                    && "[Ljava.lang.Object;".equals(result.getClass().getName())) {
+                String elem = ret.substring(1);
+                if ((elem.startsWith("L") || elem.startsWith("["))
+                        && !"Ljava/lang/Object;".equals(elem)
+                        && !isInterpretedLeaf(elem)) {
+                    Object[] typed = materializeTypedArray((Object[]) result, elem, null);
+                    if (typed != null) {
+                        return typed;
+                    }
+                }
+            }
         }
         return result;
     }
@@ -1175,6 +1197,16 @@ public final class InterpRuntime {
                         // host Class[] would raise ArrayStoreException. The
                         // arg-conversion path materialises a real Class[]
                         // when handing one to a host method that wants it.
+                        // Interpreted-leaf arrays intentionally lose their
+                        // component descriptor here -- ArrayStoreException
+                        // and instanceof-against-empty for pushed-only leaf
+                        // types are documented deviations in
+                        // Device-Runtime.asciidoc ("A known deviation, no
+                        // ArrayStoreException for pushed types"), asserted
+                        // by an assertion in InterpRuntimeContractTest so
+                        // the deviation stays a known one; closing it means
+                        // threading a wrapper through every array opcode
+                        // and every host crossing.
                         f.pushRef(isInterpretedLeaf(comp) || isClassLeaf(comp)
                                 ? new Object[count]
                                 : linker.newArray(comp.startsWith("[") ? comp : "L" + comp + ";", count));
@@ -4149,19 +4181,29 @@ public final class InterpRuntime {
     }
 
     private void putFailureInfo(Throwable t, FailureInfo info) {
-        drainFailuresQueue();
-        failuresByThrown.put(new IdentityWeakRef(t, failuresQueue), info);
+        sweepClearedEntries();
+        failuresByThrown.put(new IdentityWeakRef(t), info);
     }
 
     private FailureInfo getFailureInfo(Throwable t) {
-        drainFailuresQueue();
-        return (FailureInfo) failuresByThrown.get(new IdentityWeakRef(t, null));
+        return (FailureInfo) failuresByThrown.get(new IdentityWeakRef(t));
     }
 
-    private void drainFailuresQueue() {
-        java.lang.ref.Reference ref;
-        while ((ref = failuresQueue.poll()) != null) {
-            failuresByThrown.remove(ref);
+    /// Removes entries whose weak key has been cleared. Called on put --
+    /// CLDC has no ReferenceQueue so the map is walked directly. The map
+    /// is small in practice (one entry per exception still reachable to a
+    /// caller) so the linear scan is cheap; iteration holds the map's
+    /// monitor to stay consistent with the `Collections.synchronizedMap`
+    /// wrapper.
+    private void sweepClearedEntries() {
+        synchronized (failuresByThrown) {
+            java.util.Iterator it = failuresByThrown.keySet().iterator();
+            while (it.hasNext()) {
+                IdentityWeakRef ref = (IdentityWeakRef) it.next();
+                if (ref.get() == null) {
+                    it.remove();
+                }
+            }
         }
     }
 
