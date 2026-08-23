@@ -27,6 +27,7 @@ import org.junit.Test;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class AppExtensionBuildSettingsTest {
 
@@ -66,5 +67,33 @@ public class AppExtensionBuildSettingsTest {
                 "\n   \nCLANG_ENABLE_MODULES = YES;\nnot a setting\n");
         assertEquals(1, settings.size());
         assertEquals("YES", settings.get("CLANG_ENABLE_MODULES"));
+    }
+
+    @Test
+    public void paddingIsStrippedFromArchiveSettings() throws Exception {
+        java.io.File dist = java.nio.file.Files.createTempDirectory("appext").toFile();
+        java.io.File extension = new java.io.File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.io.FileWriter w = new java.io.FileWriter(
+                new java.io.File(extension, "buildSettings.properties"));
+        w.write("PRODUCT_BUNDLE_IDENTIFIER=com.example.app.Ext \n");
+        w.close();
+
+        // Properties keeps the trailing space and Xcode does not. Kept, preflight validated
+        // "com.example.app.Ext" while the target was handed "com.example.app.Ext " -- an
+        // identifier no profile matches, from two readers of one file disagreeing.
+        assertEquals("com.example.app.Ext", IPhoneBuilder.appExtensionBuildSettings(extension)
+                .get("PRODUCT_BUNDLE_IDENTIFIER"));
+    }
+
+    @Test
+    public void extensionDeviceFamiliesFollowTheApp() {
+        // The translator gives the app target "1" for iphone and "2" for anything else that is
+        // not "ios"; an extension pinned to "1,2" beside an iPhone-only app is an upload
+        // rejection for an embedded bundle its container does not support.
+        assertEquals("1", IPhoneBuilder.embeddedExtensionDeviceFamily("iphone"));
+        assertEquals("2", IPhoneBuilder.embeddedExtensionDeviceFamily("ipad"));
+        assertEquals("1,2", IPhoneBuilder.embeddedExtensionDeviceFamily("ios"));
+        assertEquals("1,2", IPhoneBuilder.embeddedExtensionDeviceFamily(null));
     }
 }

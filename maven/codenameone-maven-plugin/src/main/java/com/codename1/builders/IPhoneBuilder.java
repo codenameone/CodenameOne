@@ -4921,7 +4921,8 @@ public class IPhoneBuilder extends Executor {
                             // families than the app is an App Store rejection on upload, and
                             // without SKIP_INSTALL the .appex is installed into the archive's
                             // Products as a second copy of a bundle already inside the .app.
-                            buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+                            buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
                             buildSettingsMap.put("SKIP_INSTALL", "YES");
                             if (containsSwiftSource(appExtension)) {
                                 // The project's Swift settings are applied to the app target
@@ -4935,16 +4936,12 @@ public class IPhoneBuilder extends Executor {
 
                             File buildSettingsProps = new File(appExtension, "buildSettings.properties");
                             if (buildSettingsProps.exists()) {
-                                Properties _buildSettingsProps = new Properties();
-                                try (FileInputStream fis = new FileInputStream(buildSettingsProps)) {
-                                    _buildSettingsProps.load(fis);
-                                }
-                                for (Object key : _buildSettingsProps.keySet()) {
-                                    if (key instanceof String) {
-                                        String val = _buildSettingsProps.getProperty((String)key);
-                                        buildSettingsMap.put((String)key, val);
-                                    }
-                                }
+                                // Through the same reader preflight used, rather than a second
+                                // parse of the same file: the two disagreed about trailing
+                                // whitespace, so the identifier that was checked and the
+                                // identifier that was written into the target were not the same
+                                // string.
+                                buildSettingsMap.putAll(appExtensionBuildSettings(appExtension));
                                 buildSettingsProps.delete();
                             }
 
@@ -7564,6 +7561,24 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /// The device families an extension embedded in THIS app may declare.
+    ///
+    /// The app target's own come from ios.project_type: the translator rewrites the template's
+    /// TARGETED_DEVICE_FAMILY to "1" for iphone and "2" for anything else that is not "ios".
+    /// Every extension here was pinned to "1,2" regardless, so an iPhone-only app shipped an
+    /// extension claiming iPad support -- the project builds, and App Store validation refuses
+    /// the upload for an embedded bundle whose device families its container does not have.
+    ///
+    /// This is the DEFAULT only. An archive that states its own TARGETED_DEVICE_FAMILY is applied
+    /// over it further down, since an extension deliberately narrower than its app -- a widget on
+    /// iPhone alone -- is the author's call to make.
+    static String embeddedExtensionDeviceFamily(String projectType) {
+        if (projectType == null || "ios".equalsIgnoreCase(projectType)) {
+            return "1,2";
+        }
+        return "iphone".equalsIgnoreCase(projectType) ? "1" : "2";
+    }
+
     /// The identifier this extension's archive declares, or the one derived from the app.
     ///
     /// Named rather than inlined because four call sites have to agree on it: an archive that
@@ -7614,7 +7629,14 @@ public class IPhoneBuilder extends Executor {
         }
         for (Object key : props.keySet()) {
             if (key instanceof String) {
-                out.put((String) key, props.getProperty((String) key));
+                String value = props.getProperty((String) key);
+                // Trimmed, because Properties keeps trailing whitespace and Xcode does not:
+                // xcodebuild -showBuildSettings reports a padded value without its padding, and
+                // the parser for that output trims too. Untrimmed, preflight judged
+                // "com.example.app.Ext" while the target was handed "com.example.app.Ext " --
+                // an identifier no profile matches and no bundle may carry, arrived at by two
+                // readers of the same file disagreeing about what it says.
+                out.put((String) key, value == null ? null : value.trim());
             }
         }
         return out;
@@ -8191,7 +8213,8 @@ public class IPhoneBuilder extends Executor {
         buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");
         buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
                 MatterExtensionBuilder.deploymentTarget(ownFabric));
-        buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
         buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
                 "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
         buildSettingsMap.put("SKIP_INSTALL", "YES");
@@ -8282,7 +8305,8 @@ public class IPhoneBuilder extends Executor {
         // PKIssuerProvisioningExtensionHandler requires iOS 14; the extension target
         // keeps its own deployment target even when the app targets lower.
         buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", "14.0");
-        buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
         buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
         buildSettingsMap.put("SKIP_INSTALL", "YES");
         buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "YES");
@@ -8845,7 +8869,8 @@ public class IPhoneBuilder extends Executor {
         String extensionName = widgetBuilder.getExtensionName();
         Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
         buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
-        buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
         buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
         buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
         // The builder's buildSettings.properties supplies the deployment target, Swift
