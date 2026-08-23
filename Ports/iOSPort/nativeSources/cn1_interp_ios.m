@@ -437,6 +437,24 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_setFieldById___int_java_lang_Ob
     char* base = (char*)target;
     void* slot = base + entry->offset;
     if (kind == K_OBJECT) {
+        /* An interpreted PUTFIELD writes into a compiled object, so it owes the
+           collector exactly what the translator's generated reference setter
+           pays -- see the set_field_ emission in ByteCodeClass.generateCCode,
+           which writes these two in this order ahead of the store.
+
+           CN1_WRITE_BARRIER promotes a nursery value that is escaping into the
+           heap; without it the nursery frees an object the host object still
+           points at. CN1_SATB_DELETE hands the collector the reference being
+           overwritten, so a reference that was in the start-of-cycle snapshot
+           survives a mark that has already scanned this thread. Skipping either
+           is silent: the store succeeds and the damage appears a cycle later, in
+           a mark walking a field that no longer points at a live object.
+
+           Both are single predicted-not-taken flag loads outside a GC, and the
+           interpreter is on-device-debug only, so there is nothing to weigh
+           here against correctness. */
+        CN1_WRITE_BARRIER(target, refValue);
+        CN1_SATB_DELETE(slot);
         *(JAVA_OBJECT*)slot = refValue;
         return;
     }
