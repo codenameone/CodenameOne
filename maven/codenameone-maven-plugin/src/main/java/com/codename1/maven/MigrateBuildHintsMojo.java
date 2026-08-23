@@ -288,10 +288,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * Whether this module runs {@code process-annotations} in a real phase.
+     * Whether this module runs {@code process-annotations} somewhere it can
+     * actually see compiled classes.
      *
-     * <p>An execution bound to {@code none} is declared but never runs, which for
-     * this purpose is the same as not being declared at all.</p>
+     * <p>Being declared is not enough. {@code ProcessAnnotationsMojo} returns
+     * immediately when {@code skip} is set, and again when its output directory
+     * does not exist -- which is the case for every phase before {@code compile}.
+     * An execution that is skipped, or bound to {@code generate-sources}, emits
+     * no annotation resource at all, so migrating against it would delete the
+     * working properties and leave nothing behind.</p>
      */
     static boolean bindsProcessAnnotations(org.apache.maven.project.MavenProject p) {
         java.util.List<org.apache.maven.model.Plugin> plugins = p.getBuildPlugins();
@@ -306,13 +311,50 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 if (e.getGoals() == null || !e.getGoals().contains("process-annotations")) {
                     continue;
                 }
-                if ("none".equalsIgnoreCase(String.valueOf(e.getPhase()))) {
+                if (!phaseSeesCompiledClasses(e.getPhase())) {
+                    continue;
+                }
+                if (isSkipped(e.getConfiguration()) || isSkipped(plugin.getConfiguration())) {
                     continue;
                 }
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * The default lifecycle from {@code compile} onward -- the phases by which
+     * {@code target/classes} exists.
+     */
+    private static final java.util.List<String> PHASES_WITH_CLASSES =
+            java.util.Arrays.asList("compile", "process-classes",
+                    "generate-test-sources", "process-test-sources",
+                    "generate-test-resources", "process-test-resources",
+                    "test-compile", "process-test-classes", "test",
+                    "prepare-package", "package",
+                    "pre-integration-test", "integration-test", "post-integration-test",
+                    "verify", "install", "deploy");
+
+    /**
+     * @param phase the execution's phase, or null to accept the goal's own
+     *              default of {@code process-classes}
+     */
+    private static boolean phaseSeesCompiledClasses(String phase) {
+        if (phase == null || phase.trim().length() == 0) {
+            return true;
+        }
+        return PHASES_WITH_CLASSES.contains(phase.trim().toLowerCase());
+    }
+
+    /** Reads {@code <skip>true</skip>} out of a plugin or execution configuration. */
+    private static boolean isSkipped(Object configuration) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return false;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom skip =
+                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("skip");
+        return skip != null && "true".equalsIgnoreCase(String.valueOf(skip.getValue()).trim());
     }
 
     /**
