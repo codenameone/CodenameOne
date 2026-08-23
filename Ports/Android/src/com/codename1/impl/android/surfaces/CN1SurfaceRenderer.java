@@ -963,6 +963,17 @@ public final class CN1SurfaceRenderer {
     /// implementation: a complication and a home-screen widget disagreeing about what a progress
     /// node means is a bug nobody would look for.
     static double resolveFraction(JSONObject node, JSONObject state) {
+        return resolveFraction(node, state, System.currentTimeMillis());
+    }
+
+    /// As above, but resolving a date interval against a STATED moment.
+    ///
+    /// A complication is handed a whole timeline at once and its future entries are rendered
+    /// before they are current, so an interval evaluated against the request's clock freezes at
+    /// today's fraction and stays there -- the provider sets no update period, so nothing
+    /// recomputes it when the entry actually takes over. The entry's own start is the moment it
+    /// describes.
+    static double resolveFraction(JSONObject node, JSONObject state, long asOf) {
         double fraction;
         String valueKey = node.optString("valueKey", null);
         if (valueKey != null && valueKey.length() > 0 && state != null
@@ -973,8 +984,7 @@ public final class CN1SurfaceRenderer {
             // update recomputes it.
             long start = node.optLong("start");
             long end = node.optLong("end");
-            long now = System.currentTimeMillis();
-            fraction = end <= start ? 1d : (now - start) / (double) (end - start);
+            fraction = end <= start ? 1d : (asOf - start) / (double) (end - start);
         } else {
             fraction = node.optDouble("value", 0d);
         }

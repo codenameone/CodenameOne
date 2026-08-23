@@ -472,6 +472,22 @@ public final class CN1WatchSurface {
      * @return the value in 0..1, or -1 when the node carries none
      */
     public static float progressValue(JSONObject prog, JSONObject state) {
+        return progressValue(prog, state, System.currentTimeMillis());
+    }
+
+    /**
+     * As above, but resolving a date interval against a stated moment.
+     *
+     * <p>A complication renders its future entries before they are current, so an interval
+     * evaluated against the request's clock is frozen at today's fraction for ever -- there is no
+     * later request to recompute it.</p>
+     *
+     * @param prog a {@code prog} node
+     * @param state the entry state
+     * @param asOf the moment the entry describes
+     * @return the value in 0..1, or -1 when the node carries none
+     */
+    public static float progressValue(JSONObject prog, JSONObject state, long asOf) {
         if (prog == null) {
             return -1f;
         }
@@ -482,7 +498,7 @@ public final class CN1WatchSurface {
                 && !(prog.has("start") && prog.has("end"))) {
             return -1f;
         }
-        return (float) CN1SurfaceRenderer.resolveFraction(prog, state);
+        return (float) CN1SurfaceRenderer.resolveFraction(prog, state, asOf);
     }
 
     /**

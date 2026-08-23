@@ -140,11 +140,16 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         // RANGED_VALUE slot whose progress node only appears in the next entry stayed empty for
         // good. No-data covers the stretch before the first renderable entry, which is exactly
         // what the default in a ComplicationDataTimeline is for.
-        ComplicationData current = build(type, readings.get(0));
+        long asOfNow = System.currentTimeMillis();
+        ComplicationData current = build(type, readings.get(0), asOfNow);
         List<TimelineEntry> entries = new ArrayList<TimelineEntry>();
         for (int i = 1; i < readings.size(); i++) {
             CN1WatchSurface.Reading reading = readings.get(i);
-            ComplicationData entry = build(type, reading);
+            // As of the moment the entry TAKES OVER, not as of this request. A future entry is
+            // rendered now and shown in an hour, so anything time-dependent in it -- an interval
+            // progress, a relative value that has crossed by then -- is wrong if it is resolved
+            // against the clock at build time, and stays wrong: no later request recomputes it.
+            ComplicationData entry = build(type, reading, Math.max(reading.getStart(), asOfNow));
             if (entry == null) {
                 // No-data for its interval, not a skipped entry. Skipping it leaves no entry
                 // covering that stretch, and what shows then is the timeline's DEFAULT -- which
@@ -335,7 +340,7 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
         }
         if (ComplicationType.RANGED_VALUE.equals(type)) {
             JSONObject prog = CN1WatchSurface.firstOfType(nodes, "prog");
-            float value = CN1WatchSurface.progressValue(prog, reading.getState());
+            float value = CN1WatchSurface.progressValue(prog, reading.getState(), asOf);
             if (value < 0) {
                 // The face asked for a gauge and the layout has none. Answering with no data
                 // lets it fall back to another type rather than showing an empty ring.

@@ -126,6 +126,10 @@ public class WearGlueCompilesTest {
                         + "{ return \"\"; }\n"
                         + "    static double resolveFraction(JSONObject n, JSONObject s) "
                         + "{ return 0d; }\n"
+                        // The as-of overload the watch reader uses to render a future timeline
+                        // entry against the moment it takes over rather than against now.
+                        + "    static double resolveFraction(JSONObject n, JSONObject s, long a) "
+                        + "{ return 0d; }\n"
                         + "    static int resolveColor(JSONObject c, boolean d, int fl, int fd) "
                         + "{ return 0; }\n"
                         + "}\n").getBytes("UTF-8"));
