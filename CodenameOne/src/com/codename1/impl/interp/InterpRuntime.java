@@ -639,6 +639,14 @@ public final class InterpRuntime {
             // the budget, which is exactly the wedge the budget exists to stop.
             enclosingHostCalls = st.hostCallDepth;
             st.hostCallDepth = 0;
+            // Cancellation state is per-run, not per-thread lifetime. A
+            // prior cancellation that traversed a typed cleanup handler
+            // would otherwise leave `cancelCaughtOnce` set and cause the
+            // next EDT callback's try-with-resources to be skipped when
+            // its budget expires. Nested (non-fresh) entries do NOT reset
+            // -- they participate in the same cancellation unwind as the
+            // enclosing entry.
+            st.cancelCaughtOnce = false;
         }
         // Entering a method is progress too. A back edge is the usual place to
         // check, but code that recurses, catches the StackOverflowError this
