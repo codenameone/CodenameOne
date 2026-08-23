@@ -1711,6 +1711,19 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 /// the wake is to refresh a complication, not to bring an application forward the user did not
 /// ask for. When the runtime IS up, Surfaces.publishRemote is called as well so the app's own
 /// diagnostics observe the update.
+/// The one queue every mirrored apply runs on, delivered or retried.
+///
+/// The delegate hands deliveries over on its own queue and a retry fires from a timer, so without
+/// this they can run at once -- and the check-install-record sequence below is not atomic.
+static dispatch_queue_t cn1MirrorQueue(void) {
+    static dispatch_queue_t queue = NULL;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        queue = dispatch_queue_create("com.codename1.surfaces.mirror", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
 /// How many times a mirrored surface the watch could not install is re-attempted, and the delay
 /// before the first. The delays double, so the last lands a little over twenty minutes out --
 /// past the transient conditions this is for, and short of holding a payload indefinitely.
@@ -1724,16 +1737,29 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
               "keeps what it had until the phone publishes again", CN1_MIRROR_APPLY_RETRIES);
         return;
     }
-    __block NSDictionary *payload = info;
+    // Captured PLAIN, not __block. This file is manual reference counting -- see the retain and
+    // release calls throughout -- and a copied block retains an ordinary captured object while a
+    // __block one it does not: the payload would have been released when didReceiveUserInfo
+    // returned, and the retry would read freed memory twenty seconds later.
+    NSDictionary *payload = info;
+    // On the MIRROR QUEUE, not a global one. applyMirroredSurface reads the stored sequence,
+    // installs, and records the new mark, and those three are not atomic together: a retry racing
+    // a freshly delivered publication could pass the check, let the newer one install and record,
+    // and then overwrite it and LOWER the mark -- leaving the complication stale and the ordering
+    // permanently confused. One serial queue makes every apply, delivered or retried, exclusive.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
             (int64_t)(CN1_MIRROR_APPLY_DELAY_NS << (attempt - 1))),
-            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            cn1MirrorQueue(), ^{
         [self applyMirroredSurface:payload attempt:attempt + 1];
     });
 }
 
 - (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {
-    [self applyMirroredSurface:info attempt:1];
+    // Onto the mirror queue, so a delivery cannot interleave with a retry already in flight.
+    NSDictionary *payload = info;
+    dispatch_async(cn1MirrorQueue(), ^{
+        [self applyMirroredSurface:payload attempt:1];
+    });
 }
 
 - (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info attempt:(int)attempt {
