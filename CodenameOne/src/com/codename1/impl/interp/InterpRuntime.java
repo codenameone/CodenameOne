@@ -2401,12 +2401,12 @@ public final class InterpRuntime {
             if (!"[Ljava.lang.Object;".equals(src.getClass().getName())) {
                 continue;
             }
-            Object[] dst = materializeTypedArray(src, elementDesc);
-            if (dst == null) {
-                continue;
-            }
             if (hostArrayPairs == null) {
                 hostArrayPairs = new Vector();
+            }
+            Object[] dst = materializeTypedArray(src, elementDesc, hostArrayPairs);
+            if (dst == null) {
+                continue;
             }
             hostArrayPairs.addElement(src);
             hostArrayPairs.addElement(dst);
@@ -2796,10 +2796,20 @@ public final class InterpRuntime {
     /// already replaced peer-backed values with their peers), and a nested
     /// plain `Object[]` recurses so multi-dimensional parameters
     /// (`Component[][]`, `Object[][]`) also arrive as the exact host array
-    /// class the JVM will accept through reflection. Returns null when the
-    /// linker cannot produce an array of this type at all -- the caller
-    /// falls back to the untyped array in that case.
-    private Object[] materializeTypedArray(Object[] src, String elementDescriptor) throws Throwable {
+    /// class the JVM will accept through reflection. A `Ljava/lang/Class;`
+    /// leaf routes each `InterpClass` token through {@link #hostClassFor},
+    /// mirroring the 1D `Class[]` conversion so a nested `Class[][]`
+    /// containing a pushed class literal doesn't hit `ArrayStoreException`
+    /// on the leaf assignment. Returns null when the linker cannot produce
+    /// an array of this type at all -- the caller falls back to the untyped
+    /// array in that case.
+    ///
+    /// `innerPairs` -- when non-null -- collects (src, dst) for every
+    /// nested substitution so the caller's finally block can mirror host
+    /// writes on the inner arrays back through the interpreter's original
+    /// aliases (`Component[] row = matrix[0]` still sees the reorder).
+    private Object[] materializeTypedArray(Object[] src, String elementDescriptor,
+                                           Vector innerPairs) throws Throwable {
         Object array = linker.newArray(elementDescriptor, src.length);
         if (!(array instanceof Object[])) {
             return null;
@@ -2807,13 +2817,24 @@ public final class InterpRuntime {
         Object[] dst = (Object[]) array;
         boolean nested = elementDescriptor.startsWith("[");
         String innerDesc = nested ? elementDescriptor.substring(1) : null;
+        boolean classLeaf = !nested && "Ljava/lang/Class;".equals(elementDescriptor);
         for (int j = 0; j < src.length; j++) {
             Object el = src[j];
             if (nested && el instanceof Object[]
                     && "[Ljava.lang.Object;".equals(el.getClass().getName())
                     && (innerDesc.startsWith("L") || innerDesc.startsWith("["))) {
-                Object[] inner = materializeTypedArray((Object[]) el, innerDesc);
-                dst[j] = inner != null ? inner : el;
+                Object[] inner = materializeTypedArray((Object[]) el, innerDesc, innerPairs);
+                if (inner != null) {
+                    dst[j] = inner;
+                    if (innerPairs != null) {
+                        innerPairs.addElement(el);
+                        innerPairs.addElement(inner);
+                    }
+                } else {
+                    dst[j] = el;
+                }
+            } else if (classLeaf && el instanceof InterpClass) {
+                dst[j] = hostClassFor((InterpClass) el);
             } else {
                 dst[j] = el;
             }
