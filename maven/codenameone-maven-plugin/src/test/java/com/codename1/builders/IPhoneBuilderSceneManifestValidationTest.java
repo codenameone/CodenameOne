@@ -101,4 +101,28 @@ class IPhoneBuilderSceneManifestValidationTest {
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
                 "the matching delegate belongs to the CarPlay role, not the window role");
     }
+
+    @Test
+    void theValidXmlSpellingsOfTrueAreAllAccepted() {
+        // <true/> and <true /> and <true></true> are the same element. Rejecting the
+        // spaced form would fail a build over valid XML, which is worse than the
+        // misconfiguration this check exists to catch.
+        for (String spelling : new String[]{"<true/>", "<true />", "<true></true>",
+                "\n    <true/>", "<!-- on --><true/>"}) {
+            assertTrue(IPhoneBuilder.plistKeyIsTrue(
+                    "<key>UIApplicationSupportsMultipleScenes</key>" + spelling,
+                    "UIApplicationSupportsMultipleScenes"),
+                    "should accept " + spelling);
+        }
+    }
+
+    @Test
+    void theValidXmlSpellingsOfFalseAreAllRejected() {
+        for (String spelling : new String[]{"<false/>", "<false />", "<false></false>"}) {
+            assertFalse(IPhoneBuilder.plistKeyIsTrue(
+                    "<key>UIApplicationSupportsMultipleScenes</key>" + spelling,
+                    "UIApplicationSupportsMultipleScenes"),
+                    "should reject " + spelling);
+        }
+    }
 }

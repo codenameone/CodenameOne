@@ -6810,19 +6810,49 @@ public class IPhoneBuilder extends Executor {
         if (at < 0) {
             return false;
         }
-        int from = at + tag.length();
-        int t = plist.indexOf("<true/>", from);
-        if (t < 0) {
-            return false;
+        // The value of a key is the element that follows it, so read that element's
+        // name rather than matching a spelling. "<true/>" and "<true />" and
+        // "<true></true>" are the same element, and rejecting the ones with a space in
+        // them would fail a build over valid XML -- worse than the misconfiguration
+        // this check exists to catch, because it stops a build that would have worked.
+        return "true".equals(nextElementName(plist, at + tag.length()));
+    }
+
+    /// The name of the next element opening at or after `from`, or null if there is
+    /// none.
+    ///
+    /// Comments, declarations and closing tags are stepped over so the answer is the
+    /// next element that actually opens. Enough structure to read a plist value without
+    /// pretending to parse a document we did not write.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the fragment to read
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the element name, or null when no element opens after `from`
+    static String nextElementName(String plist, int from) {
+        int lt = plist.indexOf('<', from);
+        while (lt >= 0 && lt + 1 < plist.length()) {
+            char kind = plist.charAt(lt + 1);
+            if (kind == '!' || kind == '?' || kind == '/') {
+                lt = plist.indexOf('<', lt + 1);
+                continue;
+            }
+            int end = lt + 1;
+            while (end < plist.length()) {
+                char c = plist.charAt(end);
+                if (c == '>' || c == '/' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    break;
+                }
+                end++;
+            }
+            return plist.substring(lt + 1, end);
         }
-        // Only if <true/> really is this key's value: a <false/> or another key in
-        // between means the <true/> found belongs to something else further down.
-        int f = plist.indexOf("<false/>", from);
-        if (f >= 0 && f < t) {
-            return false;
-        }
-        int nextKey = plist.indexOf("<key>", from);
-        return nextKey < 0 || t < nextKey;
+        return null;
     }
 
     /// Whether a plist fragment wires the application window scene role to Codename
