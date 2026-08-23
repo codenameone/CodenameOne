@@ -2119,6 +2119,20 @@ public final class InterpRuntime {
                     return;
                 }
             }
+            // `Object.clone()` is a Codename One non-goal. Cloning a pushed
+            // object would need a fresh InterpObject beside a fresh peer,
+            // and the peer's own `Object.clone` returns a shim whose final
+            // `$interp` still points at the original wrapper -- which
+            // pushBoxed's fromHost hop then unwraps back to the original,
+            // so `copy == original`. That is the shape the peer graph has,
+            // not a bug to grind out here: the framework itself does not
+            // carry `Cloneable` support, and a runtime intercept that
+            // faked shallow copies (or wrapper cloning) would put a
+            // feature on the device runtime that no other Codename One
+            // target has. Pushed code that reaches `Object.clone()` is
+            // therefore outside the runtime's contract; the behaviour is
+            // whatever the peer's shim happens to do, and there is no
+            // plan to make it a real clone.
             if (io.hostPeer != null) {
                 // The peer's own class name, recorded when the factory built it
                 // rather than read back from getClass(). ParparVM derives
