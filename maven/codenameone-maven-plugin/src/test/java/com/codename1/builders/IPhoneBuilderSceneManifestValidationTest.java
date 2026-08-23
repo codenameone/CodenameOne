@@ -88,6 +88,62 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void whitespaceOnContainerTagsDoesNotRunTheRoleIntoTheNextOne() {
+        // "<array >" and "<dict custom=\"x\">" are the same elements as "<array>" and
+        // "<dict>", and plistElementIndex already accepts them. Matching literal tags in
+        // the nesting scan found no closing tag at all, so the role fell back to the rest
+        // of the fragment -- and a later role's delegate then vouched for a window role
+        // that names somebody else. Which is the same hole the CarPlay case above closes,
+        // reopened by a space.
+        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array ><dict custom=\"x\">"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>SomeoneElsesSceneDelegate</string></dict></array >"
+                        + "<key>CPTemplateApplicationSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
+                "a space in the array tags must not extend the window role into CarPlay's");
+    }
+
+    @Test
+    void whitespaceOnContainerTagsStillAcceptsAValidManifest() {
+        // The other direction: the same formatting on a correctly wired manifest has to
+        // keep passing, so the rule above cannot be satisfied by rejecting everything.
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array ><dict custom=\"x\">"
+                        + "<key>UISceneNested</key><array ><string>a</string></array >"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array >"),
+                "valid XML formatting on container tags must not truncate the role");
+    }
+
+    @Test
+    void aSelfClosingContainerDoesNotOpenANestingLevel() {
+        // "<array/>" is an element but not a level. Counting it as one leaves the depth
+        // permanently ahead, the real closing tag is swallowed, and the role runs to the
+        // end of the fragment -- which would let a later role's delegate vouch for it.
+        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneEmptyThing</key><array/>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>SomeoneElsesSceneDelegate</string></dict></array>"
+                        + "<key>CPTemplateApplicationSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
+                "a self-closing array must not extend the window role into the CarPlay role");
+    }
+
+    @Test
+    void aCloseTagNameThatMerelyStartsTheSameDoesNotClose() {
+        // "</arrayish>" starts with "</array" and must not be taken for the array's
+        // closing tag; only whitespace may sit between the name and the ">".
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"));
+    }
+
+    @Test
     void anotherRolesDelegateDoesNotCountAsTheWindowRoles() {
         // CarPlay declares its own role and its own delegate. Searching the whole
         // fragment for the delegate name would let CarPlay's configuration vouch for a

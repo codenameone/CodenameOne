@@ -7300,17 +7300,22 @@ public class IPhoneBuilder extends Executor {
         if (plist.charAt(gt - 1) == '/') {
             return gt + 1;
         }
-        String openTag = "<" + name + ">";
-        String closeTag = "</" + name + ">";
         int depth = 0;
         int scan = gt;
         while (true) {
+            // Structural, not spelled-out tags. "<array >" and "<dict custom=\"x\">" are
+            // the same elements as "<array>" and "<dict>", and the rest of this parser
+            // already accepts them -- matching literals here missed a nested opening and
+            // let the first inner "</array>" close the outer one, truncating the role
+            // before its delegate. A closing tag written "</array >" was missed the
+            // other way and left no close at all.
+            //
             // Live tags only. A comment containing "</dict>" would otherwise close the
             // element early and truncate the range, so validation would read a prefix of
             // the manifest and reject a build that is correctly configured -- the same
             // rule the key and element searches already follow.
-            int nextOpen = plistIndexOfLive(plist, openTag, scan + 1);
-            int nextClose = plistIndexOfLive(plist, closeTag, scan + 1);
+            int nextOpen = plistNestedElementIndex(plist, name, scan + 1);
+            int nextClose = plistCloseElementIndex(plist, name, scan + 1);
             if (nextClose < 0) {
                 return -1;
             }
@@ -7318,12 +7323,85 @@ public class IPhoneBuilder extends Executor {
                 depth++;
                 scan = nextOpen;
             } else if (depth == 0) {
-                return nextClose + closeTag.length();
+                return plistOpenTagEnd(plist, nextClose);
             } else {
                 depth--;
                 scan = nextClose;
             }
         }
+    }
+
+    /// The next opening element of the given name that actually opens a nesting level.
+    ///
+    /// A self-closing "<array/>" is an element but not a level: counting it as one would
+    /// leave the depth permanently ahead and swallow the real closing tag, so the value
+    /// would run to the end of the fragment. The literal matching this replaced happened
+    /// to get that right by not matching self-closing tags at all; matching structurally
+    /// means excluding them on purpose.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the fragment
+    ///
+    /// - `name`: the element name
+    ///
+    /// - `from`: where to start
+    ///
+    /// #### Returns
+    ///
+    /// the index of the opening tag, or -1
+    private static int plistNestedElementIndex(String plist, String name, int from) {
+        int at = plistElementIndex(plist, name, from);
+        while (at >= 0) {
+            int end = plistOpenTagEnd(plist, at);
+            if (end < 0) {
+                return -1;
+            }
+            if (end < 2 || plist.charAt(end - 2) != '/') {
+                return at;
+            }
+            at = plistElementIndex(plist, name, end);
+        }
+        return -1;
+    }
+
+    /// The next live closing element of the given name.
+    ///
+    /// The counterpart of `plistElementIndex` for "</name>", tolerating the whitespace
+    /// XML allows before the ">" so that "</array >" closes an array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the fragment
+    ///
+    /// - `name`: the element name
+    ///
+    /// - `from`: where to start
+    ///
+    /// #### Returns
+    ///
+    /// the index of the closing tag, or -1
+    static int plistCloseElementIndex(String plist, String name, int from) {
+        int at = plistIndexOfLive(plist, "</" + name, from);
+        while (at >= 0) {
+            int after = at + 2 + name.length();
+            int scan = after;
+            while (scan < plist.length()) {
+                char c = plist.charAt(scan);
+                if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    scan++;
+                    continue;
+                }
+                break;
+            }
+            // Only whitespace may sit between the name and the ">". Anything else means
+            // this was a different element whose name merely starts the same way.
+            if (scan < plist.length() && plist.charAt(scan) == '>' && scan >= after) {
+                return at;
+            }
+            at = plistIndexOfLive(plist, "</" + name, at + 1);
+        }
+        return -1;
     }
 
     /// The text of the `<string>` element that follows `from`, or null when the next
