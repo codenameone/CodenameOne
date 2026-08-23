@@ -93,7 +93,21 @@ public final class InterpRuntime {
         }
     }
 
-    private volatile Failure lastFailure;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
+    /// Cross-thread lookup for [#interpretedStackFor] and [#hostCallFor].
+    /// The current [Failure] is stored per-thread on [ThreadState] so
+    /// concurrent throws don't overwrite each other's rethrow records; but
+    /// a caller catching a Throwable that another thread raised still has
+    /// to be able to ask for its interpreted stack. `WeakHashMap` keyed
+    /// by the throwable itself keeps the failure discoverable while the
+    /// throwable is alive and lets it go when the caller drops it -- no
+    /// leak, no lifetime coupling to the runtime. Throwable's hashCode
+    /// and equals are Object identity by inheritance, so `WeakHashMap`
+    /// is effectively an identity-keyed map here.
+    ///
+    /// Wrapped in `Collections.synchronizedMap` because both entry and
+    /// lookup can happen from any thread.
+    private final java.util.Map failuresByThrown =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap());
 
     /// Execution state that belongs to one thread, not to the runtime.
     ///
@@ -102,13 +116,18 @@ public final class InterpRuntime {
     /// framework calls an interpreted `paint` or listener through a generated
     /// shim. Holding depth, fuel and the call stack on the runtime meant those
     /// threads corrupted each other's -- the depth cap tripping on the wrong
-    /// thread, a stack trace naming another thread's frames.
+    /// thread, a stack trace naming another thread's frames. `lastFailure`
+    /// belongs here too: rethrow detection compares by instance identity
+    /// against the most recent throw *on this thread*, and a runtime-wide
+    /// slot let a throw on the event thread overwrite what the pusher
+    /// thread was about to rethrow.
     private static final class ThreadState {
         int depth;
         int fuel;
         int hostCallDepth;
         long runStartMs;
         final Vector callStack = new Vector();
+        Failure lastFailure;
     }
 
     private final ThreadLocal threadState = new ThreadLocal();
@@ -2497,10 +2516,10 @@ public final class InterpRuntime {
             // interpreter's own stack and no message -- "java.lang.
             // UnsupportedOperationException" and nothing else -- which says
             // neither what was called nor from where.
-            Failure previous = lastFailure;
+            Failure previous = st.lastFailure;
             if (previous == null || previous.thrown != t) {  //NOPMD CompareObjectsWithEquals - the same throwable instance, not an equal one
-                lastFailure = new Failure(t, t, snapshotStack(),
-                        owner.replace('/', '.') + "." + name + desc);
+                recordFailure(st, new Failure(t, t, snapshotStack(),
+                        owner.replace('/', '.') + "." + name + desc));
             }
             throw t;
         } finally {
@@ -3873,13 +3892,16 @@ public final class InterpRuntime {
         // Rethrow: `catch (E e) { throw e; }` reaches ATHROW with the same
         // instance the original throw recorded, and Java preserves the stack
         // of the original throw rather than the rethrow site. Detect that
-        // by instance identity: `lastFailure.thrown` is what escapes host
-        // code (an InterpThrowable wrapper for interpreted throwables) and
-        // `.original` is what interpreted code sees on the stack (the
-        // InterpObject or bare host throwable) -- either match makes this a
-        // rethrow, and the recorded stack is kept rather than replaced with
-        // the rethrow site.
-        Failure prev = lastFailure;
+        // by instance identity, per-thread: `state().lastFailure.thrown` is
+        // what escapes host code (an InterpThrowable wrapper for
+        // interpreted throwables) and `.original` is what interpreted code
+        // sees on the stack (the InterpObject or bare host throwable) --
+        // either match makes this a rethrow, and the recorded stack is
+        // kept rather than replaced with the rethrow site. A concurrent
+        // throw on the event thread must not overwrite what this thread
+        // is about to rethrow, so `lastFailure` lives on ThreadState.
+        ThreadState st = state();
+        Failure prev = st.lastFailure;
         boolean rethrow = prev != null                             //NOPMD CompareObjectsWithEquals - identity is the point
                 && (prev.thrown == t || prev.original == t);
         if (t instanceof Throwable) {
@@ -3889,7 +3911,7 @@ public final class InterpRuntime {
             // interpreted frames are recorded beside it instead, and
             // [#interpretedStackFor] hands them back if it escapes.
             if (!rethrow) {
-                lastFailure = new Failure(t, t, snapshotStack(), null);
+                recordFailure(st, new Failure(t, t, snapshotStack(), null));
             }
             return (Throwable) t;
         }
@@ -3901,24 +3923,39 @@ public final class InterpRuntime {
         // rather than the wrapper). Without the second, the rethrow would
         // fail the identity check and land a new snapshot at the rethrow
         // site rather than preserving the original one.
-        lastFailure = new Failure(wrapped, t, wrapped.getInterpretedStack(), null);
+        recordFailure(st, new Failure(wrapped, t, wrapped.getInterpretedStack(), null));
         return wrapped;
+    }
+
+    /// Sets both the thread's rethrow-detection slot and the runtime-wide
+    /// weak map used by [#interpretedStackFor] / [#hostCallFor]. The map
+    /// entry is keyed by both identities (`thrown` and, when distinct,
+    /// `original`) so a caller that catches either can still ask for the
+    /// interpreted stack.
+    private void recordFailure(ThreadState st, Failure f) {
+        st.lastFailure = f;
+        failuresByThrown.put(f.thrown, f);
+        if (f.original != f.thrown && f.original instanceof Throwable) {   //NOPMD CompareObjectsWithEquals - identity is the point
+            failuresByThrown.put(f.original, f);
+        }
     }
 
     /// Where interpreted code threw this exception, or null if it did not.
     ///
     /// A host exception thrown by interpreted code carries the host's own stack
     /// trace, which names the interpreter's frames rather than the program's.
-    /// This is the program's, recorded when it was thrown.
+    /// This is the program's, recorded when it was thrown. Looks up the
+    /// runtime-wide weak map so a caller on any thread that received the
+    /// throwable can ask (a listener firing on the event thread, say).
     public String[] interpretedStackFor(Throwable t) {
-        Failure f = lastFailure;
-        return f != null && f.thrown == t ? f.stack : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
+        Failure f = (Failure) failuresByThrown.get(t);
+        return f != null ? f.stack : null;
     }
 
     /// The framework method that threw this, or null if interpreted code did.
     public String hostCallFor(Throwable t) {
-        Failure f = lastFailure;
-        return f != null && f.thrown == t ? f.hostCall : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
+        Failure f = (Failure) failuresByThrown.get(t);
+        return f != null ? f.hostCall : null;
     }
 
     private int findHandler(InterpMethod m, int insn, Object thrown, boolean unusedFilter)
