@@ -2409,12 +2409,15 @@ public final class InterpRuntime {
                 continue;
             }
             // The same array may reach the host through more than one slot
-            // (`fn(arr, arr)` or an aliased outer/inner). Only record the
-            // (src, dst) pair the first time so the finally mirror copies
-            // once, and both slots keep sharing one dst identity here too.
-            if (!containsMaterialisation(hostArrayPairs, src)) {
+            // (`fn(arr, arr)` or an aliased outer/inner). Record the triple
+            // once per (src, requested type) so the finally mirror copies
+            // just once for each dst; two slots at the *same* narrow type
+            // share the same dst, while a Component[] and a Button[] view
+            // of the same src get two dsts because they have to.
+            if (!containsMaterialisation(hostArrayPairs, src, elementDesc)) {
                 hostArrayPairs.addElement(src);
                 hostArrayPairs.addElement(dst);
+                hostArrayPairs.addElement(elementDesc);
             }
             args[i] = dst;
         }
@@ -2489,7 +2492,7 @@ public final class InterpRuntime {
             // the src; AALOAD's fromHost hop turns them back into wrappers
             // for interpreted reads.
             if (hostArrayPairs != null) {
-                for (int i = 0; i < hostArrayPairs.size(); i += 2) {
+                for (int i = 0; i < hostArrayPairs.size(); i += 3) {
                     Object[] src = (Object[]) hostArrayPairs.elementAt(i);
                     Object[] dst = (Object[]) hostArrayPairs.elementAt(i + 1);
                     int len = src.length < dst.length ? src.length : dst.length;
@@ -2823,10 +2826,13 @@ public final class InterpRuntime {
         // independently gives the host two dst arrays for one src, and
         // any host write through the second is overwritten again when
         // the finally-block mirror copies both back onto src in turn.
-        // Look for an existing (src, dst) pair before allocating -- the
-        // finally-mirror runs one copy per pair, so shared identity in
-        // gives shared identity out.
-        Object[] existing = existingMaterialisation(innerPairs, src);
+        // Reuse an existing dst -- but only when the earlier
+        // materialisation targeted the *same* element type. Reusing a
+        // `Component[]` dst for a `Button[]` slot would fail the
+        // reflective linker's argument-type check because Component[] is
+        // not assignable to Button[]; different requested types get their
+        // own dst arrays, each mirrored back independently.
+        Object[] existing = existingMaterialisation(innerPairs, src, elementDescriptor);
         if (existing != null) {
             return existing;
         }
@@ -2846,9 +2852,11 @@ public final class InterpRuntime {
                 Object[] inner = materializeTypedArray((Object[]) el, innerDesc, innerPairs);
                 if (inner != null) {
                     dst[j] = inner;
-                    if (innerPairs != null && !containsMaterialisation(innerPairs, el)) {
+                    if (innerPairs != null
+                            && !containsMaterialisation(innerPairs, el, innerDesc)) {
                         innerPairs.addElement(el);
                         innerPairs.addElement(inner);
+                        innerPairs.addElement(innerDesc);
                     }
                 } else {
                     dst[j] = el;
@@ -2862,20 +2870,28 @@ public final class InterpRuntime {
         return dst;
     }
 
-    private static Object[] existingMaterialisation(Vector pairs, Object src) {
+    /// `pairs` is a flat list of (src, dst, elementDescriptor) triples --
+    /// the descriptor is what makes a `Component[]` materialisation
+    /// distinguishable from a `Button[]` materialisation of the same src,
+    /// so the reflective linker doesn't reject the narrower slot with a
+    /// stale wider dst.
+    private static Object[] existingMaterialisation(Vector pairs, Object src,
+                                                    String elementDescriptor) {
         if (pairs == null) {
             return null;
         }
-        for (int k = 0; k < pairs.size(); k += 2) {
-            if (pairs.elementAt(k) == src) {   //NOPMD CompareObjectsWithEquals - identity is the point
+        for (int k = 0; k < pairs.size(); k += 3) {
+            if (pairs.elementAt(k) == src   //NOPMD CompareObjectsWithEquals - identity is the point
+                    && elementDescriptor.equals(pairs.elementAt(k + 2))) {
                 return (Object[]) pairs.elementAt(k + 1);
             }
         }
         return null;
     }
 
-    private static boolean containsMaterialisation(Vector pairs, Object src) {
-        return existingMaterialisation(pairs, src) != null;
+    private static boolean containsMaterialisation(Vector pairs, Object src,
+                                                   String elementDescriptor) {
+        return existingMaterialisation(pairs, src, elementDescriptor) != null;
     }
 
     /// A real `Class[]` built from an interpreter-owned Object[] used to
