@@ -14004,6 +14004,24 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void applicationWillResignActive() {
+        // PAIRED WITH THE TEXTURE DROP, which happens on this callback too:
+        // cn1ApplicationWillResignActive calls CN1MetalBackupMutableImagesForSuspend,
+        // and that drops the texture of every read-only image. An image created
+        // through createImageNoBackingCopy has released its decoded UIImage, so
+        // once its texture is gone the peer has no pixels at all -- it must be
+        // rebuilt from the encoded bytes, and this is what tells it to.
+        //
+        // Deliberately NOT on didEnterBackground: resigning active happens far
+        // more often than backgrounding and does not imply it -- Control Centre,
+        // the notification shade, an incoming call, the app switcher, a system
+        // alert. Each of those drops the textures and then hands control back
+        // without the app ever entering the background, so a bump wired to
+        // backgrounding would leave those images with no pixels and nothing
+        // telling them to rebuild: they would simply draw blank.
+        //
+        // A counter bump, not a sweep: nothing is walked and nothing is touched
+        // until a picture is actually asked for.
+        com.codename1.ui.EncodedImage.invalidateDecodedImages();
         minimized = true;
         callInterruptionActive = true;
         if(instance.life != null) {
@@ -14062,14 +14080,6 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public static void applicationDidEnterBackground() {
         minimized = true;
-        // iOS may discard the GPU contents of any texture we uploaded while we
-        // are suspended, and images created through createImageNoBackingCopy no
-        // longer keep a decoded copy to re-upload from. Bumping the generation
-        // makes every EncodedImage decode itself again from its encoded bytes
-        // the next time it is used -- which is after we are back on screen.
-        // A counter bump, not a sweep: nothing is walked and nothing is touched
-        // until the picture is actually asked for.
-        com.codename1.ui.EncodedImage.invalidateDecodedImages();
         if(instance.life != null) {
             safeCallSerially(new Runnable() {
                 public void run() {
