@@ -320,6 +320,29 @@ public class IPhoneBuilder extends Executor {
         while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
             out.setLength(out.length() - 1);
         }
+        // At least one ASCII LETTER, not merely one legal character. Apple
+        // requires it, and an all-digit id like "123" folded to "123" -- which
+        // reads as legal and makes MCNearbyServiceAdvertiser RAISE rather than
+        // fail, so the app crashed instead of failing to advertise. Prefixed
+        // rather than rejected: the id is still recognisable, and the runtime
+        // fold applies the same rule so the two agree.
+        boolean hasLetter = false;
+        for (int i = 0; i < out.length(); i++) {
+            char c = out.charAt(i);
+            if (c >= 'a' && c <= 'z') {
+                hasLetter = true;
+                break;
+            }
+        }
+        if (out.length() > 0 && !hasLetter) {
+            out.insert(0, "cn1-");
+            if (out.length() > 15) {
+                out.setLength(15);
+            }
+            while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
+                out.setLength(out.length() - 1);
+            }
+        }
         return out.toString();
     }
 

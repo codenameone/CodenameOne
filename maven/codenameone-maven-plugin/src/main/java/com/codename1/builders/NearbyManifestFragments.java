@@ -144,6 +144,15 @@ final class NearbyManifestFragments {
             // start without one.
             out = widenPermission(out, "android.permission.ACCESS_FINE_LOCATION",
                     tiramisu ? 32 : 0);
+            // COARSE alongside FINE, with the same reach. From Android 12 the
+            // two are requested TOGETHER -- the system shows one dialog with a
+            // precise/approximate choice and refuses a request for fine alone
+            // when coarse is not declared -- so a transport app on 12 or 12L
+            // could not obtain the location grant Nearby Connections needs
+            // there, and discovery never started.
+            out = widenPermission(out,
+                    "android.permission.ACCESS_COARSE_LOCATION",
+                    tiramisu ? 32 : 0);
         }
 
         if (companion) {

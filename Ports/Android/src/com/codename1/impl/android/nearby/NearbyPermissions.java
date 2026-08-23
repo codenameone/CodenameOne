@@ -101,7 +101,13 @@ final class NearbyPermissions {
         } else {
             // Below 33 Nearby Connections genuinely refuses to start without
             // a location grant; it is not a scan-results technicality there.
+            //
+            // Both, and in this order. From Android 12 the two are granted
+            // together -- the system shows one dialog offering precise or
+            // approximate -- and asking for fine without coarse is refused
+            // outright, so the grant the transport needs never arrived.
             out.add("android.permission.ACCESS_FINE_LOCATION");
+            out.add("android.permission.ACCESS_COARSE_LOCATION");
         }
         return out;
     }

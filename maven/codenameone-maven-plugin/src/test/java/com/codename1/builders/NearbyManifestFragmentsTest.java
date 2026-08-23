@@ -319,6 +319,30 @@ class NearbyManifestFragmentsTest {
     }
 
     @Test
+    void coarseLocationIsDeclaredAlongsideFineWithTheSameReach() {
+        // From Android 12 the two are requested together -- one dialog with a
+        // precise/approximate choice -- and a request for fine alone is
+        // refused when coarse is not declared, so the grant Nearby
+        // Connections needs on 12 and 12L never arrived.
+        String out = NearbyManifestFragments.inject("", false, true, false,
+                false, false, 34);
+        assertTrue(out.contains("android:name=\"android.permission"
+                + ".ACCESS_COARSE_LOCATION\" android:maxSdkVersion=\"32\""),
+                out);
+        assertTrue(out.contains("android:name=\"android.permission"
+                + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"32\""),
+                out);
+    }
+
+    @Test
+    void coarseLocationIsUncappedBelowATiramisuTarget() {
+        String out = NearbyManifestFragments.inject("", false, true, false,
+                false, false, 31);
+        assertTrue(out.contains("android:name=\"android.permission"
+                + ".ACCESS_COARSE_LOCATION\" />"), out);
+    }
+
+    @Test
     void aCapThatAlreadyReachesFarEnoughIsLeftAlone() {
         String seeded = "    <uses-permission android:name=\"android.permission"
                 + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"33\" />\n";

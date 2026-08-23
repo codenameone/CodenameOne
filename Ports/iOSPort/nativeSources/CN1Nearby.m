@@ -451,6 +451,29 @@ static NSString *cn1nbServiceType(NSString *serviceId) {
     while ([out hasSuffix:@"-"]) {
         [out deleteCharactersInRange:NSMakeRange([out length] - 1, 1)];
     }
+    // At least one ASCII LETTER, not merely one legal character. Apple
+    // requires it, and an all-digit id like "123" folded to "123" -- which
+    // reads as legal and makes MCNearbyServiceAdvertiser RAISE rather than
+    // fail, so the app crashed instead of failing to advertise. Prefixed
+    // rather than rejected, and the builder folds identically so the type
+    // this registers is the one the Info.plist declares.
+    BOOL hasLetter = NO;
+    for (NSUInteger i = 0; i < [out length]; i++) {
+        unichar c = [out characterAtIndex:i];
+        if (c >= 'a' && c <= 'z') {
+            hasLetter = YES;
+            break;
+        }
+    }
+    if ([out length] > 0 && !hasLetter) {
+        [out insertString:@"cn1-" atIndex:0];
+        if ([out length] > 15) {
+            [out deleteCharactersInRange:NSMakeRange(15, [out length] - 15)];
+        }
+        while ([out hasSuffix:@"-"]) {
+            [out deleteCharactersInRange:NSMakeRange([out length] - 1, 1)];
+        }
+    }
     return [out length] == 0 ? @"cn1-nearby" : out;
 }
 

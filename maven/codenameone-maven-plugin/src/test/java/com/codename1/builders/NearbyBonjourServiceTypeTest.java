@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -203,5 +204,42 @@ class NearbyBonjourServiceTypeTest {
                 assertLegal(t);
             }
         }
+    }
+
+    @Test
+    void anAllDigitIdIsGivenALetterRatherThanLeftIllegal() {
+        // Apple requires at least one ASCII LETTER, not merely one legal
+        // character. "123" folded to "123", which reads as legal and makes
+        // MCNearbyServiceAdvertiser raise rather than fail -- so the app
+        // crashed instead of failing to advertise.
+        String folded = IPhoneBuilder.foldBonjourServiceType("123");
+        assertTrue(hasLetter(folded), folded);
+        assertTrue(folded.contains("123"), folded);
+        assertTrue(folded.length() <= 15, folded);
+    }
+
+    @Test
+    void aDigitsAndPunctuationIdAlsoGetsALetter() {
+        String folded = IPhoneBuilder.foldBonjourServiceType("12.34.56");
+        assertTrue(hasLetter(folded), folded);
+        assertTrue(folded.length() <= 15, folded);
+        assertFalse(folded.startsWith("-"), folded);
+        assertFalse(folded.endsWith("-"), folded);
+    }
+
+    @Test
+    void anIdThatAlreadyHasALetterIsNotPrefixed() {
+        assertEquals("chat", IPhoneBuilder.foldBonjourServiceType("chat"));
+        assertEquals("a1", IPhoneBuilder.foldBonjourServiceType("a1"));
+    }
+
+    private static boolean hasLetter(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 'a' && c <= 'z') {
+                return true;
+            }
+        }
+        return false;
     }
 }
