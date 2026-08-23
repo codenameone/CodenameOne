@@ -382,6 +382,55 @@ public final class InterpRuntime {
     /// value for a method the interpreted class *does* override.
     public static final Object NOT_OVERRIDDEN = new Object();
 
+    /// Per-thread stack of (runtime, interp) contexts captured before a
+    /// shim's super constructor runs. Java assigns a subclass's fields
+    /// only after `super()` returns, so a framework constructor that
+    /// invokes an overridable method during initialisation (`Form(Layout)`
+    /// calls `initGlobalToolbar()`) would reach the shim's override while
+    /// `$runtime` and `$interp` are still null. The emitted constructors
+    /// push the context here in the arg-evaluation phase (which precedes
+    /// `super()`), so [#dispatchOrDeferred] finds it and routes the call
+    /// to the interpreted override -- matching Java's virtual-dispatch
+    /// rule that a subclass method runs even before its own init.
+    /// Stacked so a nested shim construction during super() doesn't
+    /// clobber the outer thread's frame.
+    private static final ThreadLocal PENDING_SHIM_CONTEXT = new ThreadLocal();
+
+    public static void pushPendingContext(InterpRuntime rt, InterpObject io) {
+        Vector stack = (Vector) PENDING_SHIM_CONTEXT.get();
+        if (stack == null) {
+            stack = new Vector();
+            PENDING_SHIM_CONTEXT.set(stack);
+        }
+        stack.addElement(new Object[]{rt, io});
+    }
+
+    public static void popPendingContext() {
+        Vector stack = (Vector) PENDING_SHIM_CONTEXT.get();
+        if (stack != null && !stack.isEmpty()) {
+            stack.removeElementAt(stack.size() - 1);
+        }
+    }
+
+    /// Runs the interpreted override, falling back to the pending
+    /// shim-construction context when the shim's own fields aren't set
+    /// yet. Generated shims call this instead of the raw
+    /// `$runtime.dispatch(...)` so a constructor-time override reaches
+    /// the pushed class even during the `super()` window.
+    public static Object dispatchOrDeferred(InterpRuntime rt, InterpObject io,
+                                            String name, String descriptor, Object[] args) {
+        if (rt == null) {
+            Vector stack = (Vector) PENDING_SHIM_CONTEXT.get();
+            if (stack == null || stack.isEmpty()) {
+                return NOT_OVERRIDDEN;
+            }
+            Object[] ctx = (Object[]) stack.elementAt(stack.size() - 1);
+            rt = (InterpRuntime) ctx[0];
+            io = (InterpObject) ctx[1];
+        }
+        return rt.dispatch(io, name, descriptor, args);
+    }
+
     /// Returned by [#dispatch] when the program that owned the object has been
     /// stopped.
     ///

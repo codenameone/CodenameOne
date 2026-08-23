@@ -975,13 +975,30 @@ public final class GenerateInterpShims {
             w.println("    private final InterpObject $interp;");
             w.println("    private final InterpRuntime $runtime;");
             w.println();
+            // A `void` capture helper the constructors chain through so a
+            // pending shim-construction context reaches the interpreter
+            // *before* super() runs. Emitted once per class: overloading it
+            // by first-arg type would collide with a primitive-leading
+            // constructor, and threading it through a `this()` chain keeps
+            // the wrapper uniform regardless of super-constructor arity.
+            w.println("    private static Void $captureCtx(InterpRuntime rt, InterpObject io) {");
+            w.println("        InterpRuntime.pushPendingContext(rt, io);");
+            w.println("        return null;");
+            w.println("    }");
+            w.println();
             // Only when super() is legal. Many framework classes have no
             // accessible no-argument constructor, and an implicit super() call
             // to one that does not exist does not compile.
             if (hasNoArgConstructor(target)) {
                 w.println("    public " + simpleName + "(InterpRuntime runtime, InterpObject interp) {");
+                w.println("        this(runtime, interp, $captureCtx(runtime, interp));");
+                w.println("    }");
+                w.println();
+                w.println("    private " + simpleName + "(InterpRuntime runtime, InterpObject interp, Void $ctx) {");
+                w.println("        super();");
                 w.println("        this.$runtime = runtime;");
                 w.println("        this.$interp = interp;");
+                w.println("        InterpRuntime.popPendingContext();");
                 w.println("    }");
                 w.println();
             }
@@ -1054,11 +1071,27 @@ public final class GenerateInterpShims {
                 call.append("a").append(i);
             }
             String sep = params.length == 0 ? "" : ", ";
+            // Two constructors: the public one immediately delegates to the
+            // private one via a `this()` chain, sneaking the pending shim
+            // context onto the thread-local stack via `$captureCtx` in the
+            // argument-evaluation phase (which precedes any subsequent
+            // `super()` call). The private constructor then calls the real
+            // super and finally pops the context. This is what lets a
+            // super-constructor's overridable hooks (Form's
+            // initGlobalToolbar()) reach the pushed override instead of
+            // silently running the framework's own implementation.
             w.println("    public " + simpleName + "(InterpRuntime runtime, InterpObject interp"
+                    + sep + sig + ")" + ctorThrows(c) + " {");
+            w.println("        this(runtime, interp, $captureCtx(runtime, interp)"
+                    + (params.length == 0 ? "" : ", " + call) + ");");
+            w.println("    }");
+            w.println();
+            w.println("    private " + simpleName + "(InterpRuntime runtime, InterpObject interp, Void $ctx"
                     + sep + sig + ")" + ctorThrows(c) + " {");
             w.println("        super(" + call + ");");
             w.println("        this.$runtime = runtime;");
             w.println("        this.$interp = interp;");
+            w.println("        InterpRuntime.popPendingContext();");
             w.println("    }");
             w.println();
         }
@@ -1543,9 +1576,8 @@ public final class GenerateInterpShims {
         if (!alreadyEmitted.contains("toString()") && !sealed(target, "toString")) {
             w.println("    @Override");
             w.println("    public String toString() {");
-            w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
-            w.println("                : $runtime.dispatch($interp, \"toString\", "
-                    + "\"()Ljava/lang/String;\", new Object[]{});");
+            w.println("        Object $r = InterpRuntime.dispatchOrDeferred($runtime, $interp,");
+            w.println("                \"toString\", \"()Ljava/lang/String;\", new Object[]{});");
             w.println("        if (" + MISS + ") {");
             w.println("            return super.toString();");
             w.println("        }");
@@ -1556,9 +1588,8 @@ public final class GenerateInterpShims {
         if (!alreadyEmitted.contains("hashCode()") && !sealed(target, "hashCode")) {
             w.println("    @Override");
             w.println("    public int hashCode() {");
-            w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
-            w.println("                : $runtime.dispatch($interp, \"hashCode\", \"()I\", "
-                    + "new Object[]{});");
+            w.println("        Object $r = InterpRuntime.dispatchOrDeferred($runtime, $interp,");
+            w.println("                \"hashCode\", \"()I\", new Object[]{});");
             w.println("        if (" + MISS + ") {");
             w.println("            return super.hashCode();");
             w.println("        }");
@@ -1570,9 +1601,8 @@ public final class GenerateInterpShims {
                 && !sealed(target, "equals")) {
             w.println("    @Override");
             w.println("    public boolean equals(Object a0) {");
-            w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
-            w.println("                : $runtime.dispatch($interp, \"equals\", "
-                    + "\"(Ljava/lang/Object;)Z\", new Object[]{a0});");
+            w.println("        Object $r = InterpRuntime.dispatchOrDeferred($runtime, $interp,");
+            w.println("                \"equals\", \"(Ljava/lang/Object;)Z\", new Object[]{a0});");
             w.println("        if (" + MISS + ") {");
             w.println("            return super.equals(a0);");
             w.println("        }");
@@ -1636,13 +1666,17 @@ public final class GenerateInterpShims {
         }
         w.println("    " + visibility + " " + typeName(ret) + " " + m.getName()
                 + "(" + sig + ")" + throwsClause(m) + " {");
-        // $runtime is null while the framework superclass constructor is still
-        // running: Java assigns a subclass's fields only after super() returns,
-        // and Form's constructor calls overridable methods. Deferring to super
-        // in that window is not a workaround -- the interpreted object genuinely
-        // has no state yet, so the base behaviour is the correct one.
-        emitDispatch(w, m, "$runtime == null ? InterpRuntime.NOT_OVERRIDDEN\n"
-                + "                : $runtime.dispatch($interp, \"" + m.getName() + "\", \""
+        // `$runtime` is null while the framework superclass constructor is
+        // still running -- Java assigns subclass fields only after super()
+        // returns -- but a framework `super(...)` that calls an overridable
+        // method (Form's constructor invokes `initGlobalToolbar()`) must
+        // still reach the pushed class's override. `dispatchOrDeferred`
+        // falls back to a per-thread pending context that the emitted
+        // constructor pushes before super() runs; the object has no state
+        // yet, exactly as Java dictates during that window, but the
+        // override runs rather than being silently skipped.
+        emitDispatch(w, m, "InterpRuntime.dispatchOrDeferred($runtime, $interp, \""
+                + m.getName() + "\", \""
                 + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "})");
         if (abstractMethod) {
             // See zero(): a callback for a program that has been stopped.
