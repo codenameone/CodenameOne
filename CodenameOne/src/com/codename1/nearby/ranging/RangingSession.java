@@ -224,7 +224,7 @@ public final class RangingSession {
     ///
     /// - `sessionHandle`: the session the measurement belongs to
     /// - `hasDistance`: whether a distance was measured
-    /// - `distanceMeters`: the distance in metres
+    /// - `distanceMeters`: the distance in meters
     /// - `hasDirection`: whether an azimuth was measured
     /// - `azimuth`: the horizontal angle in degrees
     /// - `hasElevation`: whether an elevation was measured

@@ -32,7 +32,7 @@
 /// Wi-Fi permissions that device-to-device transport costs.
 ///
 /// - [com.codename1.nearby.ranging] -- ultra-wideband precision ranging.
-///   Distance to within about ten centimetres, and direction on hardware
+///   Distance to within about ten centimeters, and direction on hardware
 ///   that has the antennas for it.
 /// - [com.codename1.nearby.companion] -- the OS-managed association between
 ///   this app and one particular accessory, which buys background presence

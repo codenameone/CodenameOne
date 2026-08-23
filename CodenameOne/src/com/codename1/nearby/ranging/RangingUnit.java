@@ -26,16 +26,16 @@ package com.codename1.nearby.ranging;
 ///
 /// There is deliberately no zero-argument distance getter on
 /// [RangingUpdate]: the caller always names the unit. Both platforms report
-/// metres natively, so a bare `getDistance()` would have been correct on
+/// meters natively, so a bare `getDistance()` would have been correct on
 /// every device and still wrong in every app that displayed it as feet.
 public enum RangingUnit {
-    /// Metres, the unit both platforms measure in.
+    /// Meters, the unit both platforms measure in.
     METERS(1.0),
 
     /// International feet, 0.3048 m exactly.
     FEET(0.3048),
 
-    /// Centimetres.
+    /// Centimeters.
     CENTIMETERS(0.01),
 
     /// International inches, 0.0254 m exactly.
@@ -47,11 +47,11 @@ public enum RangingUnit {
         this.metersPerUnit = metersPerUnit;
     }
 
-    /// Converts a distance expressed in metres into this unit.
+    /// Converts a distance expressed in meters into this unit.
     ///
     /// #### Parameters
     ///
-    /// - `meters`: the distance in metres
+    /// - `meters`: the distance in meters
     ///
     /// #### Returns
     ///
@@ -60,7 +60,7 @@ public enum RangingUnit {
         return meters / metersPerUnit;
     }
 
-    /// Converts a distance expressed in this unit into metres.
+    /// Converts a distance expressed in this unit into meters.
     ///
     /// #### Parameters
     ///
@@ -68,7 +68,7 @@ public enum RangingUnit {
     ///
     /// #### Returns
     ///
-    /// the same distance in metres
+    /// the same distance in meters
     public double toMeters(double value) {
         return value * metersPerUnit;
     }

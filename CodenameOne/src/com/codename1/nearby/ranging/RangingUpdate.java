@@ -58,7 +58,7 @@ public final class RangingUpdate {
     /// #### Parameters
     ///
     /// - `hasDistance`: whether this update carries a distance
-    /// - `distanceMeters`: the distance in metres, ignored when
+    /// - `distanceMeters`: the distance in meters, ignored when
     ///   `hasDistance` is false
     /// - `hasDirection`: whether this update carries an azimuth
     /// - `azimuth`: horizontal angle in degrees, ignored when `hasDirection`

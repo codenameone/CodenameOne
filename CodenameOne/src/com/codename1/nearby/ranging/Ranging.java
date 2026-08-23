@@ -38,8 +38,8 @@ import com.codename1.util.AsyncResource;
 /// This is ultra-wideband ranging -- Apple's Nearby Interaction on iOS and
 /// Jetpack UWB on Android -- which measures distance by timing a radio
 /// round trip rather than by guessing from signal strength. Where an RSSI
-/// estimate off a Bluetooth advertisement is worth a few metres on a good
-/// day, UWB is worth about ten centimetres, and on hardware with multiple
+/// estimate off a Bluetooth advertisement is worth a few meters on a good
+/// day, UWB is worth about ten centimeters, and on hardware with multiple
 /// antennas it also reports which way the peer is.
 ///
 /// #### The shape of a session

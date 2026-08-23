@@ -45,14 +45,14 @@ public interface TransportListener {
     /// - `endpoint`: the peer that disappeared
     void endpointLost(Endpoint endpoint);
 
-    /// A peer wants to connect. Call [ConnectionRequest#accept()] or
-    /// [ConnectionRequest#reject()]; a request that is never answered times
+    /// A peer wants to connect. Call [IncomingConnection#accept()] or
+    /// [IncomingConnection#reject()]; a request that is never answered times
     /// out on the far side.
     ///
     /// #### Parameters
     ///
     /// - `request`: the request to answer
-    void connectionRequested(ConnectionRequest request);
+    void connectionRequested(IncomingConnection request);
 
     /// A connection is open in both directions and payloads may be sent.
     ///

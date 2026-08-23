@@ -28,6 +28,12 @@ import com.codename1.nearby.spi.NearbyBridge;
 /// An incoming request from another device that wants to connect, delivered
 /// to [TransportListener#connectionRequested].
 ///
+/// Named `IncomingConnection` rather than the obvious `ConnectionRequest`
+/// because `com.codename1.io.ConnectionRequest` is one of the most widely used
+/// classes in the framework, and an app doing both networking and nearby
+/// transport -- which is most of them -- would have had to qualify one of the
+/// two at every mention.
+///
 /// Answer it with [#accept()] or [#reject()]. A request that is never
 /// answered times out on the far side, so answer every one -- and answer it
 /// promptly, because both platforms hold radio resources open meanwhile.
@@ -35,11 +41,11 @@ import com.codename1.nearby.spi.NearbyBridge;
 /// #### Show the token
 ///
 /// [#getAuthenticationToken()] is a short string both devices compute from
-/// the connection, and it is the only defence against a device in the middle
+/// the connection, and it is the only defense against a device in the middle
 /// pretending to be the one the user meant. Showing it on both screens and
 /// asking "do these match?" is what makes the pairing trustworthy; skipping
 /// that step is a choice to trust whoever answered first.
-public final class ConnectionRequest {
+public final class IncomingConnection {
 
     private final Endpoint endpoint;
     private final String authenticationToken;
@@ -53,7 +59,7 @@ public final class ConnectionRequest {
     ///
     /// - `endpoint`: who is asking
     /// - `authenticationToken`: the short comparison string, never null
-    public ConnectionRequest(Endpoint endpoint, String authenticationToken) {
+    public IncomingConnection(Endpoint endpoint, String authenticationToken) {
         this.endpoint = endpoint;
         this.authenticationToken =
                 authenticationToken == null ? "" : authenticationToken;
@@ -105,7 +111,7 @@ public final class ConnectionRequest {
     }
 
     public String toString() {
-        return "ConnectionRequest[" + endpoint + ", token="
+        return "IncomingConnection[" + endpoint + ", token="
                 + authenticationToken + "]";
     }
 }

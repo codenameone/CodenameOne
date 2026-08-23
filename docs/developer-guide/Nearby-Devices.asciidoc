@@ -1,0 +1,230 @@
+== Nearby Devices
+
+Codename One answers three questions about the surrounding devices, under
+`com.codename1.nearby`: how far away one is and in which direction
+(`com.codename1.nearby.ranging`), which one is yours
+(`com.codename1.nearby.companion`), and how to send it something
+(`com.codename1.nearby.transport`).
+
+They're three packages rather than one because referencing a package is the
+whole opt-in. The build server decides what native machinery an app gets by
+scanning bytecode for these prefixes, so an app that only wants to know how far
+away its keyring tag is pays for ranging alone -- no Play Services dependency,
+no local network prompt, no companion permissions. Referencing
+`com.codename1.nearby` itself costs nothing; it holds only the shared value
+types.
+
+[options="header"]
+|===
+| Capability | iOS | Android | Simulator and desktop | JavaScript
+| Precision ranging, peer to peer | yes (U1 chip, iPhone 11 and later) | yes (UWB hardware) | simulated | simulated
+| Ranging an accessory | yes (Nearby Interaction Accessory Protocol) | yes (join the session it names) | simulated | simulated
+| Direction as well as distance | where the hardware provides it | where the hardware provides it | simulated | simulated
+| Companion association | yes (iOS 18 and later) | yes (Android 8 and later) | simulated | simulated
+| Presence notifications | -- | yes (Android 12 and later) | simulated | simulated
+| Device-to-device transport | Apple devices only | Android devices only | simulated loopback | simulated loopback
+|===
+
+Branch on the capability queries -- `Ranging.isSupported()`,
+`Ranging.getCapabilities()`, `CompanionDevices.isSupported()`,
+`NearbyTransport.isSupported()` -- rather than on platform detection. Ranging in
+particular is absent on plenty of current phones, so treat it as an enhancement
+to a feature that also works without it rather than as the feature itself.
+
+Every callback in this family arrives on the EDT.
+
+=== Three Things Worth Knowing Before You Design Around This
+
+*The transport doesn't cross ecosystems.* Underneath are Google's Nearby
+Connections on Android and Apple's MultipeerConnectivity on iOS, which share no
+wire protocol. An iPhone and an Android phone will never discover each other
+here, however the app is written. Nothing in the API hides that, because an API
+that looked portable and never found the peer would be worse than an honest
+limitation. When both ends aren't the same platform, two things that do
+work across the divide are already in the framework:
+`com.codename1.bluetooth.le.L2capChannel` for a raw byte stream over BLE, and
+`com.codename1.io.bonjour` plus ordinary sockets when both devices share a
+Wi-Fi network.
+
+*Ranging needs `com.codename1.bluetooth`, or something like it.* Both platforms
+require the two devices to swap a token over a channel they already share
+before any radio ranging can begin. A GATT characteristic is the usual channel.
+The two APIs are designed to be used together.
+
+*Background ranging is opt-in and needs Apple's permission.* On iOS it requires
+the `com.apple.developer.nearby-interaction` entitlement, which has to be
+enabled on the App ID before it will sign. Codename One never injects it on its
+own, because an entitlement the App ID doesn't carry fails codesigning with an
+error naming the entitlement and not the reason it appeared. Set
+`ios.nearby.background=true` once the capability is enabled, and note that
+`RangingCapabilities.isBackgroundRangingSupported()` reports `false` until then.
+
+=== Ranging: How Far, And Which Way
+
+Ultra-wideband measures distance by timing a radio round trip, which is worth
+about ten centimeters. That's a different kind of answer from a Bluetooth
+signal-strength estimate, which is worth a few meters on a good day and swings
+when someone puts a hand over the phone.
+
+A session is prepared, then started. There's no honest one-call form, because
+the token exchange has to happen between the two:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearbyDevicesJava001Snippet.java[tag=nearby-devices-java-001,indent=0]
+----
+
+One session ranges one peer. That's a hard limit of Apple's
+`NINearbyPeerConfiguration` rather than a simplification, so an app tracking
+several peers prepares several sessions.
+
+Pick a role even though iOS ignores it: Android needs exactly one controller,
+and choosing costs nothing on the other side.
+
+Every field of a `RangingUpdate` except the timestamp is optional, and they drop
+out independently. A peer directly behind the phone commonly reports a distance
+with no direction, and a peer at the edge of range reports neither -- so guard
+each read with its `has` method rather than assuming a sentinel. There's no
+zero-argument `getDistance()`: meters read as feet is the accident that
+convention exists to prevent.
+
+Azimuth is degrees in the range -180 to 180, zero straight ahead and positive to
+the right; elevation is -90 to 90, positive above the device. Android reports
+both angles natively. iOS reports a unit direction vector instead and the port
+derives the angles from it, so the same code reads the same on both;
+`getDirectionVector()` still hands back the untouched vector where there is one.
+
+A peer that walks away produces `peerRemoved` and the session stays alive, ready
+to resume if it comes back -- gray the UI out rather than tearing it down. A
+session that dies for good produces `invalidated` and can't be restarted.
+
+=== Ranging An Accessory
+
+A third-party ultra-wideband tag isn't a phone, and the two platforms disagree
+about what talking to one means.
+
+On iOS there is a defined handshake. The accessory publishes a blob of
+configuration data over its own channel, and the session answers with bytes that
+have to travel back before the accessory begins ranging:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearbyDevicesJava002Snippet.java[tag=nearby-devices-java-002,indent=0]
+----
+
+Android has no equivalent protocol. There, an accessory simply names the channel
+and session to join, so build a token from what it published and call `start`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearbyDevicesJava003Snippet.java[tag=nearby-devices-java-003,indent=0]
+----
+
+`startAccessory` fails with `NearbyError.NOT_SUPPORTED` on Android, and a token
+built by `forUwbAddress` is rejected on iOS. A token is opaque and never
+portable between the two platforms; `RangingToken.fromByteArray` says so rather
+than handing garbage to a native call.
+
+=== Companion Devices: Which One Is Yours
+
+Associating isn't pairing. It's the app telling the operating system that a
+particular accessory belongs to it, through a chooser the OS draws and the user
+picks from, and getting
+privileges back that an ordinary Bluetooth scan doesn't carry: the OS watches
+for the device instead of the app, scanning stops needing location permission on
+Android, and the user sees one honest prompt naming one device.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearbyDevicesJava004Snippet.java[tag=nearby-devices-java-004,indent=0]
+----
+
+An association outlives the app: it survives restarts and reboots, and ends only
+when the app drops it, the user revokes it in system settings, or the app is
+uninstalled. Persist `CompanionDevice.getId()` and look the device up again on
+the next launch instead of asking the user to pick it twice.
+`CompanionDevice.getAddress()` is the same handle
+`BluetoothLE.getPeripheral(String)` takes, which is what makes an association
+useful rather than decorative.
+
+Ask for `CompanionProfile.GENERIC` unless the device is a watch, a
+head-mounted display or a computer. A profile is a request for elevated
+privileges as much as a description, and the specific ones cost the user a
+stronger prompt. The build scanner can't see which profile a request asks for,
+because it arrives as an enum constant; set
+`android.nearby.watchProfile=true` if you use `CompanionProfile.WATCH`, so the
+manifest carries the permission that profile needs.
+
+Two platform differences to design around. Presence notifications are Android
+only: AccessorySetupKit reports an accessory being added to or removed from the
+app's set, which isn't the same event as it coming into range, so
+`startObservingPresence` answers `false` on iOS and an app that needs live
+proximity there should scan with `com.codename1.bluetooth`. And AccessorySetupKit
+only ever discovers Bluetooth services an app declared up front, so set
+`ios.nearby.accessoryServices` to a comma-separated list of the service UUIDs
+your accessories advertise -- without it the picker finds nothing on iOS, and
+the build log says so.
+
+=== Transport: Sending Something
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NearbyDevicesJava005Snippet.java[tag=nearby-devices-java-005,indent=0]
+----
+
+`getAuthenticationToken()` is a short string both devices compute from the
+connection, and it's the only defense against a device in the middle pretending
+to be the one the user meant. Showing it on both screens and asking whether they
+match is what makes the pairing trustworthy; skipping that step is a choice to
+trust whoever answered first.
+
+Answer every `connectionRequested` without delay. A request that's never answered
+holds radio resources open on both sides until the far end times out.
+
+Keep the service id short. On iOS it also becomes the Bonjour service type,
+which the platform restricts to fifteen characters of lowercase letters, digits
+and hyphens -- so a reverse-DNS string that's legal on Android is
+folded to fit, and `com.example.chat` and `com.example.charts` fold to the same
+thing. Set `ios.nearby.serviceType` yourself rather than letting two apps
+discover each other's peers. The build log names the service type it registered.
+
+Byte payloads are capped at `NearbyTransport.getMaxPayloadSize()`, a few
+kilobytes on both platforms; anything larger goes as a file payload, which
+streams and reports progress. Call `NearbyTransport.stop()` when the feature's
+UI closes -- both platforms keep the radios busy until something says stop.
+
+=== Developing Without Hardware
+
+The simulator, the desktop ports and the JavaScript port carry a working
+implementation rather than a stub, and report
+`NearbyAvailability.LOCAL_ONLY` so an app can tell the developer its peers are
+not real. Almost none of a ranging feature is about radios -- laying out the
+screen, animating an arrow, deciding what to show while the direction drops out,
+handling the peer walking away -- and a port that answered `NOT_SUPPORTED` would
+make every line of it testable only on a pair of phones.
+
+Two things it does that a mock wouldn't. It never completes inline, because
+code written against an implementation that answers instantly races the moment
+it meets one that doesn't. And its peers move, along a bounded random walk,
+because a constant 1.5 m would let an app ship with a distance label that
+flickers unreadably against real hardware.
+
+What it won't do behind your back is drop a peer or suspend a session at
+random. Those are real events an app must handle, but a simulation that fired
+them unpredictably would make every test using it flaky, so they're controls
+the simulator drives instead.
+
+=== Build Hints
+
+[options="header"]
+|===
+| Hint | Default | What it does
+| `ios.nearby.serviceType` | derived from the package name | The Bonjour service type the transport registers. Fifteen characters of lowercase letters, digits and hyphens.
+| `ios.nearby.accessoryServices` | unset | Comma-separated Bluetooth service UUIDs the association picker may discover. Required for the picker to find anything on iOS.
+| `ios.nearby.background` | `false` | Requests the `com.apple.developer.nearby-interaction` entitlement and the matching background mode. Enable the capability on the App ID first.
+| `android.nearby.watchProfile` | `false` | Declares the watch companion profile permission, for an app that associates with `CompanionProfile.WATCH`.
+|===
+
+Everything else is automatic. Referencing a package links its frameworks,
+injects its privacy strings and adds its permissions; referencing none of them
+changes nothing about the app.

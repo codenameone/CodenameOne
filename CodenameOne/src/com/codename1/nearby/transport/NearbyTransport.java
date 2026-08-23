@@ -66,7 +66,7 @@ import java.util.List;
 ///     public void endpointFound(Endpoint e) {
 ///         NearbyTransport.requestConnection(e, "Shai's phone");
 ///     }
-///     public void connectionRequested(ConnectionRequest r) {
+///     public void connectionRequested(IncomingConnection r) {
 ///         // show r.getAuthenticationToken() on both screens before this
 ///         r.accept();
 ///     }
@@ -487,8 +487,8 @@ public final class NearbyTransport {
         }
         NearbyRequests.onEdt(new Runnable() {
             public void run() {
-                ConnectionRequest r =
-                        new ConnectionRequest(e, authenticationToken);
+                IncomingConnection r =
+                        new IncomingConnection(e, authenticationToken);
                 TransportListener[] ls = snapshot();
                 for (int i = 0; i < ls.length; i++) {
                     ls[i].connectionRequested(r);

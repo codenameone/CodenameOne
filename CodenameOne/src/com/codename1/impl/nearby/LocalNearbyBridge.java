@@ -205,7 +205,7 @@ public class LocalNearbyBridge implements NearbyBridge {
         return out;
     }
 
-    /// The last distance a session reported, in metres, or -1 when it has
+    /// The last distance a session reported, in meters, or -1 when it has
     /// not started.
     ///
     /// #### Parameters
@@ -214,7 +214,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     ///
     /// #### Returns
     ///
-    /// the distance in metres, or -1
+    /// the distance in meters, or -1
     public double getSimulatedDistance(int sessionHandle) {
         SimSession s = sessions.get(Integer.valueOf(sessionHandle));
         return s == null || !s.running ? -1 : s.distance;

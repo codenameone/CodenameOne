@@ -665,3 +665,19 @@ unretraceable
 # The value a thermostat is aiming for, as the HVAC industry and both
 # platforms name it.
 [Ss]etpoints?
+
+# -----------------------------------------------------------------------------
+# Nearby devices (Nearby-Devices.asciidoc) terminology.
+# -----------------------------------------------------------------------------
+# The radio technology and its hyphenated long form.
+UWB
+ultra-wideband
+# Apple's accessory-pairing framework, named in prose rather than in a code
+# span because the chapter discusses what it can and cannot discover.
+AccessorySetupKit
+# Apple's zero-configuration networking. Named because the transport's service
+# id becomes a Bonjour service type on iOS.
+Bonjour
+# The Apple verb for signing a build. Not "code signing" here: this is the
+# spelling in the error an unavailable entitlement produces.
+codesigning

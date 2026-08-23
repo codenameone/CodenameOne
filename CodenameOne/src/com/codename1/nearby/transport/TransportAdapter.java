@@ -34,7 +34,7 @@ public class TransportAdapter implements TransportListener {
     public void endpointLost(Endpoint endpoint) {
     }
 
-    public void connectionRequested(ConnectionRequest request) {
+    public void connectionRequested(IncomingConnection request) {
     }
 
     public void connected(Endpoint endpoint) {

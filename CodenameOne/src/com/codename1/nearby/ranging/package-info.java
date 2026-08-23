@@ -24,8 +24,8 @@
 /// which direction.
 ///
 /// UWB measures distance by timing a radio round trip, which is worth about
-/// ten centimetres. That is a different kind of answer from a Bluetooth
-/// signal-strength estimate, which is worth a few metres on a good day and
+/// ten centimeters. That is a different kind of answer from a Bluetooth
+/// signal-strength estimate, which is worth a few meters on a good day and
 /// swings wildly when someone puts a hand over the phone -- so this is what
 /// makes "unlock as I walk up to the door" and "point me at my bag" work at
 /// all.
