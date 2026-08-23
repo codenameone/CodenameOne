@@ -512,10 +512,24 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 Integer mapped = payloadIds.get(key);
                 int id = mapped == null ? (int) update.getPayloadId()
                         : mapped.intValue();
-                NearbyTransport.deliverPayloadProgress(
-                        encode(endpointId, nameOf(endpointId)), id,
-                        update.getBytesTransferred(), update.getTotalBytes(),
-                        statusFor(update.getStatus()).ordinal());
+                // An incoming FILE that Nearby calls SUCCESS is not a success
+                // yet: the copy into app storage below can still fail, and
+                // reporting terminal SUCCESS here and terminal FAILURE a few
+                // lines later gave the receiver two contradictory terminal
+                // states for one transfer -- with the first one arriving
+                // first, so anything that finalizes on terminal status
+                // finalized on the wrong one. Held back and emitted once,
+                // when the outcome is actually known.
+                boolean incomingFileSuccess = incomingFiles.containsKey(key)
+                        && update.getStatus()
+                                == PayloadTransferUpdate.Status.SUCCESS;
+                if (!incomingFileSuccess) {
+                    NearbyTransport.deliverPayloadProgress(
+                            encode(endpointId, nameOf(endpointId)), id,
+                            update.getBytesTransferred(),
+                            update.getTotalBytes(),
+                            statusFor(update.getStatus()).ordinal());
+                }
                 if (update.getStatus()
                         == PayloadTransferUpdate.Status.IN_PROGRESS) {
                     return;
@@ -558,6 +572,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
                             PayloadStatus.FAILURE.ordinal());
                     return;
                 }
+                // The terminal SUCCESS held back above, now that it is true.
+                NearbyTransport.deliverPayloadProgress(
+                        encode(endpointId, nameOf(endpointId)),
+                        senderIdOf(file), update.getBytesTransferred(),
+                        update.getTotalBytes(),
+                        PayloadStatus.SUCCESS.ordinal());
                 NearbyTransport.deliverPayloadReceived(
                         encode(endpointId, nameOf(endpointId)),
                         senderIdOf(file), NearbyBridge.PAYLOAD_FILE, null,

@@ -404,27 +404,78 @@ public class AndroidUwbRanging implements NearbyBridge {
                     channel,
                     peers,
                     RangingParameters.RANGING_UPDATE_RATE_AUTOMATIC);
+            // Answered by the subscription, not before it. subscribeOn puts
+            // the actual startRanging on an io thread, so resolving here said
+            // "ranging started" while the radio had not been asked yet -- and
+            // a rejected channel, address or key then arrived as an
+            // invalidation AFTER the caller had already been told it
+            // succeeded, which is the opposite of what start() documents.
+            //
+            // Whichever comes first wins: the first measurement (ranging is
+            // demonstrably running), the first error (it is not), or the
+            // grace timer. The timer is the backstop for the case that has no
+            // signal of its own -- a session that starts cleanly and simply
+            // has nothing in range to measure yet.
+            session.startRequest.set(requestId);
             session.subscription = UwbClientSessionScopeRx
                     .rangingResultsObservable(session.scope, params)
                     .subscribeOn(Schedulers.io())
                     .subscribe(new io.reactivex.rxjava3.functions.Consumer<
                             RangingResult>() {
                         public void accept(RangingResult result) {
+                            settleStarted(session);
                             deliver(session.handle, result);
                         }
                     }, new io.reactivex.rxjava3.functions.Consumer<
                             Throwable>() {
                         public void accept(Throwable error) {
-                            RangingSession.deliverInvalidated(session.handle,
-                                    NearbyError.SESSION_INVALIDATED.ordinal(),
-                                    message(error));
+                            int pending = session.startRequest.getAndSet(0);
+                            if (pending != 0) {
+                                // It never started, so the caller is told
+                                // that rather than being told it started and
+                                // then invalidated.
+                                fail(pending, NearbyError.SESSION_FAILED,
+                                        message(error));
+                            } else {
+                                RangingSession.deliverInvalidated(
+                                        session.handle,
+                                        NearbyError.SESSION_INVALIDATED
+                                                .ordinal(),
+                                        message(error));
+                            }
                             sessions.remove(Integer.valueOf(session.handle));
                         }
                     });
-            Ranging.deliverSessionStarted(requestId, session.handle);
+            scheduleStartGrace(session);
         } catch (Throwable t) {
             fail(requestId, NearbyError.SESSION_FAILED, message(t));
         }
+    }
+
+    /// Answers the start request if it is still waiting.
+    private static void settleStarted(Session session) {
+        int pending = session.startRequest.getAndSet(0);
+        if (pending != 0) {
+            Ranging.deliverSessionStarted(pending, session.handle);
+        }
+    }
+
+    /// How long a start is given to fail before it is called a success.
+    private static final long START_GRACE_MILLIS = 500;
+
+    /// Answers a start that produced neither a measurement nor an error.
+    ///
+    /// A session can start perfectly well and have nothing in range to
+    /// measure, which produces no signal at all -- so without this the
+    /// caller's AsyncResource would wait for a peer that may never appear.
+    private void scheduleStartGrace(final Session session) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        settleStarted(session);
+                    }
+                }, START_GRACE_MILLIS);
     }
 
     private static void deliver(int handle, RangingResult result) {
@@ -566,6 +617,11 @@ public class AndroidUwbRanging implements NearbyBridge {
         private int sessionId;
         private byte[] sessionKey;
         private Disposable subscription;
+        /// The start request still waiting for an answer, or 0 once it has
+        /// been answered. Answered exactly once, by whichever of the first
+        /// measurement, the first error, or the grace timer gets there.
+        private final java.util.concurrent.atomic.AtomicInteger startRequest =
+                new java.util.concurrent.atomic.AtomicInteger();
 
         private Session(int handle, boolean controller) {
             this.handle = handle;

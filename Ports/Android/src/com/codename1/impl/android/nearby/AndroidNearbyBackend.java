@@ -37,6 +37,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.net.MacAddress;
 import android.os.ParcelUuid;
 
@@ -548,14 +549,113 @@ public class AndroidNearbyBackend implements NearbyBridge {
             return false;
         }
         try {
-            // Takes the MAC address on every version that has it, which is
-            // what the encoded address field carries.
+            // An association with no MAC -- a Wi-Fi or self-managed companion
+            // -- cannot use the address overload: addressOf falls back to the
+            // numeric association id, which that overload rejects as not a
+            // MAC address, and the exception was swallowed into a bare false.
+            //
+            // It was suggested the association-id overload arrived in API 33.
+            // It did not: android.companion.ObservingDevicePresenceRequest,
+            // and the startObservingDevicePresence(request) that takes it,
+            // are API 36 -- javap over android-33 through android-35 shows
+            // only the String overload. So this is the honest split: use the
+            // request where it exists, and where it does not, say plainly
+            // that the platform cannot observe this association rather than
+            // failing with no reason.
+            if (macOf(cdm, associationId) == null) {
+                if (Build.VERSION.SDK_INT >= 36
+                        && observeByAssociationId(cdm, associationId)) {
+                    CN1CompanionDeviceService.register(associationId);
+                    return true;
+                }
+                Log.w("CN1", "com.codename1.nearby.companion: this Android"
+                        + " version can only observe an association that has"
+                        + " a Bluetooth address, and association "
+                        + associationId + " has none. Presence observation"
+                        + " for it needs Android 16 or later.");
+                return false;
+            }
             cdm.startObservingDevicePresence(addressOf(cdm, associationId));
             CN1CompanionDeviceService.register(associationId);
             return true;
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /// Observes by association id, which only API 36 can do.
+    ///
+    /// Reached reflectively so the port still compiles against the SDK 33
+    /// floor the rest of the nearby package needs; referencing
+    /// ObservingDevicePresenceRequest directly would raise that floor to 36
+    /// for every app that merely associates a device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cdm`: the platform manager
+    /// - `associationId`: the association to watch
+    ///
+    /// #### Returns
+    ///
+    /// true when the platform accepted the request
+    private static boolean observeByAssociationId(CompanionDeviceManager cdm,
+            String associationId) {
+        try {
+            int numeric = Integer.parseInt(associationId);
+            Class<?> builderClass = Class.forName(
+                    "android.companion.ObservingDevicePresenceRequest$Builder");
+            Object builder = builderClass.newInstance();
+            builderClass.getMethod("setAssociationId", int.class)
+                    .invoke(builder, Integer.valueOf(numeric));
+            Object request = builderClass.getMethod("build").invoke(builder);
+            Class<?> requestClass = Class.forName(
+                    "android.companion.ObservingDevicePresenceRequest");
+            CompanionDeviceManager.class
+                    .getMethod("startObservingDevicePresence", requestClass)
+                    .invoke(cdm, request);
+            return true;
+        } catch (Throwable notAvailable) {
+            return false;
+        }
+    }
+
+    /// The API 36 counterpart of observeByAssociationId.
+    private static void stopObservingByAssociationId(
+            CompanionDeviceManager cdm, String associationId) {
+        try {
+            int numeric = Integer.parseInt(associationId);
+            Class<?> builderClass = Class.forName(
+                    "android.companion.ObservingDevicePresenceRequest$Builder");
+            Object builder = builderClass.newInstance();
+            builderClass.getMethod("setAssociationId", int.class)
+                    .invoke(builder, Integer.valueOf(numeric));
+            Object request = builderClass.getMethod("build").invoke(builder);
+            Class<?> requestClass = Class.forName(
+                    "android.companion.ObservingDevicePresenceRequest");
+            CompanionDeviceManager.class
+                    .getMethod("stopObservingDevicePresence", requestClass)
+                    .invoke(cdm, request);
+        } catch (Throwable notAvailable) {
+            // Stopping something the platform is not watching is not a
+            // failure the caller can act on.
+        }
+    }
+
+    /// The MAC of an association, or null when it has none.
+    @SuppressLint("MissingPermission")
+    private static String macOf(CompanionDeviceManager cdm,
+            String associationId) {
+        if (Build.VERSION.SDK_INT < 33) {
+            // Below 33 the id IS the address; there is nothing else to hold.
+            return associationId;
+        }
+        List<AssociationInfo> all = cdm.getMyAssociations();
+        for (int i = 0; all != null && i < all.size(); i++) {
+            if (idOf(all.get(i)).equals(associationId)) {
+                return macOf(all.get(i));
+            }
+        }
+        return null;
     }
 
     @SuppressLint("MissingPermission")
@@ -566,6 +666,13 @@ public class AndroidNearbyBackend implements NearbyBridge {
             return;
         }
         try {
+            if (macOf(cdm, associationId) == null) {
+                if (Build.VERSION.SDK_INT >= 36) {
+                    stopObservingByAssociationId(cdm, associationId);
+                }
+                CN1CompanionDeviceService.unregister(associationId);
+                return;
+            }
             cdm.stopObservingDevicePresence(addressOf(cdm, associationId));
             CN1CompanionDeviceService.unregister(associationId);
         } catch (Throwable t) {
