@@ -771,6 +771,12 @@ public final class DevicePush {
         if (parent == null) {
             parent = f.toAbsolutePath().getParent();
         }
+        if (parent == null) {
+            // The path has no parent -- filesystem root -- which is not a
+            // legal home for the secrets file we would have written above,
+            // so refusing loudly beats passing null into createTempFile.
+            throw new IOException("no parent directory for " + f);
+        }
         boolean posix = f.getFileSystem().supportedFileAttributeViews().contains("posix");
         Path tmp;
         if (posix) {
