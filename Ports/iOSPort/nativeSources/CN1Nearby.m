@@ -441,6 +441,14 @@ static void cn1nbSettleRangingStart(CN1NearbyRangingSession *entry)
 @property (nonatomic, retain) NSMutableDictionary *invitations;
 @property (nonatomic, retain) NSMutableDictionary *progressByPayload;
 @property (nonatomic, retain) NSMutableSet *everConnected;
+/// Peers invited and not yet answered.
+///
+/// Counted toward the strategy limit alongside the connected ones: two
+/// requestConnection calls made before either peer answers both saw a
+/// connected count of zero, so both invitations went out and the discoverer
+/// ended up holding two sessions under STAR or POINT_TO_POINT with neither
+/// call ever told BUSY.
+@property (nonatomic, retain) NSMutableSet *inviting;
 @property (nonatomic, assign) int pendingAdvertiseRequest;
 @property (nonatomic, assign) int pendingDiscoverRequest;
 /// The advertising and discovery services are tracked SEPARATELY.
@@ -673,6 +681,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_invitations release];
     [_progressByPayload release];
     [_everConnected release];
+    [_inviting release];
     [_advertiseServiceType release];
     [_advertiseServiceId release];
     [_discoverServiceType release];
@@ -822,6 +831,29 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     }
 }
 
+/// How many peers are connected or have an invitation outstanding.
+- (NSUInteger)heldPeerCount {
+    NSUInteger pending;
+    @synchronized (self) {
+        pending = [self.inviting count];
+    }
+    return [self connectedPeerCount] + pending;
+}
+
+/// Records an invitation this device is about to send.
+- (void)markInviting:(NSString *)pid {
+    @synchronized (self) {
+        [self.inviting addObject:pid];
+    }
+}
+
+/// Forgets an invitation that has been answered, either way.
+- (void)clearInviting:(NSString *)pid {
+    @synchronized (self) {
+        [self.inviting removeObject:pid];
+    }
+}
+
 /// True when this peer has reached Connected and has not been forgotten.
 - (BOOL)isEverConnected:(NSString *)pid {
     @synchronized (self) {
@@ -856,6 +888,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         [self.peersById removeAllObjects];
         [self.serviceIdByPeer removeAllObjects];
         [self.everConnected removeAllObjects];
+        [self.inviting removeAllObjects];
     }
 }
 
@@ -966,6 +999,8 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         }
         NSString *pid = cn1nbIdForPeer(peerID);
         NSString *encoded = [self encodePeer:peerID];
+        // Answered, so the reservation is released whichever way it went.
+        [self clearInviting:pid];
         if (state == MCSessionStateConnected) {
             [self markEverConnected:pid];
             com_codename1_impl_ios_IOSNearbyCallbacks_connectionResult___java_lang_String_boolean_int_java_lang_String(
@@ -1322,6 +1357,7 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.invitations = [NSMutableDictionary dictionary];
         cn1nbTransport.progressByPayload = [NSMutableDictionary dictionary];
         cn1nbTransport.everConnected = [NSMutableSet set];
+        cn1nbTransport.inviting = [NSMutableSet set];
         cn1nbTransport.sessionsById = [NSMutableDictionary dictionary];
         cn1nbTransport.serviceIdByPeer = [NSMutableDictionary dictionary];
     }
@@ -2241,7 +2277,7 @@ void com_codename1_impl_ios_IOSNative_nearbyRequestConnection___int_java_lang_St
         // This device is the one CONNECTING, so both STAR and POINT_TO_POINT
         // allow it exactly one peer: under STAR it is the many, not the one.
         if (cn1nbTransport.discoverStrategy != CN1_NEARBY_STRATEGY_CLUSTER
-                && [cn1nbTransport connectedPeerCount] > 0) {
+                && [cn1nbTransport heldPeerCount] > 0) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_BUSY,
                     cn1nbTransport.discoverStrategy
                             == CN1_NEARBY_STRATEGY_POINT_TO_POINT
@@ -2261,6 +2297,10 @@ void com_codename1_impl_ios_IOSNative_nearbyRequestConnection___int_java_lang_St
                     @"the endpoint was lost while renaming this device");
             return;
         }
+        // Reserved BEFORE the invitation goes out, so a second
+        // requestConnection made while this one is still unanswered sees the
+        // slot taken.
+        [cn1nbTransport markInviting:pid];
         [cn1nbTransport.browser invitePeer:peer
                                  toSession:[cn1nbTransport sessionFor:pid]
                                withContext:nil
@@ -2296,7 +2336,7 @@ void com_codename1_impl_ios_IOSNative_nearbyAcceptConnection___int_java_lang_Str
         // makes this device the star's centre.
         if (cn1nbTransport.advertiseStrategy
                         == CN1_NEARBY_STRATEGY_POINT_TO_POINT
-                && [cn1nbTransport connectedPeerCount] > 0) {
+                && [cn1nbTransport heldPeerCount] > 0) {
             handler(NO, nil);
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_BUSY,
                     @"POINT_TO_POINT allows one connection at a time;"

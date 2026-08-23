@@ -600,6 +600,43 @@ class LocalNearbyTest {
     }
 
     @Test
+    void cancellingAFinishedPayloadDoesNotPoisonTheNextSend() {
+        // Recorded unconditionally, a cancel for an id that had already
+        // completed sat in the set for good -- and reusing the same immutable
+        // Payload in a later send() consumed the stale marker and reported
+        // that perfectly good transfer as CANCELED.
+        final List<PayloadTransferUpdate> progress =
+                new ArrayList<PayloadTransferUpdate>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void payloadProgress(Endpoint e, PayloadTransferUpdate u) {
+                progress.add(u);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        value(NearbyTransport.requestConnection(e, "me"));
+
+        Payload p = Payload.fromBytes(new byte[] {1, 2, 3});
+        value(NearbyTransport.send(e, p));
+        assertEquals(1, progress.size());
+        assertSame(PayloadStatus.SUCCESS, progress.get(0).getStatus());
+
+        // Too late, and for an id nothing is waiting on.
+        NearbyTransport.cancel(p.getId());
+        progress.clear();
+        value(NearbyTransport.send(e, p));
+        assertEquals(1, progress.size());
+        assertSame(PayloadStatus.SUCCESS, progress.get(0).getStatus());
+    }
+
+    @Test
     void cancellingAPayloadInFlightReportsCanceledAndSendsNothing() {
         // sendPayload is delayed like everything else here, so an app really
         // can cancel while a send is in flight -- and the simulator used to
