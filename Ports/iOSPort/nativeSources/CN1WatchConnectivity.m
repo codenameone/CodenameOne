@@ -1728,17 +1728,18 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // Persisted rather than held in memory: this delegate runs in a process the system starts and
     // stops at will, and a counter that resets would let the next stale payload through.
     id sequence = [info objectForKey:@"cn1.surfaces.seq"];
+    NSString *sequenceKey = nil;
+    long long incoming = 0;
     if ([sequence isKindOfClass:[NSNumber class]]) {
-        NSString *key = [@"cn1.surfaces.seq." stringByAppendingString:kind];
+        sequenceKey = [@"cn1.surfaces.seq." stringByAppendingString:kind];
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        long long applied = (long long)[defaults doubleForKey:key];
-        long long incoming = [(NSNumber *)sequence longLongValue];
+        long long applied = (long long)[defaults doubleForKey:sequenceKey];
+        incoming = [(NSNumber *)sequence longLongValue];
         if (applied != 0 && incoming <= applied) {
             NSLog(@"[CN1Surfaces] ignoring a mirrored update for \"%@\" that was superseded "
                   "before it arrived (%lld <= %lld)", kind, incoming, applied);
             return;
         }
-        [defaults setDouble:(double)incoming forKey:key];
     }
     NSMutableArray *names = [NSMutableArray array];
     NSMutableArray *blobs = [NSMutableArray array];
@@ -1751,7 +1752,18 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             }
         }
     }
-    cn1_watch_apply_mirrored_surface(kind, json, names, blobs);
+    // The mark moves only when the timeline is actually INSTALLED. Recording it first meant a
+    // write that failed -- a momentarily unwritable App Group, a full disk -- still raised the
+    // high-water mark, so the payload was consumed and even a redelivery of the very same one was
+    // rejected as superseded. The complication then kept its old content until the phone happened
+    // to publish again. A failed apply now leaves the mark where it was, so the next delivery of
+    // this publication, or any later one, still lands.
+    if (!cn1_watch_apply_mirrored_surface(kind, json, names, blobs)) {
+        return;
+    }
+    if (sequenceKey != nil) {
+        [[NSUserDefaults standardUserDefaults] setDouble:(double)incoming forKey:sequenceKey];
+    }
 }
 #else
 - (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {

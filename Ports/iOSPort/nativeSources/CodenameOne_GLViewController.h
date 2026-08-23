@@ -195,7 +195,7 @@ BOOL cn1HandleSurfaceURL(NSURL *url);
 // re-renders. Called from CN1WatchConnectivity's didReceiveUserInfo, which may run with no CN1
 // runtime at all -- the whole point of the background wake is to refresh a complication, not to
 // start an application -- so this touches no Java.
-void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
+BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
         NSArray<NSString *> *imageNames, NSArray<NSData *> *imageBlobs);
 #endif
 #endif

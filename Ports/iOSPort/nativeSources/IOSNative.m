@@ -15794,11 +15794,11 @@ void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_j
 //
 // The layout matches what IOSSurfaceBridge writes locally, because the extension reads one
 // format and does not care which side produced it.
-void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
+BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
         NSArray<NSString *> *imageNames, NSArray<NSData *> *imageBlobs) {
     NSString *container = cn1SurfacesContainerPath();
     if (container == nil || kind == nil || json == nil) {
-        return;
+        return NO;
     }
     NSString *kindDir = [[container stringByAppendingPathComponent:@"cn1surfaces"]
             stringByAppendingPathComponent:kind];
@@ -15807,7 +15807,7 @@ void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
     if (![fm createDirectoryAtPath:kindDir withIntermediateDirectories:YES
                         attributes:nil error:&err]) {
         NSLog(@"[CN1Surfaces] could not prepare the mirrored surface directory: %@", err);
-        return;
+        return NO;
     }
     // Imagery first, so the descriptor is never live against art that has not landed. Names are
     // content hashes, so an unchanged image rewrites identical bytes.
@@ -15830,13 +15830,13 @@ void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
             // reload sends the whole set again.
             NSLog(@"[CN1Surfaces] could not store mirrored image \"%@\" for \"%@\"; keeping the "
                     "previous timeline", name, kind);
-            return;
+            return NO;
         }
     }
     if (![json writeToFile:[kindDir stringByAppendingPathComponent:@"timeline.json"]
                 atomically:YES]) {
         NSLog(@"[CN1Surfaces] could not write the mirrored timeline for \"%@\"", kind);
-        return;
+        return NO;
     }
     // AFTER the replacement document is in place, so an extension rendering concurrently re-reads
     // the new timeline before its art can disappear -- the same order IOSSurfaceBridge uses for a
@@ -15874,6 +15874,7 @@ void cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
         ((void (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
                 NSSelectorFromString(@"reloadTimelines:"), kind);
     }
+    return YES;
 }
 #endif
 
