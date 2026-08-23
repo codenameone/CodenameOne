@@ -713,26 +713,31 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
 
     private ShortTextComplicationData shortText(ComplicationText ticking, String text,
             String title, ComplicationText tickingTitle, PendingIntent tap) {
-        // The untruncated strings become the content description, so a screen reader still hears
-        // what the layout said even where the slot shows seven characters. BOTH of them: the
-        // title is displayed too, and describing only the text announced half of what is on the
-        // face. The title arrives whole now and is shortened here, where its visual form is made
-        // -- it used to be shortened by the caller, which left nothing full to describe with.
-        //
-        // A ticking value is handed over whole: shortening it would mean rendering it here, which
-        // is the freezing this exists to avoid. The face sizes what it draws.
         boolean titled = title != null && title.length() > 0;
-        // The description TICKS too when the value does. It was a plain string resolved at
-        // request time, so with no update period a screen reader went on announcing the moment
-        // the provider was called long after the face had moved on -- reading out a time that is
-        // simply wrong. The ticking text is the same object the face advances, so it stays right.
+        // The content description, which a screen reader reads instead of the layout.
         //
-        // The title is not folded into it in that case, because a ticking value is an object
-        // rather than a string and there is nothing to concatenate onto. An announcement that is
-        // shorter and correct beats one that is complete and wrong, and the title is static text
-        // the face is already showing beside it.
-        ComplicationText described = ticking != null ? ticking
-                : plain(titled ? text + ", " + title : text);
+        // When nothing moves it is both strings UNTRUNCATED -- the slot shows seven characters
+        // and the title beside it, and describing only the shortened text announced half of what
+        // is on the face. That is why the title arrives whole and is shortened below, where its
+        // visual form is made, rather than by the caller.
+        //
+        // When something DOES move, that thing describes the whole: the value first, then the
+        // title. A plain description is a string resolved at request time, and with no update
+        // period a screen reader would go on announcing the moment the provider was called long
+        // after the face had advanced -- reading out a time that is simply wrong. A ticking text
+        // is the same object the face advances, so it stays right.
+        //
+        // The other half is not folded in then, because a ticking value is an object rather than
+        // a string and there is nothing to concatenate onto. An announcement that is shorter and
+        // correct beats one that is complete and wrong.
+        ComplicationText described;
+        if (ticking != null) {
+            described = ticking;
+        } else if (tickingTitle != null) {
+            described = tickingTitle;
+        } else {
+            described = plain(titled ? text + ", " + title : text);
+        }
         ShortTextComplicationData.Builder builder =
                 new ShortTextComplicationData.Builder(
                         ticking != null ? ticking : plain(shorten(text)), described);
