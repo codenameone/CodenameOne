@@ -199,8 +199,27 @@ API_AVAILABLE(ios(14.0))
 @end
 
 static NSMutableDictionary *cn1nbSessions = nil;
+/// Guards cn1nbSessions.
+///
+/// NISession delivers on a queue per session, so two peers invalidating at
+/// once -- or an app calling stop() while an invalidation is running -- had
+/// concurrent readers, writers and removals on a dictionary that is not
+/// thread-safe. A separate object rather than the dictionary itself, because
+/// the dictionary is created lazily and there would be nothing to lock on
+/// before the first session.
+static NSObject *cn1nbSessionsLock = nil;
+
+/// Creates the lock, on the one thread that can be first: every entry point
+/// below reaches this before touching the registry.
+static void cn1nbSessionsLockInit(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1nbSessionsLock = [[NSObject alloc] init];
+    });
+}
 
 static void cn1nbSessionsInit(void) {
+    cn1nbSessionsLockInit();
     if (cn1nbSessions == nil) {
         cn1nbSessions = [[NSMutableDictionary alloc] init];
     }
@@ -337,7 +356,11 @@ static void cn1nbSessionsInit(void) {
         com_codename1_impl_ios_IOSNearbyCallbacks_sessionInvalidated___int_int_java_lang_String(
                 getThreadLocalData(), handle, code,
                 cn1nbJString([error localizedDescription]));
-        [cn1nbSessions removeObjectForKey:[NSNumber numberWithInt:handle]];
+        cn1nbSessionsLockInit();
+        @synchronized (cn1nbSessionsLock) {
+            [cn1nbSessions removeObjectForKey:
+                    [NSNumber numberWithInt:handle]];
+        }
     }
 }
 
@@ -361,7 +384,9 @@ static void cn1nbSessionsInit(void) {
 static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
         API_AVAILABLE(ios(14.0)) {
     cn1nbSessionsInit();
-    return [cn1nbSessions objectForKey:[NSNumber numberWithInt:handle]];
+    @synchronized (cn1nbSessionsLock) {
+        return [cn1nbSessions objectForKey:[NSNumber numberWithInt:handle]];
+    }
 }
 
 /// Answers a peer-ranging start once the session has had its chance to fail.
@@ -493,6 +518,35 @@ static NSArray *cn1nbDeclaredServiceTypes(void) {
         }
     }
     return out;
+}
+
+/// Cuts a display name down to the 63 UTF-8 bytes MCPeerID accepts.
+///
+/// By BYTES and on a character boundary, not by taking a fixed number of
+/// UTF-16 units: twenty emoji are about eighty bytes, so the old cut left an
+/// over-long name that MCPeerID RAISES on -- a crash rather than an error --
+/// and cutting mid-unit could split a surrogate pair into something that is
+/// not a string at all.
+static NSString *cn1nbPeerName(NSString *name) {
+    if (name == nil || [name length] == 0) {
+        return @"Codename One";
+    }
+    if ([name lengthOfBytesUsingEncoding:NSUTF8StringEncoding] <= 63) {
+        return name;
+    }
+    NSUInteger end = [name length];
+    while (end > 0) {
+        // rangeOfComposedCharacterSequenceAtIndex keeps the cut off the
+        // middle of a surrogate pair or a combining sequence.
+        NSRange last = [name rangeOfComposedCharacterSequenceAtIndex:end - 1];
+        end = last.location;
+        NSString *candidate = [name substringToIndex:end];
+        if ([candidate lengthOfBytesUsingEncoding:NSUTF8StringEncoding]
+                <= 63) {
+            return [candidate length] == 0 ? @"Codename One" : candidate;
+        }
+    }
+    return @"Codename One";
 }
 
 static NSString *cn1nbServiceType(NSString *serviceId) {
@@ -1099,7 +1153,7 @@ static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
     // MCPeerID rejects a display name longer than 63 UTF-8 bytes.
     if (wanted != nil
             && [wanted lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > 63) {
-        wanted = [wanted substringToIndex:20];
+        wanted = cn1nbPeerName(wanted);
     }
     if (t.localPeer != nil && wanted != nil
             && ![t.localPeer.displayName isEqualToString:wanted]
@@ -1140,7 +1194,7 @@ static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
         NSString *name = wanted != nil ? wanted
                 : [[UIDevice currentDevice] name];
         if ([name lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > 63) {
-            name = [name substringToIndex:20];
+            name = cn1nbPeerName(name);
         }
         t.localPeer = [[[MCPeerID alloc] initWithDisplayName:name]
                 autorelease];
@@ -1497,8 +1551,10 @@ void com_codename1_impl_ios_IOSNative_nearbyPrepareSession___int_int_boolean(
                         [err localizedDescription]);
                 return;
             }
-            [cn1nbSessions setObject:entry
-                              forKey:[NSNumber numberWithInt:sessionHandle]];
+            @synchronized (cn1nbSessionsLock) {
+                [cn1nbSessions setObject:entry
+                        forKey:[NSNumber numberWithInt:sessionHandle]];
+            }
             com_codename1_impl_ios_IOSNearbyCallbacks_sessionPrepared___int_int_boolean_byte_1ARRAY(
                     CN1_THREAD_STATE_PASS_ARG requestId, sessionHandle,
                     controller, cn1nbJBytes(archived));
@@ -1629,8 +1685,10 @@ void com_codename1_impl_ios_IOSNative_nearbyStopSession___int(
                 // Cleared before invalidate so the delegate callback that
                 // invalidation triggers finds nothing left to report -- the
                 // app asked for this and does not need to be told.
-                [cn1nbSessions removeObjectForKey:
-                        [NSNumber numberWithInt:sessionHandle]];
+                @synchronized (cn1nbSessionsLock) {
+                    [cn1nbSessions removeObjectForKey:
+                            [NSNumber numberWithInt:sessionHandle]];
+                }
                 entry.session.delegate = nil;
                 [entry.session invalidate];
             }

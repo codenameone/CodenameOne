@@ -434,15 +434,24 @@ public class AndroidUwbRanging implements NearbyBridge {
                                 // It never started, so the caller is told
                                 // that rather than being told it started and
                                 // then invalidated.
+                                //
+                                // The backend session STAYS. A failed start
+                                // leaves the facade session open and
+                                // retryable -- Ranging.deliverRequestFailed
+                                // only clears the in-progress flag -- so
+                                // dropping it here meant the retry the facade
+                                // invites answered "no such session" for a
+                                // session isClosed() still reported as open.
+                                // The scope is still valid; only this
+                                // subscription failed.
                                 fail(pending, NearbyError.SESSION_FAILED,
                                         message(error));
-                            } else {
-                                RangingSession.deliverInvalidated(
-                                        session.handle,
-                                        NearbyError.SESSION_INVALIDATED
-                                                .ordinal(),
-                                        message(error));
+                                return;
                             }
+                            RangingSession.deliverInvalidated(
+                                    session.handle,
+                                    NearbyError.SESSION_INVALIDATED.ordinal(),
+                                    message(error));
                             sessions.remove(Integer.valueOf(session.handle));
                         }
                     });
