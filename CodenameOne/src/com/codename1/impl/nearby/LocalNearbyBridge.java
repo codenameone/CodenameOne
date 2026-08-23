@@ -646,6 +646,25 @@ public class LocalNearbyBridge implements NearbyBridge {
         answer(new Runnable() {
             @Override
             public void run() {
+                // Nobody to send to is a failure, not a success with nothing
+                // in it. Answering ok and then skipping every recipient left
+                // the caller holding a resolved resource and waiting for a
+                // terminal payloadProgress that could never come, which is
+                // exactly the state transfer UI hangs on.
+                boolean any = false;
+                for (String endpointId : endpointIds) {
+                    if (findEndpoint(endpointId) != null
+                            && connected.contains(endpointId)) {
+                        any = true;
+                        break;
+                    }
+                }
+                if (!any) {
+                    NearbyTransport.deliverRequestFailed(requestId,
+                            NearbyError.PEER_UNAVAILABLE.ordinal(),
+                            "none of those endpoints is connected");
+                    return;
+                }
                 NearbyTransport.deliverRequestOk(requestId);
                 boolean cancelled = cancelledPayloads.remove(
                         Integer.valueOf(payloadId));

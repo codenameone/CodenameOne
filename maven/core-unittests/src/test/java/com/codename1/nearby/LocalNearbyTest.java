@@ -556,6 +556,27 @@ class LocalNearbyTest {
     // ------------------------------------------------------------------
 
     @Test
+    void sendingToNobodyFailsRatherThanResolvingWithNothingInIt() {
+        // Answering ok and then skipping every recipient left the caller
+        // holding a resolved resource and waiting for a terminal
+        // payloadProgress that could never come -- the state transfer UI
+        // hangs on.
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        assertNotNull(e);
+        // Discovered but never connected.
+        assertFailedWith(NearbyError.PEER_UNAVAILABLE,
+                NearbyTransport.send(e, Payload.fromBytes(new byte[] {1})));
+    }
+
+    @Test
     void cancellingAPayloadInFlightReportsCanceledAndSendsNothing() {
         // sendPayload is delayed like everything else here, so an app really
         // can cancel while a send is in flight -- and the simulator used to

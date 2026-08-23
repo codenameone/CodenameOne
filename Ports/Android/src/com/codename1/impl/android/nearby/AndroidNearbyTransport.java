@@ -378,6 +378,14 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public void stopAllTransport() {
+        // All three, because they are three independent operations.
+        // stopAllEndpoints disconnects peers and leaves advertising and
+        // discovery running, so an app that closed its feature UI carried on
+        // broadcasting and scanning -- burning the radio and still taking
+        // endpoint and connection callbacks -- while the public stop()
+        // documents exactly the opposite.
+        client().stopAdvertising();
+        client().stopDiscovery();
         client().stopAllEndpoints();
         endpointNames.clear();
         endpointServices.clear();
