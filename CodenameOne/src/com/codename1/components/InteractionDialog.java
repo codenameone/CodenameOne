@@ -379,6 +379,9 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     private TopLevelContainer hostTopLevel;
 
+    /// A timeout set before the dialog was shown, waiting for a host to bind to.
+    private long pendingTimeout;
+
     /// True while `#hostTopLevel` holds a host worked out from a popup's anchor rather
     /// than one the application asked for. Such a host belongs to that one showing: it
     /// is the anchor's top level, and the next showing may well be somewhere else.
@@ -521,6 +524,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
             return;
         }
         shownInFormMode = formMode;
+        startPendingTimeout();
         Style unselectedStyle = getUnselectedStyle();
 
         unselectedStyle.setMargin(TOP, top);
@@ -1046,6 +1050,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (f == null) {
             return;
         }
+        startPendingTimeout();
         Rectangle origRect = rect;
         rect = new Rectangle(rect);
         rect.setX(rect.getX() - getLayeredPane(f).getAbsoluteX());
@@ -1549,9 +1554,32 @@ public class InteractionDialog extends Container implements AbstractDialog {
     @Override
     public void setTimeout(long timeout) {
         if (timeout <= 0) {
+            pendingTimeout = 0;
             return;
         }
-        UITimer.timer((int) timeout, false, resolveHost(), new Runnable() {
+        // Recorded and started when the dialog is shown, not here. A timeout set before
+        // showing has no host to bind to yet: resolveHost() answers the current form,
+        // which is the wrong one for a popup that later resolves to a window -- and if
+        // that form is replaced its animations stop, so the dialog never times out. In
+        // an application with no form at all it answers null, which threw.
+        pendingTimeout = timeout;
+        if (isShowing()) {
+            startPendingTimeout();
+        }
+    }
+
+    /// Binds the pending timeout to the host the dialog is actually on.
+    private void startPendingTimeout() {
+        if (pendingTimeout <= 0) {
+            return;
+        }
+        TopLevelContainer host = resolveHost();
+        if (host == null) {
+            return;
+        }
+        int millis = (int) pendingTimeout;
+        pendingTimeout = 0;
+        UITimer.timer(millis, false, host, new Runnable() {
             @Override
             public void run() {
                 dispose();

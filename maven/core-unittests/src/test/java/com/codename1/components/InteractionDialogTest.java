@@ -670,4 +670,53 @@ class InteractionDialogTest extends UITestBase {
         anchorWindow.dispose();
         chosen.dispose();
     }
+
+    @FormTest
+    void aTimeoutSetBeforeShowingBindsToTheHostItIsShownOn() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        implementation.setCurrentForm(main);
+
+        Button anchor = new Button("anchor");
+        Window w = windowWithAnchor("secondary", anchor);
+
+        InteractionDialog dialog = new InteractionDialog("popup");
+        dialog.add(new Label("body"));
+        // Set before showing: at this point the dialog has no host, so binding the timer
+        // now picks the current form -- the wrong one for a popup that resolves to a
+        // window, and null in an application that has no form at all.
+        dialog.setTimeout(5000);
+        dialog.showPopupDialog(anchor);
+
+        assertSame(w, dialog.getTopLevelHost(),
+                "the popup resolved to the window it was anchored in");
+        assertEquals(0, pendingTimeoutOf(dialog),
+                "and the timeout was bound once that host was known, not before");
+
+        dialog.dispose();
+        w.dispose();
+    }
+
+    /// The timeout still waiting for a host, via reflection.
+    private static long pendingTimeoutOf(InteractionDialog d) {
+        try {
+            java.lang.reflect.Field f =
+                    InteractionDialog.class.getDeclaredField("pendingTimeout");
+            f.setAccessible(true);
+            return f.getLong(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    @FormTest
+    void aTimeoutSetWithNoFormAtAllDoesNotThrow() {
+        implementation.setMultiWindowSupported(true);
+        implementation.setCurrentForm(null);
+        InteractionDialog dialog = new InteractionDialog("popup");
+        // Used to throw inside UITimer.schedule() because resolveHost() answered null.
+        dialog.setTimeout(5000);
+        assertEquals(5000L, pendingTimeoutOf(dialog),
+                "it is held until there is somewhere to bind it");
+    }
 }
