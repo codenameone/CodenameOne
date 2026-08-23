@@ -368,7 +368,14 @@ public class MacWindowManager extends WindowManager {
         if (w == null) {
             return;
         }
+        // Freed here for the same reason as on resize: a finalizer is the only other
+        // thing that would, and a disposed window's raster is the largest single
+        // allocation it owned.
+        Object raster = w.mutableImage;
         w.mutableImage = null;
+        if (raster != null) {
+            impl.releaseImage(raster);
+        }
         // Released with the raster it belongs to; a disposed window has no frames left
         // to present, and on a large display this is a few tens of megabytes.
         w.frameBuffer = null;
@@ -492,6 +499,19 @@ public class MacWindowManager extends WindowManager {
         int width = Math.max(1, window != null ? window.getWidth() : getWidth(p));
         int height = Math.max(1, window != null ? window.getHeight() : getHeight(p));
         if (w.mutableImage == null || w.rasterWidth != width || w.rasterHeight != height) {
+            // Release the raster being replaced rather than waiting for a finalizer.
+            // NativeImage frees its native peer only from finalize(), and the Java
+            // wrapper is a few dozen bytes in front of a width*height*4 native
+            // allocation -- so the collector sees almost no pressure while a live
+            // resize hands out a new multi-megabyte raster per size step. Nothing
+            // outside holds it across the swap: capture() copies the pixels into an
+            // independent image, and the paint loop re-fetches this graphics every
+            // frame rather than caching it.
+            Object previous = w.mutableImage;
+            w.mutableImage = null;
+            if (previous != null) {
+                impl.releaseImage(previous);
+            }
             w.mutableImage = impl.createMutableImage(width, height, 0xff000000);
             w.rasterWidth = width;
             w.rasterHeight = height;
