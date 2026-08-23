@@ -480,7 +480,7 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// other renderers honoured the same descriptor. A built LayoutElement has no size to set
     /// afterwards, so the sizing goes on a Box around it, exactly as the weight and alignment
     /// wrappers do.
-    private static LayoutElementBuilders.LayoutElement sized(
+    private LayoutElementBuilders.LayoutElement sized(
             LayoutElementBuilders.LayoutElement element, JSONObject node) {
         int w = node == null ? 0 : node.optInt("w", 0);
         int h = node == null ? 0 : node.optInt("h", 0);
@@ -488,7 +488,8 @@ public abstract class CN1SurfaceTileService extends TileService {
             return element;
         }
         LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder()
-                .addContent(element);
+                .addContent(element)
+                .setModifiers(clickOnly(node));
         if (w > 0) {
             box.setWidth(DimensionBuilders.dp(w));
         }
@@ -516,7 +517,7 @@ public abstract class CN1SurfaceTileService extends TileService {
     /// - `expandWidth`, `expandHeight`: which axes the wrapper may fill. A Box overlay fills
     ///   both; a column child fills only its width and a row child only its height, because the
     ///   other one is the container's main axis and expanding it would push every sibling out.
-    private static LayoutElementBuilders.LayoutElement aligned(
+    private LayoutElementBuilders.LayoutElement aligned(
             LayoutElementBuilders.LayoutElement element, JSONObject child,
             boolean expandWidth, boolean expandHeight) {
         String align = child == null ? "" : child.optString("align", "");
@@ -540,6 +541,7 @@ public abstract class CN1SurfaceTileService extends TileService {
         }
         LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder()
                 .addContent(element)
+                .setModifiers(clickOnly(child))
                 .setHorizontalAlignment(horizontal)
                 .setVerticalAlignment(vertical);
         if (expandWidth) {
@@ -549,6 +551,27 @@ public abstract class CN1SurfaceTileService extends TileService {
             box.setHeight(DimensionBuilders.expand());
         }
         return box.build();
+    }
+
+    /// The node's tap, on a wrapper box.
+    ///
+    /// modifiers(node) attaches the clickable to the element itself, and the sizing, weight and
+    /// alignment wrappers then put a LARGER box around it -- so a node combining setAction with
+    /// setSize had a tap target the size of its content rather than the bounds it asked for, and
+    /// taps in the remainder did nothing. Each wrapper carries the tap as well; a nested pair
+    /// with the same action id is harmless, and between them the whole declared area responds.
+    ///
+    /// Padding and background stay on the inner element, where they describe the content.
+    private ModifiersBuilders.Modifiers clickOnly(JSONObject node) {
+        ModifiersBuilders.Modifiers.Builder mods = new ModifiersBuilders.Modifiers.Builder();
+        JSONObject action = node == null ? null : node.optJSONObject("action");
+        if (action != null && action.optString("id", "").length() > 0) {
+            mods.setClickable(new ModifiersBuilders.Clickable.Builder()
+                    .setId(action.optString("id"))
+                    .setOnClick(launchAction(action))
+                    .build());
+        }
+        return mods.build();
     }
 
     /// A child sized to its share of the parent's leftover space, when it asked for one.
@@ -561,14 +584,15 @@ public abstract class CN1SurfaceTileService extends TileService {
     ///
     /// A weight of 0 is the default and means natural sizing, which is what the bare element
     /// already does.
-    private static LayoutElementBuilders.LayoutElement weighted(
+    private LayoutElementBuilders.LayoutElement weighted(
             LayoutElementBuilders.LayoutElement element, JSONObject child, boolean horizontal) {
         int weight = child == null ? 0 : child.optInt("weight", 0);
         if (weight <= 0) {
             return element;
         }
         LayoutElementBuilders.Box.Builder box = new LayoutElementBuilders.Box.Builder()
-                .addContent(element);
+                .addContent(element)
+                .setModifiers(clickOnly(child));
         if (horizontal) {
             box.setWidth(DimensionBuilders.weight(weight));
         } else {

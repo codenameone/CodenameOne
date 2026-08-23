@@ -6755,8 +6755,13 @@ public class IPhoneBuilder extends Executor {
                 // bundle id rather than the phone's.
                 .setHostBundleId(request.getPackageName() + ".watchkitapp")
                 .setAppGroupId(surfacesAppGroup)
+                // The WATCH APP's target, not the extension's own floor. WidgetKit goes back to
+                // watchOS 9 and the extension can build there, but it is embedded in the watch
+                // app -- a watch that cannot install the app cannot show its complication, so
+                // defaulting to the lower number advertised support that does not exist. The
+                // extension's floor stays where it is for a project that lowers both.
                 .setDeploymentTarget(request.getArg("watchNative.surfaces.deploymentTarget",
-                        IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET));
+                        WatchNativeBuilder.MIN_DEPLOYMENT_TARGET));
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             watchBuilder.addKind(kind);
         }

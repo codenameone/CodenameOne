@@ -63,10 +63,16 @@ import java.nio.charset.StandardCharsets;
 class WatchNativeBuilder {
     private final IPhoneBuilder owner;
 
-    // watchOS floor: single-target WKApplication apps, WidgetKit complications,
-    // and the SwiftUI onChange(of:) two-parameter API the generated
-    // CN1WatchRootView uses.
-    private static final String MIN_DEPLOYMENT_TARGET = "10.0";
+    /**
+     * watchOS floor for the watch APP: single-target WKApplication apps and the SwiftUI
+     * onChange(of:) two-parameter API the generated CN1WatchRootView uses.
+     *
+     * <p>Package-visible because the complication extension has to agree with it. WidgetKit
+     * itself goes back to watchOS 9 and the extension can build there, but it is embedded in
+     * this app -- so a watch that cannot install the app cannot show its complication either,
+     * and an extension advertising 9 while the host requires 10 is advertising nothing.</p>
+     */
+    static final String MIN_DEPLOYMENT_TARGET = "10.0";
 
     // Derived build state.
     private boolean enabled;
