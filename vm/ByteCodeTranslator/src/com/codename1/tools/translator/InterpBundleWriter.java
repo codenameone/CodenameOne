@@ -463,6 +463,14 @@ public class InterpBundleWriter {
             } else if (c == '/' && i + 1 < text.length() && text.charAt(i + 1) == '*') {
                 i += 2;
                 int depth = 1;
+                // Newlines inside a block comment stay in the output. A
+                // Kotlin package header ends at the first line break, and a
+                // `package foo /* ... newline ... */ class Test` would
+                // otherwise collapse to one line and the scanner would eat
+                // `class Test` as continuation of the package name. Same
+                // reason a `// line` comment above keeps its trailing
+                // newline: the terminator is significant to the caller even
+                // when the payload is not.
                 while (depth > 0 && i + 1 < text.length()) {
                     if (kotlinNested && text.charAt(i) == '/' && text.charAt(i + 1) == '*') {
                         depth++;
@@ -471,13 +479,22 @@ public class InterpBundleWriter {
                         depth--;
                         i += 2;
                     } else {
+                        if (text.charAt(i) == '\n' || text.charAt(i) == '\r') {
+                            out.append(text.charAt(i));
+                        }
                         i++;
                     }
                 }
                 if (depth > 0) {
                     // Unterminated -- treat the rest of the file as comment
-                    // rather than fall through and mis-tokenise it.
-                    i = text.length();
+                    // rather than fall through and mis-tokenise it, but keep
+                    // any newlines the terminator scan may need.
+                    while (i < text.length()) {
+                        if (text.charAt(i) == '\n' || text.charAt(i) == '\r') {
+                            out.append(text.charAt(i));
+                        }
+                        i++;
+                    }
                 }
                 out.append(' ');
             } else if (c == '"' && i + 2 < text.length()
@@ -487,12 +504,16 @@ public class InterpBundleWriter {
                 // delimiter would expose a fake `package` inside a raw
                 // string, or consume the real one that follows. The literal
                 // ends at the next `"""`; nothing inside it has meaning to
-                // the package scanner.
+                // the package scanner, but newlines still terminate a Kotlin
+                // package header so they stay in the output.
                 i += 3;
                 while (i + 2 < text.length()
                         && !(text.charAt(i) == '"'
                                 && text.charAt(i + 1) == '"'
                                 && text.charAt(i + 2) == '"')) {
+                    if (text.charAt(i) == '\n' || text.charAt(i) == '\r') {
+                        out.append(text.charAt(i));
+                    }
                     i++;
                 }
                 i = Math.min(i + 3, text.length());

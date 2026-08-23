@@ -164,6 +164,13 @@ class InterpRuntimeContractTest {
         // the inner `*/` and read `package fake;` as the declaration.
         assertEquals("real.pkg", packageOfKotlin(
                 "/* outer /* inner */ package fake; */ package real.pkg\n\nfun main() {}\n"));
+        // A Kotlin package header ends at the first line break, and the
+        // line break can live inside a block comment. Blanking the whole
+        // comment with a single space would drop the newline and the
+        // scanner would keep eating `class Test` as part of the package
+        // name (`fooclassTest`).
+        assertEquals("foo", packageOfKotlin(
+                "package foo /*\n comment */ class Test\n"));
     }
 
     private static String packageOf(String source) throws Exception {
