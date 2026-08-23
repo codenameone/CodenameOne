@@ -325,6 +325,8 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
 @property (nonatomic, retain) NSMutableDictionary *invitations;
 @property (nonatomic, retain) NSMutableDictionary *progressByPayload;
 @property (nonatomic, retain) NSMutableSet *everConnected;
+@property (nonatomic, assign) int pendingAdvertiseRequest;
+@property (nonatomic, assign) int pendingDiscoverRequest;
 @property (nonatomic, retain) NSString *serviceType;
 @end
 
@@ -567,8 +569,20 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 - (void)advertiser:(MCNearbyServiceAdvertiser *)advertiser
         didNotStartAdvertisingPeer:(NSError *)error {
-    // Reported through the request that asked, which has already been
-    // answered by the time this can fire; nothing useful is left to tell.
+    @autoreleasepool {
+        // MultipeerConnectivity rejects advertising asynchronously -- an
+        // unavailable radio, a service type it will not take -- and
+        // startAdvertising has already resolved true by the time this fires.
+        // Dropping the error left the caller believing it was advertising
+        // when it was not, with no second signal ever coming. The request id
+        // is kept precisely so this can fail it late.
+        int requestId = self.pendingAdvertiseRequest;
+        self.pendingAdvertiseRequest = 0;
+        if (requestId != 0) {
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_SESSION_FAILED,
+                    [error localizedDescription]);
+        }
+    }
 }
 
 // ---- MCNearbyServiceBrowserDelegate ----------------------------------
@@ -594,6 +608,16 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 - (void)browser:(MCNearbyServiceBrowser *)browser
         didNotStartBrowsingForPeers:(NSError *)error {
+    @autoreleasepool {
+        // Same as advertising: the answer is already out, so the request id is
+        // held to fail it when the framework changes its mind.
+        int requestId = self.pendingDiscoverRequest;
+        self.pendingDiscoverRequest = 0;
+        if (requestId != 0) {
+            cn1nbFailTransport(requestId, CN1_NEARBY_ERR_SESSION_FAILED,
+                    [error localizedDescription]);
+        }
+    }
 }
 
 @end
@@ -1243,6 +1267,9 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
                 discoveryInfo:nil
                 serviceType:t.serviceType] autorelease];
         t.advertiser.delegate = t;
+        // Recorded BEFORE the answer: didNotStartAdvertisingPeer can fire
+        // after this returns, and it needs the id to fail.
+        t.pendingAdvertiseRequest = requestId;
         [t.advertiser startAdvertisingPeer];
         cn1nbTransportOk(requestId);
         return;
@@ -1260,6 +1287,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStopAdvertising__(
             [cn1nbTransport.advertiser stopAdvertisingPeer];
             cn1nbTransport.advertiser.delegate = nil;
             cn1nbTransport.advertiser = nil;
+            cn1nbTransport.pendingAdvertiseRequest = 0;
         }
     }
 #endif
@@ -1285,6 +1313,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
                 initWithPeer:t.localPeer
                 serviceType:t.serviceType] autorelease];
         t.browser.delegate = t;
+        t.pendingDiscoverRequest = requestId;
         [t.browser startBrowsingForPeers];
         cn1nbTransportOk(requestId);
         return;
@@ -1302,6 +1331,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStopDiscovery__(
             [cn1nbTransport.browser stopBrowsingForPeers];
             cn1nbTransport.browser.delegate = nil;
             cn1nbTransport.browser = nil;
+            cn1nbTransport.pendingDiscoverRequest = 0;
         }
     }
 #endif

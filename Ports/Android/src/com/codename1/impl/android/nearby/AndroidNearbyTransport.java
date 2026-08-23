@@ -73,6 +73,10 @@ public class AndroidNearbyTransport implements NearbyBridge {
             Collections.synchronizedMap(new HashMap<String, String>());
     private final Map<Long, Integer> payloadIds =
             Collections.synchronizedMap(new HashMap<Long, Integer>());
+    /// Incoming FILE payloads between their announcement and the terminal
+    /// update that says the bytes actually arrived.
+    private final Map<Long, Payload> incomingFiles =
+            Collections.synchronizedMap(new HashMap<Long, Payload>());
 
     private String serviceId = "";
     private String localName = "";
@@ -320,6 +324,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
         client().stopAllEndpoints();
         endpointNames.clear();
         payloadIds.clear();
+        incomingFiles.clear();
     }
 
     // ------------------------------------------------------------------
@@ -381,34 +386,31 @@ public class AndroidNearbyTransport implements NearbyBridge {
             @Override
             public void onPayloadReceived(String endpointId, Payload payload) {
                 if (payload.getType() == Payload.Type.BYTES) {
+                    // A BYTES payload arrives complete -- Nearby delivers the
+                    // whole array in this callback.
                     NearbyTransport.deliverPayloadReceived(
                             encode(endpointId, nameOf(endpointId)),
                             (int) payload.getId(), NearbyBridge.PAYLOAD_BYTES,
                             payload.asBytes(), null);
                     return;
                 }
-                if (payload.getType() == Payload.Type.FILE
-                        && payload.asFile() != null) {
-                    java.io.File f = null;
-                    try {
-                        f = payload.asFile().asJavaFile();
-                    } catch (Throwable t) {
-                        // Older Play services return the file only through a
-                        // ParcelFileDescriptor; nothing to hand the app then.
-                    }
-                    NearbyTransport.deliverPayloadReceived(
-                            encode(endpointId, nameOf(endpointId)),
-                            (int) payload.getId(), NearbyBridge.PAYLOAD_FILE,
-                            null, f == null ? null
-                                    : "file://" + f.getAbsolutePath());
+                if (payload.getType() == Payload.Type.FILE) {
+                    // A FILE payload is ANNOUNCED here, not delivered: the
+                    // transfer has only started and the file on disk is
+                    // partial. Handing it to the app now breaks the
+                    // complete-payload contract of payloadReceived -- a
+                    // listener would read a half-written file, and would be
+                    // told about one that later failed or was cancelled.
+                    // Held until the terminal SUCCESS update names this id.
+                    incomingFiles.put(Long.valueOf(payload.getId()), payload);
                 }
             }
 
             @Override
             public void onPayloadTransferUpdate(String endpointId,
                     PayloadTransferUpdate update) {
-                Integer mapped = payloadIds.get(
-                        Long.valueOf(update.getPayloadId()));
+                Long key = Long.valueOf(update.getPayloadId());
+                Integer mapped = payloadIds.get(key);
                 int id = mapped == null ? (int) update.getPayloadId()
                         : mapped.intValue();
                 NearbyTransport.deliverPayloadProgress(
@@ -416,9 +418,33 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         update.getBytesTransferred(), update.getTotalBytes(),
                         statusFor(update.getStatus()).ordinal());
                 if (update.getStatus()
-                        != PayloadTransferUpdate.Status.IN_PROGRESS) {
-                    payloadIds.remove(Long.valueOf(update.getPayloadId()));
+                        == PayloadTransferUpdate.Status.IN_PROGRESS) {
+                    return;
                 }
+                payloadIds.remove(key);
+                // The terminal update is where an incoming file becomes real.
+                // Anything other than SUCCESS means the app never hears about
+                // it, which is the point: a failed or cancelled transfer is
+                // not a payload.
+                Payload file = incomingFiles.remove(key);
+                if (file == null
+                        || update.getStatus()
+                                != PayloadTransferUpdate.Status.SUCCESS) {
+                    return;
+                }
+                java.io.File f = null;
+                try {
+                    if (file.asFile() != null) {
+                        f = file.asFile().asJavaFile();
+                    }
+                } catch (Throwable t) {
+                    // Older Play services expose the file only through a
+                    // ParcelFileDescriptor; nothing to hand the app then.
+                }
+                NearbyTransport.deliverPayloadReceived(
+                        encode(endpointId, nameOf(endpointId)),
+                        (int) file.getId(), NearbyBridge.PAYLOAD_FILE, null,
+                        f == null ? null : "file://" + f.getAbsolutePath());
             }
         };
     }

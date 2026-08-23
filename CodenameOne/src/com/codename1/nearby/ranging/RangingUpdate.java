@@ -111,16 +111,22 @@ public final class RangingUpdate {
         return hasDirection;
     }
 
-    /// The horizontal angle to the peer in degrees, in the range -180 to
-    /// 180. Zero is straight ahead -- out of the top of a phone held
-    /// upright -- and positive is to the right.
+    /// The horizontal angle to the peer in degrees. Zero is straight ahead --
+    /// out of the top of a phone held upright -- and positive is to the
+    /// right.
     ///
     /// Undefined when [#hasDirection()] is `false`.
     ///
-    /// Android reports this angle directly. On iOS the platform reports a
-    /// unit direction vector instead and the port converts it with
-    /// `atan2(x, -z)`, which is the same convention; [#getDirectionVector()]
-    /// still hands back the untouched vector for code that wants it.
+    /// **The range is platform-dependent, and the difference is meaningful.**
+    /// Apple reports a unit direction vector, which the port folds with
+    /// `atan2(x, -z)` into -180 to 180 -- so it distinguishes a peer in front
+    /// from one directly behind. Jetpack UWB reports the angle itself, in
+    /// degrees, but only over -90 to 90, which does not. Code that needs to
+    /// know which side of the device a peer is on cannot get that from
+    /// azimuth alone on Android.
+    ///
+    /// [#getDirectionVector()] still hands back Apple's untouched vector for
+    /// code that wants it.
     public double getAzimuth() {
         return azimuth;
     }

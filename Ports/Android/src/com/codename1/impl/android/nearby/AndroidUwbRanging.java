@@ -295,6 +295,21 @@ public class AndroidUwbRanging implements NearbyBridge {
         }
         RangingPosition position =
                 ((RangingResult.RangingResultPosition) result).getPosition();
+        // Degrees already -- NOT radians, and NOT converted here.
+        //
+        // It was suggested these arrive in radians and need Math.toDegrees.
+        // androidx.core.uwb's own KDoc on RangingPosition says otherwise:
+        // "The azimuth angle in degrees of the ranging device", and the same
+        // for elevation. The library does no unit conversion of its own
+        // either -- disassembling UwbClientSessionScopeAospImpl shows the
+        // backend's float copied straight into androidx RangingMeasurement --
+        // so whatever it is called, it is what the library documents.
+        // Converting would turn a 90-degree bearing into 1.57.
+        //
+        // The RANGES do differ from iOS and the portable documentation says
+        // so: Android reports azimuth in [-90, 90], which cannot tell a peer
+        // in front from one behind, while Apple's direction vector yields
+        // [-180, 180].
         RangingMeasurement distance = position.getDistance();
         RangingMeasurement azimuth = position.getAzimuth();
         RangingMeasurement elevation = position.getElevation();
