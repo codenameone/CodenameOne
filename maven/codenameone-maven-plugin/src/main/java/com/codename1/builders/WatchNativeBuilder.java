@@ -1473,16 +1473,30 @@ class WatchNativeBuilder {
             plistString(sb, IOSWidgetExtensionBuilder.APP_GROUP_PLIST_KEY, surfacesAppGroup);
             plistString(sb, "CN1SurfacesMinOS", surfacesMinOS == null
                     ? IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET : surfacesMinOS);
-            // The complication tap's own scheme. A widget supplies a cn1surface:// widgetURL and
+            // The complication tap's own scheme. A widget supplies a <scheme>:// widgetURL and
             // the generated CN1WatchApp scene waits for it in onOpenURL -- but the watch is a
             // separate bundle and inherits none of the phone's URL types, so without this
             // declaration watchOS has nothing to route the URL to and the tap dispatches nothing.
+            //
+            // The scheme is this app's own, cn1surface.<bundle id>, and the bare cn1surface is
+            // deliberately NOT registered here. A URL scheme is a global claim, and the watch is
+            // where that mattered most: a complication tap is routed by the scheme and nothing
+            // else, so two Codename One apps on one watch both claiming the bare name meant a tap
+            // could open the other app. This registration is new, so nothing holds a watch link
+            // built with the old name and there is nothing to keep compatible.
+            // From the WATCH bundle id, which is what the watch extension was built with
+            // (setHostBundleId passes <package>.watchkitapp) and therefore what its widgetURL
+            // carries. Composing this from the phone's package instead would register a scheme
+            // nothing generates -- the plist would look right, the tap would route nowhere, and
+            // the only symptom would be a complication that does nothing when touched.
+            String scheme = IOSWidgetExtensionBuilder.surfaceScheme(bundleId);
             sb.append("    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n")
               .append("            <key>CFBundleURLName</key>\n")
               .append("            <string>").append(escapeXml(request.getPackageName()))
               .append(".cn1surface</string>\n")
               .append("            <key>CFBundleURLSchemes</key>\n")
-              .append("            <array>\n                <string>cn1surface</string>\n")
+              .append("            <array>\n                <string>")
+              .append(escapeXml(scheme)).append("</string>\n")
               .append("            </array>\n        </dict>\n    </array>\n");
         }
         if (isStandalone()) {

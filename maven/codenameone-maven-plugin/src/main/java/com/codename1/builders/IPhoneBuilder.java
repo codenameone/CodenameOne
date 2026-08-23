@@ -7417,14 +7417,31 @@ public class IPhoneBuilder extends Executor {
                     inject += "\n<key>NSSupportsLiveActivitiesFrequentUpdates</key><true/>";
                 }
             }
-            // Widget taps deep link back through cn1surface:// (handled by the app delegate and
+            // Widget taps deep link back through <scheme>:// (handled by the app delegate and
             // never stored in AppArg). Register the scheme by appending to ios.urlSchemes so it
             // rides the existing CFBundleURLTypes injection below, whichever branch runs.
-            if (!inject.contains("cn1surface")) {
-                String urlSchemes = request.getArg("ios.urlSchemes", request.getArg("ios.urlScheme", ""));
-                if (!urlSchemes.contains("cn1surface")) {
-                    request.putArgument("ios.urlSchemes", urlSchemes + "<string>cn1surface</string>");
-                }
+            //
+            // BOTH the app's own cn1surface.<bundle id> -- which is what the widget generates
+            // now, and the only one the watch registers -- and the bare cn1surface, which this
+            // app has always registered and which something may still hold a link built with.
+            // Keeping the bare one on the phone costs nothing; dropping it could break a link
+            // that works today.
+            String ownScheme = IOSWidgetExtensionBuilder.surfaceScheme(request.getPackageName());
+            String urlSchemes = request.getArg("ios.urlSchemes",
+                    request.getArg("ios.urlScheme", ""));
+            String added = "";
+            if (!inject.contains(ownScheme) && !urlSchemes.contains(ownScheme)) {
+                added += "<string>" + ownScheme + "</string>";
+            }
+            // Matched as a whole element, because the qualified scheme CONTAINS the bare one as
+            // a prefix -- a substring test would read the qualified registration as the bare one
+            // already being present.
+            if (!inject.contains("<string>cn1surface</string>")
+                    && !urlSchemes.contains("<string>cn1surface</string>")) {
+                added += "<string>cn1surface</string>";
+            }
+            if (added.length() > 0) {
+                request.putArgument("ios.urlSchemes", urlSchemes + added);
             }
         }
 

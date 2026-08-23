@@ -514,7 +514,52 @@ public class IOSWidgetExtensionBuilder {
         sb.append("import Foundation\n");
         sb.append("\n");
         sb.append("let cn1SurfacesAppGroup = \"").append(escapeSwift(appGroupId)).append("\"\n");
+        sb.append("let cn1SurfaceScheme = \"").append(escapeSwift(surfaceScheme())).append("\"\n");
         return sb.toString();
+    }
+
+    /**
+     * The app's own deep-link scheme for surface taps.
+     *
+     * <p>A URL scheme is a GLOBAL registration. Every Codename One app used to claim the bare
+     * {@code cn1surface}, so two of them installed together were two claims on one name -- and on
+     * the watch, where the complication's widgetURL is routed by nothing else, the tap could open
+     * whichever bundle the system decided owned it. Any other app can also claim a known scheme
+     * and hand us whatever src and id it likes.</p>
+     *
+     * <p>Qualifying it with the host bundle id makes the claim as unique as the bundle id itself,
+     * which is the strongest uniqueness Apple offers. Dots are legal in a scheme (RFC 3986 allows
+     * ALPHA, DIGIT, "+", "-" and "."), and reverse-DNS schemes are ordinary on Apple platforms.
+     * This does not make the payload trusted -- a scheme never can -- but it stops a tap landing
+     * in the wrong app, which is the part that broke without anyone being hostile.</p>
+     *
+     * @return the scheme this build registers and generates
+     */
+    public String surfaceScheme() {
+        return surfaceScheme(hostBundleId);
+    }
+
+    /**
+     * The scheme for a host bundle id, so the builders can register what this generates.
+     *
+     * @param hostBundleId the bundle id the surfaces belong to
+     * @return the scheme
+     */
+    public static String surfaceScheme(String hostBundleId) {
+        if (hostBundleId == null || hostBundleId.length() == 0) {
+            return "cn1surface";
+        }
+        StringBuilder out = new StringBuilder("cn1surface.");
+        for (int i = 0; i < hostBundleId.length(); i++) {
+            char c = hostBundleId.charAt(i);
+            // The scheme grammar, applied rather than assumed: a bundle id is normally already
+            // within it, and anything outside becomes '-' so the result stays a legal scheme
+            // instead of a plist Xcode rejects.
+            boolean legal = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
+            out.append(legal ? c : '-');
+        }
+        return out.toString();
     }
 
     private String buildBundleSwift() {

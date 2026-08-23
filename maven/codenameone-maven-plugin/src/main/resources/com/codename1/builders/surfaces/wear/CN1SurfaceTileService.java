@@ -42,6 +42,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -281,8 +282,41 @@ public abstract class CN1SurfaceTileService extends TileService {
     }
 
     private static String resourcesVersion(CN1WatchSurface.Reading reading) {
-        return String.valueOf((imageNames(reading.getLayout()).toString()
-                + "|" + String.valueOf(reading.getState())).hashCode());
+        return digest(imageNames(reading.getLayout()).toString()
+                + "|" + String.valueOf(reading.getState()));
+    }
+
+    /**
+     * A version string that differs whenever the material does.
+     *
+     * <p>String.hashCode is 32 bits and trivially collidable -- "Aa" and "BB" hash equally, and
+     * the material here is user-controlled text -- so two different snapshots could advertise one
+     * version. Wear would then treat changed artwork as unchanged and never request the new map,
+     * and {@link #rebuild} would match the wrong entry and rasterize against the wrong state.
+     * Neither corrects itself, because both read the collision as "nothing happened".</p>
+     *
+     * <p>SHA-256 truncated to 128 bits: far past any accident, and short enough to stay a
+     * comfortable resource-version string. If the digest is somehow unavailable the material
+     * itself is the version -- longer, but injective, which is the property that matters.</p>
+     *
+     * @param material the content the version stands for
+     * @return the version
+     */
+    private static String digest(String material) {
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = sha.digest(material.getBytes("UTF-8"));
+            StringBuilder out = new StringBuilder(32);
+            for (int i = 0; i < 16; i++) {
+                out.append(Character.forDigit((bytes[i] >> 4) & 0xf, 16));
+                out.append(Character.forDigit(bytes[i] & 0xf, 16));
+            }
+            return out.toString();
+        } catch (Exception noDigest) {
+            Log.w(TAG, "Could not digest the tile resource version; using the material itself",
+                    noDigest);
+            return material;
+        }
     }
 
     /**

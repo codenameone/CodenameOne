@@ -272,14 +272,19 @@ func cn1Alignment(_ value: Any?) -> Alignment? {
 
 // MARK: - Actions
 
-/// Builds the canonical surfaces deep link cn1surface://a?src=..&id=..&p=<url-encoded JSON>
+/// Builds the canonical surfaces deep link <scheme>://a?src=..&id=..&p=<url-encoded JSON>
 /// handled by the Codename One app delegate.
+///
+/// The scheme is this app's own (cn1surface.<bundle id>) rather than the bare cn1surface every
+/// Codename One app used to claim: a URL scheme is a global registration, and on the watch --
+/// where a complication tap is routed by nothing else -- two installed apps claiming one name
+/// meant the tap could open the wrong bundle.
 func cn1ActionURL(source: String, action: [String: Any]) -> URL? {
     guard let actionId = action["id"] as? String else {
         return nil
     }
     var components = URLComponents()
-    components.scheme = "cn1surface"
+    components.scheme = cn1SurfaceScheme
     components.host = "a"
     var items = [URLQueryItem(name: "src", value: source), URLQueryItem(name: "id", value: actionId)]
     if let params = action["p"], JSONSerialization.isValidJSONObject(params),

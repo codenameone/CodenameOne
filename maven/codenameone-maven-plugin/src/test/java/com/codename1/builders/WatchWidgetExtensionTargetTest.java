@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -269,9 +270,15 @@ class WatchWidgetExtensionTargetTest {
         assertFalse(bridging.contains("cn1_watch_surface_url"), bridging);
     }
 
-    /// A complication supplies a cn1surface:// widgetURL, and the watch is a separate bundle
-    /// that inherits none of the phone's URL types -- so without this declaration watchOS has
-    /// nothing to route the tap to and onOpenURL never fires, however well the rest is wired.
+    /// A complication supplies a <scheme>:// widgetURL, and the watch is a separate bundle that
+    /// inherits none of the phone's URL types -- so without this declaration watchOS has nothing
+    /// to route the tap to and onOpenURL never fires, however well the rest is wired.
+    ///
+    /// The scheme has to be the app's OWN. A URL scheme is a global claim and a complication tap
+    /// is routed by nothing else, so two Codename One apps on one watch both claiming the bare
+    /// cn1surface meant a tap could open the other one. Asserting the bare name is ABSENT is the
+    /// half that would rot silently: re-adding it costs nothing at build time and gives the
+    /// collision back.
     @Test
     void theWatchBundleDeclaresTheSurfaceUrlScheme(@TempDir Path tmp) throws Exception {
         BuildRequest req = request();
@@ -286,7 +293,29 @@ class WatchWidgetExtensionTargetTest {
                 new File(srcDir, "MyApp-Watch-Info.plist").toPath()), StandardCharsets.UTF_8);
 
         assertTrue(plist.contains("<key>CFBundleURLTypes</key>"), plist);
-        assertTrue(plist.contains("<string>cn1surface</string>"), plist);
+        // The WATCH bundle id, not the phone's. The extension is built with
+        // setHostBundleId(<package>.watchkitapp), so that is what its widgetURL carries -- and a
+        // plist registering the phone's scheme would look correct while routing nothing.
+        assertTrue(plist.contains(
+                "<string>cn1surface." + req.getPackageName() + ".watchkitapp</string>"), plist);
+        assertFalse(plist.contains("<string>cn1surface</string>"), plist);
+        assertFalse(plist.contains("<string>cn1surface." + req.getPackageName() + "</string>"),
+                plist);
+    }
+
+    /// The scheme the watch registers and the scheme the widget generates are computed by one
+    /// method, so they cannot drift -- and it has to stay a LEGAL scheme, which is a narrower
+    /// grammar than a bundle id: letters, digits, '+', '-' and '.' only.
+    @Test
+    void theSurfaceSchemeIsQualifiedAndLegal() {
+        assertEquals("cn1surface.com.mycompany.myapp",
+                IOSWidgetExtensionBuilder.surfaceScheme("com.mycompany.myapp"));
+        assertEquals("cn1surface.com.my-app.x9",
+                IOSWidgetExtensionBuilder.surfaceScheme("com.my-app.x9"));
+        assertEquals("cn1surface.com.my-app",
+                IOSWidgetExtensionBuilder.surfaceScheme("com.my_app"),
+                "an underscore is legal in a bundle id and not in a scheme");
+        assertEquals("cn1surface", IOSWidgetExtensionBuilder.surfaceScheme(null));
     }
 
     /// A watch app that publishes nothing must not carry either key.

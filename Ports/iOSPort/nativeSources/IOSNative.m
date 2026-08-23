@@ -15358,10 +15358,27 @@ static BOOL cn1SurfacesMinOSSupported() {
 // Surfaces.dispatchAction queues internally until the app registers its handler, so a cold-start
 // tap -- which is the usual case for a complication -- is safe.
 BOOL cn1HandleSurfaceURL(NSURL *url) {
-    if (url == nil || url.scheme == nil
-            || [@"cn1surface" caseInsensitiveCompare:url.scheme] != NSOrderedSame) {
+    if (url == nil || url.scheme == nil) {
         return NO;
     }
+    // This app's own scheme, cn1surface.<bundle id>, is what the widget and complication now
+    // generate: the bare cn1surface was claimed globally by every Codename One app, so two of
+    // them installed together were two claims on one name and the watch could route a tap to
+    // the wrong bundle. The bare name is still accepted on the phone because the app has always
+    // registered it and something may still hold a link built with it; the WATCH registers only
+    // the qualified one, which is where the collision actually bit.
+    NSString *ownScheme = [@"cn1surface." stringByAppendingString:
+            [[NSBundle mainBundle] bundleIdentifier] ?: @""];
+    BOOL mine = [ownScheme caseInsensitiveCompare:url.scheme] == NSOrderedSame;
+#if TARGET_OS_WATCH
+    if (!mine) {
+        return NO;
+    }
+#else
+    if (!mine && [@"cn1surface" caseInsensitiveCompare:url.scheme] != NSOrderedSame) {
+        return NO;
+    }
+#endif
     NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
     NSString *src = nil;
     NSString *actionId = nil;
