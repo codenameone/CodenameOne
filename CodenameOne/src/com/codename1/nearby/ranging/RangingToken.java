@@ -140,7 +140,14 @@ public final class RangingToken {
         }
         int plat = data[5] & 0xff;
         int len = readInt(data, 6);
-        if (len < 0 || 10 + len > data.length) {
+        // Subtract rather than add: a hostile or corrupt peer can declare a
+        // length near Integer.MAX_VALUE, and "10 + len > data.length" would
+        // overflow to a negative number and wave it through, leaving the
+        // allocation below to ask for gigabytes. data.length is already known
+        // to be at least 10, so the subtraction cannot underflow. The length
+        // must match exactly -- toByteArray always emits 10 + len bytes, so
+        // trailing bytes mean this is not our encoding.
+        if (len < 0 || len != data.length - 10) {
             throw new IllegalArgumentException("truncated ranging token");
         }
         byte[] payload = new byte[len];

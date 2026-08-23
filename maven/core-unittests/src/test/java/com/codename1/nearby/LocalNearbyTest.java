@@ -471,6 +471,51 @@ class LocalNearbyTest {
     }
 
     @Test
+    void aPresenceEventThatBeatsTheListenerIsReplayedRatherThanLost() {
+        // The whole point of companion association is that the platform can
+        // start the process purely to deliver this, which on Android happens
+        // in a process where the app's init() has not run and no listener
+        // exists yet. Dispatched straight through, the wake-up would be lost.
+        CompanionDevices.deliverPresenceChanged(
+                "cold\tCold Watch\t\t0\t1", true);
+        CompanionDevices.deliverPresenceChanged(
+                "cold\tCold Watch\t\t0\t0", false);
+
+        final List<String> events = new ArrayList<String>();
+        CompanionDevices.addPresenceListener(new PresenceListener() {
+            @Override
+            public void deviceAppeared(CompanionDevice device) {
+                events.add("appeared:" + device.getId());
+            }
+
+            @Override
+            public void deviceDisappeared(CompanionDevice device) {
+                events.add("disappeared:" + device.getId());
+            }
+        });
+
+        assertEquals(2, events.size());
+        assertEquals("appeared:cold", events.get(0));
+        assertEquals("disappeared:cold", events.get(1));
+
+        // Drained, not merely copied -- a second listener does not see the
+        // backlog a third time.
+        final List<String> later = new ArrayList<String>();
+        CompanionDevices.addPresenceListener(new PresenceListener() {
+            @Override
+            public void deviceAppeared(CompanionDevice device) {
+                later.add("appeared:" + device.getId());
+            }
+
+            @Override
+            public void deviceDisappeared(CompanionDevice device) {
+                later.add("disappeared:" + device.getId());
+            }
+        });
+        assertTrue(later.isEmpty());
+    }
+
+    @Test
     void observingSomethingThatIsNotAssociatedIsRefused() {
         assertFalse(CompanionDevices.startObservingPresence("nope"));
     }

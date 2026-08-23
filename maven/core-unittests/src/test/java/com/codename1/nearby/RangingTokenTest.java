@@ -111,6 +111,30 @@ class RangingTokenTest {
     }
 
     @Test
+    void aHugeDeclaredLengthIsRejectedRatherThanOverflowingIntoAnAllocation() {
+        // 10 + Integer.MAX_VALUE wraps negative, so an additive bounds check
+        // would accept this ten-byte input and then try to allocate 2GB.
+        byte[] t = RangingToken.forPayload(RangingToken.PLATFORM_APPLE_NI,
+                new byte[0]).toByteArray();
+        t[6] = (byte) 0x7f;
+        t[7] = (byte) 0xff;
+        t[8] = (byte) 0xff;
+        t[9] = (byte) 0xff;
+        assertThrows(IllegalArgumentException.class,
+                () -> RangingToken.fromByteArray(t));
+    }
+
+    @Test
+    void trailingBytesAreRejectedBecauseTheEncodingHasNoRoomForThem() {
+        byte[] full = RangingToken.forPayload(RangingToken.PLATFORM_APPLE_NI,
+                new byte[] {1, 2, 3}).toByteArray();
+        byte[] padded = new byte[full.length + 4];
+        System.arraycopy(full, 0, padded, 0, full.length);
+        assertThrows(IllegalArgumentException.class,
+                () -> RangingToken.fromByteArray(padded));
+    }
+
+    @Test
     void anUnknownVersionIsRejectedRatherThanGuessedAt() {
         byte[] t = RangingToken.forPayload(RangingToken.PLATFORM_APPLE_NI,
                 new byte[] {1}).toByteArray();

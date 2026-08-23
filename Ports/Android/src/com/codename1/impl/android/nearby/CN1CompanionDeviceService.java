@@ -41,6 +41,12 @@ import java.util.Set;
 /// that registered a `PresenceListener` in `init()` hears about a device that
 /// appeared while the app was not running.
 ///
+/// The platform may start the process for THIS service alone, with no activity
+/// and therefore no initialized Codename One and no registered listener yet.
+/// The event is not dispatched and dropped in that case: `CompanionDevices`
+/// parks it and replays it to the first listener that registers, which in a
+/// cold start is the one the app adds from `init()`.
+///
 /// The builder writes the `<service>` element that binds this, guarded by
 /// `android.permission.BIND_COMPANION_DEVICE_SERVICE` and the
 /// `CompanionDeviceService` intent filter, only for an app that observes

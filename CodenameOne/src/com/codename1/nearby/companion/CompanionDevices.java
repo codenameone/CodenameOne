@@ -85,6 +85,30 @@ public final class CompanionDevices {
             new PendingMap<Boolean>();
     private static final List<PresenceListener> LISTENERS =
             new ArrayList<PresenceListener>();
+    /// Presence events that arrived before any listener existed. The platform
+    /// may start the process purely to deliver one -- that is the whole point
+    /// of companion association -- and in that process the app's `init()` has
+    /// not run yet, so a straight dispatch reaches an empty listener list and
+    /// the wake-up is lost for good. Parked here instead, and replayed by
+    /// [#addPresenceListener].
+    private static final List<PendingPresence> PENDING_PRESENCE =
+            new ArrayList<PendingPresence>();
+    /// Bounds the parked backlog. An app that never registers a listener must
+    /// not accumulate events forever; the oldest is dropped first, because the
+    /// most recent sighting is the one worth reporting.
+    private static final int MAX_PENDING_PRESENCE = 64;
+
+    /// One parked presence event. Static so it holds no implicit reference to
+    /// anything but the device it carries.
+    private static final class PendingPresence {
+        final CompanionDevice device;
+        final boolean present;
+
+        PendingPresence(CompanionDevice device, boolean present) {
+            this.device = device;
+            this.present = present;
+        }
+    }
 
     private CompanionDevices() {
     }
@@ -237,7 +261,10 @@ public final class CompanionDevices {
     ///
     /// Register from the app's `init()`: presence is exactly the event that
     /// can arrive during a cold start, because the platform launched the app
-    /// to deliver it.
+    /// to deliver it. An event that arrived before any listener existed is
+    /// replayed to the listeners as soon as the first one registers, so a
+    /// wake-up delivered into a process whose `init()` had not run yet is not
+    /// lost. At most the 64 most recent are kept.
     ///
     /// #### Parameters
     ///
@@ -246,8 +273,23 @@ public final class CompanionDevices {
         if (l == null) {
             return;
         }
+        List<PendingPresence> replay = null;
         synchronized (LISTENERS) {
             LISTENERS.add(l);
+            if (!PENDING_PRESENCE.isEmpty()) {
+                // Taking the backlog under the same monitor that
+                // deliverPresenceChanged parks into is what keeps the order
+                // right: an event arriving between the registration and the
+                // replay finds the queue still non-empty and parks behind the
+                // backlog rather than overtaking it on the EDT.
+                replay = new ArrayList<PendingPresence>(PENDING_PRESENCE);
+                PENDING_PRESENCE.clear();
+            }
+        }
+        if (replay != null) {
+            for (PendingPresence parked : replay) {
+                dispatchPresence(parked.device, parked.present);
+            }
         }
     }
 
@@ -279,6 +321,7 @@ public final class CompanionDevices {
         PENDING_DISASSOCIATE.failAll(reset);
         synchronized (LISTENERS) {
             LISTENERS.clear();
+            PENDING_PRESENCE.clear();
         }
     }
 
@@ -363,6 +406,21 @@ public final class CompanionDevices {
         if (d == null) {
             return;
         }
+        synchronized (LISTENERS) {
+            if (LISTENERS.isEmpty() || !PENDING_PRESENCE.isEmpty()) {
+                while (PENDING_PRESENCE.size() >= MAX_PENDING_PRESENCE) {
+                    PENDING_PRESENCE.remove(0);
+                }
+                PENDING_PRESENCE.add(new PendingPresence(d, present));
+                return;
+            }
+        }
+        dispatchPresence(d, present);
+    }
+
+    /// Hands one presence event to the listeners on the EDT.
+    private static void dispatchPresence(final CompanionDevice d,
+            final boolean present) {
         NearbyRequests.onEdt(new Runnable() {
     @Override
             public void run() {

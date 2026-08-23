@@ -335,14 +335,25 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
 @property (nonatomic, retain) NSMutableSet *everConnected;
 @property (nonatomic, assign) int pendingAdvertiseRequest;
 @property (nonatomic, assign) int pendingDiscoverRequest;
-@property (nonatomic, retain) NSString *serviceType;
-/// The service id the CALLER passed, unfolded.
+/// The advertising and discovery services are tracked SEPARATELY.
 ///
-/// Endpoint.getServiceId() documents the id the app used, and reporting the
-/// folded Bonjour type instead ("com-example-cha" for "com.example.chat")
-/// made a comparison against the argument to startDiscovery fail on iOS
-/// alone.
-@property (nonatomic, retain) NSString *serviceId;
+/// One shared pair of fields cannot describe this object honestly: an app may
+/// advertise "files" while browsing "chat", and whichever call ran last then
+/// decided what both of them reported. Peers found by the browser belong to
+/// the discovery service and peers that invite us belong to the advertising
+/// one, so each is recorded against the peer that produced it (see
+/// serviceIdByPeer) rather than read back out of a single mutable field.
+///
+/// The unfolded id is what the CALLER passed. Endpoint.getServiceId()
+/// documents the id the app used, and reporting the folded Bonjour type
+/// instead ("com-example-cha" for "com.example.chat") made a comparison
+/// against the argument to startDiscovery fail on iOS alone.
+@property (nonatomic, retain) NSString *advertiseServiceType;
+@property (nonatomic, retain) NSString *advertiseServiceId;
+@property (nonatomic, retain) NSString *discoverServiceType;
+@property (nonatomic, retain) NSString *discoverServiceId;
+/// Peer id to the unfolded service id the peer was seen on.
+@property (nonatomic, retain) NSMutableDictionary *serviceIdByPeer;
 @end
 
 static CN1NearbyTransport *cn1nbTransport = nil;
@@ -430,8 +441,11 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_invitations release];
     [_progressByPayload release];
     [_everConnected release];
-    [_serviceType release];
-    [_serviceId release];
+    [_advertiseServiceType release];
+    [_advertiseServiceId release];
+    [_discoverServiceType release];
+    [_discoverServiceId release];
+    [_serviceIdByPeer release];
     [super dealloc];
 }
 
@@ -484,12 +498,31 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     }
 }
 
+/// Encodes a peer first seen on a known service, remembering which one.
+- (NSString *)encodePeer:(MCPeerID *)peer service:(NSString *)serviceId {
+    NSString *pid = cn1nbIdForPeer(peer);
+    if (serviceId != nil) {
+        [self.serviceIdByPeer setObject:serviceId forKey:pid];
+    }
+    return [self encodePeer:peer];
+}
+
 - (NSString *)encodePeer:(MCPeerID *)peer {
     NSString *pid = cn1nbIdForPeer(peer);
     [self.peersById setObject:peer forKey:pid];
+    // The service this peer was actually seen on, not whichever of the two
+    // was configured most recently. A peer reached through a session -- a
+    // state change, an arriving payload -- was found by the browser or came
+    // in through the advertiser earlier, and that is when the mapping was
+    // recorded.
+    NSString *service = [self.serviceIdByPeer objectForKey:pid];
+    if (service == nil) {
+        service = self.discoverServiceId != nil ? self.discoverServiceId
+                : self.advertiseServiceId;
+    }
     return cn1nbJoin([NSArray arrayWithObjects:pid,
             peer.displayName == nil ? @"" : peer.displayName,
-            self.serviceId == nil ? @"" : self.serviceId, nil]);
+            service == nil ? @"" : service, nil]);
 }
 
 - (MCPeerID *)peerForId:(NSString *)pid {
@@ -671,7 +704,8 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         invitationHandler:(void (^)(BOOL, MCSession *))invitationHandler {
     @autoreleasepool {
         NSString *pid = cn1nbIdForPeer(peerID);
-        NSString *encoded = [self encodePeer:peerID];
+        NSString *encoded = [self encodePeer:peerID
+                                     service:self.advertiseServiceId];
         // Copied because the block outlives this call: it is answered when
         // the app calls accept or reject, which is at least an EDT hop away.
         [self.invitations setObject:[[invitationHandler copy] autorelease]
@@ -706,7 +740,8 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         foundPeer:(MCPeerID *)peerID
         withDiscoveryInfo:(NSDictionary<NSString *, NSString *> *)info {
     @autoreleasepool {
-        NSString *encoded = [self encodePeer:peerID];
+        NSString *encoded = [self encodePeer:peerID
+                                     service:self.discoverServiceId];
         com_codename1_impl_ios_IOSNearbyCallbacks_endpointFound___java_lang_String_boolean(
                 getThreadLocalData(), cn1nbJString(encoded), JAVA_TRUE);
     }
@@ -715,7 +750,8 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 - (void)browser:(MCNearbyServiceBrowser *)browser
         lostPeer:(MCPeerID *)peerID {
     @autoreleasepool {
-        NSString *encoded = [self encodePeer:peerID];
+        NSString *encoded = [self encodePeer:peerID
+                                     service:self.discoverServiceId];
         com_codename1_impl_ios_IOSNearbyCallbacks_endpointFound___java_lang_String_boolean(
                 getThreadLocalData(), cn1nbJString(encoded), JAVA_FALSE);
     }
@@ -796,14 +832,14 @@ static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
             t.advertiser = [[[MCNearbyServiceAdvertiser alloc]
                     initWithPeer:t.localPeer
                    discoveryInfo:nil
-                     serviceType:t.serviceType] autorelease];
+                     serviceType:t.advertiseServiceType] autorelease];
             t.advertiser.delegate = t;
             [t.advertiser startAdvertisingPeer];
         }
         if (wasBrowsing) {
             t.browser = [[[MCNearbyServiceBrowser alloc]
                     initWithPeer:t.localPeer
-                     serviceType:t.serviceType] autorelease];
+                     serviceType:t.discoverServiceType] autorelease];
             t.browser.delegate = t;
             [t.browser startBrowsingForPeers];
         }
@@ -821,7 +857,7 @@ static void cn1nbApplyLocalName(CN1NearbyTransport *t, NSString *localName) {
 }
 
 static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
-        NSString *localName) {
+        NSString *localName, BOOL advertising) {
     if (cn1nbTransport == nil) {
         cn1nbTransport = [[CN1NearbyTransport alloc] init];
         cn1nbTransport.peersById = [NSMutableDictionary dictionary];
@@ -829,16 +865,22 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.progressByPayload = [NSMutableDictionary dictionary];
         cn1nbTransport.everConnected = [NSMutableSet set];
         cn1nbTransport.sessionsById = [NSMutableDictionary dictionary];
+        cn1nbTransport.serviceIdByPeer = [NSMutableDictionary dictionary];
     }
     if (serviceId != nil) {
-        // Reassigned on EVERY call, not just the first. Caching it meant
-        // stopping discovery for "chat" and starting it for "files" carried on
-        // browsing chat, and an app advertising one service while browsing
-        // another silently used whichever call came first. The advertiser and
-        // browser below are rebuilt per call and read this, so the id the
-        // caller passed is the one that takes effect.
-        cn1nbTransport.serviceType = cn1nbServiceType(serviceId);
-        cn1nbTransport.serviceId = serviceId;
+        // Assigned on EVERY call, and only to the half this call is for.
+        // Caching it meant stopping discovery for "chat" and starting it for
+        // "files" carried on browsing chat; writing one shared field instead
+        // meant an app advertising "files" while browsing "chat" relabelled
+        // the browser's sightings as "files". The advertiser and browser are
+        // rebuilt per call and read their own field.
+        if (advertising) {
+            cn1nbTransport.advertiseServiceType = cn1nbServiceType(serviceId);
+            cn1nbTransport.advertiseServiceId = serviceId;
+        } else {
+            cn1nbTransport.discoverServiceType = cn1nbServiceType(serviceId);
+            cn1nbTransport.discoverServiceId = serviceId;
+        }
     }
     cn1nbApplyLocalName(cn1nbTransport, localName);
     return cn1nbTransport;
@@ -1475,7 +1517,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
             return;
         }
         NSString *name = toNSString(CN1_THREAD_STATE_PASS_ARG localName);
-        CN1NearbyTransport *t = cn1nbTransportInit(sid, name);
+        CN1NearbyTransport *t = cn1nbTransportInit(sid, name, YES);
         if (t.advertiser != nil) {
             [t.advertiser stopAdvertisingPeer];
             t.advertiser = nil;
@@ -1483,7 +1525,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
         t.advertiser = [[[MCNearbyServiceAdvertiser alloc]
                 initWithPeer:t.localPeer
                 discoveryInfo:nil
-                serviceType:t.serviceType] autorelease];
+                serviceType:t.advertiseServiceType] autorelease];
         t.advertiser.delegate = t;
         // Recorded BEFORE the answer: didNotStartAdvertisingPeer can fire
         // after this returns, and it needs the id to fail.
@@ -1522,14 +1564,14 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
                     cn1nbUndeclaredServiceMessage(sid));
             return;
         }
-        CN1NearbyTransport *t = cn1nbTransportInit(sid, nil);
+        CN1NearbyTransport *t = cn1nbTransportInit(sid, nil, NO);
         if (t.browser != nil) {
             [t.browser stopBrowsingForPeers];
             t.browser = nil;
         }
         t.browser = [[[MCNearbyServiceBrowser alloc]
                 initWithPeer:t.localPeer
-                serviceType:t.serviceType] autorelease];
+                serviceType:t.discoverServiceType] autorelease];
         t.browser.delegate = t;
         t.pendingDiscoverRequest = requestId;
         [t.browser startBrowsingForPeers];
