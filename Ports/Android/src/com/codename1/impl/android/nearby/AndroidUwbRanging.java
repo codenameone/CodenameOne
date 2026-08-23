@@ -113,8 +113,21 @@ public class AndroidUwbRanging implements NearbyBridge {
     }
 
     public int getRangingAvailability() {
-        return isRangingSupported() ? NearbyAvailability.AVAILABLE.ordinal()
-                : NearbyAvailability.NOT_SUPPORTED.ordinal();
+        if (!isRangingSupported()) {
+            return NearbyAvailability.NOT_SUPPORTED.ordinal();
+        }
+        // UNAUTHORIZED is the whole reason getAvailability() exists beside
+        // isSupported(): a phone with a UWB radio whose owner has not granted
+        // (or has revoked) UWB_RANGING is supported and unusable, and the
+        // documented answer tells the app to ask rather than to hide the
+        // feature. Reporting AVAILABLE here let an app show ranging as ready
+        // until session preparation failed.
+        if (Build.VERSION.SDK_INT >= 31
+                && context.checkSelfPermission("android.permission.UWB_RANGING")
+                        != PackageManager.PERMISSION_GRANTED) {
+            return NearbyAvailability.UNAUTHORIZED.ordinal();
+        }
+        return NearbyAvailability.AVAILABLE.ordinal();
     }
 
     public int getRangingCapabilities() {

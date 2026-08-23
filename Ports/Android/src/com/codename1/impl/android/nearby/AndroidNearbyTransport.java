@@ -88,7 +88,16 @@ public class AndroidNearbyTransport implements NearbyBridge {
     private final Map<Long, Integer> payloadRecipients =
             Collections.synchronizedMap(new HashMap<Long, Integer>());
 
-    private String serviceId = "";
+    /// The service each endpoint was found under.
+    ///
+    /// One shared field was wrong: an app advertising service B while
+    /// discovering service A had the later call overwrite it, and endpoints
+    /// found under A were then encoded as B -- which Endpoint.getServiceId()
+    /// documents as the service they were found under.
+    private final Map<String, String> endpointServices =
+            Collections.synchronizedMap(new HashMap<String, String>());
+    private String advertisingServiceId = "";
+    private String discoveryServiceId = "";
     private String localName = "";
 
     public AndroidNearbyTransport(Context context) {
@@ -180,12 +189,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
 
     public void startAdvertising(final int requestId, String serviceId,
             String localName, int strategy) {
-        this.serviceId = serviceId == null ? "" : serviceId;
+        this.advertisingServiceId = serviceId == null ? "" : serviceId;
         this.localName = localName == null ? "" : localName;
         AdvertisingOptions options = new AdvertisingOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
-        client().startAdvertising(this.localName, this.serviceId,
+        client().startAdvertising(this.localName, this.advertisingServiceId,
                         connectionCallback(), options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
@@ -207,11 +216,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
 
     public void startDiscovery(final int requestId, String serviceId,
             int strategy) {
-        this.serviceId = serviceId == null ? "" : serviceId;
+        this.discoveryServiceId = serviceId == null ? "" : serviceId;
         DiscoveryOptions options = new DiscoveryOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
-        client().startDiscovery(this.serviceId, discoveryCallback(), options)
+        client().startDiscovery(this.discoveryServiceId, discoveryCallback(),
+                        options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         NearbyTransport.deliverRequestOk(requestId);
@@ -348,6 +358,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
     public void stopAllTransport() {
         client().stopAllEndpoints();
         endpointNames.clear();
+        endpointServices.clear();
         payloadIds.clear();
         payloadRecipients.clear();
         incomingFiles.clear();
@@ -363,6 +374,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
             public void onEndpointFound(String endpointId,
                     DiscoveredEndpointInfo info) {
                 endpointNames.put(endpointId, info.getEndpointName());
+                endpointServices.put(endpointId, discoveryServiceId);
                 NearbyTransport.deliverEndpointFound(
                         encode(endpointId, info.getEndpointName()), true);
             }
@@ -382,6 +394,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
             public void onConnectionInitiated(String endpointId,
                     ConnectionInfo info) {
                 endpointNames.put(endpointId, info.getEndpointName());
+                // An endpoint that arrives here without having been
+                // discovered came in through advertising, so that is the
+                // service it belongs to.
+                if (!endpointServices.containsKey(endpointId)) {
+                    endpointServices.put(endpointId, advertisingServiceId);
+                }
                 NearbyTransport.deliverConnectionRequested(
                         encode(endpointId, info.getEndpointName()),
                         info.getAuthenticationDigits());
@@ -546,8 +564,9 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     private String encode(String endpointId, String name) {
+        String service = endpointServices.get(endpointId);
         return sanitize(endpointId) + '\t' + sanitize(name) + '\t'
-                + sanitize(serviceId);
+                + sanitize(service == null ? "" : service);
     }
 
     private static String sanitize(String s) {

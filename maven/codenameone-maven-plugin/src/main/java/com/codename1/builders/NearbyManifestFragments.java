@@ -160,7 +160,12 @@ final class NearbyManifestFragments {
                             + "_FROM_BACKGROUND", "");
                 }
             }
-            if (modern && watchProfile) {
+            if (watchProfile) {
+                // Declared whatever the target SDK is, for the reason
+                // UWB_RANGING above is: selecting DEVICE_PROFILE_WATCH needs
+                // this permission on an Android 12 device no matter what the
+                // app targets, and an app targeting 30 had the association
+                // rejected there. Older devices ignore it.
                 out = addPermission(out,
                         "android.permission.REQUEST_COMPANION_PROFILE_WATCH",
                         "");

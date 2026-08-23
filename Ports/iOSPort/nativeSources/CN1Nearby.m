@@ -591,10 +591,32 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // The URL the framework hands over is in a temporary location it will
         // delete, so the file is moved somewhere the app can still read when
         // the callback returns.
+        // resourceName is chosen by the REMOTE peer, so it is untrusted
+        // input. Appended raw, a name like "../../Library/Preferences/x"
+        // walked out of the app's Documents directory and the removeItem and
+        // move below would then delete and overwrite files elsewhere in the
+        // container. Reduced to its last path component, and anything that
+        // still looks like traversal or a separator is replaced outright.
+        NSString *safe = [resourceName lastPathComponent];
+        if (safe == nil || [safe length] == 0
+                || [safe isEqualToString:@"."]
+                || [safe isEqualToString:@".."]
+                || [safe rangeOfString:@"/"].location != NSNotFound) {
+            safe = @"payload";
+        }
         NSString *docs = [NSSearchPathForDirectoriesInDomains(
                 NSDocumentDirectory, NSUserDomainMask, YES) objectAtIndex:0];
         NSString *target = [docs stringByAppendingPathComponent:
-                [NSString stringWithFormat:@"cn1nearby-%@", resourceName]];
+                [NSString stringWithFormat:@"cn1nearby-%@", safe]];
+        // Belt and braces: whatever the name folded to, the result has to
+        // stay inside the directory it was built from.
+        if (![[target stringByStandardizingPath]
+                hasPrefix:[docs stringByStandardizingPath]]) {
+            com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                    getThreadLocalData(), cn1nbJString(encoded), 0, 0, -1,
+                    CN1_NEARBY_PAYLOAD_FAILURE);
+            return;
+        }
         [[NSFileManager defaultManager] removeItemAtPath:target error:nil];
         NSError *moveError = nil;
         [[NSFileManager defaultManager] moveItemAtPath:[localURL path]

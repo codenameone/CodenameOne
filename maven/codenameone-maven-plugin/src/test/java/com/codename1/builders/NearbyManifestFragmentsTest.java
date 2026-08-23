@@ -175,17 +175,18 @@ class NearbyManifestFragmentsTest {
     }
 
     @Test
-    void theWatchProfilePermissionIsOptInAndModernOnly() {
+    void theWatchProfilePermissionIsOptInButNotTargetGated() {
         assertFalse(NearbyManifestFragments.inject("", false, false, true,
                 false, false, 34)
                 .contains("REQUEST_COMPANION_PROFILE_WATCH"));
         assertTrue(NearbyManifestFragments.inject("", false, false, true,
                 false, true, 34)
                 .contains("android.permission.REQUEST_COMPANION_PROFILE_WATCH"));
-        // The permission arrives with the profiles, in API 31.
-        assertFalse(NearbyManifestFragments.inject("", false, false, true,
+        // Selecting DEVICE_PROFILE_WATCH needs this on an Android 12 device
+        // whatever the app targets, so a legacy target must still declare it.
+        assertTrue(NearbyManifestFragments.inject("", false, false, true,
                 false, true, 30)
-                .contains("REQUEST_COMPANION_PROFILE_WATCH"));
+                .contains("android.permission.REQUEST_COMPANION_PROFILE_WATCH"));
     }
 
     @Test
