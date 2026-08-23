@@ -56,6 +56,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /// The nearby transport on Android, over Google's Nearby Connections.
@@ -212,13 +213,15 @@ public class AndroidNearbyTransport implements NearbyBridge {
 
     public void startAdvertising(final int requestId, String serviceId,
             String localName, int strategy) {
-        this.advertisingServiceId = serviceId == null ? "" : serviceId;
+        // Captured for THIS callback, for the reason startDiscovery does it.
+        final String started = serviceId == null ? "" : serviceId;
+        this.advertisingServiceId = started;
         this.localName = localName == null ? "" : localName;
         AdvertisingOptions options = new AdvertisingOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
-        client().startAdvertising(this.localName, this.advertisingServiceId,
-                        connectionCallback(), options)
+        client().startAdvertising(this.localName, started,
+                        connectionCallback(started), options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         NearbyTransport.deliverRequestOk(requestId);
@@ -239,12 +242,18 @@ public class AndroidNearbyTransport implements NearbyBridge {
 
     public void startDiscovery(final int requestId, String serviceId,
             int strategy) {
-        this.discoveryServiceId = serviceId == null ? "" : serviceId;
+        // Captured for THIS callback rather than read back out of the field
+        // when an endpoint turns up. Starting discovery for "files" while
+        // "chat" was running overwrote the field, and the callback still
+        // installed for chat then labelled chat's endpoints as files -- which
+        // happens even when Google rejects the second start as already
+        // discovering. The field remains for the state a later call needs.
+        final String started = serviceId == null ? "" : serviceId;
+        this.discoveryServiceId = started;
         DiscoveryOptions options = new DiscoveryOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
-        client().startDiscovery(this.discoveryServiceId, discoveryCallback(),
-                        options)
+        client().startDiscovery(started, discoveryCallback(started), options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         NearbyTransport.deliverRequestOk(requestId);
@@ -267,7 +276,11 @@ public class AndroidNearbyTransport implements NearbyBridge {
             String localName) {
         String name = localName == null || localName.length() == 0
                 ? this.localName : localName;
-        client().requestConnection(name, endpointId, connectionCallback())
+        // Connecting OUT, so the endpoint belongs to whatever discovery
+        // found it -- the field is the right source here, and the mapping
+        // discoveryCallback recorded is left alone when one already exists.
+        client().requestConnection(name, endpointId,
+                        connectionCallback(discoveryServiceId))
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         NearbyTransport.deliverRequestOk(requestId);
@@ -380,13 +393,25 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public void cancelPayload(int payloadId) {
+        List<Long> doomed = new ArrayList<Long>();
         synchronized (payloadIds) {
             for (Map.Entry<Long, Integer> e : payloadIds.entrySet()) {
                 if (e.getValue().intValue() == payloadId) {
-                    client().cancelPayload(e.getKey().longValue());
-                    return;
+                    // Collected, not cancelled in place: cancelPayload can
+                    // reach back into payloadIds through a transfer update,
+                    // and mutating the map mid-iteration is not something to
+                    // rely on.
+                    doomed.add(e.getKey());
                 }
             }
+        }
+        // EVERY transfer under this portable id, not the first. The same
+        // immutable Payload can be handed to two send() calls, which mints
+        // two platform ids for one portable id -- so returning after the
+        // first left the other running, free to report SUCCESS after the app
+        // had cancelled it.
+        for (Long platformId : doomed) {
+            client().cancelPayload(platformId.longValue());
         }
     }
 
@@ -416,13 +441,14 @@ public class AndroidNearbyTransport implements NearbyBridge {
     // Callbacks
     // ------------------------------------------------------------------
 
-    private EndpointDiscoveryCallback discoveryCallback() {
+    private EndpointDiscoveryCallback discoveryCallback(
+            final String serviceId) {
         return new EndpointDiscoveryCallback() {
             @Override
             public void onEndpointFound(String endpointId,
                     DiscoveredEndpointInfo info) {
                 endpointNames.put(endpointId, info.getEndpointName());
-                endpointServices.put(endpointId, discoveryServiceId);
+                endpointServices.put(endpointId, serviceId);
                 NearbyTransport.deliverEndpointFound(
                         encode(endpointId, info.getEndpointName()), true);
             }
@@ -442,7 +468,8 @@ public class AndroidNearbyTransport implements NearbyBridge {
         };
     }
 
-    private ConnectionLifecycleCallback connectionCallback() {
+    private ConnectionLifecycleCallback connectionCallback(
+            final String serviceId) {
         return new ConnectionLifecycleCallback() {
             @Override
             public void onConnectionInitiated(String endpointId,
@@ -452,7 +479,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 // discovered came in through advertising, so that is the
                 // service it belongs to.
                 if (!endpointServices.containsKey(endpointId)) {
-                    endpointServices.put(endpointId, advertisingServiceId);
+                    endpointServices.put(endpointId, serviceId);
                 }
                 NearbyTransport.deliverConnectionRequested(
                         encode(endpointId, info.getEndpointName()),

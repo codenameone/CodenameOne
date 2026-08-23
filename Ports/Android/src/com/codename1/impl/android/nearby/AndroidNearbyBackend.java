@@ -72,18 +72,47 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// the port's own IntentResultListener constants.
     private static final int ASSOCIATE_REQUEST = 0x4E42;
 
-    private final Activity activity;
+    /// The activity this backend was built with, used only when the port has
+    /// no current one.
+    private final Activity initialActivity;
     private final NearbyBridge ranging;
     private final NearbyBridge transport;
 
     private int pendingAssociateRequest;
 
     public AndroidNearbyBackend(Activity activity) {
-        this.activity = activity;
+        this.initialActivity = activity;
         this.ranging = load("com.codename1.impl.android.nearby."
                 + "AndroidUwbRanging");
         this.transport = load("com.codename1.impl.android.nearby."
                 + "AndroidNearbyTransport");
+    }
+
+    /// The activity to launch from and ask permissions on, now.
+    ///
+    /// NOT the one this backend was constructed with. The bridge is cached
+    /// for the life of the process while Android recreates the activity
+    /// freely -- a configuration change, or "Don't keep activities" -- so a
+    /// held activity is destroyed long before the app associates a device,
+    /// and the chooser was launched on it while the result listener waited on
+    /// a host nothing would ever deliver to.
+    private Activity currentActivity() {
+        Activity current = AndroidImplementation.getActivity();
+        return current != null ? current : initialActivity;
+    }
+
+    /// The context the optional backends hold.
+    ///
+    /// The application context, not the activity: these live as long as the
+    /// bridge does and use it only for package manager, permission and
+    /// content-resolver lookups, so holding a destroyed activity would be a
+    /// leak with no upside.
+    private android.content.Context contextForBackends() {
+        if (initialActivity == null) {
+            return null;
+        }
+        android.content.Context app = initialActivity.getApplicationContext();
+        return app != null ? app : initialActivity;
     }
 
     private NearbyBridge load(String className) {
@@ -91,7 +120,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         try {
             Class<?> clazz = Class.forName(className);
             instance = clazz.getConstructor(Context.class)
-                    .newInstance(activity);
+                    .newInstance(contextForBackends());
         } catch (Throwable t) {
             // The builder deletes the half an app did not reference, so this
             // is the ordinary path rather than an error.
@@ -172,7 +201,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
             // 12 uses the legacy permissions and location, and asking it for
             // BLUETOOTH_SCAN left the grant it needed unrequested.
             List<String> transport = NearbyPermissions.transportPermissions(
-                    activity, permissionBits);
+                    currentActivity(), permissionBits);
             for (int i = 0; i < transport.size(); i++) {
                 add(perms, transport.get(i));
             }
@@ -188,7 +217,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // checkForPermission blocks through invokeAndBlock and must run on the
         // EDT.
         Display.getInstance().callSerially(
-                permissionRunnable(requestId, perms, activity));
+                permissionRunnable(requestId, perms, currentActivity()));
     }
 
     /// Adds a permission the app has not already been granted.
@@ -202,7 +231,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         if (Build.VERSION.SDK_INT < 23) {
             return;
         }
-        if (activity.checkSelfPermission(permission)
+        if (currentActivity().checkSelfPermission(permission)
                 != PackageManager.PERMISSION_GRANTED) {
             perms.add(permission);
         }
@@ -335,11 +364,11 @@ public class AndroidNearbyBackend implements NearbyBridge {
     // ------------------------------------------------------------------
 
     private CompanionDeviceManager manager() {
-        if (Build.VERSION.SDK_INT < 26 || activity == null) {
+        if (Build.VERSION.SDK_INT < 26 || currentActivity() == null) {
             return null;
         }
         try {
-            return (CompanionDeviceManager) activity.getSystemService(
+            return (CompanionDeviceManager) currentActivity().getSystemService(
                     Context.COMPANION_DEVICE_SERVICE);
         } catch (Throwable t) {
             return null;
@@ -428,7 +457,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
 
     private void launch(IntentSender chooserLauncher, int requestId) {
         try {
-            activity.startIntentSenderForResult(chooserLauncher,
+            currentActivity().startIntentSenderForResult(chooserLauncher,
                     ASSOCIATE_REQUEST, null, 0, 0, 0);
         } catch (IntentSender.SendIntentException e) {
             pendingAssociateRequest = 0;
@@ -443,8 +472,9 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// Hands the activity-result channel back, so the next
     /// startActivityForResult caller can install its own listener.
     private void releaseResultListener() {
-        if (activity instanceof CodenameOneActivity) {
-            ((CodenameOneActivity) activity).restoreIntentResultListener();
+        Activity current = currentActivity();
+        if (current instanceof CodenameOneActivity) {
+            ((CodenameOneActivity) current).restoreIntentResultListener();
         }
     }
 
@@ -457,7 +487,8 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// launched at all
     private boolean listenForResult(final int requestId,
             final CompanionDeviceManager cdm) {
-        if (!(activity instanceof CodenameOneActivity)) {
+        Activity current = currentActivity();
+        if (!(current instanceof CodenameOneActivity)) {
             return false;
         }
         // setIntentResultListener SILENTLY ignores a registration while
@@ -466,13 +497,13 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // the chooser anyway sent its result to that other listener and left
         // this request's AsyncResource pending for good, so the caller is
         // told the truth instead.
-        if (((CodenameOneActivity) activity).isWaitingForResult()) {
+        if (((CodenameOneActivity) current).isWaitingForResult()) {
             return false;
         }
         // Taken BEFORE the chooser opens, so the association it creates can be
         // told apart from the ones this app already had.
         final Set<String> before = associationKeys(cdm);
-        final CodenameOneActivity host = (CodenameOneActivity) activity;
+        final CodenameOneActivity host = (CodenameOneActivity) current;
         host.setIntentResultListener(new IntentResultListener() {
             public void onActivityResult(int requestCode, int resultCode,
                     Intent data) {
