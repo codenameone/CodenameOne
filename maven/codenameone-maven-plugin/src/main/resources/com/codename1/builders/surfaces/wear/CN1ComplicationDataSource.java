@@ -407,10 +407,15 @@ public abstract class CN1ComplicationDataSource extends ComplicationDataSourceSe
             if (icon == null) {
                 return null;
             }
+            // Described by the ticking text when there is one, the same rule the other three
+            // types follow: this slot shows only an icon, so the description IS the value to a
+            // screen reader, and a request-time string is announced long after the face has
+            // advanced with nothing to correct it.
             MonochromaticImageComplicationData.Builder builder =
                     new MonochromaticImageComplicationData.Builder(
                             new MonochromaticImage.Builder(icon).build(),
-                            plain(texts.isEmpty() ? getKindId() : texts.get(0)))
+                            titleTicks && primary != null ? primary
+                                    : plain(texts.isEmpty() ? getKindId() : texts.get(0)))
                             .setTapAction(tap);
             return builder.build();
         }
