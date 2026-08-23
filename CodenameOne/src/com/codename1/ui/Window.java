@@ -1948,6 +1948,13 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         disposing = true;
+        // Whether this dispose is the thing actually taking the window off screen.
+        // hide() and activationFailed() each report Hidden themselves and leave the
+        // window invisible, and a window may never have been shown at all -- so the
+        // terminal Hidden below would either repeat a transition that already happened
+        // or announce one that never did. Listeners persist geometry and run teardown
+        // off that event, so a spurious one is not free.
+        boolean wasOnScreen = nativeVisible || iconified;
         nativeVisible = false;
         // An owned window cannot outlive its owner: the platform would leave it open
         // with no owner behind it, and it would keep painting. Snapshot first -- each
@@ -2000,7 +2007,9 @@ public class Window extends Container implements TopLevelContainer {
         // them again would run a listener's save or cleanup work twice for one user
         // close, and a listener consuming the second event could not veto anything
         // because the window is already gone.
-        fireWindowEvent(WindowEvent.Type.Hidden);
+        if (wasOnScreen) {
+            fireWindowEvent(WindowEvent.Type.Hidden);
+        }
         fireWindowEvent(WindowEvent.Type.Disposed);
     }
 

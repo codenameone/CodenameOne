@@ -4189,4 +4189,61 @@ class WindowTest extends UITestBase {
         assertEquals(0, windowKeys.released);
         w.dispose();
     }
+
+    /// Counts the terminal visibility events a window reports.
+    private static int[] countHiddenAndDisposed(Window w) {
+        final int[] counts = new int[2];
+        w.addWindowListener(new ActionListener<WindowEvent>() {
+            @Override
+            public void actionPerformed(WindowEvent evt) {
+                if (evt.getType() == WindowEvent.Type.Hidden) {
+                    counts[0]++;
+                } else if (evt.getType() == WindowEvent.Type.Disposed) {
+                    counts[1]++;
+                }
+            }
+        });
+        return counts;
+    }
+
+    @FormTest
+    void disposingAShownWindowReportsHiddenExactlyOnce() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("shown", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        int[] counts = countHiddenAndDisposed(w);
+        w.dispose();
+        assertEquals(1, counts[0], "taking a window off screen is one Hidden");
+        assertEquals(1, counts[1]);
+    }
+
+    @FormTest
+    void disposingAnAlreadyHiddenWindowDoesNotReportHiddenTwice() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("hidden", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        int[] counts = countHiddenAndDisposed(w);
+        w.hide();
+        assertEquals(1, counts[0], "hide() reports the transition");
+        w.dispose();
+        // A listener persisting geometry or running teardown off Hidden would do it
+        // twice for one disappearance.
+        assertEquals(1, counts[0],
+                "dispose() must not repeat a transition hide() already reported");
+        assertEquals(1, counts[1], "and must still report Disposed");
+    }
+
+    @FormTest
+    void disposingAWindowThatWasNeverShownReportsNoHidden() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("never shown", new BorderLayout());
+        w.setWindowSize(320, 240);
+        int[] counts = countHiddenAndDisposed(w);
+        w.dispose();
+        assertEquals(0, counts[0],
+                "a window that was never on screen cannot have gone off it");
+        assertEquals(1, counts[1]);
+    }
 }
