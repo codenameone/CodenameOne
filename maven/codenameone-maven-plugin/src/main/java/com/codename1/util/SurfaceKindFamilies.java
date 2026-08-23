@@ -63,13 +63,21 @@ public final class SurfaceKindFamilies {
         if (kindJson == null) {
             return Collections.emptyList();
         }
-        Object portable = kindJson.get("families");
-        if (portable != null) {
+        // containsKey, not a null check. "families": null is PRESENT -- a JSON author writes it
+        // to mean "no families here", and reading the legacy list instead resurrects exactly what
+        // they were removing. The contract is about the key being there, so this asks that.
+        if (kindJson.containsKey("families")) {
+            Object portable = kindJson.get("families");
             // PRESENT is what decides, not well-formed. Falling through to iosFamilies when the
             // portable value could not be read meant a manifest mid-migration -- the one case
             // carrying both keys -- silently built the legacy list the author had just replaced,
             // shipping a surface they had removed. Present and unusable is an authoring mistake,
             // and it is said rather than absorbed.
+            if (portable == null) {
+                // Explicitly nothing. Not an error -- it is a legible way to say the kind
+                // declares no families -- but it must not fall through to iosFamilies.
+                return Collections.emptyList();
+            }
             List<String> read = asFamilyList(portable);
             if (read == null) {
                 throw new IllegalArgumentException("The \"families\" value of surface kind \""

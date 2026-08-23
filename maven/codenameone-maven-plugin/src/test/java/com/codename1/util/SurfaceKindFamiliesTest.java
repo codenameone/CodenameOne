@@ -208,4 +208,18 @@ class SurfaceKindFamiliesTest {
 
         assertTrue(SurfaceKindFamilies.read(kind).isEmpty());
     }
+
+    /// An explicit null is PRESENT. A JSON author writes "families": null to mean the kind
+    /// declares none, and reading iosFamilies instead resurrects exactly what they were removing
+    /// -- the same failure as a malformed value, reached through a different door.
+    @Test
+    void anExplicitNullFamiliesKeyStillWins() {
+        Map<String, Object> kind = new LinkedHashMap<String, Object>();
+        kind.put("id", "status");
+        kind.put("families", null);
+        kind.put("iosFamilies", Arrays.asList("small"));
+
+        assertTrue(SurfaceKindFamilies.read(kind).isEmpty(),
+                "the legacy list must not come back through a null portable key");
+    }
 }

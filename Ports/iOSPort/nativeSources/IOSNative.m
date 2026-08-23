@@ -15608,6 +15608,26 @@ void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_jav
 
 #if !TARGET_OS_WATCH
 
+/// A strictly increasing publication sequence for mirrored surfaces.
+///
+/// Seeded from the wall clock so it keeps rising across a relaunch -- a counter restarting at 1
+/// would have every publication after a restart look older than what the watch already holds --
+/// and incremented so two publications in the same millisecond still differ.
+static long long cn1NextSurfaceMirrorSequence(void) {
+    static long long last = 0;
+    static dispatch_once_t once;
+    static NSObject *lock = nil;
+    dispatch_once(&once, ^{
+        lock = [[NSObject alloc] init];
+    });
+    @synchronized (lock) {
+        long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
+        last = now > last ? now : last + 1;
+        return last;
+    }
+}
+
+
 // A property list has a hard ceiling around 64KB and rejects the whole payload on overflow.
 // Complication art is a few dozen points square, so 48KB is generous and leaves envelope room.
 #define CN1_SURFACES_MIRROR_MAX_BYTES (48 * 1024)
@@ -15669,6 +15689,17 @@ void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_j
     NSMutableDictionary *payload = [NSMutableDictionary dictionary];
     [payload setObject:kind forKey:@"cn1.surfaces.kind"];
     [payload setObject:[json dataUsingEncoding:NSUTF8StringEncoding] forKey:@"cn1.surfaces.json"];
+    // A publication sequence, so the watch can tell an older payload from a newer one.
+    //
+    // The two transports do not share a queue: transferCurrentComplicationUserInfo is prioritized
+    // and transferUserInfo merely queued, so a publication sent on the second -- because the
+    // complication was disabled or its daily budget was spent -- can arrive AFTER a later one
+    // sent on the first. Applied in arrival order, the older timeline then overwrites the newer
+    // and the complication sits on stale content indefinitely, there being no periodic update to
+    // correct it. Monotonic per process and carried per kind; the receiver keeps the highest it
+    // has applied and ignores anything at or below it.
+    [payload setObject:[NSNumber numberWithLongLong:cn1NextSurfaceMirrorSequence()]
+                forKey:@"cn1.surfaces.seq"];
 
     // Imagery travels in the same dictionary rather than through transferFile, deliberately.
     // A file transfer is a separate unordered queue with no atomicity against the descriptor, so
@@ -15700,6 +15731,9 @@ void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_j
         // is worth more than one that never updates.
         NSMutableDictionary *lean = [NSMutableDictionary dictionary];
         [lean setObject:[payload objectForKey:@"cn1.surfaces.kind"] forKey:@"cn1.surfaces.kind"];
+        // The sequence travels on the lean payload too, or a publication that shed its imagery
+        // would arrive unordered and could be overwritten by an older one.
+        [lean setObject:[payload objectForKey:@"cn1.surfaces.seq"] forKey:@"cn1.surfaces.seq"];
         [lean setObject:[payload objectForKey:@"cn1.surfaces.json"] forKey:@"cn1.surfaces.json"];
         NSData *leanEncoded = [NSPropertyListSerialization dataWithPropertyList:lean
                 format:NSPropertyListBinaryFormat_v1_0 options:0 error:nil];

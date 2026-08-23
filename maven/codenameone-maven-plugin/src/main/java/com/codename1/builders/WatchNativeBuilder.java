@@ -3520,9 +3520,14 @@ class WatchNativeBuilder {
         s.append("  ext_embed.add_file_reference(ext_ref)\n");
         s.append("  ext_target.build_configurations.each{|e|\n");
         for (Map.Entry<String, String> e : buildSettings.entrySet()) {
+            // SINGLE-quoted on both sides. escapeRubyStr escapes a backslash and a single quote,
+            // which is exactly a single-quoted Ruby literal's alphabet -- and a double-quoted one
+            // needs more than that: a provisioning profile named Acme "Watch" closed the literal
+            // and made the generated project script fail to parse, and a name containing #{ would
+            // have been interpolated. Single quotes need neither escape.
             s.append("    e.build_settings['").append(IPhoneBuilder.escapeRubyStr(e.getKey()))
-                    .append("'] = \"").append(IPhoneBuilder.escapeRubyStr(e.getValue()))
-                    .append("\"\n");
+                    .append("'] = '").append(IPhoneBuilder.escapeRubyStr(e.getValue()))
+                    .append("'\n");
         }
         s.append("  }\n");
         s.append("end\n");

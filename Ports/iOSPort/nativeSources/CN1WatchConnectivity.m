@@ -1717,6 +1717,29 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (![kind isKindOfClass:[NSString class]] || ![json isKindOfClass:[NSData class]]) {
         return;
     }
+    // ARRIVAL ORDER IS NOT PUBLICATION ORDER. The sender has two transports and they do not share
+    // a queue: transferCurrentComplicationUserInfo is prioritized, transferUserInfo merely
+    // queued, and the sender falls back to the second whenever the complication is disabled or
+    // its daily budget is spent. So a publication sent on the queued transport can arrive after a
+    // later one sent on the prioritized one, and applying both in the order they land lets the
+    // older timeline overwrite the newer -- permanently, since the generated provider has no
+    // periodic update to correct it.
+    //
+    // Persisted rather than held in memory: this delegate runs in a process the system starts and
+    // stops at will, and a counter that resets would let the next stale payload through.
+    id sequence = [info objectForKey:@"cn1.surfaces.seq"];
+    if ([sequence isKindOfClass:[NSNumber class]]) {
+        NSString *key = [@"cn1.surfaces.seq." stringByAppendingString:kind];
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        long long applied = (long long)[defaults doubleForKey:key];
+        long long incoming = [(NSNumber *)sequence longLongValue];
+        if (applied != 0 && incoming <= applied) {
+            NSLog(@"[CN1Surfaces] ignoring a mirrored update for \"%@\" that was superseded "
+                  "before it arrived (%lld <= %lld)", kind, incoming, applied);
+            return;
+        }
+        [defaults setDouble:(double)incoming forKey:key];
+    }
     NSMutableArray *names = [NSMutableArray array];
     NSMutableArray *blobs = [NSMutableArray array];
     for (NSString *key in info) {
