@@ -55,7 +55,7 @@ class NearbyManifestFragmentsTest {
     @Test
     void rangingPaysForRangingOnly() {
         String out = NearbyManifestFragments.inject("", true, false, false,
-                false, false, 34);
+                false, "", 34);
         assertTrue(out.contains("android.permission.UWB_RANGING"));
         assertTrue(out.contains("android:name=\"android.hardware.uwb\""
                 + " android:required=\"false\""));
@@ -73,10 +73,10 @@ class NearbyManifestFragmentsTest {
         // and there the runtime request fails unless the manifest declares
         // this. Older devices ignore a permission they do not know.
         String legacy = NearbyManifestFragments.inject("", true, false, false,
-                false, false, 30);
+                false, "", 30);
         assertTrue(legacy.contains("android.permission.UWB_RANGING"));
         String modern = NearbyManifestFragments.inject("", true, false, false,
-                false, false, 34);
+                false, "", 34);
         assertTrue(modern.contains("android.permission.UWB_RANGING"));
         // The feature stays optional, because that is what keeps the app
         // installable on a device without the radio.
@@ -86,7 +86,7 @@ class NearbyManifestFragmentsTest {
     @Test
     void transportCarriesTheAndroid12SplitWithTheLegacyPairCapped() {
         String out = NearbyManifestFragments.inject("", false, true, false,
-                false, false, 34);
+                false, "", 34);
         assertTrue(out.contains("android:name=\"android.permission.BLUETOOTH\""
                 + " android:maxSdkVersion=\"30\""));
         assertTrue(out.contains(
@@ -104,7 +104,7 @@ class NearbyManifestFragmentsTest {
     @Test
     void transportStopsAskingForLocationOnceNearbyWifiExists() {
         String modern = NearbyManifestFragments.inject("", false, true, false,
-                false, false, 34);
+                false, "", 34);
         assertTrue(modern.contains(
                 "android:name=\"android.permission.NEARBY_WIFI_DEVICES\""
                 + " android:usesPermissionFlags=\"neverForLocation\""));
@@ -119,7 +119,7 @@ class NearbyManifestFragmentsTest {
         // is still declared, because the app may run on a 13 device and the
         // runtime asks for what THAT device requires.
         String older = NearbyManifestFragments.inject("", false, true, false,
-                false, false, 31);
+                false, "", 31);
         assertTrue(older.contains("NEARBY_WIFI_DEVICES"));
         assertTrue(older.contains(
                 "android:name=\"android.permission.ACCESS_FINE_LOCATION\" />"));
@@ -128,7 +128,7 @@ class NearbyManifestFragmentsTest {
     @Test
     void transportOnALegacyTargetKeepsTheLegacyPairUncapped() {
         String out = NearbyManifestFragments.inject("", false, true, false,
-                false, false, 30);
+                false, "", 30);
         assertTrue(out.contains(
                 "android:name=\"android.permission.BLUETOOTH\" />"));
     }
@@ -141,7 +141,7 @@ class NearbyManifestFragmentsTest {
         // target-30 app on Android 12 could not ask for these at all. A
         // device below 31 ignores permissions it has never heard of.
         String out = NearbyManifestFragments.inject("", false, true, false,
-                false, false, 30);
+                false, "", 30);
         assertTrue(out.contains("BLUETOOTH_SCAN"), out);
         assertTrue(out.contains("BLUETOOTH_ADVERTISE"), out);
         assertTrue(out.contains("BLUETOOTH_CONNECT"), out);
@@ -153,9 +153,46 @@ class NearbyManifestFragmentsTest {
     }
 
     @Test
+    void everyProfileTheApiExposesHasItsOwnPermission() {
+        // AndroidNearbyBackend forwards COMPUTER on API 33 and GLASSES on
+        // 34, and without the matching permission the platform rejects the
+        // association before the chooser opens -- which looks to the user
+        // like nothing happened at all.
+        String watch = NearbyManifestFragments.inject("", false, false, true,
+                false, "watch", 34);
+        assertTrue(watch.contains("REQUEST_COMPANION_PROFILE_WATCH"), watch);
+        assertFalse(watch.contains("REQUEST_COMPANION_PROFILE_COMPUTER"),
+                watch);
+
+        String computer = NearbyManifestFragments.inject("", false, false,
+                true, false, "computer", 34);
+        assertTrue(computer.contains("REQUEST_COMPANION_PROFILE_COMPUTER"),
+                computer);
+
+        String glasses = NearbyManifestFragments.inject("", false, false, true,
+                false, "glasses", 34);
+        assertTrue(glasses.contains("REQUEST_COMPANION_PROFILE_GLASSES"),
+                glasses);
+
+        String both = NearbyManifestFragments.inject("", false, false, true,
+                false, "watch,glasses", 34);
+        assertTrue(both.contains("REQUEST_COMPANION_PROFILE_WATCH"), both);
+        assertTrue(both.contains("REQUEST_COMPANION_PROFILE_GLASSES"), both);
+    }
+
+    @Test
+    void aProfileNameIsMatchedWholeRatherThanAsASubstring() {
+        assertFalse(NearbyManifestFragments.hasProfile("watchdog", "watch"));
+        assertTrue(NearbyManifestFragments.hasProfile(" Watch , glasses",
+                "watch"));
+        assertFalse(NearbyManifestFragments.hasProfile(null, "watch"));
+        assertFalse(NearbyManifestFragments.hasProfile("", "watch"));
+    }
+
+    @Test
     void associatingWithoutWatchingCostsNoBackgroundPermission() {
         String out = NearbyManifestFragments.inject("", false, false, true,
-                false, false, 34);
+                false, "", 34);
         assertTrue(out.contains("android.software.companion_device_setup"));
         // This is the point of tracking presence separately: background
         // privileges an app never uses are privileges a user is asked about
@@ -168,7 +205,7 @@ class NearbyManifestFragmentsTest {
     @Test
     void watchingEarnsTheBackgroundPermissions() {
         String out = NearbyManifestFragments.inject("", false, false, true,
-                true, false, 34);
+                true, "", 34);
         assertTrue(out.contains(
                 "android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND"));
         assertTrue(out.contains(
@@ -184,12 +221,12 @@ class NearbyManifestFragmentsTest {
         // platform woke its CompanionDeviceService, which is what observing
         // presence is for.
         String twelve = NearbyManifestFragments.inject("", false, false, true,
-                true, false, 31);
+                true, "", 31);
         assertTrue(twelve.contains("android.permission.REQUEST_COMPANION"
                 + "_START_FOREGROUND_SERVICES_FROM_BACKGROUND"));
         // Still absent below the API that has it.
         String eleven = NearbyManifestFragments.inject("", false, false, true,
-                true, false, 30);
+                true, "", 30);
         assertFalse(eleven.contains(
                 "REQUEST_COMPANION_START_FOREGROUND_SERVICES"));
     }
@@ -197,15 +234,15 @@ class NearbyManifestFragmentsTest {
     @Test
     void theWatchProfilePermissionIsOptInButNotTargetGated() {
         assertFalse(NearbyManifestFragments.inject("", false, false, true,
-                false, false, 34)
+                false, "", 34)
                 .contains("REQUEST_COMPANION_PROFILE_WATCH"));
         assertTrue(NearbyManifestFragments.inject("", false, false, true,
-                false, true, 34)
+                false, "watch", 34)
                 .contains("android.permission.REQUEST_COMPANION_PROFILE_WATCH"));
         // Selecting DEVICE_PROFILE_WATCH needs this on an Android 12 device
         // whatever the app targets, so a legacy target must still declare it.
         assertTrue(NearbyManifestFragments.inject("", false, false, true,
-                false, true, 30)
+                false, "watch", 30)
                 .contains("android.permission.REQUEST_COMPANION_PROFILE_WATCH"));
     }
 
@@ -217,7 +254,7 @@ class NearbyManifestFragmentsTest {
         String afterBluetooth = BluetoothManifestFragments.inject("", true,
                 true, true, false, true, false, 34);
         String out = NearbyManifestFragments.inject(afterBluetooth, false,
-                true, false, false, false, 34);
+                true, false, false, "", 34);
         assertEquals(1, count(out,
                 "android:name=\"android.permission.BLUETOOTH\""));
         assertEquals(1, count(out,
@@ -237,7 +274,7 @@ class NearbyManifestFragmentsTest {
         String seeded = "    <uses-permission android:name="
                 + "\"android.permission.BLUETOOTH_SCAN\" />\n";
         String out = NearbyManifestFragments.inject(seeded, false, true, false,
-                false, false, 34);
+                false, "", 34);
         assertEquals(1, count(out,
                 "android:name=\"android.permission.BLUETOOTH_SCAN\""));
         assertEquals(1, count(out,
@@ -249,7 +286,7 @@ class NearbyManifestFragmentsTest {
         String seeded = "    <uses-permission android:name="
                 + "\"android.permission.UWB_RANGING\" />\n";
         String out = NearbyManifestFragments.inject(seeded, true, false, false,
-                false, false, 34);
+                false, "", 34);
         assertEquals(1, count(out, "android.permission.UWB_RANGING"));
     }
 
@@ -272,7 +309,7 @@ class NearbyManifestFragmentsTest {
     @Test
     void nullInputIsTreatedAsEmpty() {
         String out = NearbyManifestFragments.inject(null, true, false, false,
-                false, false, 34);
+                false, "", 34);
         assertTrue(out.contains("android.permission.UWB_RANGING"));
     }
 
@@ -291,7 +328,7 @@ class NearbyManifestFragmentsTest {
                 "precondition: bluetooth caps it at 30");
 
         String out = NearbyManifestFragments.inject(bluetooth, false, true,
-                false, false, false, 34);
+                false, false, "", 34);
         int at = out.indexOf("ACCESS_FINE_LOCATION");
         int elementEnd = out.indexOf('>', at);
         String element = out.substring(out.lastIndexOf('<', at), elementEnd);
@@ -310,7 +347,7 @@ class NearbyManifestFragmentsTest {
         String bluetooth = BluetoothManifestFragments.inject("", true, false,
                 false, false, true, false, 32);
         String out = NearbyManifestFragments.inject(bluetooth, false, true,
-                false, false, false, 32);
+                false, false, "", 32);
         int at = out.indexOf("ACCESS_FINE_LOCATION");
         String element = out.substring(out.lastIndexOf('<', at),
                 out.indexOf('>', at));
@@ -325,7 +362,7 @@ class NearbyManifestFragmentsTest {
         // refused when coarse is not declared, so the grant Nearby
         // Connections needs on 12 and 12L never arrived.
         String out = NearbyManifestFragments.inject("", false, true, false,
-                false, false, 34);
+                false, "", 34);
         assertTrue(out.contains("android:name=\"android.permission"
                 + ".ACCESS_COARSE_LOCATION\" android:maxSdkVersion=\"32\""),
                 out);
@@ -337,7 +374,7 @@ class NearbyManifestFragmentsTest {
     @Test
     void coarseLocationIsUncappedBelowATiramisuTarget() {
         String out = NearbyManifestFragments.inject("", false, true, false,
-                false, false, 31);
+                false, "", 31);
         assertTrue(out.contains("android:name=\"android.permission"
                 + ".ACCESS_COARSE_LOCATION\" />"), out);
     }
@@ -347,7 +384,7 @@ class NearbyManifestFragmentsTest {
         String seeded = "    <uses-permission android:name=\"android.permission"
                 + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"33\" />\n";
         String out = NearbyManifestFragments.inject(seeded, false, true, false,
-                false, false, 34);
+                false, "", 34);
         assertTrue(out.contains("android:maxSdkVersion=\"33\""),
                 "a wider cap is not narrowed: " + out);
     }
@@ -356,6 +393,6 @@ class NearbyManifestFragmentsTest {
     void usingNoneOfItChangesNothing() {
         String seeded = "    <uses-permission android:name=\"x\" />\n";
         assertEquals(seeded, NearbyManifestFragments.inject(seeded, false,
-                false, false, false, false, 34));
+                false, false, false, "", 34));
     }
 }

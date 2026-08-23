@@ -80,7 +80,7 @@ final class NearbyManifestFragments {
      */
     static String inject(String xPermissions, boolean ranging,
             boolean transport, boolean companion, boolean presence,
-            boolean watchProfile, int targetSdkVersion) {
+            String profiles, int targetSdkVersion) {
         String out = xPermissions == null ? "" : xPermissions;
         boolean modern = targetSdkVersion >= 31;
         boolean tiramisu = targetSdkVersion >= 33;
@@ -181,15 +181,32 @@ final class NearbyManifestFragments {
                             + "_FROM_BACKGROUND", "");
                 }
             }
-            if (watchProfile) {
-                // Declared whatever the target SDK is, for the reason
-                // UWB_RANGING above is: selecting DEVICE_PROFILE_WATCH needs
-                // this permission on an Android 12 device no matter what the
-                // app targets, and an app targeting 30 had the association
-                // rejected there. Older devices ignore it.
+            // One permission per profile the app says it selects, and all
+            // three the portable API exposes -- not only WATCH.
+            // AndroidNearbyBackend forwards COMPUTER on API 33 and GLASSES
+            // on 34, and without the matching permission the platform
+            // rejects the association before the chooser opens, which looks
+            // to the user like nothing happened at all.
+            //
+            // Declared whatever the target SDK is, for the reason
+            // UWB_RANGING above is: selecting a profile needs its permission
+            // on a device that has the profile no matter what the app
+            // targets, and an app targeting 30 had the association rejected
+            // there. Older devices ignore a permission they never heard of.
+            if (hasProfile(profiles, "watch")) {
                 out = addPermission(out,
                         "android.permission.REQUEST_COMPANION_PROFILE_WATCH",
                         "");
+            }
+            if (hasProfile(profiles, "computer")) {
+                out = addPermission(out,
+                        "android.permission"
+                        + ".REQUEST_COMPANION_PROFILE_COMPUTER", "");
+            }
+            if (hasProfile(profiles, "glasses")) {
+                out = addPermission(out,
+                        "android.permission"
+                        + ".REQUEST_COMPANION_PROFILE_GLASSES", "");
             }
         }
         return out;
@@ -291,6 +308,28 @@ final class NearbyManifestFragments {
         }
         return xPermissions.substring(0, start) + widened
                 + xPermissions.substring(end + 1);
+    }
+
+    /// True when a comma-separated profile list names this profile.
+    ///
+    /// Compared on whole entries so "watch" does not match a longer name
+    /// that merely contains it.
+    ///
+    /// @param profiles the comma-separated list, may be null
+    /// @param profile the profile to look for, lowercase
+    /// @return whether the list names it
+    static boolean hasProfile(String profiles, String profile) {
+        if (profiles == null) {
+            return false;
+        }
+        String[] parts = profiles.split(",");
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].trim().toLowerCase(java.util.Locale.ROOT)
+                    .equals(profile)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String addFeature(String xPermissions, String name,

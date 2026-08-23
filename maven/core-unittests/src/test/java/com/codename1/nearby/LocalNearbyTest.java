@@ -556,6 +556,50 @@ class LocalNearbyTest {
     // ------------------------------------------------------------------
 
     @Test
+    void cancellingAPayloadInFlightReportsCanceledAndSendsNothing() {
+        // sendPayload is delayed like everything else here, so an app really
+        // can cancel while a send is in flight -- and the simulator used to
+        // ignore it, report SUCCESS and echo the payload anyway, which made
+        // it the one place the public cancellation contract was never
+        // exercised.
+        final List<PayloadTransferUpdate> progress =
+                new ArrayList<PayloadTransferUpdate>();
+        final List<Payload> received = new ArrayList<Payload>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void payloadProgress(Endpoint e, PayloadTransferUpdate u) {
+                progress.add(u);
+            }
+
+            @Override
+            public void payloadReceived(Endpoint e, Payload p) {
+                received.add(p);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        value(NearbyTransport.requestConnection(e, "me"));
+
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        Payload p = Payload.fromBytes(new byte[] {1, 2, 3});
+        NearbyTransport.send(e, p);
+        NearbyTransport.cancel(p.getId());
+        drain(queue);
+
+        assertTrue(received.isEmpty(),
+                "a cancelled payload must not be delivered: " + received);
+        assertEquals(1, progress.size());
+        assertSame(PayloadStatus.CANCELED, progress.get(0).getStatus());
+    }
+
+    @Test
     void stoppingBeforeDiscoveryStartsReportsNoEndpoints() {
         // The queued start had no idea discovery had been stopped, so a
         // stopped simulator announced peers nobody had asked for -- and

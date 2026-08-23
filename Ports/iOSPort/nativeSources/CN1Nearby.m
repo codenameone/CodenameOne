@@ -129,6 +129,9 @@ static NSArray *cn1nbSplitLines(NSString *joined) {
     return [joined componentsSeparatedByString:@"\n"];
 }
 
+/// How long a ranging start is given to fail before it is called a success.
+#define CN1_NEARBY_RANGING_GRACE_NS (500ull * NSEC_PER_MSEC)
+
 static void cn1nbFailRanging(int requestId, int error, NSString *message) {
     com_codename1_impl_ios_IOSNearbyCallbacks_rangingFailed___int_int_java_lang_String(
             getThreadLocalData(), requestId, error, cn1nbJString(message));
@@ -192,6 +195,7 @@ API_AVAILABLE(ios(14.0))
 @property (nonatomic, assign) int handle;
 @property (nonatomic, assign) int pendingStartRequest;
 @property (nonatomic, retain) NISession *session;
+- (void)settleStarted;
 @end
 
 static NSMutableDictionary *cn1nbSessions = nil;
@@ -250,9 +254,30 @@ static void cn1nbSessionsInit(void) {
             x, y, z);
 }
 
+/// Answers a peer-ranging start that is still waiting.
+///
+/// runWithConfiguration takes the configuration and reports a refusal
+/// asynchronously through didInvalidateWithError -- the user declining Nearby
+/// Interaction, the active-session limit -- so answering the caller straight
+/// after that call said "ranging started" for a session that never measured
+/// anything. Whichever comes first answers it: the first update (it really is
+/// measuring), an invalidation (the branch below already fails it), or the
+/// grace timer, which is the backstop for a session that starts cleanly and
+/// simply has no peer in range yet.
+- (void)settleStarted {
+    int pending = self.pendingStartRequest;
+    if (pending == 0) {
+        return;
+    }
+    self.pendingStartRequest = 0;
+    com_codename1_impl_ios_IOSNearbyCallbacks_sessionStarted___int_int(
+            getThreadLocalData(), pending, self.handle);
+}
+
 - (void)session:(NISession *)session
         didUpdateNearbyObjects:(NSArray<NINearbyObject *> *)nearbyObjects {
     @autoreleasepool {
+        [self settleStarted];
         for (NINearbyObject *o in nearbyObjects) {
             [self deliver:o];
         }
@@ -337,6 +362,22 @@ static CN1NearbyRangingSession *cn1nbSessionFor(int handle)
         API_AVAILABLE(ios(14.0)) {
     cn1nbSessionsInit();
     return [cn1nbSessions objectForKey:[NSNumber numberWithInt:handle]];
+}
+
+/// Answers a peer-ranging start once the session has had its chance to fail.
+///
+/// A second answer is harmless: the Java side takes the pending request out
+/// of its map, so whichever of this, the first update, and an invalidation
+/// arrives first wins and the others are dropped.
+static void cn1nbSettleRangingStart(CN1NearbyRangingSession *entry)
+        API_AVAILABLE(ios(14.0)) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                    (int64_t)CN1_NEARBY_RANGING_GRACE_NS),
+            dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            [entry settleStarted];
+        }
+    });
 }
 
 #endif // CN1_NEARBY_HAS_NI
@@ -1507,10 +1548,9 @@ void com_codename1_impl_ios_IOSNative_nearbyStartRanging___int_int_byte_1ARRAY(
             NINearbyPeerConfiguration *config =
                     [[[NINearbyPeerConfiguration alloc]
                             initWithPeerToken:token] autorelease];
-            entry.pendingStartRequest = 0;
+            entry.pendingStartRequest = requestId;
             [entry.session runWithConfiguration:config];
-            com_codename1_impl_ios_IOSNearbyCallbacks_sessionStarted___int_int(
-                    CN1_THREAD_STATE_PASS_ARG requestId, sessionHandle);
+            cn1nbSettleRangingStart(entry);
             return;
         }
     }

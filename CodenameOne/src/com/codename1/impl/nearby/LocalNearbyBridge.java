@@ -121,6 +121,10 @@ public class LocalNearbyBridge implements NearbyBridge {
     ///
     /// @hidden not part of the public API; test-only.
     private int lastAcceptRequestId;
+    /// Payload ids the app has cancelled, so a delivery already queued for
+    /// one can report CANCELED instead of SUCCESS.
+    private final java.util.Set<Integer> cancelledPayloads =
+            new java.util.HashSet<Integer>();
     /// Where delayed deliveries go while a test drives the clock, or null in
     /// normal operation.
     ///
@@ -643,6 +647,8 @@ public class LocalNearbyBridge implements NearbyBridge {
             @Override
             public void run() {
                 NearbyTransport.deliverRequestOk(requestId);
+                boolean cancelled = cancelledPayloads.remove(
+                        Integer.valueOf(payloadId));
                 for (String endpointId : endpointIds) {
                     final SimEndpoint e = findEndpoint(endpointId);
                     if (e == null || !connected.contains(endpointId)) {
@@ -650,6 +656,12 @@ public class LocalNearbyBridge implements NearbyBridge {
                     }
                     long total = payloadType == PAYLOAD_BYTES && bytes != null
                             ? bytes.length : -1;
+                    if (cancelled) {
+                        NearbyTransport.deliverPayloadProgress(e.encode(),
+                                payloadId, 0, total,
+                                PayloadStatus.CANCELED.ordinal());
+                        continue;
+                    }
                     NearbyTransport.deliverPayloadProgress(e.encode(),
                             payloadId, total < 0 ? 0 : total, total,
                             PayloadStatus.SUCCESS.ordinal());
@@ -664,6 +676,13 @@ public class LocalNearbyBridge implements NearbyBridge {
 
     @Override
     public void cancelPayload(int payloadId) {
+        // Cancellation is real here, not a no-op. sendPayload is delayed like
+        // everything else in this bridge, so an app CAN cancel while a send
+        // is still in flight -- and doing nothing meant the queued delivery
+        // went on to report SUCCESS and echo the payload, so the simulator
+        // was the one place the public cancellation contract was never
+        // exercised.
+        cancelledPayloads.add(Integer.valueOf(payloadId));
     }
 
     @Override
@@ -681,6 +700,7 @@ public class LocalNearbyBridge implements NearbyBridge {
         advertising = false;
         discovering = false;
         transportGeneration++;
+        cancelledPayloads.clear();
         List<String> doomed = new ArrayList<String>(connected);
         connected.clear();
         for (String id : doomed) {

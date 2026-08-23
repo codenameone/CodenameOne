@@ -152,9 +152,12 @@ Ask for `CompanionProfile.GENERIC` unless the device is a watch, a
 head-mounted display or a computer. A profile is a request for elevated
 privileges as much as a description, and the specific ones cost the user a
 stronger prompt. The build scanner can't see which profile a request asks for,
-because it arrives as an enum constant; set
-`android.nearby.watchProfile=true` if you use `CompanionProfile.WATCH`, so the
-manifest carries the permission that profile needs.
+because it arrives as an enum constant, so name it yourself: set
+`android.nearby.watchProfile`, `android.nearby.computerProfile` or
+`android.nearby.glassesProfile` to `true` for whichever of
+`CompanionProfile.WATCH`, `COMPUTER` and `GLASSES` you use. Each declares that
+profile's own permission, and without it Android rejects the association
+before the chooser opens -- which looks to the user like nothing happened.
 
 Two platform differences to design around. Presence notifications are Android
 only: AccessorySetupKit reports an accessory being added to or removed from the
@@ -255,6 +258,8 @@ the simulator drives instead.
 | `ios.nearby.accessoryServices` | unset | Comma-separated Bluetooth service UUIDs the association picker may discover. Required for the picker to find anything on iOS.
 | `ios.nearby.background` | `false` | Requests the `com.apple.developer.nearby-interaction` entitlement and the matching background mode. Enable the capability on the App ID first.
 | `android.nearby.watchProfile` | `false` | Declares the watch companion profile permission, for an app that associates with `CompanionProfile.WATCH`.
+| `android.nearby.computerProfile` | `false` | The same for `CompanionProfile.COMPUTER`, which Android honours from API 33.
+| `android.nearby.glassesProfile` | `false` | The same for `CompanionProfile.GLASSES`, which Android honours from API 34.
 |===
 
 Everything else is automatic. Referencing a package links its frameworks,

@@ -188,7 +188,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // checkForPermission blocks through invokeAndBlock and must run on the
         // EDT.
         Display.getInstance().callSerially(
-                permissionRunnable(requestId, perms));
+                permissionRunnable(requestId, perms, activity));
     }
 
     /// Adds a permission the app has not already been granted.
@@ -202,19 +202,82 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// Static so the Runnable carries no synthetic outer reference, which
     /// SpotBugs reports as SIC_INNER_SHOULD_BE_STATIC_ANON.
     private static Runnable permissionRunnable(final int requestId,
-            final ArrayList<String> perms) {
+            final ArrayList<String> perms, final Activity activity) {
         return new Runnable() {
             @Override
             public void run() {
-                boolean all = true;
-                for (String permission : perms) {
-                    all = AndroidImplementation.checkForPermission(permission,
-                            "This is required to find nearby devices") && all;
-                }
                 com.codename1.nearby.ranging.Ranging.deliverPermissionResult(
-                        requestId, all);
+                        requestId, requestTogether(activity, perms));
             }
         };
+    }
+
+    /// Asks for every outstanding permission in ONE prompt.
+    ///
+    /// Not a loop over AndroidImplementation.checkForPermission: that issues a
+    /// one-element requestPermissions, and from Android 12 fine and coarse
+    /// location must be requested TOGETHER -- the system shows one dialog with
+    /// a precise/approximate choice and rejects a request for fine on its own.
+    /// Asked one at a time, the fine request was refused outright, the method
+    /// answered false, and the transport could not become authorized without
+    /// the app asking a second time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `activity`: the foreground activity
+    /// - `perms`: every permission the operation needs
+    ///
+    /// #### Returns
+    ///
+    /// true when all of them are granted once the prompt closes
+    static boolean requestTogether(Activity activity, List<String> perms) {
+        if (Build.VERSION.SDK_INT < 23) {
+            return true;
+        }
+        if (activity == null) {
+            return false;
+        }
+        List<String> missing = new ArrayList<String>();
+        for (int i = 0; i < perms.size(); i++) {
+            if (activity.checkSelfPermission(perms.get(i))
+                    != PackageManager.PERMISSION_GRANTED) {
+                missing.add(perms.get(i));
+            }
+        }
+        if (missing.isEmpty()) {
+            return true;
+        }
+        if (!(activity instanceof CodenameOneActivity)) {
+            return false;
+        }
+        final CodenameOneActivity host = (CodenameOneActivity) activity;
+        host.setRequestForPermission(true);
+        host.setWaitingForPermissionResult(true);
+        // Request code 1, the one CodenameOneActivity's own result handler
+        // expects; it clears the flag whatever the code, but matching keeps
+        // this indistinguishable from the port's other permission requests.
+        activity.requestPermissions(
+                missing.toArray(new String[missing.size()]), 1);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                while (host.isRequestForPermission()) {
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        });
+        for (int i = 0; i < perms.size(); i++) {
+            if (activity.checkSelfPermission(perms.get(i))
+                    != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ------------------------------------------------------------------

@@ -2568,14 +2568,30 @@ public class AndroidGradleBuilder extends Executor {
         // needs usesPermissionFlags from 33 -- and a flat list cannot say any
         // of that.
         //
-        // android.nearby.watchProfile is a hint rather than something the
-        // scanner works out: the profile arrives as an enum constant, which
-        // is a field reference, and Executor.visitFieldInsn is an empty
-        // override. Defaulted false because REQUEST_COMPANION_PROFILE_WATCH
-        // is a strong permission to ask for on a guess.
+        // The profile hints are hints rather than something the scanner
+        // works out: the profile arrives as an enum constant, which is a
+        // field reference, and Executor.visitFieldInsn is an empty override.
+        // Each defaults false because a REQUEST_COMPANION_PROFILE_* is a
+        // strong permission to ask for on a guess.
+        //
+        // All three the portable API exposes have a hint, not only watch:
+        // AndroidNearbyBackend forwards COMPUTER on API 33 and GLASSES on 34,
+        // and without the matching permission the platform rejects the
+        // association before the chooser opens.
         if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
-            boolean watchProfile = "true".equalsIgnoreCase(
-                    request.getArg("android.nearby.watchProfile", "false"));
+            StringBuilder profiles = new StringBuilder();
+            if ("true".equalsIgnoreCase(
+                    request.getArg("android.nearby.watchProfile", "false"))) {
+                profiles.append("watch,");
+            }
+            if ("true".equalsIgnoreCase(request.getArg(
+                    "android.nearby.computerProfile", "false"))) {
+                profiles.append("computer,");
+            }
+            if ("true".equalsIgnoreCase(request.getArg(
+                    "android.nearby.glassesProfile", "false"))) {
+                profiles.append("glasses,");
+            }
             log("Nearby fragments version "
                     + NearbyManifestFragments.FRAGMENT_VERSION
                     + (usesNearbyRanging ? " ranging" : "")
@@ -2584,8 +2600,8 @@ public class AndroidGradleBuilder extends Executor {
                     + (usesNearbyPresence ? " presence" : ""));
             xPermissions = NearbyManifestFragments.inject(xPermissions,
                     usesNearbyRanging, usesNearbyTransport,
-                    usesNearbyCompanion, usesNearbyPresence, watchProfile,
-                    targetSDKVersionInt);
+                    usesNearbyCompanion, usesNearbyPresence,
+                    profiles.toString(), targetSDKVersionInt);
             String presenceService =
                     NearbyManifestFragments.presenceService(usesNearbyPresence);
             if (presenceService.length() > 0
