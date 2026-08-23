@@ -3088,7 +3088,11 @@ public final class InterpRuntime {
         Object values = c.staticValue("$VALUES");
         if (values instanceof Object[]) {
             Object[] a = (Object[]) values;
-            for (Object constant : a) {
+            for (Object raw : a) {
+                // `$VALUES` is the interpreter's own Object[]. Its elements
+                // are the peers each enum constant was stored as; walk back to
+                // the InterpObject the peer stands for before matching.
+                Object constant = fromHost(raw);
                 if (constant instanceof InterpObject
                         && name.equals(((InterpObject) constant).enumName)) {
                     return constant;
@@ -3311,8 +3315,13 @@ public final class InterpRuntime {
     }
 
     private boolean isElementOf(Object v, String element) throws Throwable {
-        if (v instanceof InterpObject) {
-            InterpObject io = (InterpObject) v;
+        // Arrays hold peers when a peer exists, so an element read raw from the
+        // backing `Object[]` looks host-typed. Reach back to the interpreted
+        // object it stands for before answering, or a Color[] whose elements
+        // are stored as their shim peers rejects every element.
+        Object unwrapped = fromHost(v);
+        if (unwrapped instanceof InterpObject) {
+            InterpObject io = (InterpObject) unwrapped;
             if (io.type.isSubclassOfInterp(element)) {
                 return true;
             }
@@ -3403,13 +3412,19 @@ public final class InterpRuntime {
                 int i = f.popInt();
                 Object a = f.popRef();
                 checkArray(a, i);
-                // `Form[] forms = new Form[1]; forms[0] = new MyForm();` gives
-                // us a real Form[] and an InterpObject, and storing the wrapper
-                // is an ArrayStoreException for code that is perfectly legal
-                // Java. Only an Object[] can hold the wrapper.
+                // Store the peer whenever the value has one, even into a plain
+                // `Object[]` that holds pushed-only-type elements. An earlier
+                // version kept wrappers in exact `Object[]` on the theory that
+                // interpreter reads would see them again, but a host method
+                // like `Arrays.asList(items)` retains the array by reference;
+                // a later interpreted `items[0] = new Item()` would then leave
+                // a wrapper alongside the peers the host handed out, and a
+                // subsequent `Collections.sort` casts to `Comparable` on the
+                // wrong side. `AALOAD` routes reads through `fromHost` so the
+                // interpreter still sees its own object. The wrapper is stored
+                // only when no peer exists (a pushed-only type has none).
                 if (v instanceof InterpObject && !(a instanceof InterpObject[])
-                        && ((InterpObject) v).hostPeer != null
-                        && !a.getClass().getName().equals("[Ljava.lang.Object;")) {
+                        && ((InterpObject) v).hostPeer != null) {
                     v = ((InterpObject) v).hostPeer;
                 }
                 ((Object[]) a)[i] = v;
@@ -3576,16 +3591,30 @@ public final class InterpRuntime {
         if (t == null) {
             return new InterpThrowable(new NullPointerException("throw null"), snapshotStack());
         }
+        // Rethrow: `catch (E e) { throw e; }` reaches ATHROW with the same
+        // instance the original throw recorded, and Java preserves the stack
+        // of the original throw rather than the rethrow site. Detect that by
+        // instance identity with `lastFailure.thrown` and keep the recorded
+        // stack instead of taking a fresh snapshot.
+        Failure prev = lastFailure;
+        boolean rethrow = prev != null && prev.thrown == t;   //NOPMD CompareObjectsWithEquals - identity is the point
         if (t instanceof Throwable) {
             // Deliberately not wrapped. A framework method that calls
             // interpreted code and catches IllegalStateException has to keep
             // catching it, so the exception has to stay the exception. The
             // interpreted frames are recorded beside it instead, and
             // [#interpretedStackFor] hands them back if it escapes.
-            lastFailure = new Failure(t, snapshotStack(), null);
+            if (!rethrow) {
+                lastFailure = new Failure(t, snapshotStack(), null);
+            }
             return (Throwable) t;
         }
-        return new InterpThrowable(t, snapshotStack());
+        InterpThrowable wrapped = new InterpThrowable(t, rethrow ? prev.stack : snapshotStack());
+        // Record the wrapper too, so a later `throw e` that catches this
+        // InterpThrowable is recognised as a rethrow and keeps the original
+        // stack rather than replacing it with the rethrow site.
+        lastFailure = new Failure(wrapped, wrapped.getInterpretedStack(), null);
+        return wrapped;
     }
 
     /// Where interpreted code threw this exception, or null if it did not.

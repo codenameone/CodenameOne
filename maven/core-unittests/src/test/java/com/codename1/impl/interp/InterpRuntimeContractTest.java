@@ -390,6 +390,43 @@ class InterpRuntimeContractTest {
     }
 
     /**
+     * `catch (E e) { throw e; }` is Java's usual pattern for filtering. The
+     * IDE has to see the site the exception was originally raised at, not the
+     * `throw e` a handler happened to run through, because the rethrow site is
+     * uninformative -- it is where a caller decided not to handle the failure,
+     * not where the failure happened.
+     */
+    @Test
+    @DisplayName("a rethrown exception keeps the original throw site in its trace")
+    void rethrowPreservesOriginalStack() throws Throwable {
+        InterpRuntime rt = load("Rethrow",
+                "public class Rethrow {\n"
+                + "  static void inner() { throw new IllegalStateException(\"boom\"); }\n"
+                + "  static void middle() {\n"
+                + "    try { inner(); }\n"
+                + "    catch (IllegalStateException e) { throw e; }\n"
+                + "  }\n"
+                + "  public static void main(String[] a) { middle(); }\n"
+                + "}\n");
+        rt.setEdtBudgetMs(0);
+
+        try {
+            rt.runMain(new String[0]);
+            throw new AssertionError("expected the exception to escape");
+        } catch (Throwable outer) {
+            Throwable e = outer instanceof InterpThrowable ? ((InterpThrowable) outer).getCause() : outer;
+            if (e == null) {
+                e = outer;
+            }
+            String[] stack = rt.interpretedStackFor(e);
+            assertTrue(stack != null && stack.length > 0,
+                    "the rethrown exception should still carry the interpreted stack");
+            assertTrue(stack[0].startsWith("Rethrow.inner("),
+                    "the innermost frame should be the original throw site, was " + stack[0]);
+        }
+    }
+
+    /**
      * Apple allows an app to download and run code only where the user can see
      * and edit the source (guideline 2.5.2). The runtime enforces that rather
      * than relying on the tool chain to have included it.
