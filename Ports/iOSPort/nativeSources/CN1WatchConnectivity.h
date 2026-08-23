@@ -97,6 +97,15 @@
 /// Re-runs the received-context delivery once, after any number of paths have been forgotten.
 - (void)scheduleReceivedContextReplay;
 
+/// Mirrors a published surface timeline to the paired watch so a complication can render it.
+///
+/// A class method because the surfaces natives reach it through NSClassFromString: they compile
+/// in builds that never touched com.codename1.wearable, where this class may not exist at all.
+///
+/// Best-effort by contract. See the implementation for the delivery ladder; the caller has
+/// already persisted the timeline locally, so nothing here can make the phone's own widget wrong.
++ (void)mirrorComplicationUserInfo:(NSDictionary *)info;
+
 @end
 
 #endif // CN1_USE_WATCHCONNECTIVITY

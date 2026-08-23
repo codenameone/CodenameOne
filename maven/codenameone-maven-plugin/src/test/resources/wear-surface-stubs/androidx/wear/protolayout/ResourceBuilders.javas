@@ -1,0 +1,26 @@
+package androidx.wear.protolayout;
+public final class ResourceBuilders {
+    public static final int IMAGE_FORMAT_UNDEFINED = 0;
+    public static class InlineImageResource {
+        public static class Builder {
+            public Builder setData(byte[] d) { return this; }
+            public Builder setWidthPx(int w) { return this; }
+            public Builder setHeightPx(int h) { return this; }
+            public Builder setFormat(int f) { return this; }
+            public InlineImageResource build() { return null; }
+        }
+    }
+    public static class ImageResource {
+        public static class Builder {
+            public Builder setInlineResource(InlineImageResource r) { return this; }
+            public ImageResource build() { return null; }
+        }
+    }
+    public static class Resources {
+        public static class Builder {
+            public Builder addIdToImageMapping(String id, ImageResource r) { return this; }
+            public Builder setVersion(String v) { return this; }
+            public Resources build() { return null; }
+        }
+    }
+}

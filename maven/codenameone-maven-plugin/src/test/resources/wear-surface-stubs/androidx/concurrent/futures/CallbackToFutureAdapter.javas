@@ -1,0 +1,7 @@
+package androidx.concurrent.futures;
+import com.google.common.util.concurrent.ListenableFuture;
+public final class CallbackToFutureAdapter {
+    public interface Completer<T> { boolean set(T value); }
+    public interface Resolver<T> { Object attachCompleter(Completer<T> completer); }
+    public static <T> ListenableFuture<T> getFuture(Resolver<T> resolver) { return null; }
+}

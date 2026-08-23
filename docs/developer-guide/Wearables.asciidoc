@@ -57,10 +57,10 @@ there is no phone app to pair with, declare it standalone:
 include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-002,indent=0]
 ----
 
-Wear OS has no companion form yet. An Android project that sets a watch main
-class without `codename1.watchStandalone` builds the phone APK alone -- the
-build says so -- so a Wear app has to be declared standalone today. Apple Watch
-supports both.
+Both platforms support both forms. On Apple a companion build embeds the watch
+app inside the iOS app so the pair installs together; on Android it produces a
+second artifact, `<yourapp>-wear.apk`, beside the phone one. A standalone build
+on either platform ships the watch app on its own.
 
 On Android a standalone build turns the single APK into the Wear OS app, and that
 is what ships. On Apple the watch target is built standalone -- detached from the
@@ -276,16 +276,62 @@ home here, because most complications are a gauge, a dial or a ring.
 Design for a glance. A complication is a few dozen pixels someone reads in under
 a second, so one number or one gauge beats any layout that has to be read.
 
+==== What a Watch Face Actually Shows
+[[watch-complication-fidelity]]
+
+This is the part that surprises people, so it's worth stating plainly: **a
+complication isn't a small widget.** A watch face asks your data source for one
+typed value -- a short string, a long string, a ranged value, a monochrome glyph
+-- and composes it into its own design. There is no layout to honour.
+
+The node tree you publish is therefore flattened and *mined for content* rather
+than rendered. On Wear OS your kind supplies at most two text nodes and one image;
+containers, padding, background, corner radius, alignment, weight, per-node
+colour, and every action except the root, all belong to the face. Everything
+dropped is reported once per render, so `adb logcat -s CN1Surfaces` tells you
+what a face is showing and what it leaves out.
+
+Apple is less lossy, because a WidgetKit accessory family renders your SwiftUI
+tree -- but the slot is still tiny and monochrome, and the same design advice
+applies.
+
+A Tile is the exception. It renders the node tree in full, and two things come
+out *better* there than on a phone widget:
+
+* **Circular progress renders natively.** The Android home-screen widget has to
+  degrade a circular bar to a linear one; a Tile doesn't.
+* **Per-node tap actions work.** A small iOS widget honors only the root action.
+
+The Tile's own limitation is time: a `SurfaceDynamicText` countdown ticks
+natively on both phone platforms, but freezes on a Tile and refreshes when your
+timeline says the value changes. ProtoLayout can animate one, but only on some
+Wear releases -- a frozen value that's always right beats a ticking one that
+works on some watches.
+
+TIP: Preview the watch families in the simulator (*Widgets > Widgets Preview*)
+before you build to a device. It renders the node tree at the right size and
+clips the round families the way a face does -- which is worth seeing, because a
+watch face shows nothing a circular complication draws into its corners. It
+can't show you the per-platform lowering, though, so a layout that looks right
+there can still arrive on Wear OS as one number.
+
 NOTE: `WATCH_RECTANGULAR` and `LOCKSCREEN` share a family on Apple. If you
 publish both, each surface gets the layout you designed for it; if you publish
 only one, it's used for both.
 
-IMPORTANT: The watch families and the descriptor pipeline behind them are in
-place, and declaring them is forward-compatible. The platform targets that render
-them on a watch face -- the watchOS widget extension and the Wear OS complication
-data source and Tile service -- aren't generated yet, so a kind that declares
-only watch families produces no on-device surface today. Declaring a phone family
-alongside them keeps the widget working meanwhile.
+Declaring a watch family is all it takes. On Apple the build adds a second
+WidgetKit extension, `CN1WatchWidgets`, embedded in the watch app; on Wear OS it
+generates a complication data source per kind, plus a Tile for the rectangular
+family. Both are additive: an app that declares no watch family carries neither.
+
+IMPORTANT: A kind that declares *only* watch families no longer produces a
+home-screen widget on Android. It never produced an iPhone one, and rendering a
+complication as a home-screen widget puts a surface in front of the user that the
+manifest never asked for. Declare a phone family alongside the watch ones if you
+want both.
+
+The one thing to know before you design: **what a watch face shows isn't what
+you laid out**. See <<watch-complication-fidelity>>.
 
 === Apple Watch (watchOS)
 
@@ -393,14 +439,25 @@ A Wear OS app is a regular Android app. The Codename One Android port renders th
 UI with the same pipeline it uses on phones, so no special rendering backend is
 required. The same `codename1.watchMain` declaration drives both platforms.
 
-What it produces differs, though, and that difference is worth stating precisely.
-Set `codename1.watchStandalone` and the Android build *is* the watch app: one APK
-that installs and runs on the watch. Leave it unset and the Android build stays a
-phone build -- a companion Wear APK alongside the phone APK isn't generated yet,
-so on Android the companion configuration currently gives you the phone app and
-the wearable link, not a second artifact. The build logs this rather than leaving
-you to discover it. On Apple the companion case does produce and embed the watch
-app, which is why the two platforms have a section each.
+What it produces differs from Apple, though, and that difference is worth stating
+precisely. Set `codename1.watchStandalone` and the Android build *is* the watch
+app: one APK that installs and runs on the watch. Leave it unset and you get two
+artifacts -- `<yourapp>.apk` for the phone and `<yourapp>-wear.apk` for the
+watch -- because a Wear companion is a separate product published to the same
+Play listing, where an Apple one is embedded inside the phone app.
+
+The Wear artifact carries a higher version code than the phone's. On a watch Play
+picks among the APKs the device supports by version code, so the wear one has to
+outrank it; on a phone the required watch feature filters the wear APK out
+entirely. The default is the phone's code plus 100,000,000, which sounds
+extravagant and isn't: the gap has to be wide enough that the phone's own
+next release never catches up to a watch code it already published, and
+plus one is consumed by the next phone build.
+`android.watchVersionCodeOffset` changes the gap and
+`android.watchVersionCode` sets the watch code outright.
+
+Set `android.watchModule=false` if you want the wearable link but no watch app of
+your own -- your phone build is then exactly what it was.
 
 A standalone Wear app declares the watch hardware feature in the manifest:
 
@@ -442,6 +499,50 @@ dependency and the listener service automatically. The
 `android.playService.wearable` hint remains for apps that want to call the Data
 Layer APIs directly.
 
+=== Feeding a Complication from the Phone
+[[watch-complication-mirror]]
+
+A watch app has its own storage. Nothing the phone writes is visible there, on
+either platform -- on Apple the App Group identifier is the same string but
+resolves to a watch-local container, and on Wear OS the two apps are separate
+installs. That's the single most counter-intuitive fact here, and it's got
+one consequence: **a complication is fed by the watch's own
+`Surfaces.publish()`.**
+
+Which is often inconvenient, because the data usually lives on the phone. A
+phone-side publish of a watch-bearing kind is therefore mirrored to the watch for
+you, over the same link `com.codename1.wearable` uses. You write the same
+`Surfaces.publish(...)` you always did.
+
+The mirror is best-effort by design, and always runs *after* the local publish
+has succeeded -- nothing it does can leave your phone widget wrong:
+
+* *Apple* uses the one WatchConnectivity API that wakes the watch app in the
+  background to refresh a complication. It's budgeted at about fifty transfers
+  a day. When the user has placed no complication, or the budget is spent, the
+  update is queued instead and applied when the watch app next runs.
+* *Wear OS* replicates the descriptor over the Data Layer, which starts the watch
+  app's process to deliver it. Imagery travels as a file transfer.
+* *Size* is capped -- 48KB on Apple, and on Wear OS 64KB for the descriptor with
+  its own cap on imagery. Over the cap the imagery is dropped first, on the
+  grounds that a complication rendering its numbers with a missing glyph beats one
+  that never updates; over the cap even then, the watch keeps its previous
+  timeline.
+
+Every refusal is logged once. Nothing throws.
+
+NOTE: The mirror is applied on the watch without starting your application: it
+writes the descriptor and asks the watch face to re-read. The wake exists to
+refresh a complication, not to bring a UI forward the user didn't ask for.
+
+The reserved path `/cn1surface/<kindId>` belongs to the framework on Wear OS --
+don't publish your own data there.
+
+IMPORTANT: Declaring a watch family on Android adds `play-services-wearable` to
+your *phone* APK, because that's what carries the mirror. An app that wants
+complications fed only by the watch itself can avoid that by not declaring watch
+families on kinds the phone publishes.
+
 === Summary
 
 [cols="1,2,2"]
@@ -458,7 +559,7 @@ Layer APIs directly.
 
 |Distribution
 |Companion (embedded in the phone app) or standalone
-|Standalone only -- companion doesn't yet produce a Wear artifact
+|Companion (a second `-wear` artifact) or standalone
 
 |Runtime detection
 |`CN.isWatch()`
@@ -468,15 +569,15 @@ Layer APIs directly.
 |`com.codename1.wearable` over WatchConnectivity
 |`com.codename1.wearable` over the Wearable Data Layer
 
-|Complications (no target generated yet)
-|WidgetKit accessory families, declarable only
-|Complication data source and Tiles, declarable only
+|Complications
+|A WidgetKit extension embedded in the watch app
+|A complication data source per kind, plus a Tile for the rectangular family
 |===
 
-The complication row describes where each platform's watch surfaces will come
-from, not something you can ship today. You can declare the watch families on a
-surface kind, and nothing builds a complication or tile from them yet -- see
-<<watch-complications>> for what that means in practice.
+Declare a `WATCH_*` family on a surface kind and the build generates whatever
+that platform needs. What a watch face then *shows* is narrower than what you laid
+out, on Wear OS especially -- see <<watch-complication-fidelity>> before you
+design one.
 
 The wearable build is additive on both platforms: without a watch main class,
 your phone builds are unchanged.

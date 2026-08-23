@@ -1,0 +1,2 @@
+package android.net;
+public class Uri { public static Uri parse(String s) { return null; } public static String encode(String s) { return s; } }

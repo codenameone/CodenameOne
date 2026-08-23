@@ -1,0 +1,5 @@
+package com.google.android.gms.wearable;
+public interface CapabilityInfo {
+    String getName();
+    java.util.Set<Node> getNodes();
+}

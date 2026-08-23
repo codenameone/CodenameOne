@@ -26,6 +26,7 @@ import com.codename1.wearable.WearableConnection;
 
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.WearableListenerService;
 
@@ -152,7 +153,11 @@ public class CN1WearableListenerService extends WearableListenerService {
     @Override
     public void onMessageReceived(final MessageEvent event) {
         // Same reasoning as onDataChanged: isFromAKnownNode can block on a cold start.
-        final MessageEvent frozen = event.freeze();
+        // Copied field by field rather than frozen: DataEvent is Freezable and MessageEvent is
+        // not -- it is a plain four-method interface -- so there is no freeze() to call here. The
+        // copy is what makes the hand-off safe, because Play services may recycle the event once
+        // onMessageReceived returns and the worker below reads it after that.
+        final MessageEvent frozen = new FrozenMessageEvent(event);
         MESSAGE_WORKER.execute(new Runnable() {
             public void run() {
                 handleMessageReceived(frozen);
@@ -170,6 +175,18 @@ public class CN1WearableListenerService extends WearableListenerService {
         // node can still send something this process cannot act on -- a reply whose requester died,
         // a malformed request path, a path from a different build -- and launching first brought
         // the UI forward for a message that is discarded a few lines later.
+        if (path.startsWith(CN1WearableBridge.surfaceReloadPath())) {
+            // A watch asking the phone to publish a mirrored kind again. Framework traffic, so it
+            // is answered here and never delivered to the app's own listeners -- the same
+            // position and reasoning the /cn1surface descriptors get on the way down.
+            //
+            // The watch cannot refresh a mirrored surface itself: the content is produced here,
+            // and it has no background-fetch listener recorded because that preference is written
+            // by the publish path a watch never runs.
+            surfaceMirror("reloadRequested",
+                    path.substring(CN1WearableBridge.surfaceReloadPath().length()), null);
+            return;
+        }
         if (path.startsWith(CN1WearableBridge.replyUnavailablePath())) {
             // The peer says it cannot answer -- it is installed and reachable, but has no listener
             // and no permitted way to get one (see CN1WearableBridge.declineRequest). Failing the
@@ -303,6 +320,271 @@ public class CN1WearableListenerService extends WearableListenerService {
         });
     }
 
+    /**
+     * An immutable copy of a delivered {@link MessageEvent}.
+     *
+     * <p>{@link com.google.android.gms.wearable.DataEvent} extends {@code Freezable} and hands out
+     * a detached copy through {@code freeze()}; {@code MessageEvent} does not, so a hand-off to a
+     * worker thread has to copy the four accessors by hand. Play services documents the delivered
+     * event as valid only for the duration of the callback, and every read below happens after it
+     * has returned.</p>
+     *
+     * <p>Implementing the interface, rather than passing the fields separately, keeps
+     * {@code handleMessageReceived} typed against {@code MessageEvent}. If Play services ever adds
+     * a fifth method this stops compiling, which is the intended way to find out.</p>
+     */
+    private static final class FrozenMessageEvent implements MessageEvent {
+        private final int requestId;
+        private final String path;
+        private final String sourceNodeId;
+        private final byte[] data;
+
+        FrozenMessageEvent(MessageEvent event) {
+            requestId = event.getRequestId();
+            path = event.getPath();
+            sourceNodeId = event.getSourceNodeId();
+            byte[] payload = event.getData();
+            data = payload == null ? null : (byte[]) payload.clone();
+        }
+
+        @Override
+        public int getRequestId() {
+            return requestId;
+        }
+
+        @Override
+        public String getPath() {
+            return path;
+        }
+
+        @Override
+        public String getSourceNodeId() {
+            return sourceNodeId;
+        }
+
+        @Override
+        public byte[] getData() {
+            return data;
+        }
+    }
+
+    /** The port's surface mirror, or null on a port that predates it. See {@link #surfaceMirror}. */
+    private static Class<?> mirrorClass;
+    private static boolean mirrorLookedUp;
+
+    /**
+     * The mirror class, looked up once, or null when this port has no surfaces implementation.
+     *
+     * <p>Reflective on purpose. This service is injected into EVERY build that references
+     * {@code com.codename1.wearable}, including a versioned build pinned to a Codename One
+     * release older than external surfaces -- and a hard reference to a class that port does not
+     * contain fails javac in a file the developer never wrote, for a feature they never enabled.
+     * The same reason {@code CN1WatchSurfaceNotifier} reaches for the androidx complication
+     * classes this way.</p>
+     *
+     * <p>Safe against R8 because the two conditions coincide: the builder emits
+     * {@code -keep class com.codename1.impl.android.surfaces.**} exactly when the app uses
+     * surfaces, which is exactly when this class is present to be found. A rename would otherwise
+     * turn this into the failure the reflection ban exists for -- working in the simulator and
+     * silently dead in a release build.</p>
+     *
+     * @return the mirror class, or null
+     */
+    private static synchronized Class<?> mirrorClass() {
+        if (!mirrorLookedUp) {
+            mirrorLookedUp = true;
+            try {
+                mirrorClass = Class.forName(
+                        "com.codename1.impl.android.surfaces.CN1SurfaceMirror");
+            } catch (Throwable t) {
+                // A port without surfaces. Mirror traffic cannot arrive for it either, because
+                // nothing on the phone half would have sent any.
+                mirrorClass = null;
+            }
+        }
+        return mirrorClass;
+    }
+
+    /** Whether a path belongs to the surface mirror rather than to the application. */
+    private static boolean surfaceMirrorHandles(String path) {
+        Class<?> mirror = mirrorClass();
+        if (mirror == null || path == null) {
+            return false;
+        }
+        try {
+            return Boolean.TRUE.equals(mirror.getMethod("isMirrorPath", String.class)
+                    .invoke(null, path));
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Hands one piece of mirror traffic to the port.
+     *
+     * @param method {@code receive}, {@code receiveFile} or {@code remove}
+     * @param path the reserved application path
+     * @param payload the payload, or null for {@code remove}
+     * @return true when the mirror took it; false when there is no mirror or it threw. A caller
+     *         that acknowledges delivery has to know the difference, because an acknowledgement
+     *         is durable and stops the sender retrying
+     */
+    /// How many times a failed mirrored descriptor write is re-attempted, and the delay before
+    /// the first. The delays double, so the last attempt is a little over twenty minutes out --
+    /// long enough to outlast the transient conditions this is for (storage momentarily full, a
+    /// directory briefly unwritable) without holding the payload for ever.
+    private static final int MIRROR_WRITE_RETRIES = 6;
+    private static final long MIRROR_WRITE_RETRY_MILLIS = 20000L;
+
+    /// How many mirror events each reserved path has seen, so a delayed retry can tell whether it
+    /// has been overtaken. Small and bounded by the number of declared kinds.
+    private static final java.util.HashMap<String, Long> MIRROR_GENERATIONS =
+            new java.util.HashMap<String, Long>();
+
+    private static synchronized long bumpMirrorGeneration(String path) {
+        Long current = MIRROR_GENERATIONS.get(path);
+        long next = (current == null ? 0L : current.longValue()) + 1L;
+        MIRROR_GENERATIONS.put(path, Long.valueOf(next));
+        return next;
+    }
+
+    private static synchronized long mirrorGeneration(String path) {
+        Long current = MIRROR_GENERATIONS.get(path);
+        return current == null ? 0L : current.longValue();
+    }
+
+    /**
+     * Re-attempts a mirrored descriptor the watch could not store.
+     *
+     * <p>Bounded, and in memory. What it cannot cover is the process dying mid-outage: the
+     * payload goes with it and the unchanged Data Layer item produces no fresh callback, so that
+     * descriptor waits for the phone's next publish. Persisting it to survive that would mean
+     * writing to the storage that just refused a write, which is the condition being retried.</p>
+     *
+     * @param path the reserved application path
+     * @param payload the descriptor payload, held for the retry
+     * @param attempt 1 for the first re-attempt
+     */
+    /**
+     * Re-attempts a mirrored withdrawal the watch could not carry out.
+     *
+     * <p>The mirror image of {@link #retryMirrorDescriptor}, and needed for a sharper reason: a
+     * descriptor that fails to apply is at least offered again by the next publish, while a
+     * deletion is offered once and never again.</p>
+     *
+     * @param path the reserved application path
+     * @param attempt 1 for the first re-attempt
+     * @param generation the mirror generation this withdrawal belongs to
+     */
+    private void retryMirrorRemoval(final String path, final int attempt, final long generation) {
+        if (mirrorGeneration(path) != generation) {
+            // Overtaken by a republish, which supersedes the withdrawal outright.
+            return;
+        }
+        if (attempt > MIRROR_WRITE_RETRIES) {
+            android.util.Log.w("CN1Surfaces", "gave up withdrawing the mirrored surface on "
+                    + path + " after " + MIRROR_WRITE_RETRIES + " attempts; the watch keeps "
+                    + "showing it until the phone publishes that kind again");
+            return;
+        }
+        final CN1WearableListenerService self = this;
+        CN1WearableBridge.scheduleFrameworkRetry(new Runnable() {
+            public void run() {
+                if (mirrorGeneration(path) != generation) {
+                    return;
+                }
+                if (!self.surfaceMirror("remove", path, null)) {
+                    self.retryMirrorRemoval(path, attempt + 1, generation);
+                }
+            }
+        }, MIRROR_WRITE_RETRY_MILLIS << (attempt - 1));
+    }
+
+    private void retryMirrorDescriptor(final String path, final byte[] payload,
+            final int attempt, final long generation) {
+        if (mirrorGeneration(path) != generation) {
+            // Overtaken. A newer descriptor for this path -- or its tombstone -- has been handled
+            // since this retry was scheduled, so applying the payload now would either overwrite
+            // content that is newer than it or resurrect a surface the phone has withdrawn. The
+            // newer event has its own retry if it needs one.
+            return;
+        }
+        if (payload == null || attempt > MIRROR_WRITE_RETRIES) {
+            android.util.Log.w("CN1Surfaces", "gave up applying the mirrored surface on " + path
+                    + " after " + MIRROR_WRITE_RETRIES + " attempts; the watch keeps what it had "
+                    + "until the phone publishes again");
+            return;
+        }
+        final CN1WearableListenerService self = this;
+        CN1WearableBridge.scheduleFrameworkRetry(new Runnable() {
+            public void run() {
+                if (mirrorGeneration(path) != generation) {
+                    // Checked again here, not only on entry: the overtaking event usually lands
+                    // while this task is sitting on the timer, which is the whole window.
+                    return;
+                }
+                if (!self.surfaceMirror("receive", path, payload)) {
+                    self.retryMirrorDescriptor(path, payload, attempt + 1, generation);
+                }
+            }
+        }, MIRROR_WRITE_RETRY_MILLIS << (attempt - 1));
+    }
+
+    private boolean surfaceMirror(String method, String path, byte[] payload) {
+        Class<?> mirror = mirrorClass();
+        if (mirror == null) {
+            return false;
+        }
+        try {
+            // A null payload means the two-argument form, whichever method it is: remove and
+            // reloadRequested both take (Context, String) and neither carries bytes.
+            if (payload == null) {
+                Object removed = mirror
+                        .getMethod(method, android.content.Context.class, String.class)
+                        .invoke(null, this, path);
+                // Its own answer. remove used to be void and this returned true regardless, so a
+                // withdrawal the watch could not carry out looked like one that had -- and a
+                // deletion is offered exactly once, so nothing would have tried again. A port
+                // still declaring the void form answers null here, which is treated as success
+                // exactly as it was before: it is the same old behaviour for the same old port.
+                return !(removed instanceof Boolean) || ((Boolean) removed).booleanValue();
+            }
+            Object answer = mirror
+                    .getMethod(method, android.content.Context.class, String.class, byte[].class)
+                    .invoke(null, this, path, payload);
+            // The mirror's own answer where it has one. receiveFile catches its write failures
+            // internally and reports them by returning false, so a call that merely did not throw
+            // proves nothing -- and an acknowledgement made on that basis is durable, which loses
+            // the artwork rather than having it redelivered. A void method (receive) answers null
+            // and is taken at its word.
+            return !(answer instanceof Boolean) || ((Boolean) answer).booleanValue();
+        } catch (Throwable t) {
+            // Caught rather than propagated: a listener that throws takes the Data Layer
+            // callback down with it, and mirror traffic is a refresh rather than something the
+            // app is waiting on. Logged under the mirror's own tag so it reads beside the
+            // failures the mirror reports itself.
+            android.util.Log.w("CN1Surfaces",
+                    "Could not hand " + path + " to the surface mirror", t);
+            return false;
+        }
+    }
+
+    /**
+     * The payload of a mirrored surface item.
+     *
+     * <p>Read straight from the DataMap rather than through the bridge's ordering machinery: a
+     * mirror is a replacement, not a replicated value with a logical clock, and the newest write
+     * always wins.</p>
+     */
+    private static byte[] readMirrorPayload(DataEvent event) {
+        try {
+            return DataMapItem.fromDataItem(event.getDataItem()).getDataMap()
+                    .getByteArray(CN1WearableBridge.payloadKey());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     private void handleDataChanged(java.lang.Iterable<DataEvent> events, long removalGeneration,
             java.util.Set<String> openRemovals) {
         // Before anything is read: in a cold service process this is the only context there is, and
@@ -374,6 +656,50 @@ public class CN1WearableListenerService extends WearableListenerService {
                     ? null
                     : CN1WearableBridge.decode(
                             path.substring(CN1WearableBridge.pathPrefix().length()));
+            // Framework bookkeeping, routed BEFORE anything app-visible and before
+            // ensureAppRunning -- the same position and the same reasoning the acknowledgement
+            // traffic above uses. A mirrored complication is applied by writing a file and asking
+            // the watch face to re-read; there is nothing for the application to do, and starting
+            // it would bring a UI forward that the user did not ask for. Delivering it to the
+            // app's own listeners would also show it a message it never sent itself.
+            if (appPath != null
+                    && surfaceMirrorHandles(appPath)) {
+                // Deletions too, and NOT through the ordinary value-removal path below. A mirror
+                // is a replacement rather than a replicated value, so it never entered that
+                // path's cache or its logical clock, and letting a tombstone go there left the
+                // descriptor CN1SurfaceMirror.receive wrote sitting on disk -- the complication
+                // kept showing content the phone had already withdrawn.
+                // Every mirror event for this path moves its generation on, which is what lets a
+                // scheduled retry tell that it has been overtaken. Bumped BEFORE the work, so a
+                // retry scheduled by this very event carries the current number.
+                long generation = bumpMirrorGeneration(appPath);
+                if (deleted) {
+                    // The tombstone is consumed either way, and deliberately. A Data Layer
+                    // deletion is not redelivered -- unlike a changed item there is nothing left
+                    // to ask for -- so there is no later attempt to preserve it for.
+                    //
+                    // Which is exactly why a FAILED removal has to be retried here rather than
+                    // dropped: nothing else will ever offer this deletion again, so a directory
+                    // that is momentarily unwritable would leave the complication showing content
+                    // the phone withdrew, permanently. Same generation guard as a descriptor
+                    // retry, so a republish landing meanwhile cancels the withdrawal instead of
+                    // racing it.
+                    if (!surfaceMirror("remove", appPath, null)) {
+                        retryMirrorRemoval(appPath, 1, generation);
+                    }
+                } else {
+                    byte[] descriptor = readMirrorPayload(event);
+                    if (!surfaceMirror("receive", appPath, descriptor)) {
+                        // The write failed -- storage momentarily full is the case this is for.
+                        // Nothing else will offer this descriptor again: a Data Layer item that
+                        // has not changed produces no further callback, so the watch would keep
+                        // showing content the phone has already replaced, indefinitely. The
+                        // payload is in hand, so the retry needs no round trip.
+                        retryMirrorDescriptor(appPath, descriptor, 1, generation);
+                    }
+                }
+                continue;
+            }
             // Read before anything is cleared, so the reset below can tell this device's own
             // removal from a republish that landed while it was being processed.
             String beforeTombstone = !transferItem && deleted
@@ -442,6 +768,30 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // Confirmed from inside the delivery: dispatched is not delivered, and a
                     // claim persisted for a file the app never received suppresses the redelivery
                     // that would have replaced it.
+                    if (surfaceMirrorHandles(transfer.logicalPath)) {
+                        // Mirrored complication artwork. Stored beside the descriptor that names
+                        // it, without waking the app: see the data-item branch above.
+                        // Confirmed only if it was actually stored. The helper catches whatever
+                        // the mirror throws -- a directory that is momentarily unwritable, say --
+                        // and a claim made anyway is durable: the sender stops retrying and the
+                        // artwork is gone for good.
+                        if (surfaceMirror("receiveFile", transfer.logicalPath, transfer.payload)) {
+                            CN1WearableBridge.confirmTransferDelivered(this, uri, transferSeq,
+                                    true);
+                        } else {
+                            // RELINQUISHED, not merely left unconfirmed. Passing false to
+                            // confirmTransferDelivered returns without touching the in-memory
+                            // claim claimTransfer already made, and that claim then suppresses
+                            // every retry -- while the DataItem is unchanged, so nothing
+                            // generates a fresh callback either. The artwork would be missing
+                            // until the process restarted. relinquishTransfer drops the claim
+                            // AND goes back to read the item, which is the same thing the
+                            // tracked-delivery path below does when the listener never got the
+                            // payload.
+                            CN1WearableBridge.relinquishTransfer(this, uri);
+                        }
+                        continue;
+                    }
                     if (!started) {
                         ensureAppRunning();
                         started = true;

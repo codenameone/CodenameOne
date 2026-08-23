@@ -1,0 +1,22 @@
+package android.content;
+public interface SharedPreferences {
+    String getString(String k, String def);
+    long getLong(String k, long def);
+    int getInt(String k, int def);
+    boolean getBoolean(String k, boolean def);
+    java.util.Set<String> getStringSet(String k, java.util.Set<String> def);
+    boolean contains(String k);
+    java.util.Map<String, ?> getAll();
+    Editor edit();
+    interface Editor {
+        Editor putString(String k, String v);
+        Editor putLong(String k, long v);
+        Editor putInt(String k, int v);
+        Editor putBoolean(String k, boolean v);
+        Editor putStringSet(String k, java.util.Set<String> v);
+        Editor remove(String k);
+        Editor clear();
+        boolean commit();
+        void apply();
+    }
+}

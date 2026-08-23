@@ -738,11 +738,74 @@ public final class CN1SurfaceRenderer {
         }
     }
 
+    /**
+     * Rasterizes one {@code img} or {@code vec} node for a Wear complication or Tile.
+     *
+     * <p>Neither of those renders through RemoteViews -- a complication hands the watch face a
+     * typed value and a Tile serves a ProtoLayout -- so they need the bitmap rather than a view
+     * tree. Reusing the decoding and vector rasterization here is what makes a vector degrade to
+     * a bitmap on a watch face exactly as it does on a home screen, instead of degrading twice
+     * in two slightly different ways.</p>
+     *
+     * @param ctx any context
+     * @param kindId the widget kind, which locates the published imagery
+     * @param node an {@code img} or {@code vec} node
+     * @param state the entry state, for interpolated values
+     * @return the bitmap, or null when the node names nothing renderable
+     */
+    static Bitmap renderWatchBitmap(Context ctx, String kindId, JSONObject node,
+            JSONObject state) {
+        RenderContext rc = new RenderContext(ctx, state == null ? new JSONObject() : state,
+                kindId, CN1SurfaceStore.kindDir(ctx, kindId));
+        String type = node.optString("t", "");
+        if ("vec".equals(type)) {
+            return renderVectorBitmap(node, rc);
+        }
+        if ("img".equals(type)) {
+            return loadBitmap(node.optString("name", ""), node, rc);
+        }
+        return null;
+    }
+
+    /**
+     * The intent a complication or Tile tap should fire, matching what a widget tap sends.
+     *
+     * <p>Built here rather than at the call site so all three surfaces agree on the extras and
+     * on the canonical {@code cn1surface://} form -- which doubles as the uniqueness key that
+     * keeps PendingIntents with different extras from colliding.</p>
+     *
+     * @param ctx any context
+     * @param source the widget kind, reported to the action handler
+     * @param actionId the declared action id
+     * @param params the declared parameters, or null
+     * @return the trampoline intent
+     */
+    static Intent watchActionIntent(Context ctx, String source, String actionId,
+            JSONObject params) {
+        String paramsJson = params == null ? null : params.toString();
+        Intent intent = new Intent(ctx, CN1SurfaceActionActivity.class);
+        CN1SurfaceActionActivity.authenticate(ctx, intent);
+        intent.putExtra(CN1SurfaceActionActivity.EXTRA_SOURCE, source);
+        intent.putExtra(CN1SurfaceActionActivity.EXTRA_ACTION_ID, actionId);
+        if (paramsJson != null) {
+            intent.putExtra(CN1SurfaceActionActivity.EXTRA_ACTION_PARAMS, paramsJson);
+        }
+        StringBuilder uri = new StringBuilder("cn1surface://a?src=");
+        uri.append(Uri.encode(source == null ? "" : source));
+        uri.append("&id=").append(Uri.encode(actionId));
+        if (paramsJson != null) {
+            uri.append("&p=").append(Uri.encode(paramsJson));
+        }
+        intent.setData(Uri.parse(uri.toString()));
+        return intent;
+    }
+
     private static void applyAction(RemoteViews rv, JSONObject action, RenderContext rc) {
         String actionId = action.optString("id", "");
         JSONObject params = action.optJSONObject("p");
         String paramsJson = params == null ? null : params.toString();
         Intent intent = new Intent(rc.ctx, CN1SurfaceActionActivity.class);
+        CN1SurfaceActionActivity.authenticate(rc.ctx, intent);
         intent.putExtra(CN1SurfaceActionActivity.EXTRA_SOURCE, rc.source);
         intent.putExtra(CN1SurfaceActionActivity.EXTRA_ACTION_ID, actionId);
         if (paramsJson != null) {
@@ -784,28 +847,92 @@ public final class CN1SurfaceRenderer {
 
     private static int resolveColor(JSONObject color, RenderContext rc, int fallbackLight,
             int fallbackDark) {
+        return resolveColor(color, rc != null && rc.dark, fallbackLight, fallbackDark);
+    }
+
+    /// The colour a `color` node resolves to, in ARGB.
+    ///
+    /// Package-private and taking the appearance directly rather than a RenderContext, because
+    /// the Tile renderer needs the same answer and has none to give. One implementation: a
+    /// semantic role meaning one thing on a home screen and another on a watch face is a bug
+    /// nobody would look for.
+    static int resolveColor(JSONObject color, boolean dark, int fallbackLight, int fallbackDark) {
         String role = color.optString("role", null);
         if (role != null && role.length() > 0) {
             if ("label".equals(role)) {
-                return rc.dark ? LABEL_DARK : LABEL_LIGHT;
+                return dark ? LABEL_DARK : LABEL_LIGHT;
             }
             if ("secondaryLabel".equals(role)) {
-                return rc.dark ? SECONDARY_LABEL_DARK : SECONDARY_LABEL_LIGHT;
+                return dark ? SECONDARY_LABEL_DARK : SECONDARY_LABEL_LIGHT;
             }
             if ("background".equals(role)) {
-                return rc.dark ? BACKGROUND_DARK : BACKGROUND_LIGHT;
+                return dark ? BACKGROUND_DARK : BACKGROUND_LIGHT;
             }
             if ("accent".equals(role)) {
                 return ACCENT;
             }
-            return rc.dark ? fallbackDark : fallbackLight;
+            return dark ? fallbackDark : fallbackLight;
         }
         if (color.has("l") || color.has("d")) {
             long l = color.optLong("l", fallbackLight);
             long d = color.optLong("d", l);
-            return (int) (rc.dark ? d : l);
+            return (int) (dark ? d : l);
         }
-        return rc.dark ? fallbackDark : fallbackLight;
+        return dark ? fallbackDark : fallbackLight;
+    }
+
+    /**
+     * A dynamic node's resolved timestamp, for the Wear complication and Tile readers.
+     *
+     * <p>Those two do not render through RemoteViews and so have no RenderContext, but they must
+     * resolve {@code dateKey} against the entry state exactly as a widget does -- otherwise the
+     * same published timeline would show a different moment on a watch face than on a home
+     * screen.</p>
+     *
+     * @param node a {@code dyn} node
+     * @param state the entry state
+     * @return epoch millis, or 0 when the node names none
+     */
+    static long resolveWatchDate(JSONObject node, JSONObject state) {
+        String dateKey = node.optString("dateKey", null);
+        if (dateKey != null && dateKey.length() > 0 && state != null) {
+            Object v = state.opt(dateKey);
+            if (v instanceof Number) {
+                return ((Number) v).longValue();
+            }
+            if (v instanceof String) {
+                try {
+                    return Long.parseLong((String) v);
+                } catch (NumberFormatException ignore) {
+                    // Not a timestamp; fall through to the literal below.
+                }
+            }
+        }
+        return node.optLong("date", 0);
+    }
+
+    /**
+     * A dynamic node formatted as a plain string, for a surface that can only show one.
+     *
+     * <p>A complication slot takes a string and a Tile freezes its value, so both need the
+     * text form rather than the ticking Chronometer a home-screen widget gets. The styles map
+     * the way the guide describes: the two timer styles read as remaining or elapsed time, and
+     * everything else as the moment itself.</p>
+     *
+     * @param node a {@code dyn} node
+     * @param state the entry state
+     * @return the formatted value, never null
+     */
+    static String formatWatchDynamicText(JSONObject node, JSONObject state) {
+        long date = resolveWatchDate(node, state);
+        if (date <= 0) {
+            return "";
+        }
+        // The core's own formatter, not a second one here. It covers all five styles including
+        // "relative", and sharing it is what keeps a countdown reading the same on a watch face
+        // as in the simulator preview.
+        return com.codename1.surfaces.SurfaceRasterizer.formatDynamicText(
+                node.optString("style", "timerDown"), date, System.currentTimeMillis());
     }
 
     private static long resolveDate(JSONObject node, RenderContext rc) {
@@ -826,18 +953,38 @@ public final class CN1SurfaceRenderer {
     }
 
     private static double resolveFraction(JSONObject node, RenderContext rc) {
+        return resolveFraction(node, rc == null ? null : rc.state);
+    }
+
+    /// The fraction a `prog` node is showing, in 0..1.
+    ///
+    /// Package-private and taking the state map directly rather than a RenderContext, because
+    /// the watch reader needs the same answer and has no RenderContext to give. One
+    /// implementation: a complication and a home-screen widget disagreeing about what a progress
+    /// node means is a bug nobody would look for.
+    static double resolveFraction(JSONObject node, JSONObject state) {
+        return resolveFraction(node, state, System.currentTimeMillis());
+    }
+
+    /// As above, but resolving a date interval against a STATED moment.
+    ///
+    /// A complication is handed a whole timeline at once and its future entries are rendered
+    /// before they are current, so an interval evaluated against the request's clock freezes at
+    /// today's fraction and stays there -- the provider sets no update period, so nothing
+    /// recomputes it when the entry actually takes over. The entry's own start is the moment it
+    /// describes.
+    static double resolveFraction(JSONObject node, JSONObject state, long asOf) {
         double fraction;
         String valueKey = node.optString("valueKey", null);
-        if (valueKey != null && valueKey.length() > 0 && rc.state != null
-                && rc.state.opt(valueKey) instanceof Number) {
-            fraction = ((Number) rc.state.opt(valueKey)).doubleValue();
+        if (valueKey != null && valueKey.length() > 0 && state != null
+                && state.opt(valueKey) instanceof Number) {
+            fraction = ((Number) state.opt(valueKey)).doubleValue();
         } else if (node.has("start") && node.has("end")) {
             // Date-interval progress freezes at render time on Android; the next widget
             // update recomputes it.
             long start = node.optLong("start");
             long end = node.optLong("end");
-            long now = System.currentTimeMillis();
-            fraction = end <= start ? 1d : (now - start) / (double) (end - start);
+            fraction = end <= start ? 1d : (asOf - start) / (double) (end - start);
         } else {
             fraction = node.optDouble("value", 0d);
         }

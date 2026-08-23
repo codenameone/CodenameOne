@@ -1,0 +1,7 @@
+package androidx.wear.watchface.complications.data;
+public class PlainComplicationText implements ComplicationText {
+    public static class Builder {
+        public Builder(CharSequence text) { }
+        public PlainComplicationText build() { return null; }
+    }
+}

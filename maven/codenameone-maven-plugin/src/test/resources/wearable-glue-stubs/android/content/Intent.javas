@@ -1,0 +1,18 @@
+package android.content;
+public class Intent {
+    public static final int FLAG_ACTIVITY_NEW_TASK = 0x10000000;
+    public Intent() { }
+    public Intent(String action) { }
+    public Intent(Context c, Class<?> k) { }
+    public Intent putExtra(String n, String v) { return this; }
+    public Intent putExtra(String n, byte[] v) { return this; }
+    public Intent putExtra(String n, boolean v) { return this; }
+    public Intent putExtra(String n, int v) { return this; }
+    public Intent putExtra(String n, long v) { return this; }
+    public Intent setFlags(int f) { return this; }
+    public Intent addFlags(int f) { return this; }
+    public Intent setPackage(String p) { return this; }
+    public void setData(android.net.Uri u) { }
+    public String getDataString() { return ""; }
+    public String getAction() { return ""; }
+}

@@ -1,0 +1,7 @@
+package com.google.android.gms.wearable;
+public class DataItemBuffer implements Iterable<DataItem> {
+    public java.util.Iterator<DataItem> iterator() { return null; }
+    public int getCount() { return 0; }
+    public DataItem get(int i) { return null; }
+    public void release() { }
+}

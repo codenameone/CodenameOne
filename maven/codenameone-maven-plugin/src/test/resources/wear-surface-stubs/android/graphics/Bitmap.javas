@@ -1,0 +1,8 @@
+package android.graphics;
+import java.io.OutputStream;
+public class Bitmap {
+    public enum CompressFormat { PNG }
+    public boolean compress(CompressFormat f, int q, OutputStream o) { return true; }
+    public int getWidth() { return 0; }
+    public int getHeight() { return 0; }
+}

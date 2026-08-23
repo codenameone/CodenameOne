@@ -1,0 +1,6 @@
+package android.content;
+import android.content.res.Resources;
+public class Context {
+    public String getPackageName() { return ""; }
+    public Resources getResources() { return null; }
+}
