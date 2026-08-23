@@ -76,13 +76,21 @@ set +e
 set -e
 MERGED=common/target/codenameone/antProject/codenameone_settings.properties
 test -f $MERGED || MERGED=javase/target/codenameone/antProject/codenameone_settings.properties
-if [ -f "$MERGED" ]; then
-  grep -q "codename1.arg.ios.pods=Alamofire,SwiftyJSON" $MERGED \
-    || { echo "FAIL: annotation hints did not reach the build request"; cat $MERGED; exit 1; }
-  echo "OK: annotation hints reached $MERGED"
-else
-  echo "NOTE: no build request was written for this target; skipping that assertion"
+# Do not treat an absent file as "nothing to check". This is the only assertion
+# that the annotations reach the build request at all -- the checks above cover
+# emission and the one below covers the conflict -- so if the probe stops
+# producing a merged settings file, through a change in goal ordering, target
+# validation or the merge itself, the test has to fail rather than quietly skip
+# the thing it exists to prove.
+if [ ! -f "$MERGED" ]; then
+  echo "FAIL: no build request was written; the annotation merge could not be verified."
+  echo "      Looked for common/ and javase/target/codenameone/antProject/codenameone_settings.properties"
+  tail -40 /tmp/cn1-hints-build.log
+  exit 1
 fi
+grep -q "codename1.arg.ios.pods=Alamofire,SwiftyJSON" $MERGED \
+  || { echo "FAIL: annotation hints did not reach the build request"; cat $MERGED; exit 1; }
+echo "OK: annotation hints reached $MERGED"
 
 echo "--- declaring the same hint twice must fail ---"
 echo "codename1.arg.ios.teamId=FROMFILE" >> $SETTINGS

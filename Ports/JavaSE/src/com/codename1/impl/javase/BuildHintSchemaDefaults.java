@@ -243,8 +243,32 @@ final class BuildHintSchemaDefaults {
         BuildHintCatalogDefaults.register();
     }
 
+    /**
+     * The hints this class describes by hand.
+     *
+     * <p>{@link BuildHintCatalogDefaults} consults it so the two never describe
+     * the same hint. The group name is part of the property key, so a hint
+     * registered under both {@code hardening} and {@code Hardening} is not
+     * overwritten -- it is a second group, and the editor renders both, giving
+     * the user duplicate controls for one setting.</p>
+     */
+    private static final java.util.Set<String> DECLARED = new java.util.HashSet<String>();
+
+    /** Hint names {@link #register} describes, for the generated companion to skip. */
+    static java.util.Set<String> declaredHints() {
+        return java.util.Collections.unmodifiableSet(DECLARED);
+    }
+
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */
     private static void set(String suffix, String value) {
+        int hash = suffix.indexOf('#');
+        if (suffix.startsWith("{{#") && hash >= 0) {
+            int second = suffix.indexOf('#', hash + 1);
+            int close = suffix.indexOf("}}", second + 1);
+            if (second > 0 && close > second) {
+                DECLARED.add(suffix.substring(second + 1, close));
+            }
+        }
         String key = "codename1.arg." + suffix;
         if (System.getProperty(key) == null) {
             System.setProperty(key, value);

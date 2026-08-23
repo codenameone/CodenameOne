@@ -484,18 +484,25 @@ public final class BuildHintCodeGenerator {
         sb.append(" * BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and re-run\n");
         sb.append(" * scripts/gen-build-hint-annotations.sh.</p>\n");
         sb.append(" *\n");
-        sb.append(" * <p>Registered after {@link BuildHintSchemaDefaults}, whose hand-written\n");
-        sb.append(" * entries take precedence because the shared setter never overwrites.</p>\n");
+        sb.append(" * <p>Registered after {@link BuildHintSchemaDefaults} and skipping every hint\n");
+        sb.append(" * that class already describes. Precedence cannot be left to the setter:\n");
+        sb.append(" * the group name is part of the property key, so registering harden.level\n");
+        sb.append(" * under both `hardening` and `Hardening` does not overwrite anything -- it\n");
+        sb.append(" * makes a second group, and the editor renders both, giving the user\n");
+        sb.append(" * duplicate controls for one setting.</p>\n");
         sb.append(" */\n");
         sb.append("final class BuildHintCatalogDefaults {\n\n");
         sb.append("    private BuildHintCatalogDefaults() {\n    }\n\n");
         sb.append("    static void register() {\n");
+        sb.append("        java.util.Set<String> handWritten = BuildHintSchemaDefaults.declaredHints();\n");
         for (Map.Entry<HintGroup, List<BuildHints.Hint>> e : byGroup.entrySet()) {
             String group = e.getKey().annotationSimpleName();
             sb.append("\n        set(\"{{@").append(group).append("}}.label\", ")
               .append(quote(toAscii(groupLabel(e.getKey())))).append(");\n");
             for (BuildHints.Hint h : e.getValue()) {
                 String key = "{{#" + group + "#" + h.name() + "}}";
+                sb.append("        if (!handWritten.contains(\"").append(esc(h.name()))
+                  .append("\")) {\n");
                 sb.append("        set(\"").append(key).append(".label\", ")
                   .append(quote(humanize(h.attr()))).append(");\n");
                 sb.append("        set(\"").append(key).append(".type\", \"")
@@ -515,6 +522,7 @@ public final class BuildHintCodeGenerator {
                     sb.append("        set(\"").append(key).append(".description\", ")
                       .append(quote(toAscii(h.doc()))).append(");\n");
                 }
+                sb.append("        }\n");
             }
         }
         sb.append("    }\n\n");
