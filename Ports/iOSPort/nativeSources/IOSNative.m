@@ -15621,8 +15621,21 @@ static long long cn1NextSurfaceMirrorSequence(void) {
         lock = [[NSObject alloc] init];
     });
     @synchronized (lock) {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        if (last == 0) {
+            // Resumed from the highest we have ever ISSUED, not from the clock.
+            //
+            // The clock is only a seed, and it can move backwards -- an NTP correction or the
+            // user setting the date. Reseeding from it after a relaunch would then hand out
+            // numbers below the high-water mark the WATCH has persisted, and the watch rejects
+            // those by design: every mirrored update would be dropped until the clock caught up,
+            // which could be hours or days. Remembering what we issued makes the sequence
+            // monotonic across a restart whatever the clock does.
+            last = (long long)[defaults doubleForKey:@"cn1.surfaces.seq.sent"];
+        }
         long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
         last = now > last ? now : last + 1;
+        [defaults setDouble:(double)last forKey:@"cn1.surfaces.seq.sent"];
         return last;
     }
 }
