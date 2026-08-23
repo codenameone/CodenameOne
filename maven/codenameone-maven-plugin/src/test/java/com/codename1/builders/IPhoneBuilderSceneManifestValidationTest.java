@@ -175,4 +175,21 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "UIApplicationSupportsMultipleScenes"),
                 "and the commented-out false must not hide the real true");
     }
+
+    @Test
+    void aCommentedOutWindowRoleDoesNotVouchForTheLiveOne() {
+        // A commented-out Codename One configuration sitting above a live role that
+        // names another delegate: matching the mention would accept a manifest whose
+        // real scene configuration cannot adopt a window, and the failure then happens
+        // at run time.
+        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<!-- <key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict></array> -->"
+                        + "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>SomeoneElsesSceneDelegate</string></dict></array>"),
+                "the live role names another delegate, so the commented one must not "
+                        + "answer for it");
+    }
 }

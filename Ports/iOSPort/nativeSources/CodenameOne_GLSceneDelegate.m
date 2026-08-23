@@ -56,6 +56,32 @@ extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
         return;
     }
 #endif
+#if !TARGET_OS_MACCATALYST
+    /* One main surface, so one scene may own it. Codename One has a single global
+     * current form and a single rendering surface off Catalyst, and installing a root
+     * view controller into a second scene gives two live main surfaces competing for
+     * that one state -- which shows up as a rendering fault, not as an error.
+     *
+     * A plain iOS build never gets here twice: it declares
+     * UIApplicationSupportsMultipleScenes false, so the system creates one scene. The
+     * case this covers is the iOS destination of a project generated for Mac Catalyst,
+     * which shares that project's Info.plist and therefore its true value, plus any
+     * scene the system restores on its own.
+     *
+     * Asked of the connected scenes rather than latched in a static, so a scene that
+     * disconnects and reconnects -- which iOS does on its own schedule -- is still
+     * allowed to take the main surface back. */
+    for (UIScene *eachScene in [UIApplication sharedApplication].connectedScenes) {
+        if (eachScene == scene) {
+            continue;
+        }
+        id eachDelegate = eachScene.delegate;
+        if ([eachDelegate isKindOfClass:[CodenameOne_GLSceneDelegate class]]
+                && ((CodenameOne_GLSceneDelegate *)eachDelegate).window != nil) {
+            return;
+        }
+    }
+#endif
     UIWindow *window = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1InstallRootViewControllerIntoWindow:window];

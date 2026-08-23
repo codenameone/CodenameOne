@@ -6939,7 +6939,11 @@ public class IPhoneBuilder extends Executor {
     /// true if the window scene role names `CodenameOne_GLSceneDelegate`
     static boolean plistWiresWindowSceneDelegate(String plist) {
         String tag = "<key>UIWindowSceneSessionRoleApplication</key>";
-        int role = plist.indexOf(tag);
+        // The declared role, not any mention of it: a commented-out Codename One
+        // configuration sitting above a live role that names someone else's delegate
+        // would otherwise answer for the live one, and the build would accept a
+        // manifest whose real scene configuration cannot adopt a window.
+        int role = plistKeyIndex(plist, "UIWindowSceneSessionRoleApplication");
         if (role < 0) {
             return false;
         }
