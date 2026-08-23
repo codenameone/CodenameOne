@@ -72,6 +72,14 @@ typedef struct {
      * notches are dispatched and the remainder is carried here. */
     double scrollResidueX;
     double scrollResidueY;
+    /* The outer size setWindowBounds asked for, held until the window-manager
+     * frame is known. gdk_window_get_frame_extents() reports the client rectangle
+     * until the window is realized AND the WM has attached a frame, which is
+     * usually after the app has already called setWindowBounds -- so the
+     * conversion cannot be done where the request arrives. */
+    int requestedOuterW;
+    int requestedOuterH;
+    int outerSizePending;
     /* Back-buffer replacement is deferred to the drawing thread, mirroring the
      * Windows port's pendingResize: GTK reports a resize on its own thread while
      * the event dispatch thread may be painting through g.cr, and freeing the
@@ -246,6 +254,10 @@ static gboolean cn1DesktopOnConfigure(GtkWidget* widget, GdkEventConfigure* e, g
 /* Moves and monitor changes, observed on the top level rather than on the drawing
  * area: dragging a window changes the toplevel's position while leaving the child's
  * allocation untouched, so the drawing area sees no configure event. */
+/* Defined with the other geometry helpers below; used here because configure-event
+ * is where a deferred outer size finally becomes applicable. */
+static void cn1DesktopApplyPendingOuterSize(CN1LinuxWindow* w);
+
 static gboolean cn1DesktopOnWindowConfigure(GtkWidget* widget, GdkEventConfigure* e,
         gpointer data) {
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
@@ -258,6 +270,7 @@ static gboolean cn1DesktopOnWindowConfigure(GtkWidget* widget, GdkEventConfigure
         w->y = e->y;
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_MOVED, 0, 0, 0);
     }
+    cn1DesktopApplyPendingOuterSize(w);
     {
         int now = cn1DesktopMonitorIndexFor(w->window);
         if (now != w->monitorIndex) {
@@ -661,7 +674,13 @@ static void cn1DesktopCreateOnMain(void* arg) {
         }
     }
     gtk_window_set_title(GTK_WINDOW(w->window), op->title != 0 ? op->title : "");
+    /* The creation size is outer geometry too, and nothing is realized yet, so the
+     * default size is the requested figure and the chrome comes off it once the
+     * window manager has framed the window. */
     gtk_window_set_default_size(GTK_WINDOW(w->window), w->width, w->height);
+    w->requestedOuterW = w->width;
+    w->requestedOuterH = w->height;
+    w->outerSizePending = 1;
     gtk_window_set_decorated(GTK_WINDOW(w->window), op->decorated ? TRUE : FALSE);
     gtk_window_set_resizable(GTK_WINDOW(w->window), op->resizable ? TRUE : FALSE);
     if (op->positionSet) {
@@ -790,12 +809,107 @@ static void cn1DesktopTitleOnMain(void* arg) {
     }
 }
 
+/* Thickness of the window-manager chrome: the frame extents minus the client
+ * area. Answers 0 when that difference is not knowable yet, so callers can defer
+ * rather than silently apply a zero correction.
+ *
+ * Window.setWindowBounds() defines its dimensions as native geometry including
+ * chrome, but gtk_window_resize() and gtk_window_get_size() both speak the client
+ * area, so every request and every readback has to be converted. */
+/* The decision the insets turn on, separated from the GTK sampling so it can be
+ * exercised directly -- there is no window manager under Xvfb, so CI cannot reach
+ * the interesting cases through GTK. Returns non-zero when the chrome is knowable,
+ * and only then writes the outputs. */
+int cn1DesktopChromeFromExtents(int frameW, int frameH, int clientW, int clientH,
+        int decorated, int* chromeW, int* chromeH) {
+    *chromeW = 0;
+    *chromeH = 0;
+    if (frameW <= 0 || frameH <= 0 || clientW <= 0 || clientH <= 0) {
+        return 0;
+    }
+    if (frameW < clientW || frameH < clientH) {
+        /* A frame smaller than its own contents means the extents are stale. */
+        return 0;
+    }
+    if (frameW == clientW && frameH == clientH && decorated) {
+        /* Realized, but the window manager has not attached a frame yet: the extents
+         * are still the client rectangle. Indistinguishable from a genuinely
+         * borderless window except by asking whether decorations were requested,
+         * which is why this tests that rather than the numbers. Answering zero here
+         * would bake "no chrome" in permanently for a window that is about to get
+         * some; deferring costs nothing, because a window that never gets a frame --
+         * running with no window manager, as CI does -- has a client area that
+         * genuinely is its outer size. */
+        return 0;
+    }
+    *chromeW = frameW - clientW;
+    *chromeH = frameH - clientH;
+    return 1;
+}
+
+static int cn1DesktopChromeInsets(GtkWidget* window, int* chromeW, int* chromeH) {
+    GdkWindow* gdkWindow;
+    GdkRectangle frame;
+    int clientW = 0;
+    int clientH = 0;
+    *chromeW = 0;
+    *chromeH = 0;
+    if (window == 0 || !gtk_widget_get_realized(window)) {
+        return 0;
+    }
+    gdkWindow = gtk_widget_get_window(window);
+    if (gdkWindow == 0) {
+        return 0;
+    }
+    gdk_window_get_frame_extents(gdkWindow, &frame);
+    gtk_window_get_size(GTK_WINDOW(window), &clientW, &clientH);
+    return cn1DesktopChromeFromExtents(frame.width, frame.height, clientW, clientH,
+            gtk_window_get_decorated(GTK_WINDOW(window)) ? 1 : 0, chromeW, chromeH);
+}
+
+/* Applies a pending outer size once the chrome is measurable. Called both where
+ * the request arrives and from the window's configure-event, since which of the
+ * two can actually do the work depends on how far the window has been realized. */
+static void cn1DesktopApplyPendingOuterSize(CN1LinuxWindow* w) {
+    int chromeW;
+    int chromeH;
+    int clientW;
+    int clientH;
+    if (w == 0 || w->window == 0 || !w->outerSizePending) {
+        return;
+    }
+    if (!cn1DesktopChromeInsets(w->window, &chromeW, &chromeH)) {
+        return;
+    }
+    clientW = w->requestedOuterW - chromeW;
+    clientH = w->requestedOuterH - chromeH;
+    if (clientW < 1) {
+        clientW = 1;
+    }
+    if (clientH < 1) {
+        clientH = 1;
+    }
+    /* Cleared before the resize, not after: the resize re-enters this through
+     * configure-event, and a still-pending flag there would resize forever. */
+    w->outerSizePending = 0;
+    gtk_window_resize(GTK_WINDOW(w->window), clientW, clientH);
+}
+
 static void cn1DesktopBoundsOnMain(void* arg) {
     CN1DesktopOp* op = (CN1DesktopOp*) arg;
     CN1LinuxWindow* w = slotAt(op->slot);
     if (w != 0) {
         gtk_window_move(GTK_WINDOW(w->window), op->a, op->b);
-        gtk_window_resize(GTK_WINDOW(w->window), op->c > 0 ? op->c : 1, op->d > 0 ? op->d : 1);
+        w->requestedOuterW = op->c > 0 ? op->c : 1;
+        w->requestedOuterH = op->d > 0 ? op->d : 1;
+        w->outerSizePending = 1;
+        cn1DesktopApplyPendingOuterSize(w);
+        if (w->outerSizePending) {
+            /* Chrome not measurable yet. Resize to the requested figure so the
+             * window is not left at its old size, and let configure-event apply the
+             * correction as soon as the frame exists. */
+            gtk_window_resize(GTK_WINDOW(w->window), w->requestedOuterW, w->requestedOuterH);
+        }
     }
 }
 
@@ -803,8 +917,22 @@ static void cn1DesktopGetBoundsOnMain(void* arg) {
     CN1DesktopOp* op = (CN1DesktopOp*) arg;
     CN1LinuxWindow* w = slotAt(op->slot);
     if (w != 0) {
+        int chromeW;
+        int chromeH;
         gtk_window_get_position(GTK_WINDOW(w->window), &op->out[0], &op->out[1]);
         gtk_window_get_size(GTK_WINDOW(w->window), &op->out[2], &op->out[3]);
+        if (cn1DesktopChromeInsets(w->window, &chromeW, &chromeH)) {
+            /* Report what setWindowBounds accepts: the outer rectangle. Without
+             * this the round trip disagreed with the request by exactly the chrome. */
+            op->out[2] += chromeW;
+            op->out[3] += chromeH;
+        } else if (w->outerSizePending) {
+            /* Asked before the frame existed. The requested figure is a better
+             * answer than the uncorrected client size, and it is what the window
+             * is about to become. */
+            op->out[2] = w->requestedOuterW;
+            op->out[3] = w->requestedOuterH;
+        }
     }
 }
 

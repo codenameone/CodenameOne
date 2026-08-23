@@ -533,28 +533,50 @@ static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
 }
 
 /*
- * Gets a window to the content size Codename One asked for, and keeps it there.
- *
- * Two separate problems, and an earlier attempt at each made things worse.
+ * Gets a window to the outer size Codename One asked for, and keeps it there.
  *
  * A geometry preference is a request, not an instruction. When the window manager
  * ignores one the scene keeps the size it already had -- Catalyst's 1024x768 default
  * -- and nothing asked again, so the window stayed wrong for good and the windowed
- * screenshot suite came up short of captures.
+ * screenshot suite came up short of captures. Hence the resampling.
  *
- * And the preference is a *system* frame, which encloses the title bar, while what
- * has to come out right is the content area. Whether the chrome is charged against a
- * request depends on when it arrives, so the same window came back 900x700 on one run
- * and 900x684 on the next -- fine for a live application, fatal for a golden.
+ * What is compared is the *system* frame, the rectangle that encloses the title bar,
+ * because that is what Window.setWindowBounds() is defined in and what
+ * initWithSystemFrame: accepts. Request and readback are therefore the same quantity,
+ * and the correction that used to reconcile them is gone: this settler only ever
+ * re-asks for the frame it asked for the first time.
  *
- * So: sample twice and only act on a settled reading, then apply **one** correction,
- * capped. The cap is what makes this safe. Correcting from an unsettled reading is
- * how a 400x300 window was once driven to its 120x120 minimum and a 1000x400 window
- * overshot to 1700x400; a correction that can only ever move the frame by the width
- * of some chrome cannot do either, whatever it measures.
+ * That symmetry is what makes it safe. The old version chased a *content* size
+ * through a system-frame request, so it had to compute a correction from the
+ * difference, and computing one from a reading that was still moving is how a 400x300
+ * window was once driven to its 120x120 minimum and a 1000x400 window overshot to
+ * 1700x400. Nothing is computed here any more, so neither is possible. The settled
+ * check remains, to avoid re-asking while a layout is still in flight.
  */
-#define CN1_GEOMETRY_CHROME_SLACK 64.0
 #define CN1_GEOMETRY_ATTEMPTS 10
+
+/*
+ * The scene's outer size -- the system frame, title bar included.
+ *
+ * Falls back to the content size when the geometry is not readable, which only
+ * understates the window by the chrome and so can never make a wrong size look right.
+ */
+static CGSize CN1MacWindowContentSize(UIWindow* window);
+
+static CGSize CN1MacWindowOuterSize(UIWindowScene* scene, UIWindow* window) {
+    if (@available(macCatalyst 16.0, *)) {
+        if (scene != nil) {
+            UIWindowSceneGeometry* geometry = scene.effectiveGeometry;
+            if (geometry != nil) {
+                CGRect systemFrame = geometry.systemFrame;
+                if (systemFrame.size.width > 0 && systemFrame.size.height > 0) {
+                    return systemFrame.size;
+                }
+            }
+        }
+    }
+    return CN1MacWindowContentSize(window);
+}
 
 static CGSize CN1MacWindowContentSize(UIWindow* window) {
     /* The root view controller's view, because that is the same thing
@@ -564,7 +586,7 @@ static CGSize CN1MacWindowContentSize(UIWindow* window) {
 }
 
 static void CN1MacWindowSettleGeometry(int slot, int generation, UIWindowScene* scene,
-        UIWindow* window, CGSize wantedContent, CGRect request, CGSize lastSample,
+        UIWindow* window, CGSize wantedOuter, CGRect request, CGSize lastSample,
         int attemptsLeft);
 
 /*
@@ -589,51 +611,80 @@ static BOOL CN1MacWindowSettlerStillOwns(int slot, int generation, UIWindowScene
     return owns;
 }
 
+/*
+ * Pins a non-resizable window once its frame has settled.
+ *
+ * UISceneSizeRestrictions is expressed in content points while the request is a
+ * system frame, so the two cannot be pinned to the same number. Pinning to the
+ * requested outer size up front left the system unable to deliver that outer frame
+ * at all -- the content would have had to be the whole window, chrome included. The
+ * achieved content size is the one figure that is both correct and known, and it is
+ * only known once the geometry has settled.
+ */
+static void CN1MacWindowPinIfFixedSize(int slot, int generation, UIWindowScene* scene,
+        UIWindow* window) {
+    BOOL fixed = NO;
+    CGSize content;
+    if (!CN1MacWindowSettlerStillOwns(slot, generation, scene)) {
+        return;
+    }
+    pthread_mutex_lock(&g_slotLock);
+    if (slot >= 0 && slot < CN1_MAC_MAX_WINDOWS && g_macWindows[slot].inUse
+            && g_macWindows[slot].generation == generation) {
+        fixed = !g_macWindows[slot].resizable;
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    if (!fixed || scene == nil || scene.sizeRestrictions == nil) {
+        return;
+    }
+    content = CN1MacWindowContentSize(window);
+    if (content.width <= 0 || content.height <= 0) {
+        return;
+    }
+    scene.sizeRestrictions.minimumSize = content;
+    scene.sizeRestrictions.maximumSize = content;
+}
+
 static void CN1MacWindowSettleGeometryStep(int slot, int generation,
-        UIWindowScene* scene, UIWindow* window, CGSize wantedContent, CGRect request,
+        UIWindowScene* scene, UIWindow* window, CGSize wantedOuter, CGRect request,
         CGSize lastSample, int attemptsLeft) {
     if (!CN1MacWindowSettlerStillOwns(slot, generation, scene)) {
         return;
     }
-    CGSize got = CN1MacWindowContentSize(window);
+    CGSize got = CN1MacWindowOuterSize(scene, window);
     if (got.width <= 0 || got.height <= 0) {
-        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent,
+        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedOuter,
                 request, got, attemptsLeft - 1);
         return;
     }
-    CGFloat dw = wantedContent.width - got.width;
-    CGFloat dh = wantedContent.height - got.height;
+    CGFloat dw = wantedOuter.width - got.width;
+    CGFloat dh = wantedOuter.height - got.height;
     if (fabs(dw) <= 1.0 && fabs(dh) <= 1.0) {
-        return;                      /* content is what was asked for */
+        /* The frame is what was asked for. A fixed-size window is pinned now rather
+         * than before the request, because the restriction is expressed in content
+         * points: pinning it to the outer size up front would have left the system
+         * unable to deliver the outer frame at all. */
+        CN1MacWindowPinIfFixedSize(slot, generation, scene, window);
+        return;
     }
     BOOL settled = fabs(got.width - lastSample.width) <= 1.0
             && fabs(got.height - lastSample.height) <= 1.0;
     if (!settled) {
         /* Still laying out. Look again without touching the request -- acting on a
          * reading that is still moving is what caused the two earlier regressions. */
-        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent,
+        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedOuter,
                 request, got, attemptsLeft - 1);
         return;
     }
-    if (fabs(dw) > CN1_GEOMETRY_CHROME_SLACK || fabs(dh) > CN1_GEOMETRY_CHROME_SLACK) {
-        /* Nowhere near: the request was ignored rather than adjusted for chrome. Ask
-         * again for exactly the same frame -- never a computed one, which could not
-         * be trusted at this distance. */
-        CN1MacWindowRequestGeometry(scene, request);
-        CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent,
-                request, got, attemptsLeft - 1);
-        return;
-    }
-    /* Chrome-sized shortfall on a settled window: correct once, by that much. */
-    CGRect next = CGRectMake(request.origin.x, request.origin.y,
-            request.size.width + dw, request.size.height + dh);
-    CN1MacWindowRequestGeometry(scene, next);
-    CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedContent, next,
-            got, attemptsLeft - 1);
+    /* Settled on the wrong size, so the request was refused rather than adjusted.
+     * Ask again for exactly the same frame, never a computed one. */
+    CN1MacWindowRequestGeometry(scene, request);
+    CN1MacWindowSettleGeometry(slot, generation, scene, window, wantedOuter,
+            request, got, attemptsLeft - 1);
 }
 
 static void CN1MacWindowSettleGeometry(int slot, int generation, UIWindowScene* scene,
-        UIWindow* window, CGSize wantedContent, CGRect request, CGSize lastSample,
+        UIWindow* window, CGSize wantedOuter, CGRect request, CGSize lastSample,
         int attemptsLeft) {
     if (scene == nil || window == nil || attemptsLeft <= 0) {
         return;
@@ -645,7 +696,7 @@ static void CN1MacWindowSettleGeometry(int slot, int generation, UIWindowScene* 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (0.25 * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
         CN1MacWindowSettleGeometryStep(slot, generation, heldScene, heldWindow,
-                wantedContent, request, lastSample, attemptsLeft);
+                wantedOuter, request, lastSample, attemptsLeft);
         [heldWindow release];
         [heldScene release];
     });
@@ -1089,10 +1140,14 @@ void CN1MacWindowSceneConnectedFor(UIWindowScene* scene, int requested) {
         scene.title = w->pendingTitle;
     }
     if (w->pendingWidth > 0 && w->pendingHeight > 0) {
-        /* Ask for the size the window was created with. Without this the system
-         * hands the scene whatever size it feels like -- in practice the main
-         * scene's size -- and the Codename One window then lays out into a raster
-         * that does not match what was requested. Codename One geometry is in
+        /* Ask for the size the window was created with, as a system frame. The
+         * creation size is native geometry including chrome, exactly like
+         * setWindowBounds -- the two used to disagree, creation converging on a
+         * content size while setWindowBounds asked for an outer one, so the same
+         * window reported different sizes depending on which call had placed it.
+         * Without this the system hands the scene whatever size it feels like -- in
+         * practice the main scene's size -- and the Codename One window then lays
+         * out into a raster that does not match what was requested. Codename One geometry is in
          * pixels and UIKit's is in points, hence the divide by the screen scale.
          * The restrictions have to be relaxed first, because the system clamps the
          * requested frame against them and the default minimum is larger than a
@@ -1107,19 +1162,17 @@ void CN1MacWindowSceneConnectedFor(UIWindowScene* scene, int requested) {
         w->awaitingHeight = w->pendingHeight;
         w->staleLayoutDropped = 0;
         if (scene.sizeRestrictions != nil) {
-            if (w->resizable) {
-                CGFloat minW = w->minWidth > 0 ? w->minWidth / scale : MIN(pointWidth, 120);
-                CGFloat minH = w->minHeight > 0 ? w->minHeight / scale : MIN(pointHeight, 120);
-                scene.sizeRestrictions.minimumSize = CGSizeMake(minW, minH);
-                scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
-            } else {
-                /* Pinned both ways, which is how Catalyst expresses a fixed size.
-                 * The flag reached creation and was then dropped, so a window the
-                 * framework reported as non-resizable could still be dragged out of
-                 * shape by the user. */
-                scene.sizeRestrictions.minimumSize = CGSizeMake(pointWidth, pointHeight);
-                scene.sizeRestrictions.maximumSize = CGSizeMake(pointWidth, pointHeight);
-            }
+            /* Relaxed for the request whether or not the window is resizable. The
+             * restriction is in content points and the request is a system frame, so
+             * pinning a fixed-size window to the requested figure here would demand a
+             * content area the size of the whole window and the frame could never be
+             * granted. A non-resizable window is pinned instead once its geometry has
+             * settled, to the content it actually got -- see
+             * CN1MacWindowPinIfFixedSize. */
+            CGFloat minW = w->minWidth > 0 ? w->minWidth / scale : MIN(pointWidth, 120);
+            CGFloat minH = w->minHeight > 0 ? w->minHeight / scale : MIN(pointHeight, 120);
+            scene.sizeRestrictions.minimumSize = CGSizeMake(minW, minH);
+            scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
         }
         /* The requested origin, when one was asked for. Hardcoding (0,0) here threw
          * away an explicitly positioned or restored window's placement. */
@@ -1465,12 +1518,28 @@ void CN1MacWindowGetBounds(int slot, int* out) {
     if (window != nil) {
         __block CGFloat scale = 1.0;
         __block CGRect f = CGRectZero;
+        UIWindowScene* boundsScene = (UIWindowScene*) [window.windowScene retain];
         CN1MacRunOnMainSync(^{
             /* Reported in pixels, matching CN1MacWindowGetWidth/Height and the pixel
              * geometry Codename One passes in; UIKit frames are in points. */
             scale = window.screen != nil ? window.screen.scale : 1.0;
             f = window.frame;
+            /* The system frame, so the readback is the same quantity setWindowBounds
+             * accepts. window.frame is the content area, which disagreed with the
+             * request by exactly the chrome and made a bounds round trip lossy. */
+            if (@available(macCatalyst 16.0, *)) {
+                if (boundsScene != nil) {
+                    UIWindowSceneGeometry* geometry = boundsScene.effectiveGeometry;
+                    if (geometry != nil) {
+                        CGRect systemFrame = geometry.systemFrame;
+                        if (systemFrame.size.width > 0 && systemFrame.size.height > 0) {
+                            f = systemFrame;
+                        }
+                    }
+                }
+            }
         });
+        [boundsScene release];
         [window release];
         out[0] = (int) (f.origin.x * scale);
         out[1] = (int) (f.origin.y * scale);
