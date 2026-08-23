@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.windows;
 
+import com.codename1.io.Log;
 import com.codename1.impl.WindowManager;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
@@ -292,6 +293,10 @@ public class WindowsWindowManager extends WindowManager {
         }
     }
 
+    /// Whether the capture fallback has already been reported. One line per process is
+    /// enough to notice it; one per frame would bury the run it appears in.
+    private boolean captureFallbackReported;
+
     /// Reads this window's own contents back, rather than letting
     /// `com.codename1.ui.Window#capture()` fall back to re-rendering the component
     /// tree. The fallback produces the content the window *should* be showing, so it
@@ -314,6 +319,17 @@ public class WindowsWindowManager extends WindowManager {
         }
         byte[] png = WindowsNative.captureDesktopWindowToPngBytes(s);
         if (png == null || png.length == 0) {
+            // Said out loud, once per window, because the alternative is silent:
+            // Window.capture() falls back to re-rendering the component hierarchy, which
+            // produces a plausible image of the right size and hides the fact that the
+            // real surface was never read. That is the exact failure this override
+            // exists to remove, so it must not be able to come back unnoticed.
+            if (!captureFallbackReported) {
+                captureFallbackReported = true;
+                Log.p("WindowsWindowManager: window capture returned no pixels; "
+                        + "Window.capture() is falling back to re-rendering the "
+                        + "component tree, so peers and native editors will be absent");
+            }
             return null;
         }
         long img = WindowsNative.createImageFromBytes(png, 0, png.length);
