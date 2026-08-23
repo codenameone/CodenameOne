@@ -32,6 +32,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -371,6 +372,15 @@ class AndroidWatchSurfaceCodegenTest {
         assertEquals("Ab", named.get("ab"));
         assertEquals(5, new java.util.HashSet<String>(named.values()).size(),
                 "every declared kind must end up with its own class");
+
+        // The underscore-free id declared SECOND. Its positional form is the plain name -- there
+        // are no underscores to record -- so the disambiguation has nothing of its own to add and
+        // the resolver has to keep looking.
+        Map<String, String> reversed = AndroidGradleBuilder.surfaceKindClassSuffixes(
+                Arrays.asList("status_", "status"));
+        assertEquals("Status", reversed.get("status_"), "the first declared keeps the plain name");
+        assertNotEquals(reversed.get("status_"), reversed.get("status"),
+                "two kinds must never share a generated class: " + reversed);
     }
 
     /// The runtime cannot recompute which kind won the plain name -- that is a property of the

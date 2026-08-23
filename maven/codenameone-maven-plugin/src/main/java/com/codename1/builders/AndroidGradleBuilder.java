@@ -7251,8 +7251,16 @@ public class AndroidGradleBuilder extends Executor {
             String plain = surfaceKindClassSuffix(kindId);
             String chosen = plain;
             if (!taken.add(plain)) {
+                // The positional form, which separates ids differing only in where the
+                // underscores are. It is NOT guaranteed free on its own: an id with no underscore
+                // has no positions to add, so its disambiguated form is the plain name it just
+                // lost -- declare "status_" before "status" and both wanted Status. So the answer
+                // is whatever is actually free, and the loop is what makes that true rather than
+                // hoped for.
                 chosen = surfaceKindClassSuffixDisambiguated(kindId);
-                taken.add(chosen);
+                for (int n = 2; !taken.add(chosen); n++) {
+                    chosen = surfaceKindClassSuffixDisambiguated(kindId) + "_" + n;
+                }
             }
             out.put(kindId, chosen);
         }

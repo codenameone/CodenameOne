@@ -913,6 +913,14 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     /// kinds, and one of those completing would clear an unrelated newer transfer that is still
     /// in flight -- after which the next publish displaces it before the watch ever sees it.
     WCSessionUserInfoTransfer *_complicationInFlightTransfer;
+    /// Transfers whose completion arrived before the sending thread could record them.
+    ///
+    /// transferCurrentComplicationUserInfo: can complete on the delegate queue before it has even
+    /// returned to the caller, so the recorded slot is briefly nil while a transfer is genuinely
+    /// in flight. Discarding the completion in that window left _complicationInFlight set for
+    /// ever and stalled the whole queue -- every later publication silently unsent. The
+    /// completion is parked here instead, and the sending thread finds it the moment it records.
+    NSMutableSet *_complicationCompletedEarly;
     /// Guards the recurring tombstone sweep to a single pending chain; see pruneTombstonesNow.
     BOOL _tombstoneSweepScheduled;
     /// Guards the post-removal deadline sweep to one block, however many paths are removed.
@@ -945,6 +953,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         _pendingReplyAt = [[NSMutableDictionary alloc] init];
         _pendingComplications = [[NSMutableDictionary alloc] init];
         _pendingComplicationOrder = [[NSMutableArray alloc] init];
+        _complicationCompletedEarly = [[NSMutableSet alloc] init];
         _nextInboundToken = 1;
         _lastReceived = [[NSMutableDictionary alloc] init];
     }
@@ -1067,14 +1076,29 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     @try {
         WCSessionUserInfoTransfer *handed = [s transferCurrentComplicationUserInfo:info];
+        BOOL alreadyDone = NO;
         @synchronized (self) {
             // Only if this is still the transfer we started. A completion can land before this
             // assignment does, and overwriting a cleared slot would leave the queue believing
             // something is in flight for ever.
             if (_complicationInFlight != nil && [_complicationInFlight isEqualToString:kind]
                     && _complicationInFlightPayload == info) {
-                _complicationInFlightTransfer = handed;
+                if (handed != nil && [_complicationCompletedEarly containsObject:handed]) {
+                    // It finished before we got here. The delegate parked it rather than
+                    // discarding it, precisely so this thread can retire it now -- discarding it
+                    // there would have left the queue believing this kind was still in flight and
+                    // stalled every publication behind it.
+                    [_complicationCompletedEarly removeObject:handed];
+                    alreadyDone = YES;
+                } else {
+                    _complicationInFlightTransfer = handed;
+                }
+            } else if (handed != nil) {
+                [_complicationCompletedEarly removeObject:handed];
             }
+        }
+        if (alreadyDone) {
+            [self finishComplicationForKind:kind];
         }
     } @catch (NSException *ex) {
         // Raised for a payload the session will not carry. Drop this kind and carry on with the
@@ -1101,6 +1125,9 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             _complicationInFlight = nil;
             _complicationInFlightPayload = nil;
             _complicationInFlightTransfer = nil;
+            // Nothing is in flight, so a parked completion can only be for a transfer already
+            // retired. Cleared here rather than left to accumulate.
+            [_complicationCompletedEarly removeAllObjects];
         }
         NSDictionary *queued = [_pendingComplications objectForKey:kind];
         if (queued == nil || queued == sent) {
@@ -1537,10 +1564,19 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // for the same kinds, and an old one of those completing would otherwise clear a newer
     // complication transfer that is still in flight -- after which the next publish displaces it
     // and the watch never sees it. A surfaces transfer we are not tracking needs no bookkeeping.
-    BOOL mine;
+    BOOL mine = NO;
     @synchronized (self) {
-        mine = _complicationInFlightTransfer != nil
-                && _complicationInFlightTransfer == userInfoTransfer;
+        if (_complicationInFlightTransfer != nil) {
+            mine = _complicationInFlightTransfer == userInfoTransfer;
+        } else if (_complicationInFlight != nil
+                && [_complicationInFlight isEqualToString:kind]) {
+            // In flight for this kind, but the sending thread has not recorded the transfer
+            // object yet -- WCSession can complete before transferCurrentComplicationUserInfo:
+            // has even returned. Parked rather than dropped: dropping it is what left the queue
+            // believing this kind was still in flight for ever, with every later publication
+            // silently unsent. The sender retires it the moment it looks.
+            [_complicationCompletedEarly addObject:userInfoTransfer];
+        }
     }
     if (error != nil) {
         NSLog(@"[CN1Surfaces] the watch did not accept the update for \"%@\": %@", kind,
