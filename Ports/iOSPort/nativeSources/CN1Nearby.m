@@ -761,6 +761,43 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     }
 }
 
+/// True when this peer has reached Connected and has not been forgotten.
+- (BOOL)isEverConnected:(NSString *)pid {
+    @synchronized (self) {
+        return [self.everConnected containsObject:pid];
+    }
+}
+
+/// Forgets a peer nothing is talking to any more.
+///
+/// The singleton transport retains an MCPeerID for every device it has ever
+/// seen, so a long discovery in a busy place accumulated one per device for
+/// the life of the process -- and their endpoint ids stayed resolvable, which
+/// is worse than the memory: a send addressed to a peer that went away found
+/// a mapping and looked like it might work.
+///
+/// Only for a peer nothing is connected to. lostPeer means the BROWSER can no
+/// longer see it, which says nothing about an open session -- dropping the
+/// mapping there would have broken sending to a peer that is still connected.
+- (void)forgetPeer:(NSString *)pid {
+    if (pid == nil || [self isEverConnected:pid]) {
+        return;
+    }
+    @synchronized (self) {
+        [self.peersById removeObjectForKey:pid];
+        [self.serviceIdByPeer removeObjectForKey:pid];
+    }
+}
+
+/// Forgets every peer, for a full stop.
+- (void)forgetAllPeers {
+    @synchronized (self) {
+        [self.peersById removeAllObjects];
+        [self.serviceIdByPeer removeAllObjects];
+        [self.everConnected removeAllObjects];
+    }
+}
+
 /// True when this peer had reached Connected, forgetting it either way.
 - (BOOL)takeEverConnected:(NSString *)pid {
     @synchronized (self) {
@@ -1099,6 +1136,9 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
                                      service:self.discoverServiceId];
         com_codename1_impl_ios_IOSNearbyCallbacks_endpointFound___java_lang_String_boolean(
                 getThreadLocalData(), cn1nbJString(encoded), JAVA_FALSE);
+        // Forgotten after the event is delivered, because encoding it needs
+        // the mappings.
+        [self forgetPeer:cn1nbIdForPeer(peerID)];
     }
 }
 
@@ -2407,6 +2447,7 @@ void com_codename1_impl_ios_IOSNative_nearbyStopAllTransport__(
         }
         [cn1nbTransport closeAllSessions];
         [cn1nbTransport forgetInvitations];
+        [cn1nbTransport forgetAllPeers];
     }
 #endif
 }

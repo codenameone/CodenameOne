@@ -249,6 +249,28 @@ class LocalNearbyTest {
     }
 
     @Test
+    void cancellingAStartStopsTheSessionRatherThanLeavingItRunning() {
+        // Completing a cancelled resource is a no-op, so marking the session
+        // running left a radio session alive that the caller had already
+        // walked away from -- and its listeners still receiving updates.
+        RangingSession s = value(Ranging.prepareSession(
+                RangingRole.CONTROLLER));
+        assertEquals(1, bridge.getSessionHandles().length);
+
+        // The clock is held so the cancel lands before the port answers,
+        // which is the ordering a real port produces.
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        AsyncResource<RangingSession> starting = s.start(peerToken());
+        starting.cancel(true);
+        drain(queue);
+
+        assertFalse(s.isRunning());
+        assertEquals(0, bridge.getSessionHandles().length,
+                "the radio session must be released");
+    }
+
+    @Test
     void aStoppedSessionCannotBeRestarted() {
         RangingSession s = running();
         s.stop();

@@ -286,6 +286,13 @@ public final class Ranging {
             if (s == null) {
                 r.error(new NearbyException(NearbyError.SESSION_INVALIDATED,
                         "the session was closed before it started"));
+            } else if (r.isCancelled()) {
+                // Cancelled counts as nobody waiting, the same way
+                // deliverSessionPrepared treats it: completing a cancelled
+                // resource is a no-op, so marking the session running left a
+                // radio session alive that the caller had already walked away
+                // from -- and its listeners still receiving updates.
+                s.stop();
             } else {
                 s.markRunning();
                 r.complete(s);
@@ -309,6 +316,13 @@ public final class Ranging {
         EdtResult<byte[]> r = PENDING_ACCESSORY.take(requestId);
         if (r != null) {
             RangingSession s = RangingSession.lookup(sessionHandle);
+            if (s != null && r.isCancelled()) {
+                // As deliverSessionStarted: the caller walked away, so the
+                // handshake bytes have nowhere to go and the session must not
+                // be left holding the radio.
+                s.stop();
+                return;
+            }
             if (s == null) {
                 // Mirrors deliverSessionStarted. A stop() that lands while the
                 // start is in flight deregisters the session, and completing
