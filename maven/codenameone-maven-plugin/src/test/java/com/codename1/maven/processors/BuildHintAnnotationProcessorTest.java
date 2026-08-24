@@ -677,6 +677,49 @@ public class BuildHintAnnotationProcessorTest {
                 "package com.example\n\nfun `package helper`() {}\n", true));
     }
 
+    /// javac processes `\\uXXXX` before it tokenizes anything, so
+    /// `package com.ex\\u0061mple;` really declares com.example -- and it
+    /// rejects an ill-formed one in a comment too, which is why the sequences
+    /// here are written with two backslashes. Reading the
+    /// text literally stopped the component at the backslash and recorded
+    /// `com.ex`, so a live annotated class looked like it belonged elsewhere and
+    /// was dropped as an orphan with its placement error unreported.
+    @Test
+    public void javaUnicodeEscapesAreTranslatedBeforeTheSourceIsRead() throws Exception {
+        // Through the orphan filter, which is where it decides anything: the
+        // source spells its package with an escape, the compiled class does not.
+        File src = tmp.newFolder();
+        File pkgDir = new File(src, "com/example");
+        pkgDir.mkdirs();
+        java.io.Writer w = new java.io.OutputStreamWriter(
+                new java.io.FileOutputStream(new File(pkgDir, "Escaped.java")), "UTF-8");
+        try {
+            w.write("package com.ex" + "\\u0061" + "mple;\npublic class Escaped {\n}\n");
+        } finally {
+            w.close();
+        }
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Escaped",
+                        "package com.example;\npublic class Escaped {\n}\n"),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        AnnotatedClass cls = ClassScanner.scan(classes).get("com/example/Escaped");
+        assertTrue("the class under test must have been compiled", cls != null);
+        assertTrue(BuildHintAnnotationProcessor.hasBackingSource(cls,
+                java.util.Collections.singletonList(src.getAbsolutePath())));
+
+        // A doubled backslash is not an escape, which is what keeps a string
+        // literal spelling one.
+        assertEquals("String s = \"\\\\u0041\";",
+                BuildHintAnnotationProcessor.decodeUnicodeEscapes(
+                        "String s = \"\\\\u0041\";"));
+
+        // Any number of u's is one escape, and a malformed one is left alone.
+        assertEquals("A", BuildHintAnnotationProcessor.decodeUnicodeEscapes("\\uuu0041"));
+        assertEquals("\\uZZZZ", BuildHintAnnotationProcessor.decodeUnicodeEscapes("\\uZZZZ"));
+        assertEquals("\\n", BuildHintAnnotationProcessor.decodeUnicodeEscapes("\\n"));
+    }
+
     /// `$` is a legal character in a Java type name, so a top-level
     /// `class Wrong$Type` has binary name Wrong$Type and is not nested at all.
     /// Reading every `$` as nesting looked for a `Wrong` that does not exist,

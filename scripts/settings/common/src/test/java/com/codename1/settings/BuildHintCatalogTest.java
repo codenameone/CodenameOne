@@ -931,4 +931,43 @@ public class BuildHintCatalogTest {
                         + "import com.other.`buildhints`.Ios\n"
                         + "class MyApp\n", "Ios", true));
     }
+
+    /// Kotlin can rename a type in the FILE, with no import involved:
+    /// `typealias AppIos = Ios` and then `@AppIos(...)`. The compiled
+    /// annotation is still ours, so missing it left the hint editable and Add
+    /// wrote the duplicate declaration the next build refuses.
+    @Test
+    public void aKotlinTypeAliasStillOwnsTheHint() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // The fully qualified right-hand side needs no import.
+        String qualified = "package com.example\n"
+                + "typealias AppIos = com.codename1.annotations.buildhints.Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(qualified, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Somebody else's annotation renamed to the same alias is not ours.
+        String theirs = "package com.example\n"
+                + "typealias AppIos = com.other.Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(theirs, owned, true);
+        assertNull(owned.get("ios.teamId"));
+
+        // Java has no typealias, so the same text owns nothing there.
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, false);
+        assertNull(owned.get("ios.teamId"));
+    }
 }

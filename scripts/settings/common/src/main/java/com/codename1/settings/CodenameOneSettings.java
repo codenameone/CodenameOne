@@ -2740,7 +2740,49 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
 
-    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
+    /// The name a Kotlin `typealias Alias = Ios` gives an annotation, or null.
+    ///
+    /// Unlike an import alias this renames the type in the file itself, so the
+    /// annotation never appears under its own name and no import mentions the
+    /// alias at all. The right-hand side may be the simple name -- which only
+    /// counts when an import makes it ours -- or the fully qualified one, which
+    /// needs no import.
+    ///
+    /// One level: an alias of an alias is not followed, because the first is
+    /// what a file that renames our annotation actually writes.
+    static String kotlinTypeAlias(String source, String simple, boolean kotlin) {
+        if (!kotlin) {
+            return null;
+        }
+        String qualified = "com.codename1.annotations.buildhints." + simple;
+        boolean imported = importsAnnotation(source, simple, kotlin);
+        int at = nextMarker(source, "typealias", 0, kotlin);
+        while (at >= 0) {
+            int after = at + "typealias".length();
+            boolean whole = (at == 0 || !continuesAName(source.charAt(at - 1)))
+                    && after < source.length() && !continuesAName(source.charAt(after));
+            if (whole) {
+                int n = nextLiveChar(source, after, kotlin);
+                if (n >= 0) {
+                    int end = componentEnd(source, n, kotlin);
+                    if (end > n) {
+                        String name = componentText(source, n, end, kotlin);
+                        int eq = nextLiveChar(source, end, kotlin);
+                        if (eq >= 0 && source.charAt(eq) == '=') {
+                            String target = qualifiedNameAt(source, eq + 1, kotlin);
+                            if (target.equals(qualified) || (imported && target.equals(simple))) {
+                                return name;
+                            }
+                        }
+                    }
+                }
+            }
+            at = nextMarker(source, "typealias", after, kotlin);
+        }
+        return null;
+    }
+
+    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
     ///
     /// Kotlin lets a file rename what it imports, and then the annotation never
     /// appears under its own name anywhere in the source. Missing that reads the
@@ -2775,6 +2817,11 @@ public class CodenameOneSettings extends Lifecycle {
             // which the annotation's own name appears nowhere. Missing any of
             // them leaves the hint editable and Add writes the duplicate.
             String alias = kotlinImportAlias(source, simple, kotlin);
+            // A fourth: Kotlin can rename a type in the FILE, with no import
+            // involved -- `typealias AppIos = Ios` and then `@AppIos(...)`. The
+            // compiled annotation is still ours, so missing it left the hint
+            // editable and Add wrote the duplicate the next build refuses.
+            String typeAlias = kotlinTypeAlias(source, simple, kotlin);
             // The simple name only counts when an import makes it OUR annotation.
             // @Build and @Android are ordinary enough names that another library's
             // annotation with a matching attribute would otherwise be read as
@@ -2796,7 +2843,8 @@ public class CodenameOneSettings extends Lifecycle {
                 int after = qualifiedNameEnd(source, at + 1, kotlin);
                 boolean ours = (imported && name.equals(simple))
                         || name.equals(qualified)
-                        || (alias != null && name.equals(alias));
+                        || (alias != null && name.equals(alias))
+                        || (typeAlias != null && name.equals(typeAlias));
                 if (ours) {
                     int open = nextLiveChar(source, after, kotlin);
                     if (open >= 0 && source.charAt(open) == '(') {
@@ -2903,7 +2951,7 @@ public class CodenameOneSettings extends Lifecycle {
         return -1;
     }
 
-    /// The next occurrence of `marker` that is real code, or -1.    /// The next occurrence of `marker` that is real code, or -1.
+    /// The next occurrence of `marker` that is real code, or -1.
     ///
     /// Comments and string literals are stepped over with the same scanner the
     /// argument reader uses, so what counts as code is one answer rather than

@@ -352,6 +352,12 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         // The file names its own language, and a triple-quoted literal is read
         // differently in each.
         boolean kotlin = f.getName().endsWith(".kt");
+        // Java translates unicode escapes before tokenizing, so this has to as
+        // well or `package com.ex\u0061mple;` reads as com.ex. Only the answers
+        // below depend on the text, never an offset into the file.
+        if (!kotlin) {
+            text = decodeUnicodeEscapes(text);
+        }
         if (!pkg.equals(declaredPackageIn(text, kotlin))) {
             return false;
         }
@@ -496,6 +502,81 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             i = wordEnd;
         }
         return -1;
+    }
+
+    /// Java's unicode escapes, applied.
+    ///
+    /// javac processes `\\uXXXX` in the LEXICAL TRANSLATION step, before it
+    /// tokenizes anything -- so `package com.ex\\u0061mple;` really declares
+    /// com.example, and an escape works inside an identifier, a comment or
+    /// anywhere else. Reading the text literally stopped the package component
+    /// at the backslash and recorded com.ex, so a live annotated class looked
+    /// like it belonged elsewhere and was dropped as an orphan with its
+    /// placement error unreported.
+    ///
+    /// A backslash only starts an escape when an EVEN number of backslashes
+    /// precedes it, which is what keeps `"\\\\u0041"` the four characters it
+    /// looks like. Kotlin has no such step, so this is applied to Java only.
+    ///
+    /// Offsets move, so this is for the readers that answer questions about the
+    /// source -- never for the migration, which writes back at indices into the
+    /// text as it is on disk.
+    public static String decodeUnicodeEscapes(String text) {
+        if (text == null || text.indexOf('\\') < 0) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c != '\\') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int j = i;
+            while (j < text.length() && text.charAt(j) == '\\') {
+                j++;
+            }
+            int run = j - i;
+            for (int pair = 0; pair < run / 2; pair++) {
+                out.append('\\').append('\\');
+            }
+            if (run % 2 == 0) {
+                i = j;
+                continue;
+            }
+            // One backslash is left over, and only it can open an escape.
+            int u = j;
+            while (u < text.length() && text.charAt(u) == 'u') {
+                u++;
+            }
+            int value = u > j ? hexQuad(text, u) : -1;
+            if (value < 0) {
+                out.append('\\');
+                i = j;
+                continue;
+            }
+            out.append((char) value);
+            i = u + 4;
+        }
+        return out.toString();
+    }
+
+    /// The four hex digits at `from`, or -1 when they are not four hex digits.
+    private static int hexQuad(String text, int from) {
+        if (from + 4 > text.length()) {
+            return -1;
+        }
+        int value = 0;
+        for (int i = from; i < from + 4; i++) {
+            int digit = Character.digit(text.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            value = value * 16 + digit;
+        }
+        return value;
     }
 
     /// The index just past a Kotlin escaped identifier at `i`, or -1 when there
