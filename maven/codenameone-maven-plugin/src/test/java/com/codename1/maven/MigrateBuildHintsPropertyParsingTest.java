@@ -354,6 +354,29 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals(head.length(), MigrateBuildHintsMojo.endOfImportDeclaration(code, last));
     }
 
+    /// `static` is a modifier, not the imported name. Reading it as the name
+    /// ended the declaration at the newline inside the REAL name, so the
+    /// generated import was spliced into the middle of the static import and the
+    /// verification build rolled back a valid migration.
+    @Test
+    public void theInsertionPointClearsAMultiLineStaticImport() {
+        String head = "import static java.util.\n Collections.emptyList;\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        int last = MigrateBuildHintsMojo.lastImportIndex(code);
+        assertEquals(head.length(), MigrateBuildHintsMojo.endOfImportDeclaration(code, last));
+    }
+
+    /// A name that merely STARTS with `static` is a name.
+    @Test
+    public void anImportOfATypeNamedStaticallyIsNotAStaticImport() {
+        String head = "import staticky.Thing;\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        int last = MigrateBuildHintsMojo.lastImportIndex(code);
+        assertEquals(head.length(), MigrateBuildHintsMojo.endOfImportDeclaration(code, last));
+    }
+
     /// A Kotlin alias belongs to the declaration too.
     @Test
     public void theInsertionPointClearsAKotlinAlias() {

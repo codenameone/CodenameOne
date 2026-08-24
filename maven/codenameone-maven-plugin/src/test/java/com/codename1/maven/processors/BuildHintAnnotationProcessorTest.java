@@ -582,6 +582,47 @@ public class BuildHintAnnotationProcessorTest {
                 false));
     }
 
+    /// Kotlin's UNNAMED companion object is `Companion` in the binary name and
+    /// is spelled `companion object` in the source, so nothing there is called
+    /// Companion. Treating that as inconclusive accepted the whole path without
+    /// ever checking the class at the end of it, so a deleted
+    /// `Main$Companion$Wrong` kept its orphan and failed every incremental
+    /// build until the output directory was cleaned.
+    @Test
+    public void anUnnamedCompanionObjectIsAScopeNotAWildcard() {
+        String kt = "package com.example\n"
+                + "class Main {\n"
+                + "    companion object {\n"
+                + "        class Wrong\n"
+                + "    }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                kt, new String[] {"Main", "Companion", "Wrong"}, true));
+        // The class at the end of the path is still checked.
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                kt, new String[] {"Main", "Companion", "Gone"}, true));
+        // No companion at all keeps the surrounding leniency: an intermediate
+        // segment nothing accounts for is inconclusive, because concluding
+        // orphan there drops a live annotated class silently while keeping a
+        // stale one only costs a visible placement error.
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                "package com.example\nclass Main {\n    class Wrong\n}\n",
+                new String[] {"Main", "Companion", "Wrong"}, true));
+
+        // A NAMED companion carries its own name into the binary name, so the
+        // ordinary declaration lookup is what applies to it.
+        String named = "package com.example\n"
+                + "class Main {\n"
+                + "    companion object Named {\n"
+                + "        class Wrong\n"
+                + "    }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                named, new String[] {"Main", "Named", "Wrong"}, true));
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                named, new String[] {"Main", "Named", "Gone"}, true));
+    }
+
     /// A Kotlin file annotation holding a raw string that ends in a quote closes
     /// on a run of four. Reading it by Java's rules blanked the package
     /// declaration that followed.

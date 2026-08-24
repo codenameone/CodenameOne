@@ -958,6 +958,19 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     /// The index just past the import declaration beginning at `importAt`.
     static int endOfImportDeclaration(String code, int importAt) {
         int i = importAt + "import".length();
+        // Java's optional `static` first. Passing it to the name reader made
+        // `static` itself the imported name, and the declaration then ended at
+        // the newline inside the real name -- so `import static java.util.\n
+        // Collections.emptyList;` had the generated import spliced into it.
+        int probeStatic = i;
+        while (probeStatic < code.length() && Character.isWhitespace(code.charAt(probeStatic))) {
+            probeStatic++;
+        }
+        if (code.startsWith("static", probeStatic)
+                && probeStatic + 6 < code.length()
+                && !Character.isJavaIdentifierPart(code.charAt(probeStatic + 6))) {
+            i = probeStatic + 6;
+        }
         // The name, then an optional Kotlin `as` alias, then an optional
         // semicolon, then the rest of that line.
         for (int pass = 0; pass < 2; pass++) {

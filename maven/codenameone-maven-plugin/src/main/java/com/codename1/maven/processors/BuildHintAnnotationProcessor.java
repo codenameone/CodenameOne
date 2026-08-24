@@ -365,6 +365,17 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 // way javac's $1 does. So an intermediate segment that is not a
                 // type may be a function, and the class is inside its body.
                 at = functionDeclarationOf(code, segment, from, end);
+                if (at < 0 && "Companion".equals(segment)) {
+                    // Kotlin's UNNAMED companion object is called Companion in the
+                    // binary name and is declared as `companion object` with no
+                    // name at all, so nothing in the source is spelled Companion.
+                    // Accepting the whole path here on that basis stopped the walk
+                    // before the class itself, and a deleted
+                    // Main$Companion$Wrong then kept its orphan and failed every
+                    // incremental build. Recognised as a scope so the remaining
+                    // segments are still checked.
+                    at = companionObjectAt(code, from, end);
+                }
                 if (at < 0) {
                     // Some other Kotlin construct names an intermediate segment --
                     // an init block, a property accessor. Inconclusive, and
@@ -454,6 +465,63 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     private static boolean isTypeKeyword(String word) {
         return "class".equals(word) || "interface".equals(word) || "enum".equals(word)
                 || "object".equals(word) || "record".equals(word);
+    }
+
+    /// The offset of an unnamed `companion object` declared directly between
+    /// `from` and `end`, or -1.
+    ///
+    /// A NAMED companion -- `companion object Named` -- needs nothing special:
+    /// its name is what appears in the binary name and the ordinary declaration
+    /// lookup finds it.
+    private static int companionObjectAt(String code, int from, int end) {
+        int depth = 0;
+        int i = from;
+        while (i < end && i < code.length()) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < code.length()
+                    && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            if ("companion".equals(code.substring(i, wordEnd))) {
+                int n = wordEnd;
+                while (n < end && Character.isWhitespace(code.charAt(n))) {
+                    n++;
+                }
+                int stop = n;
+                while (stop < end && Character.isJavaIdentifierPart(code.charAt(stop))) {
+                    stop++;
+                }
+                if ("object".equals(code.substring(n, stop))) {
+                    int after = stop;
+                    while (after < end && Character.isWhitespace(code.charAt(after))) {
+                        after++;
+                    }
+                    // Unnamed only: a name here means the binary path carries that
+                    // name instead, and the ordinary lookup has already handled it.
+                    if (after < end && code.charAt(after) == '{') {
+                        return i;
+                    }
+                }
+            }
+            i = wordEnd;
+        }
+        return -1;
     }
 
     /// The offset of a `fun` named `simple` declared directly between `from` and
