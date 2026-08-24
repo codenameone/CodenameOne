@@ -2409,6 +2409,14 @@ public class CodenameOneSettings extends Lifecycle {
     /// `@Build` of some other library counts as ours.
     static boolean importsAnnotation(String source, String simple, boolean kotlin) {
         String pkg = "com.codename1.annotations.buildhints.";
+        // An explicit single-type import of the same simple name, from anywhere
+        // else, wins over our wildcard -- that is the language rule, not a
+        // preference. Without it a file importing our package on demand AND some
+        // other library's Ios by name had its @Ios read as ours, so Settings hid
+        // the editor for a hint the processor never emits.
+        if (importsOtherTypeNamed(source, simple, pkg, kotlin)) {
+            return false;
+        }
         for (String needle : new String[] {pkg + simple, pkg + "*"}) {
             int at = nextMarker(source, needle, 0, kotlin);
             while (at >= 0) {
@@ -2428,7 +2436,40 @@ public class CodenameOneSettings extends Lifecycle {
         return false;
     }
 
-    /// Whether an `as` rename follows the import target at `after`.
+    /// Whether a live import brings a DIFFERENT type of this simple name into
+    /// scope by name.
+    ///
+    /// A single-type import shadows an on-demand one, so ours loses. An aliased
+    /// Kotlin import is not one of these: it introduces its alias, not `simple`.
+    static boolean importsOtherTypeNamed(String source, String simple, String ourPkg,
+                                         boolean kotlin) {
+        int at = nextMarker(source, simple, 0, kotlin);
+        while (at >= 0) {
+            int after = at + simple.length();
+            boolean whole = (at == 0 || !continuesAName(source.charAt(at - 1)))
+                    && (after >= source.length() || !continuesAName(source.charAt(after)));
+            if (whole && precededByQualifiedImport(source, at)
+                    && !hasAsClause(source, after)
+                    && !source.startsWith(ourPkg + simple, at - ourPkg.length() < 0
+                            ? 0 : at - ourPkg.length())) {
+                return true;
+            }
+            at = nextMarker(source, simple, after, kotlin);
+        }
+        return false;
+    }
+
+    /// Whether the token at `at` ends a dotted name that an `import` introduces.
+    private static boolean precededByQualifiedImport(String source, int at) {
+        int i = at - 1;
+        while (i >= 0 && (continuesAName(source.charAt(i)) || source.charAt(i) == '.')) {
+            i--;
+        }
+        return precededByImport(source, i + 1) && i >= 0 && at > 0
+                && source.charAt(at - 1) == '.';
+    }
+
+    /// Whether an `as` rename follows the import target at `after`.    /// Whether an `as` rename follows the import target at `after`.
     private static boolean hasAsClause(String source, int after) {
         int i = after;
         while (i < source.length() && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {

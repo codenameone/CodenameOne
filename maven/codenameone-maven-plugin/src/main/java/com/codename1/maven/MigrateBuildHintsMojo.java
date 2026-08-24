@@ -884,21 +884,110 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * happens to appear first.</p>
      */
     static int classDeclarationIndex(String text, boolean kotlin, String simpleName) {
-        String modifiers = kotlin
-                ? "(?:public |internal |private |open |abstract |final |sealed |data |value |annotation )*"
-                : "(?:public |protected |private |abstract |final |static |strictfp |sealed |non-sealed )*";
-        String kinds = kotlin ? "(?:class|object|interface)" : "(?:class|interface|enum|record)";
-        java.util.regex.Pattern named = java.util.regex.Pattern.compile(
-                "(?m)^" + modifiers + kinds + "\\s+"
-                        + java.util.regex.Pattern.quote(simpleName == null ? "" : simpleName)
-                        + "\\b");
-        java.util.regex.Matcher m = named.matcher(text);
-        if (simpleName != null && simpleName.length() > 0 && m.find()) {
-            return m.start();
+        // Top level means brace depth zero, not column zero. Anchoring the
+        // pattern to the start of a line refused `  public class MyApp`, which
+        // compiles perfectly well -- so the goal rolled back with "Could not find
+        // the class declaration" on a project whose source it had just accepted
+        // through the token-aware lookup.
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(text);
+        int first = -1;
+        int depth = 0;
+        int i = 0;
+        while (i < code.length()) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < code.length()
+                    && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            String word = code.substring(i, wordEnd);
+            if (isTypeKind(word, kotlin)) {
+                int n = wordEnd;
+                while (n < code.length() && Character.isWhitespace(code.charAt(n))) {
+                    n++;
+                }
+                int end = n;
+                while (end < code.length()
+                        && Character.isJavaIdentifierPart(code.charAt(end))) {
+                    end++;
+                }
+                if (end > n) {
+                    // The declaration's own modifiers come before the keyword, and
+                    // the annotations have to go before those.
+                    int start = startOfModifiers(code, i);
+                    if (simpleName != null && simpleName.length() > 0
+                            && code.substring(n, end).equals(simpleName)) {
+                        return start;
+                    }
+                    if (first < 0) {
+                        first = start;
+                    }
+                }
+            }
+            i = wordEnd;
         }
-        java.util.regex.Matcher any = java.util.regex.Pattern.compile(
-                "(?m)^" + modifiers + kinds + "\\s+\\w").matcher(text);
-        return any.find() ? any.start() : -1;
+        return first;
+    }
+
+    private static boolean isTypeKind(String word, boolean kotlin) {
+        if (kotlin) {
+            return "class".equals(word) || "object".equals(word) || "interface".equals(word);
+        }
+        return "class".equals(word) || "interface".equals(word) || "enum".equals(word)
+                || "record".equals(word);
+    }
+
+    /// Back up over the modifiers preceding the keyword at `at`, so the
+    /// annotations land above `public final class` rather than inside it.
+    private static int startOfModifiers(String code, int at) {
+        int start = at;
+        while (true) {
+            int i = start - 1;
+            while (i >= 0 && (code.charAt(i) == ' ' || code.charAt(i) == '\t')) {
+                i--;
+            }
+            if (i < 0) {
+                return start;
+            }
+            int wordEnd = i + 1;
+            while (i >= 0 && (Character.isJavaIdentifierPart(code.charAt(i))
+                    || code.charAt(i) == '-')) {
+                i--;
+            }
+            String word = code.substring(i + 1, wordEnd);
+            if (word.length() == 0 || !isModifier(word)) {
+                return start;
+            }
+            start = i + 1;
+        }
+    }
+
+    private static boolean isModifier(String word) {
+        String[] modifiers = {"public", "protected", "private", "abstract", "final", "static",
+                              "strictfp", "sealed", "non-sealed", "internal", "open", "data",
+                              "value", "annotation", "inner", "expect", "actual"};
+        for (String m : modifiers) {
+            if (m.equals(word)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

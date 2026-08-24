@@ -484,6 +484,21 @@ public class BuildHintAnnotationProcessorTest {
                 BuildHintAnnotationProcessor.declaredPackageIn(src.toString()));
     }
 
+    /// `package\ncom.example;` is valid Java. A line-oriented parse saw an empty
+    /// remainder and reported the default package, so a live class looked like it
+    /// belonged elsewhere, read as an orphan, and its misplaced annotation went
+    /// unreported.
+    @Test
+    public void aPackageDeclarationMaySpanLines() {
+        assertEquals("com.example",
+                BuildHintAnnotationProcessor.declaredPackageIn("package\ncom.example;\n"));
+        assertEquals("com.example",
+                BuildHintAnnotationProcessor.declaredPackageIn("package   com.example ;\n"));
+        assertEquals("com.example",
+                BuildHintAnnotationProcessor.declaredPackageIn("package /* x */ com.example\n"));
+        assertEquals("", BuildHintAnnotationProcessor.declaredPackageIn("// package com.example;"));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

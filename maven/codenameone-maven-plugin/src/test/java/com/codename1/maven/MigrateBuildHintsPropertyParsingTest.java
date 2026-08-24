@@ -200,4 +200,32 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertNull(mojo.toSourceLiteral(i, "024", false));
         assertNull(mojo.toSourceLiteral(i, "+24", false));
     }
+
+    /// Top level is brace depth zero, not column zero. Anchoring to the start of
+    /// a line refused `  public class MyApp`, which compiles fine -- so the goal
+    /// rolled back on a project whose source it had just accepted.
+    @Test
+    public void anIndentedDeclarationIsStillTopLevel() {
+        String src = "package com.example;\n\n  public final class MyApp {\n}\n";
+        int at = MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp");
+        assertEquals(src.indexOf("  public final class") + 2, at);
+    }
+
+    /// The insertion point precedes the modifiers, so the annotations do not land
+    /// between `public` and `class`.
+    @Test
+    public void theInsertionPointPrecedesTheModifiers() {
+        String src = "package com.example;\npublic abstract class MyApp {\n}\n";
+        assertEquals(src.indexOf("public abstract class"),
+                MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
+    }
+
+    /// A nested type of the same name is not the top-level declaration.
+    @Test
+    public void aNestedTypeIsNotTheInsertionPoint() {
+        String src = "package com.example;\nclass Outer {\n    class MyApp {}\n}\n"
+                + "class MyApp {}\n";
+        assertEquals(src.lastIndexOf("class MyApp {}"),
+                MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
+    }
 }

@@ -593,22 +593,39 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// The package `text` declares, or "" for the default package.
     public static String declaredPackageIn(String text) {
-        text = blankNonCode(text);
-        for (String line : text.split("\n")) {
-            String t = line.trim();
-            if (!t.startsWith("package")) {
+        // Tokens, not lines. `package\ncom.example;` is valid Java, and reading
+        // one physical line saw an empty remainder and reported the default
+        // package -- so a live class looked like it belonged somewhere else, read
+        // as an orphan, and its misplaced annotation went unreported.
+        String code = blankNonCode(text);
+        int i = 0;
+        while (i < code.length()) {
+            char c = code.charAt(i);
+            if (!Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
                 continue;
             }
-            String rest = t.substring("package".length());
-            if (rest.length() == 0 || Character.isJavaIdentifierPart(rest.charAt(0))) {
+            int wordEnd = i;
+            while (wordEnd < code.length()
+                    && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            if (!"package".equals(code.substring(i, wordEnd))) {
+                i = wordEnd;
                 continue;
             }
-            rest = rest.trim();
-            int end = rest.indexOf(';');
-            if (end >= 0) {
-                rest = rest.substring(0, end);
+            int n = wordEnd;
+            while (n < code.length() && Character.isWhitespace(code.charAt(n))) {
+                n++;
             }
-            return rest.trim();
+            StringBuilder name = new StringBuilder();
+            while (n < code.length()
+                    && (Character.isJavaIdentifierPart(code.charAt(n)) || code.charAt(n) == '.')) {
+                name.append(code.charAt(n));
+                n++;
+            }
+            return name.toString();
         }
         return "";
     }

@@ -636,4 +636,37 @@ public class BuildHintCatalogTest {
                 "package com.example;\npublic class Helper { char c = '{'; }\n"
                         + "class MyApp {}\n", "MyApp", "com.example", false));
     }
+
+    /// A single-type import shadows an on-demand one -- the language rule, not a
+    /// preference. A file importing our package with a wildcard AND another
+    /// library's Ios by name is using theirs.
+    @Test
+    public void anExplicitImportBeatsOurWildcard() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "import com.example.other.Ios;\n"
+                + "@Ios(teamId = \"T\")\npublic class MyApp {}\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(src, "Ios", false));
+
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, false);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// Our own explicit import is not "another library's".
+    @Test
+    public void ourOwnExplicitImportStillCounts() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "import com.codename1.annotations.buildhints.Ios;\n"
+                + "@Ios(teamId = \"T\")\npublic class MyApp {}\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(src, "Ios", false));
+    }
+
+    /// Nor is a Kotlin alias, which introduces its alias rather than the name.
+    @Test
+    public void anAliasedForeignImportDoesNotShadow() {
+        String src = "import com.codename1.annotations.buildhints.*\n"
+                + "import com.example.other.Ios as TheirIos\n"
+                + "@Ios(teamId = \"T\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(src, "Ios", true));
+    }
 }
