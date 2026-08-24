@@ -6555,6 +6555,11 @@ public class IPhoneBuilder extends Executor {
             // seen. Read in the archive's own context, since ARCHS can be conditional too.
             String archs = winningSetting(declared, "ARCHS", own);
             if (archs != null) {
+                // Resolved first: ARCHS[config=Debug] = $(DEBUG_ARCHS) is as ordinary as any other
+                // indirection, and reading the raw text meant every token was a $-token and every
+                // one of them ignored -- so that configuration's architecture was never
+                // enumerated and its plist went unstamped.
+                archs = resolveSettingsInValue(archs, flattenForContext(declared, own));
                 for (String arch : archs.trim().split("\\s+")) {
                     if (arch.length() > 0 && arch.indexOf('$') < 0 && !out.contains(arch)) {
                         out.add(arch);
@@ -6620,7 +6625,6 @@ public class IPhoneBuilder extends Executor {
         // $(SDK_NAME) stays unexpanded and the path stays unresolvable instead of being answered
         // with this archive's SDK.
         ArchiveContext own = contextForCondition(key, context);
-        File active = out.get(key + " = " + value);
         // Every enumerated value is filtered through the KEY's own conditions first. A key that
         // names a dimension applies to that value and no other, and enumerating the rest produced
         // self-contradicting candidates -- [variant=profile][variant=normal] -- which the stamper
@@ -6664,9 +6668,18 @@ public class IPhoneBuilder extends Executor {
                                 java.util.Collections.singletonList(variant));
                         File resolved = resolveInfoPlistPath(value, extensionFolder,
                                 extensionSettingsWithBuiltIns(extensionFolder, declared, other));
-                        if (resolved == null || sameFile(resolved, active)) {
+                        if (resolved == null) {
                             continue;
                         }
+                        // NOT skipped when it is the same physical file as the archive's own. The
+                        // stamper deliberately processes one file once per context, because what
+                        // is INSIDE it can vary even when the path does not: a Shared.plist
+                        // holding $(MARKETING_VERSION) beside a MARKETING_VERSION[config=Debug]
+                        // is right for one configuration and stale for the other. Skipping the
+                        // duplicate file dropped the pass that would have materialised the host's
+                        // version for Debug. Candidate keys carry their qualifiers, so nothing
+                        // collides here, and stampAppExtensionInfoPlist dedups by file AND
+                        // context.
                         // The variant is named whenever it is not the archive's own, not only
                         // when several are in play: a configuration whose BUILD_VARIANTS selects a
                         // single OTHER variant still needs saying, or the candidate's context
@@ -6682,18 +6695,6 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
             }
-        }
-    }
-
-    /// Canonical-path equality, so two ways of writing the same file are one candidate.
-    private static boolean sameFile(File one, File other) {
-        if (one == null || other == null) {
-            return one == other;
-        }
-        try {
-            return one.getCanonicalPath().equals(other.getCanonicalPath());
-        } catch (IOException cannotResolve) {
-            return one.equals(other);
         }
     }
 

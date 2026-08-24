@@ -415,7 +415,7 @@ public class AppExtensionInfoPlistPathTest {
     }
 
     @Test
-    public void aPathThatDoesNotVaryAddsNothing() throws Exception {
+    public void aPathThatDoesNotVaryAddsNoNewFile() throws Exception {
         File dist = tmp.newFolder("stable-path");
         File extension = new File(dist, "WalletUIExtension");
         assertTrue(extension.mkdirs());
@@ -426,9 +426,11 @@ public class AppExtensionInfoPlistPathTest {
         java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
                 IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
 
-        // The ordinary case: a reference that means the same thing in every configuration adds no
-        // second candidate, so nothing downstream sees a file twice.
-        assertEquals(plists.toString(), 1, plists.size());
+        // The ordinary case: a reference that means the same thing in every configuration finds
+        // no new FILE. It is still listed once per context on purpose -- what is inside a shared
+        // plist can vary even when the path does not -- and the stamper dedups by file AND
+        // context, so the file is processed once for each identity it has to satisfy.
+        assertEquals(plists.toString(), 1, distinctFiles(plists).size());
     }
 
     @Test
@@ -469,9 +471,9 @@ public class AppExtensionInfoPlistPathTest {
 
         // $(SDK_NAME) needs a VERSIONED name and this build cannot know which version a later
         // simulator build will use. Inventing the bare platform name is the stem mistake this
-        // file already made once -- it names a directory nothing is at. Only what resolves is
-        // recorded.
-        assertEquals(plists.toString(), 1, plists.size());
+        // file already made once -- it names a directory nothing is at. So no OTHER file appears:
+        // every candidate is this archive's own plist.
+        assertEquals(plists.toString(), 1, distinctFiles(plists).size());
         assertTrue(plists.toString(),
                 plists.values().contains(new File(extension, "iphoneos14.4/Info.plist")));
     }
@@ -572,5 +574,19 @@ public class AppExtensionInfoPlistPathTest {
         // qualifiers, the second plist was never seen.
         assertTrue(plists.toString(), plists.values().contains(arm));
         assertTrue(plists.toString(), plists.values().contains(intel));
+    }
+
+    /// The distinct files a candidate map names. Candidates are per CONTEXT, so one file can be
+    /// listed several times on purpose; what these tests are asking about is which files were
+    /// discovered.
+    private static java.util.Set<String> distinctFiles(java.util.Map<String, File> plists)
+            throws Exception {
+        java.util.Set<String> out = new java.util.TreeSet<String>();
+        for (File file : plists.values()) {
+            if (file != null) {
+                out.add(file.getCanonicalPath());
+            }
+        }
+        return out;
     }
 }
