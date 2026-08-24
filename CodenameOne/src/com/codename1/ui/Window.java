@@ -1669,7 +1669,7 @@ public class Window extends Container implements TopLevelContainer {
             }
             nativePeer = peer;
             paintSurface = Display.impl.createPaintSurface(nativePeer);
-            windowGraphics = Display.getInstance().createWindowGraphics(this);
+            windowGraphics = Desktop.getInstance().createWindowGraphics(this);
             if (windowIcon != null) {
                 wm.setIcon(nativePeer, windowIcon);
             }

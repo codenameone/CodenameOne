@@ -1475,7 +1475,7 @@ public final class Display extends CN1Constants {
         // Additional native windows, painted after the main surface so its call
         // ordering is untouched. One field read per frame when none are open.
         if (Desktop.getInstance().hasOpenWindows()) {
-            paintOpenWindows();
+            Desktop.getInstance().paintWindows();
         }
 
         // The main surface's timers, exactly as they always were.
@@ -3697,7 +3697,7 @@ public final class Display extends CN1Constants {
     boolean shouldEDTSleep() {
         Form current = impl.getCurrentForm();
         return ((current == null || (!current.hasAnimations())) &&
-                !anyWindowHasAnimations() &&
+                !Desktop.getInstance().anyWindowHasAnimations() &&
                 (animationQueue == null || animationQueue.isEmpty()) &&
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
@@ -3904,17 +3904,6 @@ public final class Display extends CN1Constants {
     /// modality behaves identically on every platform, whether or not the platform
     /// implements its own.
 
-    /// Creates the `Graphics` a window paints through and hands it to the
-    /// implementation. `Graphics` cannot be constructed outside this package, which
-    /// is why this lives here rather than on the window or the implementation --
-    /// exactly as `#init(java.lang.Object)` does for the main surface.
-    Graphics createWindowGraphics(Window w) {
-        Graphics g = new Graphics(impl.getWindowManager().getNativeGraphics(w.getNativePeer()));
-        g.paintPeersBehind = impl.paintNativePeersBehind();
-        impl.setPaintSurfaceGraphics(w.getPaintSurface(), g);
-        return g;
-    }
-
     /// Wakes the event dispatch thread, used when a window becomes visible before
     /// the first form has been shown and the loop would otherwise still be parked.
     void wakeEdt() {
@@ -3941,51 +3930,7 @@ public final class Display extends CN1Constants {
         if (current != null) {
             current.repaint();
         }
-        ArrayList<Window> open = Desktop.getInstance().windowList();
-        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
-            open.get(iter).repaint();
-        }
-    }
-
-    private void paintOpenWindows() {
-        ArrayList<Window> open = Desktop.getInstance().windowList();
-        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
-            Window w = open.get(iter);
-            if (!w.isWindowShowing()) {
-                continue;
-            }
-            Graphics g = w.getWindowGraphics();
-            Object peer = w.getNativePeer();
-            // The manager as well as the graphics and the peer. A window stays
-            // registered until it is disposed, so one can outlive the platform's
-            // window manager -- and dereferencing it here throws on the event dispatch
-            // thread, which catches the exception, comes straight back round the loop
-            // and throws again. That spins forever rather than losing a frame, so the
-            // one thing this must not do is assume the manager is still there.
-            WindowManager wm = impl.getWindowManager();
-            if (g == null || peer == null || wm == null) {
-                continue;
-            }
-            g.setGraphics(wm.getNativeGraphics(peer));
-            w.flushRevalidateQueue();
-            impl.paintDirtyWindow(w.getPaintSurface(), w.getWidth(), w.getHeight());
-            w.repaintAnimations();
-            // The window's raster exists from the moment it is shown, so a capture
-            // before this point returns a blank frame of the right size. Recording
-            // that a cycle completed is what lets a caller wait for real content.
-            w.markPainted();
-        }
-    }
-
-    private boolean anyWindowHasAnimations() {
-        ArrayList<Window> open = Desktop.getInstance().windowList();
-        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
-            Window w = open.get(iter);
-            if (w.isWindowShowing() && w.hasAnimations()) {
-                return true;
-            }
-        }
-        return false;
+        Desktop.getInstance().repaintWindows();
     }
 
     /// Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not

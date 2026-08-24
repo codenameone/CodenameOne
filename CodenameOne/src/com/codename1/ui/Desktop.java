@@ -1127,4 +1127,70 @@ public final class Desktop {
         }
     }
 
+    // ---- painting the open windows -----------------------------------------------
+    //
+    // Called once per pass from Display's event loop. The loop is Display's; walking
+    // the windows it has to paint is not.
+
+    /// Creates the `Graphics` a window paints through and hands it to the
+    /// implementation. `Graphics` cannot be constructed outside this package, which
+    /// is why this lives here rather than on the window or the implementation --
+    /// exactly as `#init(java.lang.Object)` does for the main surface.
+    Graphics createWindowGraphics(Window w) {
+        Graphics g = new Graphics(Display.impl.getWindowManager().getNativeGraphics(w.getNativePeer()));
+        g.paintPeersBehind = Display.impl.paintNativePeersBehind();
+        Display.impl.setPaintSurfaceGraphics(w.getPaintSurface(), g);
+        return g;
+    }
+
+    void paintWindows() {
+        ArrayList<Window> open = windowList();
+        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
+            Window w = open.get(iter);
+            if (!w.isWindowShowing()) {
+                continue;
+            }
+            Graphics g = w.getWindowGraphics();
+            Object peer = w.getNativePeer();
+            // The manager as well as the graphics and the peer. A window stays
+            // registered until it is disposed, so one can outlive the platform's
+            // window manager -- and dereferencing it here throws on the event dispatch
+            // thread, which catches the exception, comes straight back round the loop
+            // and throws again. That spins forever rather than losing a frame, so the
+            // one thing this must not do is assume the manager is still there.
+            WindowManager wm = Display.impl.getWindowManager();
+            if (g == null || peer == null || wm == null) {
+                continue;
+            }
+            g.setGraphics(wm.getNativeGraphics(peer));
+            w.flushRevalidateQueue();
+            Display.impl.paintDirtyWindow(w.getPaintSurface(), w.getWidth(), w.getHeight());
+            w.repaintAnimations();
+            // The window's raster exists from the moment it is shown, so a capture
+            // before this point returns a blank frame of the right size. Recording
+            // that a cycle completed is what lets a caller wait for real content.
+            w.markPainted();
+        }
+    }
+
+    boolean anyWindowHasAnimations() {
+        ArrayList<Window> open = windowList();
+        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
+            Window w = open.get(iter);
+            if (w.isWindowShowing() && w.hasAnimations()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Repaints every window that is on screen. The main surface is the caller's
+    /// business; this is the window half of it.
+    void repaintWindows() {
+        ArrayList<Window> open = windowList();
+        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
+            open.get(iter).repaint();
+        }
+    }
+
 }
