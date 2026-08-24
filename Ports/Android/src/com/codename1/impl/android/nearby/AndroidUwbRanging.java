@@ -166,6 +166,10 @@ public class AndroidUwbRanging implements NearbyBridge {
                 probedCapabilities = bits;
             }
             probeInFlight = false;
+            // Nothing waits on this monitor any more -- a capability getter
+            // that blocked the EDT was worse than an incomplete answer -- but
+            // the notify stays: it costs nothing with no waiters and removing
+            // it would make adding one silently deadlock-prone later.
             capabilityLock.notifyAll();
         }
     }
@@ -216,27 +220,20 @@ public class AndroidUwbRanging implements NearbyBridge {
         // produce would have an app draw an arrow that never moves.
         int bits = NearbyBridge.CAPABILITY_DISTANCE;
         // The scope that carries the answer is opened by a background probe,
-        // not here: opening one on the calling thread blocks it on the UWB
-        // system service binding, and this is called from the EDT. The wait
-        // below is bounded and only ever happens on a call that beats the
-        // probe; once it lands the answer is cached and every later call is
-        // free.
+        // and this call NEVER waits for it. Opening a scope blocks on the UWB
+        // system service binding, and this getter is called from the EDT --
+        // the thread that draws -- so waiting even a bounded 400ms for it
+        // froze input and rendering on the first call after the permission
+        // was granted, which is exactly when an app asks.
+        //
+        // Until the probe lands the answer is distance alone, which is the
+        // conservative direction: an app that believes it has less than it
+        // does asks again and gets more, while one that believes it has more
+        // draws an arrow the device cannot aim. Once the probe lands every
+        // later call has the full answer.
         startCapabilityProbe();
         int probed;
-        long deadline = System.currentTimeMillis() + 400;
         synchronized (capabilityLock) {
-            while (probedCapabilities < 0 && probeInFlight) {
-                long left = deadline - System.currentTimeMillis();
-                if (left <= 0) {
-                    break;
-                }
-                try {
-                    capabilityLock.wait(left);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
             probed = probedCapabilities;
         }
         if (probed > 0) {
@@ -438,7 +435,7 @@ public class AndroidUwbRanging implements NearbyBridge {
             // signal of its own -- a session that starts cleanly and simply
             // has nothing in range to measure yet.
             session.startRequest.set(requestId);
-            session.subscription = UwbClientSessionScopeRx
+            Disposable started = UwbClientSessionScopeRx
                     .rangingResultsObservable(session.scope, params)
                     .subscribeOn(Schedulers.io())
                     .subscribe(new io.reactivex.rxjava3.functions.Consumer<
@@ -483,6 +480,29 @@ public class AndroidUwbRanging implements NearbyBridge {
                             sessions.remove(Integer.valueOf(session.handle));
                         }
                     });
+            // Installed only if the session is still registered.
+            //
+            // stop() can land between the lookup at the top of this method
+            // and this line: it removes the session and disposes whatever
+            // subscription it finds, which at that moment is null. The start
+            // then handed a live UWB subscription to a session nobody holds,
+            // so the facade rejected the start -- its session is closed --
+            // while the radio went on ranging for the life of the process.
+            boolean late;
+            synchronized (session) {
+                late = session.stopped;
+                if (!late) {
+                    session.subscription = started;
+                }
+            }
+            if (late) {
+                started.dispose();
+                session.accessoryStart = false;
+                session.startRequest.set(0);
+                fail(requestId, NearbyError.SESSION_INVALIDATED,
+                        "the session was stopped before ranging started");
+                return;
+            }
             scheduleStartGrace(session);
         } catch (Throwable t) {
             // Cleared for the reason the token failure above clears it: this
@@ -571,8 +591,21 @@ public class AndroidUwbRanging implements NearbyBridge {
 
     public void stopRangingSession(int sessionHandle) {
         Session session = sessions.remove(Integer.valueOf(sessionHandle));
-        if (session != null && session.subscription != null) {
-            session.subscription.dispose();
+        if (session == null) {
+            return;
+        }
+        // Marked before the subscription is read, so a start still on its way
+        // to installing one sees the stop and disposes it itself. Reading
+        // alone found null for a subscription that did not exist YET and left
+        // the radio ranging once it did.
+        Disposable doomed;
+        synchronized (session) {
+            session.stopped = true;
+            doomed = session.subscription;
+            session.subscription = null;
+        }
+        if (doomed != null) {
+            doomed.dispose();
         }
     }
 
@@ -668,6 +701,11 @@ public class AndroidUwbRanging implements NearbyBridge {
         private int sessionId;
         private byte[] sessionKey;
         private Disposable subscription;
+        /// Whether stopRangingSession has taken this session. Guarded by the
+        /// session itself, which is also what guards `subscription`, so a
+        /// stop and a start that races it cannot both decide nothing needs
+        /// disposing.
+        private boolean stopped;
         /// The start request still waiting for an answer, or 0 once it has
         /// been answered. Answered exactly once, by whichever of the first
         /// measurement, the first error, or the grace timer gets there.

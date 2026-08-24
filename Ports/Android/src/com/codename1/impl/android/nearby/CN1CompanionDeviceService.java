@@ -80,7 +80,23 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
     /// Whether this service is the one that started the Codename One context.
     private boolean startedContext;
 
-    private static final Set<String> OBSERVED =
+    /// Associations the app has explicitly STOPPED watching in this process.
+    ///
+    /// The filter keys off what was UNregistered, not off what was
+    /// registered. Observation survives process death -- the platform keeps
+    /// watching and keeps binding this service -- while a set of registered
+    /// ids starts empty and fills one registration at a time, so treating it
+    /// as the authoritative list made the first re-registration turn into a
+    /// whitelist: an appearance for a second still-watched association was
+    /// dropped until the app happened to re-register that one too, which it
+    /// may never do.
+    ///
+    /// Not knowing yet is not the same as not wanting it. Only an explicit
+    /// unregister says the app is done, and that is what this records. There
+    /// is deliberately no matching set of registered ids: nothing would read
+    /// it, and one that looked authoritative without being it is what caused
+    /// the defect.
+    private static final Set<String> UNOBSERVED =
             Collections.synchronizedSet(new HashSet<String>());
 
     /// Records that the app asked to watch an association, so an event for
@@ -91,7 +107,7 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
     /// - `associationId`: the association being watched
     public static void register(String associationId) {
         if (associationId != null) {
-            OBSERVED.add(associationId);
+            UNOBSERVED.remove(associationId);
         }
     }
 
@@ -102,7 +118,7 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
     /// - `associationId`: the association no longer watched
     public static void unregister(String associationId) {
         if (associationId != null) {
-            OBSERVED.remove(associationId);
+            UNOBSERVED.add(associationId);
         }
     }
 
@@ -172,7 +188,7 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
         if (address == null) {
             return;
         }
-        if (!OBSERVED.isEmpty() && !OBSERVED.contains(address)) {
+        if (UNOBSERVED.contains(address)) {
             return;
         }
         String encoded = sanitize(address) + '\t' + sanitize(address) + '\t'
@@ -187,10 +203,11 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
         android.net.MacAddress address = info.getDeviceMacAddress();
         String mac = address == null ? null : address.toString();
         String id = mac != null ? mac : Integer.toString(info.getId());
-        if (!OBSERVED.isEmpty() && !OBSERVED.contains(id)) {
+        if (UNOBSERVED.contains(id)) {
             // The platform keeps watching until told otherwise, and it
             // outlives the process. An event for an association the app has
-            // since stopped watching is not the app's business.
+            // since stopped watching is not the app's business -- but one it
+            // simply has not re-registered yet still is.
             return;
         }
         CharSequence name = info.getDisplayName();
