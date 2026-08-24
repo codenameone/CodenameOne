@@ -44,7 +44,7 @@ public @interface Build {
     /// The application ID for an app that requires native Facebook login
     /// integration, this defaults to null which means native Facebook support
     /// shouldn't be in the app
-    String facebookAppId() default "706695982682332";
+    String facebookAppId() default "";
 
     /// The Android/chrome push identifier, see the push section for more details
     String gcmSenderId() default "";

@@ -2328,9 +2328,18 @@ public class CodenameOneSettings extends Lifecycle {
                 String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
                 String path = dir + "/" + name;
                 if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
-                    // target/ holds compiled copies of these same sources; walking
-                    // it would find a generated stub and call it the main class.
-                    if (!"target".equals(name) && !"build".equals(name) && !name.startsWith(".")) {
+                    // target/ and build/ hold compiled copies of these same
+                    // sources, and walking one would find a generated stub and
+                    // call it the main class.
+                    //
+                    // Unless we are already inside a source tree, where `build` is
+                    // an ordinary package name -- this repository has
+                    // com.codename1.build.shared -- and refusing to descend meant
+                    // a main class living there could not be read at all. An
+                    // output directory is never nested under src/.
+                    boolean output = ("target".equals(name) || "build".equals(name))
+                            && !insideSourceTree(dir);
+                    if (!output && !name.startsWith(".")) {
                         queue.add(path);
                     }
                     continue;
@@ -2347,6 +2356,13 @@ public class CodenameOneSettings extends Lifecycle {
         }
         String hit = firstDeclaring(named, main, pkg, named.size());
         return hit != null ? hit : firstDeclaring(others, main, pkg, 400);
+    }
+
+    /// Whether `dir` is under a source root, where `build` is a package name
+    /// rather than an output directory.
+    static boolean insideSourceTree(String dir) {
+        String normalised = dir.replace('\\', '/');
+        return normalised.contains("/src/") || normalised.endsWith("/src");
     }
 
     /// The text of the first of `paths` that declares `main` in `pkg`, opening at

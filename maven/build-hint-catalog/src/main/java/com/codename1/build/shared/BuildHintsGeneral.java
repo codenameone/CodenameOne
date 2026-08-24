@@ -170,10 +170,15 @@ final class BuildHintsGeneral {
                 .platform("general")
                 .consumedBy("AndroidGradleBuilder", "IPhoneBuilder"));
 
+        // NO default, whatever the literal at the call site says. Both builders
+        // decide whether Facebook support is in the app at all by asking whether
+        // this hint is null, so the 706695982682332 further down is a fallback
+        // reached only once the feature is already on -- never a value the build
+        // uses by default. Recording it made Add enable Facebook integration
+        // against an unrelated shared app ID the moment the row was clicked.
         h.add(new Hint("facebook.appId")
                 .annotatedAs(HintGroup.GENERAL, "facebookAppId")
                 .type(HintType.STRING)
-                .def("706695982682332")
                 .platform("general")
                 .consumedBy("AndroidGradleBuilder", "IPhoneBuilder")
                 .doc("The application ID for an app that requires native Facebook login integration, this "

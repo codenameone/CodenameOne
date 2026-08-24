@@ -737,4 +737,27 @@ public class BuildHintCatalogTest {
         assertTrue(pods.defaultValue() == null || pods.defaultValue().isEmpty(),
                 "a hint with no builder default must not invent one");
     }
+
+    /// `build` is an ordinary package name -- this repository has
+    /// com.codename1.build.shared -- so refusing to descend into it meant a main
+    /// class living there could not be read. An output directory is never nested
+    /// under src/.
+    @Test
+    public void buildIsAPackageNameInsideASourceTree() {
+        assertTrue(CodenameOneSettings.insideSourceTree("/p/common/src/main/kotlin/com/example"));
+        assertTrue(CodenameOneSettings.insideSourceTree("/p/common/src"));
+        assertFalse(CodenameOneSettings.insideSourceTree("/p/common"));
+        assertFalse(CodenameOneSettings.insideSourceTree("/p/common/target/classes"));
+    }
+
+    /// facebook.appId has no default: both builders decide whether Facebook
+    /// support is in the app by asking whether the hint is null, so seeding the
+    /// literal from the call site enabled the integration against an unrelated
+    /// shared app ID the moment Add was clicked.
+    @Test
+    public void facebookAppIdHasNoDefault() {
+        BuildHintMetadata meta = BuildHintCatalog.load().get("facebook.appId");
+        assertNotNull(meta);
+        assertTrue(meta.defaultValue() == null || meta.defaultValue().isEmpty());
+    }
 }
