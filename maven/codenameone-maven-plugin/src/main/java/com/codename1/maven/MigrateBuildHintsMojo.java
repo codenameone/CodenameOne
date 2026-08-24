@@ -37,6 +37,7 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
 import java.io.BufferedReader;
+import java.io.Reader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -1338,18 +1339,13 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * {@code codename1.displayName}, say -- into mojibake, even though it has
      * nothing to do with the hint being migrated.</p>
      */
-    private void removeMigratedLines(File settingsFile, List<String> keys) throws IOException {
-        List<String> lines = new ArrayList<String>();
-        BufferedReader r = new BufferedReader(
-                new InputStreamReader(new FileInputStream(settingsFile), PROPERTIES_ENCODING));
-        try {
-            String line;
-            while ((line = r.readLine()) != null) {
-                lines.add(line);
-            }
-        } finally {
-            r.close();
-        }
+    static void removeMigratedLines(File settingsFile, List<String> keys) throws IOException {
+        // Each entry keeps its own terminator. readLine() discards it, and
+        // appending '\n' to every retained line rewrote a CRLF checkout end to
+        // end -- a whole-file diff from a goal that promises to delete some
+        // lines and touch nothing else, and one this repository has been bitten
+        // by before.
+        List<String> lines = physicalLines(readAll(settingsFile));
 
         Map<String, Boolean> wanted = new LinkedHashMap<String, Boolean>();
         for (String k : keys) {
@@ -1361,10 +1357,10 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // Gather the whole logical line: continuations belong to the same
             // declaration and have to go with it.
             int last = i;
-            StringBuilder logical = new StringBuilder(lines.get(i));
-            while (continues(lines.get(last)) && last + 1 < lines.size()) {
+            StringBuilder logical = new StringBuilder(withoutTerminator(lines.get(i)));
+            while (continues(withoutTerminator(lines.get(last))) && last + 1 < lines.size()) {
                 last++;
-                logical.append(lines.get(last).replaceFirst("^\\s+", ""));
+                logical.append(withoutTerminator(lines.get(last)).replaceFirst("^\\s+", ""));
             }
             String key = propertyKeyOf(logical.toString());
             if (key != null && wanted.containsKey(key)) {
@@ -1372,11 +1368,67 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 continue;
             }
             for (int j = i; j <= last; j++) {
-                out.append(lines.get(j)).append('\n');
+                out.append(lines.get(j));
             }
             i = last;
         }
         writeProperties(settingsFile, out.toString());
+    }
+
+    /** The whole file, as the encoding {@code Properties.load} would use. */
+    private static String readAll(File f) throws IOException {
+        Reader r = new InputStreamReader(new FileInputStream(f), PROPERTIES_ENCODING);
+        try {
+            StringBuilder sb = new StringBuilder();
+            char[] buf = new char[8192];
+            for (int n = r.read(buf); n > 0; n = r.read(buf)) {
+                sb.append(buf, 0, n);
+            }
+            return sb.toString();
+        } finally {
+            r.close();
+        }
+    }
+
+    /**
+     * The physical lines of {@code text}, each WITH the terminator it ended on.
+     *
+     * <p>All three of CRLF, LF and CR end a line for {@code Properties.load}, and
+     * a file need not end with one at all -- so the terminators travel with their
+     * lines rather than being normalised away and guessed at on the way out.</p>
+     */
+    private static List<String> physicalLines(String text) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c != '\n' && c != '\r') {
+                continue;
+            }
+            int end = i + 1;
+            if (c == '\r' && end < text.length() && text.charAt(end) == '\n') {
+                end++;
+            }
+            out.add(text.substring(start, end));
+            start = end;
+            i = end - 1;
+        }
+        if (start < text.length()) {
+            out.add(text.substring(start));
+        }
+        return out;
+    }
+
+    /** That line without its terminator, which is what the parsing reads. */
+    private static String withoutTerminator(String line) {
+        int end = line.length();
+        if (end > 0 && line.charAt(end - 1) == '\n') {
+            end--;
+        }
+        if (end > 0 && line.charAt(end - 1) == '\r') {
+            end--;
+        }
+        return line.substring(0, end);
     }
 
     /** Whether a physical line ends in an odd number of backslashes. */

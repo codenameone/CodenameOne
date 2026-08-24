@@ -24,6 +24,8 @@ package com.codename1.maven;
 
 import org.junit.Test;
 
+import java.io.File;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -530,5 +532,72 @@ public class MigrateBuildHintsPropertyParsingTest {
         int pkg = MigrateBuildHintsMojo.livePackageIndex(code);
         assertEquals(head.indexOf("class X"),
                 MigrateBuildHintsMojo.endOfPackageDeclaration(code, pkg));
+    }
+
+    /// The goal promises to delete the migrated declarations and leave every
+    /// other line byte for byte as it was. Reading with readLine() discarded
+    /// each terminator, and appending a newline to every retained line rewrote a
+    /// CRLF checkout end to end -- a whole-file diff from a goal that should
+    /// have touched three lines.
+    @Test
+    public void removingLinesKeepsTheFilesOwnLineEndings() throws Exception {
+        File f = File.createTempFile("cn1-settings", ".properties");
+        f.deleteOnExit();
+        String before = "# a comment\r\n"
+                + "codename1.displayName=Demo\r\n"
+                + "codename1.arg.ios.pods=Alamofire\r\n"
+                + "codename1.arg.android.min_sdk_version=24\r\n";
+        write(f, before);
+
+        MigrateBuildHintsMojo.removeMigratedLines(f,
+                java.util.Arrays.asList("codename1.arg.ios.pods"));
+
+        assertEquals("# a comment\r\n"
+                        + "codename1.displayName=Demo\r\n"
+                        + "codename1.arg.android.min_sdk_version=24\r\n",
+                read(f));
+    }
+
+    /// A file that does not end in a newline must not acquire one, and a mixed
+    /// file keeps each line as it found it.
+    @Test
+    public void removingLinesInventsNoTerminator() throws Exception {
+        File f = File.createTempFile("cn1-settings", ".properties");
+        f.deleteOnExit();
+        write(f, "codename1.arg.ios.pods=Alamofire\n"
+                + "codename1.displayName=Demo\r\n"
+                + "codename1.arg.ios.teamId=ABCDE12345");
+        MigrateBuildHintsMojo.removeMigratedLines(f,
+                java.util.Arrays.asList("codename1.arg.ios.pods"));
+        assertEquals("codename1.displayName=Demo\r\n"
+                + "codename1.arg.ios.teamId=ABCDE12345", read(f));
+    }
+
+    /// A continuation belongs to its declaration, terminators included.
+    @Test
+    public void removingAContinuedDeclarationTakesEveryLineOfIt() throws Exception {
+        File f = File.createTempFile("cn1-settings", ".properties");
+        f.deleteOnExit();
+        write(f, "codename1.arg.ios.pods=Alamofire,\\\r\n"
+                + "    SwiftyJSON\r\n"
+                + "codename1.displayName=Demo\r\n");
+        MigrateBuildHintsMojo.removeMigratedLines(f,
+                java.util.Arrays.asList("codename1.arg.ios.pods"));
+        assertEquals("codename1.displayName=Demo\r\n", read(f));
+    }
+
+    private static void write(File f, String text) throws Exception {
+        java.io.Writer w = new java.io.OutputStreamWriter(
+                new java.io.FileOutputStream(f), "ISO-8859-1");
+        try {
+            w.write(text);
+        } finally {
+            w.close();
+        }
+    }
+
+    private static String read(File f) throws Exception {
+        byte[] all = java.nio.file.Files.readAllBytes(f.toPath());
+        return new String(all, "ISO-8859-1");
     }
 }
