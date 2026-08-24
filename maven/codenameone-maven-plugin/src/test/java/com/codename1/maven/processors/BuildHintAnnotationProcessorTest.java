@@ -314,6 +314,41 @@ public class BuildHintAnnotationProcessorTest {
         assertErrorContaining(ctx, "belong on the application's main class");
     }
 
+    /// What counts as a declaration has one answer, shared by the processor's
+    /// orphan check and the migration goal's source lookup. These pin it.
+    @Test
+    public void aDeclarationIsFoundOnlyInCode() {
+        assertTrue(BuildHintAnnotationProcessor.declaresType("public class MyApp {}", "MyApp"));
+        assertTrue(BuildHintAnnotationProcessor.declaresType("object MyApp", "MyApp"));
+        assertFalse(BuildHintAnnotationProcessor.declaresType("// class MyApp", "MyApp"));
+        assertFalse(BuildHintAnnotationProcessor.declaresType("/* class MyApp */", "MyApp"));
+        assertFalse(BuildHintAnnotationProcessor.declaresType("String s = \"class MyApp\";",
+                "MyApp"));
+        assertTrue(BuildHintAnnotationProcessor.declaresType(
+                "// class MyApp\nclass MyApp {}", "MyApp"));
+        assertFalse(BuildHintAnnotationProcessor.declaresType("class MyApplication {}", "MyApp"));
+    }
+
+    @Test
+    public void thePackageIsReadFromCodeToo() {
+        assertEquals("com.example",
+                BuildHintAnnotationProcessor.declaredPackageIn("package com.example;\n"));
+        assertEquals("com.example",
+                BuildHintAnnotationProcessor.declaredPackageIn("package com.example\n"));
+        assertEquals("", BuildHintAnnotationProcessor.declaredPackageIn("// package com.example;"));
+        assertEquals("", BuildHintAnnotationProcessor.declaredPackageIn("class MyApp {}"));
+    }
+
+    /// Blanking preserves length and line breaks, so an offset into the blanked
+    /// text still means the same place in the original.
+    @Test
+    public void blankingKeepsThePositionsIntact() {
+        String src = "a // b\nc /* d */ e\n";
+        String blanked = BuildHintAnnotationProcessor.blankNonCode(src);
+        assertEquals(src.length(), blanked.length());
+        assertEquals(2, blanked.split("\n", -1).length - 1);
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

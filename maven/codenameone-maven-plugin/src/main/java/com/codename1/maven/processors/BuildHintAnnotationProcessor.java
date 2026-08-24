@@ -353,7 +353,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Comments and string literals are blanked first: a commented-out
     /// `// class Wrong` left behind by the very edit that deleted the type would
     /// otherwise vouch for its own orphan.
-    static boolean declaresType(String text, String simple) {
+    public static boolean declaresType(String text, String simple) {
         text = blankNonCode(text);
         String[] keywords = {"class ", "interface ", "enum ", "object ", "record "};
         for (String keyword : keywords) {
@@ -378,7 +378,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// `text` with every comment and string literal replaced by spaces, so a
     /// declaration can be looked for without a quoted or commented mention of one
     /// answering for it. Lengths and line breaks are preserved.
-    static String blankNonCode(String text) {
+    public static String blankNonCode(String text) {
         char[] out = text.toCharArray();
         int i = 0;
         while (i < out.length) {
@@ -463,7 +463,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     /// The package `text` declares, or "" for the default package.
-    static String declaredPackageIn(String text) {
+    public static String declaredPackageIn(String text) {
         text = blankNonCode(text);
         for (String line : text.split("\n")) {
             String t = line.trim();

@@ -714,6 +714,8 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
         String path = (pkg == null ? "" : pkg.trim().replace('.', File.separatorChar)
                 + File.separator) + main.trim();
+        String simple = main.trim();
+        String expectedPkg = pkg == null ? "" : pkg.trim();
         String[] roots = {"src" + File.separator + "main" + File.separator + "java",
                           "src" + File.separator + "main" + File.separator + "kotlin",
                           "src"};
@@ -721,12 +723,76 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         for (String root : roots) {
             for (String ext : extensions) {
                 File f = new File(projectDir, root + File.separator + path + ext);
-                if (f.isFile()) {
+                // Declaring the class, not merely sitting at the conventional
+                // path: a Kotlin main class moved into a differently named file
+                // can leave the old one behind holding something else.
+                if (f.isFile() && declares(f, expectedPkg, simple)) {
                     return f.getAbsolutePath();
                 }
             }
         }
+        // Those three are a convention. Maven is the authority on where this
+        // module's sources are -- a module may add src/app/java or a Kotlin root
+        // -- and Kotlin does not require a file to be named after its class, so
+        // the file is identified by what it DECLARES. Without this the goal
+        // aborted with "Could not find the source" on a project Maven compiles
+        // perfectly well.
+        org.apache.maven.project.MavenProject owner = moduleAt(projectDir);
+        if (owner == null || owner.getCompileSourceRoots() == null) {
+            return null;
+        }
+        for (String root : owner.getCompileSourceRoots()) {
+            File dir = new File(root);
+            if (!dir.isDirectory()) {
+                continue;
+            }
+            File hit = findDeclaringFile(dir, expectedPkg, simple, 0);
+            if (hit != null) {
+                return hit.getAbsolutePath();
+            }
+        }
         return null;
+    }
+
+    /// The first .java or .kt under `dir` declaring `simple` in `pkg`, or null.
+    private File findDeclaringFile(File dir, String pkg, String simple, int depth) {
+        if (depth > 24) {
+            return null;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return null;
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                File hit = findDeclaringFile(f, pkg, simple, depth + 1);
+                if (hit != null) {
+                    return hit;
+                }
+            } else if ((f.getName().endsWith(".java") || f.getName().endsWith(".kt"))
+                    && declares(f, pkg, simple)) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    /// Whether `f` declares type `simple` in package `pkg`.
+    ///
+    /// Through the annotation processor's helpers rather than a second copy: the
+    /// two have already drifted apart once in this change, and "what counts as a
+    /// declaration" should have one answer.
+    private boolean declares(File f, String pkg, String simple) {
+        String text;
+        try {
+            text = read(f);
+        } catch (IOException ex) {
+            return false;
+        }
+        return pkg.equals(com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .declaredPackageIn(text))
+                && com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .declaresType(text, simple);
     }
 
     /**

@@ -2184,7 +2184,13 @@ public class CodenameOneSettings extends Lifecycle {
             for (String root : new String[]{"/src/main/java/", "/src/main/kotlin/", "/src/"}) {
                 String path = binding.projectDir() + root + rel + ext;
                 String text = readIfPresent(path);
-                if (text == null) {
+                // The conventional path has to DECLARE the class, not merely
+                // exist. Moving a Kotlin main class into a differently named file
+                // can leave the old Main.kt behind holding something else, and
+                // returning on its mere existence skipped the search below --
+                // reporting the annotated hints as unowned, which is the state
+                // that lets Add write the duplicate.
+                if (text == null || !declaresClass(text, main, pkg, ext.equals(".kt"))) {
                     continue;
                 }
                 collectAnnotationOwnedHints(text, out, ext.equals(".kt"));
