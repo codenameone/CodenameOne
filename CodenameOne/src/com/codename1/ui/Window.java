@@ -142,6 +142,23 @@ public class Window extends Container implements TopLevelContainer {
     private int initialPressY;
     private boolean cyclicFocus = true;
 
+    /// This window's own gesture state.
+    ///
+    /// Fields, not entries in a table keyed by window id. The table version had to
+    /// lease a slot on the first event and hand it back on the last, and every way of
+    /// getting that wrong is a real defect: a window disposed mid-press never returned
+    /// its slot, and once the fixed number of slots was gone the drag filter silently
+    /// switched off for every window. Held here, the state is created with the window
+    /// and collected with it, and none of those failures can be expressed.
+    private PointerDragHistory dragHistory;
+    private boolean dragOccured;
+    /// A contact is down in this window and has not been released or dragged yet, and
+    /// where it went down. In this window's coordinates, which is why it cannot be a
+    /// global: the coordinates of two windows are not comparable.
+    private boolean selectionPressed;
+    private int selectionPressedX;
+    private int selectionPressedY;
+
     private final AnimationManager animMananger = new AnimationManager(this);
     private final ArrayList<Animation> animatableComponents = new ArrayList<Animation>();
     private final ArrayList<Animation> internalAnimatableComponents = new ArrayList<Animation>();
@@ -2767,6 +2784,150 @@ public class Window extends Container implements TopLevelContainer {
                 && target.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
             LeadUtil.longPointerPress(target, x, y);
         }
+    }
+
+    /// This window's key-repeat and long-press timers. Fields, for the same reason the
+    /// gesture state is: a window that goes away takes them with it, and nothing has to
+    /// remember to hand a slot back.
+    private boolean keyRepeatArmed;
+    private boolean keyLongPressArmed;
+    private int keyRepeatValue;
+    private long keyRepeatNext;
+    private long keyLongPressStart;
+    private boolean longPointerArmed;
+    private int longPointerX;
+    private int longPointerY;
+    private long longPointerStart;
+
+    /// Arms key repeat and long key press for a press this window accepted.
+    void chargeKeyRepeat(int keyCode, boolean armed, long now, long firstRepeatAt) {
+        keyRepeatArmed = armed;
+        keyLongPressArmed = armed;
+        keyRepeatValue = keyCode;
+        keyLongPressStart = now;
+        keyRepeatNext = firstRepeatAt;
+    }
+
+    /// Cancels repeat for one key code, used when that key's release arrived
+    /// somewhere else.
+    void cancelKeyRepeatForCode(int keyCode) {
+        if (keyRepeatValue == keyCode) {
+            cancelKeyRepeat();
+        }
+    }
+
+    void cancelKeyRepeat() {
+        keyRepeatArmed = false;
+        keyLongPressArmed = false;
+    }
+
+    boolean hasKeyRepeatArmed() {
+        return keyRepeatArmed || keyLongPressArmed;
+    }
+
+    /// True while both are still pending, which is what tells the event loop it may
+    /// not go to sleep yet.
+    boolean hasKeyRepeatAndLongPressArmed() {
+        return keyRepeatArmed && keyLongPressArmed;
+    }
+
+    /// Arms the long pointer press for a press this window accepted.
+    void chargeLongPointerPress(int x, int y) {
+        longPointerArmed = true;
+        longPointerX = x;
+        longPointerY = y;
+        longPointerStart = System.currentTimeMillis();
+    }
+
+    void cancelLongPointerPress() {
+        longPointerArmed = false;
+    }
+
+    boolean hasLongPointerArmed() {
+        return longPointerArmed;
+    }
+
+    /// Fires whichever of this window's timers are due. Called once per paint pass
+    /// from the event loop, with the loop's clock so every surface agrees on the time.
+    void serviceInputTimers(long now, int longPressInterval) {
+        if (!nativeVisible || disposing) {
+            return;
+        }
+        if (keyRepeatArmed && keyRepeatNext <= now) {
+            keyRepeated(keyRepeatValue);
+            int keyRepeatNextIntervalTime = 10;
+            keyRepeatNext = now + keyRepeatNextIntervalTime;
+        }
+        if (keyLongPressArmed && longPressInterval <= now - keyLongPressStart) {
+            keyLongPressArmed = false;
+            longKeyPress(keyRepeatValue);
+        }
+        if (longPointerArmed && longPressInterval <= now - longPointerStart) {
+            longPointerArmed = false;
+            longPointerPress(longPointerX, longPointerY);
+        }
+    }
+
+    /// The recent pointer path in this window, created on first use because a window
+    /// that never sees a drag has no reason to hold the ring.
+    PointerDragHistory dragHistory() {
+        if (dragHistory == null) {
+            dragHistory = Display.getInstance().newDragHistory();
+        }
+        return dragHistory;
+    }
+
+    /// Records a position in the current gesture.
+    void recordDrag(int x, int y, int timestamp) {
+        dragHistory().record(x, y, timestamp);
+    }
+
+    /// Forgets the previous gesture so a new press does not fling with its speed.
+    void resetDragHistory() {
+        if (dragHistory != null) {
+            dragHistory.reset();
+        }
+    }
+
+    /// Whether a drag happened during the gesture currently in this window.
+    boolean hasDragOccured() {
+        return dragOccured;
+    }
+
+    void setDragOccured(boolean value) {
+        dragOccured = value;
+    }
+
+    /// The fling speed of the gesture in this window. Named apart from
+    /// Component.getDragSpeed(boolean), which this class inherits and which means the
+    /// speed of the component's own drag.
+    float windowDragSpeed(boolean yAxis) {
+        return dragHistory().speed(Display.impl, yAxis);
+    }
+
+    /// Records a press that has not been released or dragged, with the point it went
+    /// down at, for the pureTouch selection test.
+    void setSelectionPressed(boolean value, int x, int y) {
+        selectionPressed = value;
+        if (value) {
+            selectionPressedX = x;
+            selectionPressedY = y;
+        }
+    }
+
+    /// Whether this window holds a press that should still show selection on the
+    /// given component. The component is tested against this window's own press
+    /// coordinates -- window coordinates are window relative, so another window's
+    /// pointer position is not merely the wrong point but a point in a different
+    /// space.
+    boolean showsSelectionFor(Component c) {
+        return selectionPressed && c.contains(selectionPressedX, selectionPressedY);
+    }
+
+    /// Whether this window holds a press at all, which is what the component-less
+    /// selection query asks.
+    boolean hasSelectionPressed() {
+        return selectionPressed;
     }
 
     /// Stops any glide still running in the pressed component's ancestors, so the

@@ -1788,19 +1788,13 @@ class WindowTest extends UITestBase {
     /// Reads Display's per-window long-press table, which is private state with no
     /// public accessor.
     private static boolean longPressArmedFor(int windowId) throws Exception {
-        // Same -1 keying for the main surface as keyRepeatArmedFor.
-        java.lang.reflect.Field wf = Display.class.getDeclaredField("longPressWindows");
-        java.lang.reflect.Field af = Display.class.getDeclaredField("longPressArmed");
-        wf.setAccessible(true);
-        af.setAccessible(true);
-        int[] windows = (int[]) wf.get(Display.getInstance());
-        boolean[] armed = (boolean[]) af.get(Display.getInstance());
-        for (int iter = 0; iter < windows.length; iter++) {
-            if (windows[iter] == windowId && armed[iter]) {
-                return true;
-            }
+        if (windowId == 0) {
+            java.lang.reflect.Field f = Display.class.getDeclaredField("longPointerCharged");
+            f.setAccessible(true);
+            return f.getBoolean(Display.getInstance());
         }
-        return false;
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.hasLongPointerArmed();
     }
 
     @FormTest
@@ -1979,40 +1973,54 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
-    void dragHistorySlotsAreReclaimedAfterEachGesture() throws Exception {
+    void manyWindowsGesturingDoNotStarveALaterOne() {
         implementation.setMultiWindowSupported(true);
-        // Far more gestures than the table has entries. Slots were released only on
-        // disposal, so a handful of long-lived windows exhausted it and a later
-        // window could record neither drag state nor velocity.
+        // The concern this replaces was a fixed table of drag-history slots: a handful
+        // of long-lived windows exhausted it and a later window could record neither
+        // drag state nor velocity. Each window now owns its history, so there is no
+        // table to exhaust -- but the behaviour is worth pinning down regardless of how
+        // it is stored.
         Window[] windows = new Window[10];
-        for (int iter = 0; iter < windows.length; iter++) {
-            windows[iter] = new Window("w" + iter, new BorderLayout());
-            windows[iter].add(BorderLayout.CENTER, new Label("c"));
-            windows[iter].setWindowSize(300, 200);
-            windows[iter].show();
-            int[] px = new int[]{150};
-            int[] py = new int[]{120};
-            Display.getInstance().windowPointerPressed(windows[iter].getWindowId(), px, py);
-            Display.getInstance().windowPointerReleased(windows[iter].getWindowId(), px, py);
+        try {
+            for (int iter = 0; iter < windows.length; iter++) {
+                windows[iter] = new Window("w" + iter, new BorderLayout());
+                windows[iter].add(BorderLayout.CENTER, new Label("c"));
+                windows[iter].setWindowSize(300, 200);
+                windows[iter].show();
+                int[] px = new int[] { 150 };
+                int[] py = new int[] { 120 };
+                Display.getInstance().windowPointerPressed(windows[iter].getWindowId(), px, py);
+                Display.getInstance().windowPointerReleased(windows[iter].getWindowId(), px, py);
+                DisplayTest.flushEdt();
+            }
+
+            Window later = new Window("later", new BorderLayout());
+            later.setWindowSize(400, 300);
+            DragCountingComponent c = new DragCountingComponent();
+            later.add(BorderLayout.CENTER, c);
+            later.show();
+            later.asContainer().revalidate();
+            try {
+                implementation.windowPointerPressedForTest(later.getWindowId(), 100, 100);
+                for (int iter = 0; iter < 12; iter++) {
+                    implementation.windowPointerDraggedForTest(later.getWindowId(),
+                            100 + iter * 20, 100);
+                }
+                DisplayTest.flushEdt();
+                assertTrue(c.drags > 0,
+                        "a window opened after ten others have gestured must still be "
+                                + "able to drag");
+            } finally {
+                later.dispose();
+            }
+        } finally {
+            for (int iter = 0; iter < windows.length; iter++) {
+                if (windows[iter] != null) {
+                    windows[iter].dispose();
+                }
+            }
             DisplayTest.flushEdt();
         }
-
-        java.lang.reflect.Field f = Display.class.getDeclaredField("dragHistoryWindows");
-        f.setAccessible(true);
-        int[] table = (int[]) f.get(Display.getInstance());
-        int used = 0;
-        for (int entry : table) {
-            if (entry != 0) {
-                used++;
-            }
-        }
-        for (Window w : windows) {
-            w.dispose();
-        }
-
-        // Only the main surface's permanent entry should remain held.
-        assertEquals(1, used,
-                "a finished gesture must hand its drag-history slot back");
     }
 
     @FormTest
@@ -2105,22 +2113,15 @@ class WindowTest extends UITestBase {
 
     /// Reads Display's per-window key repeat table, which has no public accessor.
     private static boolean keyRepeatArmedFor(int windowId) throws Exception {
-        java.lang.reflect.Field wf = Display.class.getDeclaredField("keyRepeatWindows");
-        java.lang.reflect.Field af = Display.class.getDeclaredField("keyRepeatArmed");
-        wf.setAccessible(true);
-        af.setAccessible(true);
-        int[] windows = (int[]) wf.get(Display.getInstance());
-        boolean[] armed = (boolean[]) af.get(Display.getInstance());
-        // Display keys the main surface as -1 so that 0 can mean "unused". Comparing
-        // against 0 here matched nothing, which is what made the first version of the
-        // repeat test pass with the fix removed.
-        int key = windowId == 0 ? -1 : windowId;
-        for (int iter = 0; iter < windows.length; iter++) {
-            if (windows[iter] == key && armed[iter]) {
-                return true;
-            }
+        // Asked of the surface that owns the timer rather than reflected out of a table
+        // in Display. The main surface keeps its own fields; a window keeps its own.
+        if (windowId == 0) {
+            java.lang.reflect.Field f = Display.class.getDeclaredField("keyRepeatCharged");
+            f.setAccessible(true);
+            return f.getBoolean(Display.getInstance());
         }
-        return false;
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.hasKeyRepeatArmed();
     }
 
     @FormTest
@@ -4602,11 +4603,12 @@ class WindowTest extends UITestBase {
 
     /// Whether any key-repeat slot is currently armed.
     private static boolean anyKeyRepeatArmed() throws Exception {
-        java.lang.reflect.Field f = Display.class.getDeclaredField("keyRepeatArmed");
-        f.setAccessible(true);
-        boolean[] armed = (boolean[]) f.get(Display.getInstance());
-        for (int iter = 0; iter < armed.length; iter++) {
-            if (armed[iter]) {
+        if (keyRepeatArmedFor(0)) {
+            return true;
+        }
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasKeyRepeatArmed()) {
                 return true;
             }
         }
@@ -4653,8 +4655,6 @@ class WindowTest extends UITestBase {
 
         java.lang.reflect.Field drop = Display.class.getDeclaredField("dropEvents");
         drop.setAccessible(true);
-        java.lang.reflect.Field lp = Display.class.getDeclaredField("longPressWindows");
-        lp.setAccessible(true);
         drop.setBoolean(Display.getInstance(), true);
         try {
             Display.getInstance().pointerPressed(new int[]{40}, new int[]{40});
@@ -4666,10 +4666,10 @@ class WindowTest extends UITestBase {
         // longPointerPress() is delivered straight to the top level, so arming it off a
         // refused press sends a long press to a component that never got
         // pointerPressed().
-        int[] armedWindows = (int[]) lp.get(Display.getInstance());
-        boolean anyArmed = false;
-        for (int iter = 0; iter < armedWindows.length; iter++) {
-            if (armedWindows[iter] != 0) {
+        boolean anyArmed = longPressArmedFor(0);
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasLongPointerArmed()) {
                 anyArmed = true;
             }
         }

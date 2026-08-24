@@ -309,30 +309,40 @@ public final class Display extends CN1Constants {
     /// because shouldRenderSelection(Component) tests them against the component's own
     /// bounds, and window coordinates are window relative -- a component in one window
     /// tested against another window's pointer is comparing two different origins.
-    private final boolean[] selectionPressed = new boolean[TRACKED_KEY_PRESSES];
-    private final int[] selectionPressedX = new int[TRACKED_KEY_PRESSES];
-    private final int[] selectionPressedY = new int[TRACKED_KEY_PRESSES];
     private boolean recursivePointerReleaseA;
     private boolean recursivePointerReleaseB;
     private int pointerX;
     private int pointerY;
     private PointerEvent currentPointerEvent;
+    /// The main surface's key-repeat and long-press timers, as they always were.
+    /// A window keeps its own on the window, so there is no table here to lease.
+    private boolean keyRepeatCharged;
+    private boolean longPressCharged;
+    private boolean longPointerCharged;
+    private int keyRepeatValue;
+    private long nextKeyRepeatEvent;
+    private long longKeyPressTime;
     private int longPressInterval = 500;
     private boolean lastInteractionWasKeypad;
     private boolean processingSerialCalls;
     private int PATHLENGTH;
+
+    /// A gesture-path ring sized for this platform. Windows ask for their own rather
+    /// than being handed a row of a shared table.
+    PointerDragHistory newDragHistory() {
+        return new PointerDragHistory(PATHLENGTH, displayInitTime);
+    }
+
     /// Drag sample history, one ring per window.
     ///
-    /// Singleton before: two touchscreen contacts dragging in two windows appended
-    /// to the same ring, so releasing either scrolling component computed its
-    /// inertia from the other window's samples -- wrong or wildly extreme fling.
-    /// Index 0 is the main surface; `#dragHistoryWindows` maps the rest.
-    private float[][] dragPathX;
-    private float[][] dragPathY;
-    private long[][] dragPathTime;
-    private int[] dragPathOffset;
-    private int[] dragPathLength;
-    private int[] dragHistoryWindows;
+    /// The main surface's gesture path, exactly as it always was. A window keeps its
+    /// own ring on the window rather than borrowing a row here, so two contacts
+    /// dragging in two surfaces cannot append to the same samples.
+    private float[] dragPathX;
+    private float[] dragPathY;
+    private long[] dragPathTime;
+    private int dragPathOffset;
+    private int dragPathLength;
 
     /// The window whose drag samples `#getDragSpeed(boolean)` should report. Set
     /// while that window's pointer events are dispatched, since the public accessor
@@ -500,18 +510,9 @@ public final class Display extends CN1Constants {
             MenuBar.clearSK = impl.getClearKeyCode();
 
             INSTANCE.PATHLENGTH = impl.getDragPathLength();
-            INSTANCE.dragPathX = new float[TRACKED_KEY_PRESSES][];
-            INSTANCE.dragPathY = new float[TRACKED_KEY_PRESSES][];
-            INSTANCE.dragPathTime = new long[TRACKED_KEY_PRESSES][];
-            INSTANCE.dragPathOffset = new int[TRACKED_KEY_PRESSES];
-            INSTANCE.dragPathLength = new int[TRACKED_KEY_PRESSES];
-            INSTANCE.dragHistoryWindows = new int[TRACKED_KEY_PRESSES];
-            // Slot 0 is the main surface and is always present; the rings for the
-            // other slots are allocated the first time a window drags.
-            INSTANCE.dragHistoryWindows[0] = MAIN_LONG_PRESS_ID;
-            INSTANCE.dragPathX[0] = new float[INSTANCE.PATHLENGTH];
-            INSTANCE.dragPathY[0] = new float[INSTANCE.PATHLENGTH];
-            INSTANCE.dragPathTime[0] = new long[INSTANCE.PATHLENGTH];
+            INSTANCE.dragPathX = new float[INSTANCE.PATHLENGTH];
+            INSTANCE.dragPathY = new float[INSTANCE.PATHLENGTH];
+            INSTANCE.dragPathTime = new long[INSTANCE.PATHLENGTH];
             com.codename1.util.StringUtil.setImplementation(impl);
             Util.setImplementation(impl);
 
@@ -1485,41 +1486,29 @@ public final class Display extends CN1Constants {
             paintOpenWindows();
         }
 
-        // Key repeat and long press are routed back to whichever top level the
-        // originating press came from, not blindly to the current form.
+        // The main surface's timers, exactly as they always were.
         long t = System.currentTimeMillis();
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (keyRepeatWindows[iter] == 0) {
-                continue;
-            }
-            int repeatWindow = keyRepeatWindows[iter] == MAIN_LONG_PRESS_ID
-                    ? 0 : keyRepeatWindows[iter];
-            Container repeatTarget = repeatTarget(repeatWindow, current);
-            if (repeatTarget == null) {
-                continue;
-            }
-            if (keyRepeatArmed[iter] && keyRepeatNext[iter] <= t) {
-                repeatTarget.keyRepeated(keyRepeatValues[iter]);
+        if (current != null) {
+            if (keyRepeatCharged && nextKeyRepeatEvent <= t) {
+                current.keyRepeated(keyRepeatValue);
                 int keyRepeatNextIntervalTime = 10;
-                keyRepeatNext[iter] = t + keyRepeatNextIntervalTime;
+                nextKeyRepeatEvent = t + keyRepeatNextIntervalTime;
             }
-            if (keyLongPressArmed[iter] && longPressInterval <= t - keyLongPressStart[iter]) {
-                keyLongPressArmed[iter] = false;
-                repeatTarget.longKeyPress(keyRepeatValues[iter]);
+            if (longPressCharged && longPressInterval <= t - longKeyPressTime) {
+                longPressCharged = false;
+                current.longKeyPress(keyRepeatValue);
+            }
+            if (longPointerCharged && longPressInterval <= t - longKeyPressTime) {
+                longPointerCharged = false;
+                current.longPointerPress(pointerX, pointerY);
             }
         }
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (!longPressArmed[iter] || longPressInterval > t - longPressStart[iter]) {
-                continue;
-            }
-            int pressWindow = longPressWindows[iter] == MAIN_LONG_PRESS_ID
-                    ? 0 : longPressWindows[iter];
-            Container pointerTarget = repeatTarget(pressWindow, current);
-            longPressArmed[iter] = false;
-            longPressWindows[iter] = 0;
-            if (pointerTarget != null) {
-                pointerTarget.longPointerPress(longPressPointerX[iter], longPressPointerY[iter]);
-            }
+        // Every open window services its own, which is a walk over the windows that
+        // actually exist rather than over a fixed table of slots most of which are
+        // empty. A window that went away took its timers with it.
+        Window[] openWindows = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < openWindows.length; iter++) {
+            openWindows[iter].serviceInputTimers(t, longPressInterval);
         }
         processSerialCalls();
 
@@ -3394,25 +3383,13 @@ public final class Display extends CN1Constants {
     /// Global before: pressing in one window cleared the flag after another had
     /// already dragged, so releasing the first made `List` and friends read
     /// `hasDragOccured()` as false and treat a completed drag as a click.
-    private final boolean[] dragOccuredPerWindow = new boolean[TRACKED_KEY_PRESSES];
 
     /// Key repeat and long-key-press state, per window for the same reason the
     /// pointer equivalents are: a key held in one window and another pressed in a
     /// second window shared one id, value and clock, so each cancelled the other.
-    private final int[] keyRepeatWindows = new int[TRACKED_KEY_PRESSES];
-    private final boolean[] keyRepeatArmed = new boolean[TRACKED_KEY_PRESSES];
-    private final boolean[] keyLongPressArmed = new boolean[TRACKED_KEY_PRESSES];
-    private final int[] keyRepeatValues = new int[TRACKED_KEY_PRESSES];
-    private final long[] keyRepeatNext = new long[TRACKED_KEY_PRESSES];
-    private final long[] keyLongPressStart = new long[TRACKED_KEY_PRESSES];
 
     /// Ids of windows with a long press being timed, paired by index with the arrays
     /// below. Zero means the entry is unused; window 0 uses `#MAIN_LONG_PRESS_ID`.
-    private final int[] longPressWindows = new int[TRACKED_KEY_PRESSES];
-    private final boolean[] longPressArmed = new boolean[TRACKED_KEY_PRESSES];
-    private final int[] longPressPointerX = new int[TRACKED_KEY_PRESSES];
-    private final int[] longPressPointerY = new int[TRACKED_KEY_PRESSES];
-    private final long[] longPressStart = new long[TRACKED_KEY_PRESSES];
 
     /// Stand-in id for the main surface, so 0 can mean "unused" in
     /// `#longPressWindows`.
@@ -3422,37 +3399,21 @@ public final class Display extends CN1Constants {
         return windowId == 0 ? MAIN_LONG_PRESS_ID : windowId;
     }
 
-    /// The key-repeat slot for a window, allocating one if needed.
-    private int keyRepeatSlot(int windowId, boolean create) {
-        int key = longPressKey(windowId);
-        int free = -1;
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (keyRepeatWindows[iter] == key) {
-                return iter;
-            }
-            if (free < 0 && keyRepeatWindows[iter] == 0) {
-                free = iter;
-            }
-        }
-        if (!create || free < 0) {
-            return -1;
-        }
-        keyRepeatWindows[free] = key;
-        return free;
-    }
-
     /// Arms key repeat and the long-key-press timer for one window.
     private void chargeKeyRepeat(int windowId, int keyCode, boolean armed, long now,
             long firstRepeatAt) {
-        int slot = keyRepeatSlot(windowId, true);
-        if (slot < 0) {
+        if (windowId == 0) {
+            keyRepeatCharged = armed;
+            longPressCharged = armed;
+            keyRepeatValue = keyCode;
+            longKeyPressTime = now;
+            nextKeyRepeatEvent = firstRepeatAt;
             return;
         }
-        keyRepeatArmed[slot] = armed;
-        keyLongPressArmed[slot] = armed;
-        keyRepeatValues[slot] = keyCode;
-        keyLongPressStart[slot] = now;
-        keyRepeatNext[slot] = firstRepeatAt;
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.chargeKeyRepeat(keyCode, armed, now, firstRepeatAt);
+        }
     }
 
     /// Cancels whichever window armed a repeat for this key code.
@@ -3462,31 +3423,36 @@ public final class Display extends CN1Constants {
     /// cancelling the releasing window's slot left the pressing window repeating
     /// every 10ms with the key physically up.
     private void cancelKeyRepeatForCode(int keyCode) {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (keyRepeatWindows[iter] != 0 && keyRepeatValues[iter] == keyCode) {
-                keyRepeatArmed[iter] = false;
-                keyLongPressArmed[iter] = false;
-                keyRepeatWindows[iter] = 0;
-            }
+        if (keyRepeatValue == keyCode) {
+            keyRepeatCharged = false;
+            longPressCharged = false;
+        }
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            open[iter].cancelKeyRepeatForCode(keyCode);
         }
     }
 
     /// Cancels key repeat for one window, leaving the others alone.
     private void cancelKeyRepeat(int windowId) {
-        int slot = keyRepeatSlot(windowId, false);
-        if (slot >= 0) {
-            keyRepeatArmed[slot] = false;
-            keyLongPressArmed[slot] = false;
-            keyRepeatWindows[slot] = 0;
+        if (windowId == 0) {
+            keyRepeatCharged = false;
+            longPressCharged = false;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.cancelKeyRepeat();
         }
     }
 
     /// Cancels key repeat everywhere, for the paths that reset all input state.
     private void cancelAllKeyRepeats() {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            keyRepeatArmed[iter] = false;
-            keyLongPressArmed[iter] = false;
-            keyRepeatWindows[iter] = 0;
+        keyRepeatCharged = false;
+        longPressCharged = false;
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            open[iter].cancelKeyRepeat();
         }
     }
 
@@ -3494,8 +3460,12 @@ public final class Display extends CN1Constants {
     /// single-flag predicate this replaces was `!keyRepeatCharged ||
     /// !longPressCharged`, i.e. false only when both were set.
     private boolean anyKeyRepeatAndLongPressArmed() {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (keyRepeatArmed[iter] && keyLongPressArmed[iter]) {
+        if (keyRepeatCharged && longPressCharged) {
+            return true;
+        }
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasKeyRepeatAndLongPressArmed()) {
                 return true;
             }
         }
@@ -3504,8 +3474,12 @@ public final class Display extends CN1Constants {
 
     /// Whether any window still has key repeat or a long key press pending.
     private boolean anyKeyRepeatArmed() {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (keyRepeatArmed[iter] || keyLongPressArmed[iter]) {
+        if (keyRepeatCharged || longPressCharged) {
+            return true;
+        }
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasKeyRepeatArmed()) {
                 return true;
             }
         }
@@ -3518,13 +3492,12 @@ public final class Display extends CN1Constants {
             pointerPressedAndNotReleasedOrDragged = value;
             return;
         }
-        int slot = dragHistorySlot(windowId);
-        if (slot >= 0) {
-            selectionPressed[slot] = value;
-            if (value) {
-                selectionPressedX[slot] = x;
-                selectionPressedY[slot] = y;
-            }
+        // Window zero is the main surface and keeps the field it has always kept.
+        // Every other window keeps its own, on the window -- so there is no table here
+        // to size, lease or reclaim.
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.setSelectionPressed(value, x, y);
         }
     }
 
@@ -3540,8 +3513,8 @@ public final class Display extends CN1Constants {
         if (windowId == 0) {
             return pointerPressedAndNotReleasedOrDragged;
         }
-        int slot = dragHistorySlot(windowId, false);
-        return slot >= 0 && selectionPressed[slot];
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.hasSelectionPressed();
     }
 
     /// Whether any window has a press down. What the component-less
@@ -3550,8 +3523,9 @@ public final class Display extends CN1Constants {
         if (pointerPressedAndNotReleasedOrDragged) {
             return true;
         }
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (selectionPressed[iter]) {
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasSelectionPressed()) {
                 return true;
             }
         }
@@ -3562,36 +3536,20 @@ public final class Display extends CN1Constants {
     /// loses its input, which is not a per window event.
     private void clearAllSelectionPressed() {
         pointerPressedAndNotReleasedOrDragged = false;
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            selectionPressed[iter] = false;
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            open[iter].setSelectionPressed(false, 0, 0);
         }
-    }
-
-    /// The window a component paints in, or zero for the main surface.
-    private int selectionWindowId(Component c) {
-        TopLevelContainer top = c.getTopLevelContainer();
-        if (top instanceof Window) {
-            return ((Window) top).getWindowId();
-        }
-        return 0;
     }
 
     /// Where the press that is still down in this window went down.
     private int selectionX(int windowId) {
-        if (windowId == 0) {
-            return pointerX;
-        }
-        int slot = dragHistorySlot(windowId, false);
-        return slot >= 0 ? selectionPressedX[slot] : pointerX;
+        return pointerX;
     }
 
     /// Where the press that is still down in this window went down.
     private int selectionY(int windowId) {
-        if (windowId == 0) {
-            return pointerY;
-        }
-        int slot = dragHistorySlot(windowId, false);
-        return slot >= 0 ? selectionPressedY[slot] : pointerY;
+        return pointerY;
     }
 
     /// Records that a drag happened in one window.
@@ -3600,9 +3558,9 @@ public final class Display extends CN1Constants {
             dragOccured = value;
             return;
         }
-        int slot = dragHistorySlot(windowId);
-        if (slot >= 0) {
-            dragOccuredPerWindow[slot] = value;
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.setDragOccured(value);
         }
     }
 
@@ -3613,44 +3571,38 @@ public final class Display extends CN1Constants {
     /// first's coordinates and timer, and releasing either cancelled the other's
     /// pending long press.
     private void chargeLongPress(int windowId, int x, int y) {
-        int key = longPressKey(windowId);
-        int free = -1;
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (longPressWindows[iter] == key) {
-                free = iter;
-                break;
-            }
-            if (free < 0 && longPressWindows[iter] == 0) {
-                free = iter;
-            }
-        }
-        if (free < 0) {
+        if (windowId == 0) {
+            longPointerCharged = true;
+            longKeyPressTime = System.currentTimeMillis();
             return;
         }
-        longPressWindows[free] = key;
-        longPressArmed[free] = true;
-        longPressPointerX[free] = x;
-        longPressPointerY[free] = y;
-        longPressStart[free] = System.currentTimeMillis();
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.chargeLongPointerPress(x, y);
+        }
     }
 
     /// Cancels the long press pending for one window, leaving other windows alone.
     private void cancelLongPress(int windowId) {
-        int key = longPressKey(windowId);
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (longPressWindows[iter] == key) {
-                longPressArmed[iter] = false;
-                longPressWindows[iter] = 0;
-                return;
-            }
+        if (windowId == 0) {
+            longPointerCharged = false;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.cancelLongPointerPress();
         }
     }
 
     /// Whether any window is still timing a long press; the event dispatch thread
     /// must not park while one is pending.
     private boolean anyLongPressArmed() {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (longPressArmed[iter]) {
+        if (longPointerCharged) {
+            return true;
+        }
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasLongPointerArmed()) {
                 return true;
             }
         }
@@ -3659,9 +3611,10 @@ public final class Display extends CN1Constants {
 
     /// Cancels every pending long press, for the paths that reset all input state.
     private void cancelAllLongPresses() {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            longPressArmed[iter] = false;
-            longPressWindows[iter] = 0;
+        longPointerCharged = false;
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            open[iter].cancelLongPointerPress();
         }
     }
 
@@ -3931,83 +3884,36 @@ public final class Display extends CN1Constants {
     }
 
     private void updateDragSpeedStatus(int windowId, int x, int y, int timestamp) {
-        //save dragging input to calculate the dragging speed later
-        int slot = dragHistorySlot(windowId);
-        if (slot < 0) {
+        if (windowId == 0) {
+            //save dragging input to calculate the dragging speed later
+            dragPathX[dragPathOffset] = x;
+            dragPathY[dragPathOffset] = y;
+            dragPathTime[dragPathOffset] = displayInitTime + (long) timestamp;
+            if (dragPathLength < PATHLENGTH) {
+                dragPathLength++;
+            }
+            dragPathOffset++;
+            if (dragPathOffset >= PATHLENGTH) {
+                dragPathOffset = 0;
+            }
             return;
         }
-        dragPathX[slot][dragPathOffset[slot]] = x;
-        dragPathY[slot][dragPathOffset[slot]] = y;
-        dragPathTime[slot][dragPathOffset[slot]] = displayInitTime + (long) timestamp;
-        if (dragPathLength[slot] < PATHLENGTH) {
-            dragPathLength[slot]++;
-        }
-        dragPathOffset[slot]++;
-        if (dragPathOffset[slot] >= PATHLENGTH) {
-            dragPathOffset[slot] = 0;
-        }
-    }
-
-    /// The drag ring for a window, allocating it on first use. Returns -1 only when
-    /// every slot is taken, in which case the samples are dropped rather than
-    /// corrupting another window's history.
-    private int dragHistorySlot(int windowId) {
-        return dragHistorySlot(windowId, true);
-    }
-
-    /// Looks a window's drag ring up, optionally allocating one.
-    ///
-    /// `create` is false for readers. Allocating from `hasDragOccured()` or
-    /// `getDragSpeed()` -- which is what the first version of this did -- makes a
-    /// query mutate state: it claimed a slot and zeroed the ring, so simply asking
-    /// about a window could wipe another's history once the table filled.
-    private int dragHistorySlot(int windowId, boolean create) {
-        int key = longPressKey(windowId);
-        int free = -1;
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (dragHistoryWindows[iter] == key) {
-                return iter;
-            }
-            if (free < 0 && dragHistoryWindows[iter] == 0) {
-                free = iter;
-            }
-        }
-        if (!create || free < 0) {
-            return -1;
-        }
-        dragHistoryWindows[free] = key;
-        if (dragPathX[free] == null) {
-            dragPathX[free] = new float[PATHLENGTH];
-            dragPathY[free] = new float[PATHLENGTH];
-            dragPathTime[free] = new long[PATHLENGTH];
-        }
-        dragPathOffset[free] = 0;
-        dragPathLength[free] = 0;
-        return free;
-    }
-
-    /// Frees a disposed window's drag ring so the slot can be reused.
-    private void releaseDragHistory(int windowId) {
-        int key = longPressKey(windowId);
-        for (int iter = 1; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (dragHistoryWindows[iter] == key) {
-                dragHistoryWindows[iter] = 0;
-                dragPathLength[iter] = 0;
-                dragPathOffset[iter] = 0;
-                return;
-            }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.recordDrag(x, y, timestamp);
         }
     }
 
     /// Clears one window's drag history, on press and on disposal.
     private void resetDragHistory(int windowId) {
-        int key = longPressKey(windowId);
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (dragHistoryWindows[iter] == key) {
-                dragPathLength[iter] = 0;
-                dragPathOffset[iter] = 0;
-                return;
-            }
+        if (windowId == 0) {
+            dragPathLength = 0;
+            dragPathOffset = 0;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.resetDragHistory();
         }
     }
 
@@ -4208,9 +4114,6 @@ public final class Display extends CN1Constants {
                     // release handler can enter invokeAndBlock, whose nested loop
                     // dispatches a fresh press, and that press records a target. Freeing
                     // the ring then would strip the replacement gesture of its velocity.
-                    if (!hasPointerPressTarget(windowId)) {
-                        releaseDragHistory(windowId);
-                    }
                     break;
                 case POINTER_RELEASED_MULTI:
                     recursivePointerReleaseA = true;
@@ -4243,9 +4146,6 @@ public final class Display extends CN1Constants {
                     // release handler can enter invokeAndBlock, whose nested loop
                     // dispatches a fresh press, and that press records a target. Freeing
                     // the ring then would strip the replacement gesture of its velocity.
-                    if (!hasPointerPressTarget(windowId)) {
-                        releaseDragHistory(windowId);
-                    }
                     break;
                 case POINTER_DRAGGED: {
                     setDragOccured(windowId, true);
@@ -4388,13 +4288,13 @@ public final class Display extends CN1Constants {
     ///
     /// true if a drag has occured since the last pointer pressed
     public boolean hasDragOccured() {
-        // The window whose events are being dispatched, for the same reason
+        // The surface whose events are being dispatched, for the same reason
         // getDragSpeed uses it: components ask during their own release handling.
         if (dragHistoryCurrent == 0) {
             return dragOccured;
         }
-        int slot = dragHistorySlot(dragHistoryCurrent, false);
-        return slot >= 0 && dragOccuredPerWindow[slot];
+        Window w = Desktop.getInstance().windowById(dragHistoryCurrent);
+        return w != null && w.hasDragOccured();
     }
 
     /// Returns true for a case where the EDT has nothing at all to do
@@ -4705,7 +4605,6 @@ public final class Display extends CN1Constants {
         }
         cancelKeyRepeat(w.getWindowId());
         cancelLongPress(w.getWindowId());
-        releaseDragHistory(w.getWindowId());
         // As above: a window disposed mid-press never delivers a release, and its
         // drag slot would be held by an id that can never come back.
         impl.releaseWindowInputState(w.getWindowId());
@@ -5361,22 +5260,17 @@ public final class Display extends CN1Constants {
     ///
     /// the dragging speed
     public float getDragSpeed(boolean yAxis) {
-        float speed;
-        // The window whose events are being dispatched. Components call this from
-        // their own pointerReleased, so "the window currently being serviced" is the
+        // The surface whose events are being dispatched. Components call this from
+        // their own pointerReleased, so "the surface currently being serviced" is the
         // one that owns the samples they mean.
-        int readSlot = dragHistorySlot(dragHistoryCurrent, false);
-        if (readSlot < 0) {
-            return 0;
+        if (dragHistoryCurrent == 0) {
+            if (yAxis) {
+                return impl.getDragSpeed(dragPathY, dragPathTime, dragPathOffset, dragPathLength);
+            }
+            return impl.getDragSpeed(dragPathX, dragPathTime, dragPathOffset, dragPathLength);
         }
-        if (yAxis) {
-            speed = impl.getDragSpeed(dragPathY[readSlot], dragPathTime[readSlot],
-                    dragPathOffset[readSlot], dragPathLength[readSlot]);
-        } else {
-            speed = impl.getDragSpeed(dragPathX[readSlot], dragPathTime[readSlot],
-                    dragPathOffset[readSlot], dragPathLength[readSlot]);
-        }
-        return speed;
+        Window w = Desktop.getInstance().windowById(dragHistoryCurrent);
+        return w == null ? 0 : w.windowDragSpeed(yAxis);
     }
 
     /// Indicates whether Codename One should consider the bidi RTL algorithm
@@ -5571,10 +5465,17 @@ public final class Display extends CN1Constants {
         if (c.isCellRenderer()) {
             return shouldRenderSelection();
         }
-        int windowId = selectionWindowId(c);
+        // Asked of the component's own top level rather than resolved through a window
+        // id here: a window knows whether it is holding a press and where, and those
+        // coordinates only mean anything against its own components.
+        TopLevelContainer top = c.getTopLevelContainer();
+        if (top instanceof Window) {
+            return !pureTouch || lastInteractionWasKeypad
+                    || ((Window) top).showsSelectionFor(c)
+                    || c.shouldRenderComponentSelection();
+        }
         return !pureTouch || lastInteractionWasKeypad
-                || (isSelectionPressed(windowId)
-                        && c.contains(selectionX(windowId), selectionY(windowId)))
+                || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY))
                 || c.shouldRenderComponentSelection();
     }
 
