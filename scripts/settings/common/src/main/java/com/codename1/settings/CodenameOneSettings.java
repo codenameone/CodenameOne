@@ -2562,10 +2562,7 @@ public class CodenameOneSettings extends Lifecycle {
         int i = nextLiveChar(source, from, kotlin);
         int end = from;
         while (i >= 0 && i < source.length()) {
-            int stop = i;
-            while (stop < source.length() && continuesAName(source.charAt(stop))) {
-                stop++;
-            }
+            int stop = componentEnd(source, i, kotlin);
             if (stop == i) {
                 return end;
             }
@@ -2581,18 +2578,44 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// The dotted name starting at or after `from`, stepping over whitespace and
     /// comments around each dot.
+    /// The end of the name component at `i`, or `i` when there is none.
+    ///
+    /// A Kotlin component may be ESCAPED in backticks -- `package com.`when``
+    /// is legal and the class belongs to com.when. Reading only identifier
+    /// characters stopped at the backtick and recorded `com.`, so the real main
+    /// source was rejected: nothing then knew which hints an annotation already
+    /// owns, and Settings could write the duplicate properties declaration that
+    /// the next build rejects.
+    private static int componentEnd(String source, int i, boolean kotlin) {
+        if (kotlin && i < source.length() && source.charAt(i) == '`') {
+            int close = source.indexOf('`', i + 1);
+            return close < 0 ? i : close + 1;
+        }
+        int end = i;
+        while (end < source.length() && continuesAName(source.charAt(end))) {
+            end++;
+        }
+        return end;
+    }
+
+    /// That component's text, which is what the backticks quote rather than
+    /// include.
+    private static String componentText(String source, int i, int end, boolean kotlin) {
+        if (kotlin && i < end && source.charAt(i) == '`') {
+            return source.substring(i + 1, end - 1);
+        }
+        return source.substring(i, end);
+    }
+
     static String qualifiedNameAt(String source, int from, boolean kotlin) {
         int i = nextLiveChar(source, from, kotlin);
         StringBuilder name = new StringBuilder();
         while (i >= 0 && i < source.length()) {
-            int end = i;
-            while (end < source.length() && continuesAName(source.charAt(end))) {
-                end++;
-            }
+            int end = componentEnd(source, i, kotlin);
             if (end == i) {
                 break;
             }
-            name.append(source, i, end);
+            name.append(componentText(source, i, end, kotlin));
             int dot = nextLiveChar(source, end, kotlin);
             if (dot < 0 || source.charAt(dot) != '.') {
                 break;

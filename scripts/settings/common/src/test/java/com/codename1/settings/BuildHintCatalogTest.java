@@ -884,4 +884,22 @@ public class BuildHintCatalogTest {
         String quoted = "package com.example\nclass `say\"hi` { }\nclass MyApp { }\n";
         assertTrue(CodenameOneSettings.declaresClass(quoted, "MyApp", "com.example"));
     }
+
+    /// A Kotlin package may escape a COMPONENT -- `package com.`when`` is legal
+    /// and the class belongs to com.when. Reading only identifier characters
+    /// recorded `com.`, so the real main source was rejected: nothing knew which
+    /// hints an annotation already owns, and Settings could write the duplicate
+    /// properties declaration that the next build rejects.
+    @Test
+    public void aKotlinPackageMayEscapeAComponent() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.`when`\nclass MyApp {\n}\n", "MyApp", "com.when"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.`when`\nclass MyApp {\n}\n", "MyApp", "com"));
+        // The first component too, and an ordinary name is unchanged.
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package `in`.example\nclass MyApp {\n}\n", "MyApp", "in.example"));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass MyApp {\n}\n", "MyApp", "com.example"));
+    }
 }
