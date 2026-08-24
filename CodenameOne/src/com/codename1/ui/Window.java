@@ -1720,7 +1720,7 @@ public class Window extends Container implements TopLevelContainer {
         // focusable, movable, closable -- underneath a modal that is supposed to be
         // blocking it. Recomputed here, before the peer is mapped, so the window is
         // never briefly interactive.
-        Display.getInstance().syncNativeModalBlocking();
+        Desktop.getInstance().syncNativeModalBlocking();
         wm.show(nativePeer);
         if (wasIconified) {
             // Mapping a window does not clear its iconic state: AWT's setVisible(true)
@@ -1818,7 +1818,7 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         modalRegistered = true;
-        Display.getInstance().pushModalWindow(this);
+        Desktop.getInstance().pushModalWindow(this);
         manager().setModal(nativePeer, true,
                 modalityType == MODALITY_APPLICATION, ownerPeer());
     }
@@ -1839,7 +1839,7 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         modalRegistered = false;
-        Display.getInstance().popModalWindow(this);
+        Desktop.getInstance().popModalWindow(this);
         if (nativePeer != null) {
             manager().setModal(nativePeer, false,
                     modalityType == MODALITY_APPLICATION, ownerPeer());

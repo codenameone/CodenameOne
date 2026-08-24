@@ -9631,7 +9631,7 @@ public abstract class CodenameOneImplementation {
         // gesture is played as four queued steps and an unconsumed wheel listener can
         // show a modal in between, after which the remaining synthetic press, drags
         // and release would scroll or activate content behind it.
-        if (d.isWindowInputBlocked(windowId)) {
+        if (com.codename1.ui.Desktop.getInstance().isWindowInputBlocked(windowId)) {
             return null;
         }
         if (windowId > 0) {

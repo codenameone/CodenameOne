@@ -447,4 +447,172 @@ public final class Desktop {
             w.dispose();
         }
     }
+    // ---- modality ----------------------------------------------------------------
+    //
+    // Modality lives here rather than in Display because it is a question about
+    // windows, and the window registry is here. Display asks whether input for a
+    // window is blocked; it does not need to know what a modal is.
+
+    private final ArrayList<Window> modalWindows = new ArrayList<Window>();
+
+    /// Drops a disposed window's modal registration and re-syncs what the ports
+    /// block, so a window that went away stops blocking.
+    void forgetModal(Window w) {
+        modalWindows.remove(w);
+        syncNativeModalBlocking();
+    }
+
+    void pushModalWindow(Window w) {
+        modalWindows.add(w);
+        syncNativeModalBlocking();
+    }
+
+    void popModalWindow(Window w) {
+        modalWindows.remove(w);
+        syncNativeModalBlocking();
+    }
+
+    /// Tells every native window whether input to it is currently blocked.
+    ///
+    /// The framework already decides this, in `#isBlockedByModal(int)`, and it is the
+    /// only place that can: the answer depends on the whole modal stack, on each
+    /// window's scope and on who owns it. A port that tried to derive it from a single
+    /// "this window became modal" call has to reinvent nesting and ownership, and gets
+    /// them wrong -- releasing an inner modal re-enabled everything the outer one was
+    /// still blocking, application modality left the other secondary windows enabled,
+    /// and an unowned window modal disabled a main window it never claimed.
+    ///
+    /// This matters beyond appearances, because a blocked window's own title bar is
+    /// outside the framework's input filter: its close button still reaches the
+    /// application.
+    void syncNativeModalBlocking() {
+        WindowManager wm = Display.impl.getWindowManager();
+        if (wm == null) {
+            return;
+        }
+        wm.setMainWindowInputEnabled(!isBlockedByModal(0));
+        for (Window each : getWindows()) {
+            Object peer = each.getNativePeer();
+            if (peer != null) {
+                wm.setInputEnabled(peer, !isBlockedByModal(each.getWindowId()));
+            }
+        }
+    }
+
+    /// Whether input aimed at the given window is currently blocked by a modal.
+    ///
+    /// Public because the implementation needs it: a wheel gesture is played as four
+    /// steps queued on the event dispatch thread, and a listener can show a modal
+    /// between the first check and the last step.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// #### Returns
+    ///
+    /// true when input to that window is currently blocked
+    public boolean isWindowInputBlocked(int windowId) {
+        return isBlockedByModal(windowId);
+    }
+
+    private boolean isBlockedByModal(int windowId) {
+        // Every registered blocker is consulted rather than only the newest one.
+        // Modal windows nest: a window modal opened from inside an application modal
+        // blocks only its own owner, and stopping at the top of the stack would let
+        // input back into the main form and every unrelated window for as long as the
+        // narrower one was up.
+        Window self = windowId > 0 ? windowById(windowId) : null;
+        int len = modalWindows.size();
+        for (int iter = len - 1; iter >= 0; iter--) {
+            Window modal = modalWindows.get(iter);
+            if (modal.getWindowId() == windowId) {
+                // Never blocked by itself -- but keep looking at the outer blockers.
+                // Returning here exempted a modal window from *every* other modal,
+                // so an unrelated modal shown while an application modal was up
+                // accepted input that application modality is meant to stop.
+                continue;
+            }
+            if (self != null && ownedBy(self, modal)) {
+                // A modal opened from inside another is not blocked by the one it was
+                // opened from. That is the exemption the self check was reaching for,
+                // and it applies to the owner chain rather than to any modal at all.
+                continue;
+            }
+            if (isModalOutOfReach(modal)) {
+                // Hidden along with an owner the application hid. The registration is
+                // kept on purpose -- hideNotify() cannot tell an owner cascade from a
+                // minimize, and a minimized modal is still open and still modal -- but a
+                // modal nobody can see or dismiss must not go on blocking. Left in, the
+                // owner's hide froze the main surface and every unrelated window with no
+                // window on screen to release them, until the owner was shown again.
+                continue;
+            }
+            if (blocks(modal, windowId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether `w` sits inside `candidateOwner`'s ownership chain.
+    private static boolean ownedBy(Window w, Window candidateOwner) {
+        TopLevelContainer owner = w.getOwnerWindow();
+        while (owner instanceof Window) {
+            if (owner == candidateOwner) { //NOPMD CompareObjectsWithEquals
+                return true;
+            }
+            owner = ((Window) owner).getOwnerWindow();
+        }
+        return false;
+    }
+
+    /// Whether one modal window blocks input to the window with the given id.
+    /// Whether a registered modal is currently unreachable because an owner above it
+    /// is off screen.
+    ///
+    /// Only the owner chain is consulted, never the modal's own visibility: a modal the
+    /// user minimized is still open and still blocks, which is what keeps a minimized
+    /// modal from quietly releasing the application. An owner that is not showing is a
+    /// different situation -- its children went with it and cannot be restored
+    /// independently, so nothing on screen can dismiss them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modal`: the registered modal window
+    ///
+    /// #### Returns
+    ///
+    /// true when an owner of this modal is not showing
+    private static boolean isModalOutOfReach(Window modal) {
+        TopLevelContainer owner = modal.getOwnerWindow();
+        while (owner instanceof Window) {
+            Window w = (Window) owner;
+            if (!w.isWindowShowing()) {
+                return true;
+            }
+            owner = w.getOwnerWindow();
+        }
+        return false;
+    }
+
+    private boolean blocks(Window modal, int windowId) {
+        if (modal.getModalityType() == Window.MODALITY_APPLICATION) {
+            return true;
+        }
+        // window modal: only the owner is blocked
+        TopLevelContainer owner = modal.getOwnerWindow();
+        if (owner instanceof Window) {
+            return ((Window) owner).getWindowId() == windowId;
+        }
+        if (owner != null) {
+            // owned by the main form
+            return windowId == 0;
+        }
+        // No owner at all. Window modality blocks the owning window, and there is
+        // none, so it blocks nothing -- treating this as main-form ownership would
+        // block the main form on a window that never claimed it.
+        return false;
+    }
+
 }

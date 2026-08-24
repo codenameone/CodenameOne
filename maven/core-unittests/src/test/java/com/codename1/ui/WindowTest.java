@@ -3490,13 +3490,13 @@ class WindowTest extends UITestBase {
         w.show();
         flushSerialCalls();
         try {
-            assertTrue(Display.getInstance().isWindowInputBlocked(0),
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
                     "an application modal window blocks the main window");
 
             // The platform minimizes it. A minimized window is still open and still
             // modal -- isModalFinished() says so itself.
             w.hideNotify();
-            assertTrue(Display.getInstance().isWindowInputBlocked(0),
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
                     "minimizing a modal window does not end the modal");
 
             // Changing modality here released the old blocker and declined to take the
@@ -3504,11 +3504,11 @@ class WindowTest extends UITestBase {
             // visibly non-modal while getModalityType() still said otherwise.
             w.setModalityType(Window.MODALITY_APPLICATION);
             assertEquals(Window.MODALITY_APPLICATION, w.getModalityType());
-            assertTrue(Display.getInstance().isWindowInputBlocked(0),
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
                     "a modality change while minimized must keep the window modal");
 
             w.showNotify();
-            assertTrue(Display.getInstance().isWindowInputBlocked(0),
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
                     "and it must still be modal once restored");
         } finally {
             w.dispose();
