@@ -97,7 +97,11 @@ def check():
         if not os.path.isdir(ios_root):
             continue
         for name in sorted(os.listdir(ios_root)):
-            if not name.endswith('.m'):
+            # Objective-C++ too. A return type that conflicts with the
+            # generated void* declaration is only a clang warning, so the
+            # Xcode probe stays green and this is the check that has to catch
+            # it -- skipping .mm would leave that with no gate at all.
+            if not name.endswith(('.m', '.mm')):
                 continue
             impl_path = os.path.join(ios_root, name)
             with open(impl_path, encoding='utf-8', errors='replace') as f:
