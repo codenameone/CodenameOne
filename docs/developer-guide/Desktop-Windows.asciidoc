@@ -1,15 +1,14 @@
 == Desktop Windows
 
-Codename One applications have always had exactly one window. On a phone that's the
-only thing that makes sense: the operating system owns the screen and the application
-fills it. On a desktop it's a real limitation - an inspector panel, a preferences
-window, a second document, a tool palette and a detached console are all ordinary
-desktop expectations that a single-window framework can't express.
+A phone application has one window, because the operating system owns the screen and
+the application fills it. A desktop application usually doesn't: an inspector panel, a
+preferences window, a second document, a tool palette and a detached console are all
+ordinary desktop expectations.
 
-`com.codename1.ui.Window` adds them. A `Window` is a separate native operating-system
-window with its own Codename One component hierarchy inside it, its own focus owner,
-its own animations and its own repaint region. The application's main surface stays a
-`Form` and behaves exactly as it always has.
+`com.codename1.ui.Window` is how you open them. A `Window` is a separate native
+operating-system window with its own Codename One component hierarchy inside it, its
+own focus owner, its own animations and its own repaint region. The application's main
+surface is a `Form` and is unaffected by any of this.
 
 [source,java]
 ----
@@ -80,11 +79,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 `TopLevelContainer` carries only what genuinely applies to both. It has the
-content pane, the layered panes, the title, the toolbar and commands, animation
-registration, focus, editing state, the theme manager and the show/size listeners. It
-does *not* carry `Form`'s mobile navigation surface - form transitions, the back command,
-`previousForm` or the tint used to dim a form behind a dialog - because none of those
-mean anything for a desktop window. Members that already exist on `Component` or
+content pane, the layered panes, the title, commands, animation registration, focus,
+editing state, the theme manager and the show/size listeners. It does *not* carry
+`Form`'s mobile surface - form transitions, the back command, `previousForm`, the
+`Toolbar` or the tint that dims a form behind a dialog - because none of those mean
+anything for a desktop window, whose title and menus belong to the platform chrome. Members that already exist on `Component` or
 `Container` are reached through `asContainer()`.
 
 ==== getComponentForm() returns null inside a Window
@@ -96,12 +95,13 @@ This is the one behavioral sharp edge, and it's worth stating plainly:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava004Snippet.java[tag=desktop-windows-java-004,indent=0]
 ----
 
-`getComponentForm()` keeps its original meaning: it names the enclosing `Form`, and
-inside a window the honest answer is none. Codename One's own components were migrated
-to `getTopLevelContainer()`, so the framework works inside a window - apart from the
-handful listed under <<Unsupported inside a window>>, which depend on something that
-isn't window-aware yet rather than on the call itself. Third-party components that
-still call `getComponentForm()` won't work, until they adopt the new call.
+`getComponentForm()` means what it says: it names the enclosing `Form`, and inside a
+window the honest answer is none. Codename One's own components ask
+`getTopLevelContainer()` instead, so the framework works inside a window - apart from
+the handful listed under <<Unsupported inside a window>>, which depend on something
+that isn't window-aware rather than on the call itself. A third-party component that
+calls `getComponentForm()` works inside a window only once it asks
+`getTopLevelContainer()` too.
 
 The failure mode is usually silence rather than an exception, because most of that code
 is written as `Form f = getComponentForm(); if (f != null) { ... }`. If a component
@@ -355,7 +355,7 @@ layered pane, as above, until those components gain a top-level-aware attachment
   These work normally from the main window.
 * Tooltips. `TooltipManager` schedules against `getComponentForm()` and displays through
   an `InteractionDialog` on the current form, so it has the same limitation even though
-  the dialog it uses no longer does.
+  `InteractionDialog` itself doesn't.
 * `Form` transitions into or out of a window.
 * `HTMLComponent`.
 * Accessibility on secondary windows.
