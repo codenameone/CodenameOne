@@ -692,7 +692,11 @@ def provenance_problems(
 
 
 def documented_skip_goldens(
-    manifest: dict, port_id: str, logs: list[Path], reference: Path
+    manifest: dict,
+    port_id: str,
+    logs: list[Path],
+    reference: Path,
+    comparisons: list[Path] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Golden names whose test reported a documented skip, and why.
 
@@ -709,6 +713,13 @@ def documented_skip_goldens(
     Only a skip that is *documented for this port* counts. Silence still fails,
     an unexplained skip still fails, and a reason code written about another
     port still fails, which is what keeps this from being a hole.
+
+    And only goldens that are actually absent. The caller subtracts this count
+    from the number of uncovered goldens, so naming one the run did compare
+    would subtract a golden nothing was missing -- and the spare subtraction
+    would then hide a genuinely uncovered golden belonging to some other test.
+    A test that owns several screenshots and captures a few before skipping is
+    exactly that case.
     """
     supplement = read_json(SUPPLEMENT)
     skipped: dict[str, list[str]] = {}
@@ -726,13 +737,27 @@ def documented_skip_goldens(
             if owner:
                 skipped.setdefault(owner, []).append(reason or "")
 
+    compared: set[str] = set()
+    for path in comparisons or []:
+        if not path.is_file():
+            continue
+        try:
+            payload = read_json(path)
+        except ContractError:
+            continue
+        for result in payload.get("results", []):
+            if isinstance(result, dict) and result.get("status") in {"equal", "different"}:
+                name = result.get("test")
+                if name:
+                    compared.add(name)
+
     accounted: list[str] = []
     notes: list[str] = []
     if not reference.is_dir():
         return accounted, notes
     for golden in sorted(reference.glob("*.png")):
         owner = screenshot_test(manifest, golden.stem)
-        if owner is None or owner not in skipped:
+        if owner is None or owner not in skipped or golden.stem in compared:
             continue
         reasons = [reason for reason in skipped[owner] if reason]
         if skip_is_documented(supplement, port_id, owner, reasons):
@@ -1291,6 +1316,7 @@ def build_parser() -> argparse.ArgumentParser:
     skips_parser.add_argument("--port", required=True)
     skips_parser.add_argument("--log", action="append", type=Path, default=[])
     skips_parser.add_argument("--reference", required=True, type=Path)
+    skips_parser.add_argument("--compare", action="append", type=Path, default=[])
 
     normalize_parser = subparsers.add_parser("normalize", help="write a normalized port report")
     normalize_parser.add_argument("--port", required=True)
@@ -1328,7 +1354,7 @@ def main() -> int:
             return 0
         if args.command == "documented-skips":
             accounted, notes = documented_skip_goldens(
-                manifest, args.port, args.log, args.reference
+                manifest, args.port, args.log, args.reference, args.compare
             )
             for note in notes:
                 print(f"port-status: documented skip accounts for {note}", file=sys.stderr)

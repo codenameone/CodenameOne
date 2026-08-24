@@ -377,6 +377,7 @@ PY
 # whole job on the uncovered golden anyway.
 cn1ss_count_documented_skips() {
   local ref_dir="$1"
+  local compare_json="$2"
   local script_dir repo_root status_script python_bin
   if [ -z "${CN1SS_PORT_ID:-}" ] || [ -z "$ref_dir" ] || [ ! -d "$ref_dir" ]; then
     echo 0
@@ -391,6 +392,12 @@ cn1ss_count_documented_skips() {
     return
   fi
   local -a args=("$status_script" documented-skips --port "$CN1SS_PORT_ID" --reference "$ref_dir")
+  # The comparison results, so a golden the run DID produce is never discounted:
+  # it is already in covered_count, and subtracting it again would hide an
+  # uncovered golden belonging to some other test.
+  if [ -n "$compare_json" ] && [ -s "$compare_json" ]; then
+    args+=(--compare "$compare_json")
+  fi
   local log_var log_path
   for log_var in CN1SS_SUITE_LOG CN1SS_SUITE_LOG_2 CN1SS_SUITE_LOG_3; do
     log_path="${!log_var:-}"
@@ -666,7 +673,7 @@ cn1ss_process_and_report() {
       uncovered_count=$(( expected_count - covered_count ))
       [ "$uncovered_count" -lt 0 ] && uncovered_count=0
       local documented_skips
-      documented_skips=$(cn1ss_count_documented_skips "$ref_dir")
+      documented_skips=$(cn1ss_count_documented_skips "$ref_dir" "$compare_json_out")
       if [ "$documented_skips" -gt 0 ]; then
         cn1ss_log "$documented_skips golden(s) accounted for by a skip this port's errata explain (see the lines above)."
         uncovered_count=$(( uncovered_count - documented_skips ))

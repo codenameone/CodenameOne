@@ -522,6 +522,43 @@ class PortStatusTest(unittest.TestCase):
             ),
         )
 
+    def test_only_goldens_the_run_did_not_produce_are_discounted(self):
+        # The caller subtracts this count from the number of UNCOVERED goldens, so naming one the
+        # run did compare would subtract a golden nothing was missing -- and that spare
+        # subtraction would then hide a genuinely uncovered golden belonging to some other test,
+        # which is the regression the guard exists to catch. A test owning several screenshots
+        # that captures a few before skipping is exactly the case.
+        marker = "CN1SS:INFO:test=CenteredDialogTitle status=SKIPPED reason=phone-dialog-on-watch\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reference = root / "ref"
+            reference.mkdir()
+            for name in ("CenteredDialogTitle_dark", "CenteredDialogTitle_light"):
+                (reference / (name + ".png")).write_bytes(b"")
+            log = root / "suite.log"
+            log.write_text(marker, encoding="utf-8")
+            nothing_compared = root / "none.json"
+            nothing_compared.write_text(json.dumps({"results": []}), encoding="utf-8")
+            one_compared = root / "one.json"
+            one_compared.write_text(
+                json.dumps(
+                    {"results": [{"test": "CenteredDialogTitle_light", "status": "equal"}]}
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                ["CenteredDialogTitle_dark", "CenteredDialogTitle_light"],
+                port_status.documented_skip_goldens(
+                    self.manifest, "watchos", [log], reference, [nothing_compared]
+                )[0],
+            )
+            self.assertEqual(
+                ["CenteredDialogTitle_dark"],
+                port_status.documented_skip_goldens(
+                    self.manifest, "watchos", [log], reference, [one_compared]
+                )[0],
+            )
+
     def test_coverage_rejects_a_skip_carrying_no_reason(self):
         # An erratum with reason codes documents the reasons it lists, not the test. A skip
         # that names none matches nothing, which is what the page already decides.
