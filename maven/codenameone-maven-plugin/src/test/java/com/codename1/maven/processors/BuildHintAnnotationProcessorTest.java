@@ -443,6 +443,47 @@ public class BuildHintAnnotationProcessorTest {
         assertFalse(BuildHintAnnotationProcessor.declaresType("class Wronger {}", "Wrong"));
     }
 
+    /// A brace inside a char literal is not syntax. Counting it loses the
+    /// nesting, so a live nested class reads as an orphan and its misplaced
+    /// annotation is skipped instead of reported.
+    @Test
+    public void aBraceInACharLiteralDoesNotMoveTheNesting() {
+        // Deliberately UNBALANCED. My first version of this test had both '{'
+        // and '}', which cancel out, so it passed with the char branch removed
+        // and proved nothing.
+        String src = "class Main {\n"
+                + "    char open = '{';\n"
+                + "    static class Wrong { }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                src, new String[] {"Main", "Wrong"}));
+
+        // An escaped quote must not end the literal early, or the brace after it
+        // is counted again.
+        String escaped = "class Main {\n"
+                + "    char quote = '\\'';\n"
+                + "    char open = '{';\n"
+                + "    static class Wrong { }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                escaped, new String[] {"Main", "Wrong"}));
+    }
+
+    /// A declaration below any fixed prefix must still be found: a line bound
+    /// meant a type after a long header read as absent, so a live class looked
+    /// stale and its placement error was never reported.
+    @Test
+    public void aDeclarationFarDownTheFileIsStillFound() {
+        StringBuilder src = new StringBuilder("package com.example;\n");
+        for (int i = 0; i < 900; i++) {
+            src.append("import java.util.List").append(i).append(";\n");
+        }
+        src.append("public class MyApp {}\n");
+        assertTrue(BuildHintAnnotationProcessor.declaresType(src.toString(), "MyApp"));
+        assertEquals("com.example",
+                BuildHintAnnotationProcessor.declaredPackageIn(src.toString()));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

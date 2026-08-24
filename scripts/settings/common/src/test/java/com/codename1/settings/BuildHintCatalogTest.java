@@ -614,4 +614,26 @@ public class BuildHintCatalogTest {
                 "package com.example;\npublic class\t MyApp {}\n", "MyApp",
                 "com.example", false));
     }
+
+    /// An application's main class is top-level. Accepting a nested one let an
+    /// unrelated `class Outer { class Main }` end the fallback search on the
+    /// wrong file, so annotations on the real main class were never read.
+    @Test
+    public void aNestedDeclarationIsNotTheMainClass() {
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\nclass Outer { class MyApp }\n", "MyApp",
+                "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass Outer { }\nclass MyApp\n", "MyApp",
+                "com.example", true));
+    }
+
+    /// A brace inside a char literal is not syntax; counting it loses the depth
+    /// and turns a top-level declaration into a nested one or the reverse.
+    @Test
+    public void aBraceInACharLiteralDoesNotMoveTheDepth() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class Helper { char c = '{'; }\n"
+                        + "class MyApp {}\n", "MyApp", "com.example", false));
+    }
 }

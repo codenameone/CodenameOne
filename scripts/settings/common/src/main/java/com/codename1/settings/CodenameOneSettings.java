@@ -2329,32 +2329,58 @@ public class CodenameOneSettings extends Lifecycle {
         if (!(pkg == null || pkg.isEmpty() ? "" : pkg).equals(declaredPkg)) {
             return false;
         }
-        for (String keyword : new String[]{"class", "object"}) {
-            int at = nextMarker(text, keyword, 0, kotlin);
-            while (at >= 0) {
-                int start = at + keyword.length();
-                boolean wholeWord = (at == 0 || !continuesAName(text.charAt(at - 1)))
-                        && start < text.length() && !continuesAName(text.charAt(start));
-                if (wholeWord) {
-                    // Every legal separator, not just a space: `class\nMain` and
-                    // `class /* why */ Main` are both valid Java and Kotlin, and
-                    // stopping at a newline read the declaration as unnamed --
-                    // so the file did not declare the main class, ownership read
-                    // as empty, and Add wrote the duplicate.
-                    int i = nextLiveChar(text, start, kotlin);
-                    if (i < 0) {
-                        break;
-                    }
-                    int end = i;
+        // At the TOP level. An application's main class is not nested, and
+        // accepting a nested one let an unrelated `class Outer { class Main }`
+        // in the same package end the search on the wrong file -- so the
+        // annotations on the real main class were never read, and Settings
+        // offered Add for a hint that is already annotated.
+        int depth = 0;
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c == '"' || c == '\'' || c == '/') {
+                int skipped = skipNonCode(text, i, kotlin);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !continuesAName(c)
+                    || (i > 0 && continuesAName(text.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < text.length() && continuesAName(text.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            String word = text.substring(i, wordEnd);
+            if ("class".equals(word) || "object".equals(word)) {
+                // Every legal separator, not just a space: `class\nMain` and
+                // `class /* why */ Main` are both valid Java and Kotlin, and
+                // stopping at a newline read the declaration as unnamed.
+                int n = nextLiveChar(text, wordEnd, kotlin);
+                if (n >= 0) {
+                    int end = n;
                     while (end < text.length() && continuesAName(text.charAt(end))) {
                         end++;
                     }
-                    if (text.substring(i, end).equals(main)) {
+                    if (text.substring(n, end).equals(main)) {
                         return true;
                     }
                 }
-                at = nextMarker(text, keyword, start, kotlin);
             }
+            i = wordEnd;
         }
         return false;
     }

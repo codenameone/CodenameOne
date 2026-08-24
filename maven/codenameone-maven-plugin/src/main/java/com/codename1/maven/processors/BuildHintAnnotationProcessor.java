@@ -502,6 +502,26 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 if (i < out.length) {
                     out[i++] = ' ';
                 }
+            } else if (c == '\'') {
+                // A char literal. '{' is legal and would otherwise be counted as
+                // syntax, so the nesting scan loses its place and reads a live
+                // class as an orphan.
+                out[i++] = ' ';
+                while (i < out.length) {
+                    if (out[i] == '\\' && i + 1 < out.length) {
+                        out[i++] = ' ';
+                        out[i++] = ' ';
+                        continue;
+                    }
+                    boolean closing = out[i] == '\'';
+                    if (out[i] != '\n') {
+                        out[i] = ' ';
+                    }
+                    i++;
+                    if (closing) {
+                        break;
+                    }
+                }
             } else if (c == '"') {
                 boolean triple = i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"';
                 int quotes = triple ? 3 : 1;
@@ -533,18 +553,28 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return new String(out);
     }
 
-    /// The first 400 lines of `f`, or null when it cannot be read.
+    /// The whole of `f`, or null when it cannot be read or is implausibly large.
     ///
-    /// Bounded because this runs per annotated class, and both the package
-    /// statement and the type declarations of interest are at the top.
+    /// Not a prefix. A line bound looked harmless and was not: a type declared
+    /// below it -- after a long generated header, or a big import block -- was
+    /// not found, so a live class read as an orphan and its misplaced annotation
+    /// was skipped instead of reported. A nesting scan also cannot start in the
+    /// middle of a file and still count braces.
+    ///
+    /// The size cap is a guard against something that is not source at all, not
+    /// a budget: 4MB is far past any hand-written Java or Kotlin file, and
+    /// exceeding it returns null, which the caller reads as "cannot tell" and so
+    /// keeps the class.
     private static String readHead(File f) {
+        if (f.length() > 4L * 1024 * 1024) {
+            return null;
+        }
         BufferedReader r = null;
         try {
             r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
             StringBuilder sb = new StringBuilder();
             String line;
-            int read = 0;
-            while ((line = r.readLine()) != null && read++ < 400) {
+            while ((line = r.readLine()) != null) {
                 sb.append(line).append('\n');
             }
             return sb.toString();
