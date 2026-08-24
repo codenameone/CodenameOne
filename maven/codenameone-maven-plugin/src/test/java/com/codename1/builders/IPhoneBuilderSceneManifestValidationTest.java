@@ -144,6 +144,33 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aKeyClosedWithWhitespaceIsStillThatKey() {
+        // "</key >" closes a key exactly as "</key>" does. Matching the literal reported
+        // the key as absent, and the two callers fail in opposite directions from there:
+        // the injection path appends a second UIApplicationSceneManifest beside the
+        // application's own, and the validation path rejects a build that is correctly
+        // configured.
+        assertTrue(IPhoneBuilder.plistDeclaresKey(
+                "<key>UIApplicationSceneManifest</key >", "UIApplicationSceneManifest"),
+                "a key whose closing tag carries whitespace is still declared");
+        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+                "<key>UIApplicationSupportsMultipleScenes</key ><true/>",
+                "UIApplicationSupportsMultipleScenes"),
+                "and its value is still readable, which is what plistKeyEnd decides");
+    }
+
+    @Test
+    void aWholeManifestSurvivesWhitespaceInEveryClosingTag() {
+        // The two structural parsers together, over a fragment where every closing tag
+        // is spaced. This is valid XML and a build using it must not be rejected.
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key ><array ><dict >"
+                        + "<key>UISceneDelegateClassName</key >"
+                        + "<string>CodenameOne_GLSceneDelegate</string></dict ></array >"),
+                "spacing in the closing tags must not stop the delegate being found");
+    }
+
+    @Test
     void anotherRolesDelegateDoesNotCountAsTheWindowRoles() {
         // CarPlay declares its own role and its own delegate. Searching the whole
         // fragment for the delegate name would let CarPlay's configuration vouch for a

@@ -7051,7 +7051,11 @@ public class IPhoneBuilder extends Executor {
         int at = plistElementIndex(plist, "key", from);
         while (at >= 0) {
             int contentStart = plistOpenTagEnd(plist, at);
-            int close = plist.indexOf("</key>", at);
+            // Structural, like the container tags: "</key >" closes a key just as
+            // "</key>" does, and matching the literal reported such a key absent --
+            // which makes the injection append a second one beside the application's
+            // own and the validation reject a correctly configured build.
+            int close = plistCloseElementIndex(plist, "key", at);
             if (close < 0 || contentStart < 0) {
                 return -1;
             }
@@ -7081,8 +7085,8 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the index just past `</key>`, or -1
     static int plistKeyEnd(String plist, int keyIndex) {
-        int close = plist.indexOf("</key>", keyIndex);
-        return close < 0 ? -1 : close + "</key>".length();
+        int close = plistCloseElementIndex(plist, "key", keyIndex);
+        return close < 0 ? -1 : plistOpenTagEnd(plist, close);
     }
 
     /// Index of the next live element with this name at or after `from`, or -1.
