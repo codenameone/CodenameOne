@@ -55,7 +55,13 @@ jobs:
       # failing on the first attempt, so a re-run cannot launder a flaky test
       # into a pass.
       env:
-        RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies'
+        # These two steps only download and build, so a fetch that never reached
+        # its host is retried here as well -- the skins zip comes from github.com
+        # over the same runner network, and a DNS failure there killed the branch
+        # while Ant's own <get retries> was still inside the outage. NOT added to
+        # the test step below, where retrying a network-dependent test would
+        # launder exactly the flake this repository requires to be root-caused.
+        RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies|UnknownHostException|Unknown host|Connection timed out|Connection reset|Premature end of Content-Length|Error getting https'
       run: |
         # The cn1{app,lib}-archetype modules are part of the maven/ reactor,
         # so this single install also stages them into the local repo.
@@ -66,7 +72,7 @@ jobs:
 
     - name: Refresh archetype catalog
       env:
-        RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies'
+        RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies|UnknownHostException|Unknown host|Connection timed out|Connection reset|Premature end of Content-Length|Error getting https'
       run: |
         cd maven
         bash ../scripts/ci/retry.sh xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
