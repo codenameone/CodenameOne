@@ -158,7 +158,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// they come back, which is the first thing an app touches on its way to
     /// registering a presence listener.
     private void restorePresence() {
-        String[] rows = CN1CompanionDeviceService.takePersistedPresence(
+        String[] rows = NearbyPresenceStore.takePersistedPresence(
                 appContext);
         for (int i = 0; i < rows.length; i++) {
             int tab = rows[i].indexOf('\t');
@@ -1007,7 +1007,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
             if (macOf(cdm, associationId) == null) {
                 if (Build.VERSION.SDK_INT >= 36
                         && observeByAssociationId(cdm, associationId)) {
-                    CN1CompanionDeviceService.register(associationId);
+                    NearbyPresenceStore.register(associationId);
                     return true;
                 }
                 Log.w("CN1", "com.codename1.nearby.companion: this Android"
@@ -1018,7 +1018,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 return false;
             }
             cdm.startObservingDevicePresence(addressOf(cdm, associationId));
-            CN1CompanionDeviceService.register(associationId);
+            NearbyPresenceStore.register(associationId);
             return true;
         } catch (Throwable t) {
             return false;
@@ -1112,11 +1112,11 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 if (Build.VERSION.SDK_INT >= 36) {
                     stopObservingByAssociationId(cdm, associationId);
                 }
-                CN1CompanionDeviceService.unregister(associationId);
+                NearbyPresenceStore.unregister(associationId);
                 return;
             }
             cdm.stopObservingDevicePresence(addressOf(cdm, associationId));
-            CN1CompanionDeviceService.unregister(associationId);
+            NearbyPresenceStore.unregister(associationId);
         } catch (Throwable t) {
             // Nothing to report: the caller asked to stop and it is stopped
             // either way.

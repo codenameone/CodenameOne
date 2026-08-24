@@ -3935,15 +3935,21 @@ public class AndroidGradleBuilder extends Executor {
             if (!usesNearbyTransport) {
                 new File(nearbyPackage, "AndroidNearbyTransport.java").delete();
             }
-            // CN1CompanionDeviceService is deliberately NOT deleted for an
-            // app that skips presence observation. AndroidNearbyBackend calls
-            // its register/unregister unconditionally, the whole nearby
-            // package is excluded from the port jar, and no other definition
-            // exists -- so removing it made javac fail in the generated app
-            // for every ranging-only or transport-only build. It is a
-            // framework-only class that compiles against any modern SDK and
-            // costs an unused class in the dex; the manifest still names it
-            // only when presence is used, so nothing binds it otherwise.
+            if (!usesNearbyPresence) {
+                // Deletable now, and worth deleting: this is the one class
+                // in the package whose SUPERCLASS needs API 31, and an app
+                // that never observes presence has no use for it.
+                //
+                // It used to be kept because AndroidNearbyBackend called its
+                // register/unregister unconditionally, so removing it broke
+                // javac for every ranging-only or transport-only build. That
+                // coupling is gone -- the bookkeeping lives in
+                // NearbyPresenceStore, which touches nothing newer than
+                // SharedPreferences -- and the manifest names the service
+                // only when presence is used, so nothing binds it either.
+                new File(nearbyPackage,
+                        "CN1CompanionDeviceService.java").delete();
+            }
         }
 
         if (!arSupport) {
