@@ -970,22 +970,6 @@ public class AppExtensionDeploymentTargetTest {
     }
 
     @Test
-    public void anInheritedTargetIsLeftToInherit() throws Exception {
-        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
-        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(inherited)");
-
-        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
-                "com.example.app", "12.0",
-                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
-
-        // Not a setting this build failed to find but a directive: Xcode replaces it with the
-        // value from the level above, and writing a floor over it pins an extension that
-        // inherits iOS 16 down to 12.
-        assertEquals("$(inherited)", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
-        assertEquals(notes.toString(), 0, notes.size());
-    }
-
-    @Test
     public void anEmptyEntitlementsOverrideMeansNoEntitlements() throws Exception {
         File dist = tmp.newFolder("dist50");
         File extension = new File(dist, "WalletUIExtension");
@@ -1012,5 +996,147 @@ public class AppExtensionDeploymentTargetTest {
         settings.remove("CODE_SIGN_ENTITLEMENTS");
         assertEquals(byName, IPhoneBuilder.appExtensionSigningEntitlements(extension, settings,
                 byName, "iphoneos14.4", "Release", "arm64"));
+    }
+
+    @Test
+    public void anInheritedTargetBelowTheFloorIsClamped() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(inherited)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings),
+                "13.0");
+
+        // An extension target's $(inherited) is the PROJECT's deployment target, which this
+        // builder writes itself and which defaults below 14 -- so leaving the expression alone
+        // hands a Wallet extension 13.0 and bypasses the floor its entitlements demand.
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
+
+    @Test
+    public void anInheritedTargetThatClearsTheFloorIsKept() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(inherited)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings),
+                "16.0");
+
+        // Inheriting iOS 16 is the author's arrangement working: pinning the floor over it would
+        // take an extension built against 16 APIs down to 14.
+        assertEquals("$(inherited)", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
+
+    @Test
+    public void anUnknownInheritedTargetIsClamped() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "$(inherited)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings), null);
+
+        // A build that cannot say what the project carries cannot say the extension clears its
+        // floor either, and the floor is the one thing here that is not a preference.
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
+
+    @Test
+    public void aBlankIdentifierIsDroppedRatherThanCopiedOntoTheTarget() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", "   ");
+        settings.put("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "");
+
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(settings);
+
+        // Every question asked of a blank identifier answered "not declared", so preflight
+        // validated the derived default -- and then the properties were copied onto the target
+        // verbatim, putting the blank back and building an extension with no identifier.
+        assertFalse(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertFalse(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 2, notes.size());
+
+        // The other end of the scale is deliberate and stays: an empty entitlements setting means
+        // Xcode signs with no entitlements file.
+        assertTrue(settings.containsKey("CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]"));
+    }
+
+    @Test
+    public void aLiteralIdentifierInThePlistBecomesTheTargets() throws Exception {
+        File dist = tmp.newFolder("dist60");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "Info.plist"), plistWithIdentifier("com.example.app.Custom"));
+        IPhoneBuilder.ArchiveContext context = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", null);
+
+        // Xcode copies a literal through untouched, so the .appex declares com.example.app.Custom
+        // while the target was configured as com.example.app.WalletUIExtension: signed for one
+        // bundle, built as another, which codesign refuses.
+        assertEquals("com.example.app.Custom", IPhoneBuilder.appExtensionPlistIdentifier(
+                extension, context, "com.example.app"));
+        assertEquals("com.example.app.Custom", IPhoneBuilder.appExtensionBundleId(extension,
+                "com.example.app.WalletUIExtension", context, "com.example.app"));
+    }
+
+    @Test
+    public void anExplicitSettingStillOutranksThePlist() throws Exception {
+        File dist = tmp.newFolder("dist61");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "Info.plist"), plistWithIdentifier("com.example.app.Custom"));
+        write(new File(extension, "buildSettings.properties"),
+                "PRODUCT_BUNDLE_IDENTIFIER = com.example.app.FromSettings\n");
+
+        // buildSettings.properties is about the target, which is the thing being configured; the
+        // plist follows it, since a $(PRODUCT_BUNDLE_IDENTIFIER) there resolves to it and a
+        // literal that disagrees is refused as out of namespace or replaced.
+        assertEquals("com.example.app.FromSettings", IPhoneBuilder.appExtensionBundleId(extension,
+                "com.example.app.WalletUIExtension",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null),
+                "com.example.app"));
+    }
+
+    @Test
+    public void aReferenceOrAForeignIdentifierIsNotAdopted() throws Exception {
+        File dist = tmp.newFolder("dist62");
+        IPhoneBuilder.ArchiveContext context = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", null);
+
+        File referenced = new File(dist, "RefExtension");
+        assertTrue(referenced.mkdirs());
+        write(new File(referenced, "Info.plist"),
+                plistWithIdentifier("$(PRODUCT_BUNDLE_IDENTIFIER)"));
+        // A reference resolves against the target, so it already agrees with whatever the target
+        // is: adopting it would make the target name itself.
+        assertNull(IPhoneBuilder.appExtensionPlistIdentifier(referenced, context,
+                "com.example.app"));
+
+        File foreign = new File(dist, "ForeignExtension");
+        assertTrue(foreign.mkdirs());
+        write(new File(foreign, "Info.plist"), plistWithIdentifier("com.other.app.Ext"));
+        // Out of namespace is refused elsewhere, with a message that says why. Adopting it here
+        // would move that refusal onto the target and lose the explanation.
+        assertNull(IPhoneBuilder.appExtensionPlistIdentifier(foreign, context, "com.example.app"));
+
+        File padded = new File(dist, "PaddedExtension");
+        assertTrue(padded.mkdirs());
+        write(new File(padded, "Info.plist"), plistWithIdentifier(" com.example.app.Ext "));
+        // Padding is not the identifier it reads as, and it is not one to copy onto a target.
+        assertNull(IPhoneBuilder.appExtensionPlistIdentifier(padded, context, "com.example.app"));
+    }
+
+    private static String plistWithIdentifier(String identifier) {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\">\n<dict>\n"
+                + "\t<key>CFBundleIdentifier</key>\n\t<string>" + identifier + "</string>\n"
+                + "\t<key>NSExtension</key>\n\t<dict>\n"
+                + "\t\t<key>CFBundleIdentifier</key>\n\t\t<string>com.nested.not.this</string>\n"
+                + "\t</dict>\n</dict>\n</plist>\n";
     }
 }

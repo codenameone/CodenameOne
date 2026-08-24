@@ -5019,7 +5019,6 @@ public class IPhoneBuilder extends Executor {
                             }
 
 
-                            buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." +extensionName);
                             // The identifier as Xcode will see it: an archive may write
                             // PRODUCT_BUNDLE_IDENTIFIER = $(EXTENSION_ID) with EXTENSION_ID beside
                             // it, which resolves to a perfectly good identifier. Judging the raw
@@ -5037,7 +5036,17 @@ public class IPhoneBuilder extends Executor {
                                     && "armv7".equals(request.getArg("ios.debug.archs", null))
                                             ? "armv7" : "arm64";
                             Map<String, String> declaredSettings = appExtensionBuildSettings(appExtension);
-                            String declaredId = appExtensionBuildSetting(appExtension, "PRODUCT_BUNDLE_IDENTIFIER");
+                            ArchiveContext plistContext = ArchiveContext.of(archiveSdk,
+                                    archiveConfiguration, archiveArch, declaredSettings);
+                            // What the target is built as, before the archive's own settings are
+                            // folded in below and possibly override it. A literal identifier in
+                            // the extension's plist is what the built bundle declares whatever
+                            // this says, so the two have to be the same one: signed for a bundle
+                            // the archive does not contain is a codesign failure, not a warning.
+                            String declaredId = appExtensionBundleId(appExtension, null,
+                                    plistContext, request.getPackageName());
+                            buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", declaredId != null
+                                    ? declaredId : request.getPackageName() + "." + extensionName);
                             // The identifier THIS archive gets: a qualified setting overrides the
                             // plain one, so a stale base beside a right device value is not a
                             // reason to refuse a build Xcode would have got right.
@@ -5099,6 +5108,9 @@ public class IPhoneBuilder extends Executor {
                                 // identifier that was written into the target were not the same
                                 // string.
                                 buildSettingsMap.putAll(appExtensionBuildSettings(appExtension));
+                                for (String note : dropBlankBundleIdentifiers(buildSettingsMap)) {
+                                    debug("The " + extensionName + " app extension: " + note + ".");
+                                }
                                 buildSettingsProps.delete();
                             }
 
@@ -5141,7 +5153,8 @@ public class IPhoneBuilder extends Executor {
                                     request.getPackageName(),
                                     appExtensionDeploymentFloor(signingEntitlements),
                                     ArchiveContext.of(archiveSdk, archiveConfiguration, archiveArch,
-                                            buildSettingsMap))) {
+                                            buildSettingsMap),
+                                    getDeploymentTarget(request))) {
                                 debug("The " + extensionName + " app extension: " + note + ".");
                             }
 
@@ -6097,7 +6110,8 @@ public class IPhoneBuilder extends Executor {
             // included, which is where an identifier from another project comes in.
             Map<String, String> settings = appExtensionBuildSettings(appExtension);
             settings.put("PRODUCT_BUNDLE_IDENTIFIER", appExtensionBundleId(appExtension,
-                    request.getPackageName() + "." + appExtension.getName()));
+                    request.getPackageName() + "." + appExtension.getName(), context,
+                    request.getPackageName()));
             // In the candidate's OWN context, not this archive's. Every candidate is stamped,
             // because the generated project keeps them all and a later Debug build off
             // sources.tar.bz2 ships whichever one it names -- but a reference inside the Debug
@@ -7240,6 +7254,13 @@ public class IPhoneBuilder extends Executor {
     /// onto the target and won for the build Xcode actually makes.
     static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
             String hostPackage, String floor, ArchiveContext context) {
+        return repairQualifiedExtensionSettings(settings, hostPackage, floor, context, null);
+    }
+
+    /// @param inheritedTarget the deployment target the generated PROJECT carries, which is what
+    /// $(inherited) lands on for an extension target. Null when this build cannot say.
+    static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
+            String hostPackage, String floor, ArchiveContext context, String inheritedTarget) {
         List<String> notes = new ArrayList<String>();
         // Flattened once, for the references these values make. A qualified identifier written as
         // $(EXTENSION_ID) resolved against the raw map, which only ever answers with the plain
@@ -7274,9 +7295,27 @@ public class IPhoneBuilder extends Executor {
                 // Except $(inherited), which is not a setting this build failed to find but a
                 // directive: Xcode replaces it with the value from the level above, and writing
                 // the floor over it would pin an extension that inherits iOS 16 down to 12.
-                if (!isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
-                        || value.toLowerCase().indexOf("$(inherited)") >= 0
+                if (!isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")) {
+                    continue;
+                }
+                if (value.toLowerCase().indexOf("$(inherited)") >= 0
                         || value.toLowerCase().indexOf("${inherited}") >= 0) {
+                    // $(inherited) on an extension target inherits the PROJECT's deployment
+                    // target, not the base setting clamped above it -- and this builder writes
+                    // that project value itself, from the app's own floor. Leaving the expression
+                    // alone therefore hands a Wallet extension whatever the app got, which is
+                    // below 14 by default: the entitlement's floor is bypassed by an expression
+                    // that looked deliberate. It is kept only when what it inherits already
+                    // clears the floor.
+                    if (inheritedTarget != null && inheritedTarget.trim().length() > 0
+                            && !isDeploymentTargetBelow(inheritedTarget.trim(), floor)) {
+                        continue;
+                    }
+                    settings.put(key, floor);
+                    notes.add(key + " = " + value + " inherits the project's "
+                            + (inheritedTarget == null || inheritedTarget.trim().length() == 0
+                                    ? "deployment target" : inheritedTarget.trim())
+                            + ", which does not clear " + floor + ", so it was set to " + floor);
                     continue;
                 }
                 settings.put(key, floor);
@@ -7949,6 +7988,122 @@ public class IPhoneBuilder extends Executor {
         return "iphone".equalsIgnoreCase(projectType) ? "1" : "2";
     }
 
+    /// The identifier this extension's own Info.plist states outright, when it states one.
+    ///
+    /// Two different things decide two different identifiers and nothing reconciles them: the
+    /// target's PRODUCT_BUNDLE_IDENTIFIER chooses the profile that signs the .appex and keys the
+    /// export options, while a LITERAL in the plist is what the built bundle declares -- Xcode
+    /// copies it through untouched. An archive whose plist says com.example.app.Custom and whose
+    /// target was given the derived com.example.app.<folder> is therefore signed for one bundle
+    /// and built as another, which codesign refuses and App Store validation refuses after it.
+    ///
+    /// The archive's own statement wins, because it is the identifier the customer's profile was
+    /// issued for. An explicit PRODUCT_BUNDLE_IDENTIFIER in buildSettings.properties still
+    /// outranks it: that one is about the target, which is the thing being configured.
+    ///
+    /// @return the literal, or null when the plist states none, states a reference (which
+    /// resolves against the target and so already agrees with it), or states one outside the
+    /// host's namespace -- that case is refused elsewhere rather than adopted here
+    static String appExtensionPlistIdentifier(File extensionFolder, ArchiveContext context,
+            String hostPackage) {
+        if (extensionFolder == null || hostPackage == null || hostPackage.length() == 0) {
+            return null;
+        }
+        String found = null;
+        for (Map.Entry<String, File> candidate
+                : appExtensionInfoPlists(extensionFolder, context).entrySet()) {
+            File file = candidate.getValue();
+            if (file == null || !file.isFile()) {
+                continue;
+            }
+            // Only the plists THIS archive builds with. A [config=Debug] candidate states the
+            // Debug target's identity, and adopting it would name the device archive after a
+            // build it is not. An applicable qualifier narrows nothing, so its context and the
+            // archive's are the same object's worth of values.
+            ArchiveContext candidateContext = infoPlistCandidateContext(candidate.getKey(), context);
+            if (context != null && !String.valueOf(context).equals(String.valueOf(candidateContext))) {
+                continue;
+            }
+            String declared = plistRootString(readPlistTextQuietly(file), "CFBundleIdentifier");
+            if (declared == null || declared.length() == 0 || !declared.equals(declared.trim())
+                    || declared.indexOf('$') >= 0
+                    || !declared.startsWith(hostPackage + ".")) {
+                continue;
+            }
+            // Later candidates are the qualified ones, and a qualifier that applies to this
+            // archive overrides the base setting for it.
+            found = declared;
+        }
+        return found;
+    }
+
+    /// The plist's text, or "" when it cannot be read as one. The callers here are asking what an
+    /// archive says about itself; a file they cannot read says nothing.
+    private static String readPlistTextQuietly(File plist) {
+        try {
+            PlistText text = readPlistText(plist);
+            return text == null || text.text == null ? "" : text.text;
+        } catch (IOException cannotRead) {
+            return "";
+        }
+    }
+
+    /// One string value among the ROOT dict's direct children, exactly as written.
+    ///
+    /// Anchored to the top level for the same reason every other lookup here is: NSExtension and
+    /// CFBundleURLTypes carry keys of their own, and a whole-file search finds whichever comes
+    /// first rather than the bundle's own identity.
+    static String plistRootString(String plist, String key) {
+        if (plist == null) {
+            return null;
+        }
+        int afterKey = topLevelKeyEnd(plist, key);
+        if (afterKey < 0) {
+            return null;
+        }
+        int element = nextMarkupAt(plist, afterKey);
+        if (element < 0 || !"string".equals(WatchNativeBuilder.tagAt(plist, element))) {
+            return null;
+        }
+        int openEnd = plist.indexOf('>', element);
+        if (openEnd < 0 || plist.charAt(openEnd - 1) == '/') {
+            return null;
+        }
+        int valueEnd = WatchNativeBuilder.closeOfElement(plist, openEnd + 1, "</string>");
+        return valueEnd < 0 ? null
+                : WatchNativeBuilder.plistStringContentExact(plist.substring(openEnd + 1, valueEnd));
+    }
+
+    /// Drops a PRODUCT_BUNDLE_IDENTIFIER the archive declares as nothing, and says so.
+    ///
+    /// Empty means different things to different settings, and this is the end of the scale where
+    /// it means nothing at all: a bundle must have an identifier, so an archive setting the key
+    /// to blank cannot be stating a choice the way an empty CODE_SIGN_ENTITLEMENTS does. It read
+    /// as "not declared" everywhere that asks a question -- preflight validated the derived
+    /// default -- and then the properties were copied onto the target verbatim, which put the
+    /// blank back and built an extension with no identifier at all.
+    ///
+    /// @return a note per dropped key, for the log
+    static List<String> dropBlankBundleIdentifiers(Map<String, String> settings) {
+        List<String> notes = new ArrayList<String>();
+        if (settings == null) {
+            return notes;
+        }
+        for (String key : new ArrayList<String>(settings.keySet())) {
+            if (!"PRODUCT_BUNDLE_IDENTIFIER".equals(key)
+                    && !isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER")) {
+                continue;
+            }
+            String value = settings.get(key);
+            if (value == null || value.trim().length() == 0) {
+                settings.remove(key);
+                notes.add(key + " was declared with no value, and an extension cannot be built "
+                        + "without a bundle identifier, so it was dropped");
+            }
+        }
+        return notes;
+    }
+
     /// The identifier this extension's archive declares, or the one derived from the app.
     ///
     /// Named rather than inlined because four call sites have to agree on it: an archive that
@@ -7956,8 +8111,20 @@ public class IPhoneBuilder extends Executor {
     /// sign it, the plist that is stamped and the namespace refusal, and one of them reading the
     /// derived default instead pairs the target with a bundle the archive does not contain.
     static String appExtensionBundleId(File extensionFolder, String defaultBundleId) {
+        return appExtensionBundleId(extensionFolder, defaultBundleId, null, null);
+    }
+
+    /// @param context and {@code hostPackage} let the archive's own Info.plist have its say when
+    /// buildSettings.properties does not: a literal identifier in there is what the built bundle
+    /// declares, so the target has to be configured as that or the two disagree.
+    static String appExtensionBundleId(File extensionFolder, String defaultBundleId,
+            ArchiveContext context, String hostPackage) {
         String override = appExtensionBuildSetting(extensionFolder, "PRODUCT_BUNDLE_IDENTIFIER");
-        return override == null ? defaultBundleId : override;
+        if (override != null) {
+            return override;
+        }
+        String fromPlist = appExtensionPlistIdentifier(extensionFolder, context, hostPackage);
+        return fromPlist != null ? fromPlist : defaultBundleId;
     }
 
     /// One build setting as the extension's own buildSettings.properties overrides it, or null
