@@ -179,9 +179,20 @@ public class InterpAndroidLinker implements InterpLinker {
         // Walk up rather than relying on getMethod: the method may be public on
         // a package-private class, or declared on a supertype, and
         // getDeclaredMethod alone would miss inherited declarations.
+        // Private methods are not inherited: for
+        // `class A { private void m() {} } class B extends A implements I {}`
+        // where `I` declares `m`, `invokevirtual B.m` on the JVM raises
+        // IllegalAccessError, not a call to A.m. `setAccessible(true)`
+        // would otherwise let this run the private method the JVM refuses.
         for (Class k = c; k != null; k = k.getSuperclass()) {
             try {
-                m = k.getDeclaredMethod(name, types);
+                Method candidate = k.getDeclaredMethod(name, types);
+                if (k != c && Modifier.isPrivate(candidate.getModifiers())) {
+                    throw new IllegalAccessError(k.getName() + "." + name + descriptor
+                            + " is private and not inherited by "
+                            + owner.replace('/', '.'));
+                }
+                m = candidate;
                 break;
             } catch (NoSuchMethodException e) {
                 last = e;

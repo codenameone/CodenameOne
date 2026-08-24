@@ -185,6 +185,13 @@ class InterpRuntimeContractTest {
         assertEquals("real", packageOf(
                 "@Foo(\"\"\"\n" + "text \\\"\"\" package fake \"\"\")\n"
                 + "package real;\n"));
+        // A Kotlin backtick-escaped segment may contain characters that
+        // are terminators outside the escape: `package foo.`a{b`.Test`
+        // has `{` inside the backticks and kotlinc keeps it as part of
+        // the package name. Stopping at `{` would cut the name to `foo`
+        // and refuse the class as missing source.
+        assertEquals("foo.a{b", packageOfKotlin(
+                "package foo.`a{b`\n\nclass Test\n"));
     }
 
     private static String packageOf(String source) throws Exception {
@@ -276,6 +283,37 @@ class InterpRuntimeContractTest {
 
     static class SiblingConcrete extends SiblingAbstract {
         public int compute() { return 42; }
+    }
+
+    /**
+     * `invokevirtual B.m` on `class A { private int m() {} } class B extends A
+     * implements I { }` where `I` declares `m` resolves to `A.m` (private) --
+     * and the JVM then raises IllegalAccessError because private methods
+     * aren't inherited. The linker was walking the superclass chain, hitting
+     * the private declaration, calling `setAccessible(true)` and invoking it,
+     * silently running a method the JVM refuses to.
+     */
+    @Test
+    @DisplayName("class-owner resolution refuses to inherit a superclass's private method")
+    void inheritedPrivateMethodsAreRejectedRatherThanCalled() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.invokeVirtual(new PrivateSubject(),
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$PrivateSubject",
+                    "hidden", "()I", new Object[0]);
+            throw new AssertionError("private-on-superclass call should have been refused");
+        } catch (IllegalAccessError expected) {
+            // The linker matched the JVM's behaviour rather than bypassing
+            // it via setAccessible; nothing more to check.
+        }
+    }
+
+    static class PrivateBase {
+        @SuppressWarnings("unused")
+        private int hidden() { return 7; }
+    }
+
+    static class PrivateSubject extends PrivateBase {
     }
 
     /**

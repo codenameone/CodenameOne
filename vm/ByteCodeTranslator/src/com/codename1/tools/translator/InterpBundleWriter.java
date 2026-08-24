@@ -308,13 +308,27 @@ public class InterpBundleWriter {
                     // the key would be a garbled `com.example fun ...`
                     // that nobody wrote.
                     int end = i;
+                    boolean inBacktick = false;
                     while (end < code.length()) {
                         char t = code.charAt(end);
-                        if (t == ';' || t == '{') {
-                            break;
+                        if (t == '`') {
+                            inBacktick = !inBacktick;
+                            end++;
+                            continue;
                         }
-                        if (!java && (t == '\n' || t == '\r')) {
-                            break;
+                        // Kotlin backtick-escaped segments may contain
+                        // characters that would otherwise be terminators --
+                        // `package foo.`a{b`.Test` is a real declaration and
+                        // the `{` inside the backticks is part of the name,
+                        // not the class body. Skip terminator checks while
+                        // inside a backtick pair.
+                        if (!inBacktick) {
+                            if (t == ';' || t == '{') {
+                                break;
+                            }
+                            if (!java && (t == '\n' || t == '\r')) {
+                                break;
+                            }
                         }
                         end++;
                     }
