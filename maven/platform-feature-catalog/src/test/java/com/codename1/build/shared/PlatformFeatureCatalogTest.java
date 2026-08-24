@@ -630,4 +630,98 @@ class PlatformFeatureCatalogTest {
         assertTrue(acc.minimumAndroidSdk() >= 23,
                 "SQLCipher requires API 23; the accumulator reported " + acc.minimumAndroidSdk());
     }
+
+    // ------------------------------------------------------------------
+    // Nearby devices
+    // ------------------------------------------------------------------
+
+    @Test
+    void rangingLinksNearbyInteractionAndCarriesBothPrivacyKeys() {
+        List<PlatformFeatureCatalog.Entry> hits =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/nearby/ranging/Ranging");
+        assertEquals(1, hits.size(), "expected one entry to fire");
+        PlatformFeatureCatalog.Entry e = hits.get(0);
+        assertTrue(e.iosFrameworks().contains("NearbyInteraction"));
+        Set<String> keys = new LinkedHashSet<String>();
+        for (String[] entry : e.iosPlistEntries()) {
+            keys.add(entry[0]);
+        }
+        // Both, deliberately: iOS 14 checks the older key before letting a
+        // session start, so an app on the supported floor carrying only the
+        // newer one was terminated.
+        assertTrue(keys.contains("NSNearbyInteractionAllowOnceUsageDescription"));
+        assertTrue(keys.contains("NSNearbyInteractionUsageDescription"));
+        assertTrue(e.androidGradleDeps().contains("androidx.core.uwb:uwb:1.0.0"));
+        assertTrue(e.androidGradleDeps()
+                .contains("androidx.core.uwb:uwb-rxjava3:1.0.0"),
+                "the Java-facing wrapper is what the port actually consumes");
+        assertTrue(e.androidFeatures().contains("android.hardware.uwb"));
+        // NOT 31. androidx.core.uwb runs down to 23 and reports the feature
+        // absent below 31, so raising the whole app would cost more than the
+        // feature is worth.
+        assertEquals(23, e.androidMinimumSdk());
+        assertTrue(e.androidPermissions().isEmpty(),
+                "UWB_RANGING is version-conditional, so it belongs to"
+                        + " NearbyManifestFragments and not to this table");
+    }
+
+    @Test
+    void transportLinksMultipeerAndAsksForTheLocalNetwork() {
+        List<PlatformFeatureCatalog.Entry> hits =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/nearby/transport/NearbyTransport");
+        assertEquals(1, hits.size());
+        PlatformFeatureCatalog.Entry e = hits.get(0);
+        assertTrue(e.iosFrameworks().contains("MultipeerConnectivity"));
+        assertEquals("NSLocalNetworkUsageDescription",
+                e.iosPlistEntries().get(0)[0]);
+        // Nearby Connections is added through the builder's own Play-services
+        // table, which knows which version this build resolved.
+        assertTrue(e.androidGradleDeps().isEmpty());
+        // Nearby Connections advertises over BLE, which is API 21. Below that
+        // the dependency merges cleanly and the transport never starts, which
+        // is the failure worth preventing at build time.
+        assertEquals(21, e.androidMinimumSdk());
+    }
+
+    @Test
+    void companionLinksAccessorySetupKitAndCoreBluetooth() {
+        List<PlatformFeatureCatalog.Entry> hits =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/nearby/companion/CompanionDevices");
+        assertEquals(1, hits.size());
+        PlatformFeatureCatalog.Entry e = hits.get(0);
+        assertTrue(e.iosFrameworks().contains("AccessorySetupKit"));
+        // CBUUID is what ASDiscoveryDescriptor takes, so the framework that
+        // declares it has to be linked too.
+        assertTrue(e.iosFrameworks().contains("CoreBluetooth"));
+        assertTrue(e.androidFeatures()
+                .contains("android.software.companion_device_setup"));
+        assertEquals(26, e.androidMinimumSdk());
+    }
+
+    @Test
+    void eachNearbyPackagePaysOnlyForItself() {
+        // The whole reason there are three packages: the scanner matches on a
+        // prefix and cannot express an exclusion, so an app that only ranges
+        // must not be handed MultipeerConnectivity or the companion feature.
+        List<PlatformFeatureCatalog.Entry> ranging =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/nearby/ranging/RangingSession");
+        for (PlatformFeatureCatalog.Entry e : ranging) {
+            assertFalse(e.iosFrameworks().contains("MultipeerConnectivity"));
+            assertFalse(e.iosFrameworks().contains("AccessorySetupKit"));
+        }
+    }
+
+    @Test
+    void theSharedNearbyPackageCostsNothing() {
+        // com.codename1.nearby itself holds only value types, and referencing
+        // it must not pull a framework or a dependency in.
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/nearby/NearbyError").isEmpty());
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/nearby/spi/NearbyBridge").isEmpty());
+    }
 }

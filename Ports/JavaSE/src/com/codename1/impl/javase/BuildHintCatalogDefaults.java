@@ -99,6 +99,16 @@ final class BuildHintCatalogDefaults {
         set("{{#IosPrivacy#ios.NSMicrophoneUsageDescription}}.label", "Microphone usage description");
         set("{{#IosPrivacy#ios.NSMicrophoneUsageDescription}}.type", "TextField");
         }
+        if (!handWritten.contains("ios.NSNearbyInteractionAllowOnceUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.label", "Nearby interaction allow once usage description");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.description", "The pre-iOS 16 spelling of the nearby-interaction usage description, supplied automatically when the app references the nearby APIs.");
+        }
+        if (!handWritten.contains("ios.NSNearbyInteractionUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.label", "Nearby interaction usage description");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.description", "Why the app measures distance and direction to nearby devices. Supplied automatically when the app references the nearby APIs; set it to say something more specific than the default.");
+        }
         if (!handWritten.contains("ios.NSRemindersFullAccessUsageDescription")) {
         set("{{#IosPrivacy#ios.NSRemindersFullAccessUsageDescription}}.label", "Reminders full access usage description");
         set("{{#IosPrivacy#ios.NSRemindersFullAccessUsageDescription}}.type", "TextField");

@@ -888,6 +888,34 @@ final class BuildHintsAndroid {
                         + "than 65536 methods. This slows builds a bit so you have it off by default but if you get "
                         + "a build error mentioning this limit you should turn this on."));
 
+        h.add(new Hint("android.nearby.computerProfile")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Offers the `computer` device profile in the companion-device chooser. "
+                        + "Only read when the app uses nearby ranging, transport or companion "
+                        + "association."));
+
+        h.add(new Hint("android.nearby.glassesProfile")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Offers the `glasses` device profile in the companion-device chooser, on "
+                        + "the same terms as `android.nearby.computerProfile`."));
+
+        h.add(new Hint("android.nearby.watchProfile")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Offers the `watch` device profile in the companion-device chooser, on the "
+                        + "same terms as `android.nearby.computerProfile`."));
+
         h.add(new Hint("android.newFirebaseMessaging")
                 .annotatedAs(HintGroup.ANDROID, "newFirebaseMessaging")
                 .type(HintType.BOOLEAN)

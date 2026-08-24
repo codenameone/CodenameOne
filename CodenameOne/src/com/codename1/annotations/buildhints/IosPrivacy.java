@@ -109,6 +109,15 @@ public @interface IosPrivacy {
     /// rejects an app that touches this resource without one.
     String microphoneUsageDescription() default "";
 
+    /// The pre-iOS 16 spelling of the nearby-interaction usage description,
+    /// supplied automatically when the app references the nearby APIs.
+    String nearbyInteractionAllowOnceUsageDescription() default "";
+
+    /// Why the app measures distance and direction to nearby devices. Supplied
+    /// automatically when the app references the nearby APIs; set it to say
+    /// something more specific than the default.
+    String nearbyInteractionUsageDescription() default "";
+
     /// The text iOS shows when the app first asks for the reminders full access. It
     /// becomes the `NSRemindersFullAccessUsageDescription` key in `Info.plist`. The
     /// App Store rejects an app that touches this resource without one.

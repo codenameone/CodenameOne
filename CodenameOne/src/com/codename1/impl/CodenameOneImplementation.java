@@ -6029,6 +6029,22 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the bridge the `com.codename1.nearby` API uses to reach the platform's short-range
+    /// stacks -- precision ranging, companion-device association and the nearby transport. Ports
+    /// that implement any of the three override this; the base implementation returns null, which
+    /// makes every `com.codename1.nearby` entry point report itself unsupported and fail fast, so
+    /// application code needs no platform-specific branch.
+    ///
+    /// A port may implement one cluster and not the others: the bridge answers `isRangingSupported`,
+    /// `isCompanionSupported` and `isTransportSupported` independently.
+    ///
+    /// #### Returns
+    ///
+    /// the nearby bridge, or null when unsupported
+    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
     /// surfaces (home-screen widgets and live activities). Ports supporting surfaces override
     /// this; the base implementation returns null which renders the whole API an inert no-op.

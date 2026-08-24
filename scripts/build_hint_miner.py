@@ -65,6 +65,16 @@ METHOD_DECL = re.compile(
 LOCAL_ASSEMBLY = re.compile(
     r'\b(?:String\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;\n]*"[^;\n]*)\s*;')
 
+# Anything that gives the name a NEW value which is not an assembled literal:
+# a for-each variable, a catch parameter, a declaration or an assignment with no
+# literal in it. Such a binding shadows an earlier assembly, and ignoring that
+# attributed IPhoneBuilder's PRODUCT_BUNDLE_IDENTIFIER key to three unrelated
+# `for (String key : request.getArgs())` loops further down the same file.
+REBINDS = re.compile(
+    r'for\s*\(\s*(?:final\s+)?[A-Za-z_][A-Za-z0-9_<>\[\], .?]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*:'
+    r'|\b(?:String|var|Object|CharSequence)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[=;)]'
+    r'|\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;\n"]*)\s*;')
+
 FORWARDS = re.compile(r'\b(?:getArg|booleanArg)\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,'
                       r'|(?<![A-Za-z0-9_.])arg\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,')
 
@@ -172,6 +182,22 @@ def resolve_constants(expr, constants):
                   expr)
 
 
+def nearest(assembled, name, before):
+    """The rhs of the closest binding of `name` before `before`, if it assembles.
+
+    None when the closest binding rebinds the name to something else -- a
+    for-each variable, a plain assignment -- because the earlier assembly no
+    longer describes what the accessor is handed.
+    """
+    best = None
+    for offset, var, rhs in assembled:
+        if offset >= before:
+            break
+        if var == name:
+            best = rhs
+    return best
+
+
 def concat_of_literals(expr):
     """The value of a `"a" + "b"` expression, or None when a piece is not a literal."""
     parts = [p.strip() for p in expr.split('+')]
@@ -196,13 +222,29 @@ for dirpath, _, files in os.walk(SRC):
         rel = os.path.relpath(path, ROOT)
         constants = {m.group(1): (read_literal(m.group(0), m.group(0).index('"') + 1)[0] or "")
                      for m in CONST_DECL.finditer(text)}
-        assembled = {}
+        # (offset, name, rhs) for every local built from a literal, in order.
+        #
+        # Kept as a LIST and matched to the nearest PRECEDING assignment, not as a
+        # name->rhs map. A map is file-wide, and `key` is a common enough variable
+        # name that an assignment far below -- IPhoneBuilder builds an Xcode
+        # setting key called PRODUCT_BUNDLE_IDENTIFIER+qualifier -- was being
+        # attributed to an unrelated getArg(key, ...) thousands of lines above it,
+        # reporting a computed hint site that does not exist.
+        assembled = []
         for m in LOCAL_ASSEMBLY.finditer(text):
             rhs = m.group(2).strip()
             # Only an assembly, not a plain literal: a plain one is already mined
             # wherever it reaches an accessor.
             if '+' in rhs:
-                assembled[m.group(1)] = rhs
+                assembled.append((m.start(), m.group(1), rhs))
+        # A declaration that IS the assembly matches both patterns at the same
+        # offset; it must not cancel itself out.
+        assembly_offsets = {offset for offset, _, _ in assembled}
+        for m in REBINDS.finditer(text):
+            name = m.group(1) or m.group(2) or m.group(3)
+            if name and m.start() not in assembly_offsets:
+                assembled.append((m.start(), name, None))
+        assembled.sort(key=lambda e: e[0])
         for m in COMPUTED_OPENER.finditer(text):
             open_paren = text.rindex('(', m.start(), m.end())
             expr = first_argument(text, open_paren)
@@ -214,9 +256,10 @@ for dirpath, _, files in os.walk(SRC):
                 # Fully resolved -- an ordinary hint read that merely spelled its
                 # name with a constant.
                 hits[resolved].append(("<expr>", rel, line))
-            elif re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', expr) and expr in assembled:
-                # A bare variable, but one built from a literal in this file.
-                computed.append({"expr": " ".join(assembled[expr].split()),
+            elif re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', expr) and nearest(
+                    assembled, expr, m.start()) is not None:
+                # A bare variable, but one built from a literal ABOVE this call.
+                computed.append({"expr": " ".join(nearest(assembled, expr, m.start()).split()),
                                  "file": rel, "line": line})
             elif '"' in expr or '[' in expr:
                 # The name is BUILT here, or read out of a table -- either way no

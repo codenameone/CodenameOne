@@ -99,6 +99,23 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("MacNativeBuilder"));
 
+        h.add(new Hint("ios.NSNearbyInteractionAllowOnceUsageDescription")
+                .annotatedAs(HintGroup.IOS_PRIVACY, "nearbyInteractionAllowOnceUsageDescription")
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("The pre-iOS 16 spelling of the nearby-interaction usage description, "
+                        + "supplied automatically when the app references the nearby APIs."));
+
+        h.add(new Hint("ios.NSNearbyInteractionUsageDescription")
+                .annotatedAs(HintGroup.IOS_PRIVACY, "nearbyInteractionUsageDescription")
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Why the app measures distance and direction to nearby devices. Supplied "
+                        + "automatically when the app references the nearby APIs; set it to say "
+                        + "something more specific than the default."));
+
         h.add(new Hint("ios.NSSpeechRecognitionUsageDescription")
                 .annotatedAs(HintGroup.IOS_PRIVACY, "speechRecognitionUsageDescription")
                 .type(HintType.STRING)
@@ -843,6 +860,35 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder")
                 .doc("`nativeVerify` for the iOS translation alone."));
+
+        h.add(new Hint("ios.nearby.accessoryServices")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING_LIST)
+                .separator(",")
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Bluetooth service UUIDs published as `NSAccessorySetupBluetoothServices`, "
+                        + "so AccessorySetupKit can show a picker for them. Unset publishes "
+                        + "none."));
+
+        h.add(new Hint("ios.nearby.background")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Requests the nearby-interaction entitlement and the background mode that "
+                        + "go with ranging while backgrounded. Off by default because the "
+                        + "entitlement has to be on the provisioning profile, and requesting it "
+                        + "without one fails signing for every ranging app."));
+
+        h.add(new Hint("ios.nearby.serviceType")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Bonjour service type the nearby transport advertises. Derived from the "
+                        + "package name when unset."));
 
         h.add(new Hint("ios.newStorageLocation")
                 .annotatedAs(HintGroup.IOS, "newStorageLocation")

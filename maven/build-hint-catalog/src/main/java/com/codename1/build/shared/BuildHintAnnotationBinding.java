@@ -64,6 +64,8 @@ public final class BuildHintAnnotationBinding {
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#locationAlwaysUsageDescription", "ios.NSLocationAlwaysUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#locationWhenInUseUsageDescription", "ios.NSLocationWhenInUseUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#microphoneUsageDescription", "ios.NSMicrophoneUsageDescription");
+        HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#nearbyInteractionAllowOnceUsageDescription", "ios.NSNearbyInteractionAllowOnceUsageDescription");
+        HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#nearbyInteractionUsageDescription", "ios.NSNearbyInteractionUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#remindersFullAccessUsageDescription", "ios.NSRemindersFullAccessUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#remindersUsageDescription", "ios.NSRemindersUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#speechRecognitionUsageDescription", "ios.NSSpeechRecognitionUsageDescription");

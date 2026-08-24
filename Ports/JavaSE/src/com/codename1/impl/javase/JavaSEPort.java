@@ -15835,6 +15835,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static com.codename1.impl.home.LocalHomeBridge homeBridge;
 
+    private static com.codename1.impl.nearby.LocalNearbyBridge nearbyBridge;
+
     /// Returns the simulator's smart home. There is no desktop HomeKit or
     /// Google Home, so this is a local simulated house reporting
     /// {@code HomeAvailability.LOCAL_ONLY}: the accessories come from
@@ -15850,6 +15852,33 @@ public class JavaSEPort extends CodenameOneImplementation {
     public com.codename1.home.spi.HomeBridge getHomeBridge() {
         return getSimulatedHome();
     }
+
+    /// The nearby bridge for the simulator and desktop builds: a simulated
+    /// implementation rather than no implementation, for the same reason
+    /// [#getHomeBridge()] carries one.
+    /// Ranging UI, an association flow and a transport screen are almost
+    /// entirely code with nothing to do with radios, and a port that reported
+    /// nothing would make all of it testable only on a pair of phones.
+    ///
+    /// It reports `LOCAL_ONLY`, never `AVAILABLE`, so an app can tell the
+    /// developer the peers it is tracking are not real.
+    @Override
+    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        // Guarded for the reason the home bridge is: the bridge holds the
+        // live sessions, the association store and the connection set, and
+        // two threads racing this getter would each get their own -- a
+        // session prepared through one would be invisible to the other.
+        synchronized (JavaSEPort.class) {
+            if (nearbyBridge == null) {
+                com.codename1.impl.nearby.LocalNearbyBridge local =
+                        new com.codename1.impl.nearby.LocalNearbyBridge();
+                com.codename1.impl.nearby.SyntheticNearby.populate(local);
+                nearbyBridge = local;
+            }
+            return nearbyBridge;
+        }
+    }
+
 
     /// The simulated house, for the Simulate menu to script.
     ///
