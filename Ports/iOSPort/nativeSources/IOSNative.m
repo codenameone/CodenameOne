@@ -653,6 +653,7 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
 #else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
+    cn1StartupPhase("initVM->UIApplicationMain");
     int retVal = UIApplicationMain(0, nil, nil, @"CodenameOne_GLAppDelegate");
     POOL_END();
 #else

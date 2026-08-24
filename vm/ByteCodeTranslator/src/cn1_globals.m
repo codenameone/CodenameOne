@@ -15017,8 +15017,7 @@ void cn1StartupPhase(const char* name) {
 void cn1StartupPhase(const char* name) { }
 #endif
 
-// ======================= CN1_GC_CONFORM: the footprint probe =========================
-// Issue 5537. Four merged fixes each named a mechanism; none of them ever showed that the
+// ======================= CN1_GC_CONFORM: the footprint probe ==================// Issue 5537. Four merged fixes each named a mechanism; none of them ever showed that the
 // named mechanism ACCOUNTED for the growth, because nothing in the VM could partition the
 // footprint. This does, and its primary output is the RESIDUAL: if
 //     residKb = fpKb - residentPgKb - legBlockKb - legTableKb - sideKb
@@ -15981,6 +15980,7 @@ JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
     return arrObj;
 }
 
+=======
 void initConstantPool() {
     cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
