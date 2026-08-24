@@ -1045,4 +1045,25 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.declaresClass(
                 "package com.example;\npublic class MyApp {}\n", "MyApp", "com.example"));
     }
+
+    /// javac translates a unicode escape before it tokenizes anything, so
+    /// `package com.ex` + an escaped `a` + `mple;` really declares com.example.
+    /// Reading the text literally recorded `com.ex`, so the real main source was
+    /// rejected and Settings could offer a hint an annotation already owns.
+    @Test
+    public void javaUnicodeEscapesAreTranslatedBeforeTheSourceIsRead() {
+        String escaped = "package com.ex" + "\\u0061" + "mple;\npublic class MyApp {}\n";
+        assertTrue(CodenameOneSettings.declaresClass(
+                CodenameOneSettings.decodeUnicodeEscapes(escaped), "MyApp", "com.example"));
+
+        // A doubled backslash is not an escape, which is what keeps a string
+        // literal spelling one.
+        String literal = "String s = \"" + "\\\\u0041" + "\";";
+        assertEquals(literal, CodenameOneSettings.decodeUnicodeEscapes(literal));
+
+        // Any number of u's is one escape, and a malformed one is left alone.
+        assertEquals("A", CodenameOneSettings.decodeUnicodeEscapes("\\uuu0041"));
+        assertEquals("\\uZZZZ", CodenameOneSettings.decodeUnicodeEscapes("\\uZZZZ"));
+        assertEquals("\\n", CodenameOneSettings.decodeUnicodeEscapes("\\n"));
+    }
 }

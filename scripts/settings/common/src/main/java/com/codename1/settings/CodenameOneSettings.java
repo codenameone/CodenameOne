@@ -2307,6 +2307,9 @@ public class CodenameOneSettings extends Lifecycle {
             for (String root : new String[]{"/src/main/java/", "/src/main/kotlin/", "/src/"}) {
                 String path = binding.projectDir() + root + rel + ext;
                 String text = readIfPresent(path);
+                if (text != null && ext.equals(".java")) {
+                    text = decodeUnicodeEscapes(text);
+                }
                 // The conventional path has to DECLARE the class, not merely
                 // exist. Moving a Kotlin main class into a differently named file
                 // can leave the old Main.kt behind holding something else, and
@@ -2479,6 +2482,9 @@ public class CodenameOneSettings extends Lifecycle {
                 return null;
             }
             String text = readIfPresent(path);
+            if (text != null && !path.endsWith(".kt")) {
+                text = decodeUnicodeEscapes(text);
+            }
             if (text == null || !declaresClass(text, main, pkg, path.endsWith(".kt"))) {
                 continue;
             }
@@ -3021,6 +3027,88 @@ public class CodenameOneSettings extends Lifecycle {
     ///
     /// Hand-rolled because Character.isJavaIdentifierPart is outside the
     /// Codename One API subset, and this class is compiled as app code.
+    /// Java's unicode escapes, applied.
+    ///
+    /// javac processes `\\uXXXX` in the LEXICAL TRANSLATION step, before it
+    /// tokenizes anything, so `package com.ex\\u0061mple;` really declares
+    /// com.example and an escape works inside an identifier. Reading the text
+    /// literally recorded `com.ex`, so the real main source was rejected,
+    /// nothing knew which hints an annotation already owns, and Add could write
+    /// the duplicate declaration the next build refuses.
+    ///
+    /// A backslash only opens an escape when an EVEN number of backslashes
+    /// precedes it, which is what keeps a string literal spelling one. Kotlin
+    /// has no such step, so this is applied to Java only.
+    ///
+    /// Safe here because this tool never writes a source file back -- it edits
+    /// codenameone_settings.properties and the POM -- so nothing depends on an
+    /// offset into the text as it is on disk.
+    static String decodeUnicodeEscapes(String text) {
+        if (text == null || text.indexOf('\\') < 0) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c != '\\') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int j = i;
+            while (j < text.length() && text.charAt(j) == '\\') {
+                j++;
+            }
+            int run = j - i;
+            for (int pair = 0; pair < run / 2; pair++) {
+                out.append('\\').append('\\');
+            }
+            if (run % 2 == 0) {
+                i = j;
+                continue;
+            }
+            int u = j;
+            while (u < text.length() && text.charAt(u) == 'u') {
+                u++;
+            }
+            int value = u > j ? hexQuad(text, u) : -1;
+            if (value < 0) {
+                out.append('\\');
+                i = j;
+                continue;
+            }
+            out.append((char) value);
+            i = u + 4;
+        }
+        return out.toString();
+    }
+
+    /// The four hex digits at `from`, or -1. Hand-rolled for the same reason
+    /// [#continuesAName] is: this class compiles against the Codename One API
+    /// subset.
+    private static int hexQuad(String text, int from) {
+        if (from + 4 > text.length()) {
+            return -1;
+        }
+        int value = 0;
+        for (int i = from; i < from + 4; i++) {
+            char c = text.charAt(i);
+            int digit;
+            if (c >= '0' && c <= '9') {
+                digit = c - '0';
+            } else if (c >= 'a' && c <= 'f') {
+                digit = c - 'a' + 10;
+            } else if (c >= 'A' && c <= 'F') {
+                digit = c - 'A' + 10;
+            } else {
+                return -1;
+            }
+            value = value * 16 + digit;
+        }
+        return value;
+    }
+
     private static boolean continuesAName(char c) {
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                 || (c >= '0' && c <= '9') || c == '_' || c == '$') {
