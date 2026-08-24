@@ -1882,4 +1882,64 @@ public class AppExtensionDeploymentTargetTest {
             assertFalse(candidate, candidate.contains("[variant=normal]"));
         }
     }
+
+    @Test
+    public void aLeadingUnresolvedReferenceIsNotHiddenByTheHostPrefix() throws Exception {
+        File dist = tmp.newFolder("dist103");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", null);
+
+        // resolveSettingsInValue DELETES what it cannot expand, so the leading reference vanished
+        // and the rest read as being under the host. Xcode puts the executable name back, and the
+        // identifier is not under the host at all.
+        java.util.Map<String, String> leading = new java.util.LinkedHashMap<String, String>();
+        leading.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXECUTABLE_NAME)com.example.app.Ext");
+        assertEquals(1, IPhoneBuilder.dropBlankBundleIdentifiers(leading, extension, archive,
+                "com.example.app").size());
+        assertFalse(leading.containsKey("PRODUCT_BUNDLE_IDENTIFIER"));
+
+        // What PRECEDES a reference is what decides the namespace, and that still passes.
+        java.util.Map<String, String> trailing = new java.util.LinkedHashMap<String, String>();
+        trailing.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.$(EXECUTABLE_NAME)");
+        assertEquals(0, IPhoneBuilder.dropBlankBundleIdentifiers(trailing, extension, archive,
+                "com.example.app").size());
+    }
+
+    @Test
+    public void aHelperThatLeavesTheNamespaceInAnotherBuildIsDropped() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.app.Ext");
+        settings.put("EXTENSION_ID[config=Debug]", "com.other.Debug");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // The condition does not have to be on PRODUCT_BUNDLE_IDENTIFIER to decide it. Every check
+        // resolves in the archive's own context, so this passed them all and both settings were
+        // copied onto the target -- and the Debug build expanded the same identifier to the
+        // foreign value and could not be signed.
+        assertFalse(settings.containsKey("EXTENSION_ID[config=Debug]"));
+        assertEquals("com.example.app.Ext", settings.get("EXTENSION_ID"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
+
+    @Test
+    public void aHelperThatStaysInTheNamespaceIsLeftAlone() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.app.Ext");
+        settings.put("EXTENSION_ID[config=Debug]", "com.example.app.Ext.debug");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // A per-configuration identifier under the host is an ordinary arrangement, not a defect.
+        assertEquals("com.example.app.Ext.debug", settings.get("EXTENSION_ID[config=Debug]"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
 }

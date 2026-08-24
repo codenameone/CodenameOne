@@ -6481,6 +6481,12 @@ public class IPhoneBuilder extends Executor {
     /// and sources.tar.bz2 lets either be built later.
     private static final String[] PROJECT_CONFIGURATIONS = {"Debug", "Release"};
 
+    /// Where the first {@code $(...)} or {@code ${...}} begins, or -1 when there is none.
+    private static int firstReference(String value) {
+        java.util.regex.Matcher m = BUILD_SETTING_REFERENCE.matcher(value);
+        return m.find() ? m.start() : -1;
+    }
+
     /// Whether an identifier this build cannot finish resolving is at least known to land under
     /// the host.
     ///
@@ -6500,9 +6506,15 @@ public class IPhoneBuilder extends Executor {
         if (value == null) {
             return false;
         }
-        // What this build can already expand, so a head written through a resolvable helper counts
-        // as the literal it comes to.
-        String head = resolveSettingsInValue(value, settings);
+        // Everything this build CAN expand, with the rest left standing -- resolveSettingsInValue
+        // deletes what it cannot expand, and deleting a leading $(EXECUTABLE_NAME) made
+        // "$(EXECUTABLE_NAME)com.example.app.Ext" read as being under the host. Xcode puts the
+        // executable name back, and the identifier is not under the host at all.
+        String expanded = stripResolved(value, settings);
+        // Only the head before the first thing still unexpanded is known. What follows a
+        // reference is anyone's guess, and what PRECEDES one is what decides the namespace.
+        int reference = firstReference(expanded);
+        String head = reference < 0 ? expanded : expanded.substring(0, reference);
         return head.startsWith(hostPackage + ".");
     }
 
@@ -7823,8 +7835,58 @@ public class IPhoneBuilder extends Executor {
                         + "under " + hostPackage);
             }
         }
+        notes.addAll(dropHelpersThatLeaveTheNamespace(settings, hostPackage, context));
         return notes;
     }
+
+    /// Drops a QUALIFIED helper that takes the extension's identifier out of the host's namespace
+    /// in the build it describes.
+    ///
+    /// The condition does not have to be on PRODUCT_BUNDLE_IDENTIFIER to decide it. An
+    /// unqualified identifier written as $(EXTENSION_ID), over a host-prefixed base EXTENSION_ID
+    /// and an EXTENSION_ID[config=Debug] from the project the archive came from, passes every
+    /// check this build makes -- they all resolve in the archive's own context -- and both
+    /// settings are copied onto the target, so the Debug build expands the same identifier to the
+    /// foreign value and cannot be signed.
+    ///
+    /// The qualified helper is what makes it foreign, so that is what goes; the base helper then
+    /// governs every configuration, which is the identifier the profile was issued for. The build
+    /// is not refused over it: the archive being made here is fine, and refusing would fail builds
+    /// that ship correctly today.
+    private static List<String> dropHelpersThatLeaveTheNamespace(Map<String, String> settings,
+            String hostPackage, ArchiveContext context) {
+        List<String> notes = new ArrayList<String>();
+        if (settings == null || hostPackage == null || hostPackage.length() == 0) {
+            return notes;
+        }
+        String declaredId = settings.get("PRODUCT_BUNDLE_IDENTIFIER");
+        if (declaredId == null || declaredId.indexOf('$') < 0) {
+            return notes;
+        }
+        // Only when the identifier is sound as this archive has it: an identifier already out of
+        // namespace here is the plain refusal's business, not this one's.
+        String active = resolveSettingsInValue(declaredId, flattenForContext(settings, context));
+        if (active.length() == 0 || !active.startsWith(hostPackage + ".")) {
+            return notes;
+        }
+        for (String key : new ArrayList<String>(settings.keySet())) {
+            if (key.indexOf('[') < 0 || isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER")) {
+                continue;
+            }
+            ArchiveContext own = contextForCondition(key, context);
+            String inThatBuild = resolveSettingsInValue(declaredId,
+                    flattenForContext(settings, own));
+            if (inThatBuild.length() == 0 || inThatBuild.startsWith(hostPackage + ".")) {
+                continue;
+            }
+            String removed = settings.remove(key);
+            notes.add(key + " = " + removed + " would make the extension's identifier "
+                    + inThatBuild + ", which is not under " + hostPackage + ", so it was dropped "
+                    + "and the unqualified value governs that build too");
+        }
+        return notes;
+    }
+
 
     /// The iOS SDK this build archives against.
     ///
