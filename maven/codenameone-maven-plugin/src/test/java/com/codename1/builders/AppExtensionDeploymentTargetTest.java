@@ -1517,4 +1517,58 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals(perVariant.toString(), 2, perVariant.size());
         assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentFloor(perVariant));
     }
+
+    @Test
+    public void anIdentifierThroughAnXcodeSettingIsKept() throws Exception {
+        File dist = tmp.newFolder("dist95");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
+                "com.example.app.$(EXECUTABLE_NAME)");
+
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(settings,
+                extension, IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                        settings));
+
+        // resolveSettingsFully says null for any reference it could not expand, and this build
+        // models only some of what Xcode defines -- so a perfectly good identifier was deleted,
+        // dropping that configuration to the base one while its plist still declares the other.
+        assertEquals("com.example.app.$(EXECUTABLE_NAME)",
+                settings.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
+
+    @Test
+    public void aNameNothingWillDefineIsStillDropped() throws Exception {
+        File dist = tmp.newFolder("dist96");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(settings,
+                extension, IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                        settings));
+
+        // EXTENSION_ID is the archive's own name to define and it did not, so Xcode expands it to
+        // nothing and the .appex ships with no identifier -- which is what this guard is for.
+        assertFalse(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
+
+    @Test
+    public void onlyXcodesOwnNamesCountAsProvided() {
+        java.util.Map<String, String> none = new java.util.LinkedHashMap<String, String>();
+        assertTrue(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.$(EXECUTABLE_NAME)", none));
+        assertTrue(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.$(PRODUCT_NAME:rfc1034identifier)", none));
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings("com.example.$(EXTENSION_ID)", none));
+        // One unknown name among known ones is still an identifier that comes to nothing.
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.$(EXECUTABLE_NAME).$(EXTENSION_ID)", none));
+        // Nothing left to expand is not "only Xcode's".
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings("com.example.app.Ext", none));
+    }
 }

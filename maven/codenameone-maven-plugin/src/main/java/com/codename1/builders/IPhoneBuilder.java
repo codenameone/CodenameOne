@@ -8192,6 +8192,49 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /// The build settings Xcode itself defines for every target, which this builder does not
+    /// model and must not treat as missing.
+    ///
+    /// Not a complete list of Xcode's settings -- it does not need to be. It is the ones that
+    /// legitimately appear in a bundle identifier, so that an identifier written through one is
+    /// left for Xcode to expand instead of being read as an identifier that comes to nothing.
+    private static final java.util.Set<String> XCODE_PROVIDED_SETTINGS =
+            new java.util.HashSet<String>(java.util.Arrays.asList(
+                    "EXECUTABLE_NAME", "EXECUTABLE_PREFIX", "EXECUTABLE_SUFFIX",
+                    "PRODUCT_NAME", "PRODUCT_MODULE_NAME", "TARGET_NAME", "PROJECT_NAME",
+                    "PRODUCT_BUNDLE_IDENTIFIER", "CONFIGURATION", "SDK_NAME", "SDK_VERSION",
+                    "PLATFORM_NAME", "CURRENT_ARCH", "ARCHS", "NATIVE_ARCH",
+                    "DEVELOPMENT_LANGUAGE", "DEVELOPMENT_TEAM", "TeamIdentifierPrefix",
+                    "AppIdentifierPrefix", "MARKETING_VERSION", "CURRENT_PROJECT_VERSION",
+                    "WRAPPER_EXTENSION", "WRAPPER_NAME", "BUNDLE_IDENTIFIER", "SRCROOT",
+                    "PROJECT_DIR", "BUILT_PRODUCTS_DIR", "TARGET_BUILD_DIR", "INFOPLIST_FILE"));
+
+    /// Whether every reference still left in {@code value} names a setting Xcode supplies itself.
+    ///
+    /// @param settings what this build could already expand, so only the leftovers are judged
+    static boolean referencesOnlyXcodeSettings(String value, Map<String, String> settings) {
+        if (value == null) {
+            return false;
+        }
+        String remaining = stripResolved(value, settings);
+        java.util.regex.Matcher m = BUILD_SETTING_REFERENCE.matcher(remaining);
+        boolean any = false;
+        while (m.find()) {
+            any = true;
+            String reference = m.group();
+            // $(NAME) / ${NAME} / $(NAME:modifier)
+            String name = reference.substring(2, reference.length() - 1);
+            int modifier = name.indexOf(':');
+            if (modifier >= 0) {
+                name = name.substring(0, modifier);
+            }
+            if (!XCODE_PROVIDED_SETTINGS.contains(name)) {
+                return false;
+            }
+        }
+        return any;
+    }
+
     /// Whether two TARGETED_DEVICE_FAMILY values name the same families.
     ///
     /// Compared as sets rather than as text: "1, 2" and "1,2" are the same declaration, and
@@ -8450,6 +8493,15 @@ public class IPhoneBuilder extends Executor {
                 // perfectly valid on the machine that wrote it, and it still builds something
                 // signable.
                 String resolved = resolveSettingsFully(value.trim(), perKey);
+                // Unless what is left over is Xcode's OWN to supply. resolveSettingsFully says
+                // null for any reference it could not expand, and this build models only some of
+                // the settings Xcode defines -- so com.example.$(EXECUTABLE_NAME) came back null
+                // and a perfectly good identifier was deleted, dropping that configuration to the
+                // base one while its plist still declares the other. Only a name nothing will
+                // define is the empty identifier this guard is for.
+                if (resolved == null && referencesOnlyXcodeSettings(value.trim(), perKey)) {
+                    continue;
+                }
                 if (resolved == null || resolved.trim().length() == 0) {
                     settings.remove(key);
                     notes.add(key + " = " + value.trim() + " is a reference this build cannot "
