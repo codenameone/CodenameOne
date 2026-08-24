@@ -179,6 +179,31 @@ class NearbyPresenceStore {
         CompanionDevices.deliverPresenceChanged(encoded, present);
     }
 
+    /// Forgets the durable rows this process parked.
+    ///
+    /// Called when CompanionDevices has handed the in-memory backlog to a
+    /// listener: the app has now seen those events, so a copy kept for the
+    /// next launch would deliver them a second time. The rows this process
+    /// never parked cannot be here -- the restore took them all when the
+    /// backend was built, before any listener could register.
+    static void acknowledgeDelivered(Context ctx) {
+        DELIVERED_HERE.clear();
+        if (ctx == null) {
+            return;
+        }
+        synchronized (STORE_LOCK) {
+            try {
+                ctx.getSharedPreferences(PRESENCE_PREFS, Context.MODE_PRIVATE)
+                        .edit().remove(PRESENCE_KEY).commit();
+            } catch (Throwable unavailable) {
+                // Nothing to do: the worst case is a replay the next launch
+                // filters no further, which is what this was already.
+                Log.w("CN1Nearby", "presence backlog not cleared",
+                        unavailable);
+            }
+        }
+    }
+
     /// Whether this association was last reported present.
     static boolean isPresent(String associationId) {
         Boolean known = PRESENT.get(associationId);

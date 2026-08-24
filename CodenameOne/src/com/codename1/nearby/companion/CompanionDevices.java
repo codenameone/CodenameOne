@@ -267,6 +267,27 @@ public final class CompanionDevices {
         }
     }
 
+    /// Notified once the parked backlog has been handed to the listeners.
+    ///
+    /// A port that keeps a DURABLE copy of an event needs to know when the
+    /// in-memory one has been consumed, or it replays on the next launch
+    /// something the app has already handled. Nothing else can tell it:
+    /// parking happens here, and so does the replay.
+    private static Runnable presenceBacklogDrained;
+
+    /// Registers the hook above. Replaces any previous one.
+    ///
+    /// @hidden not part of the public API; for ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onDrained`: run on the EDT after the backlog empties, or null
+    public static void setPresenceBacklogDrainedHook(Runnable onDrained) {
+        synchronized (LISTENERS) {
+            presenceBacklogDrained = onDrained;
+        }
+    }
+
     /// Whether any listener is registered to receive presence right now.
     ///
     /// For a PORT deciding whether an event needs to outlive the process.
@@ -369,13 +390,24 @@ public final class CompanionDevices {
     /// Ends the replay, or continues it when events parked while the backlog
     /// was in flight.
     private static void finishReplay() {
+        boolean finished;
+        Runnable drained = null;
         synchronized (LISTENERS) {
-            if (PENDING_PRESENCE.isEmpty()) {
+            finished = PENDING_PRESENCE.isEmpty();
+            if (finished) {
                 replayingPresence = false;
-                return;
+                drained = presenceBacklogDrained;
             }
         }
-        replayPresence();
+        if (!finished) {
+            replayPresence();
+            return;
+        }
+        if (drained != null) {
+            // Outside the lock: a port's hook touches its own storage, and
+            // holding this monitor across it is how a deadlock is built.
+            drained.run();
+        }
     }
 
     /// Removes a listener added by [#addPresenceListener].

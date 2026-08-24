@@ -158,6 +158,18 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// they come back, which is the first thing an app touches on its way to
     /// registering a presence listener.
     private void restorePresence() {
+        // Registered here, once, so the durable rows this process parks are
+        // dropped as soon as a listener has taken the in-memory backlog.
+        // Without it an event parked AFTER the backend was built stayed on
+        // disk after the app had handled it, and the next launch delivered
+        // it again.
+        final Context ctx = appContext;
+        CompanionDevices.setPresenceBacklogDrainedHook(new Runnable() {
+            @Override
+            public void run() {
+                NearbyPresenceStore.acknowledgeDelivered(ctx);
+            }
+        });
         String[] rows = NearbyPresenceStore.takePersistedPresence(
                 appContext);
         for (int i = 0; i < rows.length; i++) {
