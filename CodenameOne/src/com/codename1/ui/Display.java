@@ -34,7 +34,6 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.VirtualKeyboardInterface;
-import com.codename1.impl.WindowManager;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.io.Util;
@@ -1500,9 +1499,8 @@ public final class Display extends CN1Constants {
         // Every open window services its own, which is a walk over the windows that
         // actually exist rather than over a fixed table of slots most of which are
         // empty. A window that went away took its timers with it.
-        Window[] openWindows = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < openWindows.length; iter++) {
-            openWindows[iter].serviceInputTimers(t, longPressInterval);
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.serviceInputTimers(t, longPressInterval);
         }
         processSerialCalls();
 
@@ -2894,18 +2892,9 @@ public final class Display extends CN1Constants {
     /// already dragged, so releasing the first made `List` and friends read
     /// `hasDragOccured()` as false and treat a completed drag as a click.
 
-    /// Key repeat and long-key-press state, per window for the same reason the
-    /// pointer equivalents are: a key held in one window and another pressed in a
-    /// second window shared one id, value and clock, so each cancelled the other.
-
-    /// Ids of windows with a long press being timed, paired by index with the arrays
-    /// below. Zero means the entry is unused; window 0 uses `#MAIN_LONG_PRESS_ID`.
-
-    /// Stand-in id for the main surface, so 0 can mean "unused" in
-    /// `#longPressWindows`.
-    private static final int MAIN_LONG_PRESS_ID = -1;
-
-    /// Arms key repeat and the long-key-press timer for one window.
+    /// Arms key repeat and the long-key-press timer for one surface. Window zero is
+    /// the main surface and keeps the fields it always kept; any other window keeps
+    /// its own, on the window.
     private void chargeKeyRepeat(int windowId, int keyCode, boolean armed, long now,
             long firstRepeatAt) {
         if (windowId == 0) {
@@ -2933,9 +2922,8 @@ public final class Display extends CN1Constants {
             keyRepeatCharged = false;
             longPressCharged = false;
         }
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            open[iter].cancelKeyRepeatForCode(keyCode);
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.cancelKeyRepeatForCode(keyCode);
         }
     }
 
@@ -2956,9 +2944,8 @@ public final class Display extends CN1Constants {
     private void cancelAllKeyRepeats() {
         keyRepeatCharged = false;
         longPressCharged = false;
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            open[iter].cancelKeyRepeat();
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.cancelKeyRepeat();
         }
     }
 
@@ -2969,9 +2956,8 @@ public final class Display extends CN1Constants {
         if (keyRepeatCharged && longPressCharged) {
             return true;
         }
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            if (open[iter].hasKeyRepeatAndLongPressArmed()) {
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasKeyRepeatAndLongPressArmed()) {
                 return true;
             }
         }
@@ -2983,9 +2969,8 @@ public final class Display extends CN1Constants {
         if (keyRepeatCharged || longPressCharged) {
             return true;
         }
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            if (open[iter].hasKeyRepeatArmed()) {
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasKeyRepeatArmed()) {
                 return true;
             }
         }
@@ -3019,9 +3004,8 @@ public final class Display extends CN1Constants {
         if (pointerPressedAndNotReleasedOrDragged) {
             return true;
         }
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            if (open[iter].hasSelectionPressed()) {
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasSelectionPressed()) {
                 return true;
             }
         }
@@ -3032,9 +3016,8 @@ public final class Display extends CN1Constants {
     /// loses its input, which is not a per window event.
     private void clearAllSelectionPressed() {
         pointerPressedAndNotReleasedOrDragged = false;
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            open[iter].setSelectionPressed(false, 0, 0);
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.setSelectionPressed(false, 0, 0);
         }
     }
 
@@ -3086,9 +3069,8 @@ public final class Display extends CN1Constants {
         if (longPointerCharged) {
             return true;
         }
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            if (open[iter].hasLongPointerArmed()) {
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasLongPointerArmed()) {
                 return true;
             }
         }
@@ -3098,9 +3080,8 @@ public final class Display extends CN1Constants {
     /// Cancels every pending long press, for the paths that reset all input state.
     private void cancelAllLongPresses() {
         longPointerCharged = false;
-        Window[] open = Desktop.getInstance().getWindows();
-        for (int iter = 0; iter < open.length; iter++) {
-            open[iter].cancelLongPointerPress();
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.cancelLongPointerPress();
         }
     }
 

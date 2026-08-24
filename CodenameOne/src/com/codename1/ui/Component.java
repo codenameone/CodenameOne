@@ -7957,7 +7957,18 @@ public class Component implements Animation, StyleListener, Editable {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
                             if (evt.getEventType() == ActionEvent.Type.PointerDrag) {
-                                if (updateMaterialPullToRefresh(p, evt.getY() - getAbsoluteY())) {
+                                // Resolved when the drag happens rather than captured
+                                // when the listener was built. The listener is created
+                                // once and kept for the life of the component, while
+                                // the component can be moved to another top level -- it
+                                // is then re-registered on the new one while still
+                                // holding the old, so the overlay went up on the top
+                                // level the component had left and the release arriving
+                                // on the new one found nothing to finish. The refresh
+                                // task simply never ran.
+                                TopLevelContainer host = getTopLevelContainer();
+                                if (host != null && updateMaterialPullToRefresh(host,
+                                        evt.getY() - getAbsoluteY())) {
                                     evt.consume();
                                 }
                             } else {

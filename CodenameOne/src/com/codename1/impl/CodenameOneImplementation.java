@@ -3863,8 +3863,8 @@ public abstract class CodenameOneImplementation {
     /// true if the drag should propagate into Codename One
     protected boolean hasWindowDragStarted(final int windowId, final int slot,
             final int x, final int y) {
-        int surfaceWidth = com.codename1.ui.Desktop.getInstance().windowWidth(windowId);
-        int surfaceHeight = com.codename1.ui.Desktop.getInstance().windowHeight(windowId);
+        int surfaceWidth = Desktop.getInstance().windowWidth(windowId);
+        int surfaceHeight = Desktop.getInstance().windowHeight(windowId);
         if (surfaceWidth <= 0 || surfaceHeight <= 0) {
             return false;
         }
@@ -3875,7 +3875,7 @@ public abstract class CodenameOneImplementation {
             return false;
         }
         windowDragActivationCounter[slot]++;
-        if (dragPassedThreshold(com.codename1.ui.Desktop.getInstance().windowDragRegionStatus(windowId, x, y),
+        if (dragPassedThreshold(Desktop.getInstance().windowDragRegionStatus(windowId, x, y),
                 surfaceWidth, surfaceHeight,
                 windowDragActivationX[slot], windowDragActivationY[slot],
                 windowDragActivationCounter[slot], x, y)) {
@@ -9631,11 +9631,11 @@ public abstract class CodenameOneImplementation {
         // gesture is played as four queued steps and an unconsumed wheel listener can
         // show a modal in between, after which the remaining synthetic press, drags
         // and release would scroll or activate content behind it.
-        if (com.codename1.ui.Desktop.getInstance().isWindowInputBlocked(windowId)) {
+        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
             return null;
         }
         if (windowId > 0) {
-            com.codename1.ui.Window w = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+            com.codename1.ui.Window w = Desktop.getInstance().windowById(windowId);
             // Visibility as well as modality, and for the same reason: an unconsumed
             // wheel listener can hide or minimize its own window before the gesture
             // starts, and a hidden window stays registered -- so the synthetic press,
