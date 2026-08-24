@@ -760,4 +760,29 @@ public class BuildHintCatalogTest {
         assertNotNull(meta);
         assertTrue(meta.defaultValue() == null || meta.defaultValue().isEmpty());
     }
+
+    /// A qualified import may carry whitespace or a comment around any dot.
+    /// Reading the name as one contiguous run stopped at the separator and
+    /// recorded only the prefix, so the import went unrecognised and the live
+    /// @Ios read as somebody else's.
+    @Test
+    public void aQualifiedImportMaySpanSeparators() {
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import com.codename1.annotations. /* generated */ buildhints.Ios;\n",
+                "Ios", false));
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import com.codename1\n   .annotations\n   .buildhints\n   .*;\n",
+                "Ios", false));
+        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(
+                "import com.codename1.annotations . buildhints . Ios as BuildIos\n",
+                "Ios", true));
+    }
+
+    /// ...and a foreign import spanning separators still shadows ours.
+    @Test
+    public void aForeignImportSpanningSeparatorsStillShadows() {
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "import com.codename1.annotations.buildhints.*;\n"
+                        + "import com.example . other . Ios;\n", "Ios", false));
+    }
 }

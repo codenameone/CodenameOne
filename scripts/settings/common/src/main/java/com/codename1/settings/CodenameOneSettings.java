@@ -2531,12 +2531,37 @@ public class CodenameOneSettings extends Lifecycle {
             if (i < 0) {
                 return out;
             }
+            // Component by component, stepping over whitespace and comments
+            // around each dot. `import com.codename1.annotations. /* x */
+            // buildhints.Ios;` is legal, and reading the name as one contiguous
+            // run stopped at the separator and recorded only the prefix -- so the
+            // import was not recognised and the live @Ios read as somebody
+            // else's.
             StringBuilder name = new StringBuilder();
-            while (i < source.length()
-                    && (continuesAName(source.charAt(i)) || source.charAt(i) == '.'
-                        || source.charAt(i) == '*')) {
-                name.append(source.charAt(i));
-                i++;
+            while (i >= 0 && i < source.length()) {
+                if (source.charAt(i) == '*') {
+                    name.append('*');
+                    i++;
+                    break;
+                }
+                int end = i;
+                while (end < source.length() && continuesAName(source.charAt(end))) {
+                    end++;
+                }
+                if (end == i) {
+                    break;
+                }
+                name.append(source, i, end);
+                int dot = nextLiveChar(source, end, kotlin);
+                if (dot < 0 || source.charAt(dot) != '.') {
+                    i = end;
+                    break;
+                }
+                name.append('.');
+                i = nextLiveChar(source, dot + 1, kotlin);
+            }
+            if (i < 0) {
+                i = source.length();
             }
             String alias = null;
             int a = nextLiveChar(source, i, kotlin);
