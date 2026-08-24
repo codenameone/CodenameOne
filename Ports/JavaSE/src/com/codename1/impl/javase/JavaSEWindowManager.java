@@ -182,6 +182,13 @@ public class JavaSEWindowManager extends WindowManager {
          * run.
          */
         boolean reconfiguring;
+
+        /// Visibility events AWT is about to deliver for a show() or hide() this
+        /// manager asked for, rather than for something the user or window manager did.
+        ///
+        /// Only ever touched on the AWT thread, which is also where the events arrive,
+        /// so the increment always precedes the delivery it accounts for.
+        int selfInflictedVisibilityEvents;
         /// The application's own always-on-top setting, kept apart from the temporary
         /// elevation a modal window gets so releasing modality cannot clear it.
         boolean explicitAlwaysOnTop;
@@ -309,7 +316,7 @@ public class JavaSEWindowManager extends WindowManager {
                      */
                     @Override
                     public void componentHidden(ComponentEvent e) {
-                        if (p.reconfiguring) {
+                        if (p.reconfiguring || consumeSelfInflicted(p)) {
                             return;
                         }
                         Desktop.getInstance().windowHideNotify(windowId);
@@ -317,7 +324,7 @@ public class JavaSEWindowManager extends WindowManager {
 
                     @Override
                     public void componentShown(ComponentEvent e) {
-                        if (p.reconfiguring) {
+                        if (p.reconfiguring || consumeSelfInflicted(p)) {
                             return;
                         }
                         Desktop.getInstance().windowShowNotify(windowId);
@@ -369,6 +376,25 @@ public class JavaSEWindowManager extends WindowManager {
         return p;
     }
 
+    /// Whether this AWT visibility event was caused by show() or hide() here, rather
+    /// than by the user or the window manager.
+    ///
+    /// The framework already knows about its own show and hide -- Window sets
+    /// nativeVisible before calling this manager -- so reporting them again is at best
+    /// redundant. It is not merely redundant, though, because the report is queued onto
+    /// the Codename One event dispatch thread rather than delivered inline: a show and
+    /// a hide in the same turn both queue, and both then run against the state the
+    /// second one left. The pair is read as a minimize and a restore, and in the
+    /// show-then-hide order the window ends up hidden but marked iconified -- which is
+    /// the state showModal() waits on, so its caller waits for good.
+    private static boolean consumeSelfInflicted(Peer p) {
+        if (p.selfInflictedVisibilityEvents > 0) {
+            p.selfInflictedVisibilityEvents--;
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public void show(Object peerObj) {
         final Peer p = peer(peerObj);
@@ -378,6 +404,12 @@ public class JavaSEWindowManager extends WindowManager {
         runOnAwtAndWait(new Runnable() {
             @Override
             public void run() {
+                // Counted only when the frame is actually changing state, because AWT
+                // delivers nothing when it is not and the count would then be spent on
+                // some later event that the user caused.
+                if (!p.frame.isVisible()) {
+                    p.selfInflictedVisibilityEvents++;
+                }
                 p.frame.setVisible(true);
                 p.canvas.requestFocus();
             }
@@ -399,6 +431,9 @@ public class JavaSEWindowManager extends WindowManager {
         runOnAwtAndWait(new Runnable() {
             @Override
             public void run() {
+                if (p.frame.isVisible()) {
+                    p.selfInflictedVisibilityEvents++;
+                }
                 p.frame.setVisible(false);
             }
         });
