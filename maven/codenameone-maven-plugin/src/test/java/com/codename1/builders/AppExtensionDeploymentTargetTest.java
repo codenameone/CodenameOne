@@ -2006,4 +2006,65 @@ public class AppExtensionDeploymentTargetTest {
         assertTrue(family.toString(), family.contains("arm64"));
         assertTrue(family.toString(), family.contains("arm64e"));
     }
+
+    @Test
+    public void theOutermostOverrideIsWhatGoes() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.app.Ext");
+        settings.put("EXTENSION_ID[config=Debug]", "$(DEBUG_ID)");
+        settings.put("DEBUG_ID[config=Debug]", "com.other.Debug");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Deleting the foreign LEAF leaves the override resolving to nothing, so Xcode builds
+        // that configuration with no identifier at all instead of falling back to the valid base.
+        // Removing the override is what restores the base.
+        assertFalse(settings.containsKey("EXTENSION_ID[config=Debug]"));
+        assertEquals("com.example.app.Ext", settings.get("EXTENSION_ID"));
+        assertEquals(notes.toString(), 1, notes.size());
+
+        // Debug now resolves to the base, which is under the host.
+        assertEquals("com.example.app.Ext", IPhoneBuilder.resolveSettingsFully(
+                "$(EXTENSION_ID)", IPhoneBuilder.flattenForContext(settings,
+                        IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Debug", "arm64",
+                                settings))));
+    }
+
+    @Test
+    public void theChainIsOutermostFirst() {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.$(SUFFIX)");
+        settings.put("SUFFIX", "Ext");
+
+        // The order is what lets a repair remove the override that selected a chain rather than
+        // the leaf at the end of it.
+        assertEquals(java.util.Arrays.asList("EXTENSION_ID", "SUFFIX"),
+                IPhoneBuilder.referencedSettingChain("$(EXTENSION_ID)", settings));
+    }
+
+    @Test
+    public void theCounterpartPlatformIsEnumerated() throws Exception {
+        File dist = tmp.newFolder("dist104");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(new File(extension, "iphoneos").mkdirs());
+        assertTrue(new File(extension, "iphonesimulator").mkdirs());
+        File device = new File(extension, "iphoneos/Info.plist");
+        File simulator = new File(extension, "iphonesimulator/Info.plist");
+        write(device, plistWithIdentifier("com.example.app.Device"));
+        write(simulator, plistWithIdentifier("com.example.app.Simulator"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/$(PLATFORM_NAME)/Info.plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // $(PLATFORM_NAME) needs no SDK version, so the simulator's plist is knowable from a
+        // device archive -- and it was invisible unless the archive happened to declare an SDK
+        // qualifier of its own.
+        assertTrue(plists.toString(), plists.values().contains(device));
+        assertTrue(plists.toString(), plists.values().contains(simulator));
+    }
 }

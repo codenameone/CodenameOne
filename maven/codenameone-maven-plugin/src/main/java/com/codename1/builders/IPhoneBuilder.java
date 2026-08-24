@@ -6623,6 +6623,19 @@ public class IPhoneBuilder extends Executor {
         if (own != null && own.sdk != null && own.sdk.length() > 0) {
             out.add(own.sdk);
         }
+        // The counterpart PLATFORM, as a family. It costs nothing to resolve a path that needs
+        // only $(PLATFORM_NAME) -- the platform is knowable where the SDK version is not -- and
+        // without it the simulator's plist was invisible to a device archive unless the archive
+        // happened to declare an SDK qualifier of its own. A path that does need $(SDK_NAME)
+        // still does not resolve in this context, which remains the honest answer.
+        if (own != null && own.sdk != null && own.sdk.length() > 0) {
+            String platform = platformOf(own.sdk);
+            String counterpart = "iphonesimulator".equalsIgnoreCase(platform) ? "iphoneos"
+                    : "iphoneos".equalsIgnoreCase(platform) ? "iphonesimulator" : null;
+            if (counterpart != null) {
+                out.add(counterpart + "*");
+            }
+        }
         if (declared != null) {
             for (String key : declared.keySet()) {
                 String sdk = conditionsOf(key).get("sdk");
@@ -7524,12 +7537,18 @@ public class IPhoneBuilder extends Executor {
                 && !out.containsKey("CONFIGURATION")) {
             out.put("CONFIGURATION", configuration);
         }
+        if (sdk != null) {
+            // The PLATFORM is known even for a family: [sdk=iphonesimulator*] does not say which
+            // simulator SDK, and it says exactly which platform. Withholding both meant a path
+            // written through $(PLATFORM_NAME) -- which needs no version -- could not be resolved
+            // for the platform this build is not making, and that plist went unstamped.
+            if (!out.containsKey("PLATFORM_NAME")) {
+                out.put("PLATFORM_NAME", platformOf(sdk));
+            }
+        }
         if (sdk != null && !isFamilyPattern(sdk)) {
             if (!out.containsKey("SDK_NAME")) {
                 out.put("SDK_NAME", sdk);
-            }
-            if (!out.containsKey("PLATFORM_NAME")) {
-                out.put("PLATFORM_NAME", platformOf(sdk));
             }
         }
         if (arch != null && !isFamilyPattern(arch)) {
@@ -7865,7 +7884,14 @@ public class IPhoneBuilder extends Executor {
     /// The closure, not just the names written in the text: PRODUCT_BUNDLE_IDENTIFIER =
     /// $(EXTENSION_ID) with EXTENSION_ID = com.example.$(SUFFIX) is built from both.
     static java.util.Set<String> referencedSettingNames(String value, Map<String, String> settings) {
-        java.util.Set<String> out = new java.util.LinkedHashSet<String>();
+        return new java.util.LinkedHashSet<String>(referencedSettingChain(value, settings));
+    }
+
+    /// The same names, OUTERMOST FIRST: what the identifier references directly, then what those
+    /// reference, and so on. The order is what lets a repair remove the override that selected a
+    /// chain rather than the leaf at the end of it.
+    static List<String> referencedSettingChain(String value, Map<String, String> settings) {
+        List<String> out = new ArrayList<String>();
         if (value == null) {
             return out;
         }
@@ -7881,7 +7907,11 @@ public class IPhoneBuilder extends Executor {
                     if (modifier >= 0) {
                         name = name.substring(0, modifier);
                     }
-                    if (!out.add(name) || settings == null) {
+                    if (out.contains(name)) {
+                        continue;
+                    }
+                    out.add(name);
+                    if (settings == null) {
                         continue;
                     }
                     // Its own value, and every qualified form of it: a reference reaches whichever
@@ -7935,12 +7965,12 @@ public class IPhoneBuilder extends Executor {
         // DESCRIBES the offending build is not the same thing as every setting that CAUSES it:
         // dropping on the context alone deleted a CODE_SIGN_ENTITLEMENTS[config=Debug] sitting
         // beside the culprit, and that target then signed with the wrong entitlements.
-        java.util.Set<String> referenced = referencedSettingNames(declaredId, settings);
+        List<String> chain = referencedSettingChain(declaredId, settings);
         for (String key : new ArrayList<String>(settings.keySet())) {
             if (key.indexOf('[') < 0 || isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER")) {
                 continue;
             }
-            if (!referenced.contains(key.substring(0, key.indexOf('[')).trim())) {
+            if (!chain.contains(key.substring(0, key.indexOf('[')).trim())) {
                 continue;
             }
             ArchiveContext own = contextForCondition(key, context);
@@ -7949,8 +7979,32 @@ public class IPhoneBuilder extends Executor {
             if (inThatBuild.length() == 0 || inThatBuild.startsWith(hostPackage + ".")) {
                 continue;
             }
-            String removed = settings.remove(key);
-            notes.add(key + " = " + removed + " would make the extension's identifier "
+            // The OUTERMOST override in the chain, not whichever foreign leaf the map happens to
+            // hand over first. With EXTENSION_ID[config=Debug] = $(DEBUG_ID) over a foreign
+            // DEBUG_ID[config=Debug], deleting DEBUG_ID leaves the EXTENSION_ID override
+            // resolving to nothing -- Xcode then builds that configuration with no identifier at
+            // all instead of falling back to the valid base. Removing the override itself is what
+            // restores the base, and the leaf it referenced becomes unreachable on its own.
+            String dropped = null;
+            for (String name : chain) {
+                for (String candidate : new ArrayList<String>(settings.keySet())) {
+                    int open = candidate.indexOf('[');
+                    if (open < 0 || !name.equals(candidate.substring(0, open).trim())
+                            || !conditionApplies(candidate, own)) {
+                        continue;
+                    }
+                    dropped = candidate;
+                    break;
+                }
+                if (dropped != null) {
+                    break;
+                }
+            }
+            if (dropped == null) {
+                continue;
+            }
+            String removed = settings.remove(dropped);
+            notes.add(dropped + " = " + removed + " would make the extension's identifier "
                     + inThatBuild + ", which is not under " + hostPackage + ", so it was dropped "
                     + "and the unqualified value governs that build too");
         }
