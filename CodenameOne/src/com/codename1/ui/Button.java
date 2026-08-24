@@ -559,12 +559,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         if ((pressedIcon != null && pressedIcon.isAnimation()) ||
                 (rolloverIcon != null && rolloverIcon.isAnimation()) ||
                 (disabledIcon != null && disabledIcon.isAnimation())) {
-            TopLevelContainer parent = getTopLevelContainer();
-            if (parent != null) {
-                // animations are always running so the internal animation isn't
-                // good enough. We never want to stop this sort of animation
-                parent.registerAnimated(this);
-            }
+            registerForAnimation();
         }
     }
 

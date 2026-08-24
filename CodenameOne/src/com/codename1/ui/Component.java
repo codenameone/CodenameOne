@@ -7423,19 +7423,11 @@ public class Component implements Animation, StyleListener, Editable {
     void checkAnimation() {
         Image bgImage = getStyle().getBgImage();
         if (bgImage != null && bgImage.isAnimation()) {
-            TopLevelContainer pf = getTopLevelContainer();
-            if (pf != null) {
-                // animations are always running so the internal animation isn't
-                // good enough. We never want to stop this sort of animation
-                pf.registerAnimated(this);
-            }
+            registerForAnimation();
         } else {
             Painter p = getStyle().getBgPainter();
             if (p != null && p.getClass() != BGPainter.class && p instanceof Animation) {
-                TopLevelContainer pf = getTopLevelContainer();
-                if (pf != null) {
-                    pf.registerAnimated(this);
-                }
+                registerForAnimation();
             } else {
                 if (scrollOpacity == 0xff && isScrollable() && getUIManager().getLookAndFeel().isFadeScrollBar()) {
                     // trigger initial fade process on a fresh view.

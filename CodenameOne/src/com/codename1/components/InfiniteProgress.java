@@ -222,12 +222,7 @@ public class InfiniteProgress extends Component {
         if (animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
         }
-        // The top level rather than the form: getComponentForm() is null by design
-        // inside a Window, so the spinner registered nothing there and sat static.
-        TopLevelContainer top = getTopLevelContainer();
-        if (top != null) {
-            top.registerAnimated(this);
-        }
+        registerForAnimation();
     }
 
     /// {@inheritDoc}

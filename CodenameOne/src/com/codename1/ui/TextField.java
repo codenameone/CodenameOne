@@ -1362,12 +1362,10 @@ public class TextField extends TextArea {
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
-        TopLevelContainer f = getTopLevelContainer();
-        if (f != null) {
-            f.deregisterAnimated(this);
-        }
+        deregisterFromAnimation();
         // if the text field is removed without restoring the commands we need to restore them
         if (handlesInput()) {
+            TopLevelContainer f = getTopLevelContainer();
             if (useSoftkeys) {
                 removeCommands(DELETE_COMMAND, T9_COMMAND, originalClearCommand);
             } else {
@@ -1744,12 +1742,7 @@ public class TextField extends TextArea {
         keyFwd = rtl ? Display.GAME_LEFT : Display.GAME_RIGHT;
         keyBack = rtl ? Display.GAME_RIGHT : Display.GAME_LEFT;
 
-        // text field relies too much on animation to use internal animations
-//        getComponentForm().registerAnimated(this);
-        TopLevelContainer f = getTopLevelContainer();
-        if (f != null) {
-            f.registerAnimated(this);
-        }
+        registerForAnimation();
     }
 
     /// The amount of time in milliseconds in which the cursor is visible

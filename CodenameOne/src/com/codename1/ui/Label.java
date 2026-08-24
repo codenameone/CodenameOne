@@ -612,13 +612,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
-        // Through the top level, matching the registration: resolving the form here
-        // left an animation registered inside a Window for the life of the window,
-        // because getComponentForm() is null there and the release was skipped.
-        TopLevelContainer top = getTopLevelContainer();
-        if (top != null) {
-            top.deregisterAnimated(this);
-        }
+        deregisterFromAnimation();
 
         if (getIcon() != null) {
             getIcon().removeActionListener(iconChangeListener);
@@ -659,12 +653,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     void checkAnimation() {
         super.checkAnimation();
         if (icon != null && icon.isAnimation()) {
-            TopLevelContainer parent = getTopLevelContainer();
-            if (parent != null) {
-                // animations are always running so the internal animation isn't
-                // good enough. We never want to stop this sort of animation
-                parent.registerAnimated(this);
-            }
+            registerForAnimation();
         }
     }
 
