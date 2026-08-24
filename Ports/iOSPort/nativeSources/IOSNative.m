@@ -16308,6 +16308,26 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boole
 
 #import "CN1WatchConnectivity.h"
 
+// Declared rather than left implicit. These six are the translated form of the static
+// Java methods on IOSWearableCallbacks, and ParparVM emits their definitions -- but it
+// emits no header this file includes, so every call below was an implicit declaration.
+// C99 dropped those, and a clang that enforces it turns all six into build errors:
+// "call to undeclared function ... ISO C99 and later do not support implicit function
+// declarations". That is a toolchain change away from breaking every iOS target at
+// once, which is exactly what happened, so the declarations are written out here.
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeMessageReceived___java_lang_String_byte_1ARRAY_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_INT replyToken);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeReplyReceived___int_byte_1ARRAY_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT replyToken, JAVA_OBJECT payload, JAVA_OBJECT error);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChanged___java_lang_String_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChangedTracked___java_lang_String_byte_1ARRAY_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_OBJECT token);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataRemoved___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeStateChanged__(
+        CODENAME_ONE_THREAD_STATE);
+
 // Callbacks the delegate calls when the peer sends something. Each hops into the Java callback
 // surface, which owns EDT dispatch and the cold-start queue.
 
