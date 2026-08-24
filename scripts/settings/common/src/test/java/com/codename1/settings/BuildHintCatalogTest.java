@@ -345,4 +345,39 @@ public class BuildHintCatalogTest {
         assertNull(CodenameOneSettings.kotlinImportAlias(
                 "val doc = com.codename1.annotations.buildhints.Ios as Whatever", "Ios"));
     }
+
+    /// Parentheses are optional on an annotation, so searching forward for the
+    /// next `(` adopted whatever call came after it. Settings then withheld the
+    /// Add and editor controls for a hint the processor never emits.
+    @Test
+    public void aBareAnnotationDoesNotAdoptTheNextCall() {
+        String src = "@Ios\n"
+                + "class MyApp {\n"
+                + "    fun setUp() { configure(teamId = \"ABCDE12345\") }\n"
+                + "}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// A comment between the name and its own argument list is still its own.
+    @Test
+    public void anAnnotationsOwnArgumentListIsStillFoundAcrossAComment() {
+        String src = "@Ios /* why */ (teamId = \"ABCDE12345\")\nclass MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// The two capture-record spellings are one setting: the builder reads the
+    /// long name and then lets the short one override it. Without the alias an
+    /// annotation and a properties line are not seen as a conflict, and the
+    /// properties line silently wins over the compile-checked annotation.
+    @Test
+    public void theShortCaptureRecordSpellingIsAnAliasOfTheLongOne() {
+        assertEquals("android.captureRecord",
+                com.codename1.build.shared.BuildHints.canonicalName("and.captureRecord"));
+        assertEquals("android.facebook_permissions",
+                com.codename1.build.shared.BuildHints.canonicalName("and.facebook_permissions"));
+    }
 }

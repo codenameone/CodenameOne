@@ -44,17 +44,33 @@ final class BuildHintsAndroid {
     }
 
     static void register(List<Hint> h) {
+        // Not an abbreviation: the builder reads android.captureRecord and then
+        // lets and.captureRecord override it, so the two name ONE setting.
+        // Without the alias, @Android(captureRecord) and a properties line
+        // spelling it the short way are not seen as a conflict -- and the
+        // properties line wins, leaving the compile-checked annotation silently
+        // ineffective, which is the whole failure this feature exists to remove.
         h.add(new Hint("and.captureRecord")
+                .aliasOf("android.captureRecord")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
                 .platform("android")
-                .consumedBy("AndroidGradleBuilder"));
+                .consumedBy("AndroidGradleBuilder")
+                .doc("Override alias of `android.captureRecord`, read after it and winning when set."));
 
+        // Same override relationship (AndroidGradleBuilder reads the long name and
+        // then this one). Not annotated today, so nothing can conflict with it yet
+        // -- recorded so Settings collapses the pair, and so annotating the long
+        // name later cannot reintroduce the captureRecord bug.
         h.add(new Hint("and.facebook_permissions")
+                .aliasOf("android.facebook_permissions")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
                 .platform("android")
-                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder"));
+                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder")
+                .doc("Override alias of `android.facebook_permissions`, read after it and winning "
+                        + "when set. `IPhoneBuilder` also falls back to it when "
+                        + "`ios.facebook_permissions` is unset."));
 
         h.add(new Hint("and.themeMode")
                 .annotatedAs(HintGroup.ANDROID, "themeMode")

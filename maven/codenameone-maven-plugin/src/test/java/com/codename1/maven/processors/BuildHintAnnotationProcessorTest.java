@@ -277,6 +277,23 @@ public class BuildHintAnnotationProcessorTest {
         }
     }
 
+    /// `and.captureRecord` is not an abbreviation: the builder reads
+    /// `android.captureRecord` and then lets the short spelling override it, so
+    /// the two name one setting. Without the alias the annotation and a
+    /// properties line spelling it the short way were both accepted -- and the
+    /// properties line wins in the builder, leaving the compile-checked
+    /// annotation silently ineffective.
+    @Test
+    public void theShortSpellingOfAnAliasedHintStillConflicts() throws Exception {
+        Properties s = new Properties();
+        s.load(new ByteArrayInputStream(
+                ("codename1.mainName=MyApp\ncodename1.packageName=com.example\n"
+                 + "codename1.arg.and.captureRecord=disabled\n").getBytes("ISO-8859-1")));
+        File classes = compile("@Android(captureRecord = \"enabled\")");
+        ProcessorContext ctx = run(classes, s, MAIN, false);
+        assertErrorContaining(ctx, "and.captureRecord");
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

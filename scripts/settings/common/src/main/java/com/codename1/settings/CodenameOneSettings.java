@@ -2293,9 +2293,16 @@ public class CodenameOneSettings extends Lifecycle {
                         at = nextMarker(source, markers[m], after);
                         continue;
                     }
-                    int open = source.indexOf('(', at);
-                    if (open < 0) {
-                        break;
+                    // The annotation's OWN argument list, not the next one in
+                    // the file. Parentheses are optional -- a bare `@Ios` is
+                    // legal -- and searching forward then adopted whatever call
+                    // came next, so `@Ios` above a `configure(teamId = "...")`
+                    // read as owning ios.teamId and Settings withheld controls
+                    // for a hint the processor never emits.
+                    int open = nextLiveChar(source, after);
+                    if (open < 0 || source.charAt(open) != '(') {
+                        at = nextMarker(source, markers[m], after);
+                        continue;
                     }
                     String args = balancedArgs(source, open);
                     if (args != null && declaresAttribute(args, h.attr())) {
@@ -2377,7 +2384,29 @@ public class CodenameOneSettings extends Lifecycle {
                 || (c >= '0' && c <= '9') || c == '_' || c == '$';
     }
 
-    /// The next occurrence of `marker` that is real code, or -1.
+    /// The index of the next character that is neither whitespace nor part of a
+    /// comment, starting at `from`; -1 when the source ends first.
+    static int nextLiveChar(String source, int from) {
+        int i = from;
+        while (i < source.length()) {
+            char c = source.charAt(i);
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') {
+                i++;
+                continue;
+            }
+            if (c == '/') {
+                int skipped = skipNonCode(source, i);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    /// The next occurrence of `marker` that is real code, or -1.    /// The next occurrence of `marker` that is real code, or -1.
     ///
     /// Comments and string literals are stepped over with the same scanner the
     /// argument reader uses, so what counts as code is one answer rather than

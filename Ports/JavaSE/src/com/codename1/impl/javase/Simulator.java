@@ -501,6 +501,18 @@ public class Simulator {
                 }
             }
         }
+        String stampedFor = p.getProperty("cn1.buildHints.mainClass");
+        String expectedMain = configuredMainClass(projectDir);
+        if (stampedFor != null && expectedMain != null && !stampedFor.equals(expectedMain)) {
+            // Somebody else's configuration. codename1.mainName changing without a
+            // clean build leaves the old class and its manifest together in the
+            // output directory, and the timestamp check finds that pair perfectly
+            // consistent -- so without the stamp the simulator runs the previous
+            // application's hints. The native merge already refuses this.
+            System.err.println("Warning: " + f + " was generated for " + stampedFor
+                    + ", not " + expectedMain + ", so its build hints were NOT applied.");
+            return;
+        }
         File staleAgainst = classNewerThanManifest(p, f);
         if (staleAgainst != null) {
             // Nothing removes target/classes between builds, so a project that ran
@@ -541,6 +553,44 @@ public class Simulator {
     }
 
     /**
+     * The main class this project is configured to launch, or null.
+     *
+     * <p>Read from the settings file rather than from the system properties: the
+     * file is what the annotation processor stamped the manifest against, and a
+     * {@code -D} override is a launch choice rather than a change of identity.</p>
+     */
+    private static String configuredMainClass(File projectDir) {
+        File settings = new File(projectDir, "codenameone_settings.properties");
+        if (!settings.isFile()) {
+            return null;
+        }
+        java.util.Properties p = new java.util.Properties();
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(settings);
+            p.load(in);
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // read-only stream; nothing useful to do
+                }
+            }
+        }
+        String main = p.getProperty("codename1.mainName");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String pkg = p.getProperty("codename1.packageName");
+        return (pkg == null || pkg.trim().length() == 0)
+                ? main.trim() : pkg.trim() + "." + main.trim();
+    }
+
+    /**
+     * The emitted build hint manifest, or null when there is none.    /**
      * The emitted build hint manifest, or null when there is none.
      *
      * <p>{@code target/classes} is only the default: a module may configure

@@ -14,13 +14,13 @@
 |string
 |_(none)_
 |_(none)_
-|
+|Override alias of `android.captureRecord`, read after it and winning when set.
 
 |and.facebook_permissions
 |string
 |_(none)_
 |_(none)_
-|
+|Override alias of `android.facebook_permissions`, read after it and winning when set. `IPhoneBuilder` also falls back to it when `ios.facebook_permissions` is unset.
 
 |and.themeMode
 |`auto`, `modern`, `hololight`, `legacy`
