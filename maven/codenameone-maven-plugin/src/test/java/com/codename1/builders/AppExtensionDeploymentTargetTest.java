@@ -1339,4 +1339,27 @@ public class AppExtensionDeploymentTargetTest {
         settings.remove("EXTENSION_ID");
         assertTrue(IPhoneBuilder.identifierBelongsToApp(plist, "com.example.app", settings));
     }
+
+    @Test
+    public void aReferencedDeviceFamilyIsResolvedBeforeNarrowing() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_FAMILIES", "1");
+        settings.put("TARGETED_DEVICE_FAMILY", "$(EXTENSION_FAMILIES)");
+
+        // Unresolved, the expression matches none of the host's numeric families, so narrowing
+        // read it as sharing nothing and handed back the host's -- silently broadening an
+        // intentionally iPhone-only extension inside a universal app.
+        String resolved = IPhoneBuilder.resolveSettingsFully(
+                settings.get("TARGETED_DEVICE_FAMILY"), settings);
+        assertEquals("1", resolved);
+        assertEquals("1", IPhoneBuilder.narrowDeviceFamily(resolved, "1,2"));
+
+        // And that is what the unresolved form would have done.
+        assertEquals("1,2", IPhoneBuilder.narrowDeviceFamily("$(EXTENSION_FAMILIES)", "1,2"));
+
+        // A reference this build cannot resolve is left as written rather than guessed at.
+        settings.remove("EXTENSION_FAMILIES");
+        assertNull(IPhoneBuilder.resolveSettingsFully(settings.get("TARGETED_DEVICE_FAMILY"),
+                settings));
+    }
 }

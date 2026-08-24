@@ -32,6 +32,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
@@ -327,5 +328,35 @@ public class AppExtensionInfoPlistPathTest {
         // captures the identities first rather than reading them back here.
         String text = new String(Files.readAllBytes(shared.toPath()), "UTF-8");
         assertTrue(text, text.contains("<key>CFBundleIdentifier</key>"));
+    }
+
+    @Test
+    public void anExplicitSettingIsNotOverriddenByARejectedPlistLiteral() throws Exception {
+        File dist = tmp.newFolder("explicit-vs-plist");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "debug.plist"), identityPlist("com.example.app.FromPlist"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE[config\\=Debug] = WalletUIExtension/debug.plist\n"
+                + "PRODUCT_BUNDLE_IDENTIFIER = com.example.app.FromSettings\n");
+
+        java.util.Map<String, String> declared =
+                IPhoneBuilder.appExtensionBuildSettings(extension);
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", declared);
+
+        // The plist states an identifier for Debug...
+        java.util.Map<String, String> identifiers = IPhoneBuilder.appExtensionPlistIdentifiers(
+                extension, archive, "com.example.app");
+        assertEquals("com.example.app.FromPlist",
+                identifiers.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+
+        // ...but the archive states one for the target, which outranks it -- which is why
+        // stamping replaces that literal. Writing it back as a qualified setting would have Xcode
+        // build Debug under FromPlist while preflight, the profile check and the export options
+        // all used FromSettings.
+        assertNotNull(IPhoneBuilder.winningSetting(declared, "PRODUCT_BUNDLE_IDENTIFIER",
+                IPhoneBuilder.contextForCondition("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
+                        archive)));
     }
 }

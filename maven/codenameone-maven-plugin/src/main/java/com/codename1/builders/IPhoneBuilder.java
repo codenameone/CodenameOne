@@ -5075,6 +5075,18 @@ public class IPhoneBuilder extends Executor {
                                     : request.getPackageName() + "." + extensionName);
                             for (Map.Entry<String, String> perConfiguration
                                     : plistIdentifiers.entrySet()) {
+                                // Unless the archive states an identifier for that configuration
+                                // itself. buildSettings.properties is about the TARGET and outranks
+                                // the plist -- which is why stamping replaces a literal disagreeing
+                                // with it -- so restoring that same rejected literal as a qualified
+                                // setting would have Xcode build the configuration under one
+                                // identifier while preflight, the profile check and the export
+                                // options all used the explicit one.
+                                if (winningSetting(declaredSettings, "PRODUCT_BUNDLE_IDENTIFIER",
+                                        contextForCondition(perConfiguration.getKey(),
+                                                plistContext)) != null) {
+                                    continue;
+                                }
                                 buildSettingsMap.put(perConfiguration.getKey(),
                                         perConfiguration.getValue());
                             }
@@ -5158,11 +5170,23 @@ public class IPhoneBuilder extends Executor {
                                 for (String key : new ArrayList<String>(archiveOwnSettings.keySet())) {
                                     if ("TARGETED_DEVICE_FAMILY".equals(key)
                                             || isQualified(key, "TARGETED_DEVICE_FAMILY")) {
-                                        String narrowed = narrowDeviceFamily(
-                                                archiveOwnSettings.get(key), hostFamily);
-                                        if (!narrowed.equals(archiveOwnSettings.get(key))) {
+                                        // Resolved first: an unexpanded $(EXTENSION_FAMILIES)
+                                        // matches none of the host's numeric families, so narrowing
+                                        // read it as sharing nothing and replaced it with the host's
+                                        // -- silently broadening an intentionally iPhone-only
+                                        // extension inside a universal app. A reference this build
+                                        // cannot resolve is left exactly as written, as everywhere
+                                        // else here: Xcode resolves it, and we do not get to guess.
+                                        String declaredFamily = resolveSettingsFully(
+                                                archiveOwnSettings.get(key), archiveOwnSettings);
+                                        if (declaredFamily == null) {
+                                            continue;
+                                        }
+                                        String narrowed = narrowDeviceFamily(declaredFamily,
+                                                hostFamily);
+                                        if (!narrowed.equals(declaredFamily)) {
                                             debug("The " + extensionName + " app extension asks for "
-                                                    + key + " = " + archiveOwnSettings.get(key)
+                                                    + key + " = " + declaredFamily
                                                     + ", which this app does not support; narrowed to "
                                                     + narrowed + ".");
                                         }
