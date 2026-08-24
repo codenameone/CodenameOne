@@ -130,9 +130,18 @@ public class AndroidNearbyBackend implements NearbyBridge {
 
     public AndroidNearbyBackend(Activity activity) {
         this.initialActivity = new WeakReference<Activity>(activity);
-        Context app = activity == null ? null : activity
-                .getApplicationContext();
-        this.appContext = app != null ? app : activity;
+        // Not from the activity alone. The bridge can be built while the
+        // port holds a SERVICE context and no activity at all -- which is
+        // exactly the case companion presence creates -- and deriving the
+        // application context only from the activity stored null there for
+        // the life of the process: the optional backends were constructed
+        // with nothing, companion support reported itself unavailable, and
+        // a later activity change only rewires the chooser and never went
+        // back to repair it.
+        Context seed = activity != null ? (Context) activity
+                : AndroidImplementation.getContext();
+        Context app = seed == null ? null : seed.getApplicationContext();
+        this.appContext = app != null ? app : seed;
         this.ranging = load("com.codename1.impl.android.nearby."
                 + "AndroidUwbRanging");
         this.transport = load("com.codename1.impl.android.nearby."

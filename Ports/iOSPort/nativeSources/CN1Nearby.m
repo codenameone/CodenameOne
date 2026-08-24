@@ -1030,7 +1030,14 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         if (outstanding == nil || [outstanding count] == 0) {
             return NO;
         }
-        NSUInteger at = [outstanding count] - 1;
+        // The OLDEST outstanding send, for an acknowledgement that names
+        // only a payload. Taking the newest let a late ack for an early
+        // send consume the record of a send made moments ago, and the early
+        // send's own timer then failed a payload that had arrived while the
+        // later send's acknowledgement was dropped as unknown. Reliable
+        // sends are delivered in order, so the oldest record is the one an
+        // ack belongs to.
+        NSUInteger at = 0;
         if (token != 0) {
             at = NSNotFound;
             for (NSUInteger i = 0; i < [outstanding count]; i++) {
