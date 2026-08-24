@@ -405,7 +405,8 @@ echo "Port status sweep: published ${published} report(s), ${skipped} already cu
 stale_days="$(jq -r '.stale_after_days' "${MANIFEST}")"
 problems=()
 published_dir="${tmp_dir}/published"
-mkdir -p "${published_dir}"
+contracts_dir="${tmp_dir}/contracts"
+mkdir -p "${published_dir}" "${contracts_dir}"
 while IFS= read -r port; do
   if ! gh api "repos/${GITHUB_REPOSITORY}/contents/ports/${port}.json?ref=${DATA_BRANCH}" \
       --jq '.content' 2>/dev/null | decode_base64 > "${tmp_dir}/check.json" 2>/dev/null; then
@@ -413,6 +414,19 @@ while IFS= read -r port; do
     continue
   fi
   cp "${tmp_dir}/check.json" "${published_dir}/${port}.json"
+  # The contract this report's own run was built against. Comparing reports to
+  # each other cannot see a test missing from ALL of them -- there is no older
+  # report left to prove it existed -- and a test nothing runs anywhere is the
+  # worst version of what this gate is for. Reading the manifest at the report's
+  # commit answers it directly: a run whose own contract listed the test has no
+  # excuse for reporting nothing. A fetch that fails simply leaves the port out,
+  # which keeps the weaker comparison rather than inventing an obligation.
+  report_commit="$(jq -r '.commit // empty' "${tmp_dir}/check.json" 2>/dev/null || true)"
+  if [ -n "${report_commit}" ]; then
+    gh api "repos/${GITHUB_REPOSITORY}/contents/docs/website/data/port_status.json?ref=${report_commit}" \
+        --jq '.content' 2>/dev/null | decode_base64 > "${contracts_dir}/${port}.json" 2>/dev/null \
+        || rm -f "${contracts_dir}/${port}.json"
+  fi
   # Freshness alone is not enough: a published report the website rejects
   # leaves the column on its checked-in fallback, which is the state this
   # sweep exists to detect.
@@ -488,4 +502,5 @@ echo "Every port in the contract has a report inside the ${stale_days}-day windo
 # writes in a pull request can reach it. A registered test runs on every port,
 # and the only permitted exception is a skip the suite itself emits with an
 # erratum explaining it.
-python3 "${SCRIPT_DIR}/port_status.py" coverage --reports "${published_dir}"
+python3 "${SCRIPT_DIR}/port_status.py" coverage \
+  --reports "${published_dir}" --contracts "${contracts_dir}"

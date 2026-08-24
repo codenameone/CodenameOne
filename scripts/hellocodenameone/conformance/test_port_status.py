@@ -573,6 +573,59 @@ class PortStatusTest(unittest.TestCase):
             problems,
         )
 
+    def test_coverage_catches_a_test_absent_from_every_report(self):
+        # Comparing reports to each other cannot see this: with the test missing everywhere,
+        # there is no older report left to prove it existed, so every port is excused and the
+        # gate prints success over a test nothing runs anywhere -- the worst version of the
+        # failure this gate is for. Each report's own contract answers it directly.
+        reports = self.stored_reports()
+        victim = "CryptoApiTest"
+        for report in reports.values():
+            report["tests"].pop(victim, None)
+        self.assertEqual([], port_status.coverage_problems(self.manifest, reports))
+
+        contract = set(port_status.test_to_feature(self.manifest))
+        problems = port_status.coverage_problems(
+            self.manifest, reports, {port: contract for port in reports}
+        )
+        self.assertEqual(len(reports), len(problems), problems)
+        self.assertTrue(all(victim in problem for problem in problems), problems)
+
+    def test_coverage_tolerates_a_report_whose_own_contract_predates_the_test(self):
+        # The state every port is in for a few hours after a test is registered, and the one
+        # this must never fail: the run happened against a manifest that did not define the
+        # test, so there was nothing to report.
+        reports = self.stored_reports()
+        victim = "CryptoApiTest"
+        for report in reports.values():
+            report["tests"].pop(victim, None)
+        # Each port's own contract is exactly what its run reported, which is what "the run
+        # predates the test" means. Handing every port the CURRENT contract minus one test
+        # would instead accuse the five Apple ports of dropping LogSubclassCaptureTest, which
+        # their reports really do predate -- and the gate would be right to say so.
+        self.assertEqual(
+            [],
+            port_status.coverage_problems(
+                self.manifest,
+                reports,
+                {port: set(report["tests"]) for port, report in reports.items()},
+            ),
+        )
+
+    def test_coverage_leaves_a_port_alone_when_its_contract_is_unknown(self):
+        # A manifest the sweep could not fetch proves nothing, so that port keeps the weaker
+        # report-to-report comparison rather than being excused or accused.
+        reports = self.stored_reports()
+        victim = "CryptoApiTest"
+        for report in reports.values():
+            report["tests"].pop(victim, None)
+        contract = set(port_status.test_to_feature(self.manifest))
+        problems = port_status.coverage_problems(
+            self.manifest, reports, {"android": contract}
+        )
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("android", problems[0])
+
     def test_coverage_accepts_a_report_older_than_the_test(self):
         # The state every port is in between the commit that registers a test and that port's
         # next master run. Failing here would put the old ritual straight back: the only way to

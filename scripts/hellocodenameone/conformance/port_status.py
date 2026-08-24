@@ -462,7 +462,11 @@ def skip_is_documented(supplement: dict, port_id: str, test: str, reasons: list)
     return False
 
 
-def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
+def coverage_problems(
+    manifest: dict,
+    reports: dict[str, dict],
+    contracts: dict[str, set[str]] | None = None,
+) -> list[str]:
     """Hold the *published* reports to "every registered test runs on every port".
 
     This is the gate that used to live, badly, in the checked-in snapshots. Two
@@ -477,6 +481,14 @@ def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
     happened earlier already knew about it, so a later run that does not is a
     test the port has dropped rather than one it has not reached. No history
     lookup and no grace period to tune; the reports date themselves.
+
+    That comparison is blind to a test missing from *every* report, because then
+    no report is the older one that proves it existed -- and a test nothing runs
+    anywhere is the worst version of the failure this gate is for, not a
+    tolerable one. ``contracts`` closes it: the set of tests each report's own
+    commit defined, which the caller reads at that commit. A report whose
+    contract already listed the test has no excuse for omitting it, whatever the
+    other ports did. Offline callers pass None and keep the weaker comparison.
 
     A ``skip`` is the one permitted exception, and only with an erratum that
     accounts for the reason the run actually gave. Reading skips out of the
@@ -541,9 +553,11 @@ def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
         if stamp is None:
             problems.append(f"{port}: report has no usable generated_at")
             continue
+        own_contract = (contracts or {}).get(port)
+        absent = set(mapped) - set(tests)
         dropped = sorted(
             name
-            for name in set(mapped) - set(tests)
+            for name in absent
             if name in known_since and known_since[name] < stamp
         )
         if dropped:
@@ -552,6 +566,13 @@ def coverage_problems(manifest: dict, reports: dict[str, dict]) -> list[str]:
                 + ", ".join(dropped)
                 + ", which an earlier run on another port already covered"
             )
+        if own_contract is not None:
+            unreported = sorted(name for name in absent - set(dropped) if name in own_contract)
+            if unreported:
+                problems.append(
+                    f"{port}: ran at {report.get('commit') or 'an unknown commit'}, which "
+                    "defines " + ", ".join(unreported) + ", and reported nothing for them"
+                )
     return problems
 
 
@@ -1289,6 +1310,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="directory of published <port>.json reports",
     )
+    coverage_parser.add_argument(
+        "--contracts",
+        type=Path,
+        help=(
+            "directory of <port>.json manifests read at each report's own commit; "
+            "omit when they cannot be fetched"
+        ),
+    )
 
     provenance_parser = subparsers.add_parser(
         "provenance",
@@ -1369,7 +1398,21 @@ def main() -> int:
                     print(f"port-status: no published report for {port_id}", file=sys.stderr)
                     return 1
                 reports[port_id] = read_json(path)
-            problems = coverage_problems(manifest, reports)
+            contracts = None
+            if args.contracts is not None:
+                contracts = {}
+                for port_id in reports:
+                    path = args.contracts / f"{port_id}.json"
+                    if not path.is_file():
+                        continue
+                    try:
+                        contracts[port_id] = set(test_to_feature(read_json(path)))
+                    except ContractError:
+                        # A manifest we cannot read proves nothing. Leaving the
+                        # port out keeps the weaker comparison rather than
+                        # inventing an obligation or excusing one.
+                        continue
+            problems = coverage_problems(manifest, reports, contracts)
             for problem in problems:
                 print(f"port-status coverage: {problem}", file=sys.stderr)
             if problems:
