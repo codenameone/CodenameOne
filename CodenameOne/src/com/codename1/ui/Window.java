@@ -1068,10 +1068,24 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `resizable`: true to allow resizing
-    public void setResizable(boolean resizable) {
+    public void setResizable(final boolean resizable) {
         this.resizable = resizable;
         if (nativePeer != null) {
-            manager().setResizable(nativePeer, resizable);
+            // The field is set above on the calling thread so a getter stays
+            // consistent, but the SPI call is marshalled: the ports resolve the peer to
+            // a slot on whatever thread calls them, which races an EDT disposal.
+            if (Display.getInstance().isEdt()) {
+                manager().setResizable(nativePeer, resizable);
+            } else {
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (nativePeer != null) {
+                            manager().setResizable(nativePeer, resizable);
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -1113,10 +1127,24 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `alwaysOnTop`: true to float the window
-    public void setAlwaysOnTop(boolean alwaysOnTop) {
+    public void setAlwaysOnTop(final boolean alwaysOnTop) {
         this.alwaysOnTop = alwaysOnTop;
         if (nativePeer != null) {
-            manager().setAlwaysOnTop(nativePeer, alwaysOnTop);
+            // The field is set above on the calling thread so a getter stays
+            // consistent, but the SPI call is marshalled: the ports resolve the peer to
+            // a slot on whatever thread calls them, which races an EDT disposal.
+            if (Display.getInstance().isEdt()) {
+                manager().setAlwaysOnTop(nativePeer, alwaysOnTop);
+            } else {
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (nativePeer != null) {
+                            manager().setAlwaysOnTop(nativePeer, alwaysOnTop);
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -1390,6 +1418,21 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Minimizes this window.
     public void minimize() {
+        // Marshalled like show(), hide() and dispose(). The window manager SPI is
+        // defined on the event dispatch thread, and the ports take it literally: the
+        // Windows one resolves the peer to a slot index on the calling thread and hands
+        // that index to the native layer, so a call from a background thread can read a
+        // slot an EDT disposal is tearing down. The developer guide also promises this
+        // is marshalled for the caller.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    minimize();
+                }
+            });
+            return;
+        }
         if (nativePeer != null) {
             manager().minimize(nativePeer);
         }
@@ -1489,6 +1532,21 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Toggles this window between maximized and its previous size.
     public void toggleMaximize() {
+        // Marshalled like show(), hide() and dispose(). The window manager SPI is
+        // defined on the event dispatch thread, and the ports take it literally: the
+        // Windows one resolves the peer to a slot index on the calling thread and hands
+        // that index to the native layer, so a call from a background thread can read a
+        // slot an EDT disposal is tearing down. The developer guide also promises this
+        // is marshalled for the caller.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    toggleMaximize();
+                }
+            });
+            return;
+        }
         if (nativePeer != null) {
             manager().toggleMaximize(nativePeer);
         }
@@ -1496,6 +1554,21 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Raises this window and gives it keyboard focus.
     public void requestWindowFocus() {
+        // Marshalled like show(), hide() and dispose(). The window manager SPI is
+        // defined on the event dispatch thread, and the ports take it literally: the
+        // Windows one resolves the peer to a slot index on the calling thread and hands
+        // that index to the native layer, so a call from a background thread can read a
+        // slot an EDT disposal is tearing down. The developer guide also promises this
+        // is marshalled for the caller.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    requestWindowFocus();
+                }
+            });
+            return;
+        }
         if (nativePeer != null) {
             manager().requestFocus(nativePeer);
         }

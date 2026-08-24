@@ -535,8 +535,41 @@ public class TestWindowManager extends WindowManager {
     public void setIcon(Object peer, Image icon) {
     }
 
+    /// Names of window-manager calls that arrived on a thread other than the event
+    /// dispatch thread.
+    ///
+    /// The SPI is defined on the EDT and the ports take that literally -- the Windows
+    /// one resolves a peer to a slot index on whatever thread calls it -- so "which
+    /// thread called this" is the property worth asserting, not whether the call
+    /// eventually happened.
+    private final java.util.List<String> offEdtCalls =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
+
+    /// Window-manager calls seen on a background thread, in order.
+    public java.util.List<String> getOffEdtCalls() {
+        return new java.util.ArrayList<String>(offEdtCalls);
+    }
+
+    private void recordThread(String call) {
+        if (!com.codename1.ui.Display.getInstance().isEdt()) {
+            offEdtCalls.add(call);
+        }
+    }
+
+    @Override
+    public void minimize(Object peer) {
+        recordThread("minimize");
+    }
+
+    @Override
+    public void toggleMaximize(Object peer) {
+        recordThread("toggleMaximize");
+    }
+
+
     @Override
     public void requestFocus(Object peer) {
+        recordThread("requestFocus");
         FakeWindow w = win(peer);
         if (w != null) {
             w.focusRequested = true;

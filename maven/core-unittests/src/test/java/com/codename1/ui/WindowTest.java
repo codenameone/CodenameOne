@@ -4324,6 +4324,40 @@ class WindowTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void windowControlsCalledOffTheEdtReachThePortOnIt() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("controls", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // The window manager SPI is defined on the event dispatch thread, and the
+            // ports take that literally: the Windows one resolves the peer to a slot
+            // index on whatever thread calls it and hands that index to the native
+            // layer, so a background caller can read a slot an EDT disposal is tearing
+            // down. What matters is therefore which thread the call arrives on.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.minimize();
+                    w.toggleMaximize();
+                    w.requestWindowFocus();
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Collections.emptyList(), wm.getOffEdtCalls(),
+                    "every window control has to reach the port on the event dispatch "
+                            + "thread, however it was called");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
     /// Counts pointer drags reaching a component.
     private static final class DragCountingComponent extends Component {
         private int drags;
