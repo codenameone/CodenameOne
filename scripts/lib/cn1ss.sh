@@ -361,6 +361,50 @@ print(sum(1 for r in results if isinstance(r, dict) and r.get("status") in ("equ
 PY
 }
 
+# Goldens whose owning test reported a skip this port's errata explain.
+#
+# The count guard below treats an unproduced golden as evidence that a test hung,
+# crashed or never delivered its frame -- which it is, when nothing else was
+# said. A test that prints "status=SKIPPED reason=..." said something, and
+# port_status.py checks that reason against port_status_supplement.json for THIS
+# port before agreeing. Silence still counts as missing; so does an unexplained
+# skip, and so does a reason code written about a different port.
+#
+# Without this the skip path some tests deliberately take could never succeed on
+# a port that owns a golden: GoogleWebMapScreenshotTest skips when the Google
+# Maps tiles never load -- documented for android, ios-gl and ios-metal, and
+# rendered as a documented skip on the public table -- and the guard failed the
+# whole job on the uncovered golden anyway.
+cn1ss_count_documented_skips() {
+  local ref_dir="$1"
+  local script_dir repo_root status_script python_bin
+  if [ -z "${CN1SS_PORT_ID:-}" ] || [ -z "$ref_dir" ] || [ ! -d "$ref_dir" ]; then
+    echo 0
+    return
+  fi
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  repo_root="$(cd "$script_dir/../.." && pwd)"
+  status_script="$repo_root/scripts/hellocodenameone/conformance/port_status.py"
+  python_bin="${CN1SS_PYTHON_BIN:-python3}"
+  if [ ! -f "$status_script" ] || ! command -v "$python_bin" >/dev/null 2>&1; then
+    echo 0
+    return
+  fi
+  local -a args=("$status_script" documented-skips --port "$CN1SS_PORT_ID" --reference "$ref_dir")
+  local log_var log_path
+  for log_var in CN1SS_SUITE_LOG CN1SS_SUITE_LOG_2 CN1SS_SUITE_LOG_3; do
+    log_path="${!log_var:-}"
+    if [ -n "$log_path" ] && [ -f "$log_path" ]; then
+      args+=(--log "$log_path")
+    fi
+  done
+  local count
+  # A failure here must not excuse anything: no answer means no discount.
+  count="$("$python_bin" "${args[@]}" 2>/dev/null || echo 0)"
+  count="${count//[^0-9]/}"
+  echo "${count:-0}"
+}
+
 # Count "missing_expected" results: a screenshot the suite captured and delivered
 # but which has NO committed golden under the reference directory. This is the
 # signal that a test ran for real yet its reference was never integrated -- the
@@ -621,6 +665,13 @@ cn1ss_process_and_report() {
       allowed_missing="${allowed_missing//[^0-9]/}"; : "${allowed_missing:=0}"
       uncovered_count=$(( expected_count - covered_count ))
       [ "$uncovered_count" -lt 0 ] && uncovered_count=0
+      local documented_skips
+      documented_skips=$(cn1ss_count_documented_skips "$ref_dir")
+      if [ "$documented_skips" -gt 0 ]; then
+        cn1ss_log "$documented_skips golden(s) accounted for by a skip this port's errata explain (see the lines above)."
+        uncovered_count=$(( uncovered_count - documented_skips ))
+        [ "$uncovered_count" -lt 0 ] && uncovered_count=0
+      fi
       if [ "$uncovered_count" -gt "$allowed_missing" ]; then
         cn1ss_log "FATAL: $uncovered_count of $expected_count expected screenshot(s) were not produced and compared (only $covered_count covered); $allowed_missing tolerated (CN1SS_ALLOWED_MISSING)."
         cn1ss_log "       A test failed to emit its screenshot, or the suite hung/crashed before finishing. The golden set under the comparison directory is the source of truth for how many screenshots must be produced."

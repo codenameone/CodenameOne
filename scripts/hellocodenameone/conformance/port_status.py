@@ -691,6 +691,56 @@ def provenance_problems(
     ]
 
 
+def documented_skip_goldens(
+    manifest: dict, port_id: str, logs: list[Path], reference: Path
+) -> tuple[list[str], list[str]]:
+    """Golden names whose test reported a documented skip, and why.
+
+    The screenshot count guard fails a run when a golden is not re-produced,
+    because a test that hangs or crashes leaves no per-test record and the
+    missing file is the only evidence there is. A test that prints
+    ``status=SKIPPED reason=...`` is the opposite of that: it left a record, and
+    the errata already say the reason is expected on this port. GoogleWebMap
+    skips on android and both iOS renderers when the Google Maps tiles never
+    load, which is a network the run cannot reach rather than anything about the
+    port -- and the guard failed the whole job over it anyway, so that skip path
+    could never actually succeed on a port that owns a golden.
+
+    Only a skip that is *documented for this port* counts. Silence still fails,
+    an unexplained skip still fails, and a reason code written about another
+    port still fails, which is what keeps this from being a hole.
+    """
+    supplement = read_json(SUPPLEMENT)
+    skipped: dict[str, list[str]] = {}
+    for path in logs:
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            match = SKIP_RE.search(line)
+            if not match:
+                continue
+            name, reason = match.group(1), match.group(2)
+            owner = name if name in test_to_feature(manifest) else screenshot_test(manifest, name)
+            if owner:
+                skipped.setdefault(owner, []).append(reason or "")
+
+    accounted: list[str] = []
+    notes: list[str] = []
+    if not reference.is_dir():
+        return accounted, notes
+    for golden in sorted(reference.glob("*.png")):
+        owner = screenshot_test(manifest, golden.stem)
+        if owner is None or owner not in skipped:
+            continue
+        reasons = [reason for reason in skipped[owner] if reason]
+        if skip_is_documented(supplement, port_id, owner, reasons):
+            accounted.append(golden.stem)
+            notes.append(f"{golden.stem}: {owner} skipped ({', '.join(reasons)})")
+    return accounted, notes
+
+
 def add_reason(entry: dict, reason: str) -> None:
     reasons = entry.setdefault("reasons", [])
     if reason and reason not in reasons:
@@ -1234,6 +1284,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    skips_parser = subparsers.add_parser(
+        "documented-skips",
+        help="goldens whose test reported a skip this port's errata explain",
+    )
+    skips_parser.add_argument("--port", required=True)
+    skips_parser.add_argument("--log", action="append", type=Path, default=[])
+    skips_parser.add_argument("--reference", required=True, type=Path)
+
     normalize_parser = subparsers.add_parser("normalize", help="write a normalized port report")
     normalize_parser.add_argument("--port", required=True)
     normalize_parser.add_argument("--log", action="append", type=Path, default=[])
@@ -1267,6 +1325,14 @@ def main() -> int:
                 # a newly registered test on its next master run, and the page
                 # shows the gap as "not run" until it does.
                 print(f"port-status: checked-in snapshot {item}")
+            return 0
+        if args.command == "documented-skips":
+            accounted, notes = documented_skip_goldens(
+                manifest, args.port, args.log, args.reference
+            )
+            for note in notes:
+                print(f"port-status: documented skip accounts for {note}", file=sys.stderr)
+            print(len(accounted))
             return 0
         if args.command == "coverage":
             reports = {}

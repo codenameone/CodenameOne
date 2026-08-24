@@ -467,6 +467,61 @@ class PortStatusTest(unittest.TestCase):
             port_status.skip_is_documented(supplement, "android", "CameraApiTest", ["anything"])
         )
 
+    def documented_skip_count(self, port, marker, reference):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "suite.log"
+            log.write_text(marker, encoding="utf-8")
+            accounted, _ = port_status.documented_skip_goldens(
+                self.manifest, port, [log], port_status.REPO_ROOT / reference
+            )
+        return accounted
+
+    def test_a_documented_skip_accounts_for_its_golden(self):
+        # The screenshot count guard reads an unproduced golden as a test that hung, crashed or
+        # never delivered its frame -- which it is, when nothing else was said. A test that
+        # prints status=SKIPPED said something. GoogleWebMap takes that path when the Maps tiles
+        # never load, the errata document it on android, and the guard failed the whole job on
+        # the uncovered golden anyway -- so the skip path could never succeed on a port that
+        # owns a golden.
+        self.assertEqual(
+            ["GoogleWebMap"],
+            self.documented_skip_count(
+                "android",
+                "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=map-tiles-never-loaded\n",
+                "scripts/android/screenshots",
+            ),
+        )
+
+    def test_silence_accounts_for_nothing(self):
+        # The case the guard exists for, and the one this must not soften: a test that hangs or
+        # crashes leaves no record, and the missing golden is the only evidence there is.
+        self.assertEqual(
+            [], self.documented_skip_count("android", "", "scripts/android/screenshots")
+        )
+
+    def test_an_undocumented_skip_accounts_for_nothing(self):
+        self.assertEqual(
+            [],
+            self.documented_skip_count(
+                "android",
+                "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=something-nobody-wrote-down\n",
+                "scripts/android/screenshots",
+            ),
+        )
+
+    def test_a_skip_documented_for_another_port_accounts_for_nothing(self):
+        # map-tiles-never-loaded is written about android and the two iOS renderers. The same
+        # reason arriving from Linux, where the errata expect no-api-key instead, is a port
+        # behaving unexpectedly rather than a network nobody can reach.
+        self.assertEqual(
+            [],
+            self.documented_skip_count(
+                "linux-x64",
+                "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=map-tiles-never-loaded\n",
+                "scripts/linux/screenshots",
+            ),
+        )
+
     def test_coverage_rejects_a_skip_carrying_no_reason(self):
         # An erratum with reason codes documents the reasons it lists, not the test. A skip
         # that names none matches nothing, which is what the page already decides.
