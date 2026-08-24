@@ -539,6 +539,16 @@ public class BuildHintAnnotationProcessorTest {
         return BuildHintAnnotationProcessor.sourceDigest(index.values().iterator().next());
     }
 
+    /// An element may legally be empty -- a newline-delimited value that starts
+    /// with a newline is {"", "..."} -- and joining on "what has been written so
+    /// far" skipped the separator after it, silently dropping the leading
+    /// newline from the hint the builder receives.
+    @Test
+    public void anEmptyListElementStillGetsItsSeparator() throws Exception {
+        Properties p = hintsOf("@Android(xgradle = {\"\", \"apply plugin: 'x'\"})");
+        assertEquals("\napply plugin: 'x'", p.getProperty("codename1.arg.android.xgradle"));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

@@ -708,4 +708,16 @@ public class BuildHintCatalogTest {
         assertFalse(CodenameOneSettings.importsAnnotation(
                 "// import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
     }
+
+    /// `package /* generated */ com.example;` is legal. Taking the remainder of
+    /// the text and trimming it started the name at the comment, so the real main
+    /// source was rejected by both the conventional lookup and the fallback.
+    @Test
+    public void aCommentBetweenPackageAndItsNameIsSkipped() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package /* generated */ com.example;\npublic class MyApp {}\n",
+                "MyApp", "com.example", false));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package\n    com.example\nclass MyApp\n", "MyApp", "com.example", true));
+    }
 }

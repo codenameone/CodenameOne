@@ -852,12 +852,18 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                         + "together.");
                 return null;
             }
+            // By POSITION, not by what has been written. An element may legally be
+            // empty -- a newline-delimited android.xgradle whose value starts with
+            // a newline migrates to {"", "..."} -- and testing sb.length() then
+            // skipped the separator after it, silently dropping the leading
+            // newline from the hint the builder receives.
             StringBuilder sb = new StringBuilder();
-            for (Object item : (List<?>) raw) {
-                if (sb.length() > 0) {
+            List<?> items = (List<?>) raw;
+            for (int i = 0; i < items.size(); i++) {
+                if (i > 0) {
                     sb.append(separator);
                 }
-                String itemValue = wireValue(cls, descriptor, member, item, hint, ctx);
+                String itemValue = wireValue(cls, descriptor, member, items.get(i), hint, ctx);
                 if (itemValue == null) {
                     return null;
                 }

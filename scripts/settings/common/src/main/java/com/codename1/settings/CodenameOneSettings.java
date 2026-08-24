@@ -616,6 +616,20 @@ public class CodenameOneSettings extends Lifecycle {
                 ToastBar.showErrorMessage("Enter a build hint name.");
                 return;
             }
+            // The same ownership rule as the catalog rows. Withholding the row's
+            // controls and leaving this form open is no protection at all: typing
+            // ios.teamId here -- or any alias of it -- writes exactly the second
+            // declaration the row was hiding, and the next build refuses the
+            // project. Canonical, so an alias of an annotation-owned hint is
+            // caught too.
+            String ownedBy = annotationOwnedHints.get(
+                    com.codename1.build.shared.BuildHints.canonicalName(k));
+            if (ownedBy != null) {
+                ToastBar.showErrorMessage(k + " is set by " + ownedBy
+                        + " on the main class. Change it there -- declaring it here as well "
+                        + "fails the build.");
+                return;
+            }
             settings.setBuildHint(k, value.getText() == null ? "" : value.getText());
             key.setText("");
             value.setText("");
@@ -2336,16 +2350,19 @@ public class CodenameOneSettings extends Lifecycle {
             int after = pkgAt + "package".length();
             if (after < text.length() && !continuesAName(text.charAt(after))
                     && (pkgAt == 0 || !continuesAName(text.charAt(pkgAt - 1)))) {
-                String rest = text.substring(after).trim();
-                int cut = rest.length();
-                for (int i = 0; i < rest.length(); i++) {
-                    char c = rest.charAt(i);
-                    if (c == ';' || c == '\n' || c == '\r') {
-                        cut = i;
-                        break;
-                    }
+                // Live tokens, as the processor-side helper reads it.
+                // `package /* generated */ com.example;` is legal, and taking the
+                // remainder of the text and trimming it started the name at the
+                // comment -- so the real main source was rejected by both the
+                // conventional lookup and the fallback search.
+                int i = nextLiveChar(text, after, kotlin);
+                StringBuilder name = new StringBuilder();
+                while (i >= 0 && i < text.length()
+                        && (continuesAName(text.charAt(i)) || text.charAt(i) == '.')) {
+                    name.append(text.charAt(i));
+                    i++;
                 }
-                declaredPkg = rest.substring(0, cut).trim();
+                declaredPkg = name.toString();
                 break;
             }
             pkgAt = nextMarker(text, "package", after, kotlin);
