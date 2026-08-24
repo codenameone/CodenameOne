@@ -116,6 +116,14 @@ public class LocalNearbyBridge implements NearbyBridge {
     /// connections the real ports refuse -- which is exactly the topology bug
     /// a simulator exists to surface rather than hide.
     private final List<String> connecting = new ArrayList<String>();
+    /// Endpoints accepted but not yet confirmed connected.
+    ///
+    /// The inbound counterpart of `connecting`. An accepted endpoint goes
+    /// into `connected` straight away, so a stop or a disconnect before its
+    /// confirmation hop reported it as DISCONNECTED -- a connection the app
+    /// had never been told it had -- while the accept's documented outcome,
+    /// connected or connectionFailed, never arrived at all.
+    private final List<String> accepting = new ArrayList<String>();
     /// The topology each half was started with, as a TransportStrategy
     /// ordinal. CLUSTER is the default, which is also what a caller that
     /// passed no strategy is given.
@@ -706,6 +714,9 @@ public class LocalNearbyBridge implements NearbyBridge {
         if (!connected.contains(endpointId)) {
             connected.add(endpointId);
         }
+        if (!accepting.contains(endpointId)) {
+            accepting.add(endpointId);
+        }
         answerOk(requestId);
         // The lifecycle event, which on a real platform arrives from the
         // connection callback and here had no other source. accept()
@@ -716,6 +727,7 @@ public class LocalNearbyBridge implements NearbyBridge {
         answer(new Runnable() {
             @Override
             public void run() {
+                accepting.remove(accepted);
                 SimEndpoint e = findEndpoint(accepted);
                 if (e != null && connected.contains(accepted)) {
                     NearbyTransport.deliverConnectionResult(e.encode(), true,
@@ -728,6 +740,7 @@ public class LocalNearbyBridge implements NearbyBridge {
     @Override
     public void rejectConnection(String endpointId) {
         connected.remove(endpointId);
+        accepting.remove(endpointId);
         if (endpointId != null && !rejected.contains(endpointId)) {
             rejected.add(endpointId);
         }
@@ -836,9 +849,20 @@ public class LocalNearbyBridge implements NearbyBridge {
     public void disconnect(String endpointId) {
         if (connected.remove(endpointId)) {
             SimEndpoint e = findEndpoint(endpointId);
-            if (e != null) {
-                NearbyTransport.deliverDisconnected(e.encode());
+            if (e == null) {
+                accepting.remove(endpointId);
+                return;
             }
+            if (accepting.remove(endpointId)) {
+                // Accepted and dropped before its confirmation, for the
+                // reason the stop path gives.
+                NearbyTransport.deliverConnectionResult(e.encode(), false,
+                        NearbyError.SESSION_INVALIDATED.ordinal(),
+                        "the connection was disconnected before it"
+                        + " completed");
+                return;
+            }
+            NearbyTransport.deliverDisconnected(e.encode());
             return;
         }
         // Not connected YET. The acceptance is queued behind this call, and
@@ -886,12 +910,26 @@ public class LocalNearbyBridge implements NearbyBridge {
         cancelledPayloads.clear();
         pendingPayloads.clear();
         List<String> doomed = new ArrayList<String>(connected);
+        List<String> unconfirmed = new ArrayList<String>(accepting);
         connected.clear();
+        accepting.clear();
         for (String id : doomed) {
             SimEndpoint e = findEndpoint(id);
-            if (e != null) {
-                NearbyTransport.deliverDisconnected(e.encode());
+            if (e == null) {
+                continue;
             }
+            if (unconfirmed.contains(id)) {
+                // Accepted, never confirmed. The app was never told this was
+                // connected, so it is not told it disconnected either -- it
+                // is told the accept did not come off, which is the outcome
+                // accept() documents.
+                NearbyTransport.deliverConnectionResult(e.encode(), false,
+                        NearbyError.SESSION_INVALIDATED.ordinal(),
+                        "the transport was stopped before the connection"
+                        + " completed");
+                continue;
+            }
+            NearbyTransport.deliverDisconnected(e.encode());
         }
     }
 

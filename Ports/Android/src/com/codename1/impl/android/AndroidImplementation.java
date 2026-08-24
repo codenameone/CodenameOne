@@ -13508,7 +13508,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// bundled, so the public API reports NOT_SUPPORTED without this getter
     /// having to know how the app was built.
     @Override
-    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+    public synchronized com.codename1.nearby.spi.NearbyBridge
+            getNearbyBridge() {
+        // Synchronized, because two threads reaching nearby for the first
+        // time both saw null and both built a backend. Only one was kept,
+        // and the loser could already have prepared a UWB session or taken
+        // the companion chooser slot in state nothing could reach again --
+        // so a later start or stop could not find its session, and the radio
+        // it had opened stayed open.
         if (nearbyBridge == null) {
             nearbyBridge = new AndroidNearbyBridge(getActivity());
         }

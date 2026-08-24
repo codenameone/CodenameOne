@@ -161,13 +161,11 @@ public class AndroidNearbyBackend implements NearbyBridge {
         String[] rows = NearbyPresenceStore.takePersistedPresence(
                 appContext);
         for (int i = 0; i < rows.length; i++) {
-            int tab = rows[i].indexOf('\t');
-            if (tab <= 0) {
-                continue;
-            }
-            CompanionDevices.deliverPresenceChanged(
-                    rows[i].substring(tab + 1),
-                    "1".equals(rows[i].substring(0, tab)));
+            // Through the store, so the presence cache is seeded with what
+            // is being replayed. Delivering straight to CompanionDevices
+            // left getAssociations answering "absent" for the very device
+            // the listener had just been told had appeared.
+            NearbyPresenceStore.deliverRestored(rows[i]);
         }
     }
 

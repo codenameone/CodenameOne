@@ -150,6 +150,35 @@ class NearbyPresenceStore {
     /// cold start this store exists for.
     private static final Object STORE_LOCK = new Object();
 
+    /// Replays one persisted row, seeding the presence it carries.
+    ///
+    /// The seeding is the point: a listener handling a cold-start appearance
+    /// and calling getAssociations() straight away got the same device back
+    /// as absent, because nothing had told the cache what the replayed event
+    /// says. Delivering without recording made the restore contradict itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: `present-flag TAB encoded`, as takePersistedPresence returns
+    static void deliverRestored(String row) {
+        if (row == null) {
+            return;
+        }
+        int tab = row.indexOf('\t');
+        if (tab <= 0) {
+            return;
+        }
+        boolean present = "1".equals(row.substring(0, tab));
+        String encoded = row.substring(tab + 1);
+        // The id is the first field of the encoded record; see the service,
+        // which builds it.
+        int end = encoded.indexOf('\t');
+        if (end > 0) {
+            PRESENT.put(encoded.substring(0, end), Boolean.valueOf(present));
+        }
+        CompanionDevices.deliverPresenceChanged(encoded, present);
+    }
+
     /// Whether this association was last reported present.
     static boolean isPresent(String associationId) {
         Boolean known = PRESENT.get(associationId);
