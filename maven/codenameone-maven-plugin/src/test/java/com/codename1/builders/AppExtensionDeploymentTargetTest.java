@@ -1399,4 +1399,59 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("1,2", IPhoneBuilder.resolveSettingsFully(
                 settings.get("TARGETED_DEVICE_FAMILY[config=Debug]"), settings));
     }
+
+    @Test
+    public void anIdentifierThatResolvesToNothingIsDropped() throws Exception {
+        File dist = tmp.newFolder("dist80");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(settings,
+                IPhoneBuilder.extensionSettingsWithBuiltIns(extension, settings, "Release",
+                        "iphoneos14.4", "arm64"));
+
+        // Xcode expands an undefined $(EXTENSION_ID) to the empty string, so merging this onto
+        // the target ships an .appex with no identifier at all -- the same failure a literal
+        // blank causes, one step later. Dropped so the derived default stands.
+        assertFalse(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
+
+    @Test
+    public void anIdentifierWrittenThroughABuiltInIsKept() throws Exception {
+        File dist = tmp.newFolder("dist81");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.$(TARGET_NAME)");
+
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(settings,
+                IPhoneBuilder.extensionSettingsWithBuiltIns(extension, settings, "Release",
+                        "iphoneos14.4", "arm64"));
+
+        // $(TARGET_NAME) is one this build supplies, so the expression is a perfectly good
+        // identifier and stays exactly as the archive wrote it.
+        assertEquals("com.example.app.$(TARGET_NAME)",
+                settings.get("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
+
+    @Test
+    public void aFamilyReferenceWithinTheHostIsLeftAsWritten() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_FAMILIES", "1,2");
+        settings.put("EXTENSION_FAMILIES[config=Debug]", "1");
+        settings.put("TARGETED_DEVICE_FAMILY", "$(EXTENSION_FAMILIES)");
+
+        // In a universal host the Release resolution is already within the host's families, so
+        // there is nothing to clamp -- and replacing the expression with what it resolves to here
+        // froze this archive's answer into the setting, taking a later Debug build from the
+        // narrower family the author asked for to universal.
+        String resolved = IPhoneBuilder.resolveSettingsFully(
+                settings.get("TARGETED_DEVICE_FAMILY"), settings);
+        assertEquals("1,2", resolved);
+        assertEquals(resolved, IPhoneBuilder.narrowDeviceFamily(resolved, "1,2"));
+    }
 }

@@ -5165,7 +5165,10 @@ public class IPhoneBuilder extends Executor {
                                 Map<String, String> archiveOwnSettings =
                                         appExtensionBuildSettings(appExtension);
                                 for (String note
-                                        : dropBlankBundleIdentifiers(archiveOwnSettings)) {
+                                        : dropBlankBundleIdentifiers(archiveOwnSettings,
+                                                extensionSettingsWithBuiltIns(appExtension,
+                                                        archiveOwnSettings, archiveConfiguration,
+                                                        archiveSdk, archiveArch))) {
                                     debug("The " + extensionName + " app extension: " + note + ".");
                                 }
                                 // Narrowed, not taken as given: an exported folder carries the
@@ -5199,12 +5202,24 @@ public class IPhoneBuilder extends Executor {
                                         }
                                         String narrowed = narrowDeviceFamily(declaredFamily,
                                                 hostFamily);
-                                        if (!narrowed.equals(declaredFamily)) {
-                                            debug("The " + extensionName + " app extension asks for "
-                                                    + key + " = " + declaredFamily
-                                                    + ", which this app does not support; narrowed to "
-                                                    + narrowed + ".");
+                                        if (narrowed.equals(declaredFamily)) {
+                                            // Already within the host's families, so there is nothing
+                                            // to clamp -- and the value is left AS WRITTEN. Replacing
+                                            // it with what it resolves to here froze this archive's
+                                            // answer into the setting: with
+                                            // EXTENSION_FAMILIES[config=Debug] = 1 under a base 1,2, a
+                                            // Release build rewrote TARGETED_DEVICE_FAMILY to 1,2 and
+                                            // a later Debug build lost the narrower family the author
+                                            // asked for.
+                                            continue;
                                         }
+                                        debug("The " + extensionName + " app extension asks for "
+                                                + key + " = " + declaredFamily
+                                                + ", which this app does not support; narrowed to "
+                                                + narrowed + ".");
+                                        // Materialized only here, where the alternative is shipping a
+                                        // family the container does not have. A reference that has to
+                                        // be clamped cannot also be preserved.
                                         archiveOwnSettings.put(key, narrowed);
                                     }
                                 }
@@ -8339,6 +8354,13 @@ public class IPhoneBuilder extends Executor {
     ///
     /// @return a note per dropped key, for the log
     static List<String> dropBlankBundleIdentifiers(Map<String, String> settings) {
+        return dropBlankBundleIdentifiers(settings, null);
+    }
+
+    /// @param resolution the settings a $(...) in an identifier expands against, Xcode's own
+    /// built-ins included, or null to judge only literal blanks
+    static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
+            Map<String, String> resolution) {
         List<String> notes = new ArrayList<String>();
         if (settings == null) {
             return notes;
@@ -8353,6 +8375,27 @@ public class IPhoneBuilder extends Executor {
                 settings.remove(key);
                 notes.add(key + " was declared with no value, and an extension cannot be built "
                         + "without a bundle identifier, so it was dropped");
+                continue;
+            }
+            if (resolution != null && value.indexOf('$') >= 0) {
+                // An expression that comes to nothing is the same thing one step later: Xcode
+                // expands an undefined $(EXTENSION_ID) to the empty string, and the .appex ships
+                // with no identifier at all. Dropped so the derived default stands, rather than
+                // merged onto the target to be emptied there.
+                // null means "a reference is left over", which for an identifier is the same
+                // outcome: Xcode expands what it cannot find to nothing. Either way the .appex
+                // would ship with no identifier, so the setting is dropped and the derived
+                // default stands -- gentler than refusing the build over a setting that may be
+                // perfectly valid on the machine that wrote it, and it still builds something
+                // signable.
+                String resolved = resolveSettingsFully(value.trim(), resolution);
+                if (resolved == null || resolved.trim().length() == 0) {
+                    settings.remove(key);
+                    notes.add(key + " = " + value.trim() + " is a reference this build cannot "
+                            + "resolve, and Xcode expands what it cannot find to nothing; an "
+                            + "extension cannot be built without a bundle identifier, so it was "
+                            + "dropped");
+                }
             }
         }
         return notes;
