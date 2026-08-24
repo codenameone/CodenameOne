@@ -154,6 +154,17 @@ class WatchNativeBuilder {
             // ARKit and SceneKit are absent on watchOS; they are linked on the iOS slice when the
             // app references com.codename1.ar, so weak-link them for the watch slice.
             + "ARKit.framework;SceneKit.framework;"
+            // The three com.codename1.nearby frameworks, linked on the iOS slice when the app
+            // references the matching package.
+            //
+            // MultipeerConnectivity and AccessorySetupKit are simply absent on watchOS. Nearby
+            // Interaction is PRESENT there and is still weak-linked, because the watch slice
+            // never calls into it: CodenameOne_GLViewController.h undoes CN1_NEARBY_RANGING for
+            // TARGET_OS_WATCH, so CN1Nearby.m compiles to its unsupported stubs on the watch and
+            // Ranging.isSupported() answers false. Linking a framework nothing references is
+            // merely untidy; leaving one out that something does reference fails the link.
+            + "NearbyInteraction.framework;MultipeerConnectivity.framework;"
+            + "AccessorySetupKit.framework;"
             // The CONDITIONAL ones -- added by IPhoneBuilder's API scan rather than by the
             // translator, so they appear only in projects that use the feature. That is why they
             // outlived two rounds of this list: a build that never touches Vision never links it,

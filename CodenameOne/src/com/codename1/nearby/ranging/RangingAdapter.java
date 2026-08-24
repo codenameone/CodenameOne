@@ -1,0 +1,60 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.ranging;
+
+import com.codename1.nearby.NearbyException;
+
+/// A [RangingListener] whose methods all do nothing, so a caller interested
+/// in one event overrides one method.
+///
+/// ```java
+/// session.addRangingListener(new RangingAdapter() {
+///     public void updated(RangingUpdate u) {
+///         if (u.hasDistance()) {
+///             label.setText(Math.round(u.getDistance(RangingUnit.CENTIMETERS)) + " cm");
+///         }
+///     }
+/// });
+/// ```
+public class RangingAdapter implements RangingListener {
+
+    @Override
+    public void updated(RangingUpdate update) {
+    }
+
+    @Override
+    public void peerRemoved(RangingRemovalReason reason) {
+    }
+
+    @Override
+    public void suspended() {
+    }
+
+    @Override
+    public void resumed() {
+    }
+
+    @Override
+    public void invalidated(NearbyException error) {
+    }
+}

@@ -222,6 +222,402 @@ public class IPhoneBuilder extends Executor {
     /// without looking at the injected fragment, so writing the hint as well would put
     /// the key in the plist twice -- and a plist with a duplicate key is not a plist that
     /// reliably keeps either value.
+    /// Uncomments one of the `CN1_NEARBY_*` defines in the shared header.
+    ///
+    /// Fails the build rather than warning when the marker is not there: a
+    /// define that silently stayed commented out produces an app whose nearby
+    /// API reports itself unsupported on a device that supports it, and
+    /// nothing in the build log would say why.
+    ///
+    /// #### Parameters
+    ///
+    /// - `buildinRes`: the directory holding CodenameOne_GLViewController.h
+    /// - `name`: the define to enable
+    private void enableNearbyDefine(File buildinRes, String name)
+            throws BuildException {
+        File header = new File(buildinRes, "CodenameOne_GLViewController.h");
+        try {
+            // Checked, because replaceInFile is a String.replace and a
+            // marker that is not there is a silent no-op. A port override or
+            // an older staged header without this line let the build finish
+            // with the native compiled out -- so the app shipped, the API
+            // reported the feature unsupported, and nothing anywhere said
+            // why. The whole point of enabling the define is that the
+            // scanner found the usage.
+            String before = readFileToString(header);
+            if (before.indexOf("//#define " + name) < 0) {
+                if (before.indexOf("#define " + name) >= 0) {
+                    // Already enabled, which is the same outcome.
+                    return;
+                }
+                throw new BuildException("This app uses"
+                        + " com.codename1.nearby, which needs " + name
+                        + " enabled in CodenameOne_GLViewController.h, and"
+                        + " the staged header does not carry that marker."
+                        + " The iOS port in use is older than the nearby"
+                        + " support or has been overridden; build against a"
+                        + " port that has it.");
+            }
+            replaceInFile(header, "//#define " + name, "#define " + name);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to enable " + name, ex);
+        }
+    }
+
+    /// Every Bonjour service type this app may register, folded to what
+    /// MultipeerConnectivity will accept.
+    ///
+    /// iOS 14 and later browse only the types declared in `NSBonjourServices`,
+    /// and a type that is missing produces a silent "no peers found" rather
+    /// than an error -- so what goes in the plist has to be a superset of what
+    /// the app passes to `startAdvertising`, and the build cannot see those
+    /// strings.
+    ///
+    /// `ios.nearby.serviceType` is therefore a comma-separated list of the
+    /// service ids the app uses, each folded here through exactly the rule
+    /// `cn1nbServiceType` in CN1Nearby.m applies. The runtime folds its own
+    /// argument the same way and checks the result against this list, failing
+    /// with an actionable message rather than browsing into the void.
+    ///
+    /// With no hint the package name is the only guess available, which is
+    /// right for an app whose service id is its package name and wrong for the
+    /// documented `startAdvertising("chat", ...)` -- so the caller logs the
+    /// derived value.
+    ///
+    /// MultipeerConnectivity allows 1 to 15 characters of lowercase ASCII
+    /// letters, digits and non-adjacent hyphens, and raises on anything else.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    ///
+    /// #### Returns
+    ///
+    /// the folded service types, never empty and without duplicates
+    static java.util.List<String> bonjourServiceTypes(BuildRequest request) {
+        String declared = request.getArg("ios.nearby.serviceType", null);
+        String source = declared != null && declared.trim().length() > 0
+                ? declared.trim() : request.getPackageName();
+        if (source == null) {
+            source = "";
+        }
+        java.util.List<String> out = new ArrayList<String>();
+        for (String entry : source.split(",")) {
+            String folded = foldBonjourServiceType(entry);
+            if (folded.length() > 0 && !out.contains(folded)) {
+                out.add(folded);
+            }
+        }
+        if (out.isEmpty()) {
+            out.add("cn1-nearby");
+        }
+        return out;
+    }
+
+    /// Folds one service id into a legal Bonjour service type. Must stay
+    /// identical to `cn1nbServiceType` in CN1Nearby.m; the two are compared by
+    /// NearbyBonjourServiceTypeTest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceId`: the id to fold
+    ///
+    /// #### Returns
+    ///
+    /// the folded type, or the empty string when nothing usable remains
+    static String foldBonjourServiceType(String serviceId) {
+        if (serviceId == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        // Locale.ROOT, not the default locale. This is a protocol identifier,
+        // and in a Turkish locale toLowerCase() maps ASCII 'I' to dotless
+        // 'i' -- which the ASCII filter below then drops, folding "PING" to
+        // "p-ng". The device doing the runtime fold has its own locale, so a
+        // build server in tr_TR would declare a service type no device ever
+        // registers and the transport would find nobody.
+        String lower = serviceId.toLowerCase(java.util.Locale.ROOT);
+        for (int i = 0; i < lower.length() && out.length() < 15; i++) {
+            char c = lower.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                out.append(c);
+            } else if (out.length() > 0
+                    && out.charAt(out.length() - 1) != '-') {
+                out.append('-');
+            }
+        }
+        while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
+            out.setLength(out.length() - 1);
+        }
+        // A stable suffix derived from the WHOLE id, because the fold above
+        // is lossy and the truncation is brutal: "com.example.chat",
+        // "com-example-chat" and "com.example.charts" all reduce to
+        // "com-example-cha", so three unrelated apps would have discovered
+        // and connected to each other while NearbyTransport promises service
+        // ids match exactly. Ten characters of the readable fold plus four of
+        // hash keeps the type recognisable in a packet trace and inside the
+        // fifteen Apple allows.
+        if (out.length() > 10) {
+            out.setLength(10);
+        }
+        while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
+            out.setLength(out.length() - 1);
+        }
+        if (out.length() == 0) {
+            out.append("cn1");
+        }
+        out.append('-').append(bonjourSuffix(serviceId));
+        // NOTE: bonjourSuffix trims and ASCII-lowercases, so the suffix
+        // matches whatever the runtime computes for the same logical id.
+        // At least one ASCII LETTER, not merely one legal character. Apple
+        // requires it, and an all-digit id like "123" folded to "123" -- which
+        // reads as legal and makes MCNearbyServiceAdvertiser RAISE rather than
+        // fail, so the app crashed instead of failing to advertise. Prefixed
+        // rather than rejected: the id is still recognisable, and the runtime
+        // fold applies the same rule so the two agree.
+        boolean hasLetter = false;
+        for (int i = 0; i < out.length(); i++) {
+            char c = out.charAt(i);
+            if (c >= 'a' && c <= 'z') {
+                hasLetter = true;
+                break;
+            }
+        }
+        if (out.length() > 0 && !hasLetter) {
+            out.insert(0, "cn1-");
+            if (out.length() > 15) {
+                out.setLength(15);
+            }
+            while (out.length() > 0 && out.charAt(out.length() - 1) == '-') {
+                out.setLength(out.length() - 1);
+            }
+        }
+        return out.toString();
+    }
+
+    /// Four base-36 characters derived from the whole service id.
+    ///
+    /// FNV-1a over the id's UTF-8 bytes, written out rather than borrowed so
+    /// that `cn1nbServiceType` in CN1Nearby.m can compute the identical value
+    /// -- the type this build declares in the Info.plist has to be the type
+    /// the device registers, or iOS drops the traffic. NearbyBonjourServiceTypeTest
+    /// compares the two.
+    ///
+    /// #### Parameters
+    ///
+    /// - `serviceId`: the caller's id, unfolded
+    ///
+    /// #### Returns
+    ///
+    /// exactly four characters of `[0-9a-z]`
+    static String bonjourSuffix(String serviceId) {
+        int hash = 0x811c9dc5;
+        // Trimmed, because a comma-separated hint hands this " files " while
+        // the runtime is handed "files" -- and the two have to agree.
+        String id = serviceId == null ? "" : serviceId.trim();
+        // StandardCharsets rather than the String name, so there is no
+        // unreachable catch whose fallback would silently use the platform
+        // default encoding and produce a different suffix on a different
+        // machine.
+        byte[] bytes = id.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        for (int i = 0; i < bytes.length; i++) {
+            int b = bytes[i] & 0xff;
+            // ASCII-lowercased before hashing, so the suffix is as
+            // case-insensitive as the fold above -- "Chat" and "chat" are one
+            // service, and always were. Done here rather than with
+            // toLowerCase so the Objective-C side can do exactly the same
+            // thing to exactly the same bytes.
+            if (b >= 'A' && b <= 'Z') {
+                b += 'a' - 'A';
+            }
+            hash ^= b;
+            hash *= 16777619;
+        }
+        long positive = ((long) hash) & 0xffffffffL;
+        long value = positive % 1679616L;
+        char[] digits = new char[4];
+        for (int i = 3; i >= 0; i--) {
+            int digit = (int) (value % 36);
+            digits[i] = (char) (digit < 10 ? ('0' + digit)
+                    : ('a' + digit - 10));
+            value /= 36;
+        }
+        return new String(digits);
+    }
+
+    /// Escapes the three characters that cannot sit in plist text content.
+    ///
+    /// Small and local rather than borrowed: the neighbouring builders each
+    /// keep a private one, and a service UUID from a build hint is arbitrary
+    /// text until something says otherwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the text
+    ///
+    /// #### Returns
+    ///
+    /// the escaped text
+    /// Adds the nearby service types to the app's Bonjour array, MERGING
+    /// with whatever is already declared rather than replacing it.
+    ///
+    /// Written through the `ios.NSBonjourServices` hint, the same route Matter
+    /// commissioning uses, and NOT through `ios.plistInject`. The plist
+    /// renderer emits the generated array only when the injected fragment has
+    /// no `NSBonjourServices` key of its own -- a plist carrying the key twice
+    /// keeps neither value reliably -- so injecting the key here silently
+    /// suppressed every service the app had already declared. An app that
+    /// commissions Matter accessories and also uses nearby transport lost
+    /// `_matter._tcp.` and `_matterc._udp.` that way, and iOS then drops the
+    /// mDNS traffic those need.
+    ///
+    /// A project that owns the key through `ios.plistInject` is refused
+    /// rather than rewritten, again as Matter does: the fragment is the
+    /// developer's own XML and reformatting it here would be guessing.
+    ///
+    /// @param request the build request
+    /// @param serviceTypes the folded service types this app advertises
+    /// @param usesBonjour whether the app also uses com.codename1.io.bonjour
+    private void mergeNearbyBonjourServices(BuildRequest request,
+            List<String> serviceTypes, boolean usesBonjour)
+            throws BuildException {
+        // The com.codename1.io.bonjour block further down seeds _http._tcp.
+        // only when the hint is still unset, which is its way of leaving a
+        // project that named its own types alone. This merge runs FIRST and
+        // creates the hint, so it would have taken that default away from an
+        // app that uses both APIs and set nothing -- leaving the ordinary
+        // Bonjour API unable to discover anything on iOS 14 and later.
+        boolean seedHttp = usesBonjour
+                && request.getArg("ios.NSBonjourServices", null) == null;
+        List<String> needed = new ArrayList<String>();
+        if (seedHttp) {
+            needed.add("_http._tcp.");
+        }
+        for (int i = 0; i < serviceTypes.size(); i++) {
+            // MultipeerConnectivity uses both transports for one service.
+            needed.add("_" + serviceTypes.get(i) + "._tcp.");
+            needed.add("_" + serviceTypes.get(i) + "._udp.");
+        }
+        if (WatchNativeBuilder.injectedPlistKeys(request)
+                .contains("NSBonjourServices")) {
+            List<String> declared = WatchNativeBuilder
+                    .injectedPlistStringArray(request, "NSBonjourServices");
+            List<String> missing = new ArrayList<String>();
+            for (String service : needed) {
+                if (!bonjourListed(declared, service)) {
+                    missing.add(service);
+                }
+            }
+            if (!missing.isEmpty()) {
+                throw new BuildException(
+                        "This app uses com.codename1.nearby.transport and "
+                        + "declares NSBonjourServices through ios.plistInject, "
+                        + "but that array does not list " + missing + ". iOS "
+                        + "drops mDNS traffic for a service type the plist "
+                        + "does not name, so the app would find no peers. Add "
+                        + "those entries to the array in ios.plistInject, or "
+                        + "remove the key from it and let the build declare "
+                        + "the array through ios.NSBonjourServices.");
+            }
+            return;
+        }
+        String bonjour = request.getArg("ios.NSBonjourServices", "");
+        List<String> existing = new ArrayList<String>();
+        for (String entry : bonjour.split("[,;]")) {
+            existing.add(entry.trim());
+        }
+        for (String service : needed) {
+            if (bonjourListed(existing, service)) {
+                continue;
+            }
+            existing.add(service);
+            bonjour = bonjour.trim().length() == 0 ? service
+                    : bonjour.trim() + "," + service;
+        }
+        request.putArgument("ios.NSBonjourServices", bonjour);
+    }
+
+    /// True when a Bonjour service type is already in a list, with or without
+    /// its trailing dot -- both spellings appear in the wild and name the
+    /// same service.
+    private static boolean bonjourListed(List<String> declared,
+            String service) {
+        String bare = service.endsWith(".")
+                ? service.substring(0, service.length() - 1) : service;
+        for (String entry : declared) {
+            String trimmed = entry == null ? "" : entry.trim();
+            if (trimmed.equals(service) || trimmed.equals(bare)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String escapeNearbyPlistText(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
+    /// Appends a string array to `ios.plistInject`, unless the project already
+    /// declares that key.
+    ///
+    /// A project that set the key itself is left alone and told so, for the
+    /// reason [#declareApplicationQueriesSchemes] gives: a plist with the same
+    /// key twice is not a plist that reliably keeps either value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `key`: the plist key
+    /// - `values`: the array entries
+    /// - `why`: what the app loses if the entries are absent, for the log
+    private void declareNearbyPlistArray(BuildRequest request, String key,
+            String[] values, String why) throws BuildException {
+        String inject = request.getArg("ios.plistInject", "");
+        if (WatchNativeBuilder.injectedPlistKeys(inject).contains(key)) {
+            // Declared by the app, so the build leaves it alone -- but it
+            // has to actually CARRY what the feature needs. Accepting the
+            // key on sight let an empty array, a malformed one, or one
+            // simply missing the value through: the build succeeded, the
+            // generated entry was skipped as redundant, and the feature was
+            // inert on the device. The Bonjour merge checks its array for
+            // the same reason.
+            java.util.List<String> declared = WatchNativeBuilder
+                    .injectedPlistStringArray(request, key);
+            java.util.List<String> missing = new java.util.ArrayList<String>();
+            for (int i = 0; i < values.length; i++) {
+                String want = values[i] == null ? "" : values[i].trim();
+                if (want.length() > 0 && !declared.contains(want)) {
+                    missing.add(want);
+                }
+            }
+            if (!missing.isEmpty()) {
+                throw new BuildException("This app uses"
+                        + " com.codename1.nearby.companion and declares "
+                        + key + " through ios.plistInject, but that array"
+                        + " does not list " + missing + ". " + why
+                        + ". Add those entries to the array in"
+                        + " ios.plistInject, or remove the key from it and"
+                        + " let the build declare it for you.");
+            }
+            log("ios.plistInject already declares " + key + " and it carries"
+                    + " what nearby needs, so no entries were added for you.");
+            return;
+        }
+        StringBuilder b = new StringBuilder(inject);
+        b.append("<key>").append(key).append("</key><array>");
+        for (int i = 0; i < values.length; i++) {
+            String v = values[i] == null ? "" : values[i].trim();
+            if (v.length() == 0) {
+                continue;
+            }
+            b.append("<string>").append(escapeNearbyPlistText(v))
+                    .append("</string>");
+        }
+        b.append("</array>");
+        request.putArgument("ios.plistInject", b.toString());
+    }
+
     private void declareApplicationQueriesSchemes(BuildRequest request,
             String[] schemes, String why) {
         java.util.List<String> alreadyInjected =
@@ -409,6 +805,15 @@ public class IPhoneBuilder extends Executor {
 
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
+    // Nearby devices (com.codename1.nearby.*). Three flags because the three
+    // packages link three different frameworks and oblige three different
+    // privacy strings: an app that only ranges must not link
+    // MultipeerConnectivity, because linking it obliges
+    // NSLocalNetworkUsageDescription and puts a local-network prompt in front
+    // of a user who never asked for one.
+    private boolean usesNearbyRanging;
+    private boolean usesNearbyTransport;
+    private boolean usesNearbyCompanion;
     private boolean usesCn1Vision;
     private boolean usesCn1Language;
     private boolean usesCn1Inference;
@@ -1569,6 +1974,15 @@ public class IPhoneBuilder extends Executor {
                     // Augmented reality (com.codename1.ar.*). Gated on actual
                     // usage so ARKit/SceneKit and the CN1AR natives are only
                     // built for apps that reference the AR API.
+                    if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
+                        usesNearbyRanging = true;
+                    }
+                    if (cls.indexOf("com/codename1/nearby/transport/") == 0) {
+                        usesNearbyTransport = true;
+                    }
+                    if (cls.indexOf("com/codename1/nearby/companion/") == 0) {
+                        usesNearbyCompanion = true;
+                    }
                     if (!usesCn1Ar && cls.indexOf("com/codename1/ar/") == 0) {
                         usesCn1Ar = true;
                     }
@@ -1893,6 +2307,51 @@ public class IPhoneBuilder extends Executor {
             });
         } catch (Exception ex) {
             throw new BuildException("Failed to scan project classes for permissions.", ex);
+        }
+
+        // The libraries as well as the loose class tree, and read HERE --
+        // before the port's own jars are unzipped into btres further down,
+        // which is what keeps the framework's own use of these packages from
+        // answering for the application's.
+        //
+        // scanClassesForPermissions reads .class files and never opens a jar,
+        // so a library that is the only code touching these APIs -- the
+        // application calls the library and never names a nearby class --
+        // left every flag false, and this build then left CN1_INCLUDE_NEARBY
+        // undefined and the frameworks unlinked. The feature was simply
+        // absent from a build that looked clean. The database scan above
+        // reads both trees for the same reason.
+        NearbyManifestFragments.NearbyUsage libraryNearby =
+                NearbyManifestFragments.scanForNearbyUsage(buildinRes);
+        if (!libraryNearby.isEmpty()) {
+            debug("Nearby usage found inside a submitted library"
+                    + (libraryNearby.usesRanging() ? " ranging" : "")
+                    + (libraryNearby.usesTransport() ? " transport" : "")
+                    + (libraryNearby.usesCompanion() ? " companion" : ""));
+        }
+        usesNearbyRanging |= libraryNearby.usesRanging();
+        usesNearbyTransport |= libraryNearby.usesTransport();
+        usesNearbyCompanion |= libraryNearby.usesCompanion();
+
+        // Fed to the CATALOG as well as to the flags. The flags decide which
+        // sources survive and which manifest fragments are written; the
+        // accumulator is what supplies the dependencies, the frameworks, the
+        // privacy strings and the minimum SDK. Setting only the flags kept
+        // AndroidUwbRanging.java in the generated sources without
+        // androidx.core.uwb to compile it against, and enabled the iOS
+        // defines without NearbyInteraction to link -- a build that fails
+        // late for a reason nothing in it names.
+        //
+        // The entry prefix IS the key: the catalog matches a consumed class
+        // by startsWith, and a prefix starts with itself.
+        if (libraryNearby.usesRanging()) {
+            aiAcc.consume("com/codename1/nearby/ranging/");
+        }
+        if (libraryNearby.usesTransport()) {
+            aiAcc.consume("com/codename1/nearby/transport/");
+        }
+        if (libraryNearby.usesCompanion()) {
+            aiAcc.consume("com/codename1/nearby/companion/");
         }
         stopwatch.split("Scan Classes");
 
@@ -4220,6 +4679,175 @@ public class IPhoneBuilder extends Executor {
                     addLibs = arLibs;
                 } else if (!addLibs.toLowerCase().contains("arkit.framework")) {
                     addLibs = addLibs + ";" + arLibs;
+                }
+            }
+
+            // Nearby devices: uncomment CN1_INCLUDE_NEARBY and whichever of
+            // the three sub-defines the app earned, so CN1Nearby.m compiles
+            // in only the halves it asked for. The frameworks themselves come
+            // from the PlatformFeatureCatalog entries through the loop below;
+            // only the defines are decided here, because a define is not
+            // something a declarative table can express.
+            if (usesNearbyRanging || usesNearbyTransport
+                    || usesNearbyCompanion) {
+                enableNearbyDefine(buildinRes, "CN1_INCLUDE_NEARBY");
+                if (usesNearbyRanging) {
+                    enableNearbyDefine(buildinRes, "CN1_NEARBY_RANGING");
+                    // com.apple.developer.nearby-interaction stays behind the
+                    // hint, and is NOT injected for ordinary foreground
+                    // ranging.
+                    //
+                    // It was suggested that the entitlement gates access to
+                    // the framework itself rather than only background
+                    // execution, and that a foreground build therefore links
+                    // Nearby Interaction but cannot run an NISession. Three
+                    // things say otherwise, and all three are checkable
+                    // without a device:
+                    //
+                    //  - The entitlement arrived with iOS 16. Nearby
+                    //    Interaction shipped in iOS 14 and NISession.isSupported
+                    //    is deprecated FROM 16 -- so two OS versions of
+                    //    foreground ranging predate the entitlement entirely,
+                    //    and requiring it would have broken every app built
+                    //    against them.
+                    //  - NIError declares no missing-entitlement code. Its
+                    //    failures are InvalidConfiguration, SessionFailed,
+                    //    ResourceUsageTimeout, ActiveSessionsLimitExceeded,
+                    //    UserDidNotAllow, InvalidARConfiguration and
+                    //    AccessoryPeerDeviceUnavailable. What gates a session
+                    //    on consent is UserDidNotAllow, and what governs that
+                    //    is the NSNearbyInteraction* usage string the catalog
+                    //    entry already injects.
+                    //  - Apple documents the capability as permitting Nearby
+                    //    Interaction in the BACKGROUND.
+                    //
+                    // Injecting it unconditionally is not free: an entitlement
+                    // the App ID does not carry fails codesigning with an error
+                    // naming the entitlement and not the reason it appeared,
+                    // which is the trap com.apple.developer.homekit sets and
+                    // the reason that one is behind a hint too. So the cost of
+                    // being wrong in this direction is every ranging app
+                    // failing to sign; the cost of being wrong the other way
+                    // is background ranging needing one build hint.
+                    // RangingCapabilities.isBackgroundRangingSupported()
+                    // reports false regardless, so nothing promises it.
+                    if ("true".equalsIgnoreCase(request.getArg(
+                            "ios.nearby.background", "false"))) {
+                        request.putArgument("ios.entitlements.com.apple"
+                                + ".developer.nearby-interaction", "true");
+                        String modes = request.getArg("ios.background_modes",
+                                "");
+                        if (!modes.contains("nearby-interaction")) {
+                            request.putArgument("ios.background_modes",
+                                    modes.length() == 0
+                                            ? "nearby-interaction"
+                                            : modes + ",nearby-interaction");
+                        }
+                    }
+                }
+                if (usesNearbyTransport) {
+                    enableNearbyDefine(buildinRes, "CN1_NEARBY_TRANSPORT");
+                    // iOS 14 refuses a MultipeerConnectivity browse whose
+                    // Bonjour service types are not declared, and the refusal
+                    // is a silent "no peers found" rather than an error.
+                    java.util.List<String> serviceTypes =
+                            bonjourServiceTypes(request);
+                    boolean hintSet = request
+                            .getArg("ios.nearby.serviceType", "").trim()
+                            .length() > 0;
+                    // Logged always. iOS browses only what is declared here,
+                    // and the runtime now REFUSES an undeclared type rather
+                    // than browsing into the void -- so a developer whose
+                    // service id is not on this line gets a build log that
+                    // says what to add, instead of an app that finds no peers.
+                    log("Nearby transport declares Bonjour service type(s) "
+                            + serviceTypes
+                            + (hintSet ? ""
+                                    : " (derived from the package name; set"
+                                    + " ios.nearby.serviceType to a"
+                                    + " comma-separated list of the service"
+                                    + " ids this app passes to"
+                                    + " startAdvertising)"));
+                    mergeNearbyBonjourServices(request, serviceTypes,
+                            usesBonjour);
+                    // The disclosure is MANDATORY, so an unusable one is
+                    // refused rather than shipped.
+                    //
+                    // The catalog supplies a default, but only where the app
+                    // set nothing: "false" suppresses the key outright and a
+                    // blank value renders an empty string, and iOS treats
+                    // either as no disclosure at all -- so MultipeerConnectivity
+                    // finds no peers and says nothing about why. Refused here,
+                    // before the cloud slot is spent, the way the Matter flow
+                    // refuses a build it knows cannot work.
+                    // The EFFECTIVE value, not the hint. ios.plistInject
+                    // wins over the hint in the renderer, so a fragment
+                    // declaring this key as <false/> or as a blank string
+                    // left the catalog's perfectly good default sitting in
+                    // the hint, unread -- and the validator that was meant
+                    // to catch exactly that passed it. effectivePurposeString
+                    // resolves what the plist will actually carry.
+                    String localNetwork = effectivePurposeString(request,
+                            "ios.NSLocalNetworkUsageDescription");
+                    if (localNetwork == null
+                            || localNetwork.trim().length() == 0
+                            || "false".equalsIgnoreCase(localNetwork.trim())) {
+                        throw new RuntimeException(
+                                "This app uses com.codename1.nearby.transport,"
+                                + " which iOS will not let discover or"
+                                + " advertise without a local-network purpose"
+                                + " string, and"
+                                + " ios.NSLocalNetworkUsageDescription is set"
+                                + " to '" + localNetwork + "'. Give it a"
+                                + " sentence telling the user why the app"
+                                + " looks for nearby devices, or remove the"
+                                + " hint and let the build supply one.");
+                    }
+                }
+                if (usesNearbyCompanion) {
+                    // Info.plist keys and NO entitlement, deliberately.
+                    //
+                    // AccessorySetupKit is gated on these declarations, not
+                    // on a capability: there is no
+                    // com.apple.developer.accessory-setup-kit -- Xcode's own
+                    // portal capability list has no such entitlement, and the
+                    // one AccessorySetupKit entitlement that does exist,
+                    // com.apple.developer.accessory-setup-discovery-extension,
+                    // is for an app EXTENSION that offers a third-party
+                    // accessory to the SYSTEM picker. An app presenting its
+                    // own ASAccessorySession picker, which is all this port
+                    // does, is not that.
+                    //
+                    // Adding one anyway would not be harmless. An entitlement
+                    // the App ID does not grant fails signing, so every app
+                    // that merely touches com.codename1.nearby.companion
+                    // would stop building -- which is exactly why the
+                    // nearby-interaction entitlement below is behind an
+                    // explicit hint rather than switched on by use.
+                    enableNearbyDefine(buildinRes, "CN1_NEARBY_COMPANION");
+                    declareNearbyPlistArray(request,
+                            "NSAccessorySetupKitSupports",
+                            new String[] {"Bluetooth"},
+                            "AccessorySetupKit will not show a picker"
+                            + " without it");
+                    String services = request.getArg(
+                            "ios.nearby.accessoryServices", "").trim();
+                    if (services.length() > 0) {
+                        declareNearbyPlistArray(request,
+                                "NSAccessorySetupBluetoothServices",
+                                services.split("\\s*,\\s*"),
+                                "AccessorySetupKit only discovers services"
+                                + " the app declared up front");
+                    } else {
+                        log("com.codename1.nearby.companion is used but"
+                                + " ios.nearby.accessoryServices is not set."
+                                + " AccessorySetupKit only discovers"
+                                + " Bluetooth services listed in"
+                                + " NSAccessorySetupBluetoothServices, so the"
+                                + " picker will find nothing on iOS. Set the"
+                                + " hint to a comma-separated list of service"
+                                + " UUIDs.");
+                    }
                 }
             }
 

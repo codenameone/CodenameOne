@@ -728,6 +728,18 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesHomeCommissioning;
     private String smartHomeQueriesFragment = "";
 
+    // Nearby devices (com.codename1.nearby.*). Three flags rather than one,
+    // because the three packages cost three different dependency and
+    // permission sets and the package prefix is the only opt-in a developer
+    // performs. usesNearbyPresence is separate again: presence observation is
+    // what earns the background companion permissions, and asking for those
+    // without it is asking a user for background privileges with nothing to
+    // show for them.
+    private boolean usesNearbyRanging;
+    private boolean usesNearbyTransport;
+    private boolean usesNearbyCompanion;
+    private boolean usesNearbyPresence;
+
     private boolean integrateMoPub = false;
 
     private static final boolean isMac;
@@ -2139,6 +2151,15 @@ public class AndroidGradleBuilder extends Executor {
                             usesHealthWrite = true;
                         }
                     }
+                    if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
+                        usesNearbyRanging = true;
+                    }
+                    if (cls.indexOf("com/codename1/nearby/transport/") == 0) {
+                        usesNearbyTransport = true;
+                    }
+                    if (cls.indexOf("com/codename1/nearby/companion/") == 0) {
+                        usesNearbyCompanion = true;
+                    }
                     if (cls.indexOf("com/codename1/bluetooth/") == 0) {
                         usesBluetooth = true;
                         if (cls.indexOf("com/codename1/bluetooth/le/server/") == 0) {
@@ -2217,6 +2238,26 @@ public class AndroidGradleBuilder extends Executor {
                     // cannot see it -- and without this the build skipped the
                     // type validation and shipped a manifest with no per-type
                     // permissions, leaving those calls unauthorized.
+                    // Presence observation is a method call, not a class
+                    // reference: an app that associates a device and one that
+                    // also asks the platform to watch for it name exactly the
+                    // same classes. Only the call tells them apart, and only
+                    // the second should carry the background permissions.
+                    if ("com/codename1/nearby/companion/CompanionDevices"
+                            .equals(cls)) {
+                        usesNearbyCompanion = true;
+                        // START, specifically. stopObservingPresence is a
+                        // cleanup call -- an app version that dropped
+                        // observation still makes it, to undo an observation
+                        // a previous version persisted -- and counting it as
+                        // observing kept the exported companion service and
+                        // the background companion permissions in the
+                        // manifest of an app that no longer observes
+                        // anything, which is the opposite of what the
+                        // per-operation gating above is for.
+                        usesNearbyPresence |=
+                                "startObservingPresence".equals(method);
+                    }
                     if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                         usesHealth = true;
                         usesHealthStore = true;
@@ -2446,6 +2487,53 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("An error occurred while trying to scan the classes for API usage.", ex);
         }
 
+        // The libraries as well as the loose class tree.
+        //
+        // scanClassesForPermissions reads .class files and never opens a jar,
+        // so a library that is the only code touching these APIs -- the
+        // application calls the library and never names a nearby class --
+        // left every flag false. This build then DELETED
+        // com/codename1/impl/android/nearby out of the sources and omitted
+        // the dependencies and manifest entries, so the library called into
+        // classes the build had removed. The database scan above reads both
+        // trees for exactly that reason; this is the same fix for the same
+        // hazard, kept to the feature whose implementation gets deleted
+        // rather than turned on for every flag the scanner carries.
+        NearbyManifestFragments.NearbyUsage libraryNearby =
+                NearbyManifestFragments.scanForNearbyUsage(libsDir);
+        if (!libraryNearby.isEmpty()) {
+            debug("Nearby usage found inside a submitted library"
+                    + (libraryNearby.usesRanging() ? " ranging" : "")
+                    + (libraryNearby.usesTransport() ? " transport" : "")
+                    + (libraryNearby.usesCompanion() ? " companion" : "")
+                    + (libraryNearby.usesPresence() ? " presence" : ""));
+        }
+        usesNearbyRanging |= libraryNearby.usesRanging();
+        usesNearbyTransport |= libraryNearby.usesTransport();
+        usesNearbyCompanion |= libraryNearby.usesCompanion();
+        usesNearbyPresence |= libraryNearby.usesPresence();
+
+        // Fed to the CATALOG as well as to the flags. The flags decide which
+        // sources survive and which manifest fragments are written; the
+        // accumulator is what supplies the dependencies, the frameworks, the
+        // privacy strings and the minimum SDK. Setting only the flags kept
+        // AndroidUwbRanging.java in the generated sources without
+        // androidx.core.uwb to compile it against, and enabled the iOS
+        // defines without NearbyInteraction to link -- a build that fails
+        // late for a reason nothing in it names.
+        //
+        // The entry prefix IS the key: the catalog matches a consumed class
+        // by startsWith, and a prefix starts with itself.
+        if (libraryNearby.usesRanging()) {
+            aiAcc.consume("com/codename1/nearby/ranging/");
+        }
+        if (libraryNearby.usesTransport()) {
+            aiAcc.consume("com/codename1/nearby/transport/");
+        }
+        if (libraryNearby.usesCompanion()) {
+            aiAcc.consume("com/codename1/nearby/companion/");
+        }
+
         // Apply AI/ML dependency table hits accumulated during the
         // scan. Permissions / features go to xPermissions right
         // away (so they're visible to all the downstream manifest
@@ -2609,6 +2697,59 @@ public class AndroidGradleBuilder extends Executor {
                     neverForLocation, bleRequired, targetSDKVersionInt);
         }
 
+        // Nearby devices (com.codename1.nearby.*). The permissions live in
+        // NearbyManifestFragments rather than in PlatformFeatureCatalog
+        // because they are version-conditional in three different ways --
+        // UWB_RANGING is API 31 and later, the transport needs the Android 12
+        // Bluetooth split with maxSdkVersion caps, and NEARBY_WIFI_DEVICES
+        // needs usesPermissionFlags from 33 -- and a flat list cannot say any
+        // of that.
+        //
+        // The profile hints are hints rather than something the scanner
+        // works out: the profile arrives as an enum constant, which is a
+        // field reference, and Executor.visitFieldInsn is an empty override.
+        // Each defaults false because a REQUEST_COMPANION_PROFILE_* is a
+        // strong permission to ask for on a guess.
+        //
+        // All three the portable API exposes have a hint, not only watch:
+        // AndroidNearbyBackend forwards COMPUTER on API 33 and GLASSES on 34,
+        // and without the matching permission the platform rejects the
+        // association before the chooser opens.
+        if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
+            StringBuilder profiles = new StringBuilder();
+            if ("true".equalsIgnoreCase(
+                    request.getArg("android.nearby.watchProfile", "false"))) {
+                profiles.append("watch,");
+            }
+            if ("true".equalsIgnoreCase(request.getArg(
+                    "android.nearby.computerProfile", "false"))) {
+                profiles.append("computer,");
+            }
+            if ("true".equalsIgnoreCase(request.getArg(
+                    "android.nearby.glassesProfile", "false"))) {
+                profiles.append("glasses,");
+            }
+            log("Nearby fragments version "
+                    + NearbyManifestFragments.FRAGMENT_VERSION
+                    + (usesNearbyRanging ? " ranging" : "")
+                    + (usesNearbyTransport ? " transport" : "")
+                    + (usesNearbyCompanion ? " companion" : "")
+                    + (usesNearbyPresence ? " presence" : ""));
+            xPermissions = NearbyManifestFragments.inject(xPermissions,
+                    usesNearbyRanging, usesNearbyTransport,
+                    usesNearbyCompanion, usesNearbyPresence,
+                    profiles.toString(), targetSDKVersionInt);
+            String presenceService =
+                    NearbyManifestFragments.presenceService(usesNearbyPresence);
+            if (presenceService.length() > 0
+                    && !request.getArg("android.xapplication", "")
+                            .contains("CN1CompanionDeviceService")) {
+                request.putArgument("android.xapplication",
+                        request.getArg("android.xapplication", "")
+                                + presenceService);
+            }
+        }
+
         // Smart home (com.codename1.home.*).
         //
         // Deliberately no permissions. Play services runs the entire
@@ -2656,6 +2797,62 @@ public class AndroidGradleBuilder extends Executor {
         // usesHealthStore, NOT usesHealth: com.codename1.health.sensors is
         // pure BLE and must not drag in Health Connect or a Google Play
         // health-permissions review.
+        if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
+            // Every nearby build compiles against SDK 33 -- see the floor
+            // further down, which AndroidNearbyBackend's use of
+            // android.companion.AssociationInfo forces. An Android Gradle
+            // plugin from before that SDK existed cannot build such a
+            // project: it either rejects the compile SDK outright or, on the
+            // legacy toolchain, is handed a DSL it does not have. Refused
+            // here rather than left to fail during Gradle evaluation with a
+            // message that names none of this.
+            // The Gradle that will actually run, not the hint that usually
+            // selects it. android.useGradle8=false does not always mean an
+            // old toolchain -- android.newFirebaseMessaging selects the
+            // modern one on its own -- so testing the hint rejected a
+            // configuration whose plugin was perfectly capable.
+            if (gradleVersionInt < 8) {
+                throw new BuildException(
+                        "com.codename1.nearby needs to compile against"
+                        + " Android SDK 33, which the Android Gradle plugin"
+                        + " for Gradle " + gradleVersion + " predates. Set"
+                        + " android.useGradle8=true and leave"
+                        + " android.gradleVersion unset to build a nearby"
+                        + " app.");
+            }
+        }
+        if (usesNearbyRanging) {
+            // androidx.core.uwb's AAR declares minAgpVersion=8.9.1 as well as
+            // minCompileSdk=36, and Gradle's dependency check rejects the
+            // project rather than building it -- with a message about AAR
+            // metadata that names neither UWB nor this hint. Raising the
+            // compile SDK alone is not enough, so a build that has explicitly
+            // selected an older toolchain is refused here, where the reason
+            // can still be explained.
+            //
+            // The version that will actually run, not the flag that usually
+            // selects it: android.gradleVersion overrides the choice, which is
+            // the same trap the Health Connect gate below documents.
+            //
+            // The Gradle MAJOR is the right test here, and only here: the
+            // dependency branch in this builder gives every Gradle 8 build
+            // ANDROID_GRADLE_PLUGIN_8_VERSION, which is well past the floor,
+            // so the major really does decide the plugin. The BuildDaemon
+            // copy selects the plugin by exact Gradle version and has to
+            // test for the modern pairing instead; the conditions differ
+            // because the selections do.
+            if (gradleVersionInt < 8) {
+                throw new BuildException(
+                        "com.codename1.nearby.ranging needs androidx.core.uwb,"
+                        + " whose Android Gradle plugin floor is 8.9.1, but"
+                        + " this build would use Gradle " + gradleVersion
+                        + " and an older plugin with it. Set"
+                        + " android.useGradle8=true and leave"
+                        + " android.gradleVersion unset to build a ranging"
+                        + " app.");
+            }
+        }
+
         if (usesHealthStore) {
             String readHint = request.getArg("android.health.read", "");
             String writeHint = request.getArg("android.health.write", "");
@@ -3076,6 +3273,43 @@ public class AndroidGradleBuilder extends Executor {
         }
 
 
+        // Nearby Connections needs the modular play-services-nearby artifact.
+        // Legacy mode adds ONLY the 6.5.87 monolith, which predates that API
+        // by years, while the nearby transport sources are retained for the
+        // same input -- so the generated project would compile
+        // AndroidNearbyTransport against a bundle with no
+        // com.google.android.gms.nearby.connection package in it and fail
+        // with a wall of unresolved imports. Checked here, after every route
+        // into legacy mode has been taken, and refused with a message that
+        // names the cause.
+        if (legacyGplayServicesMode && usesNearbyTransport) {
+            error("Error: com.codename1.nearby.transport needs the modular"
+                    + " play-services-nearby artifact, but this build selected"
+                    + " the legacy monolithic Play Services bundle, which"
+                    + " predates the Nearby Connections API. Remove"
+                    + " android.includeGPlayServices (and build against a"
+                    + " version newer than 3.3) -- the nearby dependency is"
+                    + " added for you.", new RuntimeException());
+            return false;
+        }
+
+        // And AndroidX, because the modular artifact's transitive closure is
+        // AndroidX the whole way down. The preflight that catches this for
+        // every other feature reads the CATALOG's gradle dependencies, and
+        // the transport has none -- its artifact is turned on through the
+        // Play-services flag above so it keeps the version this build's own
+        // table resolved. So the check that would have caught it cannot see
+        // it, and AGP rejected the generated project instead, well after the
+        // build had committed to it and with a message that names androidx
+        // rather than anything the developer wrote.
+        if (usesNearbyTransport && !useAndroidX) {
+            error("Error: com.codename1.nearby.transport needs"
+                    + " play-services-nearby, whose transitive dependencies"
+                    + " are AndroidX, and this build set"
+                    + " android.useAndroidX=false. Remove that hint or set"
+                    + " it to true.", new RuntimeException());
+            return false;
+        }
         playServicesPlus = !request.getArg("android.playService.plus", "false" ).equals("false");
         playServicesAuth = !request.getArg("android.playService.auth", (Boolean.valueOf(playFlag) || googleServicesJson.exists()) ? "true" : "false").equals("false");
         playServicesBase = !request.getArg("android.playService.base", playFlag).equals("false");
@@ -3096,6 +3330,15 @@ public class AndroidGradleBuilder extends Executor {
         }
         playServicesVision = !request.getArg("android.playService.vision", "false").equals("false");
         playServicesNearBy = !request.getArg("android.playService.nearby", "false").equals("false");
+        // The nearby transport IS Nearby Connections, so referencing
+        // com.codename1.nearby.transport turns the same Play service on.
+        // Routed through this flag rather than through a PlatformFeatureCatalog
+        // androidGradle entry so the artifact keeps the version the builder's
+        // own Play-services table decides, instead of one pinned in a table
+        // that has no idea which Play services this build resolved.
+        if (usesNearbyTransport) {
+            playServicesNearBy = true;
+        }
         playServicesSafetyPanorama = !request.getArg("android.playService.panorama", "false").equals("false");
         playServicesGames = !request.getArg("android.playService.games", "false").equals("false");
         playServicesSafetyNet = !request.getArg("android.playService.safetynet", "false").equals("false");
@@ -3857,6 +4100,47 @@ public class AndroidGradleBuilder extends Executor {
         if (!shouldIncludeGoogleImpl) {
             File fb = new File(srcDir, "com/codename1/social/GoogleImpl.java");
             fb.delete();
+        }
+
+        // The nearby package compiles against a modern SDK plus, for two of
+        // its three files, gradle dependencies that only exist when the
+        // matching catalog entry matched. Each is deleted on its own rather
+        // than the package as a whole, so an app that uses one half keeps it
+        // and loses the other -- AndroidNearbyBackend reaches both
+        // reflectively and treats a missing one as unsupported.
+        File nearbyPackage = new File(srcDir,
+                "com/codename1/impl/android/nearby");
+        if (!usesNearbyRanging && !usesNearbyTransport
+                && !usesNearbyCompanion) {
+            File[] nearbyFiles = nearbyPackage.listFiles();
+            if (nearbyFiles != null) {
+                for (File f : nearbyFiles) {
+                    f.delete();
+                }
+            }
+            nearbyPackage.delete();
+        } else {
+            if (!usesNearbyRanging) {
+                new File(nearbyPackage, "AndroidUwbRanging.java").delete();
+            }
+            if (!usesNearbyTransport) {
+                new File(nearbyPackage, "AndroidNearbyTransport.java").delete();
+            }
+            if (!usesNearbyPresence) {
+                // Deletable now, and worth deleting: this is the one class
+                // in the package whose SUPERCLASS needs API 31, and an app
+                // that never observes presence has no use for it.
+                //
+                // It used to be kept because AndroidNearbyBackend called its
+                // register/unregister unconditionally, so removing it broke
+                // javac for every ranging-only or transport-only build. That
+                // coupling is gone -- the bookkeeping lives in
+                // NearbyPresenceStore, which touches nothing newer than
+                // SharedPreferences -- and the manifest names the service
+                // only when presence is used, so nothing binds it either.
+                new File(nearbyPackage,
+                        "CN1CompanionDeviceService.java").delete();
+            }
         }
 
         if (!arSupport) {
@@ -6675,6 +6959,44 @@ public class AndroidGradleBuilder extends Executor {
             supportLibVersion = "28";
         }
         compileSdkVersion = ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
+        if (usesNearbyRanging) {
+            // androidx.core.uwb declares minCompileSdk=36 in its AAR metadata,
+            // and Gradle rejects the project outright rather than compiling
+            // it -- so a ranging build whose compile SDK came from an older
+            // build-tools or target never got as far as javac. Raised
+            // independently of targetSdkVersion, which is the whole point:
+            // ranging is supported on a target-30 app and that app still has
+            // to COMPILE against 36. (The AAR also wants AGP 8.9.1 or newer;
+            // ANDROID_GRADLE_PLUGIN_8_VERSION is well past that.)
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, "36");
+        }
+        if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
+            // 33, and for ANY of the three clusters, not just the one whose
+            // own API level says 33.
+            //
+            // AndroidNearbyBackend and CN1CompanionDeviceService survive for
+            // every nearby build -- the deletion pass above removes only the
+            // two files that carry an optional gradle dependency -- and both
+            // compile against android.companion.AssociationInfo, which is API
+            // 33. So a transport-only or ranging-only app built against 32
+            // failed javac on a class it never asked for.
+            //
+            // This also covers android:usesPermissionFlags, an API 31
+            // manifest attribute the transport's permissions carry whatever
+            // the app targets; AAPT rejects an attribute the compile SDK has
+            // never heard of, which failed the build even earlier.
+            //
+            // 33 is enough for every companion PROFILE too, including
+            // glasses, which is an API 34 constant. AndroidNearbyBackend
+            // never names AssociationRequest.DEVICE_PROFILE_GLASSES: it
+            // writes the role name that constant inlines to, guarded by a
+            // runtime SDK_INT check, exactly so this floor does not have to
+            // move for a hint that costs the app nothing at compile time.
+            // Raising it to 34 would raise it for every companion build.
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, "33");
+        }
         jcenter =
                 "      google()\n" +
                         "     jcenter()\n" +
