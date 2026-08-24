@@ -1685,6 +1685,33 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
 /// - `t`: the transport
 /// - `advertising`: YES for advertising, NO for discovery
 /// - `requestId`: the request to answer
+/// Fails whichever start is still pending, because a stop just cancelled it.
+///
+/// SESSION_INVALIDATED, and the same wording the simulated bridge uses. This
+/// used to answer OK on the grounds that the framework HAD taken the start --
+/// true of the radio, and beside the point to the caller, whose question was
+/// "is it advertising now". Android and the simulator both fail it, so an app
+/// that branched on the answer behaved differently on iOS alone, which is the
+/// divergence this whole family of guards exists to remove.
+static void cn1nbCancelPendingStart(CN1NearbyTransport *t, BOOL advertising) {
+    if (t == nil) {
+        return;
+    }
+    int pending = advertising ? t.pendingAdvertiseRequest
+            : t.pendingDiscoverRequest;
+    if (advertising) {
+        t.pendingAdvertiseRequest = 0;
+    } else {
+        t.pendingDiscoverRequest = 0;
+    }
+    if (pending != 0) {
+        cn1nbFailTransport(pending, CN1_NEARBY_ERR_SESSION_INVALIDATED,
+                advertising
+                ? @"advertising was stopped before it started"
+                : @"discovery was stopped before it started");
+    }
+}
+
 static void cn1nbSettleTransportStart(CN1NearbyTransport *t, BOOL advertising,
         int requestId) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
@@ -2649,17 +2676,12 @@ void com_codename1_impl_ios_IOSNative_nearbyStopAdvertising__(
             [cn1nbTransport.advertiser stopAdvertisingPeer];
             cn1nbTransport.advertiser.delegate = nil;
             cn1nbTransport.advertiser = nil;
-            // Answered on the way out. Advertising DID start -- the framework
-            // took it -- and stopping before the grace period elapsed would
-            // otherwise leave the start's AsyncResource unresolved for good,
-            // because the deferred answer only fires for a request that is
-            // still pending.
-            int pending = cn1nbTransport.pendingAdvertiseRequest;
-            cn1nbTransport.pendingAdvertiseRequest = 0;
-            if (pending != 0) {
-                cn1nbTransportOk(pending);
-            }
         }
+        // Settled on the way out, and OUTSIDE the advertiser check. Stopping
+        // before the grace period elapsed would otherwise leave the start's
+        // AsyncResource unresolved for good, because the deferred answer
+        // only fires for a request that is still pending.
+        cn1nbCancelPendingStart(cn1nbTransport, YES);
     }
 #endif
 }
@@ -2710,13 +2732,9 @@ void com_codename1_impl_ios_IOSNative_nearbyStopDiscovery__(
             [cn1nbTransport.browser stopBrowsingForPeers];
             cn1nbTransport.browser.delegate = nil;
             cn1nbTransport.browser = nil;
-            // Answered on the way out, for the reason stopAdvertising is.
-            int pending = cn1nbTransport.pendingDiscoverRequest;
-            cn1nbTransport.pendingDiscoverRequest = 0;
-            if (pending != 0) {
-                cn1nbTransportOk(pending);
-            }
         }
+        // Settled on the way out, for the reason stopAdvertising is.
+        cn1nbCancelPendingStart(cn1nbTransport, NO);
     }
 #endif
 }
@@ -3176,6 +3194,12 @@ void com_codename1_impl_ios_IOSNative_nearbyStopAllTransport__(
             cn1nbTransport.browser.delegate = nil;
             cn1nbTransport.browser = nil;
         }
+        // Both of them, for the reason the single stops settle their own: a
+        // start inside its grace period had its advertiser destroyed here
+        // while its request id stayed pending, so the deferred settler found
+        // it unchanged and reported that a stopped transport had started.
+        cn1nbCancelPendingStart(cn1nbTransport, YES);
+        cn1nbCancelPendingStart(cn1nbTransport, NO);
         [cn1nbTransport closeAllSessions];
         [cn1nbTransport forgetInvitations];
         [cn1nbTransport forgetAllPeers];
