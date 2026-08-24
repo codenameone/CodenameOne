@@ -223,7 +223,12 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// differ from the class it declares, so a package-path lookup would call a
     /// perfectly live class orphaned.
     private static boolean hasBackingSource(AnnotatedClass cls, ProcessorContext ctx) {
-        List<String> roots = ctx.getCompileSourceRoots();
+        return hasBackingSource(cls, ctx.getCompileSourceRoots());
+    }
+
+    /// As above, for a caller that has the roots but no ProcessorContext.
+    public static boolean hasBackingSource(AnnotatedClass cls, List<String> compileSourceRoots) {
+        List<String> roots = compileSourceRoots;
         if (roots == null || roots.isEmpty()) {
             return true;
         }
@@ -545,6 +550,36 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return path;
     }
 
+    /// The dotted name starting at or after `from`, skipping whitespace around
+    /// each dot. Blanked code, so comments are whitespace already.
+    static String qualifiedNameAt(String code, int from) {
+        int i = from;
+        StringBuilder name = new StringBuilder();
+        while (i < code.length()) {
+            while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+                i++;
+            }
+            int end = i;
+            while (end < code.length() && Character.isJavaIdentifierPart(code.charAt(end))) {
+                end++;
+            }
+            if (end == i) {
+                break;
+            }
+            name.append(code, i, end);
+            int dot = end;
+            while (dot < code.length() && Character.isWhitespace(code.charAt(dot))) {
+                dot++;
+            }
+            if (dot >= code.length() || code.charAt(dot) != '.') {
+                break;
+            }
+            name.append('.');
+            i = dot + 1;
+        }
+        return name.toString();
+    }
+
     /// Whether `text` declares a type called `simple`.
     ///
     /// Comments and string literals are blanked first: a commented-out
@@ -757,17 +792,12 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 i = wordEnd;
                 continue;
             }
-            int n = wordEnd;
-            while (n < code.length() && Character.isWhitespace(code.charAt(n))) {
-                n++;
-            }
-            StringBuilder name = new StringBuilder();
-            while (n < code.length()
-                    && (Character.isJavaIdentifierPart(code.charAt(n)) || code.charAt(n) == '.')) {
-                name.append(code.charAt(n));
-                n++;
-            }
-            return name.toString();
+            // Component by component. `package com /* generated */ . example;` is
+            // legal, and reading the name as one contiguous run stopped at the
+            // separator and recorded `com` -- so a live class looked like it
+            // belonged elsewhere, read as an orphan, and its misplaced annotation
+            // went unreported. Comments are already spaces here.
+            return qualifiedNameAt(code, wordEnd);
         }
         return "";
     }

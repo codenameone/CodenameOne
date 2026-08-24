@@ -812,4 +812,17 @@ public class BuildHintCatalogTest {
                 BuildHintCatalog.load().get("android.NotificationChannel.importance")
                         .defaultValue());
     }
+
+    /// The same separator rule as imports, applied to the package name: reading
+    /// it as one contiguous run recorded `com` and rejected the real main source.
+    @Test
+    public void aPackageNameMaySpanSeparatorsInSettingsToo() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com /* generated */ . example;\npublic class MyApp {}\n",
+                "MyApp", "com.example", false));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com\n  . example\nclass MyApp\n", "MyApp", "com.example", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com . other;\npublic class MyApp {}\n", "MyApp", "com.example", false));
+    }
 }

@@ -2456,14 +2456,11 @@ public class CodenameOneSettings extends Lifecycle {
                 // remainder of the text and trimming it started the name at the
                 // comment -- so the real main source was rejected by both the
                 // conventional lookup and the fallback search.
-                int i = nextLiveChar(text, after, kotlin);
-                StringBuilder name = new StringBuilder();
-                while (i >= 0 && i < text.length()
-                        && (continuesAName(text.charAt(i)) || text.charAt(i) == '.')) {
-                    name.append(text.charAt(i));
-                    i++;
-                }
-                declaredPkg = name.toString();
+                // Component by component, exactly as the import reader does.
+                // `package com /* generated */ . example;` is legal, and reading
+                // the name as one contiguous run recorded `com` and rejected the
+                // real main source.
+                declaredPkg = qualifiedNameAt(text, after, kotlin);
                 break;
             }
             pkgAt = nextMarker(text, "package", after, kotlin);
@@ -2543,6 +2540,30 @@ public class CodenameOneSettings extends Lifecycle {
         } finally {
             Util.cleanup(in);
         }
+    }
+
+    /// The dotted name starting at or after `from`, stepping over whitespace and
+    /// comments around each dot.
+    static String qualifiedNameAt(String source, int from, boolean kotlin) {
+        int i = nextLiveChar(source, from, kotlin);
+        StringBuilder name = new StringBuilder();
+        while (i >= 0 && i < source.length()) {
+            int end = i;
+            while (end < source.length() && continuesAName(source.charAt(end))) {
+                end++;
+            }
+            if (end == i) {
+                break;
+            }
+            name.append(source, i, end);
+            int dot = nextLiveChar(source, end, kotlin);
+            if (dot < 0 || source.charAt(dot) != '.') {
+                break;
+            }
+            name.append('.');
+            i = nextLiveChar(source, dot + 1, kotlin);
+        }
+        return name.toString();
     }
 
     /// One import directive: the dotted name it introduces and its alias, if any.

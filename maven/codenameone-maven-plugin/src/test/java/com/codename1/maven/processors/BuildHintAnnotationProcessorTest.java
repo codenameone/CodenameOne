@@ -591,6 +591,20 @@ public class BuildHintAnnotationProcessorTest {
         assertEquals("com.example", BuildHintAnnotationProcessor.declaredPackageIn(kt, true));
     }
 
+    /// `package com /* generated */ . example;` is legal. Reading the name as one
+    /// contiguous run recorded `com`, so a live class looked like it belonged
+    /// elsewhere, read as an orphan, and its misplaced annotation went
+    /// unreported.
+    @Test
+    public void aPackageNameMaySpanSeparators() {
+        assertEquals("com.example", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package com /* generated */ . example;\n", false));
+        assertEquals("com.example", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package com\n   . example\n", true));
+        assertEquals("com.example.deep", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package com . example . deep ;\n", false));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

@@ -2897,6 +2897,21 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     getLog().debug("cn1: could not read " + expectedMain + " from " + element, ex);
                 }
             }
+            // The main class carries none. A LIVE class elsewhere still counts:
+            // @Target(TYPE) accepts the placement, so without this the build
+            // succeeds having neither applied the hint nor said the annotation is
+            // in the wrong place -- which is the silent failure the whole feature
+            // removes. It is only stale output that must not count, and that is a
+            // question about the source, not about which class it is.
+            //
+            // Reported as a misplacement, because that is what it is: had the
+            // processor run it would have refused the build for this class.
+            for (String element : classpathElements) {
+                String live = liveAnnotatedClass(new File(element), descriptors);
+                if (live != null) {
+                    return live;
+                }
+            }
             return null;
         }
         for (String element : classpathElements) {
@@ -2917,6 +2932,46 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     return hit;
                 }
             }
+        }
+        return null;
+    }
+
+    /**
+     * The first annotated class in this element whose source still exists, or null.
+     *
+     * <p>Stale output is excluded the same way the processor excludes it &mdash;
+     * by asking whether the module's configured source roots still declare the
+     * class &mdash; so an orphan left by a rename cannot fail the build, while a
+     * class the developer actually wrote does.</p>
+     */
+    private String liveAnnotatedClass(File element, java.util.Collection<String> descriptors) {
+        List<String> roots;
+        try {
+            roots = project == null ? null : project.getCompileSourceRoots();
+        } catch (RuntimeException ex) {
+            return null;
+        }
+        if (roots == null || roots.isEmpty()) {
+            // Not told where the sources are, so staleness cannot be judged and
+            // an orphan would fail the build. Silence is the lesser harm: the
+            // processor still refuses this placement whenever it runs.
+            return null;
+        }
+        String hit = element.isDirectory()
+                ? findAnnotatedClass(element, descriptors)
+                : (element.isFile() && element.getName().endsWith(".jar")
+                    ? findAnnotatedClassInJar(element, descriptors) : null);
+        if (hit == null) {
+            return null;
+        }
+        try {
+            com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, hit);
+            if (cls != null && com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .hasBackingSource(cls, roots)) {
+                return hit;
+            }
+        } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
+            getLog().debug("cn1: could not read " + hit + " from " + element, ex);
         }
         return null;
     }
