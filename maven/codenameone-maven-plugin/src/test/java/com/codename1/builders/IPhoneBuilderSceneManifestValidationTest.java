@@ -50,6 +50,26 @@ class IPhoneBuilderSceneManifestValidationTest {
         return "<key>UIApplicationSceneManifest</key>\n<dict>\n" + body + "</dict>";
     }
 
+    /// The root dictionary's body of a whole document, which is the level the scene
+    /// manifest is a member of. The validators take a fragment at that level, so a
+    /// document has to be unwrapped before they can answer about it -- which is itself
+    /// the point of the manifest having to be a root member.
+    private static String rootBody(String document) {
+        int open = document.indexOf("<dict>");
+        int close = document.lastIndexOf("</dict>");
+        return document.substring(open + "<dict>".length(), close);
+    }
+
+    /// A whole plist document, which is what the Mac-slice transform is handed: it
+    /// reads the root dictionary, and a bare fragment has none.
+    private static String document(String body) {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<plist version=\"1.0\">\n<dict>\n"
+                + "    <key>CFBundleName</key>\n    <string>Demo</string>\n"
+                + body
+                + "</dict>\n</plist>\n";
+    }
+
     private static String wellFormedManifest() {
         return manifest(
                 "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
@@ -137,17 +157,17 @@ class IPhoneBuilderSceneManifestValidationTest {
         // One Info.plist serves both destinations of one target, so the shared file
         // stays false and the Mac copy is what differs. Getting this backwards opts
         // every iPad build into multi-window behaviour it never asked for.
-        String shared = manifest(
+        String shared = document(manifest(
                 "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
                 + "    <key>UISceneConfigurations</key>\n    <dict>\n"
                 + WINDOW_ROLE
-                + "    </dict>\n");
+                + "    </dict>\n"));
         String mac = IPhoneBuilder.plistForMacSlice(shared);
-        assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(shared),
+        assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(rootBody(shared)),
                 "the shared plist the iOS slice reads must stay false");
-        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac),
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(rootBody(mac)),
                 "the Mac slice's copy must say true");
-        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(mac),
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
                 "and must keep the scene configuration");
     }
 
@@ -155,15 +175,16 @@ class IPhoneBuilderSceneManifestValidationTest {
     void theFlipTouchesOnlyTheManifestsOwnMember() {
         // A key of the same name in an unrelated dictionary is somebody else's, and
         // rewriting it would change a setting the application chose.
-        String plist = "<key>CN1Metadata</key>\n<dict>\n"
-                + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
-                + "</dict>\n"
-                + manifest("    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n");
+        String unrelated = "    <key>CN1Metadata</key>\n    <dict>\n"
+                + "        <key>UIApplicationSupportsMultipleScenes</key>\n        <false/>\n"
+                + "    </dict>\n";
+        String plist = document(unrelated
+                + manifest("    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"));
         String mac = IPhoneBuilder.plistForMacSlice(plist);
-        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac));
-        assertTrue(mac.startsWith("<key>CN1Metadata</key>\n<dict>\n"
-                        + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
-                        + "</dict>"),
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(
+                        rootBody(mac)),
+                "the manifest's own member is what gets set");
+        assertTrue(mac.contains(unrelated),
                 "the unrelated dictionary is left exactly as it was");
     }
 
@@ -175,7 +196,7 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void theFlipIsIdempotent() {
-        String once = IPhoneBuilder.plistForMacSlice(wellFormedManifest());
+        String once = IPhoneBuilder.plistForMacSlice(document(wellFormedManifest()));
         assertTrue(once.equals(IPhoneBuilder.plistForMacSlice(once)),
                 "a manifest that already says true needs no second copy");
     }
@@ -196,8 +217,8 @@ class IPhoneBuilderSceneManifestValidationTest {
         String mac = IPhoneBuilder.plistForMacSlice(shared);
         assertTrue(IPhoneBuilder.plistDeclaresKey(mac, "UIApplicationSceneManifest"),
                 "the Mac copy is where the manifest appears");
-        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac));
-        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(mac));
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(rootBody(mac)));
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)));
         assertTrue(mac.contains("<key>CFBundleName</key>"),
                 "and everything the build already put there is kept");
         assertTrue(mac.trim().endsWith("</plist>"),
@@ -272,6 +293,73 @@ class IPhoneBuilderSceneManifestValidationTest {
         assertEquals(3, members.size(), "a nested array is one member, not its contents");
         assertTrue(members.get(1).contains("<string>b</string>"));
         assertTrue(members.get(2).startsWith("<dict>"));
+    }
+
+    @Test
+    void aCarPlayOnlyManifestGainsTheWindowRoleOnTheMacSlice() {
+        // macNative with CarPlay and ios.uiscene off: the build emits a manifest for
+        // CarPlay's sake, and it carries only the CarPlay role. Flipping the support
+        // key is not enough -- the Catalyst bundle would say multiple scenes are
+        // supported and describe no configuration to create a window from.
+        String carPlayRole =
+                "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
+                + "        <array>\n"
+                + "            <dict>\n"
+                + "                <key>UISceneDelegateClassName</key>\n"
+                + "                <string>CodenameOne_CarPlaySceneDelegate</string>\n"
+                + "            </dict>\n"
+                + "        </array>\n";
+        String shared = document(manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + carPlayRole
+                + "    </dict>\n"));
+        assertFalse(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(shared)),
+                "the shared plist has no window role, and must not gain one");
+
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(rootBody(mac)));
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "the Mac copy has to gain the window role, not just the support key");
+        assertTrue(mac.contains("CodenameOne_CarPlaySceneDelegate"),
+                "and CarPlay's own role survives beside it");
+    }
+
+    @Test
+    void aManifestWithNoSceneConfigurationsGainsThemOnTheMacSlice() {
+        String shared = document(manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"));
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "the configurations dictionary is added when there is none");
+    }
+
+    @Test
+    void aManifestMissingTheSupportKeyGainsItOnTheMacSlice() {
+        String shared = document(manifest(
+                "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n"));
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(rootBody(mac)),
+                "the support key is added when the manifest never declared it");
+    }
+
+    @Test
+    void aManifestNestedInAnotherDictionaryIsNotTheManifest() {
+        // UIKit reads members of the plist root. A manifest parked inside some other
+        // dictionary configures nothing, so accepting it would pass a build whose
+        // windows are unsupported on the device.
+        String fragment = "<key>CN1Metadata</key>\n<dict>\n"
+                + manifest("    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                        + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                        + WINDOW_ROLE
+                        + "    </dict>\n")
+                + "\n</dict>";
+        assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(fragment),
+                "a manifest nested in another dictionary is not the plist's manifest");
+        assertFalse(IPhoneBuilder.plistManifestWiresWindowScene(fragment),
+                "and neither is the role inside it");
     }
 
     @Test

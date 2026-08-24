@@ -11405,16 +11405,15 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the manifest's value element, or ""
     static String plistManifestScope(String plist) {
-        int key = plistKeyIndex(plist, "UIApplicationSceneManifest");
-        if (key < 0) {
+        if (plist == null) {
             return "";
         }
-        int start = plistKeyEnd(plist, key);
-        if (start < 0) {
-            return "";
-        }
-        int end = plistValueElementEnd(plist, start);
-        return end < 0 ? "" : plist.substring(start, end);
+        // The fragment's own level. A manifest parked inside some other dictionary is
+        // not a member of the plist UIKit reads, so it configures nothing -- and
+        // answering from it accepts a build whose windows are unsupported on the
+        // device, which is the whole failure this validation exists to catch.
+        int[] range = plistMemberRange(plist, 0, plist.length(), "UIApplicationSceneManifest");
+        return range == null ? "" : plist.substring(range[0], range[1]);
     }
 
     /// Whether a plist fragment sets the given key to `<true/>`.
@@ -11694,14 +11693,22 @@ public class IPhoneBuilder extends Executor {
     /// #### Returns
     ///
     /// true if the window scene role names `CodenameOne_GLSceneDelegate`
-    /// The Mac slice's version of a finished plist.
+    /// The Mac slice's version of a finished plist: one that supports multiple scenes
+    /// and declares the window role to create them with.
     ///
     /// The shared plist is left exactly as the iOS slice needs it, which for a default
-    /// Catalyst build means it carries no scene manifest at all: declaring one
+    /// Catalyst build means it carries no scene manifest at all -- declaring one
     /// activates the UIScene lifecycle, and the iPhone/iPad artifact still carries its
     /// main NIB, which is a window with no scene and a launch FrontBoard terminates.
-    /// So this either flips an existing manifest's support key or, when there is no
-    /// manifest, adds a whole one -- and only the Mac slice ever reads the result.
+    /// So this adds whatever is missing, and only the Mac slice ever reads the result:
+    ///
+    /// - no manifest at all: a whole one is added to the root dictionary;
+    /// - a manifest without multiple-scene support: the key is set, or added;
+    /// - a manifest whose scene configurations have no window role -- which is what a
+    ///   CarPlay build with ios.uiscene off produces -- the role is added to them.
+    ///
+    /// That last case is why this cannot simply flip a boolean: a manifest can exist
+    /// and still describe no window UIKit could create.
     ///
     /// Returns the input unchanged when there is nothing to do.
     ///
@@ -11713,55 +11720,102 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the plist text for the Mac slice
     static String plistForMacSlice(String plist) {
-        int manifestKey = plistKeyIndex(plist, "UIApplicationSceneManifest");
-        if (manifestKey < 0) {
-            return plistWithSceneManifest(plist);
+        if (plist == null) {
+            return null;
         }
-        int manifestStart = plistKeyEnd(plist, manifestKey);
-        if (manifestStart < 0) {
+        int[] root = plistRootDictBody(plist);
+        if (root == null) {
             return plist;
         }
-        int manifestEnd = plistValueElementEnd(plist, manifestStart);
-        if (manifestEnd < 0) {
-            return plist;
+        int[] manifest = plistMemberRange(plist, root[0], root[1], "UIApplicationSceneManifest");
+        if (manifest == null) {
+            return plist.substring(0, root[1]) + MAC_SCENE_MANIFEST + plist.substring(root[1]);
         }
-        String manifest = plist.substring(manifestStart, manifestEnd);
-        int[] range = plistDictMemberRange(manifest, "UIApplicationSupportsMultipleScenes");
-        if (range == null) {
-            return plist;
-        }
-        return plist.substring(0, manifestStart + range[0])
-                + "<true/>"
-                + plist.substring(manifestStart + range[1]);
+        String updated = plist.substring(manifest[0], manifest[1]);
+        updated = plistWithMultipleScenes(updated);
+        updated = plistWithWindowRole(updated);
+        return plist.substring(0, manifest[0]) + updated + plist.substring(manifest[1]);
     }
 
-    /// Adds a whole scene manifest to a plist that has none, as the last member of the
-    /// root dictionary.
+    /// The `{start, end}` offsets of the root dictionary's body -- just inside its
+    /// `<dict>` and just before the matching close.
     ///
     /// #### Parameters
     ///
-    /// - `plist`: the finished plist text
+    /// - `plist`: a whole plist document
     ///
     /// #### Returns
     ///
-    /// the plist with a manifest, or the input when the root cannot be found
-    private static String plistWithSceneManifest(String plist) {
-        int root = plistElementIndex(plist, "dict", 0);
-        if (root < 0) {
-            return plist;
+    /// the body's offsets, or null when there is no root dictionary
+    private static int[] plistRootDictBody(String plist) {
+        int open = plistElementIndex(plist, "dict", 0);
+        if (open < 0) {
+            return null;
         }
-        int end = plistValueElementEnd(plist, root);
-        if (end < 0) {
-            return plist;
+        int bodyStart = plistOpenTagEnd(plist, open);
+        int afterClose = plistValueElementEnd(plist, open);
+        if (bodyStart < 0 || afterClose < 0) {
+            return null;
         }
-        // `end` is just past the root's own closing tag, so the last "</dict" at or
-        // before it is that tag -- not a nested one, and not one inside a comment,
-        // since plistValueElementEnd already walked past those.
-        int close = plist.lastIndexOf("</dict", end);
-        if (close < 0) {
-            return plist;
+        // Back up over the closing tag itself. afterClose is immediately past the
+        // root's own close, so the last "</dict" at or before it is that tag.
+        int close = plist.lastIndexOf("</dict", afterClose);
+        if (close < bodyStart) {
+            return null;
         }
-        return plist.substring(0, close) + MAC_SCENE_MANIFEST + plist.substring(close);
+        return new int[] {bodyStart, close};
+    }
+
+    /// The same manifest with `UIApplicationSupportsMultipleScenes` true, adding the
+    /// member when it is absent.
+    private static String plistWithMultipleScenes(String manifest) {
+        int[] body = plistRootDictBody(manifest);
+        if (body == null) {
+            return manifest;
+        }
+        int[] member = plistMemberRange(manifest, body[0], body[1],
+                "UIApplicationSupportsMultipleScenes");
+        if (member != null) {
+            return manifest.substring(0, member[0]) + "<true/>" + manifest.substring(member[1]);
+        }
+        return manifest.substring(0, body[1])
+                + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + manifest.substring(body[1]);
+    }
+
+    /// The same manifest with a window scene role wired to Codename One's delegate,
+    /// adding the scene configurations dictionary when there is none.
+    ///
+    /// Left alone when a window role is already there, whatever it names: rewriting a
+    /// role the application wrote would silently replace its choice, and the caller
+    /// refuses that case rather than overruling it.
+    private static String plistWithWindowRole(String manifest) {
+        int[] body = plistRootDictBody(manifest);
+        if (body == null) {
+            return manifest;
+        }
+        int[] configurations = plistMemberRange(manifest, body[0], body[1],
+                "UISceneConfigurations");
+        if (configurations == null) {
+            return manifest.substring(0, body[1])
+                    + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                    + WINDOW_SCENE_ROLE
+                    + "    </dict>\n"
+                    + manifest.substring(body[1]);
+        }
+        String dict = manifest.substring(configurations[0], configurations[1]);
+        int[] dictBody = plistRootDictBody(dict);
+        if (dictBody == null) {
+            return manifest;
+        }
+        if (plistMemberRange(dict, dictBody[0], dictBody[1],
+                "UIWindowSceneSessionRoleApplication") != null) {
+            return manifest;
+        }
+        String widened = dict.substring(0, dictBody[1]) + WINDOW_SCENE_ROLE
+                + dict.substring(dictBody[1]);
+        return manifest.substring(0, configurations[0]) + widened
+                + manifest.substring(configurations[1]);
     }
 
     /// The value element of `key` when it is an immediate member of `dict`, which is
@@ -11821,22 +11875,48 @@ public class IPhoneBuilder extends Executor {
         if (end < 0) {
             end = dict.length();
         }
-        while (at < end) {
-            int keyIndex = plistElementIndex(dict, "key", at);
-            if (keyIndex < 0 || keyIndex >= end) {
+        return plistMemberRange(dict, at, end, key);
+    }
+
+    /// The `{start, end}` offsets of `key`'s value element between `from` and `to`,
+    /// searching only that level: each member's value element is skipped whole, so a
+    /// key of the same name nested inside one of them is never mistaken for a member
+    /// here.
+    ///
+    /// Serves both shapes the plist code deals in -- a `<dict>` element's body, and an
+    /// injected fragment, which is a run of key and value elements with no wrapper.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the text to search
+    ///
+    /// - `from`: where this level starts
+    ///
+    /// - `to`: where this level ends
+    ///
+    /// - `key`: the member name to look for
+    ///
+    /// #### Returns
+    ///
+    /// the value element's offsets, or null
+    static int[] plistMemberRange(String plist, int from, int to, String key) {
+        int at = from;
+        while (at < to) {
+            int keyIndex = plistElementIndex(plist, "key", at);
+            if (keyIndex < 0 || keyIndex >= to) {
                 return null;
             }
-            int contentStart = plistOpenTagEnd(dict, keyIndex);
-            int close = plistCloseElementIndex(dict, "key", keyIndex);
-            int valueStart = plistKeyEnd(dict, keyIndex);
+            int contentStart = plistOpenTagEnd(plist, keyIndex);
+            int close = plistCloseElementIndex(plist, "key", keyIndex);
+            int valueStart = plistKeyEnd(plist, keyIndex);
             if (contentStart < 0 || close < 0 || valueStart < 0) {
                 return null;
             }
-            int valueEnd = plistValueElementEnd(dict, valueStart);
+            int valueEnd = plistValueElementEnd(plist, valueStart);
             if (valueEnd < 0) {
                 return null;
             }
-            if (key.equals(dict.substring(contentStart, close).trim())) {
+            if (key.equals(plist.substring(contentStart, close).trim())) {
                 return new int[] {valueStart, valueEnd};
             }
             at = valueEnd;
@@ -12344,40 +12424,29 @@ public class IPhoneBuilder extends Executor {
         // just asked for them.
         if (multiWindow && plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             // The application supplied its own manifest, so this build must not write a
-            // second one -- but a Catalyst build that asked for windows and whose own
-            // manifest does not support them fails at run time, not here: the bundle is
-            // what getWindowManager() reads, so windows come back unsupported and the
-            // first "new Window(...)" throws in a build that had just asked for them.
-            // Rather than merge into a fragment we did not write, and risk producing a
-            // plist neither side intended, say plainly what is missing.
-            // Both questions are asked of the manifest's own dictionary rather than of
-            // the whole fragment. An unrelated dictionary elsewhere in the injection can
-            // carry a UIApplicationSupportsMultipleScenes of true, or something shaped
-            // like a window role, and answering from those accepts a manifest that
-            // enables and configures nothing -- the build passes and Window is still
-            // unsupported on the device.
-            // Asked at the nesting levels UIKit reads, not merely somewhere inside
-            // the manifest: the key has to be a member of the manifest dictionary and
-            // the role a member of its UISceneConfigurations. A fragment that puts
-            // either inside an unrelated metadata dictionary passes a search that only
-            // asks "is it in there", and UIKit then ignores both -- so the build goes
-            // green and Window is still unsupported on the device.
-            boolean supportsMultiple = plistManifestSupportsMultipleScenes(inject);
-            boolean hasWindowRole = plistManifestWiresWindowScene(inject);
-            if (!supportsMultiple || !hasWindowRole) {
+            // second one. What it must not do either is demand that manifest already
+            // support multiple scenes: this fragment goes into the plist the iPhone/iPad
+            // slice reads, and true there is exactly the iPad multi-window opt-in the
+            // Mac-specific copy exists to avoid. A single-scene iOS manifest is the
+            // right thing for an application to inject, and plistForMacSlice adds the
+            // support key and the window role to the Mac copy.
+            //
+            // One case cannot be repaired and is refused rather than overruled: a
+            // window role that names somebody else's delegate. Adding ours beside it
+            // would not help -- UIKit reads the role, not a list of candidates -- and
+            // replacing theirs would silently discard a choice the application made.
+            String manifest = plistManifestScope(inject);
+            String configurations = plistDictMember(manifest, "UISceneConfigurations");
+            String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
+            if (role != null && !plistManifestWiresWindowScene(inject)) {
                 throw new BuildException(
                         "macNative.enabled=true asks for com.codename1.ui.Window support, but "
-                        + "ios.plistInject already supplies its own UIApplicationSceneManifest "
-                        + "which is missing "
-                        + (!supportsMultiple
-                                ? "<key>UIApplicationSupportsMultipleScenes</key> set to <true/>"
-                                : "")
-                        + (!supportsMultiple && !hasWindowRole ? " and " : "")
-                        + (!hasWindowRole
-                                ? "a UIWindowSceneSessionRoleApplication configuration whose "
-                                + "UISceneDelegateClassName is CodenameOne_GLSceneDelegate" : "")
-                        + ". Add it to your injected manifest, or drop the manifest from "
-                        + "ios.plistInject and let the build emit one.");
+                        + "the UIApplicationSceneManifest in ios.plistInject already declares a "
+                        + "UIWindowSceneSessionRoleApplication that does not name "
+                        + "CodenameOne_GLSceneDelegate. A window is a scene of that role, so it "
+                        + "is the delegate that has to be Codename One's. Point that "
+                        + "configuration at CodenameOne_GLSceneDelegate, or drop the window role "
+                        + "from your manifest and let the build add one for the Mac slice.");
             }
         }
         // multiWindow is deliberately NOT in this condition. Declaring
