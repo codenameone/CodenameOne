@@ -566,6 +566,16 @@ public class BuildHintAnnotationProcessorTest {
         // The outermost type is still required: it is what the file declares.
         assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
                 kt, new String[] {"Other", "start", "Wrong"}, true));
+        // ...and so is the LAST segment, which is the class itself. Leniency
+        // there would keep a deleted nested type's orphan and fail every
+        // incremental build.
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                kt, new String[] {"Main", "start", "Gone"}, true));
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                "package com.example\nclass Main { }\n", new String[] {"Main", "Wrong"}, true));
+        // A function that does not exist is not an excuse either.
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                kt, new String[] {"Main", "start", "Wrong", "Deeper"}, true));
         // Java keeps the strict reading, since javac marks its locals with $1.
         assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
                 "class Main { void start() { } }", new String[] {"Main", "start", "Wrong"},

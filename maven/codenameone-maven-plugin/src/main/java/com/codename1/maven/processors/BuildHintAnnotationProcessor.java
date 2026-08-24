@@ -348,25 +348,39 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         int end = code.length();
         for (int p = 0; p < path.length; p++) {
             String segment = path[p];
+            boolean last = p == path.length - 1;
             int at = declarationOf(code, segment, from, end);
-            if (at < 0) {
+            // p > 0: the outermost segment is the type the file declares and is
+            // always required. Only what Kotlin may have synthesised BETWEEN it
+            // and the class gets the benefit of the doubt.
+            if (at < 0 && kotlin && !last && p > 0) {
                 // Kotlin builds a local class's binary name out of the enclosing
                 // FUNCTION names -- a Wrong declared in Main.start() is
-                // Main$start$Wrong, with nothing to mark `start` as synthetic. So
-                // past the outermost type a Kotlin segment that is not a declared
-                // type is inconclusive, not proof of an orphan: concluding orphan
-                // drops a live annotated class silently, while keeping a stale one
-                // costs a placement error the developer can see and act on.
-                //
-                // The outermost segment is still required, since that is the type
-                // the file declares and the whole match rests on it.
-                return kotlin && p > 0;
+                // Main$start$Wrong, with nothing to mark `start` as synthetic the
+                // way javac's $1 does. So an intermediate segment that is not a
+                // type may be a function, and the class is inside its body.
+                at = functionDeclarationOf(code, segment, from, end);
+                if (at < 0) {
+                    // Some other Kotlin construct names an intermediate segment --
+                    // an init block, a property accessor. Inconclusive, and
+                    // deliberately so: concluding orphan drops a live annotated
+                    // class and loses its hints with no message, while keeping a
+                    // stale one costs a placement error that can be seen and acted
+                    // on. This does NOT extend to the last segment, which is the
+                    // class itself: a nested type that is genuinely gone must be
+                    // reported, or a deleted Main$Wrong keeps its orphan and fails
+                    // every incremental build.
+                    return true;
+                }
+            }
+            if (at < 0) {
+                return false;
             }
             int open = code.indexOf('{', at);
             if (open < 0 || open >= end) {
                 // A body-less declaration -- Kotlin's `class Foo` -- can only be
                 // the last segment, and if it is not, nothing is nested in it.
-                return segment.equals(path[path.length - 1]);
+                return last;
             }
             from = open + 1;
             end = matchingBrace(code, open);
@@ -435,6 +449,54 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     private static boolean isTypeKeyword(String word) {
         return "class".equals(word) || "interface".equals(word) || "enum".equals(word)
                 || "object".equals(word) || "record".equals(word);
+    }
+
+    /// The offset of a `fun` named `simple` declared directly between `from` and
+    /// `end`, or -1.
+    ///
+    /// Only Kotlin names a local class after its enclosing function, so this is
+    /// how an intermediate segment is told from a nested type that is gone.
+    private static int functionDeclarationOf(String code, String simple, int from, int end) {
+        int depth = 0;
+        int i = from;
+        while (i < end && i < code.length()) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < code.length()
+                    && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            if ("fun".equals(code.substring(i, wordEnd))) {
+                int n = wordEnd;
+                while (n < end && Character.isWhitespace(code.charAt(n))) {
+                    n++;
+                }
+                int stop = n;
+                while (stop < end && Character.isJavaIdentifierPart(code.charAt(stop))) {
+                    stop++;
+                }
+                if (code.substring(n, stop).equals(simple)) {
+                    return i;
+                }
+            }
+            i = wordEnd;
+        }
+        return -1;
     }
 
     /// The index just past the brace closing the one at `open`.
