@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.animations.Animation;
 
 /// Package private helpers shared by `Form` and `Window`.
@@ -305,5 +306,124 @@ final class TopLevelSupport {
         if (top != null) {
             top.asContainer().removeComponentFromTopLevel(cmp);
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Directional focus traversal, shared by Form and Window.
+    //
+    // The scan is generic: it walks a root container by absolute coordinates and
+    // knows nothing about which kind of top level it came from. It lived on Form,
+    // where Window could not reach it -- so every arrow key in a window resolved
+    // through Container's inert stubs and moved focus nowhere at all. Moved here
+    // rather than copied, so the two cannot drift.
+    // ---------------------------------------------------------------------------
+
+    /// Returns true if the given dest component is in the column of the source component
+    static boolean isInSameColumn(Component source, Component dest) {
+        // workaround for NPE
+        if (source == null || dest == null) {
+            return false;
+        }
+        return Rectangle.intersects(source.getAbsoluteX(), 0,
+                source.getWidth(), Integer.MAX_VALUE, dest.getAbsoluteX(), dest.getAbsoluteY(),
+                dest.getWidth(), dest.getHeight());
+    }
+
+    /// Returns true if the given dest component is in the row of the source component
+    static boolean isInSameRow(Component source, Component dest) {
+        return Rectangle.intersects(0, source.getAbsoluteY(),
+                Integer.MAX_VALUE, source.getHeight(), dest.getAbsoluteX(), dest.getAbsoluteY(),
+                dest.getWidth(), dest.getHeight());
+    }
+
+    static Component findNextFocusHorizontal(Component focused, Component bestCandidate, Container root, boolean right) {
+        int count = root.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            Component current = root.getComponentAt(iter);
+            if (current.isFocusable()) {
+                if (isInSameRow(focused, current)) {
+                    int currentX = current.getAbsoluteX();
+                    int focusedX = focused.getAbsoluteX();
+                    if (right) {
+                        if (focusedX < currentX) {
+                            if (bestCandidate != null) {
+                                if (bestCandidate.getAbsoluteX() < currentX) {
+                                    continue;
+                                }
+                            }
+                            bestCandidate = current;
+                        }
+                    } else {
+                        if (focusedX > currentX) {
+                            if (bestCandidate != null) {
+                                if (bestCandidate.getAbsoluteX() > currentX) {
+                                    continue;
+                                }
+                            }
+                            bestCandidate = current;
+                        }
+                    }
+                }
+            }
+            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
+                bestCandidate = findNextFocusHorizontal(focused, bestCandidate, (Container) current, right);
+            }
+        }
+        return bestCandidate;
+    }
+
+    static Component findNextFocusVertical(Component focused, Component bestCandidate, Container root, boolean down) {
+        int count = root.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            Component current = root.getComponentAt(iter);
+            if (current.isFocusable()) {
+                int currentY = current.getAbsoluteY();
+                int focusedY = 0;
+                if (focused != null) {
+                    focusedY = focused.getAbsoluteY();
+                }
+                if (down) {
+                    if (focusedY < currentY) {
+                        if (bestCandidate != null) {
+                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);
+                            if (bestCandidate.getAbsoluteY() < currentY) {
+                                if (exitingInSame) {
+                                    continue;
+                                }
+                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
+                                    continue;
+                                }
+                            }
+                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
+                                continue;
+                            }
+                        }
+                        bestCandidate = current;
+                    }
+                } else {
+                    if (focusedY > currentY) {
+                        if (bestCandidate != null) {
+                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);
+                            if (bestCandidate.getAbsoluteY() > currentY) {
+                                if (exitingInSame) {
+                                    continue;
+                                }
+                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
+                                    continue;
+                                }
+                            }
+                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
+                                continue;
+                            }
+                        }
+                        bestCandidate = current;
+                    }
+                }
+            }
+            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
+                bestCandidate = findNextFocusVertical(focused, bestCandidate, (Container) current, down);
+            }
+        }
+        return bestCandidate;
     }
 }

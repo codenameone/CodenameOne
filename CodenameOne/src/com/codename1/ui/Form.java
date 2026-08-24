@@ -1528,23 +1528,7 @@ public class Form extends Container implements TopLevelContainer {
     }
 
 
-    /// Returns true if the given dest component is in the column of the source component
-    private boolean isInSameColumn(Component source, Component dest) {
-        // workaround for NPE
-        if (source == null || dest == null) {
-            return false;
-        }
-        return Rectangle.intersects(source.getAbsoluteX(), 0,
-                source.getWidth(), Integer.MAX_VALUE, dest.getAbsoluteX(), dest.getAbsoluteY(),
-                dest.getWidth(), dest.getHeight());
-    }
 
-    /// Returns true if the given dest component is in the row of the source component
-    private boolean isInSameRow(Component source, Component dest) {
-        return Rectangle.intersects(0, source.getAbsoluteY(),
-                Integer.MAX_VALUE, source.getHeight(), dest.getAbsoluteX(), dest.getAbsoluteY(),
-                dest.getWidth(), dest.getHeight());
-    }
 
     /// Default command is invoked when a user presses fire, this functionality works
     /// well in some situations but might collide with elements such as navigation
@@ -4335,96 +4319,7 @@ public class Form extends Container implements TopLevelContainer {
         menuBar.removeCommand(cmd);
     }
 
-    private Component findNextFocusHorizontal(Component focused, Component bestCandidate, Container root, boolean right) {
-        int count = root.getComponentCount();
-        for (int iter = 0; iter < count; iter++) {
-            Component current = root.getComponentAt(iter);
-            if (current.isFocusable()) {
-                if (isInSameRow(focused, current)) {
-                    int currentX = current.getAbsoluteX();
-                    int focusedX = focused.getAbsoluteX();
-                    if (right) {
-                        if (focusedX < currentX) {
-                            if (bestCandidate != null) {
-                                if (bestCandidate.getAbsoluteX() < currentX) {
-                                    continue;
-                                }
-                            }
-                            bestCandidate = current;
-                        }
-                    } else {
-                        if (focusedX > currentX) {
-                            if (bestCandidate != null) {
-                                if (bestCandidate.getAbsoluteX() > currentX) {
-                                    continue;
-                                }
-                            }
-                            bestCandidate = current;
-                        }
-                    }
-                }
-            }
-            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
-                bestCandidate = findNextFocusHorizontal(focused, bestCandidate, (Container) current, right);
-            }
-        }
-        return bestCandidate;
-    }
 
-    private Component findNextFocusVertical(Component focused, Component bestCandidate, Container root, boolean down) {
-        int count = root.getComponentCount();
-        for (int iter = 0; iter < count; iter++) {
-            Component current = root.getComponentAt(iter);
-            if (current.isFocusable()) {
-                int currentY = current.getAbsoluteY();
-                int focusedY = 0;
-                if (focused != null) {
-                    focusedY = focused.getAbsoluteY();
-                }
-                if (down) {
-                    if (focusedY < currentY) {
-                        if (bestCandidate != null) {
-                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);
-                            if (bestCandidate.getAbsoluteY() < currentY) {
-                                if (exitingInSame) {
-                                    continue;
-                                }
-                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
-                                    continue;
-                                }
-                            }
-                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
-                                continue;
-                            }
-                        }
-                        bestCandidate = current;
-                    }
-                } else {
-                    if (focusedY > currentY) {
-                        if (bestCandidate != null) {
-                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);
-                            if (bestCandidate.getAbsoluteY() > currentY) {
-                                if (exitingInSame) {
-                                    continue;
-                                }
-                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
-                                    continue;
-                                }
-                            }
-                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
-                                continue;
-                            }
-                        }
-                        bestCandidate = current;
-                    }
-                }
-            }
-            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
-                bestCandidate = findNextFocusVertical(focused, bestCandidate, (Container) current, down);
-            }
-        }
-        return bestCandidate;
-    }
 
     /// This method returns the next focusable Component vertically
     ///
@@ -4442,23 +4337,23 @@ public class Form extends Container implements TopLevelContainer {
     public Component findNextFocusVertical(boolean down) {
         Component c = null;
         if (formLayeredPane != null) {
-            c = findNextFocusVertical(focused, null, formLayeredPane, down);
+            c = TopLevelSupport.findNextFocusVertical(focused, null, formLayeredPane, down);
             if (c != null) {
                 return c;
             }
         }
         Container actual = getActualPane();
-        c = findNextFocusVertical(focused, null, actual, down);
+        c = TopLevelSupport.findNextFocusVertical(focused, null, actual, down);
         if (c != null) {
             return c;
         }
         if (cyclicFocus) {
-            c = findNextFocusVertical(focused, null, actual, !down);
+            c = TopLevelSupport.findNextFocusVertical(focused, null, actual, !down);
             if (c != null) {
-                Component current = findNextFocusVertical(c, null, actual, !down);
+                Component current = TopLevelSupport.findNextFocusVertical(c, null, actual, !down);
                 while (current != null) {
                     c = current;
-                    current = findNextFocusVertical(c, null, actual, !down);
+                    current = TopLevelSupport.findNextFocusVertical(c, null, actual, !down);
                 }
                 return c;
             }
@@ -4482,23 +4377,23 @@ public class Form extends Container implements TopLevelContainer {
     public Component findNextFocusHorizontal(boolean right) {
         Component c = null;
         if (formLayeredPane != null) {
-            c = findNextFocusHorizontal(focused, null, formLayeredPane, right);
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, formLayeredPane, right);
             if (c != null) {
                 return c;
             }
         }
         Container actual = getActualPane();
-        c = findNextFocusHorizontal(focused, null, actual, right);
+        c = TopLevelSupport.findNextFocusHorizontal(focused, null, actual, right);
         if (c != null) {
             return c;
         }
         if (cyclicFocus) {
-            c = findNextFocusHorizontal(focused, null, actual, !right);
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, actual, !right);
             if (c != null) {
-                Component current = findNextFocusHorizontal(c, null, actual, !right);
+                Component current = TopLevelSupport.findNextFocusHorizontal(c, null, actual, !right);
                 while (current != null) {
                     c = current;
-                    current = findNextFocusHorizontal(c, null, actual, !right);
+                    current = TopLevelSupport.findNextFocusHorizontal(c, null, actual, !right);
                 }
                 return c;
             }

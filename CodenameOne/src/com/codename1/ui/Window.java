@@ -3377,6 +3377,139 @@ public class Window extends Container implements TopLevelContainer {
         }
     }
 
+    /// The component below the focus owner, honouring an explicit
+    /// `Component#getNextFocusDown()` before scanning by position, exactly as a `Form`
+    /// does.
+    ///
+    /// `Container`'s versions of these four answer null, which is right for an
+    /// ordinary container and wrong for a top level: every arrow key in a window
+    /// resolved through them and moved focus nowhere, so a window could not be
+    /// navigated from the keyboard at all.
+    @Override
+    Component findNextFocusDown() {
+        if (focused != null) {
+            if (focused.getNextFocusDown() != null) {
+                return focused.getNextFocusDown();
+            }
+            return findNextFocusVertical(true);
+        }
+        return null;
+    }
+
+    /// The counterpart to `#findNextFocusDown()`.
+    @Override
+    Component findNextFocusUp() {
+        if (focused != null) {
+            if (focused.getNextFocusUp() != null) {
+                return focused.getNextFocusUp();
+            }
+            return findNextFocusVertical(false);
+        }
+        return null;
+    }
+
+    /// The component right of the focus owner, honouring an explicit
+    /// `Component#getNextFocusRight()` before scanning by position.
+    @Override
+    Component findNextFocusRight() {
+        if (focused != null) {
+            if (focused.getNextFocusRight() != null) {
+                return focused.getNextFocusRight();
+            }
+            return findNextFocusHorizontal(true);
+        }
+        return null;
+    }
+
+    /// The counterpart to `#findNextFocusRight()`.
+    @Override
+    Component findNextFocusLeft() {
+        if (focused != null) {
+            if (focused.getNextFocusLeft() != null) {
+                return focused.getNextFocusLeft();
+            }
+            return findNextFocusHorizontal(false);
+        }
+        return null;
+    }
+
+    /// Scans this window for the next focusable component above or below the focus
+    /// owner, through the shared traversal `Form` uses.
+    ///
+    /// The layered pane is searched first when there is one, so a component in an
+    /// overlay takes focus before one underneath it, and `isCyclicFocus()` wraps to
+    /// the far end when nothing lies in the direction asked for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `down`: true for the next component below, false for above
+    ///
+    /// #### Returns
+    ///
+    /// the next focusable component, or null
+    private Component findNextFocusVertical(boolean down) {
+        Component c;
+        if (layeredPane != null) {
+            c = TopLevelSupport.findNextFocusVertical(focused, null, layeredPane, down);
+            if (c != null) {
+                return c;
+            }
+        }
+        Container actual = getActualPane();
+        c = TopLevelSupport.findNextFocusVertical(focused, null, actual, down);
+        if (c != null) {
+            return c;
+        }
+        if (isCyclicFocus()) {
+            c = TopLevelSupport.findNextFocusVertical(focused, null, actual, !down);
+            if (c != null) {
+                Component current = TopLevelSupport.findNextFocusVertical(c, null, actual, !down);
+                while (current != null) {
+                    c = current;
+                    current = TopLevelSupport.findNextFocusVertical(c, null, actual, !down);
+                }
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /// The horizontal counterpart to `#findNextFocusVertical(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `right`: true for the next component to the right, false for the left
+    ///
+    /// #### Returns
+    ///
+    /// the next focusable component, or null
+    private Component findNextFocusHorizontal(boolean right) {
+        Component c;
+        if (layeredPane != null) {
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, layeredPane, right);
+            if (c != null) {
+                return c;
+            }
+        }
+        Container actual = getActualPane();
+        c = TopLevelSupport.findNextFocusHorizontal(focused, null, actual, right);
+        if (c != null) {
+            return c;
+        }
+        if (isCyclicFocus()) {
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, actual, !right);
+            if (c != null) {
+                Component current = TopLevelSupport.findNextFocusHorizontal(c, null, actual, !right);
+                while (current != null) {
+                    c = current;
+                    current = TopLevelSupport.findNextFocusHorizontal(c, null, actual, !right);
+                }
+                return c;
+            }
+        }
+        return null;
+    }
+
     /// Moves focus in the direction of an arrow key, mirroring `Form`'s traversal.
     private void updateWindowFocus(int gameAction) {
         Component next = null;

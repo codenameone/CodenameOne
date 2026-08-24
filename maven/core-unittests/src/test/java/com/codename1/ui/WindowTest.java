@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
@@ -2489,6 +2490,73 @@ class WindowTest extends UITestBase {
 
         w.showNotify();
         assertTrue(w.isWindowShowing(), "restoring must resume painting");
+        w.dispose();
+    }
+
+    @FormTest
+    void arrowKeysMoveFocusBetweenAWindowsControls() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("keyboard", new BoxLayout(BoxLayout.Y_AXIS));
+        Button top = new Button("top");
+        Button middle = new Button("middle");
+        Button bottom = new Button("bottom");
+        w.add(top);
+        w.add(middle);
+        w.add(bottom);
+        w.setWindowSize(400, 300);
+        w.show();
+        w.asContainer().revalidate();
+        DisplayTest.flushEdt();
+
+        w.setFocused(top);
+        // The fake implementation maps a key code to a game action identically, so the
+        // game action is what gets sent.
+        //
+        // Container's directional lookups answer null, which is right for an ordinary
+        // container and wrong for a top level: every arrow key resolved through them,
+        // so a window could not be navigated from the keyboard at all.
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+        DisplayTest.flushEdt();
+        assertSame(middle, w.getFocused(),
+                "the down arrow has to move focus to the next control down");
+
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+        DisplayTest.flushEdt();
+        assertSame(bottom, w.getFocused(), "and again to the one after it");
+
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_UP);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_UP);
+        DisplayTest.flushEdt();
+        assertSame(middle, w.getFocused(), "and the up arrow comes back");
+        w.dispose();
+    }
+
+    @FormTest
+    void anExplicitNextFocusWinsOverThePositionalScanInAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("explicit", new BoxLayout(BoxLayout.Y_AXIS));
+        Button top = new Button("top");
+        Button middle = new Button("middle");
+        Button bottom = new Button("bottom");
+        w.add(top);
+        w.add(middle);
+        w.add(bottom);
+        // Skips the middle, which the positional scan would have chosen.
+        top.setNextFocusDown(bottom);
+        w.setWindowSize(400, 300);
+        w.show();
+        w.asContainer().revalidate();
+        DisplayTest.flushEdt();
+
+        w.setFocused(top);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+        DisplayTest.flushEdt();
+        assertSame(bottom, w.getFocused(),
+                "a component's own next-focus has to win over the positional scan, as "
+                        + "it does on a form");
         w.dispose();
     }
 
