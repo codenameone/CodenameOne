@@ -158,8 +158,7 @@ public abstract class CodenameOneImplementation {
     private final Hashtable builtinSounds = new Hashtable();
     /// For use inside paintDirty() so that we don't have to instantiate
     /// a rectangle each time it is called.
-    private final Rectangle paintDirtyTmpRect = new Rectangle();
-    private Object displayLock;
+    Object displayLock;
     private boolean bidi;
     private Object lightweightClipboard;
     private Hashtable linearGradientCache;
@@ -245,7 +244,7 @@ public abstract class CodenameOneImplementation {
     private int dragActivationY = 0;
     private int dragStartPercentage = 3;
     private Form currentForm;
-    private final PaintSurface mainSurface = new PaintSurface(null);
+    private final PaintSurface mainSurface = new PaintSurface(this, null);
     private ArrayList<PaintSurface> windowSurfaces;
     private String packageName;
     private Component editingText;
@@ -824,13 +823,13 @@ public abstract class CodenameOneImplementation {
     ///
     /// false by default
     public boolean hasPendingPaints() {
-        if (mainSurface.paintQueueFill != 0) {
+        if (mainSurface.hasPendingPaints()) {
             return true;
         }
         if (windowSurfaces != null) {
             int len = windowSurfaces.size();
             for (int iter = 0; iter < len; iter++) {
-                if (windowSurfaces.get(iter).paintQueueFill != 0) {
+                if (windowSurfaces.get(iter).hasPendingPaints()) {
                     return true;
                 }
             }
@@ -838,37 +837,11 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// Everything needed to paint one surface: its own dirty queue and its own
-    /// `Graphics`. The application's main surface is one of these, and each native
-    /// window adds another.
+    /// Creates the paint surface backing a native window and registers it, so that
+    /// the sweeps over every surface -- pending paints, cancelled repaints -- see it.
     ///
-    /// Before desktop windows existed this state was four fields on
-    /// `CodenameOneImplementation`; grouping it is what lets the same paint routine
-    /// serve every surface instead of being copied per surface.
-    public static final class PaintSurface {
-
-        /// The native window this surface draws into, or null for the main surface.
-        private final Object nativeWindow;
-        private Animation[] paintQueue = new Animation[200];
-        private Animation[] paintQueueTemp = new Animation[200];
-        private int paintQueueFill;
-        private Graphics graphics;
-
-        PaintSurface(Object nativeWindow) {
-            this.nativeWindow = nativeWindow;
-        }
-
-        /// Returns the native window this surface draws into.
-        ///
-        /// #### Returns
-        ///
-        /// the native window peer, or null for the main surface
-        Object getNativeWindow() {
-            return nativeWindow;
-        }
-    }
-
-    /// Creates the paint surface backing a native window.
+    /// This is the whole of the window painting API on this class: everything else a
+    /// surface can do is a method on the surface itself.
     ///
     /// #### Parameters
     ///
@@ -876,9 +849,9 @@ public abstract class CodenameOneImplementation {
     ///
     /// #### Returns
     ///
-    /// the opaque surface handle
-    public final Object createPaintSurface(Object nativeWindow) {
-        PaintSurface surface = new PaintSurface(nativeWindow);
+    /// the new surface
+    public final PaintSurface createPaintSurface(Object nativeWindow) {
+        PaintSurface surface = new PaintSurface(this, nativeWindow);
         synchronized (displayLock) {
             if (windowSurfaces == null) {
                 windowSurfaces = new ArrayList<PaintSurface>();
@@ -888,72 +861,16 @@ public abstract class CodenameOneImplementation {
         return surface;
     }
 
-    /// Drops everything queued on a window's paint surface, keeping the surface
-    /// itself. A hidden window is not painted, so work queued on it would never
-    /// drain -- and an undrained queue keeps `#hasPendingPaints()` true, which keeps
-    /// the event dispatch thread awake spinning on it.
+    /// Unregisters a surface being disposed. Called by `PaintSurface#dispose()`
+    /// under the display lock, which is why it does not take it again.
     ///
     /// #### Parameters
     ///
-    /// - `surface`: the surface handle to clear
-    public final void clearPaintSurface(Object surface) {
-        PaintSurface s = asPaintSurface(surface);
-        if (s == null) {
-            return;
+    /// - `surface`: the surface to forget
+    void forgetWindowSurface(PaintSurface surface) {
+        if (windowSurfaces != null) {
+            windowSurfaces.remove(surface);
         }
-        synchronized (displayLock) {
-            s.paintQueueFill = 0;
-            java.util.Arrays.fill(s.paintQueue, null);
-            java.util.Arrays.fill(s.paintQueueTemp, null);
-        }
-    }
-
-    /// Releases a window's paint surface, dropping anything still queued on it so a
-    /// disposed window cannot pin its component tree.
-    ///
-    /// #### Parameters
-    ///
-    /// - `surface`: the surface handle to release
-    public final void disposePaintSurface(Object surface) {
-        if (surface == null) {
-            return;
-        }
-        PaintSurface s = asPaintSurface(surface);
-        if (s == null) {
-            return;
-        }
-        synchronized (displayLock) {
-            s.paintQueueFill = 0;
-            java.util.Arrays.fill(s.paintQueue, null);
-            java.util.Arrays.fill(s.paintQueueTemp, null);
-            s.graphics = null;
-            if (windowSurfaces != null) {
-                windowSurfaces.remove(s);
-            }
-        }
-    }
-
-    /// Installs the `Graphics` a window's surface paints through. `Graphics` cannot
-    /// be constructed outside `com.codename1.ui`, so the framework creates it and
-    /// hands it over here, exactly as it does for the main surface.
-    ///
-    /// #### Parameters
-    ///
-    /// - `surface`: the surface handle
-    ///
-    /// - `g`: the graphics to install
-    public final void setPaintSurfaceGraphics(Object surface, Graphics g) {
-        PaintSurface s = asPaintSurface(surface);
-        if (s != null) {
-            s.graphics = g;
-        }
-    }
-
-    private PaintSurface asPaintSurface(Object surface) {
-        if (surface instanceof PaintSurface) {
-            return (PaintSurface) surface;
-        }
-        return null;
     }
 
     /// Return the number of alpha levels supported by the implementation.
@@ -1018,7 +935,7 @@ public abstract class CodenameOneImplementation {
     /// - `c`: The component whose paintable bounds we are interested in.
     ///
     /// - `out`: A rectangle to return the bounds in.
-    private void getPaintableBounds(Component c, Rectangle out) {
+    void getPaintableBounds(Component c, Rectangle out) {
         int x = c.getAbsoluteX() + c.getScrollX();
         int y = c.getAbsoluteY() + c.getScrollY();
         int x2 = x + c.getWidth();
@@ -1041,141 +958,7 @@ public abstract class CodenameOneImplementation {
     /// Invoked by the EDT to paint the dirty regions of the application's main
     /// surface.
     public void paintDirty() {
-        paintDirtySurface(mainSurface, getDisplayWidth(), getDisplayHeight());
-    }
-
-    /// Invoked by the EDT to paint the dirty regions of one native window.
-    ///
-    /// #### Parameters
-    ///
-    /// - `surface`: the window's paint surface, as returned by
-    /// `#createPaintSurface(java.lang.Object)`
-    public void paintDirtyWindow(Object surface, int width, int height) {
-        PaintSurface s = asPaintSurface(surface);
-        if (s == null || s.graphics == null) {
-            return;
-        }
-        if (width <= 0 || height <= 0) {
-            return;
-        }
-        // The clip universe is the *framework's* size for the window, which is also
-        // what the port sizes its raster from. Taking it from the native drawable
-        // instead let the two disagree: a window resized larger than the platform had
-        // yet reported got a full sized raster and a clip still the size of the old
-        // one, so everything outside the old bounds was never painted -- a capture
-        // showed the content in the corner of an otherwise black frame.
-        paintDirtySurface(s, width, height);
-    }
-
-    /// Paints one surface's dirty regions. The main surface and every window share
-    /// this single routine, so the clip and paintable-bounds handling that issue
-    /// #5273 turns on cannot drift between them.
-    ///
-    /// #### Parameters
-    ///
-    /// - `s`: the surface to paint
-    ///
-    /// - `dwidth`: the surface width, used as the clip universe
-    ///
-    /// - `dheight`: the surface height, used as the clip universe
-    private void paintDirtySurface(PaintSurface s, int dwidth, int dheight) {
-        int size = 0;
-        synchronized (displayLock) {
-            size = s.paintQueueFill;
-            Animation[] array = s.paintQueue;
-            s.paintQueue = s.paintQueueTemp;
-            s.paintQueueTemp = array;
-            s.paintQueueFill = 0;
-        }
-        if (size > 0) {
-            Graphics wrapper = s.graphics;
-            int topX = dwidth;
-            int topY = dheight;
-            int bottomX = 0;
-            int bottomY = 0;
-            for (int iter = 0; iter < size; iter++) {
-                Animation ani = s.paintQueueTemp[iter];
-
-                // might happen due to paint queue removal
-                if (ani == null) {
-                    continue;
-                }
-                s.paintQueueTemp[iter] = null;
-                wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
-                wrapper.resetAffine();
-                // Reset the flush-region hint to the full screen before the
-                // full-screen clip below so neither it nor a previous
-                // component's tighter region wrongly clamps this reset (#5273).
-                setSurfaceDirtyRegionClip(s, 0, 0, dwidth, dheight);
-                wrapper.setClip(0, 0, dwidth, dheight);
-                if (ani instanceof Component) {
-                    Component cmp = (Component) ani;
-                    Rectangle dirty = cmp.getDirtyRegion();
-                    if (dirty != null) {
-                        Dimension d = dirty.getSize();
-                        wrapper.setClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
-                        cmp.setDirtyRegion(null);
-                    }
-                    // Confine any clip this component sets while painting to its
-                    // flushed region on immediate-mode ports. Use the paintable
-                    // bounds -- the region retained ports clamp to via the
-                    // flushGraphics call below -- NOT the dirty region, which
-                    // repaint() nulls (Component.repaint), in which case it would
-                    // fall back to the full screen and the clip could still escape
-                    // (#5273). Computed before paintComponent (paint does not move
-                    // the component) so the clip set during paint can be clamped.
-                    getPaintableBounds(cmp, paintDirtyTmpRect);
-                    setSurfaceDirtyRegionClip(s, paintDirtyTmpRect.getX(), paintDirtyTmpRect.getY(),
-                            paintDirtyTmpRect.getWidth(), paintDirtyTmpRect.getHeight());
-                    cmp.paintComponent(wrapper);
-                    // Recompute the paintable bounds AFTER paint for the flush
-                    // region below: paintComponent can lay the component out (its
-                    // bounds may change), and the retained ports clamp to / flush
-                    // exactly this rect, so it must match the pre-#5273 value to
-                    // the pixel (the before-paint value above is only the immediate
-                    // -mode clip hint).
-                    getPaintableBounds(cmp, paintDirtyTmpRect);
-                    int cmpAbsX = paintDirtyTmpRect.getX();
-                    topX = Math.min(cmpAbsX, topX);
-                    bottomX = Math.max(cmpAbsX + paintDirtyTmpRect.getWidth(), bottomX);
-                    int cmpAbsY = paintDirtyTmpRect.getY();
-                    topY = Math.min(cmpAbsY, topY);
-                    bottomY = Math.max(cmpAbsY + paintDirtyTmpRect.getHeight(), bottomY);
-                } else {
-                    bottomX = dwidth;
-                    bottomY = dheight;
-                    topX = 0;
-                    topY = 0;
-                    ani.paint(wrapper);
-                }
-            }
-
-            if (s.nativeWindow == null) {
-                paintOverlay(wrapper);
-                //Log.p("Flushing graphics : "+topX+","+topY+","+bottomX+","+bottomY);
-                flushGraphics(topX, topY, bottomX - topX, bottomY - topY);
-            } else {
-                WindowManager wm = getWindowManager();
-                if (wm != null) {
-                    wm.flushGraphics(s.nativeWindow, topX, topY, bottomX - topX, bottomY - topY);
-                }
-            }
-        }
-    }
-
-    /// Routes the flush-region hint to whichever surface is being painted. The
-    /// window form defaults to inert rather than delegating to the main surface
-    /// version, so a port that has not opted in cannot clamp a window's clip
-    /// against the main window's state.
-    private void setSurfaceDirtyRegionClip(PaintSurface s, int x, int y, int w, int h) {
-        if (s.nativeWindow == null) {
-            setPaintDirtyRegionClip(x, y, w, h);
-            return;
-        }
-        WindowManager wm = getWindowManager();
-        if (wm != null) {
-            wm.setPaintDirtyRegionClip(s.nativeWindow, x, y, w, h);
-        }
+        mainSurface.paintDirty(getDisplayWidth(), getDisplayHeight());
     }
 
     /// Reports the clip region that bounds the current component's flush as
@@ -1230,7 +1013,7 @@ public abstract class CodenameOneImplementation {
     /// @return a graphics object, either recycled or new, this object will be
     /// used on the EDT
     protected Graphics getCodenameOneGraphics() {
-        return mainSurface.graphics;
+        return mainSurface.getGraphics();
     }
 
     /// Installs the Codename One graphics object into the implementation
@@ -1239,7 +1022,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `g`: graphics object for use by the implementation
     public void setCodenameOneGraphics(Graphics g) {
-        mainSurface.graphics = g;
+        mainSurface.setGraphics(g);
     }
 
     /// A flag that can be overridden by a platform to indicate that native
@@ -1271,28 +1054,18 @@ public abstract class CodenameOneImplementation {
     /// - `cmp`: the component to
     public void cancelRepaint(Animation cmp) {
         synchronized (displayLock) {
-            if (cancelRepaint(mainSurface, cmp)) {
+            if (mainSurface.cancelRepaint(cmp)) {
                 return;
             }
             if (windowSurfaces != null) {
                 int len = windowSurfaces.size();
                 for (int iter = 0; iter < len; iter++) {
-                    if (cancelRepaint(windowSurfaces.get(iter), cmp)) {
+                    if (windowSurfaces.get(iter).cancelRepaint(cmp)) {
                         return;
                     }
                 }
             }
         }
-    }
-
-    private boolean cancelRepaint(PaintSurface s, Animation cmp) {
-        for (int iter = 0; iter < s.paintQueueFill; iter++) {
-            if (s.paintQueue[iter] == cmp) { //NOPMD CompareObjectsWithEquals
-                s.paintQueue[iter] = null;
-                return true;
-            }
-        }
-        return false;
     }
 
     /// Invoked to add an element to the paintQueue
@@ -1301,51 +1074,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `cmp`: component or animation to push into the paint queue
     public void repaint(Animation cmp) {
-        repaintSurface(mainSurface, cmp);
-    }
-
-    /// Queues a repaint against one native window's surface rather than the main one.
-    ///
-    /// #### Parameters
-    ///
-    /// - `surface`: the window's paint surface
-    ///
-    /// - `cmp`: the animation or component to repaint
-    public void repaintWindow(Object surface, Animation cmp) {
-        PaintSurface s = asPaintSurface(surface);
-        if (s != null) {
-            repaintSurface(s, cmp);
-        }
-    }
-
-    private void repaintSurface(PaintSurface s, Animation cmp) {
-        synchronized (displayLock) {
-            for (int iter = 0; iter < s.paintQueueFill; iter++) {
-                Animation ani = s.paintQueue[iter];
-                if (ani == cmp) { //NOPMD CompareObjectsWithEquals
-                    return;
-                }
-                //no need to paint a Component if one of its parent is already in the queue
-                if (ani instanceof Container && cmp instanceof Component) {
-                    Component parent = ((Component) cmp).getParent();
-                    while (parent != null) {
-                        if (parent == ani) { //NOPMD CompareObjectsWithEquals
-                            return;
-                        }
-                        parent = parent.getParent();
-                    }
-                }
-            }
-            // overcrowding the queue don't try to grow the array!
-            if (s.paintQueueFill >= s.paintQueue.length) {
-                System.out.println("Warning paint queue size exceeded, please watch the amount of repaint calls");
-                return;
-            }
-
-            s.paintQueue[s.paintQueueFill] = cmp;
-            s.paintQueueFill++;
-            displayLock.notifyAll();
-        }
+        mainSurface.repaint(cmp);
     }
 
     /// Extracts RGB data from the given native image and places it in the given array
@@ -3629,7 +3358,7 @@ public abstract class CodenameOneImplementation {
             keyReleased(keyCode);
             return;
         }
-        Display.getInstance().windowKeyReleased(windowId, keyCode);
+        com.codename1.ui.Desktop.getInstance().windowKeyReleased(windowId, keyCode);
     }
 
     /// Returns the native window peer owning the given component, or null when the
@@ -3644,7 +3373,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// the owning window's native peer, or null for the main surface
     public final Object getWindowPeerForComponent(Component cmp) {
-        return Display.getInstance().getWindowPeerForComponent(cmp);
+        return com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
     }
 
     /// Subclasses should invoke this method, it delegates the event to the display and into
@@ -9616,7 +9345,8 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                if (d.windowMouseWheelEvent(windowId, x, y, scrollX, scrollY, precise, modifiers)) {
+                if (com.codename1.ui.Desktop.getInstance().windowMouseWheelEvent(
+                        windowId, x, y, scrollX, scrollY, precise, modifiers)) {
                     return;
                 }
                 playWheelScrollGesture(d, windowId, x, y, scrollX, scrollY);

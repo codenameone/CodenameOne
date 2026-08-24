@@ -1941,10 +1941,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         int[] ys = new int[]{y};
         switch (type) {
             case 1:
-                Display.getInstance().windowPointerHoverPressed(windowId, xs, ys);
+                com.codename1.ui.Desktop.getInstance().windowPointerHoverPressed(windowId, xs, ys);
                 break;
             case 2:
-                Display.getInstance().windowPointerHoverReleased(windowId, xs, ys);
+                com.codename1.ui.Desktop.getInstance().windowPointerHoverReleased(windowId, xs, ys);
                 break;
             default:
                 Desktop.getInstance().windowPointerHover(windowId, xs, ys);
@@ -1970,7 +1970,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         // window's hierarchy and runs application pinch handlers.
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                Display.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+                com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, scale);
             }
         });
     }
@@ -1984,7 +1984,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         // Marshalled for the same reason as windowPinchCallback.
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                Display.getInstance().windowRotationGesture(windowId, x, y, radians);
+                com.codename1.ui.Desktop.getInstance().windowRotationGesture(windowId, x, y, radians);
             }
         });
     }
@@ -2105,7 +2105,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (pressed) {
             Desktop.getInstance().windowKeyPressed(windowId, keyCode);
         } else {
-            Display.getInstance().windowKeyReleased(windowId, keyCode);
+            com.codename1.ui.Desktop.getInstance().windowKeyReleased(windowId, keyCode);
         }
     }
 

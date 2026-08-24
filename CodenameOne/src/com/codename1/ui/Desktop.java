@@ -1061,6 +1061,141 @@ public final class Desktop {
         }
     }
 
+    /// Pushes a key release aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `keyCode`: keycode of the key event
+    public void windowKeyReleased(int windowId, int keyCode) {
+        if (windowId > 0) {
+            Display.getInstance().keyReleasedImpl(windowId, keyCode);
+        }
+    }
+
+    /// Pushes a hover press aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverPressed(int windowId, int[] x, int[] y) {
+        if (windowId > 0) {
+            Display.getInstance().pointerHoverPressedImpl(windowId, x, y);
+        }
+    }
+
+    /// Pushes a hover release aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverReleased(int windowId, int[] x, int[] y) {
+        if (windowId > 0) {
+            Display.getInstance().pointerHoverReleasedImpl(windowId, x, y);
+        }
+    }
+
+    /// Dispatches a wheel event that arrived over a native window.
+    ///
+    /// A port with desktop windows has to route the wheel explicitly: the main
+    /// surface version resolves the component from the current form, so a wheel over
+    /// a second window would either do nothing or scroll the main form instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    /// the application's main surface
+    ///
+    /// - `x`: the pointer x position in window pixels
+    ///
+    /// - `y`: the pointer y position in window pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a
+    /// trackpad
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    ///
+    /// #### Returns
+    ///
+    /// true if a listener consumed the wheel event
+    public boolean windowMouseWheelEvent(int windowId, int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
+        return Display.getInstance().windowMouseWheelEventImpl(windowId, x, y, scrollX, scrollY,
+                precise, modifiers);
+    }
+
+    /// Dispatches a magnify (pinch) gesture that arrived over a native window. Window
+    /// 0 is the application's main surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1
+    /// zooms out
+    public void windowMagnifyGesture(int windowId, int x, int y, float scale) {
+        Display.getInstance().windowMagnifyGestureImpl(windowId, x, y, scale);
+    }
+
+    /// Dispatches a rotation (twist) gesture that arrived over a native window. Window
+    /// 0 is the application's main surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `radians`: the incremental rotation in radians, positive is clockwise
+    public void windowRotationGesture(int windowId, int x, int y, float radians) {
+        Display.getInstance().windowRotationGestureImpl(windowId, x, y, radians);
+    }
+
+    /// Returns the native window peer owning the given component, or null when it
+    /// belongs to the application's main surface. Ports use this to place native peers
+    /// and native text editors into the correct window.
+    ///
+    /// It lives here rather than on `Display` because this class owns the windows;
+    /// `Display` answers for the application's single main surface and knowing which
+    /// window a component is in is not a question about that surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to locate
+    ///
+    /// #### Returns
+    ///
+    /// the owning window's native peer, or null for the main surface
+    public Object getWindowPeerForComponent(Component cmp) {
+        if (cmp == null) {
+            return null;
+        }
+        TopLevelContainer top = cmp.getTopLevelContainer();
+        return top == null ? null : top.asContainer().topLevelNativePeer();
+    }
+
     /// Pushes a pointer drag aimed at one native window into Codename One.
     /// Invoked by the implementation, off the event dispatch thread.
     ///
@@ -1141,7 +1276,7 @@ public final class Desktop {
     Graphics createWindowGraphics(Window w) {
         Graphics g = new Graphics(Display.impl.getWindowManager().getNativeGraphics(w.getNativePeer()));
         g.paintPeersBehind = Display.impl.paintNativePeersBehind();
-        Display.impl.setPaintSurfaceGraphics(w.getPaintSurface(), g);
+        w.getPaintSurface().setGraphics(g);
         return g;
     }
 
@@ -1166,7 +1301,7 @@ public final class Desktop {
             }
             g.setGraphics(wm.getNativeGraphics(peer));
             w.flushRevalidateQueue();
-            Display.impl.paintDirtyWindow(w.getPaintSurface(), w.getWidth(), w.getHeight());
+            w.getPaintSurface().paintDirty(w.getWidth(), w.getHeight());
             w.repaintAnimations();
             // The window's raster exists from the moment it is shown, so a capture
             // before this point returns a blank frame of the right size. Recording

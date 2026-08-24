@@ -898,7 +898,7 @@ class WindowTest extends UITestBase {
         // blocker would answer "not blocked" for the main form and for every unrelated
         // window, silently letting input back in while an application modal is still up.
         // The wheel entry point is the one that reports the answer synchronously.
-        Display d = Display.getInstance();
+        Desktop d = Desktop.getInstance();
         assertTrue(d.windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
                 "the main form stays blocked while an application modal is registered");
 
@@ -1046,7 +1046,7 @@ class WindowTest extends UITestBase {
         // Window modality blocks the owning window. There is none, so it blocks
         // nothing -- treating that as main-form ownership would block the main form
         // on a window that never claimed it.
-        assertFalse(Display.getInstance().windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+        assertFalse(Desktop.getInstance().windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
                 "the main form is not the owner, so it must not be blocked");
         w.dispose();
     }
@@ -1181,8 +1181,8 @@ class WindowTest extends UITestBase {
 
         // Aimed at the middle of the content, not the corner: the window's title
         // area covers the top rows and would answer the hit test instead.
-        Display.getInstance().windowMagnifyGesture(w.getWindowId(), 150, 120, 1.5f);
-        Display.getInstance().windowMagnifyGesture(0, 150, 120, 1.5f);
+        Desktop.getInstance().windowMagnifyGesture(w.getWindowId(), 150, 120, 1.5f);
+        Desktop.getInstance().windowMagnifyGesture(0, 150, 120, 1.5f);
         // Disposed before asserting: a window left open by a failing assertion is
         // painted for the rest of the class and times out every later test.
         w.dispose();
@@ -1279,11 +1279,11 @@ class WindowTest extends UITestBase {
 
         // Gestures are filtered like every other input event: pinching a window a
         // modal is blocking has to do nothing, the same way clicking it does.
-        Display.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
+        Desktop.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
         int whileBlocked = pinches[0];
 
         appModal.dispose();
-        Display.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
+        Desktop.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
         int afterRelease = pinches[0];
         blocked.dispose();
 
@@ -1412,7 +1412,7 @@ class WindowTest extends UITestBase {
         Display.getInstance().keyPressed(-91);
         Desktop.getInstance().windowKeyPressed(w.getWindowId(), -92);
         Display.getInstance().keyReleased(-91);
-        Display.getInstance().windowKeyReleased(w.getWindowId(), -92);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -92);
         DisplayTest.flushEdt();
         w.dispose();
 
@@ -1466,7 +1466,7 @@ class WindowTest extends UITestBase {
         // it has to be where the release is delivered, not merely something the
         // packet is checked against.
         Display.getInstance().keyPressed(-93);
-        Display.getInstance().windowKeyReleased(w.getWindowId(), -93);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -93);
         DisplayTest.flushEdt();
         w.dispose();
 
@@ -1560,7 +1560,7 @@ class WindowTest extends UITestBase {
         modal.setModalityType(Window.MODALITY_APPLICATION);
         modal.show();
 
-        Display.getInstance().windowKeyReleased(w.getWindowId(), -94);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -94);
         DisplayTest.flushEdt();
         int released = keys.released;
 
@@ -2209,7 +2209,7 @@ class WindowTest extends UITestBase {
         // Cancelling by the releasing window left the main surface repeating every
         // 10ms with the key physically up.
         Display.getInstance().keyPressed(66);
-        Display.getInstance().windowKeyReleased(w.getWindowId(), 66);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), 66);
         DisplayTest.flushEdt();
         boolean stillArmed = keyRepeatArmedFor(0) || keyRepeatArmedFor(w.getWindowId());
         w.dispose();
@@ -3933,7 +3933,7 @@ class WindowTest extends UITestBase {
                         + "never saw go down -- no release is coming for it");
 
         // And the release still resolves to the same place, so nothing is left latched.
-        Display.getInstance().windowKeyReleased(w.getWindowId(), -93);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -93);
         DisplayTest.flushEdt();
         assertEquals(1, mainKeys.released);
         assertEquals(0, windowKeys.released);

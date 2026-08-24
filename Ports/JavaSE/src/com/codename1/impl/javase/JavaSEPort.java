@@ -3238,7 +3238,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // Routed by window id like every other input this canvas
                     // produces: the canvas a trackpad magnify arrived on is the
                     // window whose component tree has to see it.
-                    Display.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+                    com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, scale);
                 }
             });
         }
@@ -11051,7 +11051,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private int editorWindowId(com.codename1.ui.Component cmp) {
-        Object peer = Display.getInstance().getWindowPeerForComponent(cmp);
+        Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
         return peer instanceof JavaSEWindowManager.Peer
                 ? ((JavaSEWindowManager.Peer) peer).windowId : 0;
     }
@@ -11083,7 +11083,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private C editorCanvasFor(com.codename1.ui.Component cmp) {
-        Object peer = Display.getInstance().getWindowPeerForComponent(cmp);
+        Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
         if (peer instanceof JavaSEWindowManager.Peer) {
             C owner = ((JavaSEWindowManager.Peer) peer).canvas;
             if (owner != null) {
@@ -20225,7 +20225,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private java.awt.Window resolveOwningFrame() {
-            Object peer = Display.getInstance().getWindowPeerForComponent(this);
+            Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(this);
             if (peer instanceof JavaSEWindowManager.Peer) {
                 JavaSEWindowManager.Peer owner = (JavaSEWindowManager.Peer) peer;
                 if (owner.frame != null) {

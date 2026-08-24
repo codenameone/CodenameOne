@@ -823,11 +823,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     break;
                 case EVENT_PINCH:
                     // key is the incremental scale multiplier in 1/10000 units.
-                    Display.getInstance().windowMagnifyGesture(windowId, x, y, key / GESTURE_FIXED);
+                    com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, key / GESTURE_FIXED);
                     break;
                 case EVENT_ROTATE:
                     // key is the incremental rotation in 1/10000 radians.
-                    Display.getInstance().windowRotationGesture(windowId, x, y, key / GESTURE_FIXED);
+                    com.codename1.ui.Desktop.getInstance().windowRotationGesture(windowId, x, y, key / GESTURE_FIXED);
                     break;
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();

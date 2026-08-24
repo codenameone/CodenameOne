@@ -94,7 +94,7 @@ public class Window extends Container implements TopLevelContainer {
 
     private final int windowId;
     private Object nativePeer;
-    private Object paintSurface;
+    private com.codename1.impl.PaintSurface paintSurface;
     private Graphics windowGraphics;
     /// Set as soon as dispose() begins, so re-entering it is a no-op.
     private boolean disposing;
@@ -284,8 +284,18 @@ public class Window extends Container implements TopLevelContainer {
         return nativePeer;
     }
 
-    Object getPaintSurface() {
+    com.codename1.impl.PaintSurface getPaintSurface() {
         return paintSurface;
+    }
+
+    /// Drops everything queued on this window's surface, if it has one yet. A window
+    /// that was never shown has no surface, and callers below can be reached in that
+    /// state -- hide() most obviously. The handle-based API this replaced tolerated a
+    /// null surface, and dropping that tolerance would turn those into a failure.
+    private void clearPaintSurface() {
+        if (paintSurface != null) {
+            paintSurface.clear();
+        }
     }
 
     Graphics getWindowGraphics() {
@@ -712,7 +722,7 @@ public class Window extends Container implements TopLevelContainer {
 
     private void repaintAnimation(Animation a) {
         if (paintSurface != null) {
-            Display.impl.repaintWindow(paintSurface, a);
+            paintSurface.repaint(a);
         }
     }
 
@@ -1531,7 +1541,7 @@ public class Window extends Container implements TopLevelContainer {
         cancelPendingInput();
         releaseModal();
         setVisible(false);
-        Display.impl.clearPaintSurface(paintSurface);
+        clearPaintSurface();
         fireWindowEvent(WindowEvent.Type.Hidden);
     }
 
@@ -1669,7 +1679,7 @@ public class Window extends Container implements TopLevelContainer {
             return false;
         }
         // The surface is being rebuilt, so nothing painted so far survives.
-        Display.impl.clearPaintSurface(paintSurface);
+        clearPaintSurface();
         paintedOnce = false;
         repaint();
         return true;
@@ -2030,7 +2040,7 @@ public class Window extends Container implements TopLevelContainer {
             // drain. Marking the hierarchy invisible stops components enqueuing, and
             // clearing the surface drops whatever was queued before this call.
             setVisible(false);
-            Display.impl.clearPaintSurface(paintSurface);
+            clearPaintSurface();
             manager().hide(nativePeer);
             fireWindowEvent(WindowEvent.Type.Hidden);
         }
@@ -2109,8 +2119,10 @@ public class Window extends Container implements TopLevelContainer {
         }
         // dropping the surface also drops anything queued on it, so a disposed
         // window cannot pin its component tree
-        Display.impl.disposePaintSurface(paintSurface);
-        paintSurface = null;
+        if (paintSurface != null) {
+            paintSurface.dispose();
+            paintSurface = null;
+        }
         nativePeer = null;
         windowGraphics = null;
         // showModal parks on Display.lock and wakes on this flag, so publish it under
@@ -2382,7 +2394,7 @@ public class Window extends Container implements TopLevelContainer {
         // queue, which spins the event dispatch thread until the window is restored.
         // Nothing is lost: showNotify repaints in full on restore.
         if (isVisible() && nativeVisible && paintSurface != null) {
-            Display.impl.repaintWindow(paintSurface, cmp);
+            paintSurface.repaint(cmp);
         }
     }
 
@@ -2463,7 +2475,7 @@ public class Window extends Container implements TopLevelContainer {
             // port that reallocates its buffer on resize would paint those stale
             // rectangles into a fresh one -- leaving the rest of the new, larger
             // surface unpainted. Drop them and repaint the whole window instead.
-            Display.impl.clearPaintSurface(paintSurface);
+            clearPaintSurface();
             // The frames painted so far were painted at the old size, so anything
             // waiting on hasPaintedOnce() has to wait again rather than capture a
             // surface that is half old content and half unpainted.
@@ -3203,7 +3215,7 @@ public class Window extends Container implements TopLevelContainer {
             iconified = true;
             // Nothing paints a window that is not on screen, so anything queued on its
             // surface would sit there keeping hasPendingPaints() true.
-            Display.impl.clearPaintSurface(paintSurface);
+            clearPaintSurface();
             fireWindowEvent(WindowEvent.Type.Minimized);
         }
     }

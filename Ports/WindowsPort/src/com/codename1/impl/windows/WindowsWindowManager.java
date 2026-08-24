@@ -60,7 +60,7 @@ public class WindowsWindowManager extends WindowManager {
     /// main window. The native editor needs this to parent its EDIT control to the
     /// right window rather than always to the main one.
     static int slotForComponent(com.codename1.ui.Component cmp) {
-        Object peer = com.codename1.ui.Display.getInstance().getWindowPeerForComponent(cmp);
+        Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
         if (peer == null) {
             return WindowsImplementation.MAIN_WINDOW_SLOT;
         }

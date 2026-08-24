@@ -174,7 +174,7 @@ public class LinuxWindowManager extends WindowManager {
     /// the right window's overlay; without it they were placed over the main window
     /// whatever window they belonged to.
     static int slotForComponent(com.codename1.ui.Component cmp) {
-        Object peer = com.codename1.ui.Display.getInstance().getWindowPeerForComponent(cmp);
+        Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
         if (peer == null) {
             return LinuxImplementation.MAIN_WINDOW_SLOT;
         }

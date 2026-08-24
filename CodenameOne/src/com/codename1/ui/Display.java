@@ -2324,7 +2324,7 @@ public final class Display extends CN1Constants {
     ///
     /// true if a listener consumed the wheel event
     public boolean fireMouseWheelEvent(int x, int y, int scrollX, int scrollY, boolean precise, int modifiers) {
-        return windowMouseWheelEvent(0, x, y, scrollX, scrollY, precise, modifiers);
+        return windowMouseWheelEventImpl(0, x, y, scrollX, scrollY, precise, modifiers);
     }
 
     /// Dispatches a magnify (pinch) gesture to the component under the given coordinates, walking up
@@ -2339,7 +2339,7 @@ public final class Display extends CN1Constants {
     ///
     /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
     public void fireMagnifyGesture(int x, int y, float scale) {
-        windowMagnifyGesture(0, x, y, scale);
+        windowMagnifyGestureImpl(0, x, y, scale);
     }
 
     /// Dispatches a rotation (twist) gesture to the component under the given coordinates, walking
@@ -2354,7 +2354,7 @@ public final class Display extends CN1Constants {
     ///
     /// - `radians`: the incremental rotation in radians, positive is clockwise
     public void fireRotationGesture(int x, int y, float radians) {
-        windowRotationGesture(0, x, y, radians);
+        windowRotationGestureImpl(0, x, y, radians);
     }
 
     /// The top level a gesture was aimed at, or null when it is gone or currently
@@ -2678,25 +2678,6 @@ public final class Display extends CN1Constants {
             return;
         }
         pointerPressedImpl(0, x, y);
-    }
-
-    /// Returns the native window peer owning the given component, or null when it
-    /// belongs to the application's main surface. Ports use this to place native
-    /// peers and native text editors into the correct window.
-    ///
-    /// #### Parameters
-    ///
-    /// - `cmp`: the component to locate
-    ///
-    /// #### Returns
-    ///
-    /// the owning window's native peer, or null for the main surface
-    public Object getWindowPeerForComponent(Component cmp) {
-        if (cmp == null) {
-            return null;
-        }
-        TopLevelContainer top = cmp.getTopLevelContainer();
-        return top == null ? null : top.asContainer().topLevelNativePeer();
     }
 
     void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
@@ -8496,7 +8477,7 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// true if a listener consumed the wheel event
-    public boolean windowMouseWheelEvent(int windowId, int x, int y, int scrollX, int scrollY,
+    boolean windowMouseWheelEventImpl(int windowId, int x, int y, int scrollX, int scrollY,
             boolean precise, int modifiers) {
         if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
             return true;
@@ -8546,7 +8527,7 @@ public final class Display extends CN1Constants {
     /// - `y`: the gesture y position in pixels, relative to that window
     ///
     /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
-    public void windowMagnifyGesture(int windowId, int x, int y, float scale) {
+    void windowMagnifyGestureImpl(int windowId, int x, int y, float scale) {
         Container f = gestureRoot(windowId);
         if (f == null) {
             return;
@@ -8577,7 +8558,7 @@ public final class Display extends CN1Constants {
     /// - `y`: the gesture y position in pixels, relative to that window
     ///
     /// - `radians`: the incremental rotation in radians, positive is clockwise
-    public void windowRotationGesture(int windowId, int x, int y, float radians) {
+    void windowRotationGestureImpl(int windowId, int x, int y, float radians) {
         Container f = gestureRoot(windowId);
         if (f == null) {
             return;
@@ -8600,7 +8581,7 @@ public final class Display extends CN1Constants {
     /// - `windowId`: the id the port was given when the window was created
     ///
     /// - `keyCode`: keycode of the key event
-    public void windowKeyReleased(int windowId, int keyCode) {
+    void keyReleasedImpl(int windowId, int keyCode) {
         if (windowId > 0) {
             cancelKeyRepeatForCode(keyCode);
             addSingleArgumentEvent(KEY_RELEASED | (windowId << 8), keyCode);
@@ -8617,7 +8598,7 @@ public final class Display extends CN1Constants {
     /// - `x`: the x position of the pointer, in window coordinates
     ///
     /// - `y`: the y position of the pointer, in window coordinates
-    public void windowPointerHoverPressed(int windowId, final int[] x, final int[] y) {
+    void pointerHoverPressedImpl(int windowId, final int[] x, final int[] y) {
         if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
             addPointerEvent(POINTER_HOVER_PRESSED | (windowId << 8), x[0], y[0]);
         }
@@ -8633,7 +8614,7 @@ public final class Display extends CN1Constants {
     /// - `x`: the x position of the pointer, in window coordinates
     ///
     /// - `y`: the y position of the pointer, in window coordinates
-    public void windowPointerHoverReleased(int windowId, final int[] x, final int[] y) {
+    void pointerHoverReleasedImpl(int windowId, final int[] x, final int[] y) {
         if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
             addPointerEvent(POINTER_HOVER_RELEASED | (windowId << 8), x[0], y[0]);
         }
