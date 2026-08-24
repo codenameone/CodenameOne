@@ -7545,6 +7545,13 @@ public class IPhoneBuilder extends Executor {
             if (!out.containsKey("PLATFORM_NAME")) {
                 out.put("PLATFORM_NAME", platformOf(sdk));
             }
+            // The suffix Xcode puts on a per-platform product: "-iphoneos", "-iphonesimulator".
+            // It follows the platform, so it is knowable for a family too -- and it is
+            // identifier-safe, which is why an extension distinguishing its platforms often
+            // writes it straight into PRODUCT_BUNDLE_IDENTIFIER.
+            if (!out.containsKey("EFFECTIVE_PLATFORM_NAME") && platformOf(sdk).length() > 0) {
+                out.put("EFFECTIVE_PLATFORM_NAME", "-" + platformOf(sdk));
+            }
         }
         if (sdk != null && !isFamilyPattern(sdk)) {
             if (!out.containsKey("SDK_NAME")) {
@@ -8759,7 +8766,8 @@ public class IPhoneBuilder extends Executor {
             new java.util.HashSet<String>(java.util.Arrays.asList(
                     "EXECUTABLE_NAME", "PRODUCT_NAME", "PRODUCT_MODULE_NAME", "TARGET_NAME",
                     "PROJECT_NAME", "CONFIGURATION", "SDK_NAME", "SDK_VERSION", "PLATFORM_NAME",
-                    "CURRENT_ARCH", "NATIVE_ARCH", "WRAPPER_EXTENSION", "WRAPPER_NAME"));
+                    "CURRENT_ARCH", "NATIVE_ARCH", "WRAPPER_EXTENSION", "WRAPPER_NAME",
+                    "EFFECTIVE_PLATFORM_NAME"));
 
     /// Whether every reference still left in {@code value} names a setting Xcode supplies itself.
     ///

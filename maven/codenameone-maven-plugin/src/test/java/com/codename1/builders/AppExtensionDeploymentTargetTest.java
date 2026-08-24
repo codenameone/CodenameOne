@@ -2106,4 +2106,29 @@ public class AppExtensionDeploymentTargetTest {
         assertFalse(settings.containsKey("EXTENSION_ID[config=Debug][sdk=iphonesimulator*]"));
         assertEquals("com.example.app.Ext.debug", settings.get("EXTENSION_ID[config=Debug]"));
     }
+
+    @Test
+    public void aPerPlatformIdentifierIsResolvedAndKept() throws Exception {
+        File dist = tmp.newFolder("dist105");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER",
+                "com.example.app.Widget$(EFFECTIVE_PLATFORM_NAME)");
+
+        // Xcode supplies it and it is identifier-safe, so an extension distinguishing its
+        // platforms writes it straight into the identifier. Unmodelled, the whole setting was
+        // deleted before the merge and the target silently reverted to its folder-derived name.
+        assertEquals("com.example.app.Widget-iphoneos", IPhoneBuilder.resolveSettingsFully(
+                settings.get("PRODUCT_BUNDLE_IDENTIFIER"),
+                IPhoneBuilder.extensionSettingsWithBuiltIns(extension, settings, "Release",
+                        "iphoneos14.4", "arm64")));
+
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(settings,
+                extension, IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                        null), "com.example.app");
+        assertEquals(notes.toString(), 0, notes.size());
+        assertEquals("com.example.app.Widget$(EFFECTIVE_PLATFORM_NAME)",
+                settings.get("PRODUCT_BUNDLE_IDENTIFIER"));
+    }
 }
