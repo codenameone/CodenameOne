@@ -169,7 +169,11 @@ manifest and the check no longer looks at it.
 the nightly sweep holds the *published* reports to it. A test left at `not-run`
 fails the sweep, and so does a test missing from one port's report when an
 earlier run on another port already covered it -- that port dropped the test
-rather than merely predating it. The single permitted exception is a `skip` the
+rather than merely predating it. Comparing reports to each other cannot see a
+test missing from *all* of them, so the sweep also reads the manifest at each
+report's own commit: a run whose own contract listed the test and reported
+nothing for it fails, however the other ports behaved. The single permitted
+exception is a `skip` the
 suite itself emits, and the sweep checks it against
 `port_status_supplement.json` the way the page does: the erratum has to name the
 test *and*, where it lists reason codes, account for the reason that run gave
