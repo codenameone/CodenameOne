@@ -76,12 +76,15 @@ fi
 
 while IFS= read -r port; do
   head_report="${REPO_ROOT}/${REPORT_PATH}/${port}.json"
-  [ -f "${head_report}" ] || continue
   if git -C "${REPO_ROOT}" show "${base_ref}:${REPORT_PATH}/${port}.json" \
       > "${base_dir}/${port}.json" 2>/dev/null; then
-    if cmp -s "${base_dir}/${port}.json" "${head_report}"; then
+    # Deliberately reached with no head report: deleting an existing fallback is
+    # its own finding, and skipping absent files was how it went unnoticed.
+    if [ -f "${head_report}" ] && cmp -s "${base_dir}/${port}.json" "${head_report}"; then
       continue
     fi
+  elif [ ! -f "${head_report}" ]; then
+    continue
   else
     # A report the branch ADDS. Skipping it here is how a pull request that also
     # adds a port could hand-author an entirely green snapshot for it -- the one

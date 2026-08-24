@@ -158,7 +158,12 @@ rather than failed, because unverifiable is not forged.
 
 A port with no stored report is a supported state, so adding a port does not
 start by hand-authoring one: every cell reads "No stored report" and the card
-reads "unknown" until that port's first run publishes something to copy.
+reads "unknown" until that port's first run publishes something to copy. That
+does not make removing one free -- deleting the fallback for a port that has
+published is refused, because the site serves this file exactly when the data
+branch cannot be reached, and an established column would go unknown at the
+moment the live data is missing. Retiring a port is still fine: drop it from the
+manifest and the check no longer looks at it.
 
 "All tests run on all ports" is still enforced, just where it cannot be typed:
 the nightly sweep holds the *published* reports to it. A test left at `not-run`

@@ -547,7 +547,7 @@ RUN_URL_RE = re.compile(
 def provenance_problems(
     port_id: str,
     before: dict | None,
-    after: dict,
+    after: dict | None,
     published: list[dict] | None = None,
 ) -> list[str]:
     """Refuse a hand-edited report.
@@ -577,6 +577,24 @@ def provenance_problems(
     same as forged, and failing a pull request because a fetch flaked would teach
     people to route around this.
     """
+    if after is None:
+        if before is None:
+            return []
+        # Absent because it never existed and absent because someone removed it
+        # are different things, and only the first is harmless. The site serves
+        # this file whenever the data branch cannot be reached or its newest
+        # report predates the contract, so deleting one turns an established
+        # port's whole column unknown at exactly the moment the live data is
+        # missing -- which is the moment the fallback exists for. Retiring a
+        # port is still fine: drop it from the manifest and this check never
+        # looks at it.
+        return [
+            f"{port_id}: the checked-in report was deleted. It is the fallback "
+            "the site serves when the data branch is unreachable, so an "
+            "established port would render as unknown. Only a port that has "
+            "never published needs no report."
+        ]
+
     if before == after:
         return []
 
@@ -1253,9 +1271,8 @@ def main() -> int:
                 port_id = port.get("id")
                 base_path = args.base / f"{port_id}.json"
                 head_path = REPO_ROOT / report_directory / f"{port_id}.json"
-                if not head_path.is_file():
-                    # Removed, or a port that has never published. Neither is an
-                    # edit to a result.
+                if not head_path.is_file() and not base_path.is_file():
+                    # A port that has never published. Nothing to check.
                     continue
                 published = None
                 if args.published is not None:
@@ -1268,7 +1285,7 @@ def main() -> int:
                     provenance_problems(
                         port_id,
                         read_json(base_path) if base_path.is_file() else None,
-                        read_json(head_path),
+                        read_json(head_path) if head_path.is_file() else None,
                         published,
                     )
                 )

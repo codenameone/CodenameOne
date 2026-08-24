@@ -16490,6 +16490,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boole
 #if defined(CN1_USE_WATCHCONNECTIVITY) && !TARGET_OS_TV && !TARGET_OS_MACCATALYST
 
 #import "CN1WatchConnectivity.h"
+// The generated declarations for the callbacks below. Without it every call into
+// IOSWearableCallbacks is an implicit declaration, which clang 17 rejects
+// outright -- the phone, Metal and watch targets all failed to compile. Kept
+// beside the code it declares rather than with the includes at the top of the
+// file, which is how CN1SmartHome.m carries the identical include for
+// IOSHomeCallbacks, the class this one was modelled on.
+#include "com_codename1_impl_ios_IOSWearableCallbacks.h"
 
 #if TARGET_OS_WATCH
 // Brings the session up on the watch without anyone asking for it.

@@ -691,6 +691,22 @@ class PortStatusTest(unittest.TestCase):
             counts["drift"],
         )
 
+    def test_provenance_rejects_deleting_an_established_fallback(self):
+        # A port with no stored report became a supported state so that ADDING a port would not
+        # have to begin by hand-authoring one. That must not also make removing an existing
+        # fallback free: the site serves this file whenever the data branch is unreachable or
+        # its newest report predates the contract, so deleting one turns a working port's whole
+        # column unknown at exactly the moment the live data is missing.
+        before = self.stored_reports()["tvos"]
+        problems = port_status.provenance_problems("tvos", before, None, published=[before])
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("deleted", problems[0])
+
+    def test_provenance_ignores_a_port_that_has_no_report_either_side(self):
+        # Retiring a port drops it from the manifest, and the check never looks at it. This is
+        # the port that has simply never published.
+        self.assertEqual([], port_status.provenance_problems("freebsd", None, None, published=[]))
+
     def test_provenance_ignores_an_untouched_report(self):
         before = self.stored_reports()["android"]
         self.assertEqual([], port_status.provenance_problems("android", before, dict(before)))
