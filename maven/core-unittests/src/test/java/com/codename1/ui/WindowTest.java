@@ -4232,6 +4232,63 @@ class WindowTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void pullToRefreshOverlayFollowsTheComponentToANewHost() {
+        implementation.setMultiWindowSupported(true);
+        boolean material = com.codename1.components.InfiniteProgress.isDefaultMaterialDesignMode();
+        com.codename1.components.InfiniteProgress.setDefaultMaterialDesignMode(true);
+        Form origin = new Form("origin", new BorderLayout());
+        Window later = new Window("later", new BorderLayout());
+        try {
+            // Built while the component lives in a Form: that is where the drag listener
+            // is created, and where it used to capture its host once and for all.
+            // Taller than the window on purpose: the pull gesture is gated on the
+            // container actually being scrollable, which needs content that overflows.
+            Container scroller = new Container(new com.codename1.ui.layouts.BoxLayout(
+                    com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+            scroller.setScrollableY(true);
+            for (int iter = 0; iter < 40; iter++) {
+                scroller.add(new Label("row " + iter));
+            }
+            scroller.setPullToRefresh(new Runnable() {
+                @Override
+                public void run() {
+                }
+            });
+            origin.add(BorderLayout.CENTER, scroller);
+            origin.show();
+            DisplayTest.flushEdt();
+
+            // Moved to a window, which re-registers the same listener instance on it.
+            origin.removeComponent(scroller);
+            later.setWindowSize(400, 300);
+            later.add(BorderLayout.CENTER, scroller);
+            later.show();
+            later.asContainer().revalidate();
+            DisplayTest.flushEdt();
+
+            // A pull gesture on the window.
+            int x = scroller.getAbsoluteX() + 10;
+            later.pointerPressed(x, scroller.getAbsoluteY() + 2);
+            later.pointerDragged(x, scroller.getAbsoluteY() + 60);
+            DisplayTest.flushEdt();
+
+            assertTrue(later.getLayeredPane(
+                            com.codename1.components.InfiniteProgress.class, true)
+                            .getComponentCount() > 0,
+                    "the refresh overlay belongs to the top level the component is in "
+                            + "now, not the one it was initialised in");
+            assertEquals(0, origin.getLayeredPane(
+                            com.codename1.components.InfiniteProgress.class, true)
+                            .getComponentCount(),
+                    "and nothing may be added to the top level it left");
+        } finally {
+            later.dispose();
+            com.codename1.components.InfiniteProgress.setDefaultMaterialDesignMode(material);
+            DisplayTest.flushEdt();
+        }
+    }
+
     /// Counts pointer drags reaching a component.
     private static final class DragCountingComponent extends Component {
         private int drags;
