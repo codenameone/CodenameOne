@@ -6433,6 +6433,15 @@ public class IPhoneBuilder extends Executor {
                 false, archiveSettings, changes);
         result = setPlistString(result, "CFBundleName", "$(PRODUCT_NAME)",
                 false, archiveSettings, changes);
+        // Required of an extension, and refused at upload rather than at build: "Missing
+        // Info.plist value. A value for the key 'CFBundleDisplayName' in bundle
+        // <app>.app/PlugIns/<Name>.appex is required." Both extensions this builder GENERATES
+        // have always written it -- the wallet one and the widget one -- and the list of keys
+        // filled in here was assembled from what an exported extension folder leaves out, so it
+        // was missing the one key an exported folder usually still has. Every other name in this
+        // method now matches what we write for our own.
+        result = setPlistString(result, "CFBundleDisplayName", "$(PRODUCT_NAME)",
+                false, archiveSettings, changes);
         result = setPlistString(result, "CFBundleInfoDictionaryVersion", "6.0",
                 false, archiveSettings, changes);
         // The reference rather than a literal "en", as the generated Wallet and push extensions

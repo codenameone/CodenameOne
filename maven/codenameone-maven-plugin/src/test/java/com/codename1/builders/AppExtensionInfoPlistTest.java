@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import org.junit.Test;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -129,6 +130,7 @@ public class AppExtensionInfoPlistTest {
                 + "\t<key>CFBundlePackageType</key>\n\t<string>XPC!</string>\n"
                 + "\t<key>CFBundleInfoDictionaryVersion</key>\n\t<string>6.0</string>\n"
                 + "\t<key>CFBundleDevelopmentRegion</key>\n\t<string>$(DEVELOPMENT_LANGUAGE)</string>\n"
+                + "\t<key>CFBundleDisplayName</key>\n\t<string>$(PRODUCT_NAME)</string>\n"
                 + "\t<key>CFBundleName</key>");
         List<String> changes = new ArrayList<String>();
         String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4", NO_SETTINGS, changes);
@@ -614,5 +616,77 @@ public class AppExtensionInfoPlistTest {
         // And a path that happens to contain a bracket is not a qualifier.
         assertSame(release, IPhoneBuilder.infoPlistCandidateContext(
                 "INFOPLIST_FILE = Wallet[beta]/Info.plist", release));
+    }
+
+    /// Apple refuses the upload -- not the build -- for "Missing Info.plist value. A value for the
+    /// key 'CFBundleDisplayName' in bundle <app>.app/PlugIns/<Name>.appex is required."
+    @Test
+    public void aDisplayNameIsFilledInWhenTheArchiveOmitsIt() {
+        List<String> changes = new ArrayList<String>();
+        String out = IPhoneBuilder.stampInfoPlistIdentity(NO_IDENTITY, "5.4", "5.4",
+                "com.example.app", new HashMap<String, String>(), changes);
+
+        assertTrue(out, out.contains("<key>CFBundleDisplayName</key>"));
+        assertTrue(changes.toString(), changes.toString().contains("CFBundleDisplayName"));
+    }
+
+    /// An extension that names itself keeps its own name: this is what the user sees in Settings
+    /// and in the share sheet, and it is the archive author's to choose.
+    @Test
+    public void anArchivesOwnDisplayNameIsLeftAlone() {
+        String plist = NO_IDENTITY.replace("<key>CFBundleName</key>",
+                "<key>CFBundleDisplayName</key>\n\t<string>Add to Wallet</string>\n"
+                + "\t<key>CFBundleName</key>");
+        List<String> changes = new ArrayList<String>();
+        String out = IPhoneBuilder.stampInfoPlistIdentity(plist, "5.4", "5.4", "com.example.app",
+                new HashMap<String, String>(), changes);
+
+        assertTrue(out, out.contains("<string>Add to Wallet</string>"));
+        assertFalse(changes.toString(), changes.toString().contains("CFBundleDisplayName"));
+    }
+
+    /// The whack-a-mole this list has been: each upload attempt named one more key it was missing,
+    /// while both extensions this builder GENERATES had been writing the full set all along. The
+    /// two sets are compared here so the next key cannot be found by a customer's upload -- if a
+    /// generated extension starts writing something new, this fails until the stamper matches.
+    @Test
+    public void theStampedKeysMatchWhatOurOwnExtensionsWrite() throws Exception {
+        java.util.Set<String> generated = bundleKeysOf(com.codename1.util.IOSWalletExtensionBuilder.class);
+        generated.retainAll(bundleKeysOf(com.codename1.util.IOSWidgetExtensionBuilder.class));
+
+        List<String> changes = new ArrayList<String>();
+        String stamped = IPhoneBuilder.stampInfoPlistIdentity(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\">\n<dict>\n"
+                        + "\t<key>NSExtension</key>\n\t<dict/>\n</dict>\n</plist>\n",
+                "5.4", "5.4", "com.example.app", new HashMap<String, String>(), changes);
+        java.util.Set<String> present = new java.util.TreeSet<String>();
+        for (String key : generated) {
+            if (stamped.contains("<key>" + key + "</key>")) {
+                present.add(key);
+            }
+        }
+        assertEquals("Keys our own extensions declare but a brought-in archive does not get",
+                generated, present);
+    }
+
+    /// The CFBundle* keys a generated-extension builder writes, read out of its source rather than
+    /// listed by hand: a hand-written list is the thing that went stale.
+    private static java.util.Set<String> bundleKeysOf(Class<?> builder) throws Exception {
+        File source = new File("src/main/java/com/codename1/util/"
+                + builder.getSimpleName() + ".java");
+        assertTrue(source.getAbsolutePath(), source.isFile());
+        String text = new String(java.nio.file.Files.readAllBytes(source.toPath()), "UTF-8");
+        java.util.Set<String> keys = new java.util.TreeSet<String>();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("plistKeyString\\(sb, \"(CFBundle[A-Za-z]+)\"").matcher(text);
+        while (m.find()) {
+            keys.add(m.group(1));
+        }
+        // Identity and versions are stamped by their own dedicated paths, which these tests cover
+        // separately; this is about the fixed boilerplate.
+        keys.removeAll(java.util.Arrays.asList("CFBundleIdentifier", "CFBundleShortVersionString",
+                "CFBundleVersion"));
+        assertTrue(keys.toString(), keys.size() >= 4);
+        return keys;
     }
 }
