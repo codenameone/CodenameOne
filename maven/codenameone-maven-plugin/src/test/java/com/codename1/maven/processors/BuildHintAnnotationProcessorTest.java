@@ -499,6 +499,46 @@ public class BuildHintAnnotationProcessorTest {
         assertEquals("", BuildHintAnnotationProcessor.declaredPackageIn("// package com.example;"));
     }
 
+    /// A value is a place a developer writes arbitrary text, so it must not be
+    /// able to forge the structure around it. With plain delimiters these two
+    /// annotations fingerprinted identically, and a stale manifest was then
+    /// accepted for a genuinely different configuration.
+    @Test
+    public void aValueCannotForgeTheDigestStructure() throws Exception {
+        String forged = digestOf(
+                "@Ios(bundleVersion = \"1;teamId=java.lang.String:X\")");
+        String real = digestOf("@Ios(bundleVersion = \"1\", teamId = \"X\")");
+        assertFalse("a value must not be able to imitate another member",
+                forged.equals(real));
+    }
+
+    /// Neighbouring values must not run together either: {"a","bc"} is not
+    /// {"ab","c"}, and a list of one is not the value itself.
+    @Test
+    public void adjacentValuesDoNotRunTogether() throws Exception {
+        assertFalse(digestOf("@Ios(pods = {\"a\", \"bc\"})")
+                .equals(digestOf("@Ios(pods = {\"ab\", \"c\"})")));
+        assertFalse(digestOf("@Ios(pods = {\"a\"})")
+                .equals(digestOf("@Ios(teamId = \"a\")")));
+    }
+
+    /// ...while the same annotations still fingerprint the same, or the check
+    /// would refuse every build instead of only the wrong ones.
+    @Test
+    public void theSameAnnotationsFingerprintTheSame() throws Exception {
+        assertEquals(digestOf("@Ios(teamId = \"X\", bundleVersion = \"1\")"),
+                digestOf("@Ios(bundleVersion = \"1\", teamId = \"X\")"));
+    }
+
+    /// The digest of a main class annotated so.
+    private String digestOf(String annotations) throws Exception {
+        File dir = tmp.newFolder();
+        JavaSourceCompiler.compile(JavaSourceCompiler.singleSource(MAIN, source(annotations)),
+                dir, Arrays.asList(testClassesDir(), coreJar()));
+        Map<String, AnnotatedClass> index = ClassScanner.scan(dir);
+        return BuildHintAnnotationProcessor.sourceDigest(index.values().iterator().next());
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

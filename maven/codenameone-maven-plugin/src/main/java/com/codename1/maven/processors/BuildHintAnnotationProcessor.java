@@ -839,15 +839,14 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             if (!known.contains(descriptor)) {
                 continue;
             }
-            sb.append(descriptor).append('{');
+            emit(sb, descriptor);
             AnnotationValues values = cls.getClassAnnotation(descriptor);
+            emit(sb, String.valueOf(values.all().size()));
             for (Map.Entry<String, Object> e
                     : new TreeMap<String, Object>(values.all()).entrySet()) {
-                sb.append(e.getKey()).append('=');
+                emit(sb, e.getKey());
                 renderForDigest(e.getValue(), sb);
-                sb.append(';');
             }
-            sb.append('}');
         }
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
@@ -863,35 +862,53 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
+    /// Appends `s` length-prefixed, so nothing it contains can be read as
+    /// structure.
+    ///
+    /// A value IS a place an attacker -- or an unlucky developer -- writes
+    /// arbitrary text: with plain delimiters,
+    /// `@Ios(bundleVersion = "1;teamId=java.lang.String:X")` rendered exactly
+    /// like `@Ios(bundleVersion = "1", teamId = "X")`, so a stale manifest was
+    /// accepted for a different configuration and the build silently kept the old
+    /// values.
+    private static void emit(StringBuilder sb, String s) {
+        sb.append(s.length()).append(':').append(s).append(';');
+    }
+
     /// The type is part of the rendering, so an int 1 and the string "1" -- which
     /// print alike but are different annotations -- do not fingerprint alike.
+    ///
+    /// Every variable-length piece goes through `emit`, so no value can forge the
+    /// structure around it.
     private static void renderForDigest(Object value, StringBuilder sb) {
         if (value == null) {
-            sb.append("null");
+            emit(sb, "null");
         } else if (value instanceof String[]) {
             // How ASM delivers an enum member: {descriptor, CONSTANT_NAME}.
             String[] e = (String[]) value;
-            sb.append("enum:").append(e.length > 0 ? e[0] : "")
-              .append('.').append(e.length > 1 ? e[1] : "");
+            emit(sb, "enum");
+            emit(sb, e.length > 0 ? e[0] : "");
+            emit(sb, e.length > 1 ? e[1] : "");
         } else if (value instanceof List) {
-            sb.append('[');
-            for (Object item : (List<?>) value) {
+            List<?> list = (List<?>) value;
+            emit(sb, "list");
+            emit(sb, String.valueOf(list.size()));
+            for (Object item : list) {
                 renderForDigest(item, sb);
-                sb.append(',');
             }
-            sb.append(']');
         } else if (value instanceof AnnotationValues) {
             AnnotationValues nested = (AnnotationValues) value;
-            sb.append(nested.getDescriptor()).append('{');
+            emit(sb, "annotation");
+            emit(sb, nested.getDescriptor());
+            emit(sb, String.valueOf(nested.all().size()));
             for (Map.Entry<String, Object> e
                     : new TreeMap<String, Object>(nested.all()).entrySet()) {
-                sb.append(e.getKey()).append('=');
+                emit(sb, e.getKey());
                 renderForDigest(e.getValue(), sb);
-                sb.append(';');
             }
-            sb.append('}');
         } else {
-            sb.append(value.getClass().getName()).append(':').append(value);
+            emit(sb, value.getClass().getName());
+            emit(sb, String.valueOf(value));
         }
     }
 
