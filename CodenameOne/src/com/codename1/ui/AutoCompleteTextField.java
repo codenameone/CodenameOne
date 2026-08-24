@@ -751,7 +751,7 @@ public class AutoCompleteTextField extends TextField {
     /// The height of the top level's title area, which only a Form has: a window's
     /// title is drawn by the platform outside the content, so it takes no space here.
     private static int titleAreaHeight(TopLevelContainer f) {
-        return f instanceof Form ? ((Form) f).getTitleArea().getHeight() : 0;
+        return f == null ? 0 : f.asContainer().titleAreaHeight();
     }
 
 }

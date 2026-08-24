@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
@@ -1774,6 +1775,133 @@ public class Container extends Component implements Iterable<Component> {
         return this;
     }
 
+    /// Adds a component to a top level's own layout, outside the content pane. Inert
+    /// unless this container is a top level, which is what keeps the structural add
+    /// off the public `TopLevelContainer` interface -- widening it would hand every
+    /// caller a way to place components beside the content pane.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraints`: the layout constraint
+    ///
+    /// - `cmp`: the component to add
+    void addComponentToTopLevel(Object constraints, Component cmp) {
+    }
+
+    /// The counterpart to `#addComponentToTopLevel(java.lang.Object, Component)`.
+    /// Inert unless this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to remove
+    void removeComponentFromTopLevel(Component cmp) {
+    }
+
+    /// Whether this container is a top level backed by its own native operating
+    /// system window. Inert unless this container is a `Window`.
+    ///
+    /// #### Returns
+    ///
+    /// true for a native window, false for everything else
+    boolean isNativeWindow() {
+        return false;
+    }
+
+    /// Whether this top level is the one currently on screen. Inert unless this
+    /// container is a top level.
+    ///
+    /// #### Returns
+    ///
+    /// true when this top level is showing
+    boolean isTopLevelShowing() {
+        return false;
+    }
+
+    /// The native peer this top level draws into. Inert unless this container is a
+    /// `Window`; the main surface has no peer of its own.
+    ///
+    /// #### Returns
+    ///
+    /// the native window peer, or null
+    Object topLevelNativePeer() {
+        return null;
+    }
+
+    /// The height the top level's title takes out of its own content. A `Form` draws
+    /// its title inside the content; a window's title belongs to the platform chrome
+    /// outside it, so it costs nothing here.
+    ///
+    /// #### Returns
+    ///
+    /// the title area height, or zero when the title is not drawn in content
+    int titleAreaHeight() {
+        return 0;
+    }
+
+    /// Whether this top level is holding a pointer press over the given component,
+    /// which is what decides if selection still paints. Each top level answers from
+    /// its own press coordinates: those are top level relative, so another one's
+    /// pointer position is not merely the wrong point but a point in a different
+    /// space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to test
+    ///
+    /// #### Returns
+    ///
+    /// true if a live press of this top level falls inside the component
+    boolean showsSelectionFor(Component c) {
+        return false;
+    }
+
+    /// Tells the top level that a command was activated from a list. The command has
+    /// already run; this is only the notification, so no implementation may invoke it
+    /// again.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command that was activated
+    ///
+    /// - `ev`: the event that activated it
+    void commandActivatedFromList(Command cmd, ActionEvent ev) {
+    }
+
+    /// Tells the top level that a command was activated from a component such as a
+    /// button. As with the list form, the command has already run.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command that was activated
+    ///
+    /// - `ev`: the event that activated it
+    void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
+    }
+
+    /// Restores the command a text field displaced while it was being edited. Inert
+    /// unless this container is a top level with a soft button bar to restore it to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command to restore, may be null
+    void setClearCommandInternal(Command cmd) {
+    }
+
+    /// Whether this top level should lay a popup out as though it were portrait. A
+    /// `Form` inherits the device orientation it was given; a window has none, so its
+    /// own shape is all there is to go on.
+    ///
+    /// #### Parameters
+    ///
+    /// - `deviceBias`: what the device orientation says
+    ///
+    /// #### Returns
+    ///
+    /// true to use the portrait placement
+    boolean prefersPortraitLayout(boolean deviceBias) {
+        return deviceBias;
+    }
+
     /// Schedules a container to be revalidated before the next paint. Inert unless
     /// this container is a top level.
     ///
@@ -2629,7 +2757,7 @@ public class Container extends Component implements Iterable<Component> {
         int surfaceWidth;
         int surfaceHeight;
         TopLevelContainer top = getTopLevelContainer();
-        if (top instanceof Window) {
+        if (top != null && top.asContainer().isNativeWindow()) {
             // The enclosing window's safe area and size, not the main surface's. A
             // desktop window has no notch or rounded corner, so this yields zero
             // margins and no snapping -- where reading the display's insets applied

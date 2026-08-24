@@ -1687,10 +1687,8 @@ public class List<T> extends Component implements ActionSource {
                         // never saw the activation. Neither branch re-invokes the
                         // command, which has just run above.
                         TopLevelContainer top = getTopLevelContainer();
-                        if (top instanceof Form) {
-                            ((Form) top).actionCommandImpl((Command) i);
-                        } else if (top instanceof Window) {
-                            ((Window) top).dispatchCommandNoRecurse((Command) i, a);
+                        if (top != null) {
+                            top.asContainer().commandActivatedFromList((Command) i, a);
                         }
                     }
                 }

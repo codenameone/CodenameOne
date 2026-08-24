@@ -1372,8 +1372,8 @@ public class TextField extends TextArea {
                 // Form only: the clear command lives on the soft button bar, which a
                 // Window has no equivalent of -- commands there reach the desktop menu
                 // instead. Nothing to restore when there is no such bar.
-                if (f instanceof Form) {
-                    ((Form) f).setClearCommand(originalClearCommand);
+                if (f != null) {
+                    f.asContainer().setClearCommandInternal(originalClearCommand);
                 }
                 originalClearCommand = null;
             }

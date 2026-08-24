@@ -67,16 +67,15 @@ class SearchBar extends Toolbar {
             }
         });
         setUIIDFinal("ToolbarSearch");
-        // A search bar swapped into a Window's toolbar is already on screen, so it
-        // starts editing straight away. setEditOnShow is a Form-only deferral for a
-        // toolbar being prepared before its form is shown, and there is no Window
-        // equivalent because a Window's search bar is only ever installed live.
-        TopLevelContainer top = parent.getTopLevelContainer();
-        if (top == Display.INSTANCE.getCurrent() //NOPMD CompareObjectsWithEquals
-                || (top instanceof Window && ((Window) top).isWindowShowing())) {
+        // A search bar lives in a Toolbar and a Toolbar belongs to a Form, so the
+        // form is the only top level it can be in and getComponentForm() is the
+        // right question to ask.
+        if (parent.getComponentForm() == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals
             search.startEditingAsync();
-        } else if (top instanceof Form) {
-            ((Form) top).setEditOnShow(search);
+        } else {
+            if (parent.getComponentForm() != null) {
+                parent.getComponentForm().setEditOnShow(search);
+            }
         }
     }
 
@@ -91,27 +90,21 @@ class SearchBar extends Toolbar {
                     @Override
                     public void run() {
                         onSearch("");
-                        // Through the top level rather than a cast of getParent() to
-                        // Form: inside a Window the toolbar hangs off the title area,
-                        // so that cast named the wrong type. ParparVM does not check
-                        // CHECKCAST, so on Mac Catalyst that was a native crash rather
-                        // than a ClassCastException anything could catch.
-                        final TopLevelContainer f = SearchBar.this.getTopLevelContainer();
+                        // getComponentForm() rather than a cast of getParent(): a
+                        // search bar is not always a direct child of its form, and
+                        // ParparVM does not check CHECKCAST, so that cast would not
+                        // fail as a ClassCastException anything could catch.
+                        final Form f = SearchBar.this.getComponentForm();
                         if (f == null) {
                             return;
                         }
                         f.getAnimationManager().flushAnimation(new Runnable() {
                             @Override
                             public void run() {
-                                if (!(f instanceof Form)) {
-                                    // A search bar lives in a Toolbar, and only a Form
-                                    // has one.
-                                    return;
-                                }
-                                ((Form) f).removeComponentFromForm(SearchBar.this);
-                                ((Form) f).setToolbar(parent);
+                                f.removeComponentFromForm(SearchBar.this);
+                                f.setToolbar(parent);
                                 parent.setHidden(false);
-                                f.asContainer().animateLayout(100);
+                                f.animateLayout(100);
                             }
                         });
                     }

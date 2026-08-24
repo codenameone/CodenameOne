@@ -725,10 +725,8 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
                 // never saw the activation. Neither path re-invokes the command, which
                 // this method has already run.
                 TopLevelContainer top = getTopLevelContainer();
-                if (top instanceof Form) {
-                    ((Form) top).actionCommandImplNoRecurseComponent(cmd, ev);
-                } else if (top instanceof Window) {
-                    ((Window) top).dispatchCommandNoRecurse(cmd, ev);
+                if (top != null) {
+                    top.asContainer().commandActivatedFromComponent(cmd, ev);
                 }
             }
         } else {

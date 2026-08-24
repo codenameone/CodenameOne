@@ -2696,10 +2696,7 @@ public final class Display extends CN1Constants {
             return null;
         }
         TopLevelContainer top = cmp.getTopLevelContainer();
-        if (top instanceof Window) {
-            return ((Window) top).getNativePeer();
-        }
-        return null;
+        return top == null ? null : top.asContainer().topLevelNativePeer();
     }
 
     void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
@@ -3309,7 +3306,7 @@ public final class Display extends CN1Constants {
         // dispatched into an invisible tree -- and a press among them would re-arm
         // the very timers the hide just cancelled. Cancelling at the transition
         // cannot close that race on its own, because these are already in flight.
-        boolean hidden = windowId > 0 && f instanceof Window && !((Window) f).isWindowShowing();
+        boolean hidden = windowId > 0 && f != null && !f.isTopLevelShowing();
         if (f == null || (isUserInputEvent(type) && hidden)
                 || (isUserInputEvent(type) && Desktop.getInstance().isWindowInputBlocked(windowId)
                 && !completesAcceptedPress(type, windowId, offset, inputEventStackTmp))) {
@@ -4503,6 +4500,23 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// the shouldRenderSelection
+    /// Whether the main surface is holding a press that falls inside the given
+    /// component. Package private: it exists so `Form` can answer
+    /// `Container#showsSelectionFor(Component)` from the pointer state that lives
+    /// here, rather than having this class ask what kind of top level it is looking
+    /// at.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to test
+    ///
+    /// #### Returns
+    ///
+    /// true if a live main surface press falls inside the component
+    boolean mainSurfacePressIsOver(Component c) {
+        return pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY);
+    }
+
     public boolean shouldRenderSelection(Component c) {
         if (c.isCellRenderer()) {
             return shouldRenderSelection();
@@ -4511,13 +4525,12 @@ public final class Display extends CN1Constants {
         // id here: a window knows whether it is holding a press and where, and those
         // coordinates only mean anything against its own components.
         TopLevelContainer top = c.getTopLevelContainer();
-        if (top instanceof Window) {
-            return !pureTouch || lastInteractionWasKeypad
-                    || ((Window) top).showsSelectionFor(c)
-                    || c.shouldRenderComponentSelection();
-        }
-        return !pureTouch || lastInteractionWasKeypad
-                || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY))
+        // A component with no top level still answers from the main surface's press,
+        // which is what this did before each top level owned the test.
+        boolean pressed = top == null
+                ? mainSurfacePressIsOver(c)
+                : top.asContainer().showsSelectionFor(c);
+        return !pureTouch || lastInteractionWasKeypad || pressed
                 || c.shouldRenderComponentSelection();
     }
 

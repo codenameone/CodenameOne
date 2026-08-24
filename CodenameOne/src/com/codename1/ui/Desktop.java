@@ -163,12 +163,14 @@ public final class Desktop {
     public Monitor getMonitorFor(TopLevelContainer topLevel) {
         WindowManager wm = manager();
         if (wm != null) {
-            if (topLevel instanceof Window) {
-                Object peer = ((Window) topLevel).getNativePeer();
-                if (peer != null) {
-                    return readMonitor(wm, wm.getMonitorForWindow(peer), wm.getPrimaryMonitor());
-                }
-            } else if (topLevel != null) {
+            Container c = topLevel == null ? null : topLevel.asContainer();
+            Object peer = c == null ? null : c.topLevelNativePeer();
+            if (peer != null) {
+                return readMonitor(wm, wm.getMonitorForWindow(peer), wm.getPrimaryMonitor());
+            }
+            // A window that has not been shown yet has no peer and so no monitor; it
+            // falls through to the primary rather than borrowing the main window's.
+            if (c != null && !c.isNativeWindow()) {
                 // A Form lives in the application's main window, which has no peer to
                 // ask about. Reporting the primary monitor was wrong as soon as the
                 // application had been dragged to a second display: everything

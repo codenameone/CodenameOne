@@ -190,8 +190,10 @@ final class TopLevelSupport {
     ///
     /// `registerAnimatedInternal` is package private on both `Form` and `Window` and so
     /// cannot sit on the public `TopLevelContainer` interface -- an interface member
-    /// would force it public. Callers inside this package go through here instead of
-    /// `getComponentForm()`, which is null by design inside a `Window`.
+    /// would force it public. It is declared on `Container`, the nearest common
+    /// supertype, so the call below dispatches virtually. Callers inside this package
+    /// go through here instead of `getComponentForm()`, which is null by design inside
+    /// a `Window`.
     ///
     /// #### Parameters
     ///
@@ -199,12 +201,7 @@ final class TopLevelSupport {
     ///
     /// - `a`: the animation to register
     static void registerAnimatedInternal(Component c, Animation a) {
-        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
-        if (top instanceof Form) {
-            ((Form) top).registerAnimatedInternal(a);
-        } else if (top instanceof Window) {
-            ((Window) top).registerAnimatedInternal(a);
-        }
+        registerAnimatedInternal(c == null ? null : c.getTopLevelContainer(), a);
     }
 
     /// The counterpart to `#registerAnimatedInternal(Component, Animation)`.
@@ -215,12 +212,7 @@ final class TopLevelSupport {
     ///
     /// - `a`: the animation to deregister
     static void deregisterAnimatedInternal(Component c, Animation a) {
-        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
-        if (top instanceof Form) {
-            ((Form) top).deregisterAnimatedInternal(a);
-        } else if (top instanceof Window) {
-            ((Window) top).deregisterAnimatedInternal(a);
-        }
+        deregisterAnimatedInternal(c == null ? null : c.getTopLevelContainer(), a);
     }
 
     /// Registers an animation with an already resolved top level.
@@ -234,10 +226,8 @@ final class TopLevelSupport {
     ///
     /// - `a`: the animation to register
     static void registerAnimatedInternal(TopLevelContainer top, Animation a) {
-        if (top instanceof Form) {
-            ((Form) top).registerAnimatedInternal(a);
-        } else if (top instanceof Window) {
-            ((Window) top).registerAnimatedInternal(a);
+        if (top != null) {
+            top.asContainer().registerAnimatedInternal(a);
         }
     }
 
@@ -249,17 +239,16 @@ final class TopLevelSupport {
     ///
     /// - `a`: the animation to deregister
     static void deregisterAnimatedInternal(TopLevelContainer top, Animation a) {
-        if (top instanceof Form) {
-            ((Form) top).deregisterAnimatedInternal(a);
-        } else if (top instanceof Window) {
-            ((Window) top).deregisterAnimatedInternal(a);
+        if (top != null) {
+            top.asContainer().deregisterAnimatedInternal(a);
         }
     }
 
     /// The content area a top level lays its children out in.
     ///
     /// `getActualPane` is package private on both `Form` and `Window`, so like the
-    /// internal animation registration it cannot sit on the public interface.
+    /// internal animation registration it is declared on `Container` and reached
+    /// through `asContainer()` rather than on the public interface.
     ///
     /// #### Parameters
     ///
@@ -269,13 +258,7 @@ final class TopLevelSupport {
     ///
     /// the actual pane, or null when there is no top level
     static Container actualPaneOf(TopLevelContainer top) {
-        if (top instanceof Form) {
-            return ((Form) top).getActualPane();
-        }
-        if (top instanceof Window) {
-            return ((Window) top).getActualPane();
-        }
-        return null;
+        return top == null ? null : top.asContainer().getActualPane();
     }
 
     /// Throws when the running platform has no windowing system, so that misuse
@@ -295,7 +278,7 @@ final class TopLevelSupport {
     /// Adds a component to the top level's own layout, outside the content pane. Both
     /// `Form` and `Window` keep that structural add package private rather than on
     /// `TopLevelContainer`, since widening it would hand every caller a way to place
-    /// components beside the content pane.
+    /// components beside the content pane; `Container` declares the hook they override.
     ///
     /// #### Parameters
     ///
@@ -305,10 +288,8 @@ final class TopLevelSupport {
     ///
     /// - `cmp`: the component to add
     static void addComponentToTopLevel(TopLevelContainer top, Object constraints, Component cmp) {
-        if (top instanceof Form) {
-            ((Form) top).addComponentToForm(constraints, cmp);
-        } else if (top instanceof Window) {
-            ((Window) top).addComponentToWindow(constraints, cmp);
+        if (top != null) {
+            top.asContainer().addComponentToTopLevel(constraints, cmp);
         }
     }
 
@@ -321,10 +302,8 @@ final class TopLevelSupport {
     ///
     /// - `cmp`: the component to remove
     static void removeComponentFromTopLevel(TopLevelContainer top, Component cmp) {
-        if (top instanceof Form) {
-            ((Form) top).removeComponentFromForm(cmp);
-        } else if (top instanceof Window) {
-            ((Window) top).removeComponentFromWindow(cmp);
+        if (top != null) {
+            top.asContainer().removeComponentFromTopLevel(cmp);
         }
     }
 }

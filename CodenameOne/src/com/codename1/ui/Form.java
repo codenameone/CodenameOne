@@ -2140,6 +2140,46 @@ public class Form extends Container implements TopLevelContainer {
         super.removeComponent(cmp);
     }
 
+    @Override
+    void addComponentToTopLevel(Object constraints, Component cmp) {
+        addComponentToForm(constraints, cmp);
+    }
+
+    @Override
+    void removeComponentFromTopLevel(Component cmp) {
+        removeComponentFromForm(cmp);
+    }
+
+    @Override
+    boolean isTopLevelShowing() {
+        return Display.getInstance().getCurrent() == this; //NOPMD CompareObjectsWithEquals
+    }
+
+    @Override
+    int titleAreaHeight() {
+        return getTitleArea().getHeight();
+    }
+
+    @Override
+    boolean showsSelectionFor(Component c) {
+        return Display.getInstance().mainSurfacePressIsOver(c);
+    }
+
+    @Override
+    void commandActivatedFromList(Command cmd, ActionEvent ev) {
+        actionCommandImpl(cmd);
+    }
+
+    @Override
+    void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
+        actionCommandImplNoRecurseComponent(cmd, ev);
+    }
+
+    @Override
+    void setClearCommandInternal(Command cmd) {
+        setClearCommand(cmd);
+    }
+
     /// Registering media component to this Form, that like to receive
     /// animation events
     ///

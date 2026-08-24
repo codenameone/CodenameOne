@@ -536,18 +536,50 @@ public class Window extends Container implements TopLevelContainer {
     /// - `constraints`: the layout constraint
     ///
     /// - `cmp`: the component to add
-    final void addComponentToWindow(Object constraints, Component cmp) {
+    @Override
+    final void addComponentToTopLevel(Object constraints, Component cmp) {
         super.addComponent(constraints, cmp);
     }
 
     /// Removes a component previously added with
-    /// `#addComponentToWindow(Object, Component)`.
+    /// `#addComponentToTopLevel(Object, Component)`.
     ///
     /// #### Parameters
     ///
     /// - `cmp`: the component to remove
-    void removeComponentFromWindow(Component cmp) {
+    @Override
+    void removeComponentFromTopLevel(Component cmp) {
         super.removeComponent(cmp);
+    }
+
+    @Override
+    boolean isNativeWindow() {
+        return true;
+    }
+
+    @Override
+    boolean isTopLevelShowing() {
+        return isWindowShowing();
+    }
+
+    @Override
+    Object topLevelNativePeer() {
+        return nativePeer;
+    }
+
+    @Override
+    void commandActivatedFromList(Command cmd, ActionEvent ev) {
+        dispatchCommandNoRecurse(cmd, ev);
+    }
+
+    @Override
+    void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
+        dispatchCommandNoRecurse(cmd, ev);
+    }
+
+    @Override
+    boolean prefersPortraitLayout(boolean deviceBias) {
+        return getHeight() >= getWidth();
     }
 
     @Override
@@ -1733,8 +1765,7 @@ public class Window extends Container implements TopLevelContainer {
                 // the relation at creation. Create the owner's native window first.
                 ((Window) ownerWindow).show();
             }
-            Object parentPeer = ownerWindow instanceof Window
-                    ? ((Window) ownerWindow).nativePeer : null;
+            Object parentPeer = ownerPeer();
             // A null peer means two different things -- no owner at all, or an owner
             // that is the application's main form -- and a port has to tell them
             // apart: one is a top level window, the other is a child of the main one.
@@ -1909,7 +1940,7 @@ public class Window extends Container implements TopLevelContainer {
     /// application's main window. A port implements modality by disabling that
     /// window, so it has to be told which one.
     private Object ownerPeer() {
-        return ownerWindow instanceof Window ? ((Window) ownerWindow).nativePeer : null;
+        return ownerWindow == null ? null : ownerWindow.asContainer().topLevelNativePeer();
     }
 
     /// Drops this window's modal blocker, both the framework one and the native flag.
@@ -2967,6 +2998,7 @@ public class Window extends Container implements TopLevelContainer {
     /// coordinates -- window coordinates are window relative, so another window's
     /// pointer position is not merely the wrong point but a point in a different
     /// space.
+    @Override
     boolean showsSelectionFor(Component c) {
         return selectionPressed && c.contains(selectionPressedX, selectionPressedY);
     }
