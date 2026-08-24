@@ -1599,6 +1599,32 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     }
 #endif
     [self.commandBuffer presentDrawable:dr];
+    // CN1_GPU_TIME reports what the GPU actually spent on this frame, which is
+    // the number the vsync cadence cannot tell you: a renderer presenting at a
+    // steady 60fps looks identical whether it used 2ms or 15ms of the 16.67ms
+    // budget, and the difference decides whether there is room to repaint more.
+    // GPUStartTime/GPUEndTime are only valid once the buffer has completed.
+    {
+        static int gpuTimeOn = -1;
+        if(gpuTimeOn < 0) {
+            gpuTimeOn = getenv("CN1_GPU_TIME") ? 1 : 0;
+        }
+        if(gpuTimeOn) {
+            [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+                static long n = 0;
+                static double sum = 0, worst = 0;
+                double ms = (cb.GPUEndTime - cb.GPUStartTime) * 1000.0;
+                if(ms <= 0) return;
+                n++; sum += ms;
+                if(ms > worst) worst = ms;
+                if((n % 20) == 0) {
+                    fprintf(stderr, "BENCH:GPU frames=%ld mean=%.2fms worst=%.2fms budget=16.67ms\n",
+                            n, sum / (double)n, worst);
+                    fflush(stderr);
+                }
+            }];
+        }
+    }
     [self.commandBuffer commit];
     self.drawable = nil;
     self.commandBuffer = nil;
