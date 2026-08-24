@@ -1942,4 +1942,68 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Ext.debug", settings.get("EXTENSION_ID[config=Debug]"));
         assertEquals(notes.toString(), 0, notes.size());
     }
+
+    @Test
+    public void onlySettingsTheIdentifierIsBuiltFromAreDropped() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.app.Ext");
+        settings.put("EXTENSION_ID[config=Debug]", "com.other.Debug");
+        settings.put("CODE_SIGN_ENTITLEMENTS[config=Debug]", "WalletUIExtension/debug.entitlements");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Every qualified setting that DESCRIBES the offending build is not the same thing as
+        // every setting that CAUSES it: dropping on the context alone deleted the entitlements
+        // sitting beside the culprit, and that target then signed with the wrong ones.
+        assertFalse(settings.containsKey("EXTENSION_ID[config=Debug]"));
+        assertEquals("WalletUIExtension/debug.entitlements",
+                settings.get("CODE_SIGN_ENTITLEMENTS[config=Debug]"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
+
+    @Test
+    public void theReferenceClosureIsWhatCounts() {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.$(SUFFIX)");
+        settings.put("SUFFIX", "Ext");
+        settings.put("UNRELATED", "x");
+
+        // The closure, not just the names written in the text.
+        java.util.Set<String> names =
+                IPhoneBuilder.referencedSettingNames("$(EXTENSION_ID)", settings);
+        assertTrue(names.toString(), names.contains("EXTENSION_ID"));
+        assertTrue(names.toString(), names.contains("SUFFIX"));
+        assertFalse(names.toString(), names.contains("UNRELATED"));
+    }
+
+    @Test
+    public void aWildcardArchitectureExpandsToItsMembers() {
+        java.util.Map<String, String> declared = new java.util.LinkedHashMap<String, String>();
+        declared.put("INFOPLIST_FILE[arch=x86*]", "WalletUIExtension/$(CURRENT_ARCH)/Info.plist");
+        IPhoneBuilder.ArchiveContext arm = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", declared);
+
+        // Adding the pattern itself was useless: extensionSettingsWithBuiltIns will not define
+        // CURRENT_ARCH for a family, so the path never resolved and that plist went unstamped.
+        // Architecture names are a closed set, unlike an SDK's version, so expanding one invents
+        // nothing.
+        java.util.List<String> archs = IPhoneBuilder.enumerableArchsForTest(arm, declared);
+        assertTrue(archs.toString(), archs.contains("x86_64"));
+        assertFalse(archs.toString(), archs.contains("x86*"));
+        // The family is matched by name, so i386 is not in it -- expansion is not "every
+        // architecture", it is the ones the pattern actually names.
+        assertFalse(archs.toString(), archs.contains("i386"));
+
+        // And a family covering more than one really does yield them all.
+        java.util.Map<String, String> arm64s = new java.util.LinkedHashMap<String, String>();
+        arm64s.put("INFOPLIST_FILE[arch=arm64*]", "WalletUIExtension/$(CURRENT_ARCH)/Info.plist");
+        java.util.List<String> family = IPhoneBuilder.enumerableArchsForTest(
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "x86_64", arm64s),
+                arm64s);
+        assertTrue(family.toString(), family.contains("arm64"));
+        assertTrue(family.toString(), family.contains("arm64e"));
+    }
 }

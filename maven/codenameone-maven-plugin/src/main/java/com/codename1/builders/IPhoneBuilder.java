@@ -6538,6 +6538,11 @@ public class IPhoneBuilder extends Executor {
         return out;
     }
 
+    /// The architecture names an iOS target can be built for. A closed set, which is what makes
+    /// expanding an [arch=x86*] family into its members honest -- an SDK's version is not.
+    private static final String[] KNOWN_ARCHITECTURES = {"arm64", "arm64e", "armv7", "armv7s",
+            "x86_64", "i386"};
+
     /// The architectures worth resolving a path against: this build's, and every one the archive
     /// names in a qualifier.
     ///
@@ -6558,8 +6563,23 @@ public class IPhoneBuilder extends Executor {
         if (declared != null) {
             for (String key : declared.keySet()) {
                 String arch = conditionsOf(key).get("arch");
-                if (arch != null && arch.length() > 0 && !out.contains(arch)) {
-                    out.add(arch);
+                if (arch == null || arch.length() == 0) {
+                    continue;
+                }
+                if (!isFamilyPattern(arch)) {
+                    if (!out.contains(arch)) {
+                        out.add(arch);
+                    }
+                    continue;
+                }
+                // A family expands to the architectures it names. Adding the pattern itself was
+                // useless -- extensionSettingsWithBuiltIns will not define CURRENT_ARCH for one,
+                // so the path never resolved and that plist went unstamped. Architecture names
+                // are a closed set, unlike an SDK's version, so expanding one invents nothing.
+                for (String concrete : KNOWN_ARCHITECTURES) {
+                    if (matchesCondition(arch, concrete) && !out.contains(concrete)) {
+                        out.add(concrete);
+                    }
                 }
             }
             // ARCHS names them outright, with no qualified key anywhere: an archive building
@@ -7839,6 +7859,48 @@ public class IPhoneBuilder extends Executor {
         return notes;
     }
 
+    /// Every setting name {@code value} is built from, following references through the settings
+    /// as far as they go.
+    ///
+    /// The closure, not just the names written in the text: PRODUCT_BUNDLE_IDENTIFIER =
+    /// $(EXTENSION_ID) with EXTENSION_ID = com.example.$(SUFFIX) is built from both.
+    static java.util.Set<String> referencedSettingNames(String value, Map<String, String> settings) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<String>();
+        if (value == null) {
+            return out;
+        }
+        List<String> pending = new ArrayList<String>();
+        pending.add(value);
+        for (int step = 0; step < MAX_SETTING_EXPANSIONS && !pending.isEmpty(); step++) {
+            List<String> next = new ArrayList<String>();
+            for (String text : pending) {
+                java.util.regex.Matcher m = BUILD_SETTING_REFERENCE.matcher(text);
+                while (m.find()) {
+                    String name = m.group().substring(2, m.group().length() - 1);
+                    int modifier = name.indexOf(':');
+                    if (modifier >= 0) {
+                        name = name.substring(0, modifier);
+                    }
+                    if (!out.add(name) || settings == null) {
+                        continue;
+                    }
+                    // Its own value, and every qualified form of it: a reference reaches whichever
+                    // one the build it describes selects.
+                    for (Map.Entry<String, String> setting : settings.entrySet()) {
+                        String key = setting.getKey();
+                        int open = key.indexOf('[');
+                        if (name.equals(open < 0 ? key : key.substring(0, open).trim())
+                                && setting.getValue() != null) {
+                            next.add(setting.getValue());
+                        }
+                    }
+                }
+            }
+            pending = next;
+        }
+        return out;
+    }
+
     /// Drops a QUALIFIED helper that takes the extension's identifier out of the host's namespace
     /// in the build it describes.
     ///
@@ -7869,8 +7931,16 @@ public class IPhoneBuilder extends Executor {
         if (active.length() == 0 || !active.startsWith(hostPackage + ".")) {
             return notes;
         }
+        // Only the settings the identifier is actually built from. Every qualified setting that
+        // DESCRIBES the offending build is not the same thing as every setting that CAUSES it:
+        // dropping on the context alone deleted a CODE_SIGN_ENTITLEMENTS[config=Debug] sitting
+        // beside the culprit, and that target then signed with the wrong entitlements.
+        java.util.Set<String> referenced = referencedSettingNames(declaredId, settings);
         for (String key : new ArrayList<String>(settings.keySet())) {
             if (key.indexOf('[') < 0 || isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER")) {
+                continue;
+            }
+            if (!referenced.contains(key.substring(0, key.indexOf('[')).trim())) {
                 continue;
             }
             ArchiveContext own = contextForCondition(key, context);
