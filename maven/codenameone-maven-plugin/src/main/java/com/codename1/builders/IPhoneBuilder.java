@@ -6532,22 +6532,32 @@ public class IPhoneBuilder extends Executor {
         // with this archive's SDK.
         ArchiveContext own = contextForCondition(key, context);
         File active = out.get(key + " = " + value);
+        // One variant at a time, not the whole list: [variant=normal] and [variant=profile] are
+        // equally specific, so carrying both into a context reduced them by map order and only
+        // one variant's plist was ever discovered -- the other keeping a stale identity for a
+        // build Xcode really makes. The entitlements walk splits them for the same reason.
+        List<String> variants = own.variants == null || own.variants.isEmpty()
+                ? java.util.Collections.singletonList("normal") : own.variants;
         for (String sdk : enumerableSdks(own, declared)) {
             for (String configuration : PROJECT_CONFIGURATIONS) {
-                boolean sameSdk = sdk.equalsIgnoreCase(own.sdk == null ? "" : own.sdk);
-                if (sameSdk && configuration.equalsIgnoreCase(own.configuration)) {
-                    continue;
+                for (String variant : variants) {
+                    boolean sameSdk = sdk.equalsIgnoreCase(own.sdk == null ? "" : own.sdk);
+                    boolean sameConfiguration = configuration.equalsIgnoreCase(own.configuration);
+                    if (sameSdk && sameConfiguration && variants.size() == 1) {
+                        continue;
+                    }
+                    ArchiveContext other = new ArchiveContext(sdk, configuration, own.arch,
+                            java.util.Collections.singletonList(variant));
+                    File resolved = resolveInfoPlistPath(value, extensionFolder,
+                            extensionSettingsWithBuiltIns(extensionFolder, declared, other));
+                    if (resolved == null || sameFile(resolved, active)) {
+                        continue;
+                    }
+                    String qualifier = (sameSdk ? "" : "[sdk=" + sdk + "]")
+                            + "[config=" + configuration + "]"
+                            + (variants.size() > 1 ? "[variant=" + variant + "]" : "");
+                    out.put(key + qualifier + " = " + value, resolved);
                 }
-                ArchiveContext other = new ArchiveContext(sdk, configuration, own.arch,
-                        own.variants);
-                File resolved = resolveInfoPlistPath(value, extensionFolder,
-                        extensionSettingsWithBuiltIns(extensionFolder, declared, other));
-                if (resolved == null || sameFile(resolved, active)) {
-                    continue;
-                }
-                String qualifier = sameSdk ? "[config=" + configuration + "]"
-                        : "[sdk=" + sdk + "][config=" + configuration + "]";
-                out.put(key + qualifier + " = " + value, resolved);
             }
         }
     }

@@ -475,4 +475,31 @@ public class AppExtensionInfoPlistPathTest {
         assertTrue(plists.toString(),
                 plists.values().contains(new File(extension, "iphoneos14.4/Info.plist")));
     }
+
+    @Test
+    public void aPathVaryingByVariantIsEnumeratedPerVariant() throws Exception {
+        File dist = tmp.newFolder("variant-path");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File normal = new File(extension, "normal.plist");
+        File profile = new File(extension, "profile.plist");
+        write(normal, identityPlist("com.example.app.Normal"));
+        write(profile, identityPlist("com.example.app.Profile"));
+        write(new File(extension, "buildSettings.properties"),
+                "BUILD_VARIANTS = normal profile\n"
+                + "PLIST_PATH[variant\\=normal] = WalletUIExtension/normal.plist\n"
+                + "PLIST_PATH[variant\\=profile] = WalletUIExtension/profile.plist\n"
+                + "INFOPLIST_FILE = $(PLIST_PATH)\n");
+
+        java.util.Map<String, String> declared =
+                IPhoneBuilder.appExtensionBuildSettings(extension);
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", declared));
+
+        // Both helpers are equally specific, so carrying both variants into one context reduced
+        // them by map order: only one variant's plist was discovered and stamped, and the other
+        // kept a stale identity for a build Xcode really makes.
+        assertTrue(plists.toString(), plists.values().contains(normal));
+        assertTrue(plists.toString(), plists.values().contains(profile));
+    }
 }
