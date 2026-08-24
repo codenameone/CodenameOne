@@ -9,7 +9,12 @@
 # every expansion must be catalogued or match a dynamic pattern. A new computed
 # site therefore forces a catalog decision instead of disappearing.
 #
-# Format: <file>|<expression>|<expansion>[,<expansion>...]
+# Format: <file>|<expression>|<expansion>[,<expansion>...][#<call-count>]
+#
+# The call count defaults to 1 and only matters when one file makes the same
+# call twice: two `getArg(hintAndMarker[0], ...)` over different tables produce
+# an identical key, so without it the second would be validated against the
+# first one's expansions and its own hints never checked at all.
 #
 # Keyed by the expression, not just the file: a builder that already appears here
 # would otherwise absorb a SECOND computed hint for free -- adding

@@ -139,7 +139,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // annotation simple name -> attribute -> source literal
         Map<String, Map<String, String>> plan = new TreeMap<String, Map<String, String>>();
         List<String> migratedKeys = new ArrayList<String>();
+        /// Canonical keys to look for in the emitted manifest. Not the same list:
+        /// a legacy spelling is deleted under the name the file used and comes
+        /// back under the name the annotation carries.
+        List<String> verifiedKeys = new ArrayList<String>();
         List<String> skipped = new ArrayList<String>();
+        /// Canonical hint name to every properties key that names it.
+        Map<String, List<String>> declaredAs = new TreeMap<String, List<String>>();
+        Map<String, BuildHints.Hint> byHint = new TreeMap<String, BuildHints.Hint>();
 
         for (String key : new ArrayList<String>(settings.stringPropertyNames())) {
             if (!key.startsWith(BuildHints.ARG_PREFIX)) {
@@ -160,9 +167,45 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 skipped.add(name + " (no annotation for this hint yet)");
                 continue;
             }
-            String literal = toSourceLiteral(hint, settings.getProperty(key), kotlinTarget);
+            List<String> spellings = declaredAs.get(hint.name());
+            if (spellings == null) {
+                spellings = new ArrayList<String>();
+                declaredAs.put(hint.name(), spellings);
+                byHint.put(hint.name(), hint);
+            }
+            spellings.add(key);
+        }
+
+        for (Map.Entry<String, List<String>> e : declaredAs.entrySet()) {
+            BuildHints.Hint hint = byHint.get(e.getKey());
+            List<String> spellings = e.getValue();
+
+            // One setting, spelled more than one way, with the two disagreeing.
+            // Which one the build honours is decided per hint and not always by
+            // the builder: and.captureRecord is read after android.captureRecord
+            // and overrides it, while the theme aliases are each handed to
+            // Display.setProperty and resolved in the framework. So there is no
+            // rule to apply here, and picking either value would change what the
+            // app builds with while reporting a successful migration -- the
+            // verification cannot catch it, since it checks that the hint came
+            // back and not what it holds. The developer decides.
+            String value = settings.getProperty(spellings.get(0));
+            boolean disagree = false;
+            for (String other : spellings) {
+                String v = settings.getProperty(other);
+                if (value == null ? v != null : !value.equals(v)) {
+                    disagree = true;
+                }
+            }
+            if (disagree) {
+                skipped.add(e.getKey() + " (declared as " + spellings + " with different values; "
+                        + "delete all but one and run this again)");
+                continue;
+            }
+
+            String literal = toSourceLiteral(hint, value, kotlinTarget);
             if (literal == null) {
-                skipped.add(name + " = '" + settings.getProperty(key)
+                skipped.add(e.getKey() + " = '" + value
                         + "' (value is outside the hint's supported set)");
                 continue;
             }
@@ -173,7 +216,12 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 plan.put(annotation, members);
             }
             members.put(hint.attr(), literal);
-            migratedKeys.add(key);
+            // Every spelling goes, because they were all naming this one setting.
+            migratedKeys.addAll(spellings);
+            // Verified under the CANONICAL key: that is what the annotation makes
+            // the processor emit. Checking the alias the file happened to use
+            // reported it missing and rolled a correct migration back.
+            verifiedKeys.add(BuildHints.ARG_PREFIX + hint.name());
         }
 
         if (plan.isEmpty()) {
@@ -258,7 +306,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     + restore(source, originalSource, settingsFile, originalSettings), ex);
         }
 
-        String missing = verifyAnnotationsAreProcessed(projectDir, migratedKeys);
+        String missing = verifyAnnotationsAreProcessed(projectDir, verifiedKeys);
         if (missing != null) {
             String restoreFailed = restore(source, originalSource, settingsFile, originalSettings);
             throw new MojoFailureException("The annotations were added but the build did not turn "

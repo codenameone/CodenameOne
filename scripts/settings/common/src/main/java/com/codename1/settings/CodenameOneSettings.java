@@ -2204,7 +2204,28 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
-    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
+    /// Whether a live import brings `simple` in from the build hints package.
+    ///
+    /// Either the type by name or the package on demand. Without this the bare
+    /// `@Build` of some other library counts as ours.
+    static boolean importsAnnotation(String source, String simple, boolean kotlin) {
+        String pkg = "com.codename1.annotations.buildhints.";
+        for (String needle : new String[] {pkg + simple, pkg + "*"}) {
+            int at = nextMarker(source, needle, 0, kotlin);
+            while (at >= 0) {
+                int after = at + needle.length();
+                boolean whole = needle.endsWith("*")
+                        || after >= source.length() || !continuesAName(source.charAt(after));
+                if (whole && precededByImport(source, at)) {
+                    return true;
+                }
+                at = nextMarker(source, needle, after, kotlin);
+            }
+        }
+        return false;
+    }
+
+    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
     ///
     /// Kotlin lets a file rename what it imports, and then the annotation never
     /// appears under its own name anywhere in the source. Missing that reads the
@@ -2289,16 +2310,22 @@ public class CodenameOneSettings extends Lifecycle {
             // which the annotation's own name appears nowhere. Missing any of
             // them leaves the hint editable and Add writes the duplicate.
             String alias = kotlinImportAlias(source, simple, kotlin);
-            String[] markers = alias == null
-                ? new String[] {
-                    "@" + simple,
-                    "@com.codename1.annotations.buildhints." + simple,
-                  }
-                : new String[] {
-                    "@" + simple,
-                    "@com.codename1.annotations.buildhints." + simple,
-                    "@" + alias,
-                  };
+            // The simple name only counts when an import makes it OUR annotation.
+            // @Build and @Android are ordinary enough names that another library's
+            // annotation with a matching attribute would otherwise be read as
+            // ownership -- and Settings would hide the editor for a hint the
+            // processor never emits, which is indistinguishable from the tool
+            // being broken.
+            boolean imported = importsAnnotation(source, simple, kotlin);
+            java.util.List<String> markerList = new java.util.ArrayList<String>();
+            if (imported) {
+                markerList.add("@" + simple);
+            }
+            markerList.add("@com.codename1.annotations.buildhints." + simple);
+            if (alias != null) {
+                markerList.add("@" + alias);
+            }
+            String[] markers = markerList.toArray(new String[markerList.size()]);
             boolean found = false;
             for (int m = 0; m < markers.length && !found; m++) {
                 // Found by walking the source rather than by indexOf, so a

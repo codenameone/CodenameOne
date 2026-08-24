@@ -186,7 +186,8 @@ public class BuildHintCatalogTest {
      */
     @Test
     public void valuesContainingSeparatorsDoNotCreatePhantomOwnership() {
-        String src = "@Android(xpermissions = \"<uses-permission android:name=\\\"X\\\"/>\")\n"
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Android(xpermissions = \"<uses-permission android:name=\\\"X\\\"/>\")\n"
                 + "public class MyApp {}\n";
         java.util.Map<String, String> owned = new java.util.HashMap<>();
         CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
@@ -203,7 +204,8 @@ public class BuildHintCatalogTest {
      */
     @Test
     public void commentsInsideAnAnnotationDoNotBreakOwnership() {
-        String src = "@Ios(/* required for issue ( */ teamId = \"T\")\n"
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(/* required for issue ( */ teamId = \"T\")\n"
                 + "public class MyApp {}\n";
         java.util.Map<String, String> owned = new java.util.HashMap<>();
         CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
@@ -212,7 +214,8 @@ public class BuildHintCatalogTest {
 
     @Test
     public void lineCommentsAndCharLiteralsDoNotBreakOwnership() {
-        String src = "@Ios(\n"
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(\n"
                 + "    // a stray ) in a line comment\n"
                 + "    teamId = \"T\",\n"
                 + "    urlScheme = \"x\")\n"
@@ -222,7 +225,8 @@ public class BuildHintCatalogTest {
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
         assertEquals("@Ios(urlScheme)", owned.get("ios.urlScheme"));
 
-        String withChar = "@Android(xpermissions = \"a\") // ')'\npublic class MyApp {}\n";
+        String withChar = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Android(xpermissions = \"a\") // ')'\npublic class MyApp {}\n";
         java.util.Map<String, String> owned2 = new java.util.HashMap<>();
         CodenameOneSettings.collectAnnotationOwnedHints(withChar, owned2);
         assertEquals("@Android(xpermissions)", owned2.get("android.xpermissions"));
@@ -244,7 +248,8 @@ public class BuildHintCatalogTest {
     /** `@Ios` must not match `@IosPrivacy`, which is a different annotation. */
     @Test
     public void aSimpleNameDoesNotMatchALongerAnnotation() {
-        String src = "@IosPrivacy(cameraUsageDescription = \"why\")\n"
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@IosPrivacy(cameraUsageDescription = \"why\")\n"
                 + "public class MyApp {}\n";
         java.util.Map<String, String> owned = new java.util.HashMap<>();
         CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
@@ -315,7 +320,8 @@ public class BuildHintCatalogTest {
     /// And the real one is still found when a commented-out copy precedes it.
     @Test
     public void aLiveAnnotationAfterACommentedOneIsStillFound() {
-        String src = "// @Ios(teamId = \"OLD\")\n"
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "// @Ios(teamId = \"OLD\")\n"
                 + "@Ios(teamId = \"ABCDE12345\")\n"
                 + "public class MyApp {}\n";
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
@@ -363,7 +369,8 @@ public class BuildHintCatalogTest {
     /// A comment between the name and its own argument list is still its own.
     @Test
     public void anAnnotationsOwnArgumentListIsStillFoundAcrossAComment() {
-        String src = "@Ios /* why */ (teamId = \"ABCDE12345\")\nclass MyApp\n";
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios /* why */ (teamId = \"ABCDE12345\")\nclass MyApp\n";
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
         CodenameOneSettings.collectAnnotationOwnedHints(src, out);
         assertEquals("@Ios(teamId)", out.get("ios.teamId"));
@@ -386,7 +393,8 @@ public class BuildHintCatalogTest {
     /// after it -- so the hint read as unowned and Add wrote the duplicate.
     @Test
     public void aTripleQuotedStringDoesNotSwallowTheAnnotation() {
-        String src = "val doc = \"\"\"quoted \" text\"\"\"\n"
+        String src = "import com.codename1.annotations.buildhints.*\n"
+                + "val doc = \"\"\"quoted \" text\"\"\"\n"
                 + "@Ios(teamId = \"ABCDE12345\")\n"
                 + "class MyApp\n";
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
@@ -409,7 +417,8 @@ public class BuildHintCatalogTest {
     /// after it.
     @Test
     public void anEscapedQuoteRunDoesNotCloseAJavaTextBlock() {
-        String src = "String doc = \"\"\"\n"
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "String doc = \"\"\"\n"
                 + "  a \\\"\"\" b\n"
                 + "  \"\"\";\n"
                 + "@Ios(teamId = \"ABCDE12345\")\n"
@@ -424,11 +433,52 @@ public class BuildHintCatalogTest {
     /// Java's rule here would keep scanning and swallow the annotation.
     @Test
     public void aQuoteRunClosesAKotlinRawStringAtItsLastThree() {
-        String src = "val doc = \"\"\"a\"\"\"\"\n"
+        String src = "import com.codename1.annotations.buildhints.*\n"
+                + "val doc = \"\"\"a\"\"\"\"\n"
                 + "@Ios(teamId = \"ABCDE12345\")\n"
                 + "class MyApp\n";
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
         CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
         assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// `@Build` and `@Android` are ordinary enough names that another library's
+    /// annotation with a matching attribute would be read as ownership -- and
+    /// Settings would then hide the editor for a hint the processor never emits.
+    /// The simple name only counts when an import makes it ours.
+    @Test
+    public void anUnrelatedAnnotationOfTheSameNameIsNotOwnership() {
+        String src = "import com.example.other.Ios;\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// A wildcard import counts, and so does the fully qualified spelling, which
+    /// needs no import at all.
+    @Test
+    public void aWildcardImportAndTheQualifiedSpellingBothCount() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "import com.codename1.annotations.buildhints.*;\n"
+                        + "@Ios(teamId = \"T\")\npublic class MyApp {}\n", out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+
+        out.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.codename1.annotations.buildhints.Ios(teamId = \"T\")\n"
+                        + "public class MyApp {}\n", out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// A commented-out import does not bring the name in.
+    @Test
+    public void aCommentedOutImportDoesNotCount() {
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "// import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
     }
 }

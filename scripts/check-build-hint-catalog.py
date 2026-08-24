@@ -10,7 +10,7 @@ green build, no effect, nobody noticed.
 Held against a baseline rather than failing outright: a large tail of hints
 predates the catalog. The point is that *new* code cannot add another one.
 """
-import fnmatch, os, re, sys
+import collections, fnmatch, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -164,11 +164,15 @@ def main():
                 # cannot.
                 path, _, rest = line.partition("|")
                 expr, _, expansions = rest.rpartition("|")
-                declared[(path, " ".join(expr.split()))] = [
-                    e for e in expansions.split(",") if e]
+                names, _, count = expansions.partition("#")
+                declared[(path, " ".join(expr.split()))] = (
+                    [e for e in names.split(",") if e],
+                    int(count) if count.strip() else 1)
 
     computed_bad = []
     mined = miner.hits_computed()
+    seen_counts = collections.Counter(
+        (path, " ".join(expr.split())) for expr, path, _ in mined)
     for expr, path, line_no in mined:
         key = (path, " ".join(expr.split()))
         if key not in declared:
@@ -177,14 +181,25 @@ def main():
             computed_bad.append(
                 f"{path}:{line_no}  builds a hint name from `{expr}` and is not listed")
             continue
-        for name in declared[key]:
+        for name in declared[key][0]:
             if name in known or any(fnmatch.fnmatch(name, p) for p in patterns):
                 continue
             computed_bad.append(
                 f"{path}:{line_no}  expands to {name}, which the catalog does not describe")
-    mined_keys = {(path, " ".join(expr.split())) for expr, path, _ in mined}
-    for path, expr in sorted(set(declared) - mined_keys):
-        computed_bad.append(f"{path}  is listed for `{expr}`, which no longer builds a hint name")
+    # Two calls in one file can read the same expression -- a second
+    # getArg(hintAndMarker[0], ...) over a different table -- and the key alone
+    # cannot tell them apart, so the newcomer would be validated against the old
+    # table's expansions and its own hints would never be checked. The declared
+    # occurrence count is what notices; the accounting line has to be revisited
+    # for the second call, which is the point.
+    for key, expected in sorted(declared.items()):
+        actual = seen_counts.get(key, 0)
+        if actual != expected[1]:
+            path, expr = key
+            computed_bad.append(
+                f"{path}  is listed once for `{expr}` covering {expected[1]} call(s), "
+                f"but {actual} were mined -- list the expansions of every one and "
+                f"record the count as `#{actual}`")
     if computed_bad:
         print("check-build-hint-catalog: computed hint names are unaccounted for:",
               file=sys.stderr)
