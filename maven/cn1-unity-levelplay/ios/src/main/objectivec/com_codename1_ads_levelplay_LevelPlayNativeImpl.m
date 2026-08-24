@@ -329,10 +329,18 @@ static LPMAdSize *cn1BannerSize(int sizeType, int widthDp) {
 -(void)disposeBanner:(int)param {
     CN1LPBanner *holder = cn1Banners[@(param)];
     if (holder == nil) { return; }
-    [cn1Banners removeObjectForKey:@(param)];
+    // The dictionary is the holder's only owner under MRR, so removing the
+    // entry first would deallocate it before the block below is copied and
+    // leave that block holding a dangling pointer. Reading the view out here
+    // means the block captures -- and so retains -- the object it needs, and
+    // the entry can go immediately afterwards rather than inside the block,
+    // which would let a banner recreated on the same handle be removed by a
+    // disposal still in flight.
+    LPMBannerAdView *view = holder.view;
     dispatch_async(dispatch_get_main_queue(), ^{
-        [holder.view destroy];
+        [view destroy];
     });
+    [cn1Banners removeObjectForKey:@(param)];
 }
 
 -(void)requestConsent:(BOOL)param {

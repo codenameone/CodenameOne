@@ -21,7 +21,9 @@ alone, and the library also has to appear in the workflow's trigger paths.
 Each of those rules exists because dropping it lets something claim coverage
 it does not have: a matrix over "lib:" in an unrelated packaging job, a
 packaging job sitting in the same file as a real native check, or a library
-the workflow never fires for. Jobs are separated by indentation rather than
+the workflow never fires for. The trigger paths are read per trigger, since a
+library listed under push but not pull_request is compiled only after it has
+already merged. Jobs and triggers are separated by indentation rather than
 with a YAML parser, so this keeps running wherever python3 does.
 
 The Android half needs no registry: check-cn1lib-android-api.py enumerates
@@ -59,6 +61,10 @@ def libraries_with_ios_sources():
 
 
 JOB_START = re.compile(r'^  ([A-Za-z_][\w.\-]*):\s*$')
+# The triggers a change to a library has to run under. push alone would mean
+# the break is found after it merged; pull_request alone leaves master
+# unguarded against anything that lands another way.
+REQUIRED_TRIGGERS = ('pull_request', 'push')
 
 
 def jobs(text):
@@ -84,6 +90,38 @@ def jobs(text):
     for position, start in enumerate(starts):
         end = starts[position + 1] if position + 1 < len(starts) else len(lines)
         yield '\n'.join(lines[start:end])
+
+
+def indented_block(text, header, indent):
+    """The lines under `header` that are indented past it, as one string."""
+    lines = text.splitlines()
+    prefix = ' ' * indent
+    out = []
+    collecting = False
+    for line in lines:
+        if line.startswith(prefix + header):
+            collecting = True
+            continue
+        if collecting:
+            if line.strip() and not line.startswith(prefix + ' '):
+                break
+            out.append(line)
+    return '\n'.join(out)
+
+
+def triggers_for(text, lib):
+    """True when every required trigger lists this library's path.
+
+    on: is read as a block and each trigger inside it separately, because a
+    path present under one trigger and missing from the other reads as covered
+    to any whole-file search while half the cases run nothing.
+    """
+    on_block = indented_block(text, 'on:', 0)
+    entry = "maven/%s/**" % lib
+    for trigger in REQUIRED_TRIGGERS:
+        if entry not in indented_block(on_block, trigger + ':', 2):
+            return False
+    return True
 
 
 def compiles_cn1lib_natives(body):
@@ -122,7 +160,7 @@ def covered_libraries():
             # something else in that workflow's paths changes, which is not
             # coverage of a change to the library. Recorded separately so the
             # finding can say which of the two is missing.
-            if ("maven/%s/**" % lib) in text:
+            if triggers_for(text, lib):
                 covered.setdefault(lib, name)
             else:
                 untriggered.setdefault(lib, name)
@@ -158,10 +196,11 @@ def main():
     for lib in libs:
         if lib in untriggered:
             findings.append(
-                "%s is in %s's matrix, but that workflow does not trigger on "
-                "'maven/%s/**', so a change to the library does not run the "
-                "check. Add the path to its pull_request and push filters."
-                % (lib, untriggered[lib], lib))
+                "%s is in %s's matrix, but 'maven/%s/**' is missing from at "
+                "least one of that workflow's %s trigger path lists, so a "
+                "change to the library does not run the check in every context. "
+                "Add it to each."
+                % (lib, untriggered[lib], lib, ' and '.join(REQUIRED_TRIGGERS)))
         elif lib not in covered:
             findings.append(
                 '%s ships Objective-C under maven/%s/ios/src/main/objectivec '
