@@ -234,6 +234,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         String pkg = packageOf(cls.getBinaryName());
         String simpleName = simpleNameOf(cls.getBinaryName());
+        String nestedName = nestedNameOf(cls.getBinaryName());
         boolean sawARoot = false;
         for (String root : roots) {
             File dir = new File(root);
@@ -241,7 +242,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             sawARoot = true;
-            if (declaresPackage(dir, sourceFile, pkg, simpleName, 0)) {
+            if (declaresPackage(dir, sourceFile, pkg, simpleName, nestedName, 0)) {
                 return true;
             }
         }
@@ -281,7 +282,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// because Kotlin does not require the two to agree. Depth-limited: this runs
     /// per annotated class and a source tree is not a search index.
     private static boolean declaresPackage(File dir, String name, String pkg, String simple,
-                                           int depth) {
+                                           String nested, int depth) {
         if (depth > 24) {
             return false;
         }
@@ -291,10 +292,10 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         for (File f : children) {
             if (f.isFile()) {
-                if (f.getName().equals(name) && matches(f, pkg, simple)) {
+                if (f.getName().equals(name) && matches(f, pkg, simple, nested)) {
                     return true;
                 }
-            } else if (f.isDirectory() && declaresPackage(f, name, pkg, simple, depth + 1)) {
+            } else if (f.isDirectory() && declaresPackage(f, name, pkg, simple, nested, depth + 1)) {
                 return true;
             }
         }
@@ -309,18 +310,51 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// class that used to be in it -- keeping a stale annotation owner and
     /// failing the placement check on every incremental build, which is the very
     /// thing this guard was added to stop.
-    private static boolean matches(File f, String pkg, String simple) {
+    private static boolean matches(File f, String pkg, String simple, String nested) {
         String text = readHead(f);
         if (text == null) {
             // Unreadable: answer yes, as everywhere else here, because the only
             // thing this decides is whether to IGNORE an annotated class.
             return true;
         }
-        return pkg.equals(declaredPackageIn(text)) && declaresType(text, simple);
+        if (!pkg.equals(declaredPackageIn(text)) || !declaresType(text, simple)) {
+            return false;
+        }
+        // The nested type has to be there too. Reducing Main$Wrong to Main so the
+        // file can be found let the LIVE outer class vouch for a nested type that
+        // had been deleted, and the orphan then failed the placement check on
+        // every incremental build -- swapping one silent failure for a loud
+        // permanent one.
+        return nested == null || declaresType(text, nested);
+    }
+
+    /// The innermost named segment of a nested binary name, or null.
+    ///
+    /// Null for an unnamed segment -- Main$1 is an anonymous class, which no
+    /// source declares and which cannot carry an annotation in the first place,
+    /// so there is nothing to look for and nothing to conclude from not finding
+    /// it.
+    private static String nestedNameOf(String binaryName) {
+        int nested = binaryName.lastIndexOf('$');
+        if (nested < 0 || nested + 1 >= binaryName.length()) {
+            return null;
+        }
+        String tail = binaryName.substring(nested + 1);
+        for (int i = 0; i < tail.length(); i++) {
+            if (!Character.isDigit(tail.charAt(i))) {
+                return tail;
+            }
+        }
+        return null;
     }
 
     /// Whether `text` declares a type called `simple`.
+    ///
+    /// Comments and string literals are blanked first: a commented-out
+    /// `// class Wrong` left behind by the very edit that deleted the type would
+    /// otherwise vouch for its own orphan.
     static boolean declaresType(String text, String simple) {
+        text = blankNonCode(text);
         String[] keywords = {"class ", "interface ", "enum ", "object ", "record "};
         for (String keyword : keywords) {
             int at = text.indexOf(keyword);
@@ -339,6 +373,65 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             }
         }
         return false;
+    }
+
+    /// `text` with every comment and string literal replaced by spaces, so a
+    /// declaration can be looked for without a quoted or commented mention of one
+    /// answering for it. Lengths and line breaks are preserved.
+    static String blankNonCode(String text) {
+        char[] out = text.toCharArray();
+        int i = 0;
+        while (i < out.length) {
+            char c = out[i];
+            if (c == '/' && i + 1 < out.length && out[i + 1] == '/') {
+                while (i < out.length && out[i] != '\n') {
+                    out[i++] = ' ';
+                }
+            } else if (c == '/' && i + 1 < out.length && out[i + 1] == '*') {
+                out[i++] = ' ';
+                out[i++] = ' ';
+                while (i < out.length && !(out[i] == '*' && i + 1 < out.length
+                        && out[i + 1] == '/')) {
+                    if (out[i] != '\n') {
+                        out[i] = ' ';
+                    }
+                    i++;
+                }
+                if (i < out.length) {
+                    out[i++] = ' ';
+                }
+                if (i < out.length) {
+                    out[i++] = ' ';
+                }
+            } else if (c == '"') {
+                boolean triple = i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"';
+                int quotes = triple ? 3 : 1;
+                for (int q = 0; q < quotes && i < out.length; q++) {
+                    out[i++] = ' ';
+                }
+                while (i < out.length) {
+                    if (!triple && out[i] == '\\' && i + 1 < out.length) {
+                        out[i++] = ' ';
+                        out[i++] = ' ';
+                        continue;
+                    }
+                    if (out[i] == '"' && (!triple
+                            || (i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"'))) {
+                        for (int q = 0; q < quotes && i < out.length; q++) {
+                            out[i++] = ' ';
+                        }
+                        break;
+                    }
+                    if (out[i] != '\n') {
+                        out[i] = ' ';
+                    }
+                    i++;
+                }
+            } else {
+                i++;
+            }
+        }
+        return new String(out);
     }
 
     /// The first 400 lines of `f`, or null when it cannot be read.
@@ -371,6 +464,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// The package `text` declares, or "" for the default package.
     static String declaredPackageIn(String text) {
+        text = blankNonCode(text);
         for (String line : text.split("\n")) {
             String t = line.trim();
             if (!t.startsWith("package")) {

@@ -205,8 +205,13 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
 
             String literal = toSourceLiteral(hint, value, kotlinTarget);
             if (literal == null) {
-                skipped.add(e.getKey() + " = '" + value
-                        + "' (value is outside the hint's supported set)");
+                boolean padded = value != null && !value.equals(value.trim());
+                skipped.add(e.getKey() + " = '" + value + "' ("
+                        + (padded
+                            ? "has surrounding whitespace, which builders read differently; "
+                              + "remove it and run this again"
+                            : "value is outside the hint's supported set")
+                        + ")");
                 continue;
             }
             String annotation = hint.group().annotationSimpleName();
@@ -571,12 +576,18 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         if (value == null) {
             return null;
         }
-        // Trimmed only where the surrounding space cannot be part of the value:
-        // "true ", " 24" and " modern" all mean what they say. A string does not
-        // get that treatment -- an ios.glAppDelegateHeader ending in a newline
-        // after a // comment needs that newline, and losing it comments out
-        // whatever the builder generates next. The verification build would not
-        // notice, since it checks that the key came back and not what it holds.
+        // A scalar with surrounding whitespace is NOT migrated at all. It looks
+        // like it means what it says, and it does not: AndroidGradleBuilder
+        // compares android.hideStatusBar with .equals("true"), so `=true ` is
+        // false today, while other builders trim or ignore case. Trimming it into
+        // an annotation `true` would change what the app builds with and report a
+        // successful migration, since the verification asks whether the hint came
+        // back and not what it holds. Which reading is right differs per builder,
+        // so this refuses rather than picks.
+        if (hint.type() != HintType.STRING && hint.type() != HintType.STRING_LIST
+                && !value.equals(value.trim())) {
+            return null;
+        }
         String v = value;
         switch (hint.type()) {
             case BOOLEAN:

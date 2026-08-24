@@ -574,4 +574,30 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", ""));
         assertFalse(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", "com.x"));
     }
+
+    /// A commented-out or quoted mention of a declaration is not a declaration.
+    /// An unrelated file answering for the main class reads ownership as empty,
+    /// and Settings then offers Add for a hint the real main class annotates.
+    @Test
+    public void aMentionOfADeclarationIsNotADeclaration() {
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\n// class MyApp\n", "MyApp", "com.example", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\n/* class MyApp */\n", "MyApp", "com.example", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\nval s = \"class MyApp\"\n", "MyApp", "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\n// class MyApp\nclass MyApp\n", "MyApp",
+                "com.example", true));
+    }
+
+    /// The same for a commented-out package statement, which would otherwise make
+    /// a default-package file claim to be in one.
+    @Test
+    public void aCommentedPackageStatementIsNotThePackage() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "// package com.example\nclass MyApp\n", "MyApp", "", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "// package com.example\nclass MyApp\n", "MyApp", "com.example", true));
+    }
 }

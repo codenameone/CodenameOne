@@ -2277,7 +2277,7 @@ public class CodenameOneSettings extends Lifecycle {
                 return null;
             }
             String text = readIfPresent(path);
-            if (text == null || !declaresClass(text, main, pkg)) {
+            if (text == null || !declaresClass(text, main, pkg, path.endsWith(".kt"))) {
                 continue;
             }
             lastSourceWasKotlin = path.endsWith(".kt");
@@ -2289,35 +2289,61 @@ public class CodenameOneSettings extends Lifecycle {
     /// Whether `text` declares `main` in `pkg`, judged by the package statement
     /// and a `class`/`object` declaration rather than by where the file sits.
     static boolean declaresClass(String text, String main, String pkg) {
+        return declaresClass(text, main, pkg, true);
+    }
+
+    /// Whether `text` declares `main` in `pkg`, judged by the package statement
+    /// and a `class`/`object` declaration rather than by where the file sits.
+    ///
+    /// Found in CODE: a `// class Main` left over from an edit, or those words
+    /// inside a string, would otherwise make an unrelated file answer for the
+    /// main class -- ownership then reads as empty and Settings offers Add for a
+    /// hint the real main class already annotates.
+    static boolean declaresClass(String text, String main, String pkg, boolean kotlin) {
         String declaredPkg = "";
-        for (String line : com.codename1.util.StringUtil.tokenize(text, "\n")) {
-            String t = line.trim();
-            if (t.startsWith("package") && t.length() > 7
-                    && !continuesAName(t.charAt(7))) {
-                declaredPkg = t.substring(7).trim();
-                int semi = declaredPkg.indexOf(';');
-                if (semi >= 0) {
-                    declaredPkg = declaredPkg.substring(0, semi);
+        int pkgAt = nextMarker(text, "package", 0, kotlin);
+        while (pkgAt >= 0) {
+            int after = pkgAt + "package".length();
+            if (after < text.length() && !continuesAName(text.charAt(after))
+                    && (pkgAt == 0 || !continuesAName(text.charAt(pkgAt - 1)))) {
+                String rest = text.substring(after).trim();
+                int cut = rest.length();
+                for (int i = 0; i < rest.length(); i++) {
+                    char c = rest.charAt(i);
+                    if (c == ';' || c == '\n' || c == '\r') {
+                        cut = i;
+                        break;
+                    }
                 }
-                declaredPkg = declaredPkg.trim();
+                declaredPkg = rest.substring(0, cut).trim();
                 break;
             }
+            pkgAt = nextMarker(text, "package", after, kotlin);
         }
         if (!(pkg == null || pkg.isEmpty() ? "" : pkg).equals(declaredPkg)) {
             return false;
         }
-        for (String keyword : new String[]{"class ", "object "}) {
-            int at = text.indexOf(keyword);
+        for (String keyword : new String[]{"class", "object"}) {
+            int at = nextMarker(text, keyword, 0, kotlin);
             while (at >= 0) {
                 int start = at + keyword.length();
-                int end = start;
-                while (end < text.length() && continuesAName(text.charAt(end))) {
-                    end++;
+                boolean wholeWord = (at == 0 || !continuesAName(text.charAt(at - 1)))
+                        && start < text.length() && !continuesAName(text.charAt(start));
+                if (wholeWord) {
+                    int i = start;
+                    while (i < text.length()
+                            && (text.charAt(i) == ' ' || text.charAt(i) == '\t')) {
+                        i++;
+                    }
+                    int end = i;
+                    while (end < text.length() && continuesAName(text.charAt(end))) {
+                        end++;
+                    }
+                    if (text.substring(i, end).equals(main)) {
+                        return true;
+                    }
                 }
-                if (text.substring(start, end).equals(main)) {
-                    return true;
-                }
-                at = text.indexOf(keyword, start);
+                at = nextMarker(text, keyword, start, kotlin);
             }
         }
         return false;
