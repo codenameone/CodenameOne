@@ -6522,8 +6522,7 @@ public class IPhoneBuilder extends Executor {
     /// Nothing is added when the path resolves the same everywhere, which is the ordinary case.
     private static void addConfigurationVariants(Map<String, File> out, String key, String value,
             File extensionFolder, Map<String, String> declared, ArchiveContext context) {
-        if (context == null || value.indexOf('$') < 0
-                || conditionsOf(key).containsKey("config")) {
+        if (context == null || value.indexOf('$') < 0) {
             return;
         }
         // From the CANDIDATE's context, not the archive's: a key qualified for some other build
@@ -6538,11 +6537,21 @@ public class IPhoneBuilder extends Executor {
         // build Xcode really makes. The entitlements walk splits them for the same reason.
         List<String> variants = own.variants == null || own.variants.isEmpty()
                 ? java.util.Collections.singletonList("normal") : own.variants;
+        // A key that names its own configuration is not enumerated across configurations -- it
+        // applies to one and says so. It can still vary along the other dimensions, though, and
+        // returning early for it skipped those: an INFOPLIST_FILE[config=Release] written through
+        // variant-qualified helpers had one variant's plist chosen by map order, and the other
+        // variant of that same Release archive kept an unstamped identity.
+        List<String> configurations = conditionsOf(key).containsKey("config")
+                ? java.util.Collections.singletonList(own.configuration)
+                : java.util.Arrays.asList(PROJECT_CONFIGURATIONS);
         for (String sdk : enumerableSdks(own, declared)) {
-            for (String configuration : PROJECT_CONFIGURATIONS) {
+            for (String configuration : configurations) {
                 for (String variant : variants) {
                     boolean sameSdk = sdk.equalsIgnoreCase(own.sdk == null ? "" : own.sdk);
-                    boolean sameConfiguration = configuration.equalsIgnoreCase(own.configuration);
+                    boolean sameConfiguration = configuration == null
+                            ? own.configuration == null
+                            : configuration.equalsIgnoreCase(own.configuration);
                     if (sameSdk && sameConfiguration && variants.size() == 1) {
                         continue;
                     }
@@ -6554,7 +6563,7 @@ public class IPhoneBuilder extends Executor {
                         continue;
                     }
                     String qualifier = (sameSdk ? "" : "[sdk=" + sdk + "]")
-                            + "[config=" + configuration + "]"
+                            + (sameConfiguration ? "" : "[config=" + configuration + "]")
                             + (variants.size() > 1 ? "[variant=" + variant + "]" : "");
                     out.put(key + qualifier + " = " + value, resolved);
                 }
@@ -7848,14 +7857,19 @@ public class IPhoneBuilder extends Executor {
                 // EXTENSION_ID[variant=profile] then matched nothing -- the identifier read as
                 // unresolvable and was dropped.
                 if ("variant".equals(name) && context != null && context.variants != null) {
-                    boolean familyDescribesThisBuild = false;
+                    // Narrowed to the ones that match, not kept whole. [variant=prof*] describes
+                    // this build when profile is among its variants -- but the entry belongs to
+                    // profile alone, and leaving normal in the context let an
+                    // EXTENSION_ID[variant=normal] answer for it by map order, resolving the
+                    // profile identifier out of the normal helper.
+                    List<String> matching = new ArrayList<String>();
                     for (String own : context.variants) {
                         if (matchesCondition(value, own)) {
-                            familyDescribesThisBuild = true;
-                            break;
+                            matching.add(own);
                         }
                     }
-                    if (familyDescribesThisBuild) {
+                    if (!matching.isEmpty()) {
+                        variants = matching;
                         continue;
                     }
                 }

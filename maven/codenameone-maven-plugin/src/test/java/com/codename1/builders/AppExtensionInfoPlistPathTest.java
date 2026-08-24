@@ -502,4 +502,32 @@ public class AppExtensionInfoPlistPathTest {
         assertTrue(plists.toString(), plists.values().contains(normal));
         assertTrue(plists.toString(), plists.values().contains(profile));
     }
+
+    @Test
+    public void aConfigQualifiedPathStillVariesByVariant() throws Exception {
+        File dist = tmp.newFolder("config-and-variant");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File normal = new File(extension, "normal.plist");
+        File profile = new File(extension, "profile.plist");
+        write(normal, identityPlist("com.example.app.Normal"));
+        write(profile, identityPlist("com.example.app.Profile"));
+        write(new File(extension, "buildSettings.properties"),
+                "BUILD_VARIANTS = normal profile\n"
+                + "PLIST_PATH[variant\\=normal] = WalletUIExtension/normal.plist\n"
+                + "PLIST_PATH[variant\\=profile] = WalletUIExtension/profile.plist\n"
+                + "INFOPLIST_FILE[config\\=Release] = $(PLIST_PATH)\n");
+
+        java.util.Map<String, String> declared =
+                IPhoneBuilder.appExtensionBuildSettings(extension);
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", declared));
+
+        // The key names its own configuration, which is a reason not to enumerate CONFIGURATIONS
+        // for it -- and it was a reason to enumerate nothing at all, so one variant's plist was
+        // chosen by map order and the other variant of the same Release archive kept an unstamped
+        // identity.
+        assertTrue(plists.toString(), plists.values().contains(normal));
+        assertTrue(plists.toString(), plists.values().contains(profile));
+    }
 }

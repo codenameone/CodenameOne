@@ -1606,6 +1606,16 @@ public class AppExtensionDeploymentTargetTest {
         // what the sdk, config and arch conditions beside it already do.
         assertEquals(java.util.Collections.singletonList("profile"), own.variants);
 
+        // And it narrows to the variants that MATCH, not the whole list: the entry belongs to
+        // profile alone, and leaving normal in the context let an EXTENSION_ID[variant=normal]
+        // answer for it by map order.
+        java.util.Map<String, String> both = new java.util.LinkedHashMap<String, String>();
+        both.put("BUILD_VARIANTS", "normal profile");
+        assertEquals(java.util.Collections.singletonList("profile"),
+                IPhoneBuilder.contextForCondition("PRODUCT_BUNDLE_IDENTIFIER[variant=prof*]",
+                        IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                                both)).variants);
+
         // A family that describes some OTHER build is kept whole -- star and all -- as every
         // other inactive pattern is, so nothing is resolved against a stem that names no variant.
         assertEquals(java.util.Collections.singletonList("deb*"), IPhoneBuilder.contextForCondition(
