@@ -121,6 +121,16 @@ public class AndroidNearbyTransport implements NearbyBridge {
     /// caller's request as though the state it describes were still current.
     /// Read and written on the main thread, which is where Google delivers
     /// these listeners and where the portable API is called from.
+    /// Guards the four fields below.
+    ///
+    /// They are written by the public API, which runs on Codename One's EDT,
+    /// and read by Google's Task listeners, which run on Android's main
+    /// thread -- two different threads, and the public API does not promise
+    /// callers only one of them either. Unsynchronized, an increment could
+    /// be lost or a callback could read a stale pair and let a stopped start
+    /// report success, or stop the start that replaced it.
+    private final Object transportLock = new Object();
+
     private int advertiseGeneration;
     private int discoverGeneration;
 
@@ -134,6 +144,73 @@ public class AndroidNearbyTransport implements NearbyBridge {
     /// radio this call had switched off.
     private boolean advertisingWanted;
     private boolean discoveringWanted;
+
+    /// This start owns the operation and should report success.
+    private static final int START_CURRENT = 0;
+    /// It was stopped and nothing has asked since: undo it.
+    private static final int START_ORPHANED = 1;
+    /// A newer start owns the operation: leave the radio alone.
+    private static final int START_SUPERSEDED = 2;
+
+    /// Claims a generation for a start that is about to be issued.
+    private int beginStart(boolean advertising) {
+        synchronized (transportLock) {
+            if (advertising) {
+                advertisingWanted = true;
+                return ++advertiseGeneration;
+            }
+            discoveringWanted = true;
+            return ++discoverGeneration;
+        }
+    }
+
+    /// What a start's answer means, decided from BOTH fields at once.
+    ///
+    /// One reading, under the lock. As two -- is it current, then does
+    /// anyone want it -- a stop or a start landing between them could have
+    /// this answer act on a state that never existed.
+    private int classifyStart(boolean advertising, int generation) {
+        synchronized (transportLock) {
+            if (advertising) {
+                if (generation == advertiseGeneration) {
+                    return START_CURRENT;
+                }
+                return advertisingWanted ? START_SUPERSEDED : START_ORPHANED;
+            }
+            if (generation == discoverGeneration) {
+                return START_CURRENT;
+            }
+            return discoveringWanted ? START_SUPERSEDED : START_ORPHANED;
+        }
+    }
+
+    /// Records that the current start failed, so nothing is wanted any more.
+    private void failStart(boolean advertising, int generation) {
+        synchronized (transportLock) {
+            if (advertising) {
+                if (generation == advertiseGeneration) {
+                    advertisingWanted = false;
+                }
+                return;
+            }
+            if (generation == discoverGeneration) {
+                discoveringWanted = false;
+            }
+        }
+    }
+
+    /// Ends the operation, invalidating any start still in flight.
+    private void endStart(boolean advertising) {
+        synchronized (transportLock) {
+            if (advertising) {
+                advertiseGeneration++;
+                advertisingWanted = false;
+                return;
+            }
+            discoverGeneration++;
+            discoveringWanted = false;
+        }
+    }
 
     private String advertisingServiceId = "";
     private String discoveryServiceId = "";
@@ -261,8 +338,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // it had stopped it, and left the platform start running behind a
         // stop that had already returned. The simulated bridge has modelled
         // this race from the beginning; this is the same answer.
-        final int generation = ++advertiseGeneration;
-        advertisingWanted = true;
+        final int generation = beginStart(true);
         AdvertisingOptions options = new AdvertisingOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
@@ -270,7 +346,8 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         connectionCallback(started), options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
-                        if (generation != advertiseGeneration) {
+                        int state = classifyStart(true, generation);
+                        if (state != START_CURRENT) {
                             // Stopped, so the platform is advertising for a
                             // caller that no longer wants it. Undone here,
                             // because the stop that ran before this had
@@ -278,7 +355,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                             // asked to advertise since. stopAdvertising is
                             // global, so calling it when a newer start has
                             // taken over stopped that one instead.
-                            if (!advertisingWanted) {
+                            if (state == START_ORPHANED) {
                                 client().stopAdvertising();
                             }
                             NearbyTransport.deliverRequestFailed(requestId,
@@ -292,15 +369,13 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     public void onFailure(Exception e) {
-                        if (generation == advertiseGeneration) {
-                            // Nothing is advertising and nothing is trying
-                            // to. Leaving the flag set told an older start
-                            // whose success is still on its way that a live
-                            // replacement owned the radio, so it declined to
-                            // undo itself -- and went on advertising after
-                            // both an explicit stop and this failure.
-                            advertisingWanted = false;
-                        }
+                        // Nothing is advertising and nothing is trying to.
+                        // Leaving the flag set told an older start whose
+                        // success is still on its way that a live replacement
+                        // owned the radio, so it declined to undo itself --
+                        // and went on advertising after both an explicit stop
+                        // and this failure.
+                        failStart(true, generation);
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());
@@ -309,8 +384,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public void stopAdvertising() {
-        advertiseGeneration++;
-        advertisingWanted = false;
+        endStart(true);
         client().stopAdvertising();
     }
 
@@ -326,18 +400,18 @@ public class AndroidNearbyTransport implements NearbyBridge {
         this.discoveryServiceId = started;
         // The generation this start belongs to, for the reason
         // startAdvertising keeps one.
-        final int generation = ++discoverGeneration;
-        discoveringWanted = true;
+        final int generation = beginStart(false);
         DiscoveryOptions options = new DiscoveryOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
         client().startDiscovery(started, discoveryCallback(started), options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
-                        if (generation != discoverGeneration) {
+                        int state = classifyStart(false, generation);
+                        if (state != START_CURRENT) {
                             // Only when nobody has asked since, for the
                             // reason the advertising branch gives.
-                            if (!discoveringWanted) {
+                            if (state == START_ORPHANED) {
                                 client().stopDiscovery();
                             }
                             NearbyTransport.deliverRequestFailed(requestId,
@@ -351,11 +425,9 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     public void onFailure(Exception e) {
-                        if (generation == discoverGeneration) {
-                            // Cleared for the reason the advertising failure
-                            // clears its own.
-                            discoveringWanted = false;
-                        }
+                        // Cleared for the reason the advertising failure
+                        // clears its own.
+                        failStart(false, generation);
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());
@@ -364,8 +436,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public void stopDiscovery() {
-        discoverGeneration++;
-        discoveringWanted = false;
+        endStart(false);
         client().stopDiscovery();
     }
 
@@ -535,10 +606,8 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // to the client and left them alone. A start pending across it
         // therefore passed its check and resolved as though it had survived
         // the stop.
-        advertiseGeneration++;
-        discoverGeneration++;
-        advertisingWanted = false;
-        discoveringWanted = false;
+        endStart(true);
+        endStart(false);
         client().stopAdvertising();
         client().stopDiscovery();
         client().stopAllEndpoints();

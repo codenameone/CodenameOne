@@ -290,6 +290,15 @@ public final class CompanionDevices {
         if (l == null) {
             return;
         }
+        // Asked for BEFORE the backlog is replayed, and the answer thrown
+        // away. Building the bridge is what gives a port the chance to put
+        // back events that outlived the process they arrived in -- Android
+        // persists them, because the platform starts a service for a
+        // sighting without starting the app, and an idle process reclaimed
+        // before the user opens it took the in-memory backlog with it.
+        // Nothing else on this path would have touched the bridge, so an app
+        // whose init() only registers a listener never restored them.
+        NearbyRequests.bridge();
         synchronized (LISTENERS) {
             LISTENERS.add(l);
             if (PENDING_PRESENCE.isEmpty() || replayingPresence) {

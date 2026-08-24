@@ -101,6 +101,29 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 + "AndroidUwbRanging");
         this.transport = load("com.codename1.impl.android.nearby."
                 + "AndroidNearbyTransport");
+        restorePresence();
+    }
+
+    /// Replays presence events that outlived the process they arrived in.
+    ///
+    /// The platform starts the companion service for a sighting and does not
+    /// start the application, so the event lands in an in-memory backlog that
+    /// dies with the process if the user never opens the app -- and the
+    /// platform does not replay it. The service persists them; this is where
+    /// they come back, which is the first thing an app touches on its way to
+    /// registering a presence listener.
+    private void restorePresence() {
+        String[] rows = CN1CompanionDeviceService.takePersistedPresence(
+                appContext);
+        for (int i = 0; i < rows.length; i++) {
+            int tab = rows[i].indexOf('\t');
+            if (tab <= 0) {
+                continue;
+            }
+            CompanionDevices.deliverPresenceChanged(
+                    rows[i].substring(tab + 1),
+                    "1".equals(rows[i].substring(0, tab)));
+        }
     }
 
     /// The activity the association's result listener is installed on, or
